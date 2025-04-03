@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	cnpgiPostgres "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/env"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -41,6 +42,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
@@ -107,6 +110,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
+// nolint: gocognit
 func upgradeSubCommand(
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -127,10 +131,16 @@ func upgradeSubCommand(
 		return err
 	}
 
+	pluginRepository := repository.New()
+	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
+	}
+	defer pluginRepository.Close()
+
 	// Create a fake reconciler just to download the secrets and
 	// the cluster definition
 	metricExporter := metricserver.NewExporter(instance)
-	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
+	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter, pluginRepository)
 
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
@@ -301,7 +311,12 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	}
 
 	newInstance := postgres.Instance{PgData: destDir}
-	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, &cluster, false); err != nil {
+	if _, err := newInstance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		&cluster,
+		false,
+		cnpgiPostgres.OperationType_TYPE_UPGRADE,
+	); err != nil {
 		return fmt.Errorf("error while creating the configuration files for new datadir %q: %w", destDir, err)
 	}
 

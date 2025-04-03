@@ -450,8 +450,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: currently not working, sidecar not present in the initjob
-	enabledPluginNamesSet := stringset.From(apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
 	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
 	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
 	ctx = cluster.SetInContext(ctx)

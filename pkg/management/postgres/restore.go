@@ -39,8 +39,8 @@ import (
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
-	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -844,7 +844,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		}
 	}()
 
-	enabledPluginNamesSet := stringset.From(apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
 	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
 	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
 	ctx = cluster.SetInContext(ctx)

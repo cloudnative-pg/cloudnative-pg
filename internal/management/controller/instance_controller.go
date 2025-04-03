@@ -125,14 +125,11 @@ func (r *InstanceReconciler) Reconcile(
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
-	// Load the plugins required to bootstrap and reconcile this cluster
-	enabledPluginNames := apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
-	enabledPluginNames = append(
-		enabledPluginNames,
-		apiv1.GetExternalClustersEnabledPluginNames(cluster.Spec.ExternalClusters)...,
+	pluginClient, err := cnpgiclient.WithPlugins(
+		pluginLoadingContext,
+		r.pluginRepository,
+		cluster.GetInstanceEnabledPluginNames()...,
 	)
-
-	pluginClient, err := cnpgiclient.WithPlugins(pluginLoadingContext, r.pluginRepository, enabledPluginNames...)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err
