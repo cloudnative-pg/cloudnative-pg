@@ -29,6 +29,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
@@ -111,7 +113,14 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	// Create a fake reconciler just to download the secrets and
 	// the cluster definition
 	metricExporter := metricserver.NewExporter(instance)
-	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
+
+	pluginRepository := repository.New()
+	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
+	}
+	defer pluginRepository.Close()
+
+	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter, pluginRepository)
 
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
