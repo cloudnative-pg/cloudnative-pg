@@ -81,7 +81,8 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	plugins := repository.New()
 	defer plugins.Close()
 
-	enabledPluginNamesSet := stringset.From(apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins))
+	enabledPluginNamesSet := stringset.New()
+	enabledPluginNamesSet.Put(b.Backup.Spec.PluginConfiguration.Name)
 	cli, err := pluginClient.NewClient(
 		ctx,
 		enabledPluginNamesSet,

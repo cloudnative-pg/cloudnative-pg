@@ -33,6 +33,8 @@ import (
 func NewClient(ctx context.Context, enabledPlugin *stringset.Data) (Client, error) {
 	contextLogger := log.FromContext(ctx)
 	plugins := repository.New()
+
+	// TODO: make che socketDir a parameter
 	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading local plugins")
