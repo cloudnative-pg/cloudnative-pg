@@ -88,8 +88,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 
 	availablePluginNamesSet := stringset.From(availablePlugins)
 
-	enabledPluginNamesSet := stringset.From(
-		apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins))
+	enabledPluginNamesSet := stringset.From([]string{b.Backup.Spec.PluginConfiguration.Name})
 	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
 
 	if !availableAndEnabled.Has(b.Backup.Spec.PluginConfiguration.Name) {
