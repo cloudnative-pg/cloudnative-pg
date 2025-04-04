@@ -827,6 +827,10 @@ type ClusterStatus struct {
 	// +optional
 	ResizingPVC []string `json:"resizingPVC,omitempty"`
 
+	// List of all the PVCs that have ResizingRequireRestartPVC condition.
+	// +optional
+	ResizingRequireRestartPVC []string `json:"resizingRequireRestartPVC,omitempty"`
+
 	// List of all the PVCs that are being initialized by this cluster
 	// +optional
 	InitializingPVC []string `json:"initializingPVC,omitempty"`
@@ -937,6 +941,7 @@ type ClusterStatus struct {
 	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
 
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+	// Deprecated.
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
 

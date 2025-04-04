@@ -904,6 +904,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ResizingRequireRestartPVC != nil {
+		in, out := &in.ResizingRequireRestartPVC, &out.ResizingRequireRestartPVC
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.InitializingPVC != nil {
 		in, out := &in.InitializingPVC, &out.InitializingPVC
 		*out = make([]string, len(*in))

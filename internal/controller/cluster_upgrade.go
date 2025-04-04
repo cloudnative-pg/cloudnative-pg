@@ -408,15 +408,13 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 }
 
 func checkHasResizingPVC(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if configuration.Current.EnableAzurePVCUpdates {
-		for _, pvcName := range cluster.Status.ResizingPVC {
-			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if persistentvolumeclaim.BelongToInstance(cluster, pod.Name, pvcName) {
-				return rollout{
-					required: true,
-					reason:   fmt.Sprintf("rebooting pod to complete the resizing of the following PVC: '%s'", pvcName),
-				}, nil
-			}
+	for _, pvcName := range cluster.Status.ResizingRequireRestartPVC {
+		// This code works on the assumption that the PVC begins with the name of the pod using it.
+		if persistentvolumeclaim.BelongToInstance(cluster, pod.Name, pvcName) {
+			return rollout{
+				required: true,
+				reason:   fmt.Sprintf("rebooting pod to complete the resizing of the following PVC: '%s'", pvcName),
+			}, nil
 		}
 	}
 	return rollout{}, nil

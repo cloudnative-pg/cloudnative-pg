@@ -124,9 +124,6 @@ type Data struct {
 	// replacing the executable in a pod without restarting
 	EnableInstanceManagerInplaceUpdates bool `json:"enableInstanceManagerInplaceUpdates" env:"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"` //nolint
 
-	// EnableAzurePVCUpdates enables the live update of PVC in Azure environment
-	EnableAzurePVCUpdates bool `json:"enableAzurePVCUpdates" env:"ENABLE_AZURE_PVC_UPDATES"`
-
 	// This is the lifetime of the generated certificates
 	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
 

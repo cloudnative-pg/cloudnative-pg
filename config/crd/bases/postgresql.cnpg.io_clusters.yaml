@@ -5928,8 +5928,9 @@ spec:
                   type: object
                 type: array
               azurePVCUpdateEnabled:
-                description: AzurePVCUpdateEnabled shows if the PVC online upgrade
-                  is enabled for this cluster
+                description: |-
+                  AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+                  Deprecated.
                 type: boolean
               certificates:
                 description: The configuration for the CA and related certificates,
@@ -6313,6 +6314,12 @@ spec:
                 type: integer
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.
+                items:
+                  type: string
+                type: array
+              resizingRequireRestartPVC:
+                description: List of all the PVCs that have ResizingRequireRestartPVC
+                  condition.
                 items:
                   type: string
                 type: array

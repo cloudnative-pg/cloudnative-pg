@@ -2067,6 +2067,13 @@ which are not attached to a Pod</p>
    <p>List of all the PVCs that have ResizingPVC condition.</p>
 </td>
 </tr>
+<tr><td><code>resizingRequireRestartPVC</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of all the PVCs that have ResizingRequireRestartPVC condition.</p>
+</td>
+</tr>
 <tr><td><code>initializingPVC</code><br/>
 <i>[]string</i>
 </td>
@@ -2255,7 +2262,8 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 <i>bool</i>
 </td>
 <td>
-   <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
+   <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+Deprecated.</p>
 </td>
 </tr>
 <tr><td><code>image</code><br/>

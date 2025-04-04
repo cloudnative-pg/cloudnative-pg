@@ -65,10 +65,22 @@ external:
 	return true
 }
 
-// isResizing returns true if PersistentVolumeClaimResizing condition is present
-func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+// isResizingInProgress returns true if PersistentVolumeClaimResizing condition is present
+func isResizingInProgress(pvc corev1.PersistentVolumeClaim) bool {
 	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing {
+		if condition.Type == corev1.PersistentVolumeClaimResizing && condition.Status == corev1.ConditionTrue &&
+			!isResizingWithRestart(pvc) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isResizingWithRestart(pvc corev1.PersistentVolumeClaim) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending &&
+			condition.Status == corev1.ConditionTrue {
 			return true
 		}
 	}

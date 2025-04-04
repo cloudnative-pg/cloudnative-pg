@@ -385,6 +385,7 @@ ReplicationSlotsConfiguration
 ReplicationSlotsHAConfiguration
 ReplicationTLSSecret
 ResizingPVC
+ResizingRequireRestartPVC
 ResourceRequirements
 ResourceVersion
 RestoreJobHook
@@ -1184,6 +1185,7 @@ req
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
+resizingRequireRestartPVC
 resourceRequirements
 resourceVersion
 resourcerequirements
