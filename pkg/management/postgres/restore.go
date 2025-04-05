@@ -86,6 +86,7 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
+// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -144,9 +145,54 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 	}
 
-	backup, env, err := info.createBackupObjectForSnapshotRestore(ctx, cli, cluster)
+	backup, server, err := info.createBackupObjectForSnapshotRestore(ctx, cluster)
 	if err != nil {
 		return err
+	}
+
+	var envs []string
+	var config string
+
+	// nolint:nestif
+	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
+		contextLogger.Info("Restore through plugin detected, proceeding...")
+		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
+		if err != nil {
+			return err
+		}
+		if res == nil {
+			return errors.New("empty response from restoreViaPlugin, programmatic error")
+		}
+
+		processEnvironment, err := envmap.ParseEnviron()
+		if err != nil {
+			return fmt.Errorf("error while parsing the process environment: %w", err)
+		}
+
+		pluginEnvironment, err := envmap.Parse(res.Envs)
+		if err != nil {
+			return fmt.Errorf("error while parsing the plugin environment: %w", err)
+		}
+
+		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
+		config = res.RestoreConfig
+	} else {
+		env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
+			ctx,
+			cli,
+			cluster.Namespace,
+			server.BarmanObjectStore,
+			os.Environ())
+		if err != nil {
+			return fmt.Errorf("error while setting the environment: %w", err)
+		}
+
+		conf, err := getRestoreWalConfig(ctx, backup)
+		if err != nil {
+			return err
+		}
+		config = conf
+		envs = env
 	}
 
 	if _, err := info.restoreCustomWalDir(ctx); err != nil {
@@ -156,7 +202,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
-
+	// we need a migration here, otherwise the server will not start up if
+	// we recover from a base which has postgresql.auto.conf
+	// the override.conf and include statement is present, what we need to do is to
+	// migrate the content
+	if _, err := info.GetInstance().migratePostgresAutoConfFile(ctx); err != nil {
+		return err
+	}
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
@@ -178,20 +230,19 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
+	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
 // createBackupObjectForSnapshotRestore creates a fake Backup object that can be used during the
 // snapshot restore process
 func (info InitInfo) createBackupObjectForSnapshotRestore(
 	ctx context.Context,
-	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) (*apiv1.Backup, *apiv1.ExternalCluster, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
@@ -205,22 +256,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 	if !found {
 		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
-
-	if server.BarmanObjectStore == nil {
-		return nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
-	}
-
 	serverName := server.GetServerName()
-
-	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
-		ctx,
-		typedClient,
-		cluster.Namespace,
-		server.BarmanObjectStore,
-		os.Environ())
-	if err != nil {
-		return nil, nil, err
-	}
 
 	return &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
@@ -236,7 +272,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 			ServerName:        serverName,
 			Phase:             apiv1.BackupPhaseCompleted,
 		},
-	}, env, nil
+	}, &server, nil
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
@@ -621,27 +657,6 @@ func (info InitInfo) loadBackupFromReference(
 
 	contextLogger.Info("Recovering existing backup", "backup", backup)
 	return &backup, env, nil
-}
-
-// writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
-// to complete the WAL recovery from the object storage and then start
-// as a new primary
-func (info InitInfo) writeRestoreWalConfig(
-	ctx context.Context,
-	backup *apiv1.Backup,
-	cluster *apiv1.Cluster,
-) error {
-	conf, err := getRestoreWalConfig(ctx, backup)
-	if err != nil {
-		return err
-	}
-	recoveryFileContents := fmt.Sprintf(
-		"%s\n"+
-			"%s",
-		conf,
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
-
-	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
 }
 
 func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {
