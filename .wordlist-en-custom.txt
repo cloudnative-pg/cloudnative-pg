@@ -144,6 +144,7 @@ EDB
 EKS
 EOF
 EOL
+ESO
 EmbeddedObjectMetadata
 EnablePDB
 EncryptionType
