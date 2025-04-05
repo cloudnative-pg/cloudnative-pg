@@ -1,0 +1,188 @@
+# GitVote configuration file
+#
+# GitVote will look for it in the following locations (in order of precedence):
+#
+#   - At the root of the repository where the vote was created
+#   - At the root of the .github repository, for organization wide configuration
+#
+
+# Automation (optional)
+#
+# Create votes automatically on PRs when any of the files affected by the PR
+# match any of the patterns provided. Patterns must follow the gitignore
+# format (https://git-scm.com/docs/gitignore#_pattern_format).
+#
+# Each automation rule must include a list of patterns and the profile to use
+# when creating the vote. This allows creating votes automatically using the
+# desired configuration based on the patterns matched. Rules are processed in
+# the order provided, and the first match wins.
+#
+# automation:
+#   enabled: true
+#   rules:
+#     - patterns:
+#         - "README.md"
+#         - "*.txt"
+#       profile: default
+#
+automation:
+  enabled: false
+  rules:
+    - patterns: []
+      profile: cnpg-profile
+
+# Configuration profiles (required)
+#
+# A configuration profile defines some properties of a vote, like its duration,
+# the pass threshold or the users who have a binding vote. It's possible to
+# define multiple configuration profiles, each with a different set of settings.
+#
+profiles:
+  # Default configuration profile
+  #
+  # This profile will be used with votes created with the /vote command
+  default:
+    # Voting duration (required)
+    #
+    # How long the vote will be open
+    #
+    # Units supported (can be combined as in 1hour 30mins):
+    #
+    #   minutes | minute | mins | min | m
+    #   hours   | hour   | hrs  | hrs | h
+    #   days    | day    | d
+    #   weeks   | week   | w
+    #
+    duration: 5m
+
+    # Pass threshold (required)
+    #
+    # Percentage of votes in favor required to pass the vote
+    #
+    # The percentage is calculated based on the number of votes in favor and the
+    # number of allowed voters (see allowed_voters field below for more details).
+    pass_threshold: 50
+
+    # Allowed voters (optional)
+    #
+    # List of GitHub teams and users who have binding votes
+    #
+    # If no teams or users are provided, all repository collaborators will be
+    # allowed to vote. For organization-owned repositories, the list of
+    # collaborators includes outside collaborators, organization members that
+    # are direct collaborators, organization members with access through team
+    # memberships, organization members with access through default organization
+    # permissions, and organization owners.
+    #
+    # By default, teams' members with the maintainer role are allowed to vote
+    # as well. By using the `exclude_team_maintainers` option, it's possible to
+    # modify this behavior so that only teams' members with the member role are
+    # considered allowed voters. Please note that this option only applies to
+    # the teams explicitly listed in `allowed_voters/teams`.
+    #
+    # Teams names must be provided without the organization prefix.
+    #
+    # allowed_voters:
+    #   teams:
+    #     - team1
+    #   users:
+    #     - cynthia-sg
+    #     - tegioz
+    #   exclude_team_maintainers: false
+    #
+    allowed_voters:
+      teams: [maintainers]
+      users: []
+
+    # Periodic status check
+    # 
+    # GitVote allows checking the status of a vote in progress manually by
+    # calling the /check-vote command. The periodic status check option makes
+    # it possible to automate the execution of status checks periodically. The
+    # vote status will be published to the corresponding issue or pull request,
+    # the same way as if the /check-vote command would have been called
+    # manually.
+    #
+    # When this option is enabled, while the vote is open, a status check will
+    # be run automatically using the frequency configured. Please note that the
+    # hard limit of one status check per day still applies, so if the command
+    # has been called manually the automatic periodic run may be delayed.
+    # Automatic status checks won't be run if the vote will be closed within
+    # the next hour.
+    #
+    # Units supported:
+    #
+    #   - day / days
+    #   - week / weeks
+    #
+    # As an example, using a value of "5 days" would mean that 5 days after the
+    # vote was created, and every 5 days after that, an automatic status check
+    # will be run.
+    #
+    # periodic_status_check: "5 days"
+    #
+    periodic_status_check: null
+
+    # Close on passing
+    # 
+    # By default, votes remain open for the configured duration. Sometimes,
+    # specially on votes that stay open for a long time, it may be preferable
+    # to close a vote automatically once the passing threshold has been met.
+    # The close on passing feature makes this possible. Open votes where this
+    # feature has been enabled will be checked once daily and, if GitVote
+    # detects that the vote has passed, it will automatically close it.
+    # 
+    # close_on_passing: true
+    #
+    close_on_passing: false
+
+    # Close on passing minimum wait
+    # 
+    # When the close on passing feature is activated, voting will conclude once
+    # the pass threshold is met. However, there may be instances where it is
+    # preferable to implement a minimum wait time, even if the vote would
+    # already pass. This allows participants sufficient opportunity to engage
+    # and reflect before the vote is automatically finalized.
+    #
+    # Units supported:
+    #
+    #   - day / days
+    #   - week / weeks 
+    #
+    # close_on_passing_min_wait: "1 week"
+    #
+    close_on_passing_min_wait: null
+
+    # Announcements
+    #
+    # GitVote can announce the results of a vote when it is closed on GitHub
+    # discussions. This feature won't be enabled if this configuration section
+    # is not provided. The slug of the category where the announcement will be
+    # posted to must be specified (i.e. announcements).
+    #
+    # announcements:
+    #   discussions:
+    #     category: announcements
+    #
+    announcements:
+      discussions:
+        category: announcements
+
+  # Additional configuration profiles
+  #
+  # In addition to the default configuration profile, it is possible to add more
+  # to easily create votes with different settings. To create a vote that uses a
+  # different profile you can use the command /vote-PROFILE. In the case below,
+  # the command would be /vote-profile1
+  #
+  # Please note that each profile must contain all required fields. The default
+  # profile is used when using the /vote command, but its values are not used as
+  # default values when they are not provided on other profiles.
+  #
+  cnpg-profile:
+    duration: 1m
+    pass_threshold: 75
+    allowed_voters:
+      teams:
+        - maintainers
+    close_on_passing: false
