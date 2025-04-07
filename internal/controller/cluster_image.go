@@ -52,7 +52,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, err.Error())
 	}
 
-	currentDataImage := cluster.Status.GetCurrentDataImage()
+	currentDataImage := getCurrentPgDataImage(&cluster.Status)
 
 	// Case 1: the cluster is being initialized and there is still no
 	// running image. In this case, we should simply apply the image selected by the user.
@@ -104,6 +104,18 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		status.SetImage(image),
 		status.SetMajorVersionUpgradeFromImage(majorVersionUpgradeFromImage),
 	)
+}
+
+// getCurrentPgDataImage returns Postgres image that was able to run the cluster
+// PGDATA correctly last time.
+// This is important in the context of major upgrade because it contains the
+// image with the "old" major version even when there are no Pods available.
+func getCurrentPgDataImage(status *apiv1.ClusterStatus) string {
+	if status.MajorVersionUpgradeFromImage != nil {
+		return *status.MajorVersionUpgradeFromImage
+	}
+
+	return status.Image
 }
 
 func (r *ClusterReconciler) getConfiguredImage(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
