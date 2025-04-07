@@ -64,7 +64,11 @@ func (instance *Instance) RefreshReplicaConfiguration(
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
 	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
-	return UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
+	primaryConnInfo := instance.GetPrimaryConnInfo()
+	if applicationDB := cluster.GetApplicationDatabaseName(); applicationDB != "" {
+		primaryConnInfo += fmt.Sprintf("dbname=%v", applicationDB)
+	}
+	return UpdateReplicaConfiguration(instance.PgData, primaryConnInfo, slotName)
 }
 
 func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
