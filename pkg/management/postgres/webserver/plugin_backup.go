@@ -89,7 +89,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	availablePluginNamesSet := stringset.From(availablePlugins)
 
 	enabledPluginNamesSet := stringset.From([]string{b.Backup.Spec.PluginConfiguration.Name})
-	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
+	availableAndEnabled := availablePluginNamesSet.Intersect(enabledPluginNamesSet)
 
 	if !availableAndEnabled.Has(b.Backup.Spec.PluginConfiguration.Name) {
 		b.markBackupAsFailed(
