@@ -6,6 +6,9 @@ docs_dir: src
 theme:
   name: readthedocs
 
+extra:
+   version: !ENV [CNPG_VERSION]
+
 extra_css:
   - css/override.css
 
@@ -76,3 +79,4 @@ nav:
   - release_notes.md
   - Appendixes:
     - appendixes/object_stores.md
+
