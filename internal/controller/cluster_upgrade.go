@@ -357,7 +357,6 @@ func isPodNeedingRollout(
 
 	checkers := map[string]rolloutChecker{
 		"pod has missing PVCs":                     checkHasMissingPVCs,
-		"pod has PVC requiring resizing":           checkHasResizingPVC,
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
 		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
@@ -405,21 +404,6 @@ func hasValidPodSpec(pod *corev1.Pod) bool {
 	}
 	err := json.Unmarshal([]byte(podSpecAnnotation), &corev1.PodSpec{})
 	return err == nil
-}
-
-func checkHasResizingPVC(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if configuration.Current.EnableAzurePVCUpdates {
-		for _, pvcName := range cluster.Status.ResizingPVC {
-			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if persistentvolumeclaim.BelongToInstance(cluster, pod.Name, pvcName) {
-				return rollout{
-					required: true,
-					reason:   fmt.Sprintf("rebooting pod to complete the resizing of the following PVC: '%s'", pvcName),
-				}, nil
-			}
-		}
-	}
-	return rollout{}, nil
 }
 
 func checkPodNeedsUpdatedTopology(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {

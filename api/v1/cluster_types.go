@@ -936,10 +936,6 @@ type ClusterStatus struct {
 	// +optional
 	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
 
-	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
-	// +optional
-	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
-
 	// Image contains the image name used by the pods
 	// +optional
 	Image string `json:"image,omitempty"`
