@@ -177,26 +177,47 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		return currentMajor, targetMajor
 	}
 
+	// generateTargetImages, given a targetMajor, generates a target image for each buildScenario.
+	// MAJOR_UPGRADE_IMAGE_REPO env allows to customize the target image repository.
+	generateTargetImages := func(targetMajor uint64) map[string]string {
+		// Default target Images
+		targetImages := map[string]string{
+			postgisEntry:           fmt.Sprintf("%v:%v", postgres.PostgisImageRepository, targetMajor),
+			postgresqlEntry:        fmt.Sprintf("%v:%v", postgres.ImageRepository, targetMajor),
+			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", postgres.ImageRepository, targetMajor),
+		}
+		// Set custom targets when detecting a given env variable
+		if envValue := os.Getenv("MAJOR_UPGRADE_IMAGE_REPO"); envValue != "" {
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetMajor)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetMajor)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetMajor)
+		}
+
+		return targetImages
+	}
+
 	buildScenarios := func(
 		namespace string, storageClass string, currentMajor, targetMajor uint64,
 	) map[string]*scenario {
+		targetImages := generateTargetImages(targetMajor)
+
 		return map[string]*scenario{
 			postgisEntry: {
 				startingCluster: generatePostGISCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgis:%v", targetMajor),
+				targetImage:     targetImages[postgisEntry],
 				targetMajor:     int(targetMajor),
 			},
 			postgresqlEntry: {
 				startingCluster: generatePostgreSQLCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%v", targetMajor),
+				targetImage:     targetImages[postgresqlEntry],
 				targetMajor:     int(targetMajor),
 			},
 			postgresqlMinimalEntry: {
 				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%v-minimal-bookworm", targetMajor),
+				targetImage:     targetImages[postgresqlMinimalEntry],
 				targetMajor:     int(targetMajor),
 			},
 		}
