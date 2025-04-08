@@ -185,7 +185,7 @@ We offer two types of support:
 Technical support
 :   Technical assistance is offered on a best-effort basis for supported
     releases only. You can request support from the community on the
-    [CloudNativePG Slack](https://cloudnativepg.slack.com/) (in the `#general` channel),
+    [CNCF Slack](https://cloud-native.slack.com/) (in the `#cloudnativepg-users` channel),
     or using [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions).
 
 Security and bug fixes
