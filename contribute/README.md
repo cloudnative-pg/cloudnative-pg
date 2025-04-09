@@ -9,8 +9,9 @@ a good set of docs that guide you through the development process. Having said t
 we know that everything can always be improved, so if you think our documentation
 is not enough, let us know or provide a pull request based on your experience.
 
-Feel free to ask in the ["dev" chat](https://cloudnativepg.slack.com/archives/C03D68KGG65)
-if you have questions or are seeking guidance.
+If you have any questions or need guidance, feel free to reach out in the
+[#cloudnativepg-dev](https://cloud-native.slack.com/archives/C08MW1HKF40) channel
+on the [CNCF Slack workspace](https://communityinviter.com/apps/cloud-native/cncf).
 
 ## About our development workflow
 
