@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -210,5 +211,24 @@ var _ = Describe("Cluster image detection", func() {
 		Expect(cluster.Status.Image).To(Equal("postgres:17.2"))
 		Expect(cluster.Status.MajorVersionUpgradeFromImage).ToNot(BeNil())
 		Expect(*cluster.Status.MajorVersionUpgradeFromImage).To(Equal("postgres:16.2"))
+	})
+})
+
+var _ = Describe("Major version tracking with getCurrentPgDataImage", func() {
+	It("returns the current major version if no major version update has been requested", func() {
+		status := &apiv1.ClusterStatus{
+			Image: "postgres:15.2",
+		}
+
+		Expect(getCurrentPgDataImage(status)).To(Equal("postgres:15.2"))
+	})
+
+	It("returns the old major version if a major version update has been requested", func() {
+		status := &apiv1.ClusterStatus{
+			Image:                        "postgres:15.2",
+			MajorVersionUpgradeFromImage: ptr.To("postgres:14.3"),
+		}
+
+		Expect(getCurrentPgDataImage(status)).To(Equal("postgres:14.3"))
 	})
 })
