@@ -10,8 +10,8 @@ our project that we need help with, including:
 * Bugs in our Github actions
 * Promotion of PostgreSQL on Kubernetes with our operator
 
-First, though, it is important that you read the [code of
-conduct](CODE_OF_CONDUCT.md).
+First, though, it is important that you read the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 The guidelines below are a starting point. We don't want to limit your
 creativity, passion, and initiative. If you think there's a better way, please
@@ -29,7 +29,7 @@ We welcome many types of contributions including:
 * [Documentation](docs/README.md)
 * Issue Triage
 * Answering questions on Slack or Github Discussions
-* Web design
+* [Website](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
 * Communications / Social Media / Blog Posts
 * Events participation
 * Release management

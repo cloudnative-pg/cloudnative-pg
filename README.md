@@ -116,8 +116,9 @@ MariaDB cluster).
 
 ## Communications
 
-- [Slack Channel](https://join.slack.com/t/cloudnativepg/shared_invite/zt-30a6l6bp3-u1lNAmh~N02Cfiv2utKTFg)
 - [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
+- [Slack](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
+  (join the [CNCF Slack Workspace](https://communityinviter.com/apps/cloud-native/cncf)).
 - [Twitter](https://twitter.com/CloudNativePg)
 - [Mastodon](https://mastodon.social/@CloudNativePG)
 - [Bluesky](https://bsky.app/profile/cloudnativepg.bsky.social)
