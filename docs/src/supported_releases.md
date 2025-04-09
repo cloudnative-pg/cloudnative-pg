@@ -186,9 +186,9 @@ Technical support
 :   Technical assistance is offered on a best-effort basis and is limited to
     supported releases only.  For help, you can reach out to the community via the
     [#cloudnativepg-users](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
-    channel on the CNCF Slack workspace. If you're not yet a member, you can
-    [join the workspace](https://communityinviter.com/apps/cloud-native/cncf)
-    using the Community Inviter App. Alternatively, you can post your questions in
+    channel on the CNCF Slack workspace (if you're not yet a member, you can
+    [join the workspace](https://communityinviter.com/apps/cloud-native/cncf)).
+    Alternatively, you can post your questions in
     the [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
     section of the CloudNativePG repository.
 
@@ -200,5 +200,5 @@ Security and bug fixes
 
 If you’re looking for professional support, please refer to the
 [Support page on our website](https://cloudnative-pg.io/support/).
-The vendors listed there may offer service level agreements (SLAs), including
+The vendors listed there may offer service level agreements (SLA), including
 extended support periods and additional services.
