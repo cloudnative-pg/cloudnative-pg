@@ -337,7 +337,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3 # v6
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
         with:
           distribution: goreleaser
           version: v2
@@ -425,7 +425,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3 # v6
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
         if: |
           always() && !cancelled() &&
           needs.evaluate_options.outputs.test_level == '4'
@@ -790,7 +790,7 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2.2.0
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -897,7 +897,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2.2.0
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1137,7 +1137,7 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2.2.0
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -2145,7 +2145,7 @@ jobs:
       - name: Send the Ciclops view over Slack
         # Send the Ciclops thermometer on every scheduled run on `main`.
         # or when there are systematic failures in release branches
-        uses: rtCamp/action-slack-notify@c33737706dea87cd7784c687dadc9adf1be59990 # v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         if: |
           github.repository_owner == env.REPOSITORY_OWNER &&
           (
