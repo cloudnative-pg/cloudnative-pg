@@ -180,10 +180,14 @@ Only the last patch release of each branch is supported.
 We offer two types of support:
 
 Technical support
-:   Technical assistance is offered on a best-effort basis for supported
-    releases only. You can request support from the community on the
-    [CloudNativePG Slack](https://cloudnativepg.slack.com/) (in the `#general` channel),
-    or using [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions).
+:   Technical assistance is offered on a best-effort basis and is limited to
+    supported releases only.  For help, you can reach out to the community via the
+    [#cloudnativepg-users](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
+    channel on the CNCF Slack workspace (if you're not yet a member, you can
+    [join the workspace](https://communityinviter.com/apps/cloud-native/cncf)).
+    Alternatively, you can post your questions in
+    the [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
+    section of the CloudNativePG repository.
 
 Security and bug fixes
 :   We backport important bug fixes — including security fixes - to all
@@ -191,7 +195,7 @@ Security and bug fixes
     *"Does this backport improve `CloudNativePG`, bearing in mind that we really
     value stability for already-released versions?"*
 
-If you're looking for professional support, see the
-[Support page in the website](https://cloudnative-pg.io/support/).
-The vendors listed there might provide service level agreements that included
-extended support timeframes.
+If you’re looking for professional support, please refer to the
+[Support page on our website](https://cloudnative-pg.io/support/).
+The vendors listed there may offer service level agreements (SLA), including
+extended support periods and additional services.
