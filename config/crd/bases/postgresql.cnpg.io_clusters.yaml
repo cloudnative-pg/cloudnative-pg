@@ -5927,10 +5927,6 @@ spec:
                   - hash
                   type: object
                 type: array
-              azurePVCUpdateEnabled:
-                description: AzurePVCUpdateEnabled shows if the PVC online upgrade
-                  is enabled for this cluster
-                type: boolean
               certificates:
                 description: The configuration for the CA and related certificates,
                   initialized with defaults.

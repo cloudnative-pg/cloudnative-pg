@@ -2251,13 +2251,6 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster</p>
 </td>
 </tr>
-<tr><td><code>azurePVCUpdateEnabled</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
-</td>
-</tr>
 <tr><td><code>image</code><br/>
 <i>string</i>
 </td>

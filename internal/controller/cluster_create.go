@@ -1345,19 +1345,6 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 			)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
-
-		if configuration.Current.EnableAzurePVCUpdates {
-			for _, resizingPVC := range cluster.Status.ResizingPVC {
-				// if the pvc is in resizing state we requeue and wait
-				if resizingPVC == instancePVC.Name {
-					contextLogger.Info(
-						"PVC is in resizing status, retrying in 5 seconds",
-						"instance", instanceToCreate.Name,
-					)
-					return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
-				}
-			}
-		}
 	}
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
