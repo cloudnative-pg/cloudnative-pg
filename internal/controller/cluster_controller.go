@@ -210,7 +210,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		pluginClient.Close(ctx)
 	}()
 
-	ctx = setPluginClientInContext(ctx, pluginClient)
+	ctx = cnpgiClient.SetPluginClientInContext(ctx, pluginClient)
 
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
@@ -522,7 +522,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
-	return setStatusPluginHook(ctx, r.Client, getPluginClientFromContext(ctx), cluster)
+	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(

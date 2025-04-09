@@ -26,16 +26,20 @@ import (
 	"slices"
 
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ErrNoPluginSupportsRestoreJobHooksCapability is raised when no plugin supports the restore job hooks capability
 var ErrNoPluginSupportsRestoreJobHooksCapability = errors.New("no plugin supports the restore job hooks capability")
 
+type gvkEnsurer interface {
+	EnsureGVKIsPresent()
+	client.Object
+}
+
 func (data *data) Restore(
 	ctx context.Context,
-	cluster *apiv1.Cluster,
+	cluster gvkEnsurer,
 ) (*restore.RestoreResponse, error) {
 	cluster.EnsureGVKIsPresent()
 
