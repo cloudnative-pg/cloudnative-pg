@@ -43,6 +43,10 @@ Let’s walk through how to automatically rotate the password of the `app` user
 every 24 hours in the `cluster-example` Postgres cluster from the
 [quickstart guide](../quickstart.md#part-3-deploy-a-postgresql-cluster).
 
+!!! Important
+    Before proceeding, ensure that the `cluster-example` Postgres cluster is up
+    and running in your environment.
+
 By default, CloudNativePG generates and manages a Kubernetes `Secret` named
 `cluster-example-app`, which contains the credentials for the `app` user in the
 `cluster-example` cluster. You can read more about this in the
