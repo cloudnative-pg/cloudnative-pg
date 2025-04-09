@@ -150,7 +150,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3 # v6
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
         with:
           distribution: goreleaser
           version: v2
