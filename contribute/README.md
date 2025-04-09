@@ -11,9 +11,7 @@ is not enough, let us know or provide a pull request based on your experience.
 
 If you have any questions or need guidance, feel free to reach out in the
 [#cloudnativepg-dev](https://cloud-native.slack.com/archives/C08MW1HKF40) channel
-on the CNCF Slack workspace.
-If you're not yet a member, you can join the Cloud Native Computing Foundation
-Slack via the [Community Inviter App](https://communityinviter.com/apps/cloud-native/cncf).
+on the [CNCF Slack workspace](https://communityinviter.com/apps/cloud-native/cncf).
 
 ## About our development workflow
 

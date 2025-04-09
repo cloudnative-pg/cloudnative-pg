@@ -92,9 +92,8 @@ CloudNativePG can be extended via the [CNPG-I plugin interface](https://github.c
 ## Communications
 
 - [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
-- [#cloudnativepg-users on CNCF Slack Workspace](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
-- [#cloudnativepg-dev on CNCF Slack Workspace](https://cloud-native.slack.com/archives/C08MW1HKF40)
-- [CNCF Slack Workspace Inviter](https://communityinviter.com/apps/cloud-native/cncf).
+- [Slack](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
+  (on the [CNCF Slack Workspace](https://communityinviter.com/apps/cloud-native/cncf)).
 - [Twitter](https://twitter.com/CloudNativePg)
 - [Mastodon](https://mastodon.social/@CloudNativePG)
 - [Bluesky](https://bsky.app/profile/cloudnativepg.bsky.social)
