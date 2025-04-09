@@ -42,6 +42,7 @@ spec:
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --webhook-port=9443
         image: controller:latest
+        imagePullPolicy: Always
         name: manager
         ports:
           - containerPort: 8080
