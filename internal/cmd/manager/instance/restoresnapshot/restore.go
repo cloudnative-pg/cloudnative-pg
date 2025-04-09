@@ -21,12 +21,8 @@ package restoresnapshot
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
-	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,6 +43,8 @@ type restoreRunnable struct {
 }
 
 func (r *restoreRunnable) Start(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	// we will wait this way for the mgr and informers to be online
 	if err := management.WaitForGetClusterWithClient(ctx, r.cli, client.ObjectKey{
 		Name:      r.clusterName,
@@ -64,50 +62,13 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 		TablespaceMapFile: r.tablespaceMapFile,
 	}
 
-	if err := restoreSubCommand(ctx, info, r.cli, r.immediate); err != nil {
-		return fmt.Errorf("while restoring cluster: %s", err)
+	if err := info.RestoreSnapshot(ctx, r.cli, r.immediate); err != nil {
+		contextLogger.Error(err, "Error while restoring a backup")
+		return err
 	}
 
 	// the backup was restored correctly and we now ask
 	// the manager to quit
 	r.cancel()
 	return nil
-}
-
-func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.Client, immediate bool) error {
-	contextLogger := log.FromContext(ctx)
-	if err := info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
-		return err
-	}
-
-	if err := info.RestoreSnapshot(ctx, cli, immediate); err != nil {
-		contextLogger.Error(err, "Error while restoring a backup")
-		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
-		return err
-	}
-
-	contextLogger.Info("restoresnapshot command execution completed without errors")
-
-	return nil
-}
-
-func cleanupDataDirectoryIfNeeded(ctx context.Context, restoreError error, dataDirectory string) {
-	contextLogger := log.FromContext(ctx)
-
-	var barmanError *barmanCommand.CloudRestoreError
-	if !errors.As(restoreError, &barmanError) {
-		return
-	}
-
-	if !barmanError.IsRetriable() {
-		return
-	}
-
-	contextLogger.Info("Cleaning up data directory", "directory", dataDirectory)
-	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
-		contextLogger.Error(
-			err,
-			"error occurred cleaning up data directory",
-			"directory", dataDirectory)
-	}
 }
