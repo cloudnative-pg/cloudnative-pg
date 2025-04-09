@@ -39,7 +39,6 @@ Name | Description
 `CERTIFICATE_DURATION` | Determines the lifetime of the generated certificates in days. Default is 90.
 `CLUSTERS_ROLLOUT_DELAY` | The duration (in seconds) to wait between the roll-outs of different clusters during an operator upgrade. This setting controls the timing of upgrades across clusters, spreading them out to reduce system impact. The default value is `0` which means no delay between PostgreSQL cluster upgrades.
 `CREATE_ANY_SERVICE` | When set to `true`, will create `-any` service for the cluster. Default is `false`
-`ENABLE_AZURE_PVC_UPDATES` | Enables to delete Postgres pod if its PVC is stuck in Resizing condition. This feature is mainly for the Azure environment (default `false`)
 `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | When set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
 `EXPIRING_CHECK_THRESHOLD` | Determines the threshold, in days, for identifying a certificate as expiring. Default is 7. 
 `INCLUDE_PLUGINS` | A comma-separated list of plugins to be always included in the Cluster's reconciliation.
