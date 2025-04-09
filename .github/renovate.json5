@@ -449,7 +449,7 @@
     {
       groupName: 'spellcheck',
       separateMajorMinor: false,
-      pinDigests: false,
+      pinDigests: true,
       matchPackageNames: [
         'jonasbn/github-action-spellcheck{/,}**',
         'rojopolis/spellcheck-github-actions{/,}**',
