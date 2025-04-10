@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/spf13/cobra"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -195,8 +196,13 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while getting old data directory control data: %w", err)
 	}
 
+	targetVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return fmt.Errorf("error while getting the target version from the cluster object: %w", err)
+	}
+
 	contextLogger.Info("Creating data directory", "directory", newDataDir)
-	if err := runInitDB(newDataDir, newWalDir, controlData); err != nil {
+	if err := runInitDB(newDataDir, newWalDir, controlData, targetVersion); err != nil {
 		return fmt.Errorf("error while creating the data directory: %w", err)
 	}
 
@@ -282,7 +288,7 @@ func getControlData(binDir, pgData string) (map[string]string, error) {
 	return utils.ParsePgControldataOutput(string(out)), nil
 }
 
-func runInitDB(destDir string, walDir *string, pgControlData map[string]string) error {
+func runInitDB(destDir string, walDir *string, pgControlData map[string]string, targetVersion version.Data) error {
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
@@ -301,7 +307,10 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string) 
 		return err
 	}
 
-	options = tryAddDataChecksums(pgControlData, options)
+	options, err = tryAddDataChecksums(pgControlData, targetVersion, options)
+	if err != nil {
+		return err
+	}
 
 	// Certain CSI drivers may add setgid permissions on newly created folders.
 	// A default umask is set to attempt to avoid this, by revoking group/other
@@ -317,13 +326,25 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string) 
 }
 
 // TODO: refactor it should be a method of pgControlData
-func tryAddDataChecksums(pgControlData map[string]string, options []string) []string {
+func tryAddDataChecksums(
+	pgControlData map[string]string,
+	targetVersion version.Data,
+	options []string,
+) ([]string, error) {
 	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
-	if !ok || dataPageChecksumVersion != "1" {
-		return options
+	if !ok {
+		return nil, fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataDataPageChecksumVersion)
 	}
 
-	return append(options, "--data-checksums")
+	if dataPageChecksumVersion != "1" {
+		// In postgres 18 we will have to set "--no-data-checksums" if checksums are disabled (they are enabled by default)
+		if targetVersion.Major() >= 18 {
+			return append(options, "--no-data-checksums"), nil
+		}
+		return options, nil
+	}
+
+	return append(options, "--data-checksums"), nil
 }
 
 // TODO: refactor it should be a method of pgControlData
