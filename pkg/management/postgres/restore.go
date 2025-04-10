@@ -41,7 +41,6 @@ import (
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
-	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -86,7 +85,6 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
-// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -145,60 +143,26 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 	}
 
-	backup, server, err := info.createBackupObjectForSnapshotRestore(ctx, cluster)
+	rs, err := getRestoreSettings(
+		ctx,
+		cli,
+		cluster,
+		getRestoreSettingsFromPlugin,
+		info.getRestoreSettingsFromInTreeSnapshot,
+	)
 	if err != nil {
 		return err
 	}
 
-	var envs []string
-	var config string
+	return info.concludeRestore(ctx, cli, cluster, rs)
+}
 
-	// nolint:nestif
-	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
-		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
-		if err != nil {
-			return err
-		}
-		if res == nil {
-			return errors.New("empty response from restoreViaPlugin, programmatic error")
-		}
-
-		processEnvironment, err := envmap.ParseEnviron()
-		if err != nil {
-			return fmt.Errorf("error while parsing the process environment: %w", err)
-		}
-
-		pluginEnvironment, err := envmap.Parse(res.Envs)
-		if err != nil {
-			return fmt.Errorf("error while parsing the plugin environment: %w", err)
-		}
-
-		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
-		config = res.RestoreConfig
-	} else {
-		env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
-			ctx,
-			cli,
-			cluster.Namespace,
-			server.BarmanObjectStore,
-			os.Environ())
-		if err != nil {
-			return fmt.Errorf("error while setting the environment: %w", err)
-		}
-
-		conf, err := getRestoreWalConfig(ctx, backup)
-		if err != nil {
-			return err
-		}
-		config = conf
-		envs = env
-	}
-
-	if _, err := info.restoreCustomWalDir(ctx); err != nil {
-		return err
-	}
-
+func (info InitInfo) concludeRestore(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	rs *restoreSettings,
+) error {
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
@@ -230,11 +194,11 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
+	if err := info.writeCustomRestoreWalConfig(cluster, rs.config); err != nil {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, rs.envs)
 }
 
 // createBackupObjectForSnapshotRestore creates a fake Backup object that can be used during the
@@ -277,8 +241,6 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
-	contextLogger := log.FromContext(ctx)
-
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
@@ -294,102 +256,12 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
 	}
 
-	var envs []string
-	var config string
-
-	// nolint:nestif
-	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
-		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
-		if err != nil {
-			return err
-		}
-		if res == nil {
-			return errors.New("empty response from restoreViaPlugin, programmatic error")
-		}
-
-		processEnvironment, err := envmap.ParseEnviron()
-		if err != nil {
-			return fmt.Errorf("error while parsing the process environment: %w", err)
-		}
-
-		pluginEnvironment, err := envmap.Parse(res.Envs)
-		if err != nil {
-			return fmt.Errorf("error while parsing the plugin environment: %w", err)
-		}
-
-		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
-		config = res.RestoreConfig
-	} else {
-		// Before starting the restore we check if the archive destination is safe to use
-		// otherwise, we stop creating the cluster
-		err = info.checkBackupDestination(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		// If we need to download data from a backup, we do it
-		backup, env, err := info.loadBackup(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
-
-		if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-			return err
-		}
-
-		if err := info.restoreDataDir(ctx, backup, env); err != nil {
-			return err
-		}
-
-		if _, err := info.restoreCustomWalDir(ctx); err != nil {
-			return err
-		}
-
-		conf, err := getRestoreWalConfig(ctx, backup)
-		if err != nil {
-			return err
-		}
-		config = conf
-		envs = env
-	}
-
-	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
-		return err
-	}
-	// we need a migration here, otherwise the server will not start up if
-	// we recover from a base which has postgresql.auto.conf
-	// the override.conf and include statement is present, what we need to do is to
-	// migrate the content
-	if _, err := info.GetInstance().migratePostgresAutoConfFile(ctx); err != nil {
-		return err
-	}
-	if cluster.IsReplica() {
-		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
-		if !ok {
-			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
-		}
-
-		connectionString, err := external.ConfigureConnectionToServer(
-			ctx, cli, info.Namespace, &server)
-		if err != nil {
-			return err
-		}
-
-		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
+	rs, err := getRestoreSettings(ctx, cli, cluster, getRestoreSettingsFromPlugin, info.getRestoreSettingsFromInTreeBarman)
+	if err != nil {
 		return err
 	}
 
-	if err := info.WriteRestoreHbaConf(ctx); err != nil {
-		return err
-	}
-
-	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
-		return err
-	}
-
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
+	return info.concludeRestore(ctx, cli, cluster, rs)
 }
 
 func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
@@ -998,6 +870,7 @@ func (info InitInfo) GetPrimaryConnInfo() string {
 	return buildPrimaryConnInfo(info.ClusterName+"-rw", info.PodName)
 }
 
+// checkBackupDestination check if the archive destination is safe to use
 func (info *InitInfo) checkBackupDestination(
 	ctx context.Context,
 	client client.Client,
