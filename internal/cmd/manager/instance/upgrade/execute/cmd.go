@@ -272,8 +272,7 @@ func upgradeSubCommand(
 
 func getControlData(binDir, pgData string) (map[string]string, error) {
 	pgControlDataCmd := exec.Command(path.Join(binDir, "pg_controldata")) // #nosec
-	pgControlDataCmd.Env = os.Environ()
-	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+pgData)
+	pgControlDataCmd.Env = append(os.Environ(), "PGDATA="+pgData)
 
 	out, err := pgControlDataCmd.CombinedOutput()
 	if err != nil {
@@ -297,29 +296,12 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string) 
 	}
 
 	// Extract the WAL segment size from the pg_controldata output
-	walSegmentSizeString, ok := pgControlData[utils.PgControlDataBytesPerWALSegment]
-	if !ok {
-		return fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataBytesPerWALSegment)
-	}
-
-	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	options, err := tryAddWalSegmentSize(pgControlData, options)
 	if err != nil {
-		return fmt.Errorf(
-			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
-			utils.PgControlDataBytesPerWALSegment, walSegmentSizeString, err)
+		return err
 	}
 
-	options = append(options, "--wal-segsize="+strconv.Itoa(walSegmentSize/(1024*1024)))
-
-	// Extract the dat checksum version from the pg_controldata output
-	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
-	if !ok {
-		return fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataDataPageChecksumVersion)
-	}
-
-	if dataPageChecksumVersion == "1" {
-		options = append(options, "--data-checksums")
-	}
+	options = tryAddDataChecksums(pgControlData, options)
 
 	// Certain CSI drivers may add setgid permissions on newly created folders.
 	// A default umask is set to attempt to avoid this, by revoking group/other
@@ -332,6 +314,34 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string) 
 	}
 
 	return nil
+}
+
+// TODO: refactor it should be a method of pgControlData
+func tryAddDataChecksums(pgControlData map[string]string, options []string) []string {
+	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
+	if !ok || dataPageChecksumVersion != "1" {
+		return options
+	}
+
+	return append(options, "--data-checksums")
+}
+
+// TODO: refactor it should be a method of pgControlData
+func tryAddWalSegmentSize(pgControlData map[string]string, options []string) ([]string, error) {
+	walSegmentSizeString, ok := pgControlData[utils.PgControlDataBytesPerWALSegment]
+	if !ok {
+		return nil, fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataBytesPerWALSegment)
+	}
+
+	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
+			utils.PgControlDataBytesPerWALSegment, walSegmentSizeString, err)
+	}
+
+	param := "--wal-segsize=" + strconv.Itoa(walSegmentSize/(1024*1024))
+	return append(options, param), nil
 }
 
 func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destDir string) error {

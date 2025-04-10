@@ -88,7 +88,7 @@ func (state PgDataState) IsShutdown(ctx context.Context) bool {
 }
 
 // ParsePgControldataOutput parses a pg_controldata output into a map of key-value pairs
-func ParsePgControldataOutput(data string) map[string]string {
+func ParsePgControldataOutput(data string) map[pgControlDataKey]string {
 	pairs := make(map[string]string)
 	lines := strings.Split(data, "\n")
 	for _, line := range lines {
