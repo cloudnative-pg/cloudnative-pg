@@ -136,6 +136,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=events,verbs=create
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;patch;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
@@ -313,6 +314,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
+	// Get the replication status
+	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
+
+	err = r.reconcileRemapping(ctx, cluster, resources, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Calls pre-reconcile hooks
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
 		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
@@ -352,7 +361,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
+	instancesStatus = r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
