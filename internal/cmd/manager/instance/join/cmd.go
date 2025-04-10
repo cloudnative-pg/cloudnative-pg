@@ -123,16 +123,10 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	// Since we're directly using the reconciler here, we cannot
-	// tell if the secrets were correctly downloaded or not.
-	// If they were the following "pg_basebackup" command will work, if
-	// they don't "pg_basebackup" with fail, complaining that the
-	// cryptographic material is not available.
-	// So it doesn't make a real difference.
-	//
-	// Besides this, we should improve this situation to have
-	// a real error handling.
-	reconciler.RefreshSecrets(ctx, &cluster)
+	if _, err := reconciler.RefreshSecrets(ctx, &cluster); err != nil {
+		contextLogger.Error(err, "Error while refreshing secrets")
+		return err
+	}
 
 	// Run "pg_basebackup" to download the data directory from the primary
 	if err := info.Join(ctx, &cluster); err != nil {
