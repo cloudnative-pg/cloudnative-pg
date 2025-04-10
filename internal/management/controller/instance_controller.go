@@ -159,7 +159,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile secrets and cryptographic material
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadNeeded := r.RefreshSecrets(ctx, cluster)
+	reloadNeeded, err := r.RefreshSecrets(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("while refreshing secrets: %w", err)
+	}
 
 	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
 	if err != nil {
@@ -899,65 +902,53 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 // It returns a boolean flag telling if something changed. Usually
 // the invoker will check that flag and reload the PostgreSQL
 // instance it is up.
-//
-// This function manages its own errors by logging them, so the
-// user cannot easily tell if the operation has been done completely.
-// The rationale behind this is:
-//
-//  1. when invoked at the startup of the instance manager, PostgreSQL
-//     is not up. If this raise an error, then PostgreSQL won't
-//     be able to start correctly (TLS certs are missing, i.e.),
-//     making no difference between returning an error or not
-//
-//  2. when invoked inside the reconciliation loop, if the operation
-//     raise an error, it's pointless to retry. The only way to recover
-//     from such an error is wait for the CNPG operator to refresh the
-//     resource version of the secrets to be used, and in that case a
-//     reconciliation loop will be started again.
 func (r *InstanceReconciler) RefreshSecrets(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) bool {
+) (bool, error) {
+	type executor func(context.Context, *apiv1.Cluster) (bool, error)
+
 	contextLogger := log.FromContext(ctx)
 
-	changed := false
+	var changed bool
 
-	serverSecretChanged, err := r.refreshServerCertificateFiles(ctx, cluster)
-	if err == nil {
-		changed = changed || serverSecretChanged
-	} else if !apierrors.IsNotFound(err) {
+	secretRefresher := func(cb executor) error {
+		localChanged, err := cb(ctx, cluster)
+		if err == nil {
+			changed = changed || localChanged
+			return nil
+		}
+
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := secretRefresher(r.refreshServerCertificateFiles); err != nil {
 		contextLogger.Error(err, "Error while getting server secret")
+		return changed, err
 	}
 
-	replicationSecretChanged, err := r.refreshReplicationUserCertificate(ctx, cluster)
-	if err == nil {
-		changed = changed || replicationSecretChanged
-	} else if !apierrors.IsNotFound(err) {
+	if err := secretRefresher(r.refreshReplicationUserCertificate); err != nil {
 		contextLogger.Error(err, "Error while getting streaming replication secret")
+		return changed, err
 	}
-
-	clientCaSecretChanged, err := r.refreshClientCA(ctx, cluster)
-	if err == nil {
-		changed = changed || clientCaSecretChanged
-	} else if !apierrors.IsNotFound(err) {
+	if err := secretRefresher(r.refreshClientCA); err != nil {
 		contextLogger.Error(err, "Error while getting cluster CA Client secret")
+		return changed, err
 	}
-
-	serverCaSecretChanged, err := r.refreshServerCA(ctx, cluster)
-	if err == nil {
-		changed = changed || serverCaSecretChanged
-	} else if !apierrors.IsNotFound(err) {
+	if err := secretRefresher(r.refreshServerCA); err != nil {
 		contextLogger.Error(err, "Error while getting cluster CA Server secret")
+		return changed, err
 	}
-
-	barmanEndpointCaSecretChanged, err := r.refreshBarmanEndpointCA(ctx, cluster)
-	if err == nil {
-		changed = changed || barmanEndpointCaSecretChanged
-	} else if !apierrors.IsNotFound(err) {
+	if err := secretRefresher(r.refreshBarmanEndpointCA); err != nil {
 		contextLogger.Error(err, "Error while getting barman endpoint CA secret")
+		return changed, err
 	}
 
-	return changed
+	return changed, nil
 }
 
 // reconcileInstance sets PostgreSQL instance parameters to current values
