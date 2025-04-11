@@ -151,3 +151,35 @@ var _ = Describe("instance with tablespace test", func() {
 		}
 	})
 })
+
+var _ = Describe("PVC resize detection", func() {
+	pvc := corev1.PersistentVolumeClaim{
+		Status: corev1.PersistentVolumeClaimStatus{},
+	}
+	It("no resizing", func() {
+		pvc.Status.Conditions = nil
+		Expect(isResizing(pvc)).To(BeFalse())
+	})
+
+	It("with one resizing condition", func() {
+		pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
+			{
+				Type: corev1.PersistentVolumeClaimResizing,
+			},
+		}
+		Expect(isResizing(pvc)).To(BeTrue())
+	})
+
+	It("with one resizing condition", func() {
+		pvc := makePVC("test", "1", "1", NewPgDataCalculator(), false)
+		pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
+			{
+				Type: corev1.PersistentVolumeClaimResizing,
+			},
+			{
+				Type: corev1.PersistentVolumeClaimFileSystemResizePending,
+			},
+		}
+		Expect(isResizing(pvc)).To(BeFalse())
+	})
+})
