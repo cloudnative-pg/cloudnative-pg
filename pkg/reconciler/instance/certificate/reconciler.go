@@ -1,3 +1,22 @@
+/*
+Copyright © contributors to CloudNativePG, established as
+CloudNativePG a Series of LF Projects, LLC.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+SPDX-License-Identifier: Apache-2.0
+*/
+
 package certificate
 
 import (
@@ -7,7 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,13 +111,15 @@ func (r *Reconciler) RefreshSecrets(
 	return changed, nil
 }
 
-// refreshServerCertificateFiles gets the latest server certificates files from the
-// secrets, and may set the instance certificate if it was missing our outdated.
-// Returns true if configuration has been changed or the instance has been updated
+// refreshServerCertificateFiles updates the latest server certificate files
+// from the secrets and updates the instance certificate if it is missing or
+// outdated.
+// It returns true if the configuration has been changed or the instance
+// certificate has been updated.
 func (r *Reconciler) refreshServerCertificateFiles(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
-	var secret v1.Secret
+	var secret corev1.Secret
 
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true },
 		func() error {
@@ -133,13 +154,14 @@ func (r *Reconciler) refreshServerCertificateFiles(ctx context.Context, cluster 
 	return changed, nil
 }
 
-// refreshReplicationUserCertificate gets the latest replication certificates from the
-// secrets. Returns true if configuration has been changed
+// refreshReplicationUserCertificate updates the latest replication user certificates
+// from the secrets and updates the corresponding files.
+// It returns true if the configuration has been changed.
 func (r *Reconciler) refreshReplicationUserCertificate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.cli.Get(
 		ctx,
 		client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Status.Certificates.ReplicationTLSSecret},
@@ -155,10 +177,10 @@ func (r *Reconciler) refreshReplicationUserCertificate(
 		postgresSpec.StreamingReplicaKeyLocation)
 }
 
-// refreshClientCA gets the latest client CA certificates from the secrets.
-// It returns true if configuration has been changed
+// refreshClientCA updates the latest client CA certificates from the secrets.
+// It returns true if the configuration has been changed.
 func (r *Reconciler) refreshClientCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.cli.Get(
 		ctx,
 		client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Status.Certificates.ClientCASecret},
@@ -171,9 +193,9 @@ func (r *Reconciler) refreshClientCA(ctx context.Context, cluster *apiv1.Cluster
 }
 
 // refreshServerCA gets the latest server CA certificates from the secrets.
-// It returns true if configuration has been changed
+// It returns true if the configuration has been changed.
 func (r *Reconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.cli.Get(
 		ctx,
 		client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Status.Certificates.ServerCASecret},
@@ -185,8 +207,8 @@ func (r *Reconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster
 	return r.refreshCAFromSecret(ctx, &secret, postgresSpec.ServerCACertificateLocation)
 }
 
-// refreshBarmanEndpointCA gets the latest barman endpoint CA certificates from the secrets.
-// It returns true if configuration has been changed
+// refreshBarmanEndpointCA updates the barman endpoint CA certificates from the secrets.
+// It returns true if the configuration has been changed.
 func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	endpointCAs := map[string]*apiv1.SecretKeySelector{}
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
@@ -201,7 +223,7 @@ func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1
 
 	var changed bool
 	for target, secretKeySelector := range endpointCAs {
-		var secret v1.Secret
+		var secret corev1.Secret
 		err := r.cli.Get(
 			ctx,
 			client.ObjectKey{Namespace: cluster.Namespace, Name: secretKeySelector.Name},
@@ -219,18 +241,18 @@ func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
-// corresponding to the server certificate
+// corresponding to the server certificate.
 func (r *Reconciler) refreshInstanceCertificateFromSecret(
-	secret *v1.Secret,
+	secret *corev1.Secret,
 ) error {
-	certData, ok := secret.Data[v1.TLSCertKey]
+	certData, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
-		return fmt.Errorf("missing %s field in Secret", v1.TLSCertKey)
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
 	}
 
-	keyData, ok := secret.Data[v1.TLSPrivateKeyKey]
+	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok {
-		return fmt.Errorf("missing %s field in Secret", v1.TLSPrivateKeyKey)
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
 	}
 
 	certificate, err := tls.X509KeyPair(certData, keyData)
@@ -244,23 +266,23 @@ func (r *Reconciler) refreshInstanceCertificateFromSecret(
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
-// corresponding to the server certificate
+// corresponding to the server certificate.
 func (r *Reconciler) refreshCertificateFilesFromSecret(
 	ctx context.Context,
-	secret *v1.Secret,
+	secret *corev1.Secret,
 	certificateLocation string,
 	privateKeyLocation string,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
-	certificate, ok := secret.Data[v1.TLSCertKey]
+	certificate, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
-		return false, fmt.Errorf("missing %s field in Secret", v1.TLSCertKey)
+		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
 	}
 
-	privateKey, ok := secret.Data[v1.TLSPrivateKeyKey]
+	privateKey, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok {
-		return false, fmt.Errorf("missing %s field in Secret", v1.TLSPrivateKeyKey)
+		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
 	}
 
 	certificateIsChanged, err := fileutils.WriteFileAtomic(certificateLocation, certificate, 0o600)
@@ -288,10 +310,10 @@ func (r *Reconciler) refreshCertificateFilesFromSecret(
 	return certificateIsChanged || privateKeyIsChanged, nil
 }
 
-// refreshCAFromSecret receive a secret and rewrite the ca.crt file to the provided location
+// refreshCAFromSecret receive a secret and rewrite the `ca.crt` file to the provided location.
 func (r *Reconciler) refreshCAFromSecret(
 	ctx context.Context,
-	secret *v1.Secret,
+	secret *corev1.Secret,
 	destLocation string,
 ) (bool, error) {
 	caCertificate, ok := secret.Data[certs.CACertKey]
@@ -313,10 +335,11 @@ func (r *Reconciler) refreshCAFromSecret(
 	return changed, nil
 }
 
-// refreshFileFromSecret receive a secret and rewrite the file corresponding to the key to the provided location
+// refreshFileFromSecret receive a secret and rewrite the file corresponding to
+// the key to the provided location.
 func (r *Reconciler) refreshFileFromSecret(
 	ctx context.Context,
-	secret *v1.Secret,
+	secret *corev1.Secret,
 	key, destLocation string,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
