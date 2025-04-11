@@ -1,3 +1,22 @@
+/*
+Copyright © contributors to CloudNativePG, established as
+CloudNativePG a Series of LF Projects, LLC.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+SPDX-License-Identifier: Apache-2.0
+*/
+
 package storage
 
 import (
@@ -11,8 +30,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// ReconcileWalStorage moves the files from PGDATA/pg_wal to the volume attached, if exists, and
-// creates a symlink for it
+// ReconcileWalStorage ensures that the `pg_wal` directory is moved to the attached volume (if present)
+// and creates a symbolic link pointing to the new location.
 func ReconcileWalStorage(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -22,18 +41,15 @@ func ReconcileWalStorage(ctx context.Context) error {
 		return nil
 	}
 
+	// Check if `pg_wal` is already a symbolic link; if so, no further action is needed.
 	pgWalDirInfo, err := os.Lstat(specs.PgWalPath)
 	if err != nil {
 		return err
 	}
-	// The pgWalDir it's already a symlink meaning that there's nothing to do
-	mode := pgWalDirInfo.Mode() & fs.ModeSymlink
-	if !pgWalDirInfo.IsDir() && mode != 0 {
+	if pgWalDirInfo.Mode().Type() == fs.ModeSymlink {
 		return nil
 	}
 
-	// We discarded every possibility that this has been done, let's move the current file to their
-	// new location
 	contextLogger.Info("Moving data", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
 	if err := fileutils.MoveDirectoryContent(specs.PgWalPath, specs.PgWalVolumePgWalPath); err != nil {
 		contextLogger.Error(err, "Moving data", "from", specs.PgWalPath, "to",
@@ -47,7 +63,6 @@ func ReconcileWalStorage(ctx context.Context) error {
 		return err
 	}
 
-	// We moved all the files now we should create the proper symlink
 	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
 	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
 }
