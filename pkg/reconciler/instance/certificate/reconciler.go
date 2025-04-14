@@ -42,6 +42,11 @@ type Reconciler struct {
 	serverCertificateHandler serverCertificateHandler
 }
 
+// ErrNoServerCertificateHandler is raised when a new server
+// certificate has been detected by the instance reconciler
+// but no handler has been set.
+var ErrNoServerCertificateHandler = fmt.Errorf("no server certificate handler")
+
 // NewReconciler creates a new certificate reconciler
 func NewReconciler(cli client.Client, serverHandler serverCertificateHandler) *Reconciler {
 	return &Reconciler{
@@ -90,7 +95,6 @@ func (r *Reconciler) RefreshSecrets(
 		contextLogger.Error(err, "Error while getting server secret")
 		return changed, err
 	}
-
 	if err := secretRefresher(r.refreshReplicationUserCertificate); err != nil {
 		contextLogger.Error(err, "Error while getting streaming replication secret")
 		return changed, err
@@ -209,7 +213,38 @@ func (r *Reconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster
 
 // refreshBarmanEndpointCA updates the barman endpoint CA certificates from the secrets.
 // It returns true if the configuration has been changed.
+//
+// Important: this function is deprecated and will be replaced by the relative feature
+// in the plugin-barman-cloud project
 func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
+	// refreshFileFromSecret receive a secret and rewrite the file corresponding to
+	// the key to the provided location. Implementated with an inner function to discourage
+	// reuse.
+	refreshFileFromSecret := func(
+		secret *corev1.Secret,
+		key, destLocation string,
+	) (bool, error) {
+		contextLogger := log.FromContext(ctx)
+		data, ok := secret.Data[key]
+		if !ok {
+			return false, fmt.Errorf("missing %s entry in Secret", key)
+		}
+
+		changed, err := fileutils.WriteFileAtomic(destLocation, data, 0o600)
+		if err != nil {
+			return false, fmt.Errorf("while writing file: %w", err)
+		}
+
+		if changed {
+			contextLogger.Info("Refreshed configuration file",
+				"filename", destLocation,
+				"secret", secret.Name,
+				"key", key)
+		}
+
+		return changed, nil
+	}
+
 	endpointCAs := map[string]*apiv1.SecretKeySelector{}
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
 		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = cluster.Spec.Backup.BarmanObjectStore.EndpointCA
@@ -231,7 +266,7 @@ func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1
 		if err != nil {
 			return false, err
 		}
-		c, err := r.refreshFileFromSecret(ctx, &secret, secretKeySelector.Key, target)
+		c, err := refreshFileFromSecret(&secret, secretKeySelector.Key, target)
 		changed = changed || c
 		if err != nil {
 			return changed, err
@@ -240,11 +275,15 @@ func (r *Reconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1
 	return changed, nil
 }
 
-// refreshCertificateFilesFromSecret receive a secret and rewrite the file
-// corresponding to the server certificate.
+// refreshCertificateFilesFromSecret receive a TLS secret, parses it and communicates
+// back to the handler the certificate change event.
 func (r *Reconciler) refreshInstanceCertificateFromSecret(
 	secret *corev1.Secret,
 ) error {
+	if r.serverCertificateHandler == nil {
+		return ErrNoServerCertificateHandler
+	}
+
 	certData, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
 		return fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
@@ -330,34 +369,6 @@ func (r *Reconciler) refreshCAFromSecret(
 		log.FromContext(ctx).Info("Refreshed configuration file",
 			"filename", destLocation,
 			"secret", secret.Name)
-	}
-
-	return changed, nil
-}
-
-// refreshFileFromSecret receive a secret and rewrite the file corresponding to
-// the key to the provided location.
-func (r *Reconciler) refreshFileFromSecret(
-	ctx context.Context,
-	secret *corev1.Secret,
-	key, destLocation string,
-) (bool, error) {
-	contextLogger := log.FromContext(ctx)
-	data, ok := secret.Data[key]
-	if !ok {
-		return false, fmt.Errorf("missing %s entry in Secret", key)
-	}
-
-	changed, err := fileutils.WriteFileAtomic(destLocation, data, 0o600)
-	if err != nil {
-		return false, fmt.Errorf("while writing file: %w", err)
-	}
-
-	if changed {
-		contextLogger.Info("Refreshed configuration file",
-			"filename", destLocation,
-			"secret", secret.Name,
-			"key", key)
 	}
 
 	return changed, nil
