@@ -150,6 +150,32 @@ spec:
         [...]
 ```
 
+!!! Important
+    By default, backups will be encrypted. Encryption requires support for
+    server-side encryption in the object storage system. While AWS S3 and
+    many others enable server-side encryption by default, not all third
+    party systems do.
+
+    If the object storage does not support server side encryption and you
+    can accept unencrypted backups, disable encryption by setting
+    `encryption` to the empty string.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      wal:
+        encryption: ""
+      data:
+        encryption: ""
+      
+```
+
+
 ### Using Object Storage with a private CA
 
 Suppose you configure an Object Storage provider which uses a certificate
