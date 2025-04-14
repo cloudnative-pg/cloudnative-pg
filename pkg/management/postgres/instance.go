@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/blang/semver"
@@ -212,8 +213,30 @@ type Instance struct {
 	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
 	MetricsPortTLS bool
 
+	serverCertificateHandler serverCertificateHandler
+}
+
+type serverCertificateHandler struct {
+	operationInProgress sync.Mutex
+
 	// ServerCertificate is the certificate we use to serve https connections
 	ServerCertificate *tls.Certificate
+}
+
+// GetServerCertificate returns the server certificate for the instance
+func (instance *Instance) GetServerCertificate() *tls.Certificate {
+	instance.serverCertificateHandler.operationInProgress.Lock()
+	defer instance.serverCertificateHandler.operationInProgress.Unlock()
+
+	return instance.serverCertificateHandler.ServerCertificate
+}
+
+// SetServerCertificate sets the server certificate for the instance
+func (instance *Instance) SetServerCertificate(cert *tls.Certificate) {
+	instance.serverCertificateHandler.operationInProgress.Lock()
+	defer instance.serverCertificateHandler.operationInProgress.Unlock()
+
+	instance.serverCertificateHandler.ServerCertificate = cert
 }
 
 // SetPostgreSQLAutoConfWritable allows or deny writes to the
