@@ -827,7 +827,7 @@ If you enabled TLS metrics, run instead:
 kubectl exec -ti curl -- curl -sk https://${POD_IP}:9187/metrics
 ```
 
-If want to access the metrics of the operator, you need to point
+To access the metrics of the operator, you need to point
 to the pod where the operator is running, and use TCP port 8080 as target.
 
 When you're done inspecting metrics, please remember to delete the `curl` pod:
