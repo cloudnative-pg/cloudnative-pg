@@ -145,11 +145,6 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 	}
 
-	backup, server, err := info.createBackupObjectForSnapshotRestore(ctx, cluster)
-	if err != nil {
-		return err
-	}
-
 	var envs []string
 	var config string
 
@@ -177,22 +172,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
 		config = res.RestoreConfig
 	} else {
-		env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
-			ctx,
-			cli,
-			cluster.Namespace,
-			server.BarmanObjectStore,
-			os.Environ())
-		if err != nil {
-			return fmt.Errorf("error while setting the environment: %w", err)
-		}
-
-		conf, err := getRestoreWalConfig(ctx, backup)
+		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
 		if err != nil {
 			return err
 		}
-		config = conf
-		envs = env
 	}
 
 	if _, err := info.restoreCustomWalDir(ctx); err != nil {
@@ -237,28 +220,38 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
-// createBackupObjectForSnapshotRestore creates a fake Backup object that can be used during the
-// snapshot restore process
-func (info InitInfo) createBackupObjectForSnapshotRestore(
+// createEnvAndConfigForSnapshotRestore creates env and config for snapshot restore
+func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
+	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, *apiv1.ExternalCluster, error) {
+) ([]string, string, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
-		return nil, nil, fmt.Errorf("recovery source not specified")
+		return nil, "", fmt.Errorf("recovery source not specified")
 	}
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+		return nil, "", fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 	serverName := server.GetServerName()
 
-	return &apiv1.Backup{
+	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
+		ctx,
+		typedClient,
+		cluster.Namespace,
+		server.BarmanObjectStore,
+		os.Environ())
+	if err != nil {
+		return nil, "", err
+	}
+
+	backup := &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
 			Cluster: apiv1.LocalObjectReference{
 				Name: serverName,
@@ -272,7 +265,10 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 			ServerName:        serverName,
 			Phase:             apiv1.BackupPhaseCompleted,
 		},
-	}, &server, nil
+	}
+
+	config, err := getRestoreWalConfig(ctx, backup)
+	return env, config, err
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
