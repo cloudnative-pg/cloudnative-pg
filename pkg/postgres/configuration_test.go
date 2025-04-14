@@ -407,10 +407,10 @@ var _ = Describe("PostgreSQL Extensions", func() {
 
 		It("configures them when an Extension is defined", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpgConfigurationSettings,
-				Version:            version.New(18, 0),
-				IncludingMandatory: true,
-				Extensions:         []string{"postgis", "pgvector"},
+				Settings:              CnpgConfigurationSettings,
+				Version:               version.New(18, 0),
+				IncludingMandatory:    true,
+				ImageVolumeExtensions: []string{"postgis", "pgvector"},
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig(ExtensionControlPath)).To(
@@ -428,7 +428,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 					ExtensionControlPath: "/my/extension/path",
 					DynamicLibraryPath:   "/my/library/path",
 				},
-				Extensions: []string{"postgis", "pgvector"},
+				ImageVolumeExtensions: []string{"postgis", "pgvector"},
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig(ExtensionControlPath)).To(
