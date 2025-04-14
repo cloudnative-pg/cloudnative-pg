@@ -142,7 +142,7 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while downloading secrets: %w", err)
 	}
 
-	if err := instancestorage.ReconcileWalStorage(ctx); err != nil {
+	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
 	}
 

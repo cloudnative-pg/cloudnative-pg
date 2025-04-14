@@ -268,7 +268,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
 
-	if err := instancestorage.ReconcileWalStorage(ctx); err != nil {
+	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		return err
 	}
 

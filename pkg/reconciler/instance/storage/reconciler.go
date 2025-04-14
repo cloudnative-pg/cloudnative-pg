@@ -30,19 +30,43 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// ReconcileWalStorage ensures that the `pg_wal` directory is moved to the attached volume (if present)
+type walDirectoryReconcilerOptions struct {
+	// pgWalDirectory is the directory where PostgreSQL will look for WALs.
+	// This is usually $PGDATA/pg_wal, and will be a symbolic link pointing
+	// to the separate WAL storage if configured.
+	pgWalDirectory string
+
+	// walVolumeDirectory is the directory where the WAL volume is mounted.
+	walVolumeDirectory string
+
+	// walVolumeWalDirectory is the directory where the WALs should be stored.
+	// This is usually inside of walVolumeDirectory
+	walVolumeWalDirectory string
+}
+
+// ReconcileWalDirectory ensures that the `pg_wal` directory is moved to the attached volume (if present)
 // and creates a symbolic link pointing to the new location.
-func ReconcileWalStorage(ctx context.Context) error {
+func ReconcileWalDirectory(ctx context.Context) error {
+	return internalReconcileWalDirectory(ctx, walDirectoryReconcilerOptions{
+		pgWalDirectory:        specs.PgWalPath,
+		walVolumeDirectory:    specs.PgWalVolumePath,
+		walVolumeWalDirectory: specs.PgWalVolumePgWalPath,
+	})
+}
+
+// internalReconcileWalDirectory is only meant to be used internally by unit tests
+func internalReconcileWalDirectory(ctx context.Context, opts walDirectoryReconcilerOptions) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pgWalExists, err := fileutils.FileExists(specs.PgWalVolumePath); err != nil {
+	// Important: for now walStorage cannot be disabled once configured
+	if pgWalExists, err := fileutils.FileExists(opts.walVolumeDirectory); err != nil {
 		return err
 	} else if !pgWalExists {
 		return nil
 	}
 
 	// Check if `pg_wal` is already a symbolic link; if so, no further action is needed.
-	pgWalDirInfo, err := os.Lstat(specs.PgWalPath)
+	pgWalDirInfo, err := os.Lstat(opts.pgWalDirectory)
 	if err != nil {
 		return err
 	}
@@ -50,19 +74,19 @@ func ReconcileWalStorage(ctx context.Context) error {
 		return nil
 	}
 
-	contextLogger.Info("Moving data", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
-	if err := fileutils.MoveDirectoryContent(specs.PgWalPath, specs.PgWalVolumePgWalPath); err != nil {
-		contextLogger.Error(err, "Moving data", "from", specs.PgWalPath, "to",
-			specs.PgWalVolumePgWalPath)
+	contextLogger.Info("Moving data", "from", opts.pgWalDirectory, "to", opts.walVolumeWalDirectory)
+	if err := fileutils.MoveDirectoryContent(opts.pgWalDirectory, opts.walVolumeWalDirectory); err != nil {
+		contextLogger.Error(err, "Moving data", "from", opts.pgWalDirectory, "to",
+			opts.walVolumeWalDirectory)
 		return err
 	}
 
-	contextLogger.Debug("Deleting old path", "path", specs.PgWalPath)
-	if err := fileutils.RemoveFile(specs.PgWalPath); err != nil {
-		contextLogger.Error(err, "Deleting old path", "path", specs.PgWalPath)
+	contextLogger.Debug("Deleting old path", "path", opts.pgWalDirectory)
+	if err := fileutils.RemoveFile(opts.pgWalDirectory); err != nil {
+		contextLogger.Error(err, "Deleting old path", "path", opts.pgWalDirectory)
 		return err
 	}
 
-	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
-	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
+	contextLogger.Debug("Creating symlink", "from", opts.pgWalDirectory, "to", opts.walVolumeWalDirectory)
+	return os.Symlink(opts.walVolumeWalDirectory, opts.pgWalDirectory)
 }
