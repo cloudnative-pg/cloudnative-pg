@@ -1248,14 +1248,6 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
-	// Create a new indexed field on Jobs.
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx,
-		&batchv1.Job{},
-		jobOwnerKey, jobOwnerIndexFunc); err != nil {
-		return err
-	}
-
 	// Create a new indexed field on Backup.
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
@@ -1267,7 +1259,11 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
-	return nil
+	// Create a new indexed field on Jobs.
+	return mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&batchv1.Job{},
+		jobOwnerKey, jobOwnerIndexFunc)
 }
 
 // IsOwnedByCluster checks that an object is owned by a Cluster and returns
