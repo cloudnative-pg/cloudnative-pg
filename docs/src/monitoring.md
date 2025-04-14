@@ -4,7 +4,7 @@
 !!! Important
     Installing Prometheus and Grafana is beyond the scope of this project.
     We assume they are correctly installed in your system. However, for
-    experimentation we provide instructions in 
+    experimentation we provide instructions in
     [Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
 
 ## Monitoring Instances
@@ -55,10 +55,10 @@ by specifying a list of one or more databases in the `target_databases` option.
     with Prometheus and Grafana, you can find a quick setup guide
     in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
 
-### Prometheus Operator example
+### Monitoring with the Prometheus operator
 
 A specific PostgreSQL cluster can be monitored using the
-[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
+[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.75.1/Documentation/api.md#podmonitor).
 
 A `PodMonitor` that correctly points to the Cluster can be automatically created by the operator by setting
@@ -637,7 +637,6 @@ The possible values for `usage` are:
 | `DURATION`          | use this column as a text duration (in milliseconds)     |
 | `HISTOGRAM`         | use this column as a histogram                          |
 
-
 Please visit the ["Metric Types" page](https://prometheus.io/docs/concepts/metric_types/)
 from the Prometheus documentation for more information.
 
@@ -652,7 +651,6 @@ cnpg_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <Colum
 
 !!! Note
     `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`
-
 
 Considering the `pg_replication` example above, the exporter's endpoint would
 return the following output when invoked:
@@ -674,7 +672,7 @@ cnpg_pg_replication_is_wal_receiver_up 0
 
 ### Default set of metrics
 
-The operator can be configured to automatically inject in a Cluster a set of 
+The operator can be configured to automatically inject in a Cluster a set of
 monitoring queries defined in a ConfigMap or a Secret, inside the operator's namespace.
 You have to set the `MONITORING_QUERIES_CONFIGMAP` or
 `MONITORING_QUERIES_SECRET` key in the ["operator configuration"](operator_conf.md),
@@ -684,11 +682,12 @@ the operator will then use the content of the `queries` key.
 Any change to the `queries` content will be immediately reflected on all the
 deployed Clusters using it.
 
-The operator installation manifests come with a predefined ConfigMap, 
+The operator installation manifests come with a predefined ConfigMap,
 called `cnpg-default-monitoring`, to be used by all Clusters.
 `MONITORING_QUERIES_CONFIGMAP` is by default set to `cnpg-default-monitoring` in the operator configuration.
 
 If you want to disable the default set of metrics, you can:
+
 - disable it at operator level: set the `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET` key to `""`
   (empty string), in the operator ConfigMap. Changes to operator ConfigMap require an operator restart.
 - disable it for a specific Cluster: set `.spec.monitoring.disableDefaultQueries` to `true` in the Cluster.
@@ -704,7 +703,7 @@ CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
 presents some differences. In particular, the `cache_seconds` field is not implemented
 in CloudNativePG's exporter.
 
-## Monitoring the operator
+## Monitoring the CloudNativePG operator
 
 The operator internally exposes [Prometheus](https://prometheus.io/) metrics
 via HTTP on port 8080, named `metrics`.
@@ -714,17 +713,21 @@ via HTTP on port 8080, named `metrics`.
     the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
     section below.
 
-Currently, the operator exposes default `kubebuilder` metrics, see
-[kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html) for more details.
+Currently, the operator exposes default `kubebuilder` metrics. See
+[kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html)
+for more details.
 
-### Prometheus Operator example
+### Monitoring the operator with Prometheus
 
-The operator deployment can be monitored using the
-[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
+The operator can be monitored using the
+[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining a
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
-resource:
+pointing to the operator pod(s), as follows (note it's applied in the same
+namespace as the operator):
 
 ```yaml
+kubectl -n cnpg-system apply -f - <<EOF
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -735,23 +738,53 @@ spec:
       app.kubernetes.io/name: cloudnative-pg
   podMetricsEndpoints:
     - port: metrics
+EOF
 ```
 
 ## How to inspect the exported metrics
 
-In this section we provide some basic instructions on how to inspect
+In this section we provide basic instructions on how to inspect
 the metrics exported by a specific PostgreSQL instance manager (primary
-or replica) or the operator, using a temporary pod running `curl` in
-the same namespace.
+or replica) or the operator.
 
 !!! Note
-    In the example below we assume we are working in the default namespace,
-    alongside with the PostgreSQL cluster. Please feel free to adapt
-    this example to your use case, by applying basic Kubernetes knowledge.
+    In the examples below we assume we are working in the default namespace, and
+    with the operator installed in the `cnpg-system` namespace.
+    Please adapt to your use case.
 
-Create the `curl.yaml` file with this content:
+### Using port forwarding
+
+The simplest way to inspect the metrics is to port-forward the metrics ports
+of the pods involved.
+
+For example, to inspect the metrics on the `-1` instance of `cluster-example`,
+we port-forward the 9187 port:
+
+``` sh
+kubectl port-forward cluster-example-1 9187:9187
+```
+
+With port-forwarding active, the metrics can be inspected easily, for
+example on a web browser, using HTTP or HTTPS depending on the configuration,
+with address: `localhost:9187/metrics`.
+
+The operator pod also exports metrics, on port 8080. Similarly to instances, we
+port-forward the operator pod, which is located in the operator namespace:
+
+``` sh
+kubectl -n cnpg-system port-forward pod/<CONTROLLER-MANAGER-POD> 8080:8080
+```
+
+With port forwarding active, the metrics are easily viewable on a browser at
+[`localhost:8080/metrics`](http://localhost:8080/metrics).
+
+### Using curl
+
+Create the `curl` pod with the following command:
 
 ```yaml
+kubectl apply -f - <<EOF
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -761,17 +794,13 @@ spec:
   - name: curl
     image: curlimages/curl:8.2.1
     command: ['sleep', '3600']
+EOF
 ```
 
-Then create the pod:
-
-```shell
-kubectl apply -f curl.yaml
-```
-
-In case you want to inspect the metrics exported by an instance, you need
-to connect to port 9187 of the target pod. This is the generic command to be
-run (make sure you use the correct IP for the pod):
+To inspect the metrics exported by an instance, you need
+to connect to port 9187 of the target pod. You will need to know the pod's
+IP address, which you can find easily by running `kubectl get pod -o wide`.
+The following generic command will run `curl` on the desired pod:
 
 ```shell
 kubectl exec -ti curl -- curl -s <pod_ip>:9187/metrics
@@ -793,14 +822,15 @@ kubectl exec -ti curl -- curl -s ${POD_IP}:9187/metrics
 ```
 
 If you enabled TLS metrics, run instead:
+
 ```shell
 kubectl exec -ti curl -- curl -sk https://${POD_IP}:9187/metrics
 ```
 
-In case you want to access the metrics of the operator, you need to point
+If want to access the metrics of the operator, you need to point
 to the pod where the operator is running, and use TCP port 8080 as target.
 
-At the end of the inspection, please make sure you delete the `curl` pod:
+When you're done inspecting metrics, please remember to delete the `curl` pod:
 
 ```shell
 kubectl delete -f curl.yaml
@@ -827,12 +857,15 @@ section for context:
 In addition, we provide the "raw" sources for the Prometheus alert rules in the
 `alerts.yaml` file.
 
-The [Grafana dashboard](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json) has a dedicated repository now.
+A Grafana dashboard for CloudNativePG clusters and operator, is kept in the
+dedicated repository [`cloudnative-pg/grafana-dashboards`](https://github.com/cloudnative-pg/grafana-dashboards/tree/main)
+as a dashboard JSON configuration:
+[`grafana-dashboard.json`](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json).
+The file can be downloaded, and imported into Grafana
+(menus: Dashboard > New > Import).
 
-Note that, for the configuration of `kube-prometheus-stack`, other fields and
-settings are available over what we provide in `kube-stack-config.yaml`.
-
-You can execute `helm show values prometheus-community/kube-prometheus-stack`
-to view them. For further information, please refer to the
+For a general reference on the settings available on `kube-prometheus-stack`,
+you can execute `helm show values prometheus-community/kube-prometheus-stack`.
+Please refer to the
 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
-page.
+page for more detail.
