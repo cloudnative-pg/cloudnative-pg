@@ -336,7 +336,7 @@ type ConfigurationInfo struct {
 	RecoveryMinApplyDelay time.Duration
 
 	// The list of extensions to be loaded
-	Extensions []string
+	ImageVolumeExtensions []string
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -707,7 +707,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
-	if len(info.Extensions) > 0 {
+	if len(info.ImageVolumeExtensions) > 0 {
 		// Set all ExtensionControlPaths
 		setExtensionControlPath(info, configuration)
 
@@ -803,7 +803,7 @@ func escapePostgresConfValue(value string) string {
 // `.spec.postgresql.extensions` stanza
 func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	extensionControlPath := []string{"$system"}
-	for _, extension := range info.Extensions {
+	for _, extension := range info.ImageVolumeExtensions {
 		extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
 	}
 
@@ -823,7 +823,7 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 // `.spec.postgresql.extensions` stanza
 func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	dynamicLibraryPath := []string{"$libdir"}
-	for _, extension := range info.Extensions {
+	for _, extension := range info.ImageVolumeExtensions {
 		dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
 	}
 
