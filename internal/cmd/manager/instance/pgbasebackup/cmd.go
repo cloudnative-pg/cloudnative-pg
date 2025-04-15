@@ -180,5 +180,5 @@ func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster
 	// In the future, when we will support recovering WALs in the
 	// designated primary from an object store, we'll need to use
 	// the environment variables of the recovery object store.
-	return env.info.ConfigureInstanceAfterRestore(ctx, cluster)
+	return env.info.ConfigureInstanceAfterRestore(ctx, cluster, nil)
 }
