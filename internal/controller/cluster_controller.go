@@ -329,10 +329,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if cluster.ShouldPromoteFromReplicaCluster() {
 		if !(cluster.Status.Phase == apiv1.PhaseReplicaClusterPromotion ||
 			cluster.Status.Phase == apiv1.PhaseUnrecoverable) {
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx,
+			if err := r.RegisterPhase(ctx,
 				cluster,
 				apiv1.PhaseReplicaClusterPromotion,
-				"Replica cluster promotion in progress")
+				"Replica cluster promotion in progress"); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
@@ -413,15 +415,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		contextLogger.Warning(
 			"Failed to extract instance status from ready instances. Attempting to requeue...",
 		)
-		registerPhaseErr := r.RegisterPhase(
+		if err := r.RegisterPhase(
 			ctx,
 			cluster,
 			"Instance Status Extraction Error: HTTP communication issue",
 			"Communication issue detected: The operator was unable to receive the status from all the ready instances. "+
 				"This may be due to network restrictions such as NetworkPolicy and/or any other network plugin setting. "+
 				"Please verify your network configuration.",
-		)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
@@ -549,13 +553,15 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 
 	reason := "Insufficient disk space detected in one or more pods is preventing PostgreSQL from running." +
 		"Please verify your storage settings. Further information inside .status.instancesReportedState"
-	registerPhaseErr := r.RegisterPhase(
+	if err := r.RegisterPhase(
 		ctx,
 		cluster,
 		"Not enough disk space",
 		reason,
-	)
-	return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(
@@ -735,8 +741,11 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	if len(resources.instances.Items) > 0 && resources.noInstanceIsAlive() {
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
-			"No pods are active, the cluster needs manual intervention ")
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
+			"No pods are active, the cluster needs manual intervention "); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// If we still need more instances, we need to wait before setting healthy status
@@ -822,8 +831,15 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 		}
 
 		if podRollout := isPodNeedingRollout(ctx, pod, cluster); podRollout.required {
-			return &ctrl.Result{RequeueAfter: 1 * time.Second},
-				r.upgradePod(ctx, cluster, pod, fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason))
+			if err := r.upgradePod(
+				ctx,
+				cluster,
+				pod,
+				fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason),
+			); err != nil {
+				return nil, err
+			}
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
 		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {

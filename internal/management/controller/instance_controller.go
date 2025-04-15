@@ -211,7 +211,7 @@ func (r *InstanceReconciler) Reconcile(
 				"tokenContent", tokenError.TokenContent(),
 			)
 			// We should be waiting for WAL recovery to reach the LSN in the token
-			return reconcile.Result{RequeueAfter: 10 * time.Second}, err
+			return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 	}
 
