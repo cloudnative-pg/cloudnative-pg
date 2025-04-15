@@ -84,7 +84,10 @@ func setStatusPluginHook(
 		"after", cluster.Status.PluginStatus,
 	)
 
-	return ctrl.Result{RequeueAfter: 5 * time.Second}, cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
 // setPluginClientInContext records the plugin client in the given context

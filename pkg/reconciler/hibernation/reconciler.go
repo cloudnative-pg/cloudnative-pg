@@ -82,9 +82,12 @@ func reconcileDeletePods(
 		podToBeDeleted = &instances[0]
 	}
 
-	// The Pod list is sorted and the primary instance
+	// The Pod list is sorted, and the primary instance
 	// will always be the first one, if present
 	contextLogger.Info("Deleting Pod as requested by the hibernation procedure", "podName", podToBeDeleted.Name)
-	deletionResult := c.Delete(ctx, podToBeDeleted)
-	return &ctrl.Result{RequeueAfter: 5 * time.Second}, deletionResult
+	if err := c.Delete(ctx, podToBeDeleted); err != nil {
+		return nil, err
+	}
+
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
