@@ -194,7 +194,7 @@ func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
 	}
 
 	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.imageCatalog.name", object.GetName()),
+		FieldSelector: fields.OneTermEqualSelector(imageCatalogKey, object.GetName()),
 		Namespace:     object.GetNamespace(),
 	}
 
@@ -241,7 +241,7 @@ func (r *ClusterReconciler) getClustersForClusterImageCatalogsToClustersMapper(
 	}
 
 	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.imageCatalog.name", object.GetName()),
+		FieldSelector: fields.OneTermEqualSelector(imageCatalogKey, object.GetName()),
 	}
 
 	err = r.List(ctx, &clusters, listOps)
