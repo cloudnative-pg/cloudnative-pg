@@ -171,7 +171,7 @@ It will:
 1. Create a fio deployment composed by a single Pod, which will run fio on
    the PVC, create graphs after completing the benchmark and start serving the
    generated files with a webserver. We use the
-   [`fio-tools`](https://github.com/wallnerryan/fio-tools`) image for that.
+   [`fio-tools`](https://github.com/wallnerryan/fio-tools) image for that.
 
 The Pod created by the deployment will be ready when it starts serving the
 results. You can forward the port of the pod created by the deployment
