@@ -2070,6 +2070,11 @@ type MonitoringConfiguration struct {
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
+	// Specifies the `PodMonitor` scrape class.
+	// +optional.
+	// +kubebuilder:validation:MinLength=1
+	PodMonitorScrapeClass string `json:"podMonitorScrapeClass,omitempty"`
+
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`

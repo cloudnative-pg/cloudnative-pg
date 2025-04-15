@@ -98,10 +98,22 @@ var _ = Describe("PodMonitor test", func() {
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
 		})
 
-		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
+		It("should create a monitoringv1.PodMonitor object with scrapeClass", func() {
+			scrapeClass := "custom-scrape-class"
+			cluster := cluster.DeepCopy()
+			cluster.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
+			mgr := NewClusterPodMonitorManager(cluster)
+			monitor := mgr.BuildPodMonitor()
+
+			Expect(monitor.Spec.ScrapeClassName).To(Equal(&scrapeClass))
+		})
+
+		It("should create a monitoringv1.PodMonitor object with all options", func() {
+			scrapeClass := "custom-scrape-class"
 			relabeledCluster := cluster.DeepCopy()
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
+			relabeledCluster.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
 
@@ -109,6 +121,7 @@ var _ = Describe("PodMonitor test", func() {
 			expectedEndpoint.MetricRelabelConfigs = getMetricRelabelings()
 			expectedEndpoint.RelabelConfigs = getRelabelings()
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+			Expect(monitor.Spec.ScrapeClassName).To(Equal(&scrapeClass))
 		})
 
 		It("does not panic if monitoring section is not present", func() {
