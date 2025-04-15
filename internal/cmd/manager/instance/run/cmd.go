@@ -56,6 +56,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -231,7 +232,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
 
-	if err := reconciler.ReconcileWalStorage(ctx); err != nil {
+	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
 		return err
 	}
 

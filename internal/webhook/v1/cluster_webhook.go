@@ -1525,7 +1525,7 @@ func (v *ClusterCustomValidator) validateWalStorageChange(r, old *apiv1.Cluster)
 			field.Invalid(
 				field.NewPath("spec", "walStorage"),
 				r.Spec.WalStorage,
-				"walStorage cannot be disabled once the cluster is created"),
+				"walStorage cannot be disabled once configured"),
 		}
 	}
 
