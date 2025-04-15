@@ -84,6 +84,19 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 
 			Expect(podMonitor.Spec.PodMetricsEndpoints).To(HaveLen(1))
 			Expect(*podMonitor.Spec.PodMetricsEndpoints[0].Port).To(Equal("metrics"))
+
+			Expect(podMonitor.Spec.ScrapeClassName).To(BeNil())
+		})
+
+		It("returns the correct PodMonitor object with scrapeClass", func() {
+			scrapeClass := "custom-scrape-class"
+			pooler.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
+			manager := NewPoolerPodMonitorManager(pooler)
+
+			podMonitor := manager.BuildPodMonitor()
+
+			Expect(podMonitor).ToNot(BeNil())
+			Expect(podMonitor.Spec.ScrapeClassName).To(Equal(&scrapeClass))
 		})
 	})
 
