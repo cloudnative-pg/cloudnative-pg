@@ -1030,7 +1030,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		recoverySnapshot,
 		nodeSerial,
 	); err != nil {
-		return ctrl.Result{RequeueAfter: time.Minute}, err
+		return ctrl.Result{}, fmt.Errorf("cannot create primary instance PVCs: %w", err)
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1209,7 +1209,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		storageSource,
 		nodeSerial,
 	); err != nil {
-		return ctrl.Result{RequeueAfter: time.Minute}, err
+		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop

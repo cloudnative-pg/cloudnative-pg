@@ -176,7 +176,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 				cluster.Status.TargetPrimary)
 			backup.Status.Phase = apiv1.BackupPhasePending
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+			if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 		if err != nil {
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
@@ -191,7 +194,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			backup.Status.Phase = apiv1.BackupPhasePending
 			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 				cluster.Status.TargetPrimary)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+			if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
 		contextLogger.Info("Starting backup",
@@ -327,8 +333,11 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		)
 		origBackup := backup.DeepCopy()
 		backup.Status.Phase = apiv1.BackupPhasePending
-		err := r.Patch(ctx, backup, client.MergeFrom(origBackup))
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, err
+		if err := r.Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
+			return nil, err
+		}
+
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	if err != nil {
 		tryFlagBackupAsFailed(ctx, r.Client, backup, fmt.Errorf("while getting pod: %w", err))

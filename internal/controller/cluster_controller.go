@@ -159,7 +159,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit
+// nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -296,15 +296,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		contextLogger.Warning(
 			"Failed to extract instance status from ready instances. Attempting to requeue...",
 		)
-		registerPhaseErr := r.RegisterPhase(
+		if err := r.RegisterPhase(
 			ctx,
 			cluster,
 			"Instance Status Extraction Error: HTTP communication issue",
 			"Communication issue detected: The operator was unable to receive the status from all the ready instances. "+
 				"This may be due to network restrictions such as NetworkPolicy and/or any other network plugin setting. "+
 				"Please verify your network configuration.",
-		)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// The instance list is sorted and will present the primary as the first
@@ -379,8 +381,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return *result, nil
 	}
 
-	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	res, err := r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return res, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(
@@ -560,8 +566,11 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	if len(resources.instances.Items) > 0 && resources.noInstanceIsAlive() {
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
-			"No pods are active, the cluster needs manual intervention ")
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
+			"No pods are active, the cluster needs manual intervention "); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// If we still need more instances, we need to wait before setting healthy status
@@ -647,8 +656,15 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 		}
 
 		if podRollout := isPodNeedingRollout(ctx, pod, cluster); podRollout.required {
-			return &ctrl.Result{RequeueAfter: 1 * time.Second},
-				r.upgradePod(ctx, cluster, pod, fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason))
+			if err := r.upgradePod(
+				ctx,
+				cluster,
+				pod,
+				fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason),
+			); err != nil {
+				return nil, err
+			}
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
 		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
