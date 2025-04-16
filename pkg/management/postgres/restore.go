@@ -41,6 +41,7 @@ import (
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -274,21 +275,31 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	}
 
 	var envs []string
-	restoreCmd := fmt.Sprintf(
-		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-		postgresSpec.LogPath, postgresSpec.LogFileName)
-	config := fmt.Sprintf(
-		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n",
-		restoreCmd)
+	var config string
 
 	// nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
-		_, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
+		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
 		if err != nil {
 			return err
 		}
+		if res == nil {
+			return errors.New("empty response from restoreViaPlugin, programmatic error")
+		}
+
+		processEnvironment, err := envmap.ParseEnviron()
+		if err != nil {
+			return fmt.Errorf("error while parsing the process environment: %w", err)
+		}
+
+		pluginEnvironment, err := envmap.Parse(res.Envs)
+		if err != nil {
+			return fmt.Errorf("error while parsing the plugin environment: %w", err)
+		}
+
+		envs = envmap.Merge(processEnvironment, pluginEnvironment).StringSlice()
+		config = res.RestoreConfig
 	} else {
 		// Before starting the restore we check if the archive destination is safe to use
 		// otherwise, we stop creating the cluster
