@@ -109,7 +109,7 @@ var _ = Describe("promotion token creation", func() {
 			return err
 		}
 
-		token, err := CreatePromotionToken(parsedControlData)
+		token, err := parsedControlData.CreatePromotionToken()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(token).ToNot(BeEmpty())
 		Expect(decodeBase64(token)).To(Succeed())
@@ -120,7 +120,7 @@ var _ = Describe("promotion token parser", func() {
 	It("parses a newly generated promotion token", func() {
 		parsedControlData := ParsePgControldataOutput(fakeControlData)
 
-		token, err := CreatePromotionToken(parsedControlData)
+		token, err := parsedControlData.CreatePromotionToken()
 		Expect(err).ToNot(HaveOccurred())
 
 		tokenContent, err := ParsePgControldataToken(token)
@@ -155,7 +155,7 @@ var _ = Describe("promotion token validation", func() {
 	It("validates a newly generated promotion token", func() {
 		parsedControlData := ParsePgControldataOutput(fakeControlData)
 
-		token, err := CreatePromotionToken(parsedControlData)
+		token, err := parsedControlData.CreatePromotionToken()
 		Expect(err).ToNot(HaveOccurred())
 
 		tokenContent, err := ParsePgControldataToken(token)

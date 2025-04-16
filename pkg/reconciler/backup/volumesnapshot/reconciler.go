@@ -99,11 +99,11 @@ func (se *Reconciler) enrichSnapshot(
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
 		pgControlData := utils.ParsePgControldataOutput(data)
-		timelineID, ok := pgControlData[utils.PgControlDataKeyLatestCheckpointTimelineID]
+		timelineID, ok := pgControlData.TryGetLatestCheckpointTimelineID()
 		if ok {
 			vs.Labels[utils.BackupTimelineLabelName] = timelineID
 		}
-		startWal, ok := pgControlData[utils.PgControlDataKeyREDOWALFile]
+		startWal, ok := pgControlData.TryGetREDOWALFile()
 		if ok {
 			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change

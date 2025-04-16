@@ -75,9 +75,9 @@ func (r *InstanceReconciler) verifyPromotionToken(cluster *apiv1.Cluster) error 
 	}
 
 	parsedControlData := utils.ParsePgControldataOutput(out)
-	currentTimelineIDString := parsedControlData[utils.PgControlDataKeyLatestCheckpointTimelineID]
-	currentSystemIdentifier := parsedControlData[utils.PgControlDataKeyDatabaseSystemIdentifier]
-	replayLSNString := parsedControlData[utils.PgControlDataKeyLatestCheckpointREDOLocation]
+	currentTimelineIDString := parsedControlData.GetLatestCheckpointTimelineID()
+	currentSystemIdentifier := parsedControlData.GetDatabaseSystemIdentifier()
+	replayLSNString := parsedControlData.GetLatestCheckpointREDOLocation()
 
 	return promotiontoken.ValidateAgainstInstanceStatus(promotionToken, currentSystemIdentifier,
 		currentTimelineIDString, replayLSNString)
