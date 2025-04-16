@@ -484,7 +484,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	}
 
 	data := utils.ParsePgControldataOutput(out)
-	walFile := data[utils.PgControlDataKeyREDOWALFile]
+	walFile := data.GetREDOWALFile()
 	if walFile == "" {
 		sendBadRequestJSONResponse(w, "COULD_NOT_PARSE_REDOWAL_FILE", "")
 		return

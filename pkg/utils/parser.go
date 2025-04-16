@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -34,36 +35,106 @@ import (
 type pgControlDataKey = string
 
 const (
-	// PgControlDataKeyLatestCheckpointTimelineID is the
+	// pgControlDataKeyLatestCheckpointTimelineID is the
 	// latest checkpoint's TimeLineID pg_controldata entry
-	PgControlDataKeyLatestCheckpointTimelineID pgControlDataKey = "Latest checkpoint's TimeLineID"
+	pgControlDataKeyLatestCheckpointTimelineID pgControlDataKey = "Latest checkpoint's TimeLineID"
 
-	// PgControlDataKeyREDOWALFile is the latest checkpoint's
+	// pgControlDataKeyREDOWALFile is the latest checkpoint's
 	// REDO WAL file pg_controldata entry
-	PgControlDataKeyREDOWALFile pgControlDataKey = "Latest checkpoint's REDO WAL file"
+	pgControlDataKeyREDOWALFile pgControlDataKey = "Latest checkpoint's REDO WAL file"
 
-	// PgControlDataKeyDatabaseSystemIdentifier is the database
+	// pgControlDataKeyDatabaseSystemIdentifier is the database
 	// system identifier pg_controldata entry
-	PgControlDataKeyDatabaseSystemIdentifier pgControlDataKey = "Database system identifier"
+	pgControlDataKeyDatabaseSystemIdentifier pgControlDataKey = "Database system identifier"
 
-	// PgControlDataKeyLatestCheckpointREDOLocation is the latest
+	// pgControlDataKeyLatestCheckpointREDOLocation is the latest
 	// checkpoint's REDO location pg_controldata entry
-	PgControlDataKeyLatestCheckpointREDOLocation pgControlDataKey = "Latest checkpoint's REDO location"
+	pgControlDataKeyLatestCheckpointREDOLocation pgControlDataKey = "Latest checkpoint's REDO location"
 
-	// PgControlDataKeyTimeOfLatestCheckpoint is the time
+	// pgControlDataKeyTimeOfLatestCheckpoint is the time
 	// of latest checkpoint pg_controldata entry
-	PgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
+	pgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
 
-	// PgControlDataDatabaseClusterStateKey is the status
+	// pgControlDataDatabaseClusterStateKey is the status
 	// of the latest primary that run on this data directory.
-	PgControlDataDatabaseClusterStateKey pgControlDataKey = "Database cluster state"
+	pgControlDataDatabaseClusterStateKey pgControlDataKey = "Database cluster state"
 
-	// PgControlDataDataPageChecksumVersion reports whether the checksums are enabled in the cluster
-	PgControlDataDataPageChecksumVersion pgControlDataKey = "Data page checksum version"
+	// pgControlDataDataPageChecksumVersion reports whether the checksums are enabled in the cluster
+	pgControlDataDataPageChecksumVersion pgControlDataKey = "Data page checksum version"
 
-	// PgControlDataBytesPerWALSegment reports the size of the WAL segments
-	PgControlDataBytesPerWALSegment pgControlDataKey = "Bytes per WAL segment"
+	// pgControlDataBytesPerWALSegment reports the size of the WAL segments
+	pgControlDataBytesPerWALSegment pgControlDataKey = "Bytes per WAL segment"
 )
+
+type PgControlData map[pgControlDataKey]string
+
+// GetLatestCheckpointTimelineID returns the latest checkpoint's TimeLineID
+func (p PgControlData) GetLatestCheckpointTimelineID() string {
+	return p[pgControlDataKeyLatestCheckpointTimelineID]
+}
+
+// TryGetLatestCheckpointTimelineID returns the latest checkpoint's TimeLineID
+func (p PgControlData) TryGetLatestCheckpointTimelineID() (string, bool) {
+	v, ok := p[pgControlDataKeyLatestCheckpointTimelineID]
+	return v, ok
+}
+
+// GetREDOWALFile returns the latest checkpoint's REDO WAL file
+func (p PgControlData) GetREDOWALFile() string {
+	return p[pgControlDataKeyREDOWALFile]
+}
+
+// TryGetREDOWALFile returns the latest checkpoint's REDO WAL file
+func (p PgControlData) TryGetREDOWALFile() (string, bool) {
+	v, ok := p[pgControlDataKeyREDOWALFile]
+	return v, ok
+}
+
+// GetDatabaseSystemIdentifier returns the database system identifier
+func (p PgControlData) GetDatabaseSystemIdentifier() string {
+	return p[pgControlDataKeyDatabaseSystemIdentifier]
+}
+
+// GetLatestCheckpointREDOLocation returns the latest checkpoint's REDO location
+func (p PgControlData) GetLatestCheckpointREDOLocation() string {
+	return p[pgControlDataKeyLatestCheckpointREDOLocation]
+}
+
+// GetTimeOfLatestCheckpoint returns the time of latest checkpoint
+func (p PgControlData) GetTimeOfLatestCheckpoint() string {
+	return p[pgControlDataKeyTimeOfLatestCheckpoint]
+}
+
+// GetDatabaseClusterState returns the status of the latest primary that ran on this data directory
+func (p PgControlData) GetDatabaseClusterState() string {
+	return p[pgControlDataDatabaseClusterStateKey]
+}
+
+// GetDataPageChecksumVersion returns whether the checksums are enabled in the cluster
+func (p PgControlData) GetDataPageChecksumVersion() (string, error) {
+	value, ok := p[pgControlDataDataPageChecksumVersion]
+	if !ok {
+		return "", fmt.Errorf("no '%s' section in pg_controldata output", pgControlDataDataPageChecksumVersion)
+	}
+	return value, nil
+}
+
+// GetBytesPerWALSegment returns the size of the WAL segments
+func (p PgControlData) GetBytesPerWALSegment() (int, error) {
+	value, ok := p[pgControlDataBytesPerWALSegment]
+	if !ok {
+		return 0, fmt.Errorf("no '%s' section in pg_controldata output", pgControlDataBytesPerWALSegment)
+	}
+
+	walSegmentSize, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
+			pgControlDataBytesPerWALSegment, value, err)
+	}
+
+	return walSegmentSize, nil
+}
 
 // PgDataState represents the "Database cluster state" field of pg_controldata
 type PgDataState string
@@ -88,7 +159,7 @@ func (state PgDataState) IsShutdown(ctx context.Context) bool {
 }
 
 // ParsePgControldataOutput parses a pg_controldata output into a map of key-value pairs
-func ParsePgControldataOutput(data string) map[pgControlDataKey]string {
+func ParsePgControldataOutput(data string) PgControlData {
 	pairs := make(map[string]string)
 	lines := strings.Split(data, "\n")
 	for _, line := range lines {
@@ -236,13 +307,13 @@ var (
 )
 
 // CreatePromotionToken translates a parsed pgControlData into a JSON token
-func CreatePromotionToken(pgDataMap map[string]string) (string, error) {
+func (p PgControlData) CreatePromotionToken() (string, error) {
 	content := PgControldataTokenContent{
-		LatestCheckpointTimelineID:   pgDataMap[PgControlDataKeyLatestCheckpointTimelineID],
-		REDOWALFile:                  pgDataMap[PgControlDataKeyREDOWALFile],
-		DatabaseSystemIdentifier:     pgDataMap[PgControlDataKeyDatabaseSystemIdentifier],
-		LatestCheckpointREDOLocation: pgDataMap[PgControlDataKeyLatestCheckpointREDOLocation],
-		TimeOfLatestCheckpoint:       pgDataMap[PgControlDataKeyTimeOfLatestCheckpoint],
+		LatestCheckpointTimelineID:   p.GetLatestCheckpointTimelineID(),
+		REDOWALFile:                  p.GetREDOWALFile(),
+		DatabaseSystemIdentifier:     p.GetDatabaseSystemIdentifier(),
+		LatestCheckpointREDOLocation: p.GetLatestCheckpointREDOLocation(),
+		TimeOfLatestCheckpoint:       p.GetTimeOfLatestCheckpoint(),
 		OperatorVersion:              versions.Info.Version,
 	}
 
