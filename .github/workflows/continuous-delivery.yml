@@ -259,6 +259,8 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       controller_img: ${{ env.CONTROLLER_IMG }}
+      controller_img_digest: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] }}
+      controller_img_prime_digest: ${{ steps.build-prime.outputs.digest }}
       controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
       index_img: ${{ env.INDEX_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
@@ -407,6 +409,7 @@ jobs:
         id: generate-manifest
         env:
           CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
+          CONTROLLER_IMG_DIGEST: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['containerimage.digest'] }}
         run: |
           make generate-manifest
       -
@@ -448,6 +451,7 @@ jobs:
       # upgrade test
         name: Build and push image for upgrade test
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
+        id: build-prime
         if: |
           always() && !cancelled() &&
           needs.evaluate_options.outputs.test_level == '4'
@@ -607,6 +611,8 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
+      CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
+      CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
       E2E_DEFAULT_STORAGE_CLASS: standard
       E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
@@ -853,6 +859,8 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
+      CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
+      CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
       E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
       E2E_CSI_STORAGE_CLASS: rook-ceph-block
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-rbdplugin-snapclass
@@ -1191,6 +1199,8 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
+      CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
+      CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
       E2E_DEFAULT_STORAGE_CLASS: gp3
       E2E_CSI_STORAGE_CLASS: gp3
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ebs-csi-snapclass
@@ -1579,6 +1589,8 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
+      CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
+      CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
       E2E_DEFAULT_STORAGE_CLASS: standard-rwo
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass

@@ -32,6 +32,13 @@ CATALOG_IMG ?= ${CONTROLLER_IMG}-catalog
 BUNDLE_IMG ?= ${CONTROLLER_IMG}-bundle
 INDEX_IMG ?= ${CONTROLLER_IMG}-index
 
+# Define CONTROLLER_IMG_WITH_DIGEST by appending CONTROLLER_IMG_SHA to CONTROLLER_IMG with '@' if CONTROLLER_IMG_SHA is set
+ifneq ($(CONTROLLER_IMG_DIGEST),)
+CONTROLLER_IMG_WITH_DIGEST := $(CONTROLLER_IMG)@$(CONTROLLER_IMG_DIGEST)
+else
+CONTROLLER_IMG_WITH_DIGEST := $(CONTROLLER_IMG)
+endif
+
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/-dev\1/')
@@ -215,7 +222,7 @@ generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 		cd $$CONFIG_TMP_DIR/default ;\
 		$(KUSTOMIZE) edit add patch --path manager_image_pull_secret.yaml ;\
 		cd $$CONFIG_TMP_DIR/manager ;\
-		$(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG}" ;\
+		$(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG_WITH_DIGEST}" ;\
 		$(KUSTOMIZE) edit add patch --path env_override.yaml ;\
 		$(KUSTOMIZE) edit add configmap controller-manager-env \
 			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" \
