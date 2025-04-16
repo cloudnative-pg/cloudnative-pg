@@ -86,6 +86,7 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
+// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -144,9 +145,21 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 	}
 
-	backup, env, err := info.createBackupObjectForSnapshotRestore(ctx, cli, cluster)
-	if err != nil {
-		return err
+	var envs []string
+	restoreCmd := fmt.Sprintf(
+		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+		postgresSpec.LogPath, postgresSpec.LogFileName)
+	config := fmt.Sprintf(
+		"recovery_target_action = promote\n"+
+			"restore_command = '%s'\n",
+		restoreCmd)
+
+	// nolint:nestif
+	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
+		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
+		if err != nil {
+			return err
+		}
 	}
 
 	if _, err := info.restoreCustomWalDir(ctx); err != nil {
@@ -156,7 +169,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
-
+	// we need a migration here, otherwise the server will not start up if
+	// we recover from a base which has postgresql.auto.conf
+	// the override.conf and include statement is present, what we need to do is to
+	// migrate the content
+	if _, err := info.GetInstance().migratePostgresAutoConfFile(ctx); err != nil {
+		return err
+	}
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
@@ -178,32 +197,31 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
+	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
-// createBackupObjectForSnapshotRestore creates a fake Backup object that can be used during the
-// snapshot restore process
-func (info InitInfo) createBackupObjectForSnapshotRestore(
+// createEnvAndConfigForSnapshotRestore creates env and config for snapshot restore
+func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
-) (*apiv1.Backup, []string, error) {
+) ([]string, string, error) {
 	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
-		return nil, nil, fmt.Errorf("recovery source not specified")
+		return nil, "", fmt.Errorf("recovery source not specified")
 	}
 
 	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+		return nil, "", fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 	serverName := server.GetServerName()
 
@@ -214,10 +232,10 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 		server.BarmanObjectStore,
 		os.Environ())
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 
-	return &apiv1.Backup{
+	backup := &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
 			Cluster: apiv1.LocalObjectReference{
 				Name: serverName,
@@ -231,7 +249,10 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 			ServerName:        serverName,
 			Phase:             apiv1.BackupPhaseCompleted,
 		},
-	}, env, nil
+	}
+
+	config, err := getRestoreWalConfig(ctx, backup)
+	return env, config, err
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
@@ -616,27 +637,6 @@ func (info InitInfo) loadBackupFromReference(
 
 	contextLogger.Info("Recovering existing backup", "backup", backup)
 	return &backup, env, nil
-}
-
-// writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
-// to complete the WAL recovery from the object storage and then start
-// as a new primary
-func (info InitInfo) writeRestoreWalConfig(
-	ctx context.Context,
-	backup *apiv1.Backup,
-	cluster *apiv1.Cluster,
-) error {
-	conf, err := getRestoreWalConfig(ctx, backup)
-	if err != nil {
-		return err
-	}
-	recoveryFileContents := fmt.Sprintf(
-		"%s\n"+
-			"%s",
-		conf,
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
-
-	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
 }
 
 func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {

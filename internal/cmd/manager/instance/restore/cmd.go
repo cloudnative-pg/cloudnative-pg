@@ -44,10 +44,12 @@ import (
 
 // NewCmd creates the "restore" subcommand
 func NewCmd() *cobra.Command {
-	var clusterName string
-	var namespace string
-	var pgData string
-	var pgWal string
+	var (
+		clusterName string
+		namespace   string
+		pgData      string
+		pgWal       string
+	)
 
 	cmd := &cobra.Command{
 		Use:           "restore [flags]",
