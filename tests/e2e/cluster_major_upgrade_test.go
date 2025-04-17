@@ -111,14 +111,10 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	generatePostgreSQLCluster := func(namespace string, storageClass string, majorVersion int) *v1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgresql:" + strconv.Itoa(majorVersion)
-		cluster.Spec.Bootstrap = &v1.BootstrapConfiguration{
-			InitDB: &v1.BootstrapInitDB{
-				PostInitSQL: []string{
-					"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
-					"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
-				},
-			},
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%d-standard-bookworm", majorVersion)
+		cluster.Spec.Bootstrap.InitDB.PostInitSQL = []string{
+			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
+			"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
 		}
 		cluster.Spec.PostgresConfiguration.Parameters["pg_stat_statements.track"] = "top"
 		return cluster
@@ -132,26 +128,22 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	generatePostGISCluster := func(namespace string, storageClass string, majorVersion int) *v1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
 		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgis:" + strconv.Itoa(majorVersion)
-		cluster.Spec.Bootstrap = &v1.BootstrapConfiguration{
-			InitDB: &v1.BootstrapInitDB{
-				PostInitApplicationSQL: []string{
-					"CREATE EXTENSION postgis",
-					"CREATE EXTENSION postgis_raster",
-					"CREATE EXTENSION postgis_sfcgal",
-					"CREATE EXTENSION fuzzystrmatch",
-					"CREATE EXTENSION address_standardizer",
-					"CREATE EXTENSION address_standardizer_data_us",
-					"CREATE EXTENSION postgis_tiger_geocoder",
-					"CREATE EXTENSION postgis_topology",
-					"CREATE TABLE geometries (name varchar, geom geometry)",
-					"INSERT INTO geometries VALUES" +
-						" ('Point', 'POINT(0 0)')," +
-						" ('Linestring', 'LINESTRING(0 0, 1 1, 2 1, 2 2)')," +
-						" ('Polygon', 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))')," +
-						" ('PolygonWithHole', 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),(1 1, 1 2, 2 2, 2 1, 1 1))')," +
-						" ('Collection', 'GEOMETRYCOLLECTION(POINT(2 0),POLYGON((0 0, 1 0, 1 1, 0 1, 0 0)))');",
-				},
-			},
+		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
+			"CREATE EXTENSION postgis",
+			"CREATE EXTENSION postgis_raster",
+			"CREATE EXTENSION postgis_sfcgal",
+			"CREATE EXTENSION fuzzystrmatch",
+			"CREATE EXTENSION address_standardizer",
+			"CREATE EXTENSION address_standardizer_data_us",
+			"CREATE EXTENSION postgis_tiger_geocoder",
+			"CREATE EXTENSION postgis_topology",
+			"CREATE TABLE geometries (name varchar, geom geometry)",
+			"INSERT INTO geometries VALUES" +
+				" ('Point', 'POINT(0 0)')," +
+				" ('Linestring', 'LINESTRING(0 0, 1 1, 2 1, 2 2)')," +
+				" ('Polygon', 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))')," +
+				" ('PolygonWithHole', 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),(1 1, 1 2, 2 2, 2 1, 1 1))')," +
+				" ('Collection', 'GEOMETRYCOLLECTION(POINT(2 0),POLYGON((0 0, 1 0, 1 1, 0 1, 0 0)))');",
 		}
 		return cluster
 	}
@@ -177,26 +169,47 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		return currentMajor, targetMajor
 	}
 
+	// generateTargetImages, given a targetMajor, generates a target image for each buildScenario.
+	// MAJOR_UPGRADE_IMAGE_REPO env allows to customize the target image repository.
+	generateTargetImages := func(targetMajor uint64) map[string]string {
+		// Default target Images
+		targetImages := map[string]string{
+			postgisEntry:           fmt.Sprintf("%v:%v", postgres.PostgisImageRepository, targetMajor),
+			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", postgres.ImageRepository, targetMajor),
+			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", postgres.ImageRepository, targetMajor),
+		}
+		// Set custom targets when detecting a given env variable
+		if envValue := os.Getenv("MAJOR_UPGRADE_IMAGE_REPO"); envValue != "" {
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetMajor)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetMajor)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetMajor)
+		}
+
+		return targetImages
+	}
+
 	buildScenarios := func(
 		namespace string, storageClass string, currentMajor, targetMajor uint64,
 	) map[string]*scenario {
+		targetImages := generateTargetImages(targetMajor)
+
 		return map[string]*scenario{
 			postgisEntry: {
 				startingCluster: generatePostGISCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgis:%v", targetMajor),
+				targetImage:     targetImages[postgisEntry],
 				targetMajor:     int(targetMajor),
 			},
 			postgresqlEntry: {
 				startingCluster: generatePostgreSQLCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%v", targetMajor),
+				targetImage:     targetImages[postgresqlEntry],
 				targetMajor:     int(targetMajor),
 			},
 			postgresqlMinimalEntry: {
 				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass, int(currentMajor)),
 				startingMajor:   int(currentMajor),
-				targetImage:     fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%v-minimal-bookworm", targetMajor),
+				targetImage:     targetImages[postgresqlMinimalEntry],
 				targetMajor:     int(targetMajor),
 			},
 		}
