@@ -86,6 +86,10 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
 	}
 
+	if monitoring := c.cluster.Spec.Monitoring; monitoring != nil && monitoring.PodMonitorScrapeClass != "" {
+		spec.ScrapeClassName = &monitoring.PodMonitorScrapeClass
+	}
+
 	return &monitoringv1.PodMonitor{
 		ObjectMeta: meta,
 		Spec:       spec,
