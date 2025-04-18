@@ -213,16 +213,10 @@ func internalRun(
 	}
 
 	// Step 3: gather the WAL files names to archive
-	maxParallel := 1
-	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil && cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel > 0 {
-		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
-	}
-
-	maxResults := maxParallel - 1
 	walFilesList := walUtils.GatherReadyWALFiles(
 		ctx,
 		walUtils.GatherReadyWALFilesConfig{
-			MaxResults: maxResults,
+			MaxResults: getMaxResult(cluster),
 			SkipWALs:   []string{walName},
 			PgDataPath: pgData,
 		},
@@ -256,6 +250,13 @@ func internalRun(
 	// The other errors are related to WAL files that were pre-archived as
 	// a performance optimization and are just logged
 	return walStatus[0].Err
+}
+
+func getMaxResult(cluster *apiv1.Cluster) int {
+	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil && cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel > 0 {
+		return cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel - 1
+	}
+	return 0
 }
 
 // archiveWALViaPlugins requests every capable plugin to archive the passed
