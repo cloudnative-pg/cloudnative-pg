@@ -110,6 +110,7 @@ Should be empty or one of error, warning, info, debug, or trace.`)
 // decode progressively decodes the logs
 func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel chan<- logRecord) {
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 
 	for scanner.Scan() {
 		select {
