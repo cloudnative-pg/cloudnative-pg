@@ -57,22 +57,6 @@ var _ = Describe("CSV file reader", func() {
 			Expect(spy.records).To(HaveLen(2))
 		})
 
-		It("can read multiple CSV lines on PostgreSQL version <= 12", func(ctx SpecContext) {
-			f, err := os.Open("testdata/two_lines_12.csv")
-			defer func() {
-				_ = f.Close()
-			}()
-			Expect(err).ToNot(HaveOccurred())
-
-			spy := SpyRecordWriter{}
-			p := LogPipe{
-				record:          &LoggingRecord{},
-				fieldsValidator: LogFieldValidator,
-			}
-			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
-			Expect(spy.records).To(HaveLen(2))
-		})
-
 		It("can read multiple CSV lines on PostgreSQL version == 14", func(ctx SpecContext) {
 			f, err := os.Open("testdata/two_lines_14.csv")
 			defer func() {

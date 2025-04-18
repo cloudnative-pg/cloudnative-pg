@@ -150,8 +150,8 @@ var _ = Describe("Cluster image detection", func() {
 			Spec: apiv1.ImageCatalogSpec{
 				Images: []apiv1.CatalogImage{
 					{
-						Image: "postgres:11.2",
-						Major: 11,
+						Image: "postgres:17.4",
+						Major: 17,
 					},
 				},
 			},
