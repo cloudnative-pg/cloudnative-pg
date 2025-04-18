@@ -53,18 +53,18 @@ func parseVersionNum(versionNum string) (*semver.Version, error) {
 	}, nil
 }
 
-// GetPgdataVersion read the PG_VERSION file in the data directory
+// GetMajorVersionFromPgData read the PG_VERSION file in the data directory
 // returning the major version of the database
-func GetPgdataVersion(pgData string) (semver.Version, error) {
+func GetMajorVersionFromPgData(pgData string) (int, error) {
 	content, err := os.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
 	if err != nil {
-		return semver.Version{}, err
+		return 0, err
 	}
 
-	major, err := strconv.ParseUint(strings.TrimSpace(string(content)), 10, 64)
+	major, err := strconv.ParseInt(strings.TrimSpace(string(content)), 10, 64)
 	if err != nil {
-		return semver.Version{}, err
+		return 0, err
 	}
 
-	return semver.Version{Major: major}, nil
+	return int(major), nil
 }

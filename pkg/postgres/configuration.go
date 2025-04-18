@@ -28,8 +28,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
@@ -249,16 +247,13 @@ var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateStr
 // identTemplate is the template used to create the HBA configuration
 var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
 
-// MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
-var MajorVersionRangeUnlimited = version.Data{}
-
-// VersionRange is used to represent a range of PostgreSQL versions
-type VersionRange struct {
+// MajorVersionRange is used to represent a range of PostgreSQL major versions
+type MajorVersionRange struct {
 	// The minimum limit of PostgreSQL major version, extreme included
-	Min version.Data
+	Min int
 
 	// The maximum limit of PostgreSQL version, extreme excluded, or MajorVersionRangeUnlimited
-	Max version.Data
+	Max int
 }
 
 // SettingsCollection is a collection of PostgreSQL settings
@@ -274,7 +269,7 @@ type ConfigurationSettings struct {
 
 	// The following settings are like GlobalPostgresSettings
 	// but are relative only to certain PostgreSQL versions
-	DefaultSettings map[VersionRange]SettingsCollection
+	DefaultSettings map[MajorVersionRange]SettingsCollection
 
 	// The following settings are applied to the final PostgreSQL configuration,
 	// even if the user specified something different
@@ -294,7 +289,7 @@ type ConfigurationInfo struct {
 	Settings ConfigurationSettings
 
 	// The PostgreSQL version
-	Version version.Data
+	MajorVersion int
 
 	// The list of user-level settings
 	UserSettings map[string]string
@@ -642,7 +637,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 			configuration.OverwriteConfig(key, value)
 		}
 
-		if info.Version.Major() >= 17 {
+		if info.MajorVersion >= 17 {
 			configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
 		}
 	}
@@ -711,14 +706,9 @@ func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfigura
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range info.Settings.DefaultSettings {
-		if constraints.Min == MajorVersionRangeUnlimited ||
-			constraints.Min == info.Version ||
-			constraints.Min.Less(info.Version) {
-			if constraints.Max == MajorVersionRangeUnlimited ||
-				info.Version.Less(constraints.Max) {
-				for key, value := range settings {
-					configuration.OverwriteConfig(key, value)
-				}
+		if constraints.Min <= info.MajorVersion && info.MajorVersion < constraints.Max {
+			for key, value := range settings {
+				configuration.OverwriteConfig(key, value)
 			}
 		}
 	}

@@ -30,7 +30,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -70,12 +69,12 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
-	pgVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
+	pgMajor, err := postgresutils.GetMajorVersionFromPgData(instance.PgData)
 	if err != nil {
 		return false, err
 	}
 
-	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgVersion.Major)
+	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgMajor)
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,
@@ -93,7 +92,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 
 // GeneratePostgresqlHBA generates the pg_hba.conf content with the LDAP configuration if configured.
 func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBindPassword string) (string, error) {
-	version, err := cluster.GetPostgresqlVersion()
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +105,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 	// See:
 	// https://www.postgresql.org/docs/14/release-14.html
 	defaultAuthenticationMethod := "scram-sha-256"
-	if version.Major() < 14 {
+	if majorVersion < 14 {
 		defaultAuthenticationMethod = "md5"
 	}
 
@@ -382,11 +381,11 @@ func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (chan
 func createPostgresqlConfiguration(
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
-	majorVersion uint64,
+	majorVersion int,
 ) (string, string) {
 	info := postgres.ConfigurationInfo{
 		Settings:                         postgres.CnpgConfigurationSettings,
-		Version:                          version.New(majorVersion, 0),
+		MajorVersion:                     majorVersion,
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,

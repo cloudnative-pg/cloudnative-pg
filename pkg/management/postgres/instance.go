@@ -1034,7 +1034,7 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Version) error {
+func (instance *Instance) Rewind(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
@@ -1052,16 +1052,12 @@ func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Ver
 		"--target-pgdata", instance.PgData,
 	}
 
-	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
-	// let’s automatically use it, if possible
-	if postgresVersion.Major >= 13 {
-		// make sure restore_command is set in override.conf
-		if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
-			return err
-		}
-
-		options = append(options, "--restore-target-wal")
+	// make sure restore_command is set in override.conf
+	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
+		return err
 	}
+
+	options = append(options, "--restore-target-wal")
 
 	// Make sure PostgreSQL control file is not empty
 	err := instance.managePgControlFileBackup()

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -395,27 +394,27 @@ func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, contextutils.ContextKeyCluster, cluster)
 }
 
-// GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
+// GetPostgresqlMajorVersion gets the PostgreSQL image major version detecting it from the
 // image name or from the ImageCatalogRef.
-// Example:
-//
-// ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version (14,0)
-// ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version (13,2)
-func (cluster *Cluster) GetPostgresqlVersion() (version.Data, error) {
+func (cluster *Cluster) GetPostgresqlMajorVersion() (int, error) {
 	if cluster.Spec.ImageCatalogRef != nil {
-		return version.FromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
-	}
-
-	if cluster.Status.Image != "" {
-		return version.FromTag(reference.New(cluster.Status.Image).Tag)
+		return cluster.Spec.ImageCatalogRef.Major, nil
 	}
 
 	if cluster.Spec.ImageName != "" {
-		return version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
+		if imgVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag); err != nil {
+			return 0, fmt.Errorf("cannot parse image name %q: %w", cluster.Spec.ImageName, err)
+		} else {
+			return int(imgVersion.Major()), nil
+		}
 	}
 
 	// Fallback for unit tests where a cluster is created without status or defaults
-	return version.FromTag(reference.New(configuration.Current.PostgresImageName).Tag)
+	if imgVersion, err := version.FromTag(reference.New(configuration.Current.PostgresImageName).Tag); err != nil {
+		return 0, fmt.Errorf("cannot parse default image name %q: %w", configuration.Current.PostgresImageName, err)
+	} else {
+		return int(imgVersion.Major()), nil
+	}
 }
 
 // GetImagePullSecret get the name of the pull secret to use

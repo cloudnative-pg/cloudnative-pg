@@ -124,6 +124,7 @@ var _ = Describe("testing the building of the ldap config string", func() {
 var _ = Describe("Test building of the list of temporary tablespaces", func() {
 	defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 	Expect(err).ToNot(HaveOccurred())
+	defaultMajor := int(defaultVersion.Major())
 
 	clusterWithoutTablespaces := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -175,17 +176,17 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 	}
 
 	It("doesn't set temp_tablespaces if there are no declared tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithoutTablespaces, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&clusterWithoutTablespaces, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
 	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
 	It("sets temp_tablespaces when there are temporary tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true, defaultMajor)
 		Expect(config).To(ContainSubstring("temp_tablespaces = 'other_temporary_tablespace,temporary_tablespace'"))
 	})
 })
@@ -193,6 +194,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 var _ = Describe("recovery_min_apply_delay", func() {
 	defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 	Expect(err).ToNot(HaveOccurred())
+	defaultMajor := int(defaultVersion.Major())
 
 	primaryCluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -242,21 +244,21 @@ var _ = Describe("recovery_min_apply_delay", func() {
 	It("do not set recovery_min_apply_delay in primary clusters", func() {
 		Expect(primaryCluster.IsReplica()).To(BeFalse())
 
-		config, _ := createPostgresqlConfiguration(&primaryCluster, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&primaryCluster, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 
 	It("set recovery_min_apply_delay in replica clusters when set", func() {
 		Expect(replicaCluster.IsReplica()).To(BeTrue())
 
-		config, _ := createPostgresqlConfiguration(&replicaCluster, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&replicaCluster, true, defaultMajor)
 		Expect(config).To(ContainSubstring("recovery_min_apply_delay = '3600s'"))
 	})
 
 	It("do not set recovery_min_apply_delay in replica clusters when not set", func() {
 		Expect(replicaClusterWithNoDelay.IsReplica()).To(BeTrue())
 
-		config, _ := createPostgresqlConfiguration(&replicaClusterWithNoDelay, true, defaultVersion.Major())
+		config, _ := createPostgresqlConfiguration(&replicaClusterWithNoDelay, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 })

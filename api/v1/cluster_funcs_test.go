@@ -24,7 +24,6 @@ import (
 	"time"
 
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -778,16 +777,16 @@ var _ = Describe("A config map resource version", func() {
 
 var _ = Describe("PostgreSQL version detection", func() {
 	tests := []struct {
-		imageName       string
-		postgresVersion version.Data
+		imageName            string
+		postgresMajorVersion int
 	}{
 		{
 			"ghcr.io/cloudnative-pg/postgresql:14.0",
-			version.New(14, 0),
+			14,
 		},
 		{
-			"ghcr.io/cloudnative-pg/postgresql:13.2",
-			version.New(13, 2),
+			"ghcr.io/cloudnative-pg/postgresql:17.4",
+			17,
 		},
 	}
 
@@ -795,7 +794,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 		cluster := Cluster{}
 		for _, test := range tests {
 			cluster.Spec.ImageName = test.imageName
-			Expect(cluster.GetPostgresqlVersion()).To(Equal(test.postgresVersion))
+			Expect(cluster.GetPostgresqlMajorVersion()).To(Equal(test.postgresMajorVersion))
 		}
 	})
 	It("correctly extract PostgreSQL versions from ImageCatalogRef", func() {
@@ -807,7 +806,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 			},
 			Major: 16,
 		}
-		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(16, 0)))
+		Expect(cluster.GetPostgresqlMajorVersion()).To(Equal(16))
 	})
 
 	It("correctly prioritizes ImageCatalogRef over Status.Image and Spec.ImageName", func() {
@@ -828,15 +827,11 @@ var _ = Describe("PostgreSQL version detection", func() {
 		}
 
 		// ImageCatalogRef should take precedence
-		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(16, 0)))
-
-		// Remove ImageCatalogRef, Status.Image should take precedence
-		cluster.Spec.ImageCatalogRef = nil
-		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(15, 2)))
+		Expect(cluster.GetPostgresqlMajorVersion()).To(Equal(16))
 
 		// Remove Status.Image, Spec.ImageName should be used
-		cluster.Status.Image = ""
-		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(14, 1)))
+		cluster.Spec.ImageCatalogRef = nil
+		Expect(cluster.GetPostgresqlMajorVersion()).To(Equal(14))
 	})
 })
 

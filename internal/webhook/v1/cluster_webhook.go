@@ -951,13 +951,13 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 				"Can't have both legacy synchronous replica configuration and new one"))
 	}
 
-	pgVersion, err := r.GetPostgresqlVersion()
+	pgMajor, err := r.GetPostgresqlMajorVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
-	if pgVersion.Major() < 13 {
+	if pgMajor < 13 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
@@ -966,7 +966,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
-		Version:                pgVersion,
+		MajorVersion:           pgMajor,
 		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster:       r.IsReplica(),
 		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
@@ -1232,7 +1232,7 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 // to a new one.
 func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
-	var newVersion, oldVersion version.Data
+	var newVersion, oldVersion int
 	var err error
 	var fieldPath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
@@ -1243,7 +1243,7 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 
 	newCluster := r.DeepCopy()
 	newCluster.Status.Image = ""
-	newVersion, err = newCluster.GetPostgresqlVersion()
+	newVersion, err = newCluster.GetPostgresqlMajorVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
@@ -1254,32 +1254,31 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 	if old.Status.MajorVersionUpgradeFromImage != nil {
 		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
 	}
-	oldVersion, err = old.GetPostgresqlVersion()
+	oldVersion, err = old.GetPostgresqlMajorVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
-	if oldVersion.Major() > newVersion.Major() {
+	if oldVersion > newVersion {
 		result = append(
 			result,
 			field.Invalid(
 				fieldPath,
-				fmt.Sprintf("%v", newVersion.Major()),
-				fmt.Sprintf("can't downgrade from majors %v to %v",
-					oldVersion.Major(), newVersion.Major())))
+				strconv.Itoa(newVersion),
+				fmt.Sprintf("can't downgrade from majors %v to %v", oldVersion, newVersion)))
 	}
 
 	// TODO: Upgrading to versions 14 and 15 would require carrying information around about the collation used.
 	//   See https://git.postgresql.org/gitweb/?p=postgresql.git;a=commitdiff;h=9637badd9.
 	//   This is not implemented yet, and users should not upgrade to old versions anyway, so we are blocking it.
-	if oldVersion.Major() < newVersion.Major() && newVersion.Major() < 16 {
+	if oldVersion < newVersion && newVersion < 16 {
 		result = append(
 			result,
 			field.Invalid(
 				fieldPath,
-				fmt.Sprintf("%v", newVersion.Major()),
+				strconv.Itoa(newVersion),
 				"major upgrades are only supported to version 16 or higher"))
 	}
 	return result

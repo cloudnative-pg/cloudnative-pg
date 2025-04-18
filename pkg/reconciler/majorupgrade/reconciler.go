@@ -68,7 +68,7 @@ func Reconcile(
 		return nil, nil
 	}
 
-	desiredVersion, err := cluster.GetPostgresqlVersion()
+	desiredMajor, err := cluster.GetPostgresqlMajorVersion()
 	if err != nil {
 		contextLogger.Error(err, "Unable to retrieve the new PostgreSQL version")
 		return nil, err
@@ -81,10 +81,10 @@ func Reconcile(
 	}
 
 	contextLogger.Info("Reconciling in-place major version upgrades",
-		"primaryNodeSerial", primaryNodeSerial, "desiredVersion", desiredVersion.Major())
+		"primaryNodeSerial", primaryNodeSerial, "desiredMajor", desiredMajor)
 
 	err = registerPhase(ctx, c, cluster, apiv1.PhaseMajorUpgrade,
-		fmt.Sprintf("Upgrading cluster to major version %v", desiredVersion.Major()))
+		fmt.Sprintf("Upgrading cluster to major version %v", desiredMajor))
 	if err != nil {
 		return nil, err
 	}
