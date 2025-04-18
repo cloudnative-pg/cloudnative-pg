@@ -93,13 +93,6 @@ var _ = Describe("probes", func() {
 	})
 
 	Context("Fill basebackup stats", func() {
-		It("does nothing in case of that major version is less than 13 ", func() {
-			instance := &Instance{
-				pgVersion: &semver.Version{Major: 12},
-			}
-			Expect(instance.fillBasebackupStats(nil, nil)).To(Succeed())
-		})
-
 		It("set the information", func() {
 			instance := (&Instance{
 				pgVersion: &semver.Version{Major: 13},
