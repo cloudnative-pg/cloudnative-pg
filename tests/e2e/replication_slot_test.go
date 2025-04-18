@@ -73,13 +73,6 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			}, 10, 2).Should(BeTrue())
 		})
 
-		if env.PostgresVersion == 11 {
-			// We need to take into account the fact that on PostgreSQL 11
-			// it is required to rolling restart the cluster to
-			// enable or disable the feature once the cluster is created.
-			AssertClusterRollingRestart(namespace, clusterName)
-		}
-
 		By("checking Primary HA slots exist and are active", func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -166,13 +159,6 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 				return cluster.Spec.ReplicationSlots.GetEnabled(), nil
 			}, 10, 2).Should(BeFalse())
 		})
-
-		if env.PostgresVersion == 11 {
-			// We need to take into account the fact that on PostgreSQL 11
-			// it is required to rolling restart the cluster to
-			// enable or disable the feature once the cluster is created.
-			AssertClusterRollingRestart(namespace, clusterName)
-		}
 
 		By("verifying slots have been removed from the cluster's pods", func() {
 			pods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
