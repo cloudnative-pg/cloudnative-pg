@@ -47,7 +47,7 @@ type prettyCmd struct {
 // NewCmd creates a new `kubectl cnpg logs pretty` command
 func NewCmd() *cobra.Command {
 	var loggers, pods []string
-	var sortingGroupSize, verbosity, bufferSizeInKB int
+	var sortingGroupSize, verbosity int
 	bf := prettyCmd{}
 
 	cmd := &cobra.Command{
@@ -71,8 +71,7 @@ func NewCmd() *cobra.Command {
 
 			wait.Add(1)
 			go func() {
-				scanner := newScanner(bufferSizeInKB*1024, os.Stdin)
-				bf.decode(cmd.Context(), scanner, recordChannel)
+				bf.decode(cmd.Context(), os.Stdin, recordChannel)
 				wait.Done()
 			}()
 
@@ -104,14 +103,15 @@ func NewCmd() *cobra.Command {
 Should be empty or one of error, warning, info, debug, or trace.`)
 	cmd.Flags().CountVarP(&verbosity, "verbosity", "v",
 		"The logs verbosity level. More verbose means more information will be printed")
-	cmd.Flags().IntVar(&bufferSizeInKB, "buffer-size", 8*1024,
-		"Scanner buffer size in KB. Increase this value when processing very large log lines")
 
 	return cmd
 }
 
 // decode progressively decodes the logs
-func (bf *prettyCmd) decode(ctx context.Context, scanner *bufio.Scanner, recordChannel chan<- logRecord) {
+func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel chan<- logRecord) {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -138,15 +138,6 @@ func (bf *prettyCmd) decode(ctx context.Context, scanner *bufio.Scanner, recordC
 	}
 
 	close(recordChannel)
-}
-
-func newScanner(bufferSize int, reader io.Reader) *bufio.Scanner {
-	scanner := bufio.NewScanner(reader)
-	if bufferSize > 0 {
-		buffer := make([]byte, bufferSize)
-		scanner.Buffer(buffer, bufferSize)
-	}
-	return scanner
 }
 
 // group transforms a stream of logs into a stream of log groups, so that the groups
