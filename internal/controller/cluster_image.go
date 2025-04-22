@@ -75,8 +75,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
 	requestedMajorVersion := requestedImageInfo.MajorVersion
 
-	switch {
-	case currentMajorVersion > requestedMajorVersion:
+	if currentMajorVersion > requestedMajorVersion {
 		// Major version downgrade requested. This is not allowed.
 		contextLogger.Info(
 			"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
@@ -84,8 +83,9 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 			"requestedImage", requestedImageInfo)
 		return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
 			currentMajorVersion, requestedMajorVersion)
+	}
 
-	case currentMajorVersion < requestedMajorVersion:
+	if currentMajorVersion < requestedMajorVersion {
 		// Major version upgrade requested
 		return nil, status.PatchWithOptimisticLock(
 			ctx,
@@ -93,17 +93,16 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 			cluster,
 			status.SetImage(requestedImageInfo.Image),
 		)
-
-	default:
-		// The major versions are the same, but the images are different.
-		// This is a minor version upgrade.
-		return nil, status.PatchWithOptimisticLock(
-			ctx,
-			r.Client,
-			cluster,
-			status.SetImage(requestedImageInfo.Image),
-			status.SetPGDataImageInfo(&requestedImageInfo))
 	}
+
+	// The major versions are the same, but the images are different.
+	// This is a minor version upgrade/downgrade.
+	return nil, status.PatchWithOptimisticLock(
+		ctx,
+		r.Client,
+		cluster,
+		status.SetImage(requestedImageInfo.Image),
+		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
 func getImageInfoFromImage(image string) (apiv1.ImageInfo, error) {
