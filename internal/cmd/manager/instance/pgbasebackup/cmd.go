@@ -105,8 +105,6 @@ func NewCmd() *cobra.Command {
 
 // bootstrapUsingPgbasebackup creates a new data dir from the configuration
 func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
-	contextLogger := log.FromContext(ctx)
-
 	var cluster apiv1.Cluster
 	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: env.info.ClusterName}, &cluster)
 	if err != nil {
@@ -134,22 +132,13 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return err
 	}
 
-	pgVersion, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		contextLogger.Warning(
-			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
-			"imageName", cluster.GetImageName(),
-			"err", err)
-	} else if pgVersion.Major() >= 12 {
-		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
-		// A short timeout could not be enough in case the instance is slow to send data,
-		// like when the I/O is overloaded.
-		connectionString += " options='-c wal_sender_timeout=0s'"
-	}
+	// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
+	// A short timeout could not be enough in case the instance is slow to send data,
+	// like when the I/O is overloaded.
+	connectionString += " options='-c wal_sender_timeout=0s'"
 
-	err = postgres.ClonePgData(ctx, connectionString, env.info.PgData, env.info.PgWal)
-	if err != nil {
-		return err
+	if err := postgres.ClonePgData(ctx, connectionString, env.info.PgData, env.info.PgWal); err != nil {
+		return fmt.Errorf("while cloning pgdata: %w", err)
 	}
 
 	if cluster.IsReplica() {

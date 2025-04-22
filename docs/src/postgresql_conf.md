@@ -65,7 +65,7 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
-archive_mode = 'on'
+archive_timeout = '5min'
 dynamic_shared_memory_type = 'posix'
 full_page_writes = 'on'
 logging_collector = 'on'
@@ -78,9 +78,11 @@ log_truncate_on_rotation = 'false'
 max_parallel_workers = '32'
 max_replication_slots = '32'
 max_worker_processes = '32'
-shared_memory_type = 'mmap' # for PostgreSQL >= 12 only
-wal_keep_size = '512MB' # for PostgreSQL >= 13 only
-wal_keep_segments = '32' # for PostgreSQL <= 12 only
+shared_memory_type = 'mmap'
+shared_preload_libraries = ''
+ssl_max_protocol_version = 'TLSv1.3'
+ssl_min_protocol_version = 'TLSv1.3'
+wal_keep_size = '512MB'
 wal_level = 'logical'
 wal_log_hints = 'on'
 wal_sender_timeout = '5s'

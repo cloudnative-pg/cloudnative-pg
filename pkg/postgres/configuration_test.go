@@ -88,21 +88,6 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		Expect(confFile).To(ContainSubstring("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
 	})
 
-	When("version is 10", func() {
-		It("will use appropriate settings", func() {
-			info := ConfigurationInfo{
-				Settings:              CnpgConfigurationSettings,
-				Version:               version.New(10, 0),
-				UserSettings:          settings,
-				IncludingMandatory:    true,
-				SyncReplicasElectable: nil,
-				SyncReplicas:          0,
-			}
-			config := CreatePostgresqlConfiguration(info)
-			Expect(config.GetConfig("wal_keep_segments")).To(Equal("32"))
-		})
-	})
-
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{

@@ -105,7 +105,8 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 	if !ok {
 		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
 	}
-	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
+		cluster.GetNamespace())
 
 	allErrs := v.validate(cluster)
 	allWarnings := v.getAdmissionWarnings(cluster)
@@ -134,7 +135,8 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 		return nil, fmt.Errorf("expected a Cluster object for the oldObj but got %T", oldObj)
 	}
 
-	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
+		cluster.GetNamespace())
 
 	// applying defaults before validating updates to set any new default
 	oldCluster.SetDefaults()
@@ -160,7 +162,8 @@ func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, obj runtime.O
 	if !ok {
 		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
 	}
-	clusterLog.Info("Validation for Cluster upon deletion", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+	clusterLog.Info("Validation for Cluster upon deletion", "name", cluster.GetName(), "namespace",
+		cluster.GetNamespace())
 
 	// TODO(user): fill in your validation logic upon object deletion.
 
@@ -906,12 +909,12 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		// validateImageName function
 		return result
 	}
-	if pgVersion.Major() < 12 {
+	if pgVersion.Major() < 13 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
-				"Unsupported PostgreSQL version. Versions 12 or newer are supported"))
+				"Unsupported PostgreSQL version. Versions 13 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
