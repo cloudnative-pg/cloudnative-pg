@@ -1232,8 +1232,6 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 // to a new one.
 func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
-	var newVersion, oldVersion int
-	var err error
 	var fieldPath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
 		fieldPath = field.NewPath("spec", "imageCatalogRef", "major")
@@ -1241,25 +1239,17 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		fieldPath = field.NewPath("spec", "imageName")
 	}
 
-	newCluster := r.DeepCopy()
-	newCluster.Status.Image = ""
-	newVersion, err = newCluster.GetPostgresqlMajorVersion()
+	newVersion, err := r.GetPostgresqlMajorVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
-	old = old.DeepCopy()
-	if old.Status.MajorVersionUpgradeFromImage != nil {
-		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
-	}
-	oldVersion, err = old.GetPostgresqlMajorVersion()
-	if err != nil {
-		// The validation error will be already raised by the
-		// validateImageName function
+	if old.Status.PGDataImageInfo == nil {
 		return result
 	}
+	oldVersion := old.Status.PGDataImageInfo.MajorVersion
 
 	if oldVersion > newVersion {
 		result = append(
@@ -1267,7 +1257,7 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 			field.Invalid(
 				fieldPath,
 				strconv.Itoa(newVersion),
-				fmt.Sprintf("can't downgrade from majors %v to %v", oldVersion, newVersion)))
+				fmt.Sprintf("can't downgrade from major %v to %v", oldVersion, newVersion)))
 	}
 
 	// TODO: Upgrading to versions 14 and 15 would require carrying information around about the collation used.

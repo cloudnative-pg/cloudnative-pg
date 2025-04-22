@@ -6173,11 +6173,6 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
-              majorVersionUpgradeFromImage:
-                description: |-
-                  MajorVersionUpgradeFromImage contains the image that was
-                  running before the major version upgrade started.
-                type: string
               managedRolesStatus:
                 description: ManagedRolesStatus reports the state of the managed roles
                   in the cluster
@@ -6220,6 +6215,20 @@ spec:
                 description: OnlineUpdateEnabled shows if the online upgrade is enabled
                   inside the cluster
                 type: boolean
+              pgDataImageInfo:
+                description: PGDataImageInfo contains the details of the latest image
+                  that has run on the current data directory.
+                properties:
+                  image:
+                    description: Image is the image name
+                    type: string
+                  majorVersion:
+                    description: MajorVersion is the major version of the image
+                    type: integer
+                required:
+                - image
+                - majorVersion
+                type: object
               phase:
                 description: Current phase of the cluster
                 type: string

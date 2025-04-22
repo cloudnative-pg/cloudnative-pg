@@ -2258,12 +2258,11 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>Image contains the image name used by the pods</p>
 </td>
 </tr>
-<tr><td><code>majorVersionUpgradeFromImage</code><br/>
-<i>string</i>
+<tr><td><code>pgDataImageInfo</code><br/>
+<a href="#postgresql-cnpg-io-v1-ImageInfo"><i>ImageInfo</i></a>
 </td>
 <td>
-   <p>MajorVersionUpgradeFromImage contains the image that was
-running before the major version upgrade started.</p>
+   <p>PGDataImageInfo contains the details of the latest image that has run on the current data directory.</p>
 </td>
 </tr>
 <tr><td><code>pluginStatus</code><br/>
@@ -2993,6 +2992,37 @@ of WAL archiving and backups for this external cluster</p>
 </td>
 <td>
    <p>List of CatalogImages available in the catalog</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageInfo     {#postgresql-cnpg-io-v1-ImageInfo}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>ImageInfo contains the information about a PostgreSQL image</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Image is the image name</p>
+</td>
+</tr>
+<tr><td><code>majorVersion</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>MajorVersion is the major version of the image</p>
 </td>
 </tr>
 </tbody>

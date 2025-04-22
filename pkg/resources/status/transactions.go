@@ -70,10 +70,9 @@ func SetImage(image string) Transaction {
 	}
 }
 
-// SetMajorVersionUpgradeFromImage is a transaction that sets the cluster as upgrading to a newer major version
-// starting from the provided image
-func SetMajorVersionUpgradeFromImage(image *string) Transaction {
+// SetPGDataImageInfo is a transaction that sets the PGDataImageInfo
+func SetPGDataImageInfo(imageInfo *apiv1.ImageInfo) Transaction {
 	return func(cluster *apiv1.Cluster) {
-		cluster.Status.MajorVersionUpgradeFromImage = image
+		cluster.Status.PGDataImageInfo = imageInfo
 	}
 }

@@ -402,19 +402,19 @@ func (cluster *Cluster) GetPostgresqlMajorVersion() (int, error) {
 	}
 
 	if cluster.Spec.ImageName != "" {
-		if imgVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag); err != nil {
+		imgVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
+		if err != nil {
 			return 0, fmt.Errorf("cannot parse image name %q: %w", cluster.Spec.ImageName, err)
-		} else {
-			return int(imgVersion.Major()), nil
 		}
+		return int(imgVersion.Major()), nil //nolint:gosec
 	}
 
 	// Fallback for unit tests where a cluster is created without status or defaults
-	if imgVersion, err := version.FromTag(reference.New(configuration.Current.PostgresImageName).Tag); err != nil {
+	imgVersion, err := version.FromTag(reference.New(configuration.Current.PostgresImageName).Tag)
+	if err != nil {
 		return 0, fmt.Errorf("cannot parse default image name %q: %w", configuration.Current.PostgresImageName, err)
-	} else {
-		return int(imgVersion.Major()), nil
 	}
+	return int(imgVersion.Major()), nil //nolint:gosec
 }
 
 // GetImagePullSecret get the name of the pull secret to use

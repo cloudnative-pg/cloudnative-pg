@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -74,7 +73,8 @@ var _ = Describe("Cluster image detection", func() {
 		Expect(result).To(BeNil())
 
 		Expect(cluster.Status.Image).To(Equal("postgres:15.2"))
-		Expect(cluster.Status.MajorVersionUpgradeFromImage).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:15.2"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(15))
 	})
 
 	It("gets the image from an image catalog", func(ctx SpecContext) {
@@ -118,7 +118,8 @@ var _ = Describe("Cluster image detection", func() {
 		Expect(result).To(BeNil())
 
 		Expect(cluster.Status.Image).To(Equal("postgres:15.2"))
-		Expect(cluster.Status.MajorVersionUpgradeFromImage).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:15.2"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(15))
 	})
 
 	It("gets the name from the image catalog, but the catalog is incomplete", func(ctx SpecContext) {
@@ -176,13 +177,18 @@ var _ = Describe("Cluster image detection", func() {
 			},
 			Status: apiv1.ClusterStatus{
 				Image: "postgres:16.2",
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:16.2",
+					MajorVersion: 16,
+				},
 			},
 		}
 
 		r := newFakeReconcilerFor(cluster, nil)
 
 		result, err := r.reconcileImage(ctx, cluster)
-		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(err).Error().Should(HaveOccurred())
+		Expect(err).Error().Should(MatchError("cannot downgrade the PostgreSQL major version from 16 to 15"))
 		Expect(result).To(BeNil())
 
 		Expect(cluster.Status.Image).To(Equal("postgres:16.2"))
@@ -199,6 +205,10 @@ var _ = Describe("Cluster image detection", func() {
 			},
 			Status: apiv1.ClusterStatus{
 				Image: "postgres:16.2",
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:16.2",
+					MajorVersion: 16,
+				},
 			},
 		}
 
@@ -209,26 +219,7 @@ var _ = Describe("Cluster image detection", func() {
 		Expect(result).To(BeNil())
 
 		Expect(cluster.Status.Image).To(Equal("postgres:17.2"))
-		Expect(cluster.Status.MajorVersionUpgradeFromImage).ToNot(BeNil())
-		Expect(*cluster.Status.MajorVersionUpgradeFromImage).To(Equal("postgres:16.2"))
-	})
-})
-
-var _ = Describe("Major version tracking with getCurrentPgDataImage", func() {
-	It("returns the current major version if no major version update has been requested", func() {
-		status := &apiv1.ClusterStatus{
-			Image: "postgres:15.2",
-		}
-
-		Expect(getCurrentPgDataImage(status)).To(Equal("postgres:15.2"))
-	})
-
-	It("returns the old major version if a major version update has been requested", func() {
-		status := &apiv1.ClusterStatus{
-			Image:                        "postgres:15.2",
-			MajorVersionUpgradeFromImage: ptr.To("postgres:14.3"),
-		}
-
-		Expect(getCurrentPgDataImage(status)).To(Equal("postgres:14.3"))
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16.2"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
 	})
 })

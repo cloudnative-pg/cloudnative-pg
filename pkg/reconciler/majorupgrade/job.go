@@ -54,8 +54,6 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 
 // createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version
 func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *batchv1.Job {
-	oldImage := *cluster.Status.MajorVersionUpgradeFromImage
-
 	prepareCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -65,7 +63,7 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 	}
 	oldVersionInitContainer := corev1.Container{
 		Name:            "prepare",
-		Image:           oldImage,
+		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command:         prepareCommand,
 		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster),

@@ -65,6 +65,9 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "cluster-example",
 			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+			},
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			buildPrimaryPVC(1),
@@ -100,8 +103,8 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		}
 
 		// the upgrade has been marked as done
-		Expect(cluster.Status.MajorVersionUpgradeFromImage).ToNot(BeNil())
-		Expect(*cluster.Status.MajorVersionUpgradeFromImage).To(Equal("postgres:16"))
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
 
 		// the job has been deleted
 		var tempJob batchv1.Job

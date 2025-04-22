@@ -64,14 +64,13 @@ func Reconcile(
 		return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
 	}
 
-	if cluster.Status.MajorVersionUpgradeFromImage == nil {
-		return nil, nil
-	}
-
-	desiredMajor, err := cluster.GetPostgresqlMajorVersion()
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
 	if err != nil {
-		contextLogger.Error(err, "Unable to retrieve the new PostgreSQL version")
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
 		return nil, err
+	}
+	if requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
+		return nil, nil
 	}
 
 	primaryNodeSerial, err := getPrimarySerial(pvcs)
@@ -81,10 +80,10 @@ func Reconcile(
 	}
 
 	contextLogger.Info("Reconciling in-place major version upgrades",
-		"primaryNodeSerial", primaryNodeSerial, "desiredMajor", desiredMajor)
+		"primaryNodeSerial", primaryNodeSerial, "requestedMajor", requestedMajor)
 
 	err = registerPhase(ctx, c, cluster, apiv1.PhaseMajorUpgrade,
-		fmt.Sprintf("Upgrading cluster to major version %v", desiredMajor))
+		fmt.Sprintf("Upgrading cluster to major version %v", requestedMajor))
 	if err != nil {
 		return nil, err
 	}
@@ -232,11 +231,20 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, ErrIncoherentMajorUpgradeJob
 	}
 
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
 	if err := status.PatchWithOptimisticLock(
 		ctx,
 		c,
 		cluster,
-		status.SetMajorVersionUpgradeFromImage(&jobImage),
+		status.SetPGDataImageInfo(&apiv1.ImageInfo{
+			Image:        jobImage,
+			MajorVersion: requestedMajor,
+		}),
 	); err != nil {
 		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
 		return nil, err
