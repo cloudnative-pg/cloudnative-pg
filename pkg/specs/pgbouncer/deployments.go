@@ -42,7 +42,7 @@ import (
 
 const (
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.24.0"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.24.1"
 )
 
 // Deployment create the deployment of pgbouncer, given
