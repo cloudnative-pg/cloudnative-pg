@@ -54,11 +54,12 @@ import (
 
 var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade), func() {
 	const (
-		level                  = tests.Medium
-		namespacePrefix        = "cluster-major-upgrade"
-		postgisEntry           = "postgis"
-		postgresqlEntry        = "postgresql"
-		postgresqlMinimalEntry = "postgresql-minimal"
+		level                     = tests.Medium
+		namespacePrefix           = "cluster-major-upgrade"
+		postgisEntry              = "postgis"
+		postgresqlEntry           = "postgresql"
+		postgresqlMinimalEntry    = "postgresql-minimal"
+		customImageRegistryEnvVar = "MAJOR_UPGRADE_IMAGE_REGISTRY"
 	)
 
 	var namespace string
@@ -179,7 +180,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", postgres.ImageRepository, targetMajor),
 		}
 		// Set custom targets when detecting a given env variable
-		if envValue := os.Getenv("MAJOR_UPGRADE_IMAGE_REPO"); envValue != "" {
+		if envValue := os.Getenv(customImageRegistryEnvVar); envValue != "" {
 			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetMajor)
 			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetMajor)
 			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetMajor)
@@ -298,6 +299,14 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	DescribeTable("can upgrade a Cluster to a newer major version", func(scenarioName string) {
 		By("Creating the starting cluster")
+		// Avoid running Postgis major upgrade tests when a custom registry is being specified, because our
+		// PostGIS images are still based on Debian bullseye which uses OpenSSL 1.1, thus making them incompatible
+		// with any other image that uses OpenSSL 3.0 or greater.
+		// TODO: remove once we have PostGIS bookworm images
+		if scenarioName == postgisEntry && os.Getenv(customImageRegistryEnvVar) != "" {
+			Skip("Skipping PostGIS major upgrades when a custom registry is specified")
+		}
+
 		scenario := scenarios[scenarioName]
 		cluster := scenario.startingCluster
 		err := env.Client.Create(env.Ctx, cluster)
