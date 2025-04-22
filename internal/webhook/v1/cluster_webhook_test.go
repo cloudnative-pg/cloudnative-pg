@@ -1030,6 +1030,23 @@ var _ = Describe("configuration change validation", func() {
 		Expect(v.validateConfiguration(cluster)).To(HaveLen(1))
 	})
 
+	It("rejects PostgreSQL version lower than 13", func() {
+		v := &ClusterCustomValidator{}
+
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:12",
+			},
+		}
+
+		result := v.validateConfiguration(cluster)
+
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.imageName"))
+		Expect(result[0].Detail).To(ContainSubstring("Unsupported PostgreSQL version"))
+		Expect(result[0].Detail).To(ContainSubstring("Versions 13 or newer are supported"))
+	})
+
 	It("should disallow changing wal_level to minimal for existing clusters", func() {
 		oldCluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

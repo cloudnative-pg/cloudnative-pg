@@ -475,64 +475,52 @@ var (
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
 			"archive_timeout":            "5min",
+			"dynamic_shared_memory_type": "posix",
 			"full_page_writes":           "on",
-			"max_parallel_workers":       "32",
-			"max_worker_processes":       "32",
-			"max_replication_slots":      "32",
 			"logging_collector":          "on",
 			"log_destination":            "csvlog",
+			"log_directory":              LogPath,
+			"log_filename":               LogFileName,
 			"log_rotation_age":           "0",
 			"log_rotation_size":          "0",
 			"log_truncate_on_rotation":   "false",
-			"log_directory":              LogPath,
-			"log_filename":               LogFileName,
-			"dynamic_shared_memory_type": "posix",
-			"wal_sender_timeout":         "5s",
-			"wal_receiver_timeout":       "5s",
+			"max_parallel_workers":       "32",
+			"max_worker_processes":       "32",
+			"max_replication_slots":      "32",
+			"shared_memory_type":         "mmap",
+			"ssl_max_protocol_version":   "TLSv1.3",
+			"ssl_min_protocol_version":   "TLSv1.3",
+			"wal_keep_size":              "512MB",
 			"wal_level":                  "logical",
 			ParameterWalLogHints:         "on",
+			"wal_sender_timeout":         "5s",
+			"wal_receiver_timeout":       "5s",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
 			SharedPreloadLibraries: "",
 		},
-		DefaultSettings: map[VersionRange]SettingsCollection{
-			{MajorVersionRangeUnlimited, version.New(12, 0)}: {
-				"wal_keep_segments": "32",
-			},
-			{version.New(12, 0), version.New(13, 0)}: {
-				"wal_keep_segments":  "32",
-				"shared_memory_type": "mmap",
-			},
-			{version.New(13, 0), MajorVersionRangeUnlimited}: {
-				"wal_keep_size":      "512MB",
-				"shared_memory_type": "mmap",
-			},
-			{version.New(12, 0), MajorVersionRangeUnlimited}: {
-				"ssl_max_protocol_version": "TLSv1.3",
-				"ssl_min_protocol_version": "TLSv1.3",
-			},
-		},
 		MandatorySettings: SettingsCollection{
-			"listen_addresses":        "*",
-			"unix_socket_directories": SocketDirectory,
-			"hot_standby":             "true",
 			"archive_command": fmt.Sprintf(
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
-			"port":                fmt.Sprint(ServerPort),
-			"ssl":                 "on",
-			"ssl_cert_file":       ServerCertificateLocation,
-			"ssl_key_file":        ServerKeyLocation,
-			"ssl_ca_file":         ClientCACertificateLocation,
-			"restart_after_crash": "false",
+			"hot_standby":             "true",
+			"listen_addresses":        "*",
+			"port":                    fmt.Sprint(ServerPort),
+			"restart_after_crash":     "false",
+			"ssl":                     "on",
+			"ssl_cert_file":           ServerCertificateLocation,
+			"ssl_key_file":            ServerKeyLocation,
+			"ssl_ca_file":             ClientCACertificateLocation,
+			"unix_socket_directories": SocketDirectory,
 		},
 	}
 )
 
 // CreateHBARules will create the content of pg_hba.conf file given
 // the rules set by the cluster spec
-func CreateHBARules(hba []string,
+func CreateHBARules(
+	hba []string,
 	defaultAuthenticationMethod, ldapConfigString string,
 ) (string, error) {
 	var hbaContent bytes.Buffer
