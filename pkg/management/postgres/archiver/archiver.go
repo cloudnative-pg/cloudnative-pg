@@ -164,11 +164,6 @@ func internalRun(
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
-	maxParallel := 1
-	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil {
-		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
-	}
-
 	// Create the archiver
 	var walArchiver *barmanArchiver.WALArchiver
 	if walArchiver, err = barmanArchiver.New(
@@ -194,7 +189,7 @@ func internalRun(
 		return fmt.Errorf("while testing the existence of the WAL file in the spool directory: %w", err)
 	}
 	if isDeletedFromSpool {
-		contextLog.Info("Archived WAL file (parallel)",
+		contextLog.Info("WAL file already archived, skipping",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
@@ -205,7 +200,7 @@ func internalRun(
 	walFilesList := walUtils.GatherReadyWALFiles(
 		ctx,
 		walUtils.GatherReadyWALFilesConfig{
-			MaxResults: maxParallel,
+			MaxResults: getMaxResult(cluster),
 			SkipWALs:   []string{walName},
 			PgDataPath: pgData,
 		},
@@ -214,6 +209,7 @@ func internalRun(
 	// Ensure the requested WAL file is always the first one being
 	// archived
 	walFilesList.Ready = append([]string{walName}, walFilesList.Ready...)
+	contextLog.Debug("WAL files to archive", "walFilesListReady", walFilesList.Ready)
 
 	options, err := walArchiver.BarmanCloudWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
@@ -238,6 +234,13 @@ func internalRun(
 	// The other errors are related to WAL files that were pre-archived as
 	// a performance optimization and are just logged
 	return walStatus[0].Err
+}
+
+func getMaxResult(cluster *apiv1.Cluster) int {
+	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil && cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel > 0 {
+		return cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel - 1
+	}
+	return 0
 }
 
 // isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
