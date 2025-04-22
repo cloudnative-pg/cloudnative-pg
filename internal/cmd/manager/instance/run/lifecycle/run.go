@@ -22,16 +22,15 @@ package lifecycle
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/blang/semver"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 var identifierStreamingReplicationUser = pgx.Identifier{apiv1.StreamingReplicationUser}.Sanitize()
@@ -153,11 +152,6 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return nil
 	}
 
-	pgVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
-	if err != nil {
-		return fmt.Errorf("while getting major version: %w", err)
-	}
-
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting a connection to the instance: %w", err)
@@ -177,14 +171,12 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
 	}
 
-	hasSuperuser, err := configureStreamingReplicaUser(tx)
-	if err != nil {
+	if err := configureStreamingReplicaUser(tx); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
 
-	err = configurePgRewindPrivileges(pgVersion, hasSuperuser, tx)
-	if err != nil {
+	if err = configurePgRewindPrivileges(tx); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -194,28 +186,28 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 
 // configureStreamingReplicaUser makes sure the streaming replication user exists
 // and has the required rights
-func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
-	var hasLoginRight, hasReplicationRight, hasSuperuser bool
-	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_catalog.pg_roles WHERE rolname = $1",
+func configureStreamingReplicaUser(tx *sql.Tx) error {
+	var hasLoginRight, hasReplicationRight bool
+	row := tx.QueryRow("SELECT rolcanlogin, rolreplication FROM pg_catalog.pg_roles WHERE rolname = $1",
 		apiv1.StreamingReplicationUser)
-	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
+	err := row.Scan(&hasLoginRight, &hasReplicationRight)
 	if err != nil {
-		if err != sql.ErrNoRows {
-			return false, fmt.Errorf("while creating streaming replication user: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("while getting streaming replication user privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"CREATE USER %v REPLICATION",
 			identifierStreamingReplicationUser))
 		if err != nil {
-			return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
+			return fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"COMMENT ON ROLE %v IS 'Special user for streaming replication created by CloudNativePG'",
 			identifierStreamingReplicationUser))
 		if err != nil {
-			return false, fmt.Errorf("COMMENT ON ROLE %v error: %w", apiv1.StreamingReplicationUser, err)
+			return fmt.Errorf("COMMENT ON ROLE %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
 	}
 
@@ -224,28 +216,14 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 			"ALTER USER %v LOGIN REPLICATION",
 			identifierStreamingReplicationUser))
 		if err != nil {
-			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
+			return fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
 	}
-	return hasSuperuser, nil
+	return nil
 }
 
 // configurePgRewindPrivileges ensures that the StreamingReplicationUser has enough rights to execute pg_rewind
-func configurePgRewindPrivileges(pgVersion semver.Version, hasSuperuser bool, tx *sql.Tx) error {
-	// We need the superuser bit for the streaming-replication user since pg_rewind in PostgreSQL <= 10
-	// will require it.
-	if pgVersion.Major <= 10 {
-		if !hasSuperuser {
-			_, err := tx.Exec(fmt.Sprintf(
-				"ALTER USER %v SUPERUSER",
-				identifierStreamingReplicationUser))
-			if err != nil {
-				return fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
-			}
-		}
-		return nil
-	}
-
+func configurePgRewindPrivileges(tx *sql.Tx) error {
 	// Ensure the user has rights to execute the functions needed for pg_rewind
 	var hasPgRewindPrivileges bool
 	row := tx.QueryRow(
