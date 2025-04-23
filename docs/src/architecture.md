@@ -115,7 +115,7 @@ primarily for Disaster Recovery.
 ![Example of a Kubernetes architecture with only 2 data centers](./images/k8s-architecture-2-az.png)
 
 !!! Hint
-    If you are at en early stage of your Kubernetes journey, please share this
+    If you are at an early stage of your Kubernetes journey, please share this
     document with your infrastructure team. The two data centers setup might
     be simply the result of a "lift-and-shift" transition to Kubernetes
     from a traditional bare-metal or VM based infrastructure, and the benefits
