@@ -66,6 +66,7 @@ const (
 	pgControlDataBytesPerWALSegment pgControlDataKey = "Bytes per WAL segment"
 )
 
+// PgControlData represents the parsed output of pg_controldata
 type PgControlData map[pgControlDataKey]string
 
 // GetLatestCheckpointTimelineID returns the latest checkpoint's TimeLineID
