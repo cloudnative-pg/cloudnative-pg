@@ -809,6 +809,35 @@ var _ = Describe("PostgreSQL version detection", func() {
 		}
 		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(16, 0)))
 	})
+
+	It("correctly prioritizes ImageCatalogRef over Status.Image and Spec.ImageName", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "ghcr.io/cloudnative-pg/postgresql:14.1",
+				ImageCatalogRef: &ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name: "test-catalog",
+						Kind: "ImageCatalog",
+					},
+					Major: 16,
+				},
+			},
+			Status: ClusterStatus{
+				Image: "ghcr.io/cloudnative-pg/postgresql:15.2",
+			},
+		}
+
+		// ImageCatalogRef should take precedence
+		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(16, 0)))
+
+		// Remove ImageCatalogRef, Status.Image should take precedence
+		cluster.Spec.ImageCatalogRef = nil
+		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(15, 2)))
+
+		// Remove Status.Image, Spec.ImageName should be used
+		cluster.Status.Image = ""
+		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(14, 1)))
+	})
 })
 
 var _ = Describe("Default Metrics", func() {

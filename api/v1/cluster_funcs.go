@@ -402,16 +402,16 @@ func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
 // ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version (14,0)
 // ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version (13,2)
 func (cluster *Cluster) GetPostgresqlVersion() (version.Data, error) {
+	if cluster.Spec.ImageCatalogRef != nil {
+		return version.FromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
+	}
+
 	if cluster.Status.Image != "" {
 		return version.FromTag(reference.New(cluster.Status.Image).Tag)
 	}
 
 	if cluster.Spec.ImageName != "" {
 		return version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
-	}
-
-	if cluster.Spec.ImageCatalogRef != nil {
-		return version.FromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
 
 	// Fallback for unit tests where a cluster is created without status or defaults
