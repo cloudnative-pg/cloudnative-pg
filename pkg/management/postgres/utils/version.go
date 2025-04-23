@@ -61,10 +61,5 @@ func GetMajorVersionFromPgData(pgData string) (int, error) {
 		return 0, err
 	}
 
-	major, err := strconv.ParseInt(strings.TrimSpace(string(content)), 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return int(major), nil
+	return strconv.Atoi(strings.TrimSpace(string(content)))
 }
