@@ -96,7 +96,7 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       platforms: ${{ env.PLATFORMS }}
-      ubi_img: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+      ubi_img: ${{ env.UBI_IMAGE }}
     steps:
       -
         name: Checkout
@@ -214,12 +214,22 @@ jobs:
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
-      - name: Sign images
+      -
+        name: Sign images
         run: |
           images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
+      -
+        # Bake returns all the tags for a target's variant in a comma separated list.
+        # We only care about a single tag for OLM, so we remove the "latest" tag and
+        # pick the first entry in order from what's left in the list
+        name: Output images
+        env:
+          ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+        run: |
+          echo "UBI_IMAGE=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
