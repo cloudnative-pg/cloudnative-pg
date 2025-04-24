@@ -1313,8 +1313,8 @@ jobs:
         name: Setup Velero
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
-          VELERO_VERSION: "v1.15.2"
-          VELERO_AWS_PLUGIN_VERSION: "v1.11.1"
+          VELERO_VERSION: "v1.16.0"
+          VELERO_AWS_PLUGIN_VERSION: "v1.12.0"
         with:
           timeout_minutes: 10
           max_attempts: 3
