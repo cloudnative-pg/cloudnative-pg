@@ -820,6 +820,9 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 
 	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
 	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
 	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
 	ctx = cluster.SetInContext(ctx)
 

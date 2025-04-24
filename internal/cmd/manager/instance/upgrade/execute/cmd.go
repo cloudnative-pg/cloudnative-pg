@@ -37,11 +37,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -402,6 +404,14 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	if pgMajorVersion >= 18 {
 		tmpCluster.Spec.PostgresConfiguration.Parameters["idle_replication_slot_timeout"] = "0"
 	}
+
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
 
 	newInstance := postgres.Instance{PgData: destDir}
 	if _, err := newInstance.RefreshConfigurationFilesFromCluster(
