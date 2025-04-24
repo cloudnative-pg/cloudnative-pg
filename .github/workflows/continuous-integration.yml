@@ -611,7 +611,7 @@ jobs:
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
+        uses: github/codeql-action/upload-sarif@28deaeda66b76a05916b6923827895f2b14ab387 # v3
         if: |
           !github.event.repository.fork && 
           !github.event.pull_request.head.repo.fork
