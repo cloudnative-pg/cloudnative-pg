@@ -823,6 +823,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 	if err != nil {
 		return fmt.Errorf("error while creating the plugin client: %w", err)
 	}
+	defer pluginCli.Close(ctx)
 	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
 	ctx = cluster.SetInContext(ctx)
 
