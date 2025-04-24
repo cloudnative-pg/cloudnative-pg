@@ -173,11 +173,19 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	// generateTargetImages, given a targetMajor, generates a target image for each buildScenario.
 	// MAJOR_UPGRADE_IMAGE_REPO env allows to customize the target image repository.
 	generateTargetImages := func(targetMajor uint64) map[string]string {
+		const (
+			// ImageRepository is the default repository for Postgres container images
+			ImageRepository = "ghcr.io/cloudnative-pg/postgresql"
+
+			// PostgisImageRepository is the default repository for Postgis container images
+			PostgisImageRepository = "ghcr.io/cloudnative-pg/postgis"
+		)
+
 		// Default target Images
 		targetImages := map[string]string{
-			postgisEntry:           fmt.Sprintf("%v:%v", postgres.PostgisImageRepository, targetMajor),
-			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", postgres.ImageRepository, targetMajor),
-			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", postgres.ImageRepository, targetMajor),
+			postgisEntry:           fmt.Sprintf("%v:%v", PostgisImageRepository, targetMajor),
+			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", ImageRepository, targetMajor),
+			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", ImageRepository, targetMajor),
 		}
 		// Set custom targets when detecting a given env variable
 		if envValue := os.Getenv(customImageRegistryEnvVar); envValue != "" {

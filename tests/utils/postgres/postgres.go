@@ -51,10 +51,6 @@ const (
 	PostgresDBName = "postgres"
 	// TablespaceDefaultName is the default tablespace location
 	TablespaceDefaultName = "pg_default"
-	// ImageRepository is the default repository for Postgres container images
-	ImageRepository = "ghcr.io/cloudnative-pg/postgresql"
-	// PostgisImageRepository is the default repository for Postgis container images
-	PostgisImageRepository = "ghcr.io/cloudnative-pg/postgis"
 )
 
 // CountReplicas counts the number of replicas attached to an instance
