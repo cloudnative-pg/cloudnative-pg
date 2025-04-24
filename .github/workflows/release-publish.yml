@@ -96,7 +96,7 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       platforms: ${{ env.PLATFORMS }}
-      ubi_img: ${{ env.UBI_IMAGE }}
+      olm_img: ${{ steps.olm-image.outputs.olm_image }}
     steps:
       -
         name: Checkout
@@ -225,11 +225,12 @@ jobs:
         # Bake returns all the tags for a target's variant in a comma separated list.
         # We only care about a single tag for OLM, so we remove the "latest" tag and
         # pick the first entry in order from what's left in the list
-        name: Output images
+        name: Image for OLM
+        id: olm-image
         env:
           ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
-          echo "UBI_IMAGE=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_ENV
+          echo "olm_image=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_OUTPUT
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -271,11 +272,11 @@ jobs:
 
       - name: Set bundle variables
         env:
-          UBI_IMG: ${{ needs.release-binaries.outputs.ubi_img }}
+          OLM_IMG: ${{ needs.release-binaries.outputs.olm_img }}
         run: |
-          echo "CONTROLLER_IMG=${UBI_IMG}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${UBI_IMG}-bundle" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${UBI_IMG}-catalog" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${OLM_IMG}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${OLM_IMG}-bundle" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${OLM_IMG}-catalog" >> $GITHUB_ENV
 
       - name: Create bundle
         env:
