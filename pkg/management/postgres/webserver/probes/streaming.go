@@ -68,7 +68,7 @@ func (c pgStreamingChecker) IsHealthy(ctx context.Context, instance *postgres.In
               THEN true
             WHEN (SELECT coalesce(setting, '') = '' FROM pg_catalog.pg_settings WHERE name = 'primary_conninfo')
               THEN true
-            WHEN (SELECT value FROM lag) < $1
+            WHEN (SELECT value FROM lag) <= $1
               THEN true
             ELSE false
           END AS ready_to_start,
