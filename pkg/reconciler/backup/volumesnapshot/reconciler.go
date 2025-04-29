@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/controldata"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,7 +99,7 @@ func (se *Reconciler) enrichSnapshot(
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
-		pgControlData := utils.ParsePgControldataOutput(data)
+		pgControlData := controldata.ParseOutput(data)
 		timelineID, ok := pgControlData.TryGetLatestCheckpointTimelineID()
 		if ok {
 			vs.Labels[utils.BackupTimelineLabelName] = timelineID
@@ -334,11 +335,11 @@ func backupStatusFromSnapshots(
 	snapshots slice,
 	backupStatus *apiv1.BackupStatus,
 ) error {
-	controldata, err := snapshots.getControldata()
+	controldataOutput, err := snapshots.getControldata()
 	if err != nil {
 		return err
 	}
-	pairs := utils.ParsePgControldataOutput(controldata)
+	pairs := controldata.ParseOutput(controldataOutput)
 
 	// TODO: calculate wal in case of online backup
 	// the begin/end WAL and LSN are the same, since the instance was fenced

@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -384,7 +385,7 @@ func (fullStatus *PostgresqlStatus) printTokenStatus(token string) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
 	tokenStatus := tabby.New()
-	if tokenContent, err := utils.ParsePgControldataToken(token); err != nil {
+	if tokenContent, err := promotiontoken.Parse(token); err != nil {
 		tokenStatus.AddLine(
 			"Token",
 			fmt.Sprintf("%s %s", token, aurora.Red(fmt.Sprintf("(invalid format: %s)", err.Error()))),

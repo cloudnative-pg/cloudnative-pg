@@ -20,17 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package promotiontoken
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Promotion Token Validation", func() {
-	var validToken *utils.PgControldataTokenContent
+	var validToken *Data
 
 	BeforeEach(func() {
-		validToken = &utils.PgControldataTokenContent{
+		validToken = &Data{
 			DatabaseSystemIdentifier:     "12345",
 			LatestCheckpointTimelineID:   "2",
 			LatestCheckpointREDOLocation: "0/16D68D0",
@@ -58,14 +56,14 @@ var _ = Describe("Promotion Token Validation", func() {
 			It("returns permanent failure", func() {
 				err := ValidateAgainstLSN(validToken, "0/FFFFFFF")
 				Expect(err).To(HaveOccurred())
-				Expect(err.(*TokenVerificationError).IsRetryable()).To(BeFalse())
+				Expect(err.(*VerificationError).IsRetryable()).To(BeFalse())
 			})
 		})
 		Context("with later LSN in the token", func() {
 			It("returns retryable failure", func() {
 				err := ValidateAgainstLSN(validToken, "0/0000000")
 				Expect(err).To(HaveOccurred())
-				Expect(err.(*TokenVerificationError).IsRetryable()).To(BeTrue())
+				Expect(err.(*VerificationError).IsRetryable()).To(BeTrue())
 			})
 		})
 	})
@@ -81,14 +79,14 @@ var _ = Describe("Promotion Token Validation", func() {
 			It("returns permanent failure", func() {
 				err := ValidateAgainstTimelineID(validToken, "3")
 				Expect(err).To(HaveOccurred())
-				Expect(err.(*TokenVerificationError).IsRetryable()).To(BeFalse())
+				Expect(err.(*VerificationError).IsRetryable()).To(BeFalse())
 			})
 		})
 		Context("with later timeline ID in the token", func() {
 			It("returns retryable failure", func() {
 				err := ValidateAgainstTimelineID(validToken, "1")
 				Expect(err).To(HaveOccurred())
-				Expect(err.(*TokenVerificationError).IsRetryable()).To(BeTrue())
+				Expect(err.(*VerificationError).IsRetryable()).To(BeTrue())
 			})
 		})
 	})
@@ -104,7 +102,7 @@ var _ = Describe("Promotion Token Validation", func() {
 			It("returns permanent failure", func() {
 				err := ValidateAgainstSystemIdentifier(validToken, "54321")
 				Expect(err).To(HaveOccurred())
-				Expect(err.(*TokenVerificationError).IsRetryable()).To(BeFalse())
+				Expect(err.(*VerificationError).IsRetryable()).To(BeFalse())
 			})
 		})
 	})

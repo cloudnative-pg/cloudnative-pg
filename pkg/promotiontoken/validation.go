@@ -24,38 +24,36 @@ import (
 	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/types"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// TokenVerificationError are raised when the promotion token
+// VerificationError are raised when the promotion token
 // does not correspond to the status of the current instance
-type TokenVerificationError struct {
+type VerificationError struct {
 	msg          string
 	retryable    bool
-	tokenContent *utils.PgControldataTokenContent
+	tokenContent *Data
 }
 
 // Error implements the error interface
-func (e *TokenVerificationError) Error() string {
+func (e *VerificationError) Error() string {
 	return e.msg
 }
 
 // IsRetryable is true when this condition is temporary
 // and the calling code is expected to retry this
 // operator in the future
-func (e *TokenVerificationError) IsRetryable() bool {
+func (e *VerificationError) IsRetryable() bool {
 	return e.retryable
 }
 
 // TokenContent returns the token content that caused the error
-func (e *TokenVerificationError) TokenContent() *utils.PgControldataTokenContent {
+func (e *VerificationError) TokenContent() *Data {
 	return e.tokenContent
 }
 
 // ValidateAgainstInstanceStatus checks if the promotion token is valid against the instance status
 func ValidateAgainstInstanceStatus(
-	promotionToken *utils.PgControldataTokenContent, currentSystemIdentifier string,
+	promotionToken *Data, currentSystemIdentifier string,
 	currentTimelineIDString string, replayLSNString string,
 ) error {
 	if err := ValidateAgainstSystemIdentifier(promotionToken, currentSystemIdentifier); err != nil {
@@ -73,11 +71,11 @@ func ValidateAgainstInstanceStatus(
 }
 
 // ValidateAgainstLSN checks if the promotion token is valid against the last replay LSN
-func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayLSNString string) error {
+func ValidateAgainstLSN(promotionToken *Data, replayLSNString string) error {
 	promotionTokenLSNString := promotionToken.LatestCheckpointREDOLocation
 	promotionTokenLSN, err := types.LSN(promotionTokenLSNString).Parse()
 	if err != nil {
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("promotion token LSN is invalid: %s",
 				promotionToken.LatestCheckpointREDOLocation),
 			retryable:    false,
@@ -87,7 +85,7 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 
 	replayLSN, err := types.LSN(replayLSNString).Parse()
 	if err != nil {
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg:          fmt.Sprintf("last replay LSN is invalid: %s", replayLSNString),
 			retryable:    false,
 			tokenContent: promotionToken,
@@ -96,7 +94,7 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 
 	switch {
 	case promotionTokenLSN < replayLSN:
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf(
 				"promotion token LSN (%s) is older than the last replay LSN (%s)",
 				promotionTokenLSNString, replayLSNString),
@@ -105,7 +103,7 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 		}
 
 	case replayLSN < promotionTokenLSN:
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf(
 				"waiting for promotion token LSN (%s) to be replayed (the last replayed LSN is %s)",
 				promotionTokenLSNString, replayLSNString),
@@ -119,13 +117,13 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 
 // ValidateAgainstTimelineID checks if the promotion token is valid against the timeline ID
 func ValidateAgainstTimelineID(
-	promotionToken *utils.PgControldataTokenContent, currentTimelineIDString string,
+	promotionToken *Data, currentTimelineIDString string,
 ) error {
 	// If we're in a different timeline, we should definitely wait
 	// for this replica to be in the same timeline as the old primary
 	promotionTokenTimeline, err := strconv.Atoi(promotionToken.LatestCheckpointTimelineID)
 	if err != nil {
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("promotion token timeline is not an integer: %s (%s)",
 				promotionToken.LatestCheckpointTimelineID, err.Error()),
 			retryable:    false,
@@ -135,7 +133,7 @@ func ValidateAgainstTimelineID(
 
 	currentTimelineID, err := strconv.Atoi(currentTimelineIDString)
 	if err != nil {
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("current timeline is not an integer: %s (%s)",
 				currentTimelineIDString, err.Error()),
 			retryable:    false,
@@ -145,7 +143,7 @@ func ValidateAgainstTimelineID(
 
 	switch {
 	case promotionTokenTimeline > currentTimelineID:
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("requested timeline not reached, current:%d wanted:%d",
 				currentTimelineID, promotionTokenTimeline),
 			retryable:    true,
@@ -153,7 +151,7 @@ func ValidateAgainstTimelineID(
 		}
 
 	case promotionTokenTimeline < currentTimelineID:
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("requested timeline is older than current one, current:%d wanted:%d",
 				currentTimelineID, promotionTokenTimeline),
 			retryable:    false,
@@ -165,11 +163,11 @@ func ValidateAgainstTimelineID(
 
 // ValidateAgainstSystemIdentifier checks if the promotion token is valid against the system identifier
 func ValidateAgainstSystemIdentifier(
-	promotionToken *utils.PgControldataTokenContent, currentSystemIdentifier string,
+	promotionToken *Data, currentSystemIdentifier string,
 ) error {
 	// If the token belongs to a different database, we cannot use if
 	if promotionToken.DatabaseSystemIdentifier != currentSystemIdentifier {
-		return &TokenVerificationError{
+		return &VerificationError{
 			msg: fmt.Sprintf("mismatching system identifiers, current:%s wanted:%s",
 				currentSystemIdentifier, promotionToken.DatabaseSystemIdentifier),
 			retryable:    false,

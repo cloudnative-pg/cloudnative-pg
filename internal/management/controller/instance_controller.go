@@ -136,7 +136,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Verify that the promotion token is usable before changing the archive mode and triggering restarts
 	if err := r.verifyPromotionToken(cluster); err != nil {
-		var tokenError *promotiontoken.TokenVerificationError
+		var tokenError *promotiontoken.VerificationError
 		if errors.As(err, &tokenError) {
 			if !tokenError.IsRetryable() {
 				oldCluster := cluster.DeepCopy()
@@ -203,7 +203,7 @@ func (r *InstanceReconciler) Reconcile(
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore, it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
-		var tokenError *promotiontoken.TokenVerificationError
+		var tokenError *promotiontoken.VerificationError
 		if errors.As(err, &tokenError) {
 			contextLogger.Warning(
 				"Waiting for promotion token to be verified",

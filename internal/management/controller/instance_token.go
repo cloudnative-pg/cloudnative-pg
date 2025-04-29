@@ -22,9 +22,10 @@ package controller
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/postgres/controldata"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Assuming this PostgreSQL instance is a replica and we have a promotion token
@@ -35,7 +36,7 @@ func (r *InstanceReconciler) verifyPromotionToken(cluster *apiv1.Cluster) error 
 		return nil
 	}
 
-	promotionToken, err := utils.ParsePgControldataToken(cluster.Spec.ReplicaCluster.PromotionToken)
+	promotionToken, err := promotiontoken.Parse(cluster.Spec.ReplicaCluster.PromotionToken)
 	if err != nil {
 		// The promotion token is not correct, and the webhook should
 		// have prevented this to happen. If we're here, two things
@@ -74,7 +75,7 @@ func (r *InstanceReconciler) verifyPromotionToken(cluster *apiv1.Cluster) error 
 		return fmt.Errorf("while verifying the promotion token [pg_controldata]: %w", err)
 	}
 
-	parsedControlData := utils.ParsePgControldataOutput(out)
+	parsedControlData := controldata.ParseOutput(out)
 	currentTimelineIDString := parsedControlData.GetLatestCheckpointTimelineID()
 	currentSystemIdentifier := parsedControlData.GetDatabaseSystemIdentifier()
 	replayLSNString := parsedControlData.GetLatestCheckpointREDOLocation()

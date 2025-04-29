@@ -35,6 +35,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -710,7 +711,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 			})
 
 			By("forging an invalid token", func() {
-				tokenContent, err := utils.ParsePgControldataToken(token)
+				tokenContent, err := promotiontoken.Parse(token)
 				Expect(err).ToNot(HaveOccurred())
 				tokenContent.LatestCheckpointREDOLocation = "0/0"
 				Expect(tokenContent.IsValid()).To(Succeed())

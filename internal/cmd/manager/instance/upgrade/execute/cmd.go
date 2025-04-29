@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/controldata"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/spf13/cobra"
 	"k8s.io/utils/ptr"
@@ -53,7 +54,6 @@ import (
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd creates the cobra command
@@ -280,7 +280,7 @@ func getControlData(binDir, pgData string) (map[string]string, error) {
 		return nil, fmt.Errorf("while executing pg_controldata: %w", err)
 	}
 
-	return utils.ParsePgControldataOutput(string(out)), nil
+	return controldata.ParseOutput(string(out)), nil
 }
 
 func runInitDB(destDir string, walDir *string, pgControlData map[string]string, targetVersion version.Data) error {
@@ -321,7 +321,7 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string, 
 }
 
 func tryAddDataChecksums(
-	pgControlData utils.PgControlData,
+	pgControlData controldata.Info,
 	targetVersion version.Data,
 	options []string,
 ) ([]string, error) {
@@ -341,7 +341,7 @@ func tryAddDataChecksums(
 	return append(options, "--data-checksums"), nil
 }
 
-func tryAddWalSegmentSize(pgControlData utils.PgControlData, options []string) ([]string, error) {
+func tryAddWalSegmentSize(pgControlData controldata.Info, options []string) ([]string, error) {
 	walSegmentSize, err := pgControlData.GetBytesPerWALSegment()
 	if err != nil {
 		return nil, fmt.Errorf("error while reading the WAL segment size: %w", err)

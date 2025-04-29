@@ -50,6 +50,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -1818,7 +1819,7 @@ func (v *ClusterCustomValidator) validatePromotionToken(r *apiv1.Cluster) field.
 	}
 
 	if !r.IsReplica() {
-		tokenContent, err := utils.ParsePgControldataToken(token)
+		tokenContent, err := promotiontoken.Parse(token)
 		if err != nil {
 			result = append(
 				result,

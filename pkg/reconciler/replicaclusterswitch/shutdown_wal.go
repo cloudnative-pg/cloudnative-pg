@@ -24,11 +24,12 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/controldata"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 )
 
 // errPostgresNotShutDown is raised when PostgreSQL is not shut down
@@ -69,16 +70,16 @@ func generateDemotionToken(
 	if err != nil {
 		return "", fmt.Errorf("could not get pg_controldata from Pod %s: %w", primaryInstance.Pod.Name, err)
 	}
-	parsed := utils.ParsePgControldataOutput(rawPgControlData)
+	parsed := controldata.ParseOutput(rawPgControlData)
 	pgDataState := parsed.GetDatabaseClusterState()
 
-	if !utils.PgDataState(pgDataState).IsShutdown(ctx) {
+	if !controldata.PgDataState(pgDataState).IsShutdown(ctx) {
 		// PostgreSQL is still not shut down, waiting
 		// until the shutdown is completed
 		return "", errPostgresNotShutDown
 	}
 
-	token, err := parsed.CreatePromotionToken()
+	token, err := promotiontoken.FromControlDataInfo(parsed)
 	if err != nil {
 		return "", err
 	}

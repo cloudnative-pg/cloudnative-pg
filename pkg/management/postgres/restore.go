@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/controldata"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -782,7 +783,7 @@ func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, err
 	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
 
 	enforcedParams := make(map[string]int)
-	for key, value := range utils.ParsePgControldataOutput(stdoutBuffer.String()) {
+	for key, value := range controldata.ParseOutput(stdoutBuffer.String()) {
 		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
 			intValue, err := strconv.Atoi(value)
 			if err != nil {

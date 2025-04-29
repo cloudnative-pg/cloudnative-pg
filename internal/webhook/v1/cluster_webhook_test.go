@@ -37,6 +37,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
@@ -2674,7 +2675,7 @@ var _ = Describe("promotion token validation", func() {
 	})
 
 	It("doesn't complain if the replica token is valid", func() {
-		tokenContent := utils.PgControldataTokenContent{
+		tokenContent := promotiontoken.Data{
 			LatestCheckpointTimelineID:   "3",
 			REDOWALFile:                  "this-wal-file",
 			DatabaseSystemIdentifier:     "231231212",
@@ -2708,7 +2709,7 @@ var _ = Describe("promotion token validation", func() {
 	})
 
 	It("complains if the token is set on a replica cluster (enabled)", func() {
-		tokenContent := utils.PgControldataTokenContent{
+		tokenContent := promotiontoken.Data{
 			LatestCheckpointTimelineID:   "1",
 			REDOWALFile:                  "0000000100000001000000A1",
 			DatabaseSystemIdentifier:     "231231212",
@@ -2734,7 +2735,7 @@ var _ = Describe("promotion token validation", func() {
 	})
 
 	It("complains if the token is set on a replica cluster (primary, default name)", func() {
-		tokenContent := utils.PgControldataTokenContent{
+		tokenContent := promotiontoken.Data{
 			LatestCheckpointTimelineID:   "1",
 			REDOWALFile:                  "0000000100000001000000A1",
 			DatabaseSystemIdentifier:     "231231212",
@@ -2763,7 +2764,7 @@ var _ = Describe("promotion token validation", func() {
 	})
 
 	It("complains if the token is set on a replica cluster (primary, self)", func() {
-		tokenContent := utils.PgControldataTokenContent{
+		tokenContent := promotiontoken.Data{
 			LatestCheckpointTimelineID:   "1",
 			REDOWALFile:                  "0000000100000001000000A1",
 			DatabaseSystemIdentifier:     "231231212",
@@ -2790,7 +2791,7 @@ var _ = Describe("promotion token validation", func() {
 	})
 
 	It("complains it the token is set when minApplyDelay is being used", func() {
-		tokenContent := utils.PgControldataTokenContent{
+		tokenContent := promotiontoken.Data{
 			LatestCheckpointTimelineID:   "1",
 			REDOWALFile:                  "0000000100000001000000A1",
 			DatabaseSystemIdentifier:     "231231212",
