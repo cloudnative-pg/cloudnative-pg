@@ -12,19 +12,14 @@ on:
 
 permissions: read-all
 
-env:
-  REPO_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
-
 jobs:
   require-labels:
     name: Require labels
     runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: write
     steps:
       - name: Require labels
         uses: docker://agilepathway/pull-request-label-checker:v1.6.65
         with:
           any_of: "ok to merge :ok_hand:"
           none_of: "do not merge"
-          repo_token: ${{ env.REPO_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}

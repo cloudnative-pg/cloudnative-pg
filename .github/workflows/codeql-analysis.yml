@@ -40,6 +40,9 @@ jobs:
   duplicate_runs:
     runs-on: ubuntu-24.04
     name: Skip duplicate runs
+    permissions:
+      actions: write
+      contents: read
     continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
@@ -60,7 +63,6 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true'
     permissions:
-      actions: read
       contents: read
       security-events: write
 

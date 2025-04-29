@@ -90,6 +90,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       packages: write
+      contents: read
       id-token: write
     needs:
       - check-version
@@ -238,7 +239,7 @@ jobs:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
       packages: write
     needs:
       - check-version
@@ -387,9 +388,6 @@ jobs:
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-      packages: write
     steps:
       -
         name: Checkout artifact

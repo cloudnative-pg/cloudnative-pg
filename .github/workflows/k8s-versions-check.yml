@@ -121,10 +121,6 @@ jobs:
       -
         name: Create Pull Request if versions have been updated
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
-        permissions:
-          contents: write
-          pull-requests: write
-          issues: read
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: Public Cloud K8S versions update"

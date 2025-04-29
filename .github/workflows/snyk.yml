@@ -8,7 +8,9 @@ on:
       - main
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  security-events: write
+  contents: read
 
 jobs:
   security:

@@ -7,8 +7,6 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
-permissions: read-all
-
 env:
   IMAGE_NAME: "cloudnative-pg-testing"
   CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"
@@ -16,6 +14,8 @@ env:
 jobs:
   clean-ghcr:
     name: delete old testing container images
+    permissions:
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - name: Delete '-testing' operator images in ${{ env.IMAGE_NAME }}
