@@ -807,7 +807,8 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --allow-preview true --name aks-preview
+            # TODO: unpin the version once https://github.com/Azure/azure-cli/issues/31345 is fixed
+            az extension add --allow-preview true --name aks-preview --version 14.0.0b3
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             AZURE_STORAGE_ACCOUNT="${{ github.run_number }}${{ env.E2E_SUFFIX }}"
@@ -920,7 +921,8 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --allow-preview true --name aks-preview
+            # TODO: unpin the version once https://github.com/Azure/azure-cli/issues/31345 is fixed
+            az extension add --allow-preview true --name aks-preview --version 14.0.0b3
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             # name of the AKS cluster
