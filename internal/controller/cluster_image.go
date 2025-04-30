@@ -123,12 +123,11 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 ) (apiv1.ImageInfo, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// If ImageName is defined and different from the current image in the status, we update the status
-	if cluster.Spec.ImageName != "" {
-		return getImageInfoFromImage(cluster.Spec.ImageName)
-	}
-
 	if cluster.Spec.ImageCatalogRef == nil {
+		if cluster.Spec.ImageName != "" {
+			return getImageInfoFromImage(cluster.Spec.ImageName)
+		}
+
 		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
 	}
 

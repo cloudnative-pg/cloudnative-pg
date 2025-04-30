@@ -201,6 +201,7 @@ IfNotPresent
 ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
+ImageInfo
 ImportSource
 InfoSec
 Innocenti
@@ -298,6 +299,7 @@ PGAudit
 PGDATA
 PGDG
 PGData
+PGDataImageInfo
 PGSQL
 PKI
 PODNAME
@@ -968,6 +970,7 @@ lsn
 lt
 lz
 macOS
+majorVersion
 majorVersionUpgradeFromImage
 malcolm
 mallocs
@@ -1075,6 +1078,7 @@ pgAdmin
 pgBouncer
 pgBouncerIntegration
 pgBouncerSecrets
+pgDataImageInfo
 pgDumpExtraOptions
 pgRestoreExtraOptions
 pgSQL

@@ -247,12 +247,12 @@ var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateStr
 // identTemplate is the template used to create the HBA configuration
 var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
 
-// MajorVersionRange is used to represent a range of PostgreSQL major versions
+// MajorVersionRange represents a range of PostgreSQL major versions.
 type MajorVersionRange struct {
-	// The minimum limit of PostgreSQL major version, extreme included
+	// Min is the inclusive lower bound of the PostgreSQL major version range.
 	Min int
 
-	// The maximum limit of PostgreSQL version, extreme excluded, or MajorVersionRangeUnlimited
+	// Max is the exclusive upper bound of the PostgreSQL major version range.
 	Max int
 }
 
