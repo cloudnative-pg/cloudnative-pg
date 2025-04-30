@@ -232,7 +232,7 @@ There are a few things you need to be aware of when using the `monolith` type:
 - Any role that is required by the imported databases must be specified inside
   `initdb.import.roles`, with the limitations below:
     - The following roles, if present, are not imported:
-      `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
+      `postgres`, `streaming_replica`, `cnpg_pooler_pgbouncer`
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
   `roles` arrays to import every object of the kind; When matching databases
