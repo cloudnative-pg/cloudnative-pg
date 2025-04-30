@@ -758,6 +758,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
 			IsPrimary:  item.IsPrimary,
 			TimeLineID: item.TimeLineID,
+			IP:         item.Pod.Status.PodIP,
 		}
 	}
 
