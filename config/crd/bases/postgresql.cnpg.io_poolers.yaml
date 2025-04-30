@@ -301,7 +301,6 @@ spec:
                     type: array
                   podMonitorScrapeClass:
                     description: Specifies the `PodMonitor` scrape class.
-                    minLength: 1
                     type: string
                 type: object
               pgbouncer:

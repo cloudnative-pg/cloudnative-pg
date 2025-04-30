@@ -101,7 +101,7 @@ var _ = Describe("PodMonitor test", func() {
 		It("should create a monitoringv1.PodMonitor object with scrapeClass", func() {
 			scrapeClass := "custom-scrape-class"
 			cluster := cluster.DeepCopy()
-			cluster.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
+			cluster.Spec.Monitoring.PodMonitorScrapeClass = &scrapeClass
 			mgr := NewClusterPodMonitorManager(cluster)
 			monitor := mgr.BuildPodMonitor()
 
@@ -113,7 +113,7 @@ var _ = Describe("PodMonitor test", func() {
 			relabeledCluster := cluster.DeepCopy()
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
-			relabeledCluster.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
+			relabeledCluster.Spec.Monitoring.PodMonitorScrapeClass = &scrapeClass
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
 

@@ -90,7 +90,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 
 		It("returns the correct PodMonitor object with scrapeClass", func() {
 			scrapeClass := "custom-scrape-class"
-			pooler.Spec.Monitoring.PodMonitorScrapeClass = scrapeClass
+			pooler.Spec.Monitoring.PodMonitorScrapeClass = &scrapeClass
 			manager := NewPoolerPodMonitorManager(pooler)
 
 			podMonitor := manager.BuildPodMonitor()

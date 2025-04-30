@@ -3578,6 +3578,13 @@ Changing tls.enabled option will force a rollout of all instances.</p>
    <p>The list of metric relabelings for the <code>PodMonitor</code>. Applied to samples before ingestion.</p>
 </td>
 </tr>
+<tr><td><code>podMonitorScrapeClass</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the <code>PodMonitor</code> scrape class.</p>
+</td>
+</tr>
 <tr><td><code>podMonitorRelabelings</code><br/>
 <a href="https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig"><i>[]github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1.RelabelConfig</i></a>
 </td>
@@ -4068,6 +4075,13 @@ part for now.</p>
 </td>
 <td>
    <p>The list of metric relabelings for the <code>PodMonitor</code>. Applied to samples before ingestion.</p>
+</td>
+</tr>
+<tr><td><code>podMonitorScrapeClass</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the <code>PodMonitor</code> scrape class.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorRelabelings</code><br/>

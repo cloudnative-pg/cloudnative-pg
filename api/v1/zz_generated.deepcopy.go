@@ -1753,6 +1753,11 @@ func (in *MonitoringConfiguration) DeepCopyInto(out *MonitoringConfiguration) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PodMonitorScrapeClass != nil {
+		in, out := &in.PodMonitorScrapeClass, &out.PodMonitorScrapeClass
+		*out = new(string)
+		**out = **in
+	}
 	if in.PodMonitorRelabelConfigs != nil {
 		in, out := &in.PodMonitorRelabelConfigs, &out.PodMonitorRelabelConfigs
 		*out = make([]monitoringv1.RelabelConfig, len(*in))
@@ -2099,6 +2104,11 @@ func (in *PoolerMonitoringConfiguration) DeepCopyInto(out *PoolerMonitoringConfi
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.PodMonitorScrapeClass != nil {
+		in, out := &in.PodMonitorScrapeClass, &out.PodMonitorScrapeClass
+		*out = new(string)
+		**out = **in
 	}
 	if in.PodMonitorRelabelConfigs != nil {
 		in, out := &in.PodMonitorRelabelConfigs, &out.PodMonitorRelabelConfigs

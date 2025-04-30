@@ -110,8 +110,7 @@ type PoolerMonitoringConfiguration struct {
 
 	// Specifies the `PodMonitor` scrape class.
 	// +optional.
-	// +kubebuilder:validation:MinLength=1
-	PodMonitorScrapeClass string `json:"podMonitorScrapeClass,omitempty"`
+	PodMonitorScrapeClass *string `json:"podMonitorScrapeClass,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional

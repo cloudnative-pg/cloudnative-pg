@@ -77,6 +77,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 
 	spec := monitoringv1.PodMonitorSpec{
+		ScrapeClassName: c.cluster.Spec.Monitoring.GetPodMonitorScrapeClass(),
 		Selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				utils.ClusterLabelName: c.cluster.Name,
@@ -84,10 +85,6 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 			},
 		},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
-	}
-
-	if monitoring := c.cluster.Spec.Monitoring; monitoring != nil && monitoring.PodMonitorScrapeClass != "" {
-		spec.ScrapeClassName = &monitoring.PodMonitorScrapeClass
 	}
 
 	return &monitoringv1.PodMonitor{

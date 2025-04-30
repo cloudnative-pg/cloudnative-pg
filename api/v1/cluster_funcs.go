@@ -328,6 +328,14 @@ func (m *MonitoringConfiguration) AreDefaultQueriesDisabled() bool {
 	return m != nil && m.DisableDefaultQueries != nil && *m.DisableDefaultQueries
 }
 
+// GetPodMonitorScrapeClass returns the PodMonitor scrape class
+func (m *MonitoringConfiguration) GetPodMonitorScrapeClass() *string {
+	if m == nil || m.PodMonitorScrapeClass == nil {
+		return nil
+	}
+	return m.PodMonitorScrapeClass
+}
+
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified
 // in the BarmanObjectStore
 func (in ExternalCluster) GetServerName() string {
