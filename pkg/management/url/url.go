@@ -34,6 +34,9 @@ const (
 	// PgBouncerMetricsPort is the port for the exporter of PgBouncer related metrics (HTTP)
 	PgBouncerMetricsPort int32 = 9127
 
+	// PathFailSafe is the path for the failsafe entrypoint
+	PathFailSafe string = "/failsafe"
+
 	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"
 

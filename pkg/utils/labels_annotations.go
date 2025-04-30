@@ -30,6 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// AlphaMetadataNamespace is the annotation and label namespace used by the alpha features of
+// the operator
+const AlphaMetadataNamespace = "alpha.cnpg.io"
+
 // MetadataNamespace is the annotation and label namespace used by the operator
 const MetadataNamespace = "cnpg.io"
 
@@ -105,6 +109,14 @@ const (
 	// PluginNameLabelName is the name of the label to be applied to services
 	// to have them detected as CNPG-i plugins
 	PluginNameLabelName = MetadataNamespace + "/pluginName"
+
+	// PingerRequestTimeoutAnnotationName is the name of the annotation containing
+	// the request timeout in milliseconds for the isolation tester. Defaults to 500.
+	PingerRequestTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerRequestTimeout"
+
+	// PingerConnectionTimeoutAnnotationName is the name of the annotation containing
+	// the connection timeout in milliseconds for the isolation tester. Defaults to 1000.
+	PingerConnectionTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerRequestTimeout"
 )
 
 const (
