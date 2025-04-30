@@ -166,6 +166,16 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
+	return info.concludeRestore(ctx, cli, cluster, config, envs)
+}
+
+func (info InitInfo) concludeRestore(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	config string,
+	envs []string,
+) error {
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
@@ -334,42 +344,7 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 		envs = env
 	}
 
-	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
-		return err
-	}
-	// we need a migration here, otherwise the server will not start up if
-	// we recover from a base which has postgresql.auto.conf
-	// the override.conf and include statement is present, what we need to do is to
-	// migrate the content
-	if _, err := info.GetInstance().migratePostgresAutoConfFile(ctx); err != nil {
-		return err
-	}
-	if cluster.IsReplica() {
-		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
-		if !ok {
-			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
-		}
-
-		connectionString, err := external.ConfigureConnectionToServer(
-			ctx, cli, info.Namespace, &server)
-		if err != nil {
-			return err
-		}
-
-		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
-		return err
-	}
-
-	if err := info.WriteRestoreHbaConf(ctx); err != nil {
-		return err
-	}
-
-	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
-		return err
-	}
-
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
+	return info.concludeRestore(ctx, cli, cluster, config, envs)
 }
 
 func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
