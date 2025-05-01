@@ -218,8 +218,8 @@ This configuration creates a `SecretStore` resource named `vault-backend`.
 
 ### Creating the `PushSecret`
 
-The `PushSecret` resource is used to push a Kubernetes secret to HashiCorp
-Vault. In this simplified example, we’ll push the credentials for the `app`
+The `PushSecret` resource is used to push a Kubernetes `Secret` to HashiCorp
+Vault. In this simplified example, we'll push the credentials for the `app`
 user of the sample cluster `cluster-example`.
 
 For more details on configuring `PushSecret`, refer to the
