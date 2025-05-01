@@ -206,14 +206,16 @@ data:
 This configuration creates a `SecretStore` resource named `vault-backend`.
 
 !!! Important
-    We use the basic token authentication method, which is suitable for API and CLI
-    usages, this is the default authentication method enabled but is not recommended
-    for production use. For production, consider using other authentication methods
-    that can be found [in the External Secrets Operator documentation](https://external-secrets.io/latest/provider/hashicorp-vault/).
+    This example uses basic token-based authentication, which is suitable for
+    testing API, and CLI use cases. While it is the default method enabled in
+    Vault, it is not recommended for production environments. For production,
+    consider using more secure authentication methods.
+    Refer to the [External Secrets Operator documentation](https://external-secrets.io/latest/provider/hashicorp-vault/)
+    for a full list of supported authentication mechanisms.
 
-!!! Important
+!!! Info
     HashiCorp Vault must have a KV secrets engine enabled at the `secrets` path
-    with version `v2`.  If your Vault instance uses a different path or
+    with version `v2`. If your Vault instance uses a different path or
     version, be sure to update the `path` and `version` fields accordingly.
 
 ### Creating the `PushSecret`
