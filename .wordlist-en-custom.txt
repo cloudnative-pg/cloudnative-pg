@@ -138,6 +138,7 @@ EDB
 EKS
 EOF
 EOL
+ESO
 EmbeddedObjectMetadata
 EnablePDB
 EncryptionType
@@ -202,6 +203,8 @@ Istio's
 JSON
 Jihyuk
 Jitendra
+KV
+Karpenter
 KinD
 Krew
 KubeCon
@@ -345,6 +348,7 @@ ProbeTerminationGracePeriod
 ProbesConfiguration
 ProjectedVolumeSource
 PullPolicy
+PushSecret
 QoS
 Quaresima
 QuickStart
@@ -406,6 +410,7 @@ Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
+SecretStore
 SecretVersion
 SecretsResourceVersion
 SecurityProfiles

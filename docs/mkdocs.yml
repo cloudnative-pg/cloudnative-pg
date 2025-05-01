@@ -71,5 +71,7 @@ nav:
   - supported_releases.md
   - preview_version.md
   - release_notes.md
+  - CNCF Projects Integrations:
+    - cncf-projects/external-secrets.md
   - Appendixes:
     - appendixes/object_stores.md
