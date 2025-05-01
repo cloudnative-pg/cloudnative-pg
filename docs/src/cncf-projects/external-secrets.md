@@ -200,10 +200,16 @@ kind: Secret
 metadata:
   name: vault-token
 data:
-  token: # TODO: Add the token here
+  token: aHZzLioqKioqKio= # hvs.*******
 ```
 
 This configuration creates a `SecretStore` resource named `vault-backend`.
+
+!!! Important
+    We use the basic token authentication method, which is suitable for API and CLI
+    usages, this is the default authentication method enabled but is not recommended
+    for production use. For production, consider using other authentication methods
+    that can be found [in the External Secrets Operator documentation](https://external-secrets.io/latest/provider/hashicorp-vault/).
 
 !!! Important
     HashiCorp Vault must have a KV secrets engine enabled at the `secrets` path
