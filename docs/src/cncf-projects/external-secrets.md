@@ -87,8 +87,8 @@ letters.
 
 The example below creates an `ExternalSecret` resource named
 `cluster-example-app-secret`, which refreshes the password every 24 hours. It
-uses a `Merge` policy to update only the specified fields (`password` and
-`pgpass`) in the `cluster-example-app` secret.
+uses a `Merge` policy to update only the specified fields (`password`, `pgpass`,
+`jdbc-uri` and `uri`) in the `cluster-example-app` secret.
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -107,6 +107,8 @@ spec:
       data:
         password: "{{ .password }}"
         pgpass: "cluster-example-rw:5432:app:app:{{ .password }}"
+        jdbc-uri: "jdbc:postgresql://cluster-example-rw.default:5432/app?password={{ .password }}&user=app"
+        uri: "postgresql://app:{{ .password }}@cluster-example-rw.default:5432/app"
   dataFrom:
     - sourceRef:
         generatorRef:
