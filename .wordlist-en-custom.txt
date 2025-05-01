@@ -211,6 +211,7 @@ Istio's
 JSON
 Jihyuk
 Jitendra
+KV
 Karpenter
 KinD
 Krew

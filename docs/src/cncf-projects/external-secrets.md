@@ -145,25 +145,33 @@ custom secrets or PostgreSQL users you create to regularly rotate their
 password.
 
 
-## Example: Integration with an external KMS
+## Example: Integration with an External KMS
 
-One of the popular KMS (Key Management Service) providers in the CNCF ecosystem is
-[HashiCorp Vault](https://www.vaultproject.io/), in the following example we will
-see how we can integrate CloudNativePG, External Secrets Operator and HashiCorp Vault to
-automatically rotate the password and store it in Vault.
+A widely used Key Management Service (KMS) provider in the CNCF ecosystem is
+[HashiCorp Vault](https://www.vaultproject.io/).
+
+In this example, we'll demonstrate how to integrate CloudNativePG,
+External Secrets Operator, and HashiCorp Vault to automatically rotate
+a PostgreSQL password and securely store it in Vault.
 
 !!! Important
-    We assume that you have already installed and configured HashiCorp Vault in your
-    environment. For more information, refer to the [HashiCorp Vault documentation](https://www.vaultproject.io/docs).
+    This example assumes that HashiCorp Vault is already installed and properly
+    configured in your environment, and that your team has the necessary expertise
+    to operate it. There are various ways to deploy Vault, and detailing them is
+    outside the scope of CloudNativePG. While it's possible to run Vault inside
+    Kubernetes, it is more commonly deployed externally. For detailed instructions,
+    consult the [HashiCorp Vault documentation](https://www.vaultproject.io/docs).
 
-Following the previous example, we will create the required `SecretStore` and `PushSecret`
-objects required to integrate with HashiCorp Vault.
+Continuing from the previous example, we will now create the necessary
+`SecretStore` and `PushSecret` resources to complete the integration with
+Vault.
 
-### Creating the SecretStore
+### Creating the `SecretStore`
 
-The HashiCorp Vault will be access from the namespace in the following URL `http://vault.vault.svc:8200`
-and we presume there's a `Secret` object with the name `vault-token` in the same namespace
-that contains the token to access the Vault.
+In this example, we assume that HashiCorp Vault is accessible from within the
+namespace at `http://vault.vault.svc:8200`, and that a Kubernetes `Secret`
+named `vault-token` exists in the same namespace, containing the token used to
+authenticate with Vault.
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -175,29 +183,39 @@ spec:
     vault:
       server: "http://vault.vault.svc:8200"
       path: "secrets"
-      # Version is the Vault KV secret engine version.
-      # This can be either "v1" or "v2", defaults to "v2"
+      # Specifies the Vault KV secret engine version ("v1" or "v2").
+      # Defaults to "v2" if not set.
       version: "v2"
       auth:
-        # points to a secret that contains a vault token
-        # https://www.vaultproject.io/docs/auth/token
+        # References a Kubernetes Secret that contains the Vault token.
+        # See: https://www.vaultproject.io/docs/auth/token
         tokenSecretRef:
           name: "vault-token"
           key: "token"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-token
+data:
+  token: # TODO: Add the token here
 ```
 
-Now we have the required `SecretStore` object with the name `vault-backend`.
+This configuration creates a `SecretStore` resource named `vault-backend`.
 
 !!! Important
-    On the HashiCorp Vault is required to have the `secrets` path on the `kv` engine with version 2,
-    these names may not be the same in your current implementation of HashiCorp Vault, so
-    please adjust the `path` and `version` accordingly.
+    HashiCorp Vault must have a KV secrets engine enabled at the `secrets` path
+    with version `v2`.  If your Vault instance uses a different path or
+    version, be sure to update the `path` and `version` fields accordingly.
 
-### Creating the PushSecret
+### Creating the `PushSecret`
 
-The `PushSecret` object is used to push the secret to the HashiCorp Vault, we have a simplified
-configuration that will work with our sample cluster `cluster-example` and the `app` user. For
-more configurations on the `PushSecret` object, please refer to the https://external-secrets.io/latest/api/pushsecret/
+The `PushSecret` resource is used to push a Kubernetes secret to HashiCorp
+Vault. In this simplified example, we’ll push the credentials for the `app`
+user of the sample cluster `cluster-example`.
+
+For more details on configuring `PushSecret`, refer to the
+[External Secrets Operator documentation](https://external-secrets.io/latest/api/pushsecret/).
 
 ```yaml
 apiVersion: external-secrets.io/v1alpha1
@@ -219,12 +237,15 @@ spec:
           remoteKey: cluster-example-app
 ```
 
-Here we are using the `PushSecret` object to push the `cluster-example-app` secret to the
-HashiCorp Vault, the `remoteKey` is the name of the secret in the HashiCorp Vault referenced
-by the `SecretStore` with the name `vault-backend`.
+In this example, the `PushSecret` resource instructs the External Secrets
+Operator to push the Kubernetes `Secret` named `cluster-example-app` to
+HashiCorp Vault (from the previous example). The `remoteKey` defines the name
+under which the secret will be stored in Vault, using the `SecretStore` named
+`vault-backend`.
 
 ### Verifying the Configuration
 
-To check that the `PushSecret` is correctly synchronizing, you can go to the HashiCorp Vault
-UI and in the secret engine `kv` with the path `secrets` you should be able to see a secret
-with the name `cluster-example-app` as it was referenced in the `remoteKey` before.
+To verify that the `PushSecret` is functioning correctly, navigate to the
+HashiCorp Vault UI. In the `kv` secrets engine at the path `secrets`, you
+should find a secret named `cluster-example-app`, corresponding to the
+`remoteKey` defined above.
