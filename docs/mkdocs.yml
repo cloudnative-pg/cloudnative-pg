@@ -69,5 +69,7 @@ nav:
   - cloudnative-pg.v1.md
   - supported_releases.md
   - release_notes.md
+  - CNCF Projects Integrations:
+    - cncf-projects/external-secrets.md
   - Appendixes:
     - appendixes/object_stores.md
