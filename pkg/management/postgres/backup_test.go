@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	barmanBackup "github.com/cloudnative-pg/barman-cloud/pkg/backup"
-	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,8 +119,6 @@ var _ = Describe("testing backup command", func() {
 				},
 			},
 		}
-		capabilities, err := barmanCapabilities.CurrentCapabilities()
-		Expect(err).ShouldNot(HaveOccurred())
 		backupCommand = BackupCommand{
 			Cluster: cluster,
 			Backup:  backup,
@@ -130,11 +127,10 @@ var _ = Describe("testing backup command", func() {
 				WithObjects(cluster, backup).
 				WithStatusSubresource(cluster, backup).
 				Build(),
-			Recorder:     &record.FakeRecorder{},
-			Env:          os.Environ(),
-			Log:          log.FromContext(context.Background()),
-			Instance:     &Instance{},
-			Capabilities: capabilities,
+			Recorder: &record.FakeRecorder{},
+			Env:      os.Environ(),
+			Log:      log.FromContext(context.Background()),
+			Instance: &Instance{},
 		}
 	})
 
@@ -154,16 +150,9 @@ var _ = Describe("testing backup command", func() {
 var _ = Describe("generate backup options", func() {
 	const namespace = "test"
 
-	var (
-		capabilities *barmanCapabilities.Capabilities
-		cluster      *apiv1.Cluster
-	)
+	var cluster *apiv1.Cluster
 
 	BeforeEach(func() {
-		var err error
-		capabilities, err = barmanCapabilities.CurrentCapabilities()
-		Expect(err).ShouldNot(HaveOccurred())
-
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			Spec: apiv1.ClusterSpec{
@@ -185,7 +174,7 @@ var _ = Describe("generate backup options", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
 
-		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities)
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore)
 		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -206,7 +195,7 @@ var _ = Describe("generate backup options", func() {
 			"--encryption=aes256",
 		}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
-		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities)
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore)
 		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
