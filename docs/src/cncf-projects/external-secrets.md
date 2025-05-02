@@ -150,7 +150,10 @@ password.
 ## Example: Integration with an External KMS
 
 A widely used Key Management Service (KMS) provider in the CNCF ecosystem is
-[HashiCorp Vault](https://www.vaultproject.io/).
+[HashiCorp Vault](https://www.vaultproject.io/). While Hashicorp Vault itself is
+under a BUSL license, there is an actively maintained, fully compatible open source
+project called [Open Bao](https://openbao.org/). All the interfaces supported by
+Hashicorp Vault are also supported by Open Bao, so this is a drop in replacement.
 
 In this example, we'll demonstrate how to integrate CloudNativePG,
 External Secrets Operator, and HashiCorp Vault to automatically rotate
