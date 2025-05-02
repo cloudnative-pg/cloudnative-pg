@@ -1152,14 +1152,11 @@ spec:
                             description: |-
                               Compress a backup file (a tar file per tablespace) while streaming it
                               to the object store. Available options are empty string (no
-                              compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, `xz`, and `zstd`.
+                              compression, default), `gzip`, `bzip2`, and `snappy`.
                             enum:
                             - bzip2
                             - gzip
-                            - lz4
                             - snappy
-                            - xz
-                            - zstd
                             type: string
                           encryption:
                             description: |-
@@ -2606,14 +2603,11 @@ spec:
                               description: |-
                                 Compress a backup file (a tar file per tablespace) while streaming it
                                 to the object store. Available options are empty string (no
-                                compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, `xz`, and `zstd`.
+                                compression, default), `gzip`, `bzip2`, and `snappy`.
                               enum:
                               - bzip2
                               - gzip
-                              - lz4
                               - snappy
-                              - xz
-                              - zstd
                               type: string
                             encryption:
                               description: |-
