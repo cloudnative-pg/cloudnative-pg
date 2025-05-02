@@ -28,7 +28,6 @@ import (
 	"time"
 
 	barmanBackup "github.com/cloudnative-pg/barman-cloud/pkg/backup"
-	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
@@ -68,7 +67,6 @@ type BackupCommand struct {
 	Env          []string
 	Log          log.Logger
 	Instance     *Instance
-	Capabilities *barmanCapabilities.Capabilities
 	barmanBackup *barmanBackup.Command
 }
 
@@ -81,11 +79,6 @@ func NewBackupCommand(
 	instance *Instance,
 	log log.Logger,
 ) (*BackupCommand, error) {
-	capabilities, err := barmanCapabilities.CurrentCapabilities()
-	if err != nil {
-		return nil, err
-	}
-
 	return &BackupCommand{
 		Cluster:      cluster,
 		Backup:       backup,
@@ -94,8 +87,7 @@ func NewBackupCommand(
 		Env:          os.Environ(),
 		Instance:     instance,
 		Log:          log,
-		Capabilities: capabilities,
-		barmanBackup: barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities),
+		barmanBackup: barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore),
 	}, nil
 }
 
@@ -103,9 +95,6 @@ func NewBackupCommand(
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-	if err := b.ensureCompatibility(); err != nil {
-		return err
-	}
 
 	b.setupBackupStatus()
 
@@ -142,15 +131,6 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	go b.run(ctx)
 
 	return nil
-}
-
-func (b *BackupCommand) ensureCompatibility() error {
-	postgresVers, err := b.Instance.GetPgVersion()
-	if err != nil {
-		return err
-	}
-
-	return b.barmanBackup.IsCompatible(postgresVers)
 }
 
 func (b *BackupCommand) retryWithRefreshedCluster(
@@ -243,7 +223,6 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		b.Backup.Status.BackupName,
 		backupStatus.ServerName,
 		b.Env,
-		b.Cluster,
 		postgres.BackupTemporaryDirectory,
 	)
 	if err != nil {
@@ -258,7 +237,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Backup.Status.SetAsCompleted()
 
 	barmanBackup, err := b.barmanBackup.GetExecutedBackupInfo(
-		ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Cluster, b.Env)
+		ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Env)
 	if err != nil {
 		return err
 	}
@@ -357,9 +336,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		backupStatus.BackupName = fmt.Sprintf("backup-%v", pgTime.ToCompactISO8601(time.Now()))
-	}
+	backupStatus.BackupName = fmt.Sprintf("backup-%v", pgTime.ToCompactISO8601(time.Now()))
 	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
 	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
