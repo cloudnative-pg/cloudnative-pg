@@ -194,7 +194,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@4ba453fbc2db7735392b93edf935aaf9b1e8f747 # v6
+        uses: docker/bake-action@76f9fa3a758507623da19f6092dc4089a7e61592 # v6
         id: bake-push
         env:
           environment: "production"
@@ -315,7 +315,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: bundle
 
@@ -398,7 +398,7 @@ jobs:
           git config user.name "${{ needs.release-binaries.outputs.author_name }}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: bundle
       -
