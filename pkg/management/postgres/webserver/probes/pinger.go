@@ -22,15 +22,15 @@ package probes
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -39,49 +39,47 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-const (
-	// defaultRequestTimeout is the default value of the request timeout
-	defaultRequestTimeout = 500 * time.Millisecond
-
-	// defaultConnectionTimeout is the default value of the connection timeout
-	defaultConnectionTimeout = 1000 * time.Millisecond
-)
-
-// pingerCfg if the configuration of the instance
+// livenessPingerCfg if the configuration of the instance
 // reachability checker
-type pingerCfg struct {
-	requestTimeout    time.Duration
-	connectionTimeout time.Duration
+type livenessPingerCfg struct {
+	Enabled           bool          `json:"enabled,omitempty"`
+	RequestTimeout    time.Duration `json:"requestTimeout,omitempty"`
+	ConnectionTimeout time.Duration `json:"connectionTimeout,omitempty"`
 }
 
-// pingerConfigFromCluster creates a new pinger configuration from the annotations
+// newLivenessPingerConfigFromCluster creates a new pinger configuration from the annotations
 // in the passed cluster definition
-func pingerConfigFromCluster(ctx context.Context, cluster *apiv1.Cluster) pingerCfg {
+func newLivenessPingerConfigFromCluster(ctx context.Context, cluster *apiv1.Cluster) (*livenessPingerCfg, error) {
+	const (
+		// defaultRequestTimeout is the default value of the request timeout
+		defaultRequestTimeout = 500 * time.Millisecond
+
+		// defaultConnectionTimeout is the default value of the connection timeout
+		defaultConnectionTimeout = 1000 * time.Millisecond
+	)
+
 	contextLogger := log.FromContext(ctx)
 
-	timeoutFromAnnotation := func(name string, defaultValue time.Duration) time.Duration {
-		if value, ok := cluster.Annotations[name]; ok {
-			parsedValue, parserErr := strconv.ParseInt(value, 10, 64)
-			if parserErr != nil {
-				contextLogger.Info(
-					"Wrong annotation value, using defaut value",
-					"parserErr", parserErr,
-					"name", name,
-					"value", value,
-					"default", defaultValue)
-				return defaultValue
-			}
-
-			return time.Duration(parsedValue) * time.Millisecond
-		}
-
-		return defaultValue
+	v, ok := cluster.Annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		contextLogger.Debug("pinger config not found in the cluster annotations")
+		return nil, nil
 	}
 
-	return pingerCfg{
-		requestTimeout:    timeoutFromAnnotation(utils.PingerRequestTimeoutAnnotationName, defaultRequestTimeout),
-		connectionTimeout: timeoutFromAnnotation(utils.PingerConnectionTimeoutAnnotationName, defaultConnectionTimeout),
+	var cfg livenessPingerCfg
+	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
+		contextLogger.Error(err, "failed to unmarshal pinger config")
+		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
 	}
+
+	if cfg.RequestTimeout == 0 {
+		cfg.RequestTimeout = defaultRequestTimeout
+	}
+	if cfg.ConnectionTimeout == 0 {
+		cfg.ConnectionTimeout = defaultConnectionTimeout
+	}
+
+	return &cfg, nil
 }
 
 // pinger can check if a certain instance is reachable by using
@@ -90,15 +88,13 @@ type pinger struct {
 	dialer *net.Dialer
 	client *http.Client
 
-	config pingerCfg
+	config livenessPingerCfg
 }
 
-// newInstanceReachabilityChecker creates a new instance reachability checker by loading
+// buildInstanceReachabilityChecker creates a new instance reachability checker by loading
 // the server CA certificate from the same location that will be used by PostgreSQL.
 // In this case, we avoid using the API Server as it may be unreliable.
-func newInstanceReachabilityChecker(
-	cfg pingerCfg,
-) (*pinger, error) {
+func buildInstanceReachabilityChecker(cfg livenessPingerCfg) (*pinger, error) {
 	certificateLocation := postgresSpec.ServerCACertificateLocation
 	caCertificate, err := os.ReadFile(certificateLocation) //nolint:gosec
 	if err != nil {
@@ -110,14 +106,14 @@ func newInstanceReachabilityChecker(
 
 	tlsConfig := certs.NewTLSConfigFromCertPool(caCertPool)
 
-	dialer := &net.Dialer{Timeout: cfg.connectionTimeout}
+	dialer := &net.Dialer{Timeout: cfg.ConnectionTimeout}
 
 	client := http.Client{
 		Transport: &http.Transport{
 			DialContext:     dialer.DialContext,
 			TLSClientConfig: tlsConfig,
 		},
-		Timeout: cfg.requestTimeout,
+		Timeout: cfg.RequestTimeout,
 	}
 
 	return &pinger{
@@ -151,12 +147,24 @@ func (e *pinger) ping(host, ip string) error {
 	return nil
 }
 
+func (e pinger) ensureInstancesAreReachable(cluster *apiv1.Cluster) error {
+	for name, state := range cluster.Status.InstancesReportedState {
+		host := string(name)
+		ip := state.IP
+		if err := e.ping(host, ip); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // pingError is raised when the instance connectivity test failed.
 type pingError struct {
 	host string
 	ip   string
 
-	config pingerCfg
+	config livenessPingerCfg
 
 	err error
 }
@@ -167,8 +175,8 @@ func (e *pingError) Error() string {
 		"instance connectivity error for instance [%s] with ip [%s] (requestTimeout:%v connectionTimeout:%v): %s",
 		e.host,
 		e.ip,
-		e.config.requestTimeout,
-		e.config.connectionTimeout,
+		e.config.RequestTimeout,
+		e.config.ConnectionTimeout,
 		e.err.Error())
 }
 

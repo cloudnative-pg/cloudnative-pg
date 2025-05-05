@@ -110,13 +110,8 @@ const (
 	// to have them detected as CNPG-i plugins
 	PluginNameLabelName = MetadataNamespace + "/pluginName"
 
-	// PingerRequestTimeoutAnnotationName is the name of the annotation containing
-	// the request timeout in milliseconds for the isolation tester. Defaults to 500.
-	PingerRequestTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerRequestTimeout"
-
-	// PingerConnectionTimeoutAnnotationName is the name of the annotation containing
-	// the connection timeout in milliseconds for the isolation tester. Defaults to 1000.
-	PingerConnectionTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerConnectionTimeout"
+	// LivenessPingerAnnotationName is the name of the pinger configuration
+	LivenessPingerAnnotationName = AlphaMetadataNamespace + "/livenessPinger"
 )
 
 const (
