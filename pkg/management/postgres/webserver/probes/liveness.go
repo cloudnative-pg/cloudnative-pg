@@ -143,12 +143,12 @@ func evaluateLivenessPinger(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	cfg, err := newLivenessPingerConfigFromCluster(ctx, cluster)
+	cfg, err := NewLivenessPingerConfigFromAnnotations(ctx, cluster.Annotations)
 	if err != nil {
 		return err
 	}
-	if cfg == nil || !cfg.Enabled {
-		contextLogger.Debug("pinger config not found in the cluster annotations, skipping")
+	if !cfg.isEnabled() {
+		contextLogger.Debug("pinger config not enabled, skipping")
 		return nil
 	}
 

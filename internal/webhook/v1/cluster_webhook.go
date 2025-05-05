@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -218,6 +219,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
+		v.validateLivenessPingerProbe,
 	}
 
 	for _, validate := range validations {
@@ -2452,4 +2454,24 @@ func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) f
 	}
 
 	return errorList
+}
+
+func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) field.ErrorList {
+	value, ok := r.Annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	_, err := probes.NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	if err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.LivenessPingerAnnotationName),
+				value,
+				fmt.Sprintf("error decoding liveness pinger config: %s", err.Error()),
+			),
+		}
+	}
+
+	return nil
 }

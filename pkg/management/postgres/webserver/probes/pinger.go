@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -39,17 +40,28 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// livenessPingerCfg if the configuration of the instance
+// LivenessPingerCfg if the configuration of the instance
 // reachability checker
-type livenessPingerCfg struct {
-	Enabled           bool          `json:"enabled,omitempty"`
+type LivenessPingerCfg struct {
+	Enabled           *bool         `json:"enabled"`
 	RequestTimeout    time.Duration `json:"requestTimeout,omitempty"`
 	ConnectionTimeout time.Duration `json:"connectionTimeout,omitempty"`
 }
 
-// newLivenessPingerConfigFromCluster creates a new pinger configuration from the annotations
+func (probe *LivenessPingerCfg) isEnabled() bool {
+	if probe == nil || probe.Enabled == nil {
+		return false
+	}
+
+	return *probe.Enabled
+}
+
+// NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
 // in the passed cluster definition
-func newLivenessPingerConfigFromCluster(ctx context.Context, cluster *apiv1.Cluster) (*livenessPingerCfg, error) {
+func NewLivenessPingerConfigFromAnnotations(
+	ctx context.Context,
+	annotations map[string]string,
+) (*LivenessPingerCfg, error) {
 	const (
 		// defaultRequestTimeout is the default value of the request timeout
 		defaultRequestTimeout = 500 * time.Millisecond
@@ -60,16 +72,25 @@ func newLivenessPingerConfigFromCluster(ctx context.Context, cluster *apiv1.Clus
 
 	contextLogger := log.FromContext(ctx)
 
-	v, ok := cluster.Annotations[utils.LivenessPingerAnnotationName]
+	v, ok := annotations[utils.LivenessPingerAnnotationName]
 	if !ok {
 		contextLogger.Debug("pinger config not found in the cluster annotations")
-		return nil, nil
+		// TODO: remove, needed to run all E2E
+		return &LivenessPingerCfg{
+			Enabled:           ptr.To(true),
+			RequestTimeout:    defaultRequestTimeout,
+			ConnectionTimeout: defaultConnectionTimeout,
+		}, nil
 	}
 
-	var cfg livenessPingerCfg
+	var cfg LivenessPingerCfg
 	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
 		contextLogger.Error(err, "failed to unmarshal pinger config")
 		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
+	}
+
+	if cfg.Enabled == nil {
+		return nil, fmt.Errorf("pinger config is missing the enabled field")
 	}
 
 	if cfg.RequestTimeout == 0 {
@@ -88,13 +109,13 @@ type pinger struct {
 	dialer *net.Dialer
 	client *http.Client
 
-	config livenessPingerCfg
+	config LivenessPingerCfg
 }
 
 // buildInstanceReachabilityChecker creates a new instance reachability checker by loading
 // the server CA certificate from the same location that will be used by PostgreSQL.
 // In this case, we avoid using the API Server as it may be unreliable.
-func buildInstanceReachabilityChecker(cfg livenessPingerCfg) (*pinger, error) {
+func buildInstanceReachabilityChecker(cfg LivenessPingerCfg) (*pinger, error) {
 	certificateLocation := postgresSpec.ServerCACertificateLocation
 	caCertificate, err := os.ReadFile(certificateLocation) //nolint:gosec
 	if err != nil {
@@ -164,7 +185,7 @@ type pingError struct {
 	host string
 	ip   string
 
-	config livenessPingerCfg
+	config LivenessPingerCfg
 
 	err error
 }
