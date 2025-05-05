@@ -47,87 +47,88 @@ import (
 func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.Cluster) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	image, err := r.getConfiguredImage(ctx, cluster)
+	requestedImageInfo, err := r.getRequestedImageInfo(ctx, cluster)
 	if err != nil {
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, err.Error())
 	}
 
-	currentDataImage := getCurrentPgDataImage(&cluster.Status)
-
 	// Case 1: the cluster is being initialized and there is still no
 	// running image. In this case, we should simply apply the image selected by the user.
-	if currentDataImage == "" {
+	if cluster.Status.PGDataImageInfo == nil {
 		return nil, status.PatchWithOptimisticLock(
 			ctx,
 			r.Client,
 			cluster,
-			status.SetImage(image),
-			status.SetMajorVersionUpgradeFromImage(nil),
+			status.SetImage(requestedImageInfo.Image),
+			status.SetPGDataImageInfo(&requestedImageInfo),
 		)
 	}
 
 	// Case 2: there's a running image. The code checks if the user selected
 	// an image of the same major version or if a change in the major
 	// version has been requested.
-	currentVersion, err := version.FromTag(reference.New(currentDataImage).Tag)
-	if err != nil {
-		contextLogger.Error(err, "While parsing current major versions")
-		return nil, err
+	if requestedImageInfo.Image == cluster.Status.PGDataImageInfo.Image {
+		// The requested image is the same as the current one, no action needed
+		return nil, nil
 	}
 
-	requestedVersion, err := version.FromTag(reference.New(image).Tag)
-	if err != nil {
-		contextLogger.Error(err, "While parsing requested major versions")
-		return nil, err
-	}
+	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
+	requestedMajorVersion := requestedImageInfo.MajorVersion
 
-	var majorVersionUpgradeFromImage *string
-	switch {
-	case currentVersion.Major() < requestedVersion.Major():
-		// The current major version is older than the requested one
-		majorVersionUpgradeFromImage = &currentDataImage
-	case currentVersion.Major() == requestedVersion.Major():
-		// The major versions are the same, cancel the update
-		majorVersionUpgradeFromImage = nil
-	default:
+	if currentMajorVersion > requestedMajorVersion {
+		// Major version downgrade requested. This is not allowed.
 		contextLogger.Info(
-			"Cannot downgrade the PostgreSQL major version. Forcing the current image.",
-			"currentImage", currentDataImage,
-			"requestedImage", image)
-		image = currentDataImage
+			"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
+			"currentImage", cluster.Status.PGDataImageInfo.Image,
+			"requestedImage", requestedImageInfo)
+		return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
+			currentMajorVersion, requestedMajorVersion)
 	}
 
+	if currentMajorVersion < requestedMajorVersion {
+		// Major version upgrade requested
+		return nil, status.PatchWithOptimisticLock(
+			ctx,
+			r.Client,
+			cluster,
+			status.SetImage(requestedImageInfo.Image),
+		)
+	}
+
+	// The major versions are the same, but the images are different.
+	// This is a minor version upgrade/downgrade.
 	return nil, status.PatchWithOptimisticLock(
 		ctx,
 		r.Client,
 		cluster,
-		status.SetImage(image),
-		status.SetMajorVersionUpgradeFromImage(majorVersionUpgradeFromImage),
-	)
+		status.SetImage(requestedImageInfo.Image),
+		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
-// getCurrentPgDataImage returns Postgres image that was able to run the cluster
-// PGDATA correctly last time.
-// This is important in the context of major upgrade because it contains the
-// image with the "old" major version even when there are no Pods available.
-func getCurrentPgDataImage(status *apiv1.ClusterStatus) string {
-	if status.MajorVersionUpgradeFromImage != nil {
-		return *status.MajorVersionUpgradeFromImage
+func getImageInfoFromImage(image string) (apiv1.ImageInfo, error) {
+	// Parse the version from the tag
+	imageVersion, err := version.FromTag(reference.New(image).Tag)
+	if err != nil {
+		return apiv1.ImageInfo{}, fmt.Errorf("cannot parse version from image %s: %w", image, err)
 	}
 
-	return status.Image
+	return apiv1.ImageInfo{
+		Image:        image,
+		MajorVersion: int(imageVersion.Major()), //nolint:gosec
+	}, nil
 }
 
-func (r *ClusterReconciler) getConfiguredImage(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
+func (r *ClusterReconciler) getRequestedImageInfo(
+	ctx context.Context, cluster *apiv1.Cluster,
+) (apiv1.ImageInfo, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// If ImageName is defined and different from the current image in the status, we update the status
-	if cluster.Spec.ImageName != "" {
-		return cluster.Spec.ImageName, nil
-	}
-
 	if cluster.Spec.ImageCatalogRef == nil {
-		return "", fmt.Errorf("ImageName is not defined and no catalog is referenced")
+		if cluster.Spec.ImageName != "" {
+			return getImageInfoFromImage(cluster.Spec.ImageName)
+		}
+
+		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
 	}
 
 	contextLogger = contextLogger.WithValues("catalogRef", cluster.Spec.ImageCatalogRef)
@@ -142,13 +143,13 @@ func (r *ClusterReconciler) getConfiguredImage(ctx context.Context, cluster *api
 		catalog = &apiv1.ImageCatalog{}
 	default:
 		contextLogger.Info("Unknown catalog kind")
-		return "", fmt.Errorf("invalid image catalog type")
+		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog type")
 	}
 
 	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
 	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
 		contextLogger.Info("Unknown catalog group")
-		return "", fmt.Errorf("invalid image catalog group")
+		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog group")
 	}
 
 	// Get the referenced catalog
@@ -159,10 +160,10 @@ func (r *ClusterReconciler) getConfiguredImage(ctx context.Context, cluster *api
 			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
 				catalogKind, catalogName)
 			contextLogger.Info("catalog not found", "catalogKind", catalogKind, "catalogName", catalogName)
-			return "", fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
+			return apiv1.ImageInfo{}, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
 		}
 
-		return "", err
+		return apiv1.ImageInfo{}, err
 	}
 
 	// Catalog found, we try to find the image for the major version
@@ -178,10 +179,10 @@ func (r *ClusterReconciler) getConfiguredImage(ctx context.Context, cluster *api
 			catalogName)
 		contextLogger.Info("cannot find requested major version",
 			"requestedMajorVersion", requestedMajorVersion)
-		return "", fmt.Errorf("selected major version is not available in the catalog")
+		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
 	}
 
-	return catalogImage, nil
+	return apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(

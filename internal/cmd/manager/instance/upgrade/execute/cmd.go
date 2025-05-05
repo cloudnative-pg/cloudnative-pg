@@ -31,13 +31,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/cloudnative-pg/machinery/pkg/env"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/spf13/cobra"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -191,7 +189,7 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while getting old data directory control data: %w", err)
 	}
 
-	targetVersion, err := cluster.GetPostgresqlVersion()
+	targetVersion, err := cluster.GetPostgresqlMajorVersion()
 	if err != nil {
 		return fmt.Errorf("error while getting the target version from the cluster object: %w", err)
 	}
@@ -208,17 +206,17 @@ func upgradeSubCommand(
 
 	contextLogger.Info("Checking if we have anything to update")
 	// Read pg_version from both the old and new data directories
-	oldVersion, err := postgresutils.GetPgdataVersion(pgData)
+	oldVersion, err := postgresutils.GetMajorVersionFromPgData(pgData)
 	if err != nil {
 		return fmt.Errorf("error while reading the old version: %w", err)
 	}
 
-	newVersion, err := postgresutils.GetPgdataVersion(newDataDir)
+	newVersion, err := postgresutils.GetMajorVersionFromPgData(newDataDir)
 	if err != nil {
 		return fmt.Errorf("error while reading the new version: %w", err)
 	}
 
-	if oldVersion.Equals(newVersion) {
+	if oldVersion == newVersion {
 		contextLogger.Info("Versions are the same, no need to upgrade")
 		if err := os.RemoveAll(newDataDir); err != nil {
 			return fmt.Errorf("failed to remove the directory: %w", err)
@@ -283,7 +281,7 @@ func getControlData(binDir, pgData string) (map[string]string, error) {
 	return utils.ParsePgControldataOutput(string(out)), nil
 }
 
-func runInitDB(destDir string, walDir *string, pgControlData map[string]string, targetVersion version.Data) error {
+func runInitDB(destDir string, walDir *string, pgControlData map[string]string, targetMajorVersion int) error {
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
@@ -302,7 +300,7 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string, 
 		return err
 	}
 
-	options, err = tryAddDataChecksums(pgControlData, targetVersion, options)
+	options, err = tryAddDataChecksums(pgControlData, targetMajorVersion, options)
 	if err != nil {
 		return err
 	}
@@ -323,7 +321,7 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string, 
 // TODO: refactor it should be a method of pgControlData
 func tryAddDataChecksums(
 	pgControlData map[string]string,
-	targetVersion version.Data,
+	targetMajorVersion int,
 	options []string,
 ) ([]string, error) {
 	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
@@ -333,7 +331,7 @@ func tryAddDataChecksums(
 
 	if dataPageChecksumVersion != "1" {
 		// In postgres 18 we will have to set "--no-data-checksums" if checksums are disabled (they are enabled by default)
-		if targetVersion.Major() >= 18 {
+		if targetMajorVersion >= 18 {
 			return append(options, "--no-data-checksums"), nil
 		}
 		return options, nil
@@ -374,11 +372,11 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	tmpCluster := cluster.DeepCopy()
 	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
 
-	pgVersion, err := postgresutils.GetPgdataVersion(destDir)
+	pgMajorVersion, err := postgresutils.GetMajorVersionFromPgData(destDir)
 	if err != nil {
 		return fmt.Errorf("error while reading the new data directory version: %w", err)
 	}
-	if pgVersion.Major >= 18 {
+	if pgMajorVersion >= 18 {
 		tmpCluster.Spec.PostgresConfiguration.Parameters["idle_replication_slot_timeout"] = "0"
 	}
 
@@ -422,7 +420,7 @@ func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBin
 func moveDataInPlace(
 	ctx context.Context,
 	pgData string,
-	oldVersion semver.Version,
+	oldMajor int,
 	newDataDir string,
 	newWalDir *string,
 ) error {
@@ -473,7 +471,7 @@ func moveDataInPlace(
 
 	contextLogger.Info("Cleaning up the previous version directory from tablespaces")
 	if err := removeMatchingPaths(ctx,
-		path.Join(pgData, "pg_tblspc", "*", fmt.Sprintf("PG_%v_*", oldVersion.Major))); err != nil {
+		path.Join(pgData, "pg_tblspc", "*", fmt.Sprintf("PG_%v_*", oldMajor))); err != nil {
 		return fmt.Errorf("error while removing the old tablespaces directories: %w", err)
 	}
 

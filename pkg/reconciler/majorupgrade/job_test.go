@@ -30,7 +30,10 @@ import (
 )
 
 var _ = Describe("Major upgrade Job generation", func() {
-	oldImageName := "postgres:16"
+	oldImageInfo := &apiv1.ImageInfo{
+		Image:        "postgres:16",
+		MajorVersion: 16,
+	}
 	newImageName := "postgres:17"
 
 	cluster := apiv1.Cluster{
@@ -41,8 +44,8 @@ var _ = Describe("Major upgrade Job generation", func() {
 			},
 		},
 		Status: apiv1.ClusterStatus{
-			Image:                        newImageName,
-			MajorVersionUpgradeFromImage: &oldImageName,
+			Image:           newImageName,
+			PGDataImageInfo: oldImageInfo.DeepCopy(),
 		},
 	}
 

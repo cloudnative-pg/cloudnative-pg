@@ -33,7 +33,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -111,11 +110,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return err
 		}
 
-		pgVersion, err := utils.GetPgdataVersion(r.instance.PgData)
-		if err != nil {
-			return err
-		}
-
 		// Clean up any stale pid file before executing pg_rewind
 		err = r.instance.CleanUpStalePid()
 		if err != nil {
@@ -136,7 +130,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
-		err = r.instance.Rewind(ctx, pgVersion)
+		err = r.instance.Rewind(ctx)
 		if err != nil {
 			return fmt.Errorf("while exucuting pg_rewind: %w", err)
 		}

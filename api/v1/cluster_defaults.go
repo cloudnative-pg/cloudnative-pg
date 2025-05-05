@@ -85,13 +85,13 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.Backup.Target = DefaultBackupTarget
 	}
 
-	psqlVersion, err := r.GetPostgresqlVersion()
+	psqlVersion, err := r.GetPostgresqlMajorVersion()
 	if err == nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		info := postgres.ConfigurationInfo{
 			Settings:                      postgres.CnpgConfigurationSettings,
-			Version:                       psqlVersion,
+			MajorVersion:                  psqlVersion,
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
