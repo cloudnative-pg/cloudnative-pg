@@ -116,7 +116,7 @@ const (
 
 	// PingerConnectionTimeoutAnnotationName is the name of the annotation containing
 	// the connection timeout in milliseconds for the isolation tester. Defaults to 1000.
-	PingerConnectionTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerRequestTimeout"
+	PingerConnectionTimeoutAnnotationName = AlphaMetadataNamespace + "/pingerConnectionTimeout"
 )
 
 const (
