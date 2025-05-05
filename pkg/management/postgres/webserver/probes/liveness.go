@@ -49,16 +49,33 @@ func NewLivenessChecker(
 	}
 }
 
+// tryRefreshLatestCluster refreshes the latest cluster definition, returns a bool indicating if the operation was
+// successful
+func (e *livenessExecutor) tryRefreshLatestCluster(ctx context.Context) bool {
+	var cluster apiv1.Cluster
+	err := e.cli.Get(
+		ctx,
+		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
+		&cluster,
+	)
+	if err != nil {
+		return false
+	}
+
+	e.lastestKnownCluster = cluster.DeepCopy()
+	return true
+}
+
 func (e *livenessExecutor) IsHealthy(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	isPrimary, err := e.instance.IsPrimary()
-	if err != nil {
+	isPrimary, isPrimaryErr := e.instance.IsPrimary()
+	if isPrimaryErr != nil {
 		contextLogger.Error(
-			err,
+			isPrimaryErr,
 			"Error while checking the instance role, skipping automatic shutdown.")
 		_, _ = fmt.Fprint(w, "OK")
 		return
@@ -70,41 +87,24 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	var cluster apiv1.Cluster
-	err = e.cli.Get(
-		ctx,
-		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
-		&cluster,
-	)
-	if err == nil {
-		// We were able to reach the API server. Everything is right.
-		_, _ = fmt.Fprint(w, "OK")
-
-		// Even if we reach this point concurrently, assignment is an atomic
-		// operation and it would not represent a problem.
-		e.lastestKnownCluster = &cluster
-
+	if clusterRefreshed := e.tryRefreshLatestCluster(ctx); clusterRefreshed {
 		// We correctly reached the API server but, as a failsafe measure, we
-		// exercise the rechability checker and leave a log message if something
+		// exercise the reachability checker and leave a log message if something
 		// is not right.
 		// In this way a network configuration problem can be discovered as
 		// quickly as possible.
-		e.reachabilityCheckerExercise(ctx, &cluster)
-
+		if err := evaluateLivenessPinger(ctx, e.lastestKnownCluster.DeepCopy()); err != nil {
+			contextLogger.Warning(
+				"Instance connectivity error - liveness probe failing but API server is reachable",
+				"err",
+				err.Error(),
+			)
+		}
+		_, _ = fmt.Fprint(w, "OK")
 		return
 	}
 
-	e.isHealthyWithCluster(ctx, w, e.lastestKnownCluster)
-}
-
-func (e *livenessExecutor) isHealthyWithCluster(
-	ctx context.Context,
-	w http.ResponseWriter,
-	cluster *apiv1.Cluster,
-) {
-	contextLogger := log.FromContext(ctx)
-
-	if cluster == nil {
+	if e.lastestKnownCluster == nil {
 		// We were never able to download a cluster definition. This should not
 		// happen because we check the API server connectivity as soon as the
 		// instance manager starts, before starting the probe web server.
@@ -119,22 +119,8 @@ func (e *livenessExecutor) isHealthyWithCluster(
 		return
 	}
 
-	if cluster.Spec.Instances == 1 {
-		// There will be just one instance, and it will be not possible to have
-		// two primaries at the same time.
-		contextLogger.Warning(
-			"The API server is not reachable in a single-instance cluster, " +
-				"skipping automatic shutdown.")
-
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	// We are isolated from the API server. We use the failsafe entrypoint to
-	// check if we're isolated from the other PG instances too.
-	contextLogger.Warning(
-		"The API server is not reachable, triggering instance connectivity check")
-	if err := e.ensureInstancesAreReachable(ctx, cluster); err != nil {
+	err := evaluateLivenessPinger(ctx, e.lastestKnownCluster.DeepCopy())
+	if err != nil {
 		contextLogger.Error(err, "Instance connectivity error - liveness probe failing")
 		http.Error(
 			w,
@@ -144,36 +130,40 @@ func (e *livenessExecutor) isHealthyWithCluster(
 		return
 	}
 
-	contextLogger.Info(
+	contextLogger.Debug(
 		"Instance connectivity test succeeded - liveness probe succeeding",
 		"latestKnownInstancesReportedState", e.lastestKnownCluster.Status.InstancesReportedState,
 	)
-
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-func (e *livenessExecutor) reachabilityCheckerExercise(ctx context.Context, cluster *apiv1.Cluster) {
+func evaluateLivenessPinger(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	if err := e.ensureInstancesAreReachable(ctx, cluster); err != nil {
-		contextLogger.Warning("Instances connectivity test failed, skipping", "err", err)
-		return
-	}
-}
-
-func (e *livenessExecutor) ensureInstancesAreReachable(ctx context.Context, cluster *apiv1.Cluster) error {
-	pingerCfg := pingerConfigFromCluster(ctx, cluster)
-	checker, err := newInstanceReachabilityChecker(pingerCfg)
+	cfg, err := newLivenessPingerConfigFromCluster(ctx, cluster)
 	if err != nil {
 		return err
 	}
+	if cfg == nil || !cfg.Enabled {
+		contextLogger.Debug("pinger config not found in the cluster annotations, skipping")
+		return nil
+	}
 
-	for name, state := range cluster.Status.InstancesReportedState {
-		host := string(name)
-		ip := state.IP
-		if err := checker.ping(host, ip); err != nil {
-			return err
-		}
+	if cluster.Spec.Instances == 1 {
+		contextLogger.Debug("Only one instance present in the latest known cluster definition. Skipping automatic shutdown.")
+		return nil
+	}
+
+	checker, err := buildInstanceReachabilityChecker(*cfg)
+	if err != nil {
+		return fmt.Errorf("failed to build instance reachability checker: %w", err)
+	}
+
+	if err := checker.ensureInstancesAreReachable(cluster); err != nil {
+		return fmt.Errorf("liveness check failed: %w", err)
 	}
 
 	return nil
