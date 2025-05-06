@@ -66,7 +66,7 @@ type remoteWebserverEndpoints struct {
 	instance             *postgres.Instance
 	currentBackup        *backupConnection
 	ongoingBackupRequest sync.Mutex
-
+	// livenessChecker is a  stateful probe
 	livenessChecker probes.Checker
 }
 

@@ -104,6 +104,8 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
+	contextLogger = contextLogger.WithValues("apiServerReachable", false)
+
 	if e.lastestKnownCluster == nil {
 		// We were never able to download a cluster definition. This should not
 		// happen because we check the API server connectivity as soon as the
@@ -112,8 +114,7 @@ func (e *livenessExecutor) IsHealthy(
 		// To be safe, we classify this instance manager to be not isolated and
 		// postpone any decision to a later liveness probe call.
 		contextLogger.Warning(
-			"The API server is not reachable and no cluster definition has been received, " +
-				"skipping automatic shutdown.")
+			"No cluster definition has been received, skipping automatic shutdown.")
 
 		_, _ = fmt.Fprint(w, "OK")
 		return
