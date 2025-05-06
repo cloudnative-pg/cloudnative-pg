@@ -2335,7 +2335,34 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
-	return append(list, getSharedBuffersWarnings(r)...)
+	list = append(list, getSharedBuffersWarnings(r)...)
+	return append(list, getBarmanWarnings(r)...)
+}
+
+func getBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	inTreeUsages := 0
+
+	if r.Spec.Backup.BarmanObjectStore != nil {
+		inTreeUsages++
+	}
+
+	for _, externalCluster := range r.Spec.ExternalClusters {
+		if externalCluster.BarmanObjectStore != nil {
+			inTreeUsages++
+		}
+	}
+
+	if inTreeUsages > 0 {
+		result = append(
+			result,
+			"Native support for Barman Cloud backups and recovery is now deprecated and will be "+
+				"fully removed in CloudNativePG 1.28.0. Please migrate the existing clusters to the "+
+				"new Barman Cloud Plugin to ensure a smooth transition.",
+		)
+	}
+	return result
 }
 
 func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {
