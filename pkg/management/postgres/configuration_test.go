@@ -181,7 +181,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 			ctx,
 			&clusterWithoutTablespaces,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -193,7 +193,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 			ctx,
 			&clusterWithoutTemporaryTablespaces,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -205,7 +205,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 			ctx,
 			&clusterWithTemporaryTablespaces,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -270,7 +270,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 			ctx,
 			&primaryCluster,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -284,7 +284,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 			ctx,
 			&replicaCluster,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -298,7 +298,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 			ctx,
 			&replicaClusterWithNoDelay,
 			true,
-			defaultVersion.Major(),
+			defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
