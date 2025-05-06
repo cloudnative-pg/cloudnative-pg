@@ -15,6 +15,8 @@ on:
     - labeled
     - unlabeled
 
+permissions: read-all
+
 jobs:
   verify_linked_issue:
     runs-on: ubuntu-latest
@@ -25,5 +27,3 @@ jobs:
         uses: hattan/verify-linked-issue-action@2d8e2e47a462cc7b07ba5e6cab6f9d57bd36672e # v1.1.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
