@@ -8,6 +8,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  security-events: write
+  contents: read
+
 jobs:
   security:
     name: Security scan

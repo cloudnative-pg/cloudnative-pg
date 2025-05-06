@@ -8,6 +8,8 @@ on:
     branches:
       - main
 
+permissions: read-all
+
 env:
   GOLANG_VERSION: "1.24.x"
 
@@ -21,6 +23,8 @@ jobs:
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
     steps:
       -
         name: Label the pull request
@@ -142,6 +146,8 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       COMMIT: ${{ needs.back-porting-pr.outputs.commit }}
     runs-on: ubuntu-24.04
+    permissions:
+      issues: write
     steps:
       - name: create ticket
         uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2 # v2
