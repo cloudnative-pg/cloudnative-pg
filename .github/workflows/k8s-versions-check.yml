@@ -16,10 +16,7 @@ on:
         description: 'Limit to the specified engines list (eks, aks, gke, kind, ocp)'
         required: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: read
+permissions: read-all
 
 defaults:
   run:

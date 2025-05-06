@@ -14,6 +14,8 @@ on:
   schedule:
     - cron:  '0 1 * * *'
 
+permissions: read-all
+
 # set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.24.x"
@@ -48,6 +50,8 @@ jobs:
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
     name: smoke test release-* branches when it's a scheduled run
     if: github.event_name == 'schedule'
     strategy:
@@ -68,6 +72,9 @@ jobs:
   duplicate_runs:
     runs-on: ubuntu-24.04
     name: Skip duplicate runs
+    permissions:
+      actions: write
+      contents: read
     continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
