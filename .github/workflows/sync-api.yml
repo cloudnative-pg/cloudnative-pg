@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+permissions: read-all
+
 jobs:
   trigger-sync:
     runs-on: ubuntu-latest
