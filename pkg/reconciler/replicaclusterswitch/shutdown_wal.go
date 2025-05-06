@@ -70,7 +70,7 @@ func generateDemotionToken(
 		return "", fmt.Errorf("could not get pg_controldata from Pod %s: %w", primaryInstance.Pod.Name, err)
 	}
 	parsed := utils.ParsePgControldataOutput(rawPgControlData)
-	pgDataState := parsed[utils.PgControlDataDatabaseClusterStateKey]
+	pgDataState := parsed.GetDatabaseClusterState()
 
 	if !utils.PgDataState(pgDataState).IsShutdown(ctx) {
 		// PostgreSQL is still not shut down, waiting
@@ -78,7 +78,7 @@ func generateDemotionToken(
 		return "", errPostgresNotShutDown
 	}
 
-	token, err := utils.CreatePromotionToken(parsed)
+	token, err := parsed.CreatePromotionToken()
 	if err != nil {
 		return "", err
 	}
@@ -92,9 +92,9 @@ func generateDemotionToken(
 		return "", fmt.Errorf("could not archive shutdown checkpoint wal file: %w", err)
 	}
 
-	if parsed[utils.PgControlDataKeyREDOWALFile] != partialArchiveWALName {
+	if parsed.GetREDOWALFile() != partialArchiveWALName {
 		return "", fmt.Errorf("unexpected shutdown checkpoint wal file archived, expected: %s, got: %s",
-			parsed[utils.PgControlDataKeyREDOWALFile],
+			parsed.GetREDOWALFile(),
 			partialArchiveWALName,
 		)
 	}
