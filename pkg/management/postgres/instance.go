@@ -288,16 +288,9 @@ func (instance *Instance) CheckHasDiskSpaceForWAL(ctx context.Context) (bool, er
 	}
 
 	pgControlData := utils.ParsePgControldataOutput(pgControlDataString)
-	walSegmentSizeString, ok := pgControlData["Bytes per WAL segment"]
-	if !ok {
-		return false, fmt.Errorf("no 'Bytes per WAL segment' section into pg_controldata output")
-	}
-
-	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	walSegmentSize, err := pgControlData.GetBytesPerWALSegment()
 	if err != nil {
-		return false, fmt.Errorf(
-			"wrong 'Bytes per WAL segment' pg_controldata value (not an integer): '%s' %w",
-			walSegmentSizeString, err)
+		return false, err
 	}
 
 	walDirectory := path.Join(instance.PgData, pgWalDirectory)
