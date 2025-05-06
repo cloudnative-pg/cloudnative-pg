@@ -64,7 +64,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
 	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
-	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres"
+	primaryConnInfo := instance.GetPrimaryConnInfo()
 	return UpdateReplicaConfiguration(instance.PgData, primaryConnInfo, slotName)
 }
 
