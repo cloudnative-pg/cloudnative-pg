@@ -22,12 +22,15 @@ package postgres
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
@@ -240,6 +243,12 @@ local {{.Username}} postgres
 	// config in the custom.conf file
 	CNPGConfigSha256 = "cnpg.config_sha256"
 
+	// CNPGSynchronousStandbyNamesMetadata is used to inject inside PG the parameters
+	// that were used to calculate synchronous_standby_names. With this data we're
+	// able to know the actual settings without parsing back the
+	// synchronous_standby_names GUC
+	CNPGSynchronousStandbyNamesMetadata = "cnpg.synchronous_standby_names_metadata"
+
 	// SharedPreloadLibraries shared preload libraries key in the config
 	SharedPreloadLibraries = "shared_preload_libraries"
 
@@ -285,6 +294,21 @@ type ConfigurationSettings struct {
 	PgAuditSettings SettingsCollection
 }
 
+// SynchronousStandbyNamesConfig is the parameters that are needed
+// to create the synchronous_standby_names GUC
+type SynchronousStandbyNamesConfig struct {
+	// Method accepts 'any' (quorum-based synchronous replication)
+	// or 'first' (priority-based synchronous replication) as values.
+	Method string `json:"method"`
+
+	// NumSync is the number of synchronous standbys that transactions
+	// need to wait for replies from
+	NumSync int `json:"number"`
+
+	// StandbyNames is the list of standby servers
+	StandbyNames []string `json:"standbyNames"`
+}
+
 // ConfigurationInfo contains the required information to create a PostgreSQL
 // configuration
 type ConfigurationInfo struct {
@@ -301,7 +325,7 @@ type ConfigurationInfo struct {
 	UserSettings map[string]string
 
 	// The synchronous_standby_names configuration to be applied
-	SynchronousStandbyNames string
+	SynchronousStandbyNames SynchronousStandbyNamesConfig
 
 	// The synchronized_standby_slots configuration to be applied
 	SynchronizedStandbySlots []string
@@ -688,9 +712,17 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Apply the synchronous replication settings
-	syncStandbyNames := info.SynchronousStandbyNames
+	syncStandbyNames := info.SynchronousStandbyNames.String()
 	if len(syncStandbyNames) > 0 {
 		configuration.OverwriteConfig(SynchronousStandbyNames, syncStandbyNames)
+
+		if metadata, err := json.Marshal(info.SynchronousStandbyNames); err != nil {
+			log.Error(err,
+				"Error while serializing streaming configuration parameters",
+				"synchronousStandbyNames", info.SynchronousStandbyNames)
+		} else {
+			configuration.OverwriteConfig(CNPGSynchronousStandbyNamesMetadata, string(metadata))
+		}
 	}
 
 	if len(info.SynchronizedStandbySlots) > 0 {
@@ -820,4 +852,32 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// String creates the synchronous_standby_names PostgreSQL GUC
+// with the passed members
+func (s *SynchronousStandbyNamesConfig) String() string {
+	if s.IsZero() {
+		return ""
+	}
+
+	escapePostgresConfLiteral := func(value string) string {
+		return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
+	}
+
+	escapedReplicas := make([]string, len(s.StandbyNames))
+	for idx, name := range s.StandbyNames {
+		escapedReplicas[idx] = escapePostgresConfLiteral(name)
+	}
+
+	return fmt.Sprintf(
+		"%s %v (%v)",
+		s.Method,
+		s.NumSync,
+		strings.Join(escapedReplicas, ","))
+}
+
+// IsZero is true when synchronour replication is disabled
+func (s SynchronousStandbyNamesConfig) IsZero() bool {
+	return len(s.StandbyNames) == 0
 }
