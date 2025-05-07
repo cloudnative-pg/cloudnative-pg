@@ -252,11 +252,26 @@ func (r *InstanceReconciler) Reconcile(
 
 	if reloadNeeded && !restarted {
 		contextLogger.Info("reloading the instance")
+
+		// IMPORTANT
+		//
+		// We are unsure of the state of the PostgreSQL configuration
+		// meanwhile a new configuration is applied.
+		//
+		// For this reason, before applying a new configuration we
+		// reset the SyncQuorum object - de facto preventing any failover -
+		// and we update it after.
+		if err = r.resetSyncQuorumObject(ctx, cluster); err != nil {
+			return reconcile.Result{}, err
+		}
 		if err = r.instance.Reload(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
+		}
+		if err = r.updateSyncQuorumObject(ctx, cluster); err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 
