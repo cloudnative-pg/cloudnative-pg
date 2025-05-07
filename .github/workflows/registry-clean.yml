@@ -11,6 +11,8 @@ env:
   IMAGE_NAME: "cloudnative-pg-testing"
   CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"
 
+permissions: read-all
+
 jobs:
   clean-ghcr:
     name: delete old testing container images
