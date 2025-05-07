@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,7 +47,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("ANY 2 (\"three\",\"two\",\"one\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "ANY",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two", "one"},
+			}))
 		})
 
 		It("creates configuration with the FIRST clause", func() {
@@ -65,7 +70,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\",\"one\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two", "one"},
+			}))
 		})
 
 		It("considers the maximum number of standby names", func() {
@@ -84,7 +93,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three"},
+			}))
 		})
 
 		It("prepends the prefix and append the suffix", func() {
@@ -103,8 +116,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(
-				Equal("FIRST 2 (\"prefix\",\"here\",\"three\",\"suffix\",\"there\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"prefix", "here", "three", "suffix", "there"},
+			}))
 		})
 
 		It("enforce synchronous replication even if there are no healthy replicas", func() {
@@ -116,8 +132,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			}
 			cluster.Status = apiv1.ClusterStatus{}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(
-				Equal("FIRST 2 (\"example-placeholder\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"example-placeholder"},
+			}))
 		})
 
 		It("includes pods that do not report the status", func() {
@@ -136,7 +155,12 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 				InstanceNames: []string{"one", "two", "three"},
 			}
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\",\"one\")"))
+
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two", "one"},
+			}))
 		})
 	})
 
@@ -159,7 +183,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			}
 
 			// Important: the name of the primary is not included in the list
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("ANY 2 (\"three\",\"two\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "ANY",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two"},
+			}))
 		})
 
 		It("creates configuration with the FIRST clause", func() {
@@ -180,7 +208,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			}
 
 			// Important: the name of the primary is not included in the list
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two"},
+			}))
 		})
 
 		It("considers the maximum number of standby names", func() {
@@ -200,7 +232,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 1 (\"three\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      1,
+				StandbyNames: []string{"three"},
+			}))
 		})
 
 		It("ignores the prefix and the suffix", func() {
@@ -219,8 +255,11 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 			}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(
-				Equal("FIRST 2 (\"three\",\"two\")"))
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      2,
+				StandbyNames: []string{"three", "two"},
+			}))
 		})
 
 		It("disables synchronous replication when no instance is available", func() {
@@ -233,7 +272,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			}
 			cluster.Status = apiv1.ClusterStatus{}
 
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(""))
+			Expect(explicitSynchronousStandbyNames(cluster).IsZero()).To(BeTrue())
 		})
 
 		It("does not include pods that do not report the status", func() {
@@ -253,7 +292,12 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 				},
 				InstanceNames: []string{"one", "two", "three"},
 			}
-			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 1 (\"three\")"))
+
+			Expect(explicitSynchronousStandbyNames(cluster)).To(Equal(postgres.SynchronousStandbyNamesConfig{
+				Method:       "FIRST",
+				NumSync:      1,
+				StandbyNames: []string{"three"},
+			}))
 		})
 	})
 })
