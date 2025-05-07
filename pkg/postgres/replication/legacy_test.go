@@ -21,6 +21,7 @@ package replication
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -110,7 +111,13 @@ var _ = Describe("legacy synchronous_standby_names configuration", func() {
 			},
 		}
 		synchronousStandbyNames := legacySynchronousStandbyNames(cluster)
-		Expect(synchronousStandbyNames).
-			To(Equal("ANY 2 (\"one\",\"three\",\"two\")"))
+
+		Expect(synchronousStandbyNames).To(Equal(
+			postgres.SynchronousStandbyNamesConfig{
+				Method:       "ANY",
+				NumSync:      2,
+				StandbyNames: []string{"one", "three", "two"},
+			},
+		))
 	})
 })

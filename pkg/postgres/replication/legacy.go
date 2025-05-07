@@ -20,18 +20,17 @@ SPDX-License-Identifier: Apache-2.0
 package replication
 
 import (
-	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // legacySynchronousStandbyNames sets the standby node list with the
 // legacy API
-func legacySynchronousStandbyNames(cluster *apiv1.Cluster) string {
+func legacySynchronousStandbyNames(cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
 	syncReplicas, syncReplicasElectable := getSyncReplicasData(cluster)
 
 	if syncReplicasElectable != nil && syncReplicas > 0 {
@@ -39,13 +38,14 @@ func legacySynchronousStandbyNames(cluster *apiv1.Cluster) string {
 		for idx, name := range syncReplicasElectable {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
-		return fmt.Sprintf(
-			"ANY %v (%v)",
-			syncReplicas,
-			strings.Join(escapedReplicas, ","))
+		return postgres.SynchronousStandbyNamesConfig{
+			Method:       "ANY",
+			NumSync:      syncReplicas,
+			StandbyNames: syncReplicasElectable,
+		}
 	}
 
-	return ""
+	return postgres.SynchronousStandbyNamesConfig{}
 }
 
 // getSyncReplicasData computes the actual number of required synchronous replicas and the names of

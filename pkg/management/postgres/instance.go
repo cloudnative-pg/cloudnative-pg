@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -1008,6 +1009,37 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 	}
 
 	return status, nil
+}
+
+// GetSynchronousReplicationMetadata reads the current PostgreSQL configuration
+// and extracts the parameters that were used to compute the synchronous_standby_names
+// GUC.
+func (instance *Instance) GetSynchronousReplicationMetadata(
+	ctx context.Context,
+) (*postgres.SynchronousStandbyNamesConfig, error) {
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var metadata string
+	row := db.QueryRowContext(
+		ctx, fmt.Sprintf("SHOW %s", postgres.CNPGSynchronousStandbyNamesMetadata))
+	err = row.Scan(&metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+
+	var result postgres.SynchronousStandbyNamesConfig
+	if err := json.Unmarshal([]byte(metadata), &result); err != nil {
+		return nil, fmt.Errorf("while decoding synchronous_standby_names metadata: %w", err)
+	}
+
+	return &result, nil
 }
 
 // waitForStreamingConnectionAvailable waits until we can connect to the passed
