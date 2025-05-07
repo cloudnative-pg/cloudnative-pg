@@ -373,6 +373,7 @@ PushSecret
 QoS
 Quaresima
 QuickStart
+QuorumFailoverProtection
 RBAC
 README
 RHSA
@@ -460,6 +461,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StandbyNames
+StandbyNumber
 StartupProbe
 StartupStrategyType
 StatefulSets
@@ -472,11 +475,15 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
+SyncQuorum
+SyncQuorumSpec
+SyncQuorumStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
 SynchronousReplicaConfigurationMethod
+SynchronousStandbyNamesList
 Synopsys
 TCP
 TLS
@@ -1161,6 +1168,7 @@ pvcTemplate
 quantile
 queryable
 quickstart
+quorumFailoverProtection
 rbac
 rc
 readService
@@ -1286,8 +1294,10 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNames
 standbyNamesPost
 standbyNamesPre
+standbyNumber
 startDelay
 startedAt
 stateful

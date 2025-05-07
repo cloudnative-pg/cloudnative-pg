@@ -21,6 +21,7 @@ package replication
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // GetExpectedSyncReplicasNumber computes the actual number of required synchronous replicas
@@ -35,7 +36,7 @@ func GetExpectedSyncReplicasNumber(cluster *apiv1.Cluster) int {
 
 // GetSynchronousStandbyNames gets the value to be applied
 // to synchronous_standby_names
-func GetSynchronousStandbyNames(cluster *apiv1.Cluster) string {
+func GetSynchronousStandbyNames(cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
 	if cluster.Spec.PostgresConfiguration.Synchronous != nil {
 		return explicitSynchronousStandbyNames(cluster)
 	}
