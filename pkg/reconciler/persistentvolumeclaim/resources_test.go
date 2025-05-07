@@ -35,7 +35,7 @@ var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func(ctx SpecContext) {
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
+			return makePVC(clusterName, serial+apiv1.DataVolumeSuffix, serial, NewPgDataCalculator(), isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
@@ -67,16 +67,16 @@ var _ = Describe("PVC detection", func() {
 			clusterName + "-4",
 		}))
 		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{
-			clusterName + "-2",
+			clusterName + "-2" + apiv1.DataVolumeSuffix,
 		}))
 		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{
-			clusterName + "-3",
+			clusterName + "-3" + apiv1.DataVolumeSuffix,
 		}))
 		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{
-			clusterName + "-4",
+			clusterName + "-4" + apiv1.DataVolumeSuffix,
 		}))
 		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{
-			clusterName + "-1",
+			clusterName + "-1" + apiv1.DataVolumeSuffix,
 		}))
 		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
 	})
@@ -96,10 +96,10 @@ var _ = Describe("PVCs used by instance", func() {
 	}
 
 	It("true if the pvc belongs to the instance name", func() {
-		res := BelongToInstance(cluster, instanceName, instanceName)
+		res := BelongToInstance(cluster, instanceName, instanceName+apiv1.DataVolumeSuffix)
 		Expect(res).To(BeTrue())
 
-		res = BelongToInstance(cluster, instanceName, instanceName+"-wal")
+		res = BelongToInstance(cluster, instanceName, instanceName+apiv1.WalArchiveVolumeSuffix)
 		Expect(res).To(BeTrue())
 	})
 

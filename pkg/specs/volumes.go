@@ -97,7 +97,7 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 			Name: "pgdata",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: podName,
+					ClaimName: podName + apiv1.DataVolumeSuffix,
 				},
 			},
 		},

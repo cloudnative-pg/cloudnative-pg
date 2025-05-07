@@ -103,7 +103,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      clusterName + "-2-wal",
+					Name:      clusterName + "-2" + apiv1.WalArchiveVolumeSuffix,
 					Namespace: namespace,
 					Labels: map[string]string{
 						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),

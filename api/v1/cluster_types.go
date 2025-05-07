@@ -78,6 +78,10 @@ const (
 	// get the name of the pull secret
 	ClusterSecretSuffix = "-pull-secret"
 
+	// DataVolumeSuffix is the suffix appended to the instance name to
+	// get the name of the PVC dedicated to DATA files.
+	DataVolumeSuffix = "-data"
+
 	// WalArchiveVolumeSuffix is the suffix appended to the instance name to
 	// get the name of the PVC dedicated to WAL files.
 	WalArchiveVolumeSuffix = "-wal"

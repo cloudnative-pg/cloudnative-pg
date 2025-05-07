@@ -54,7 +54,7 @@ var _ = Describe("pvc role test", func() {
 
 		role := NewPgDataCalculator()
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgData))
-		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.DataVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusInitializing))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName))

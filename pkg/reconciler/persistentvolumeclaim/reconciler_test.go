@@ -48,10 +48,10 @@ var _ = Describe("Reconcile Metadata", func() {
 		clusterName := "Cluster-pvc-resources"
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
-				makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
-				makePVC(clusterName, "2", "2", NewPgWalCalculator(), false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", "3", NewPgDataCalculator(), false), // role is out of sync with name
-				makePVC(clusterName, "3", "3", NewPgDataCalculator(), false),
+				makePVC(clusterName, "1"+apiv1.DataVolumeSuffix, "1", NewPgDataCalculator(), false),
+				makePVC(clusterName, "2"+apiv1.DataVolumeSuffix, "2", NewPgWalCalculator(), false),        // role is out of sync with name
+				makePVC(clusterName, "3"+apiv1.WalArchiveVolumeSuffix, "3", NewPgDataCalculator(), false), // role is out of sync with name
+				makePVC(clusterName, "3"+apiv1.DataVolumeSuffix, "3", NewPgDataCalculator(), false),
 			},
 		}
 		cluster := &apiv1.Cluster{
@@ -96,7 +96,7 @@ var _ = Describe("Reconcile Metadata", func() {
 								Name: clusterName + "-3",
 								VolumeSource: corev1.VolumeSource{
 									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: clusterName + "-3",
+										ClaimName: clusterName + "-3" + apiv1.DataVolumeSuffix,
 									},
 								},
 							},
@@ -204,8 +204,8 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
 				makePVC(clusterName, "1", "1", NewPgDataCalculator(), false),
-				makePVC(clusterName, "2", "2", NewPgWalCalculator(), false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", "3", NewPgDataCalculator(), false), // role is out of sync with name
+				makePVC(clusterName, "2", "2", NewPgWalCalculator(), false),                               // role is out of sync with name
+				makePVC(clusterName, "3"+apiv1.WalArchiveVolumeSuffix, "3", NewPgDataCalculator(), false), // role is out of sync with name
 				makePVC(clusterName, "3", "3", NewPgDataCalculator(), false),
 			},
 		}
@@ -241,7 +241,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Labels).To(BeEquivalentTo(map[string]string{
-			utils.InstanceNameLabelName: clusterName + "-3-wal",
+			utils.InstanceNameLabelName: clusterName + "-3" + apiv1.WalArchiveVolumeSuffix,
 			utils.PvcRoleLabelName:      "PG_DATA",
 			"label1":                    "value",
 			"label2":                    "value",
@@ -289,10 +289,10 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			},
 		}
 
-		pvc := makePVC(clusterName, "1", "1", NewPgDataCalculator(), false)
-		pvc2 := makePVC(clusterName, "2", "2", NewPgWalCalculator(), false)         // role is out of sync with name
-		pvc3Wal := makePVC(clusterName, "3-wal", "3", NewPgDataCalculator(), false) // role is out of sync with name
-		pvc3Data := makePVC(clusterName, "3", "3", nil, false)
+		pvc := makePVC(clusterName, "1"+apiv1.DataVolumeSuffix, "1", NewPgDataCalculator(), false)
+		pvc2 := makePVC(clusterName, "2"+apiv1.DataVolumeSuffix, "2", NewPgWalCalculator(), false)           // role is out of sync with name
+		pvc3Wal := makePVC(clusterName, "3"+apiv1.WalArchiveVolumeSuffix, "3", NewPgDataCalculator(), false) // role is out of sync with name
+		pvc3Data := makePVC(clusterName, "3"+apiv1.DataVolumeSuffix, "3", nil, false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
 			pvc2,

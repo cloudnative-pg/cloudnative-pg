@@ -130,7 +130,7 @@ func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 
 // GetName will be used to get the name of the PVC
 func (r pgDataCalculator) GetName(instanceName string) string {
-	return instanceName
+	return instanceName + apiv1.DataVolumeSuffix
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
