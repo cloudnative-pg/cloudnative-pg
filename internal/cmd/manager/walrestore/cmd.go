@@ -107,6 +107,7 @@ func NewCmd() *cobra.Command {
 }
 
 func run(ctx context.Context, pgData string, podName string, args []string) error {
+	// FIXME: logs here are not shown to the user
 	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 	walName := args[0]
@@ -123,7 +124,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
 	if err != nil {
-		return err
+		contextLog.Trace("could not restore WAL via plugins", "wal", walName, "error", err)
 	}
 	if walFound {
 		return nil
