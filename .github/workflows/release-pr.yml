@@ -2,9 +2,7 @@
 
 name: release-pr
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: read-all
 
 on:
   push:
@@ -14,6 +12,9 @@ on:
 jobs:
   pull-request:
     runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+      contents: write
     steps:
       -
         name: Checkout
