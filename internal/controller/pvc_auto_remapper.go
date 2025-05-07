@@ -13,6 +13,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -260,6 +261,7 @@ func (r *ClusterReconciler) deletePod(
 
 func (r *ClusterReconciler) recreatePodWithNewVolumeBlock(
 	ctx context.Context,
+	cluster *apiv1.Cluster,
 	instanceName types.NamespacedName,
 	toRemap pvcremapper.InstancePVCs,
 ) error {
@@ -277,6 +279,18 @@ func (r *ClusterReconciler) recreatePodWithNewVolumeBlock(
 		}
 	}
 	newPod := orgPod.DeepCopy()
+	if len(newPod.OwnerReferences) == 0 {
+		isController := true
+		newPod.OwnerReferences = []metav1.OwnerReference{
+			metav1.OwnerReference{
+				APIVersion: "postgresql.cnpg.io/v1",
+				Kind:       "Cluster",
+				Name:       cluster.Name,
+				UID:        cluster.UID,
+				Controller: &isController,
+			},
+		}
+	}
 	var volumes []corev1.Volume
 	for _, volume := range newPod.Spec.Volumes {
 		for _, ipvc := range toRemap {
@@ -382,6 +396,7 @@ func (r *ClusterReconciler) pvcRemapping(
 
 func (r *ClusterReconciler) instanceRemapping(
 	ctx context.Context,
+	cluster *apiv1.Cluster,
 	instanceName types.NamespacedName,
 	instancePvcs pvcremapper.InstancePVCs,
 ) error {
@@ -396,7 +411,7 @@ func (r *ClusterReconciler) instanceRemapping(
 		"pvc to remap count", len(toRemap),
 	)
 
-	if err := r.recreatePodWithNewVolumeBlock(ctx, instanceName, toRemap); err != nil {
+	if err := r.recreatePodWithNewVolumeBlock(ctx, cluster, instanceName, toRemap); err != nil {
 		return err
 	}
 
@@ -425,7 +440,7 @@ func (r *ClusterReconciler) autoPVCRemapping(
 			continue
 		}
 		instanceNamespacedName := types.NamespacedName{Namespace: cluster.Namespace, Name: instanceName}
-		if err = r.instanceRemapping(ctx, instanceNamespacedName, pvcRemapper.ForInstance(instanceName)); err != nil {
+		if err = r.instanceRemapping(ctx, cluster, instanceNamespacedName, pvcRemapper.ForInstance(instanceName)); err != nil {
 			return err
 		}
 	}
@@ -434,7 +449,7 @@ func (r *ClusterReconciler) autoPVCRemapping(
 		return nil
 	}
 	primaryNamespaceName := types.NamespacedName{Name: cluster.Status.CurrentPrimary, Namespace: cluster.Namespace}
-	if err = r.instanceRemapping(ctx, primaryNamespaceName, pvcRemapper.ForInstance(cluster.Status.CurrentPrimary)); err != nil {
+	if err = r.instanceRemapping(ctx, cluster, primaryNamespaceName, pvcRemapper.ForInstance(cluster.Status.CurrentPrimary)); err != nil {
 		return err
 	}
 	/*

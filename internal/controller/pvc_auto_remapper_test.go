@@ -131,8 +131,8 @@ var _ = Describe("unit test for pvc remapper logic", func() {
 	})
 
 	When("remapping is required", func() {
-		ctx := context.Background()
 		It("should rename PVC's", func() {
+			ctx := context.Background()
 			namespace := newFakeNamespace(env.client)
 			cluster := newFakeCNPGCluster(
 				env.client,
@@ -177,6 +177,7 @@ var _ = Describe("unit test for pvc remapper logic", func() {
 				for _, instance := range instances {
 					err := env.clusterReconciler.instanceRemapping(
 						ctx,
+						cluster,
 						types.NamespacedName{Name: instance.Name, Namespace: namespace},
 						ipvcs,
 					)
@@ -271,6 +272,72 @@ var _ = Describe("unit test for pvc remapper logic", func() {
 					}))
 					verifyVolumes(pod.Spec.Volumes, ipvcs.ForInstance(instance.Name))
 				}
+			})
+		})
+		It("should fix owner references when they have been removed but pod was not deleted and recreated in one go", func() {
+			ctx := context.Background()
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(
+				env.client,
+				namespace,
+				func(cluster *apiv1.Cluster) {
+					cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
+						Size: "1Gi",
+					}
+				},
+			)
+			instances := generateFakeClusterPods(env.client, cluster, true)
+			Ω(instances).To(HaveLen(3))
+			nonOwnedInstance := instances[1]
+			pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+			ipvcs, err := pvcremapper.InstancePVCsFromPVCs(pvcs)
+			Ω(err).NotTo(HaveOccurred())
+			Ω(ipvcs).To(HaveLen(6))
+			configuration.Current.DataVolumeSuffix = "-data2"
+			configuration.Current.WalArchiveVolumeSuffix = "-wal2"
+			ipvcs = generateInstancePVs(ctx, env.client, ipvcs)
+
+			By("mimicking a previous reconcile that removed owner reference, but did not recreate pod properly", func() {
+				var pod corev1.Pod
+				err := env.clusterReconciler.Get(ctx,
+					types.NamespacedName{Namespace: nonOwnedInstance.Namespace, Name: nonOwnedInstance.Name},
+					&pod,
+				)
+				Ω(err).ToNot(HaveOccurred())
+
+				patchedPod := pod.DeepCopy()
+				patchedPod.OwnerReferences = nil
+				err = env.clusterReconciler.Patch(ctx, patchedPod, client.MergeFrom(&pod))
+				Ω(err).ToNot(HaveOccurred())
+			})
+			By("checking that remap finishes successfully", func() {
+				for _, instance := range instances {
+					err := env.clusterReconciler.instanceRemapping(
+						ctx,
+						cluster,
+						types.NamespacedName{Name: instance.Name, Namespace: namespace},
+						ipvcs,
+					)
+					Ω(err).NotTo(HaveOccurred())
+				}
+			})
+			By("mimicking a previous reconcile that removed owner reference, but did not recreate pod properly", func() {
+				var pod corev1.Pod
+				err := env.clusterReconciler.Get(ctx,
+					types.NamespacedName{Namespace: nonOwnedInstance.Namespace, Name: nonOwnedInstance.Name},
+					&pod,
+				)
+				Ω(err).ToNot(HaveOccurred())
+				Ω(pod.OwnerReferences).To(HaveLen(1))
+				isController := true
+				expectedOwnerReference := metav1.OwnerReference{
+					APIVersion: "postgresql.cnpg.io/v1",
+					Kind:       "Cluster",
+					Name:       cluster.Name,
+					UID:        cluster.UID,
+					Controller: &isController,
+				}
+				Ω(pod.OwnerReferences).To(ContainElement(expectedOwnerReference))
 			})
 		})
 	})
