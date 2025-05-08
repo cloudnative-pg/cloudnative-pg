@@ -110,7 +110,12 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
 			}
 
-			if backupMethod != string(apiv1.BackupMethodPlugin) {
+			if backupMethod == string(apiv1.BackupMethodPlugin) {
+				if len(pluginName) == 0 {
+					return fmt.Errorf("plugin-name is required when backup method in %s",
+						apiv1.BackupMethodPlugin)
+				}
+			} else {
 				if len(pluginName) > 0 {
 					return fmt.Errorf("plugin-name is allowed only when backup method in %s",
 						apiv1.BackupMethodPlugin)
