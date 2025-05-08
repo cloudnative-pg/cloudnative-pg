@@ -60,7 +60,6 @@ import (
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
 
 var (
@@ -1039,9 +1038,6 @@ func restoreViaPlugin(
 	plugin *apiv1.PluginConfiguration,
 ) (*restore.RestoreResponse, error) {
 	contextLogger := log.FromContext(ctx)
-
-	// TODO: timeout should be configurable by the user
-	ctx = context.WithValue(ctx, contextutils.GRPCTimeoutKey, 100*time.Minute)
 
 	plugins := repository.New()
 	defer plugins.Close()
