@@ -23,14 +23,10 @@ package connection
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
 
 // ProtocolUnix is for plugins that are reachable over a
@@ -44,15 +40,7 @@ func (p ProtocolUnix) Dial(ctx context.Context) (Handler, error) {
 
 	contextLogger.Debug("Connecting to plugin via local socket", "path", dialPath)
 
-	timeoutValue := defaultTimeout
-	value, ok := ctx.Value(contextutils.GRPCTimeoutKey).(time.Duration)
-	if ok {
-		contextLogger.Debug("Using custom timeout value", "timeout", value)
-		timeoutValue = value
-	}
-
 	return grpc.NewClient(
 		dialPath,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(timeout.UnaryClientInterceptor(timeoutValue)))
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
