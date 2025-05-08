@@ -2342,24 +2342,27 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 func getBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 	var result admission.Warnings
 
-	inTreeUsages := 0
+	var paths []string
 
-	if r.Spec.Backup.BarmanObjectStore != nil {
-		inTreeUsages++
+	if r.Spec.Backup != nil && r.Spec.Backup.BarmanObjectStore != nil {
+		paths = append(paths, field.NewPath("spec", "backup", "barmanObjectStore").String())
 	}
 
-	for _, externalCluster := range r.Spec.ExternalClusters {
+	for idx, externalCluster := range r.Spec.ExternalClusters {
 		if externalCluster.BarmanObjectStore != nil {
-			inTreeUsages++
+			paths = append(paths, field.NewPath("spec", "externalClusters", fmt.Sprintf("%d", idx),
+				"barmanObjectStore").String())
 		}
 	}
 
-	if inTreeUsages > 0 {
+	if len(paths) > 0 {
+		pathsStr := strings.Join(paths, ", ")
 		result = append(
 			result,
-			"Native support for Barman Cloud backups and recovery is now deprecated and will be "+
-				"fully removed in CloudNativePG 1.28.0. Please migrate the existing clusters to the "+
-				"new Barman Cloud Plugin to ensure a smooth transition.",
+			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
+				"completely removed in CloudNativePG 1.28.0. Found usage in: %s. "+
+				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
+				pathsStr),
 		)
 	}
 	return result
