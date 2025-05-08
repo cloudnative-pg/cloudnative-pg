@@ -147,11 +147,13 @@ spec:
     size: 10Gi
   tablespaces:
     - name: current
-      size: 100Gi
-      storageClass: fastest
+      storage:        
+        size: 100Gi
+        storageClass: fastest
     - name: this_year
-      size: 500Gi
-      storageClass: balanced
+      storage:
+        size: 500Gi
+        storageClass: balanced
 ```
 
 The `yardbirds` cluster example requests 4 persistent volume claims using
