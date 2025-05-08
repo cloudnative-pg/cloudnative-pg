@@ -72,6 +72,8 @@ func NewCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			// TODO: The command is triggered by PG, resulting in the loss of stdout logs.
+			// TODO: We need to implement a logpipe to prevent this.
 			contextLog := log.WithName("wal-restore")
 			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
 			err := run(ctx, pgData, podName, args)
@@ -123,9 +125,19 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
 	if err != nil {
-		return err
+		// With the current implementation, this happens when both of the following conditions are met:
+		//
+		// 1. At least one CNPG-i plugin that implements the WAL service is present.
+		// 2. No plugin can restore the WAL file because:
+		//   a) The requested WAL could not be found
+		//   b) The plugin failed in the restoration process.
+		//
+		// When this happens, `walFound` is false, prompting us to revert to the in-tree barman-cloud support.
+		contextLog.Trace("could not restore WAL via plugins", "wal", walName, "error", err)
 	}
 	if walFound {
+		// This happens only if a CNPG-i plugin was able to restore
+		// the requested WAL.
 		return nil
 	}
 
