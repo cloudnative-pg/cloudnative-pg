@@ -124,9 +124,21 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
 	if err != nil {
+		// With the current implementation, this happens when both the
+		// following conditions are met:
+		//
+		// 1. at least one CNPG-i plugin implementing the WAL service exists
+		// 2. no plugin was able to restore the WAL file because:
+		//   - the requested WAL was not found or
+		//   - the plugin failed restoring it
+		//
+		// When this happens, walFound is false and we fall back
+		// to the in-tree barman-cloud support.
 		contextLog.Trace("could not restore WAL via plugins", "wal", walName, "error", err)
 	}
 	if walFound {
+		// This happens only if a CNPG-i plugin was able to restore
+		// the requested WAL.
 		return nil
 	}
 
