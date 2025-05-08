@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -43,9 +42,5 @@ func (p ProtocolUnix) Dial(ctx context.Context) (Handler, error) {
 
 	return grpc.NewClient(
 		dialPath,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(
-			timeout.UnaryClientInterceptor(defaultTimeout),
-		),
-	)
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
