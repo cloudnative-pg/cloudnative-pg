@@ -841,7 +841,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
-	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres connect_timeout=5"
+	primaryConnInfo := instance.GetPrimaryConnInfo() + " connect_timeout=5"
 
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
@@ -1041,7 +1041,7 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	primaryConnInfo := instance.GetPrimaryConnInfo()
 	options := []string{
 		"-P",
-		"--source-server", primaryConnInfo + " dbname=postgres",
+		"--source-server", primaryConnInfo,
 		"--target-pgdata", instance.PgData,
 	}
 
@@ -1300,7 +1300,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
+	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName()) + " dbname=postgres"
 
 	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
 	if len(standbyTCPUserTimeout) > 0 {
