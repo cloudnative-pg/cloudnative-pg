@@ -213,7 +213,7 @@ CloudNativePG manages the following predefined annotations:
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
 
 `cnpg.io/skipEmptyWalArchiveCheck`
-:   When set to `true` on a `Cluster` resource, the operator disables the check
+:   When set to `enabled` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
 
