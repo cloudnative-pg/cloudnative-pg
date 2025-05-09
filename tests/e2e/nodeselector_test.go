@@ -126,7 +126,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 				for _, nodeDetails := range nodeList.Items {
 					if (nodeDetails.Spec.Unschedulable != true) &&
 						(len(nodeDetails.Spec.Taints) == 0) {
-						nodeName = nodeDetails.ObjectMeta.Name
+						nodeName = nodeDetails.Name
 						break
 					}
 				}

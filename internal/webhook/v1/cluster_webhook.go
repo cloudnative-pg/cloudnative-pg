@@ -1858,7 +1858,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
 			// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
-			len(r.ObjectMeta.ResourceVersion) == 0 {
+			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
 				replicaClusterConf,

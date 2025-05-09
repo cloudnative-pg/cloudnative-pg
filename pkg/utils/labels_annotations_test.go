@@ -155,7 +155,7 @@ var _ = Describe("Annotate pods management", func() {
 		}
 
 		AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, annotations)
-		_, isPresent := pod.ObjectMeta.Annotations[appArmorPostgres]
+		_, isPresent := pod.Annotations[appArmorPostgres]
 		Expect(isPresent).To(BeFalse())
 	})
 })

@@ -47,7 +47,7 @@ var _ = Describe("Hibernation annotation management", func() {
 		}
 		Expect(isHibernationEnabled(&cluster)).To(BeTrue())
 
-		cluster.ObjectMeta.Annotations[utils.HibernationAnnotationName] = HibernationOff
+		cluster.Annotations[utils.HibernationAnnotationName] = HibernationOff
 		Expect(isHibernationEnabled(&cluster)).To(BeFalse())
 	})
 })

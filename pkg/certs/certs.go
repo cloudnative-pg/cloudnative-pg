@@ -194,11 +194,11 @@ func (pair KeyPair) createAndSignPairWithValidity(
 	}
 
 	leafTemplate.KeyUsage = x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement
-	switch {
-	case usage == CertTypeClient:
+	switch usage {
+	case CertTypeClient:
 		leafTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 
-	case usage == CertTypeServer:
+	case CertTypeServer:
 		leafTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 		leafTemplate.KeyUsage |= x509.KeyUsageKeyEncipherment
 
