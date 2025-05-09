@@ -211,7 +211,7 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
-		"Set the '.spec.onlineConfiguratoin.waitForArchive' field of the "+
+		"Set the '.spec.onlineConfiguration.waitForArchive' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
 			optionalAcceptedValues,
