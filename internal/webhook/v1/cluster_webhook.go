@@ -2336,10 +2336,11 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
 	list = append(list, getSharedBuffersWarnings(r)...)
-	return append(list, getBarmanWarnings(r)...)
+	list = append(list, getInTreeBarmanWarnings(r)...)
+	return append(list, getRetentionPolicyWarnings(r)...)
 }
 
-func getBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
+func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 	var result admission.Warnings
 
 	var paths []string
@@ -2365,6 +2366,21 @@ func getBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 				pathsStr),
 		)
 	}
+	return result
+}
+
+func getRetentionPolicyWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Backup != nil && r.Spec.Backup.RetentionPolicy != "" && r.Spec.Backup.BarmanObjectStore == nil {
+		result = append(
+			result,
+			"Retention policies specified in .spec.backup.retentionPolicy are only used by the "+
+				"in-tree barman-cloud support, which is not being used in this cluster. "+
+				"Please use a backup plugin and migrate this configuration to the plugin configuration",
+		)
+	}
+
 	return result
 }
 
