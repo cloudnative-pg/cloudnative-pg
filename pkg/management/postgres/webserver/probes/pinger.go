@@ -57,7 +57,7 @@ func (probe *LivenessPingerCfg) isEnabled() bool {
 }
 
 // NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
-// in the passed cluster definition
+// in the cluster definition
 func NewLivenessPingerConfigFromAnnotations(
 	ctx context.Context,
 	annotations map[string]string,
@@ -93,9 +93,11 @@ func NewLivenessPingerConfigFromAnnotations(
 		return nil, fmt.Errorf("pinger config is missing the enabled field")
 	}
 
+	cfg.RequestTimeout = cfg.RequestTimeout * time.Millisecond
 	if cfg.RequestTimeout == 0 {
 		cfg.RequestTimeout = defaultRequestTimeout
 	}
+	cfg.ConnectionTimeout = cfg.ConnectionTimeout * time.Millisecond
 	if cfg.ConnectionTimeout == 0 {
 		cfg.ConnectionTimeout = defaultConnectionTimeout
 	}
