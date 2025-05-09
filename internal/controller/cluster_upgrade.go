@@ -229,7 +229,7 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 			primaryPod.Annotations = make(map[string]string)
 		}
 		primaryPod.Annotations[utils.ClusterRestartAnnotationName] = clusterRestart
-		if err := r.Client.Patch(ctx, &primaryPod, client.MergeFrom(original)); err != nil {
+		if err := r.Patch(ctx, &primaryPod, client.MergeFrom(original)); err != nil {
 			return err
 		}
 	}
@@ -364,7 +364,7 @@ func isPodNeedingRollout(
 
 // check if the pod has a valid podSpec
 func hasValidPodSpec(pod *corev1.Pod) bool {
-	podSpecAnnotation, hasStoredPodSpec := pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	podSpecAnnotation, hasStoredPodSpec := pod.Annotations[utils.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
 		return false
 	}
@@ -590,7 +590,7 @@ func checkPodEnvironmentIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rol
 }
 
 func checkPodSpecIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	podSpecAnnotation, ok := pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	podSpecAnnotation, ok := pod.Annotations[utils.PodSpecAnnotationName]
 	if !ok {
 		return rollout{}, nil
 	}

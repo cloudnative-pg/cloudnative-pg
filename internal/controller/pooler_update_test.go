@@ -296,7 +296,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		pooler := newFakePooler(env.client, cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 		By("setting the reconcilePodSpec annotation to disabled on the pooler ", func() {
-			pooler.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
+			pooler.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 			pooler.Spec.Template = &apiv1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: ptr.To(int64(100)),
@@ -343,7 +343,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		})
 
 		By("enable again, making sure pooler change updates the deployment", func() {
-			delete(pooler.ObjectMeta.Annotations, utils.ReconcilePodSpecAnnotationName)
+			delete(pooler.Annotations, utils.ReconcilePodSpecAnnotationName)
 			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
 			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
 			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)

@@ -1,45 +1,25 @@
-linters-settings:
-  lll:
-    line-length: 120
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(github.com/cloudnative-pg/cloudnative-pg)
-      - blank
-      - dot
-  gosec:
-    excludes:
-      - G101 # remove this exclude when https://github.com/securego/gosec/issues/1001 is fixed
-
+version: "2"
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - dogsled
     - dupl
     - durationcheck
     - errcheck
-    - copyloopvar
-    - gci
+    - ginkgolinter
     - gocognit
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
     - gomoddirectives
     - gomodguard
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
-    - ginkgolinter
     - importas
     - ineffassign
     - lll
@@ -53,78 +33,64 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - stylecheck
     - thelper
     - tparallel
-    - typecheck
     - unconvert
     - unparam
     - unused
     - wastedassign
     - whitespace
-
-  # to be checked:
-  # - errorlint
-  # - forbidigo
-  # - forcetypeassert
-  # - goerr113
-  # - ifshort
-  # - nilerr
-  # - nlreturn
-  # - noctx
-  # - nolintlint
-  # - paralleltest
-  # - promlinter
-  # - tagliatelle
-  # - wrapcheck
-
-  # don't enable:
-  # - cyclop
-  # - depguard
-  # - exhaustive
-  # - exhaustivestruct
-  # - funlen
-  # - gochecknoglobals
-  # - gochecknoinits
-  # - godot
-  # - godox
-  # - gomnd
-  # - testpackage
-  # - wsl
-
-  # deprecated:
-  # - deadcode
-  # - golint
-  # - interfacer
-  # - maligned
-  # - scopelint
-  # - structcheck
-  # - varcheck
-
-run:
-  timeout: 5m
-
-issues:
-  exclude-rules:
-    # Allow dot imports for ginkgo and gomega
-    - source: ginkgo|gomega
-      linters:
-      - revive
-      text: "should not use dot imports"
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - goconst
-    # Exclude lll issues for lines with long annotations
-    - linters:
-      - lll
-      source: "//\\s*\\+"
-    # We have no control of this in zz_generated files and it looks like that excluding those files is not enough
-    # so we disable "ST1016: methods on the same type should have the same receiver name" in api directory
-    - linters:
-      - stylecheck
-      text: "ST1016:"
-      path: api/
-  exclude-use-default: false
-  exclude-files:
-    - zz_generated.*
+  settings:
+    gosec:
+      excludes:
+        - G101
+    staticcheck:
+      checks:
+        - all
+        - '-QF1001'
+        - '-QF1007'
+    lll:
+      line-length: 120
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - revive
+        text: should not use dot imports
+        source: ginkgo|gomega
+      - linters:
+          - goconst
+        path: _test\.go
+      - linters:
+          - lll
+        source: //\s*\+
+      - linters:
+          - staticcheck
+        path: api/
+        text: 'ST1016:'
+    paths:
+      - zz_generated.*
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/cloudnative-pg/cloudnative-pg)
+        - blank
+        - dot
+  exclusions:
+    generated: lax
+    paths:
+      - zz_generated.*
+      - third_party$
+      - builtin$
+      - examples$

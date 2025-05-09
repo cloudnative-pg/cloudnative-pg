@@ -94,8 +94,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	// Verify that the tablespace exists on the primary pod of a cluster
 	hasTablespaceAndOwner := func(cluster *apiv1.Cluster, tablespace, owner string) (bool, error) {
-		namespace := cluster.ObjectMeta.Namespace
-		clusterName := cluster.ObjectMeta.Name
+		namespace := cluster.Namespace
+		clusterName := cluster.Name
 		primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		if err != nil {
 			return false, err
@@ -919,8 +919,8 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 	numTablespaces int,
 	timeout int,
 ) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	podMountPaths := func(pod corev1.Pod) (bool, []string) {
 		var hasPostgresContainer bool
 		var mountPaths []string
@@ -991,8 +991,8 @@ func getDatabasUserUID(cluster *apiv1.Cluster, dbContainer *corev1.Container) in
 }
 
 func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeout int) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking all the required PVCs were created", func() {
 		Eventually(func(g Gomega) {
 			pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
@@ -1055,8 +1055,8 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 }
 
 func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
 			instances, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -1085,8 +1085,8 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 }
 
 func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content string) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking the expected setting in a new PG session", func() {
 		Eventually(func(g Gomega) {
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -1111,8 +1111,8 @@ func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content st
 }
 
 func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespaceName string) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 
 	primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	if err != nil {

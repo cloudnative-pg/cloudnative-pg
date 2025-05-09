@@ -61,7 +61,7 @@ func GetInstancePods(ctx context.Context, clusterName string) ([]corev1.Pod, cor
 	var managedPods []corev1.Pod
 	var primaryPod corev1.Pod
 	for idx := range pods.Items {
-		for _, owner := range pods.Items[idx].ObjectMeta.OwnerReferences {
+		for _, owner := range pods.Items[idx].OwnerReferences {
 			if owner.Kind == apiv1.ClusterKind && owner.Name == clusterName {
 				managedPods = append(managedPods, pods.Items[idx])
 				if specs.IsPodPrimary(pods.Items[idx]) {

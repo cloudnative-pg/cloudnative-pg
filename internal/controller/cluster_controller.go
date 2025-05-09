@@ -231,7 +231,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {

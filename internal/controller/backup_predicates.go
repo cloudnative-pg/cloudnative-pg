@@ -73,7 +73,7 @@ func (r *BackupReconciler) mapClustersToBackup() handler.MapFunc {
 			return nil
 		}
 		var backups apiv1.BackupList
-		err := r.Client.List(ctx, &backups,
+		err := r.List(ctx, &backups,
 			client.MatchingFields{
 				backupPhase: apiv1.BackupPhaseRunning,
 			},

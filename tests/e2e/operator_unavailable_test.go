@@ -169,7 +169,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				podList := &corev1.PodList{}
 				err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
 				Expect(err).ToNot(HaveOccurred())
-				operatorPodName = podList.Items[0].ObjectMeta.Name
+				operatorPodName = podList.Items[0].Name
 
 				// Force-delete the operator and the primary
 				quickDelete := &ctrlclient.DeleteOptions{
