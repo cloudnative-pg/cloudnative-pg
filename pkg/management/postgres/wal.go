@@ -65,7 +65,7 @@ func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchive
 		dbFactory: func() (*sql.DB, error) {
 			db, openErr := sql.Open(
 				"pgx",
-				fmt.Sprintf("%s dbname=%s", primaryConnInfo, "postgres"),
+				primaryConnInfo,
 			)
 			if openErr != nil {
 				log.Error(openErr, "can not open postgres database")
