@@ -110,7 +110,7 @@ func EnrichStatus(
 		}
 
 		// There's no point in reattaching ignored PVCs
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
+		if pvc.DeletionTimestamp != nil {
 			continue
 		}
 
@@ -162,7 +162,7 @@ func classifyPVC(
 	instanceName string,
 ) status {
 	// PVC to ignore
-	if pvc.ObjectMeta.DeletionTimestamp != nil || hasUnknownStatus(ctx, pvc) {
+	if pvc.DeletionTimestamp != nil || hasUnknownStatus(ctx, pvc) {
 		return ignored
 	}
 

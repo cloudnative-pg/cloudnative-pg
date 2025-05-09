@@ -23,10 +23,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 )
 
 var _ = Describe("update Postgres configuration files", func() {

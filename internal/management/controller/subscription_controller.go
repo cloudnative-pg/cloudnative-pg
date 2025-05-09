@@ -62,7 +62,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Get the subscription object
 	var subscription apiv1.Subscription
-	if err := r.Client.Get(ctx, client.ObjectKey{
+	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &subscription); err != nil {

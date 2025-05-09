@@ -61,7 +61,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Get the database object
 	var database apiv1.Database
-	if err := r.Client.Get(ctx, client.ObjectKey{
+	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &database); err != nil {

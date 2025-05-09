@@ -162,7 +162,7 @@ func outputWriter(baseDir string, logReader io.Reader) {
 			continue
 		}
 
-		_, err = file.WriteString(fmt.Sprintf("%v\n", logLine.Message))
+		_, err = fmt.Fprintf(file, "%v\n", logLine.Message)
 		if err != nil {
 			fmt.Printf("could not write message to file %v: %v\n", file.Name(), err)
 			continue
