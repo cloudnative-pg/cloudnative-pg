@@ -90,10 +90,10 @@ func reconcileInstanceRoleLabel(
 		instanceReconciler := metadataReconciler{
 			name: "instance-role",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != instanceRole {
+				if pvc.Labels[utils.ClusterRoleLabelName] != instanceRole {
 					return false
 				}
-				if pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != instanceRole {
+				if pvc.Labels[utils.ClusterInstanceRoleLabelName] != instanceRole {
 					return false
 				}
 

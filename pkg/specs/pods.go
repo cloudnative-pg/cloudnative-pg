@@ -280,9 +280,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 	}
 
 	if enableHTTPS {
-		containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].StartupProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].LivenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].ReadinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
 		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 

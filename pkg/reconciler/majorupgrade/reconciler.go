@@ -282,7 +282,7 @@ func getPrimarySerial(
 	pvcs []corev1.PersistentVolumeClaim,
 ) (int, error) {
 	for _, pvc := range pvcs {
-		instanceRole, _ := utils.GetInstanceRole(pvc.ObjectMeta.Labels)
+		instanceRole, _ := utils.GetInstanceRole(pvc.Labels)
 		if instanceRole != specs.ClusterRoleLabelPrimary {
 			continue
 		}

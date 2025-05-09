@@ -116,7 +116,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			cluster.Spec.Monitoring = &apiv1.MonitoringConfiguration{
 				DisableDefaultQueries: ptr.To(false),
 			}
-			err := crReconciler.Client.Update(context.Background(), cluster)
+			err := crReconciler.Update(context.Background(), cluster)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

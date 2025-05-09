@@ -190,8 +190,8 @@ func (r *instanceClientImpl) GetPgControlDataFromInstance(
 	if err != nil {
 		return "", err
 	}
-	r.Client.Timeout = defaultRequestTimeout
-	resp, err := r.Client.Do(req)
+	r.Timeout = defaultRequestTimeout
+	resp, err := r.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -250,8 +250,8 @@ func (r *instanceClientImpl) UpgradeInstanceManager(
 	}
 	req.Body = binaryFileStream
 
-	r.Client.Timeout = noRequestTimeout
-	resp, err := r.Client.Do(req)
+	r.Timeout = noRequestTimeout
+	resp, err := r.Do(req)
 	// This is the desired response. The instance manager will
 	// synchronously update and this call won't return.
 	if isEOF(err) {
@@ -299,8 +299,8 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 		return result
 	}
 
-	r.Client.Timeout = defaultRequestTimeout
-	resp, err := r.Client.Do(req)
+	r.Timeout = defaultRequestTimeout
+	resp, err := r.Do(req)
 	if err != nil {
 		result.Error = err
 		return result
@@ -379,7 +379,7 @@ func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.
 	if err != nil {
 		return "", err
 	}
-	resp, err := r.Client.Do(req)
+	resp, err := r.Do(req)
 	if err != nil {
 		return "", err
 	}
