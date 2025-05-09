@@ -232,7 +232,7 @@ func (r *PluginReconciler) mapSecretToPlugin(ctx context.Context, obj client.Obj
 	logger := log.FromContext(ctx)
 
 	var services corev1.ServiceList
-	if err := r.Client.List(
+	if err := r.List(
 		ctx,
 		&services,
 		client.HasLabels{utils.PluginNameLabelName},

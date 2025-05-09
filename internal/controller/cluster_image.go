@@ -87,7 +87,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 
 	// Get the referenced catalog
 	catalogName := cluster.Spec.ImageCatalogRef.Name
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
+	err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",

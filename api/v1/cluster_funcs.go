@@ -1249,7 +1249,7 @@ func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
 	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
-		backupConfiguration.BarmanObjectStore.BarmanCredentials.ArePopulated()
+		backupConfiguration.BarmanObjectStore.ArePopulated()
 }
 
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint

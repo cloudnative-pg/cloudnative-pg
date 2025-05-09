@@ -61,7 +61,7 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 			// Gathers the pod list using annotations
 			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			for _, pod := range podList.Items {
-				annotation := pod.ObjectMeta.Annotations[pkgutils.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
+				annotation := pod.Annotations[pkgutils.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
 				Expect(annotation).ShouldNot(BeEmpty(),
 					fmt.Sprintf("annotation for apparmor is not on pod %v", specs.PostgresContainerName))
 				Expect(annotation).Should(BeEquivalentTo("runtime/default"),

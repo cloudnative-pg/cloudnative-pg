@@ -143,11 +143,11 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC apiv1.Cluster) error {
 	cluster := clusterFromPVC.DeepCopy()
 	// remove any runtime kubernetes metadata
-	cluster.ObjectMeta.ResourceVersion = ""
-	cluster.ObjectMeta.ManagedFields = nil
-	cluster.ObjectMeta.UID = ""
-	cluster.ObjectMeta.Generation = 0
-	cluster.ObjectMeta.CreationTimestamp = metav1.Time{}
+	cluster.ResourceVersion = ""
+	cluster.ManagedFields = nil
+	cluster.UID = ""
+	cluster.Generation = 0
+	cluster.CreationTimestamp = metav1.Time{}
 	// remove cluster status
 	cluster.Status = apiv1.ClusterStatus{}
 

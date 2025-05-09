@@ -2160,7 +2160,7 @@ func assertPodIsRecreated(namespace, poolerSampleFile string) {
 			}
 			if len(podList.Items) == 1 {
 				if utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]) {
-					if !(podNameBeforeDelete == podList.Items[0].GetName()) {
+					if podNameBeforeDelete != podList.Items[0].GetName() {
 						return true, err
 					}
 				}

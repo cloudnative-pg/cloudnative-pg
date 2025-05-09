@@ -187,7 +187,7 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 		},
 		"resources": func() bool {
 			// semantic equality will compare the two objects semantically, not only numbers
-			return equality.Semantic.Equalities.DeepEqual(
+			return equality.Semantic.DeepEqual(
 				currentContainer.Resources,
 				targetContainer.Resources,
 			)

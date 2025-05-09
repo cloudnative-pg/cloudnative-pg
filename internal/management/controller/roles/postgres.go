@@ -310,7 +310,7 @@ func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 			quotedInRoles[i] = pgx.Identifier{inRole}.Sanitize()
 		}
 
-		query.WriteString(fmt.Sprintf(" IN ROLE %s ", strings.Join(quotedInRoles, ",")))
+		fmt.Fprintf(query, " IN ROLE %s ", strings.Join(quotedInRoles, ","))
 	}
 }
 
@@ -357,7 +357,7 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 		query.WriteString(" NOSUPERUSER")
 	}
 
-	query.WriteString(fmt.Sprintf(" CONNECTION LIMIT %d", role.ConnectionLimit))
+	fmt.Fprintf(query, " CONNECTION LIMIT %d", role.ConnectionLimit)
 }
 
 func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
@@ -369,7 +369,7 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	case !role.password.Valid:
 		query.WriteString(" PASSWORD NULL")
 	default:
-		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
+		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
 	}
 
 	if role.ValidUntil.Valid {
@@ -379,6 +379,6 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 		} else {
 			value = role.ValidUntil.InfinityModifier.String()
 		}
-		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(value)))
+		fmt.Fprintf(query, " VALID UNTIL %s", pq.QuoteLiteral(value))
 	}
 }

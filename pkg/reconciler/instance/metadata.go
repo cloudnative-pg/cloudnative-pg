@@ -187,11 +187,11 @@ func updateRoleLabels(
 
 	// it is important to note that even if utils.ClusterRoleLabelName is deprecated,
 	// we still ensure that the values are aligned between the two fields
-	podRole, hasRole := instance.ObjectMeta.Labels[utils.ClusterRoleLabelName]
-	newPodRole, newHasRole := instance.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName]
+	podRole, hasRole := instance.Labels[utils.ClusterRoleLabelName]
+	newPodRole, newHasRole := instance.Labels[utils.ClusterInstanceRoleLabelName]
 
-	switch {
-	case instance.Name == cluster.Status.CurrentPrimary:
+	switch instance.Name {
+	case cluster.Status.CurrentPrimary:
 		if !hasRole || podRole != specs.ClusterRoleLabelPrimary || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelPrimary {
 			contextLogger.Info("Setting primary label", "pod", instance.Name)

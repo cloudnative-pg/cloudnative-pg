@@ -338,7 +338,7 @@ func (fullStatus *PostgresqlStatus) printHibernationInfo() {
 		hibernationStatus.AddLine("Status", "Active")
 	}
 	hibernationStatus.AddLine("Message", hibernationCondition.Message)
-	hibernationStatus.AddLine("Time", hibernationCondition.LastTransitionTime.Time.UTC())
+	hibernationStatus.AddLine("Time", hibernationCondition.LastTransitionTime.UTC())
 
 	fmt.Println(aurora.Green("Hibernation"))
 	hibernationStatus.Print()
