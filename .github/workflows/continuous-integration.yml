@@ -19,7 +19,7 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.24.x"
-  GOLANGCI_LINT_VERSION: "v1.64.8"
+  GOLANGCI_LINT_VERSION: "v2.1.6"
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.27.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
