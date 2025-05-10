@@ -5089,3 +5089,43 @@ var _ = Describe("validatePluginConfiguration", func() {
 		Expect(v.validatePluginConfiguration(cluster)).To(BeNil())
 	})
 })
+
+var _ = Describe("", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("returns no errors if the liveness pinger annotation is not present", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{},
+			},
+		}
+		Expect(v.validateLivenessPingerProbe(cluster)).To(BeNil())
+	})
+
+	It("returns no errors if the liveness pinger annotation is valid", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"connectionTimeout": 1000, "requestTimeout": 5000, "enabled": true}`,
+				},
+			},
+		}
+		Expect(v.validateLivenessPingerProbe(cluster)).To(BeNil())
+	})
+
+	It("returns an error if the liveness pinger annotation is invalid", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"requestTimeout": 5000}`,
+				},
+			},
+		}
+		errs := v.validateLivenessPingerProbe(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Error()).To(ContainSubstring("error decoding liveness pinger config"))
+	})
+})
