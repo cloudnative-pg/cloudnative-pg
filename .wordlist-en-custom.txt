@@ -159,9 +159,9 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
-ExtensionConfiguration
 ExternalCluster
 FQDN
 FQDNs
@@ -204,6 +204,7 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolumeSource
 ImportSource
 InfoSec
 Innocenti
