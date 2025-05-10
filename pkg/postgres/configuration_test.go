@@ -397,7 +397,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 		It("both empty when there are no Extensions defined", func() {
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
-				Version:            version.New(18, 0),
+				MajorVersion:       18,
 				IncludingMandatory: true,
 			}
 			config := CreatePostgresqlConfiguration(info)
@@ -408,7 +408,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 		It("configures them when an Extension is defined", func() {
 			info := ConfigurationInfo{
 				Settings:              CnpgConfigurationSettings,
-				Version:               version.New(18, 0),
+				MajorVersion:          18,
 				IncludingMandatory:    true,
 				ImageVolumeExtensions: []string{"postgis", "pgvector"},
 			}
@@ -422,7 +422,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 		It("correctly merges the configuration with UserSettings", func() {
 			info := ConfigurationInfo{
 				Settings:           CnpgConfigurationSettings,
-				Version:            version.New(18, 0),
+				MajorVersion:       18,
 				IncludingMandatory: true,
 				UserSettings: map[string]string{
 					ExtensionControlPath: "/my/extension/path",
