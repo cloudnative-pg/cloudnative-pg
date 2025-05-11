@@ -104,7 +104,7 @@ func getBackupVolumeSnapshots(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
-	backupLabelName string,
+	backupName string,
 ) (slice, error) {
 	var list storagesnapshotv1.VolumeSnapshotList
 
@@ -112,7 +112,7 @@ func getBackupVolumeSnapshots(
 		ctx,
 		&list,
 		client.InNamespace(namespace),
-		client.MatchingLabels{utils.BackupNameLabelName: backupLabelName},
+		client.MatchingLabels{utils.BackupNameLabelName: backupName},
 	); err != nil {
 		return nil, err
 	}
