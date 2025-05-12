@@ -3193,6 +3193,13 @@ conflict with the operator's intended functionality or design.</p>
    <p>indicates on which TimelineId the instance is</p>
 </td>
 </tr>
+<tr><td><code>ip</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>IP address of the instance</p>
+</td>
+</tr>
 </tbody>
 </table>
 
