@@ -74,8 +74,8 @@ For details on supported image tags, see
 ### Upgrade Process
 
 1. Shuts down all cluster pods to ensure data consistency.
-2. Records the previous PostgreSQL version in the cluster’s status under
-   `.status.majorVersionUpgradeFromImage`.
+2. Records the previous PostgreSQL version and image in the cluster’s status under
+   `.status.pgDataImageInfo`.
 3. Initiates a new upgrade job, which:
    - Verifies that the binaries in the image and the data files align with a
      major upgrade request.
