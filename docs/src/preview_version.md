@@ -36,7 +36,7 @@ are not backwards compatible and could be removed entirely.
 
 There are currently no preview versions available.
 
-The current preview version is **1.26.0-rc2**.
+The current preview version is **1.26.0-rc3**.
 
 For more information on the current preview version and how to test, please view the links below:
 
