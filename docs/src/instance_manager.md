@@ -229,6 +229,7 @@ metadata:
   annotations:
     alpha.cnpg.io/livenessPinger: '{"enabled": true,"requestTimeout":1000,"connectionTimeout":1000}'
 ```
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.
