@@ -6126,7 +6126,7 @@ spec:
                     of an instance during a reconciliation loop
                   properties:
                     ip:
-                      description: IP is the IP address of the instance
+                      description: IP address of the instance
                       type: string
                     isPrimary:
                       description: indicates if an instance is the primary one

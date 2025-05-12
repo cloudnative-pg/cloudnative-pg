@@ -3197,7 +3197,7 @@ conflict with the operator's intended functionality or design.</p>
 <i>string</i>
 </td>
 <td>
-   <p>IP is the IP address of the instance</p>
+   <p>IP address of the instance</p>
 </td>
 </tr>
 </tbody>
