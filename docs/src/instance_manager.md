@@ -210,7 +210,7 @@ metadata:
 
 !!! Warning
     This feature is experimental and will be introduced in a future CloudNativePG
-    release with a new API. If you decide to use it now, note that the API **might
+    release with a new API. If you decide to use it now, note that the API **will
     change**.
 
 !!! Important
@@ -219,11 +219,16 @@ metadata:
     be aggressive (30 seconds). As such, we recommend explicitly setting the
     liveness probe configuration to suit your environment.
 
-!!! Note
-    The annotation also accepts two optional network settings: `requestTimeout`
-    and `connectionTimeout`, both defaulting to `500` (in milliseconds).
-    In cloud environments, you may need to increase these values.
+The annotation also accepts two optional network settings: `requestTimeout`
+and `connectionTimeout`, both defaulting to `500` (in milliseconds).
+In cloud environments, you may need to increase these values.
+For example:
 
+```yaml
+metadata:
+  annotations:
+    alpha.cnpg.io/livenessPinger: '{"enabled": true,"requestTimeout":1000,"connectionTimeout":1000}'
+```
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.
