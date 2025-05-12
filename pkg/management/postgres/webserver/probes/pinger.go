@@ -75,11 +75,8 @@ func NewLivenessPingerConfigFromAnnotations(
 	v, ok := annotations[utils.LivenessPingerAnnotationName]
 	if !ok {
 		contextLogger.Debug("pinger config not found in the cluster annotations")
-		// TODO: remove, needed to run all E2E
 		return &LivenessPingerCfg{
-			Enabled:           ptr.To(true),
-			RequestTimeout:    defaultRequestTimeout,
-			ConnectionTimeout: defaultConnectionTimeout,
+			Enabled: ptr.To(false),
 		}, nil
 	}
 
