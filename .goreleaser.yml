@@ -95,7 +95,7 @@ archives:
     {{- if eq .Arch "amd64" }}x86_64
     {{- else if eq .Arch "386" }}i386
     {{- else }}{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ end }}
-  builds:
+  ids:
   - kubectl-cnpg
 
 nfpms:
@@ -109,7 +109,7 @@ nfpms:
     homepage: https://github.com/cloudnative-pg/cloudnative-pg
     bindir: /usr/local/bin
     maintainer: 'Marco Nenciarini <marco.nenciarini@enterprisedb.com>'
-    builds:
+    ids:
       - kubectl-cnpg
     formats:
       - rpm
