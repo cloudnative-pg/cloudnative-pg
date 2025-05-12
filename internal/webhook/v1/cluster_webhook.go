@@ -2335,9 +2335,9 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
-	list = append(list, getSharedBuffersWarnings(r)...)
 	list = append(list, getInTreeBarmanWarnings(r)...)
-	return append(list, getRetentionPolicyWarnings(r)...)
+	list = append(list, getRetentionPolicyWarnings(r)...)
+	return append(list, getSharedBuffersWarnings(r)...)
 }
 
 func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
