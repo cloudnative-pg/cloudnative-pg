@@ -110,12 +110,14 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			// Assert that the oldPrimary is eventually terminated
 			Eventually(func(g Gomega) {
 				out, _, err := run.Unchecked(fmt.Sprintf(
-					"docker exec %v crictl ps -a --namespace %v --name postgres -s Exited -q",
-					isolatedNode, namespace))
+					"docker exec %v crictl ps -a "+
+						"--label io.kubernetes.pod.namespace=%s,io.kubernetes.pod.name=%s "+
+						"--name postgres -s Exited -q", isolatedNode, namespace, oldPrimaryPod.Name))
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(out).ToNot(BeEmpty())
 				if out != "" {
-					GinkgoWriter.Printf("Container %s has been terminated\n", strings.TrimSpace(out))
+					GinkgoWriter.Printf("Container %s (%s) has been terminated\n",
+						oldPrimaryPod.Name, strings.TrimSpace(out))
 				}
 			}, 120).Should(Succeed())
 		})
