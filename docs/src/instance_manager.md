@@ -188,6 +188,42 @@ spec:
       failureThreshold: 10
 ```
 
+### Primary Isolation (alpha)
+
+CloudNativePG 1.26 introduces an opt-in experimental behavior for the liveness
+probe of a PostgreSQL primary, which will report a failure if **both** of the
+following conditions are met:
+
+1. The instance manager cannot reach the Kubernetes API server
+2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
+
+The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+
+It is **disabled by default** and can be enabled by adding the following
+annotation to the `Cluster` resource:
+
+```yaml
+metadata:
+  annotations:
+    alpha.cnpg.io/livenessPinger: '{"enabled": true}'
+```
+
+!!! Warning
+    This feature is experimental and will be introduced in a future CloudNativePG
+    release with a new API. If you decide to use it now, note that the API **might
+    change**.
+
+!!! Important
+    If you plan to enable this experimental feature, be aware that the default
+    liveness probe settings—automatically derived from `livenessProbeTimeout`—might
+    be aggressive (30 seconds). As such, we recommend explicitly setting the
+    liveness probe configuration to suit your environment.
+
+!!! Note
+    The annotation also accepts two optional network settings: `requestTimeout`
+    and `connectionTimeout`, both defaulting to `500` (in milliseconds).
+    In cloud environments, you may need to increase these values.
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.
