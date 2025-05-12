@@ -43,9 +43,9 @@ import (
 // LivenessPingerCfg if the configuration of the instance
 // reachability checker
 type LivenessPingerCfg struct {
-	Enabled           *bool         `json:"enabled"`
-	RequestTimeout    time.Duration `json:"requestTimeout,omitempty"`
-	ConnectionTimeout time.Duration `json:"connectionTimeout,omitempty"`
+	Enabled           *bool `json:"enabled"`
+	RequestTimeout    int   `json:"requestTimeout,omitempty"`
+	ConnectionTimeout int   `json:"connectionTimeout,omitempty"`
 }
 
 func (probe *LivenessPingerCfg) isEnabled() bool {
@@ -64,10 +64,10 @@ func NewLivenessPingerConfigFromAnnotations(
 ) (*LivenessPingerCfg, error) {
 	const (
 		// defaultRequestTimeout is the default value of the request timeout
-		defaultRequestTimeout = 500 * time.Millisecond
+		defaultRequestTimeout = 500
 
 		// defaultConnectionTimeout is the default value of the connection timeout
-		defaultConnectionTimeout = 1000 * time.Millisecond
+		defaultConnectionTimeout = 1000
 	)
 
 	contextLogger := log.FromContext(ctx)
@@ -93,11 +93,9 @@ func NewLivenessPingerConfigFromAnnotations(
 		return nil, fmt.Errorf("pinger config is missing the enabled field")
 	}
 
-	cfg.RequestTimeout = cfg.RequestTimeout * time.Millisecond
 	if cfg.RequestTimeout == 0 {
 		cfg.RequestTimeout = defaultRequestTimeout
 	}
-	cfg.ConnectionTimeout = cfg.ConnectionTimeout * time.Millisecond
 	if cfg.ConnectionTimeout == 0 {
 		cfg.ConnectionTimeout = defaultConnectionTimeout
 	}
@@ -129,14 +127,14 @@ func buildInstanceReachabilityChecker(cfg LivenessPingerCfg) (*pinger, error) {
 
 	tlsConfig := certs.NewTLSConfigFromCertPool(caCertPool)
 
-	dialer := &net.Dialer{Timeout: cfg.ConnectionTimeout}
+	dialer := &net.Dialer{Timeout: time.Duration(cfg.ConnectionTimeout) * time.Millisecond}
 
 	client := http.Client{
 		Transport: &http.Transport{
 			DialContext:     dialer.DialContext,
 			TLSClientConfig: tlsConfig,
 		},
-		Timeout: cfg.RequestTimeout,
+		Timeout: time.Duration(cfg.RequestTimeout) * time.Millisecond,
 	}
 
 	return &pinger{
