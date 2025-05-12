@@ -19,15 +19,49 @@ SPDX-License-Identifier: Apache-2.0
 
 package utils
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"context"
+	"fmt"
+
+	discoveryv1 "k8s.io/api/discovery/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 // FirstEndpointIP returns the IP of first Address in the Endpoint
-func FirstEndpointIP(endpoint *corev1.Endpoints) string {
+func FirstEndpointIP(endpoint *discoveryv1.EndpointSlice) string {
 	if endpoint == nil {
 		return ""
 	}
-	if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+	if len(endpoint.Endpoints) == 0 || len(endpoint.Endpoints[0].Addresses) == 0 {
 		return ""
 	}
-	return endpoint.Subsets[0].Addresses[0].IP
+	return endpoint.Endpoints[0].Addresses[0]
+}
+
+// GetEndpointSliceByServiceName returns the EndpointSlice for a given service name in a given namespace
+func GetEndpointSliceByServiceName(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace, serviceName string,
+) (*discoveryv1.EndpointSlice, error) {
+	endpointSliceList := &discoveryv1.EndpointSliceList{}
+
+	if err := crudClient.List(
+		ctx,
+		endpointSliceList,
+		client.InNamespace(namespace),
+		client.MatchingLabels{"kubernetes.io/service-name": serviceName},
+	); err != nil {
+		return nil, err
+	}
+
+	if len(endpointSliceList.Items) == 0 {
+		return nil, fmt.Errorf("no endpointslice found for service %s in namespace %s", serviceName, namespace)
+	}
+
+	if len(endpointSliceList.Items) > 1 {
+		return nil, fmt.Errorf("multiple endpointslice found for service %s in namespace %s", serviceName, namespace)
+	}
+
+	return &endpointSliceList.Items[0], nil
 }
