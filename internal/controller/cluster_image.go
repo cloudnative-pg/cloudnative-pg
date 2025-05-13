@@ -42,8 +42,7 @@ import (
 // reconcileImage processes the image request, executes it, and stores
 // the result in the .status.image field. If the user requested a
 // major version upgrade, the current image is saved in the
-// .status.majorVersionUpgradeFromImage field. This allows for
-// reverting the upgrade if it doesn't complete successfully.
+// .status.pgDataImageInfo field.
 func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.Cluster) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
