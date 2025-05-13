@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
@@ -151,15 +150,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 
 	minioEnv.Client = objs["minio"]
-})
-
-var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
-	// Keep the logs of the operator and the clusters in case of failure
-	// If everything is skipped, env has not been initialized, and we'll have nothing to clean up
-	if report.SuiteSucceeded && env != nil {
-		err := fileutils.RemoveDirectory(namespaces.SternLogDirectory)
-		Expect(err).ToNot(HaveOccurred())
-	}
 })
 
 var _ = BeforeEach(func() {

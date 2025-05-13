@@ -66,6 +66,8 @@ type remoteWebserverEndpoints struct {
 	instance             *postgres.Instance
 	currentBackup        *backupConnection
 	ongoingBackupRequest sync.Mutex
+	// livenessChecker is a  stateful probe
+	livenessChecker probes.Checker
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -97,11 +99,13 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient: typedClient,
-		instance:    instance,
+		typedClient:     typedClient,
+		instance:        instance,
+		livenessChecker: probes.NewLivenessChecker(typedClient, instance),
 	}
 
 	serveMux := http.NewServeMux()
+	serveMux.HandleFunc(url.PathFailSafe, endpoints.failSafe)
 	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
@@ -222,8 +226,14 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 	checker.IsHealthy(req.Context(), w)
 }
 
-func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
+// This is the failsafe entrypoint
+func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
+}
+
+// This is the failsafe probe
+func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, req *http.Request) {
+	ws.livenessChecker.IsHealthy(req.Context(), w)
 }
 
 // This is the readiness probe
@@ -484,7 +494,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	}
 
 	data := utils.ParsePgControldataOutput(out)
-	walFile := data[utils.PgControlDataKeyREDOWALFile]
+	walFile := data.GetREDOWALFile()
 	if walFile == "" {
 		sendBadRequestJSONResponse(w, "COULD_NOT_PARSE_REDOWAL_FILE", "")
 		return

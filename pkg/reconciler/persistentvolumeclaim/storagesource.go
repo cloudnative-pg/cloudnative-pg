@@ -92,7 +92,7 @@ func GetCandidateStorageSourceForReplica(
 
 	if result := getCandidateSourceFromBackupList(
 		ctx,
-		cluster.ObjectMeta.CreationTimestamp,
+		cluster.CreationTimestamp,
 		backupList,
 	); result != nil {
 		return result
@@ -129,7 +129,7 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		if backup.ObjectMeta.CreationTimestamp.Before(&clusterCreationTime) {
+		if backup.CreationTimestamp.Before(&clusterCreationTime) {
 			contextLogger.Info(
 				"skipping backup as a potential recovery storage source candidate " +
 					"because if was created before the Cluster object")

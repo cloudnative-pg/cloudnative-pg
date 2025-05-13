@@ -58,7 +58,7 @@ func (r *CSVRecordReadWriter) Read() ([]string, error) {
 
 	for _, allowedFields := range r.allowedFieldsPerRecord {
 		if len(record) == allowedFields {
-			r.Reader.FieldsPerRecord = allowedFields
+			r.FieldsPerRecord = allowedFields
 			return record, nil
 		}
 	}

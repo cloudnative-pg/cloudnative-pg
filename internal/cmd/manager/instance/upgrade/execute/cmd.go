@@ -318,15 +318,14 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string, 
 	return nil
 }
 
-// TODO: refactor it should be a method of pgControlData
 func tryAddDataChecksums(
-	pgControlData map[string]string,
+	pgControlData utils.PgControlData,
 	targetMajorVersion int,
 	options []string,
 ) ([]string, error) {
-	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
-	if !ok {
-		return nil, fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataDataPageChecksumVersion)
+	dataPageChecksumVersion, err := pgControlData.GetDataPageChecksumVersion()
+	if err != nil {
+		return nil, err
 	}
 
 	if dataPageChecksumVersion != "1" {
@@ -340,18 +339,10 @@ func tryAddDataChecksums(
 	return append(options, "--data-checksums"), nil
 }
 
-// TODO: refactor it should be a method of pgControlData
-func tryAddWalSegmentSize(pgControlData map[string]string, options []string) ([]string, error) {
-	walSegmentSizeString, ok := pgControlData[utils.PgControlDataBytesPerWALSegment]
-	if !ok {
-		return nil, fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataBytesPerWALSegment)
-	}
-
-	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+func tryAddWalSegmentSize(pgControlData utils.PgControlData, options []string) ([]string, error) {
+	walSegmentSize, err := pgControlData.GetBytesPerWALSegment()
 	if err != nil {
-		return nil, fmt.Errorf(
-			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
-			utils.PgControlDataBytesPerWALSegment, walSegmentSizeString, err)
+		return nil, fmt.Errorf("error while reading the WAL segment size: %w", err)
 	}
 
 	param := "--wal-segsize=" + strconv.Itoa(walSegmentSize/(1024*1024))

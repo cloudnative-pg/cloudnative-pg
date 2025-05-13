@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -218,6 +219,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
+		v.validateLivenessPingerProbe,
 	}
 
 	for _, validate := range validations {
@@ -1858,7 +1860,7 @@ func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.Err
 		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 			// this is needed because we only want to validate this during cluster creation, currently if we would have
 			// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
-			len(r.ObjectMeta.ResourceVersion) == 0 {
+			len(r.ResourceVersion) == 0 {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "replicaCluster"),
 				replicaClusterConf,
@@ -2333,7 +2335,53 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
+	list = append(list, getInTreeBarmanWarnings(r)...)
+	list = append(list, getRetentionPolicyWarnings(r)...)
 	return append(list, getSharedBuffersWarnings(r)...)
+}
+
+func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	var paths []string
+
+	if r.Spec.Backup != nil && r.Spec.Backup.BarmanObjectStore != nil {
+		paths = append(paths, field.NewPath("spec", "backup", "barmanObjectStore").String())
+	}
+
+	for idx, externalCluster := range r.Spec.ExternalClusters {
+		if externalCluster.BarmanObjectStore != nil {
+			paths = append(paths, field.NewPath("spec", "externalClusters", fmt.Sprintf("%d", idx),
+				"barmanObjectStore").String())
+		}
+	}
+
+	if len(paths) > 0 {
+		pathsStr := strings.Join(paths, ", ")
+		result = append(
+			result,
+			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
+				"completely removed in CloudNativePG 1.28.0. Found usage in: %s. "+
+				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
+				pathsStr),
+		)
+	}
+	return result
+}
+
+func getRetentionPolicyWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Backup != nil && r.Spec.Backup.RetentionPolicy != "" && r.Spec.Backup.BarmanObjectStore == nil {
+		result = append(
+			result,
+			"Retention policies specified in .spec.backup.retentionPolicy are only used by the "+
+				"in-tree barman-cloud support, which is not being used in this cluster. "+
+				"Please use a backup plugin and migrate this configuration to the plugin configuration",
+		)
+	}
+
+	return result
 }
 
 func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -2452,4 +2500,24 @@ func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) f
 	}
 
 	return errorList
+}
+
+func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) field.ErrorList {
+	value, ok := r.Annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	_, err := probes.NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	if err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.LivenessPingerAnnotationName),
+				value,
+				fmt.Sprintf("error decoding liveness pinger config: %s", err.Error()),
+			),
+		}
+	}
+
+	return nil
 }

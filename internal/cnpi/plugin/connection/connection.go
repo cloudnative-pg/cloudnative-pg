@@ -36,8 +36,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-// defaultTimeout is the timeout applied by default to every GRPC call
-const defaultTimeout = 30 * time.Second
+// defaultNetworkCallTimeout is the timeout applied by default to every GRPC
+// call to a plugin in a different Pod
+const defaultNetworkCallTimeout = 30 * time.Second
 
 // Protocol represents a way to connect to a plugin
 type Protocol interface {

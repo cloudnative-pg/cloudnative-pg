@@ -762,14 +762,14 @@ var _ = Describe("hasValidPodSpec", func() {
 			It("should return true", func() {
 				podSpec := &corev1.PodSpec{}
 				podSpecBytes, _ := json.Marshal(podSpec)
-				pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = string(podSpecBytes)
+				pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecBytes)
 				Expect(hasValidPodSpec(pod)).To(BeTrue())
 			})
 		})
 
 		Context("and the PodSpecAnnotation is invalid", func() {
 			It("should return false", func() {
-				pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = "invalid JSON"
+				pod.Annotations[utils.PodSpecAnnotationName] = "invalid JSON"
 				Expect(hasValidPodSpec(pod)).To(BeFalse())
 			})
 		})
@@ -794,7 +794,7 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	})
 
 	It("skips the rollout if the annotation that disables PodSpec reconciliation is set", func(ctx SpecContext) {
-		cluster.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
+		cluster.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 
 		pod, err := specs.NewInstance(ctx, cluster, 1, true)
 		Expect(err).ToNot(HaveOccurred())

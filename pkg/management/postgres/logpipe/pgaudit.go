@@ -67,7 +67,7 @@ func (r *PgAuditLoggingDecorator) FromCSV(content []string) NamedRecord {
 		return r.LoggingRecord
 	}
 
-	_, err := r.CSVReadWriter.Write([]byte(record))
+	_, err := r.Write([]byte(record))
 	if err != nil {
 		return r.LoggingRecord
 	}
@@ -76,7 +76,7 @@ func (r *PgAuditLoggingDecorator) FromCSV(content []string) NamedRecord {
 		return r.LoggingRecord
 	}
 
-	r.LoggingRecord.Message = ""
+	r.Message = ""
 	r.Audit.fromCSV(auditContent)
 	return r
 }

@@ -294,16 +294,9 @@ func (instance *Instance) CheckHasDiskSpaceForWAL(ctx context.Context) (bool, er
 	}
 
 	pgControlData := utils.ParsePgControldataOutput(pgControlDataString)
-	walSegmentSizeString, ok := pgControlData[utils.PgControlDataBytesPerWALSegment]
-	if !ok {
-		return false, fmt.Errorf("no 'Bytes per WAL segment' section into pg_controldata output")
-	}
-
-	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	walSegmentSize, err := pgControlData.GetBytesPerWALSegment()
 	if err != nil {
-		return false, fmt.Errorf(
-			"wrong 'Bytes per WAL segment' pg_controldata value (not an integer): '%s' %w",
-			walSegmentSizeString, err)
+		return false, err
 	}
 
 	walDirectory := path.Join(instance.PgData, pgWalDirectory)
@@ -848,7 +841,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
-	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres connect_timeout=5"
+	primaryConnInfo := instance.GetPrimaryConnInfo() + " connect_timeout=5"
 
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
@@ -1048,7 +1041,7 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	primaryConnInfo := instance.GetPrimaryConnInfo()
 	options := []string{
 		"-P",
-		"--source-server", primaryConnInfo + " dbname=postgres",
+		"--source-server", primaryConnInfo,
 		"--target-pgdata", instance.PgData,
 	}
 
@@ -1307,7 +1300,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
+	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName()) + " dbname=postgres"
 
 	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
 	if len(standbyTCPUserTimeout) > 0 {

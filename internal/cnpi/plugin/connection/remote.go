@@ -41,7 +41,7 @@ func (p *ProtocolTCP) Dial(_ context.Context) (Handler, error) {
 		p.Address,
 		grpc.WithTransportCredentials(credentials.NewTLS(p.TLSConfig)),
 		grpc.WithUnaryInterceptor(
-			timeout.UnaryClientInterceptor(defaultTimeout),
+			timeout.UnaryClientInterceptor(defaultNetworkCallTimeout),
 		),
 	)
 }

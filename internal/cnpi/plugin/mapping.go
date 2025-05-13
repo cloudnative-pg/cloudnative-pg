@@ -38,7 +38,7 @@ const (
 )
 
 // ToOperationType_Type converts an OperationVerb into a lifecycle.OperationType_Type
-// nolint: revive,stylecheck
+// nolint: revive,staticcheck
 func (o OperationVerb) ToOperationType_Type() (lifecycle.OperatorOperationType_Type, error) {
 	switch o {
 	case OperationVerbPatch:

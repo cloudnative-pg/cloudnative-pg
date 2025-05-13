@@ -57,9 +57,18 @@ func newTLSConfigFromSecret(
 	// for the <cluster>-rw service, which would cause a name verification error.
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertificate)
+
+	return NewTLSConfigFromCertPool(caCertPool), nil
+}
+
+// NewTLSConfigFromCertPool creates a tls.Config object from X509 cert pool
+// containing the expected server CA
+func NewTLSConfigFromCertPool(
+	certPool *x509.CertPool,
+) *tls.Config {
 	tlsConfig := tls.Config{
 		MinVersion:         tls.VersionTLS13,
-		RootCAs:            caCertPool,
+		RootCAs:            certPool,
 		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
 		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
@@ -77,7 +86,7 @@ func newTLSConfigFromSecret(
 			}
 
 			opts := x509.VerifyOptions{
-				Roots:         caCertPool,
+				Roots:         certPool,
 				Intermediates: x509.NewCertPool(),
 			}
 
@@ -93,7 +102,7 @@ func newTLSConfigFromSecret(
 		},
 	}
 
-	return &tlsConfig, nil
+	return &tlsConfig
 }
 
 // NewTLSConfigForContext creates a tls.config with the provided data and returns an expanded context that contains

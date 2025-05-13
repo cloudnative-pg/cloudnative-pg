@@ -982,6 +982,8 @@ type InstanceReportedState struct {
 	// indicates on which TimelineId the instance is
 	// +optional
 	TimeLineID int `json:"timeLineID,omitempty"`
+	// IP address of the instance
+	IP string `json:"ip,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions

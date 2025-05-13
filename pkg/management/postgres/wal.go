@@ -37,7 +37,7 @@ var errNoWalArchivePresent = errors.New("no wal-archive present")
 // On primary, it could run even before the first WAL has completed. For this reason it
 // could require a WAL switch, to quicken the check.
 // On standby, the mere existence of the standby guarantees that a WAL file has already been generated
-// by the pg_basebakup used to prime the standby data directory, so we check only if the WAL
+// by the pg_basebackup used to prime the standby data directory, so we check only if the WAL
 // archive process is not failing.
 func ensureWalArchiveIsWorking(instance *Instance) error {
 	isPrimary, err := instance.IsPrimary()
@@ -46,7 +46,7 @@ func ensureWalArchiveIsWorking(instance *Instance) error {
 	}
 
 	if isPrimary {
-		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(retryUntilWalArchiveWorking)
+		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(instance, retryUntilWalArchiveWorking)
 	}
 
 	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
@@ -65,7 +65,7 @@ func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchive
 		dbFactory: func() (*sql.DB, error) {
 			db, openErr := sql.Open(
 				"pgx",
-				fmt.Sprintf("%s dbname=%s", primaryConnInfo, "postgres"),
+				primaryConnInfo,
 			)
 			if openErr != nil {
 				log.Error(openErr, "can not open postgres database")
@@ -146,8 +146,18 @@ func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
 	}
 }
 
-func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) error {
-	return retry.OnError(backoff, resources.RetryAlways, func() error {
+var errPrimaryDemoted = errors.New("primary was demoted while waiting for the first wal-archive")
+
+func (w *walArchiveBootstrapper) ensureFirstWalArchived(instance *Instance, backoff wait.Backoff) error {
+	return retry.OnError(backoff, func(err error) bool { return !errors.Is(err, errPrimaryDemoted) }, func() error {
+		isPrimary, err := instance.IsPrimary()
+		if err != nil {
+			return fmt.Errorf("error checking primary: %w", err)
+		}
+		if !isPrimary {
+			return errPrimaryDemoted
+		}
+
 		db, err := w.dbFactory()
 		if err != nil {
 			return err
