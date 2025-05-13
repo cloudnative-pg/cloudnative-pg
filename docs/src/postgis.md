@@ -106,7 +106,7 @@ values from the ones in this document):
 
 ```console
 $ kubectl cnpg psql postgis-example -- app
-psql (17.4 (Debian 17.4-1.pgdg110+2))
+psql (17.5 (Debian 17.5-1.pgdg110+2))
 Type "help" for help.
 
 app=# SELECT * FROM pg_available_extensions WHERE name ~ '^postgis' ORDER BY 1;
