@@ -2335,7 +2335,53 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	list := getMaintenanceWindowsAdmissionWarnings(r)
+	list = append(list, getInTreeBarmanWarnings(r)...)
+	list = append(list, getRetentionPolicyWarnings(r)...)
 	return append(list, getSharedBuffersWarnings(r)...)
+}
+
+func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	var paths []string
+
+	if r.Spec.Backup != nil && r.Spec.Backup.BarmanObjectStore != nil {
+		paths = append(paths, field.NewPath("spec", "backup", "barmanObjectStore").String())
+	}
+
+	for idx, externalCluster := range r.Spec.ExternalClusters {
+		if externalCluster.BarmanObjectStore != nil {
+			paths = append(paths, field.NewPath("spec", "externalClusters", fmt.Sprintf("%d", idx),
+				"barmanObjectStore").String())
+		}
+	}
+
+	if len(paths) > 0 {
+		pathsStr := strings.Join(paths, ", ")
+		result = append(
+			result,
+			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
+				"completely removed in CloudNativePG 1.28.0. Found usage in: %s. "+
+				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
+				pathsStr),
+		)
+	}
+	return result
+}
+
+func getRetentionPolicyWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Backup != nil && r.Spec.Backup.RetentionPolicy != "" && r.Spec.Backup.BarmanObjectStore == nil {
+		result = append(
+			result,
+			"Retention policies specified in .spec.backup.retentionPolicy are only used by the "+
+				"in-tree barman-cloud support, which is not being used in this cluster. "+
+				"Please use a backup plugin and migrate this configuration to the plugin configuration",
+		)
+	}
+
+	return result
 }
 
 func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {

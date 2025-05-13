@@ -5129,3 +5129,89 @@ var _ = Describe("", func() {
 		Expect(errs[0].Error()).To(ContainSubstring("error decoding liveness pinger config"))
 	})
 })
+
+var _ = Describe("getInTreeBarmanWarnings", func() {
+	It("returns no warnings when BarmanObjectStore is not configured", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup:           nil,
+				ExternalClusters: nil,
+			},
+		}
+		Expect(getInTreeBarmanWarnings(cluster)).To(BeEmpty())
+	})
+
+	It("returns a warning when BarmanObjectStore is configured in backup", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+				},
+			},
+		}
+		warnings := getInTreeBarmanWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("spec.backup.barmanObjectStore"))
+	})
+
+	It("returns warnings for multiple external clusters with BarmanObjectStore", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
+					{BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
+				},
+			},
+		}
+		warnings := getInTreeBarmanWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("spec.externalClusters.0.barmanObjectStore"))
+		Expect(warnings[0]).To(ContainSubstring("spec.externalClusters.1.barmanObjectStore"))
+	})
+
+	It("returns warnings for both backup and external clusters with BarmanObjectStore", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+				},
+				ExternalClusters: []apiv1.ExternalCluster{
+					{BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{}},
+				},
+			},
+		}
+		warnings := getInTreeBarmanWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+		Expect(warnings[0]).To(ContainSubstring("spec.backup.barmanObjectStore"))
+		Expect(warnings[0]).To(ContainSubstring("spec.externalClusters.0.barmanObjectStore"))
+	})
+})
+
+var _ = Describe("getRetentionPolicyWarnings", func() {
+	It("returns no warnings if the retention policy is used with the in-tree backup support", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					RetentionPolicy:   "this retention policy",
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+				},
+			},
+		}
+
+		warnings := getRetentionPolicyWarnings(cluster)
+		Expect(warnings).To(BeEmpty())
+	})
+
+	It("return a warning when retention policies are declared and not used", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					RetentionPolicy: "this retention policy",
+				},
+			},
+		}
+
+		warnings := getRetentionPolicyWarnings(cluster)
+		Expect(warnings).To(HaveLen(1))
+	})
+})
