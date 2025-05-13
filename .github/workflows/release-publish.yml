@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       packages: write
-      contents: read
+      contents: write
       id-token: write
     needs:
       - check-version
@@ -239,7 +239,7 @@ jobs:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     needs:
       - check-version
