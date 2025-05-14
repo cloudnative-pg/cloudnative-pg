@@ -72,6 +72,15 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, meth
 	backupStatus.Method = method
 }
 
+// SetKeep sets Keep target in status
+func (backupStatus *BackupStatus) SetKeep(keep bool, target string) {
+	if keep {
+		backupStatus.Keep = &target
+	} else {
+		backupStatus.Keep = nil
+	}
+}
+
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
 func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
