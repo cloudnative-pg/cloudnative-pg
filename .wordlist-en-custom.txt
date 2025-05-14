@@ -25,6 +25,7 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BUSL
 BackupCapabilities
 BackupConfiguration
 BackupFrom
@@ -285,6 +286,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenBao
 OpenID
 OpenSSL
 OpenShift
