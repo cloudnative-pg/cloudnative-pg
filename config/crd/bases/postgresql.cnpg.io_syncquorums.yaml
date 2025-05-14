@@ -1,0 +1,100 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: syncquorums.postgresql.cnpg.io
+spec:
+  group: postgresql.cnpg.io
+  names:
+    kind: SyncQuorum
+    listKind: SyncQuorumList
+    plural: syncquorums
+    singular: syncquorum
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.cluster.name
+      name: Cluster
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SyncQuorum contains the information about the current synchronous
+          quorum status of a PG cluster. It is updated by the instance manager
+          of the primary node and reset to zero by the operator to trigger
+          an update.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Specification of the cluster that will refresh this data
+            properties:
+              cluster:
+                description: The name of the PostgreSQL cluster hosting the database.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - cluster
+            type: object
+          status:
+            description: Most recently observed status of the sync quorum.
+            properties:
+              method:
+                description: |-
+                  SynchronousStandbyNamesList is the list of potentially synchronous
+                  instance names
+                type: string
+              primary:
+                description: |-
+                  Primary is the name of the primary instance that updated
+                  this object the latest time.
+                type: string
+              standbyNames:
+                description: |-
+                  StandbyNames is the list of potentially synchronous
+                  instance names
+                items:
+                  type: string
+                type: array
+              standbyNumber:
+                description: |-
+                  StandbyNumber is the quorum of instances that will be
+                  synchronous, to be chosen within SynchronousStandbyNamesList
+                type: integer
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1334,6 +1334,11 @@ type SynchronousReplicaConfiguration struct {
 	// +kubebuilder:default:=required
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
+
+	// QuorumFailoverProtection enables quorum-based check before a failover, ensuring
+	// no data loss at the expense of availability.
+	// +optional
+	QuorumFailoverProtection bool `json:"quorumFailoverProtection,omitempty"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
