@@ -70,9 +70,8 @@ jobs:
       - name: Create PR to update PostgreSQL version
         if: env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         with:
+          token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
           body: "Update default PostgreSQL version from ${{ env.CURRENT_POSTGRES_VERSION }} to ${{ env.LATEST_POSTGRES_VERSION }}"
           branch: "postgres-versions-update"
@@ -83,9 +82,8 @@ jobs:
       - name: Create Pull Request if postgresql versions have been updated
         if: env.LATEST_POSTGRES_VERSION_IMAGE == env.CURRENT_POSTGRES_VERSION_IMAGE
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         with:
+          token: ${{ secrets.REPO_GHA_PAT }}
           title: "test: Updated Postgres versions used in E2E tests"
           body: "Update the Postgres versions used in E2E tests"
           branch: "postgres-versions-update"
