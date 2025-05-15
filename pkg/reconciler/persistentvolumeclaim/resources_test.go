@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,9 +34,10 @@ import (
 
 var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func(ctx SpecContext) {
+		dataVolumeSuffix := configuration.Current.DataVolumeSuffix
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
+			return makePVC(clusterName, serial+dataVolumeSuffix, serial, NewPgDataCalculator(), isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
@@ -67,22 +69,24 @@ var _ = Describe("PVC detection", func() {
 			clusterName + "-4",
 		}))
 		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{
-			clusterName + "-2",
+			clusterName + "-2" + dataVolumeSuffix,
 		}))
 		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{
-			clusterName + "-3",
+			clusterName + "-3" + dataVolumeSuffix,
 		}))
 		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{
-			clusterName + "-4",
+			clusterName + "-4" + dataVolumeSuffix,
 		}))
 		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{
-			clusterName + "-1",
+			clusterName + "-1" + dataVolumeSuffix,
 		}))
 		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
 	})
 })
 
 var _ = Describe("PVCs used by instance", func() {
+	dataVolumeSuffix := configuration.Current.DataVolumeSuffix
+	walArchiveVolumeSuffix := configuration.Current.WalArchiveVolumeSuffix
 	clusterName := "cluster-pvc-instance"
 	instanceName := clusterName + "-1"
 
@@ -96,10 +100,10 @@ var _ = Describe("PVCs used by instance", func() {
 	}
 
 	It("true if the pvc belongs to the instance name", func() {
-		res := BelongToInstance(cluster, instanceName, instanceName)
+		res := BelongToInstance(cluster, instanceName, instanceName+dataVolumeSuffix)
 		Expect(res).To(BeTrue())
 
-		res = BelongToInstance(cluster, instanceName, instanceName+"-wal")
+		res = BelongToInstance(cluster, instanceName, instanceName+walArchiveVolumeSuffix)
 		Expect(res).To(BeTrue())
 	})
 

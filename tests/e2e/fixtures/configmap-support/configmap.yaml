@@ -6,6 +6,8 @@ data:
   MONITORING_QUERIES_CONFIGMAP: ""
   CLUSTERS_ROLLOUT_DELAY: '1'
   INSTANCES_ROLLOUT_DELAY: '1'
+  DATA_VOLUME_SUFFIX: '-data'
+  WAL_VOLUME_SUFFIX: '-wal'
 kind: ConfigMap
 metadata:
   name: cnpg-controller-manager-config
