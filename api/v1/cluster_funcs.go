@@ -154,12 +154,18 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
-func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
+// synchronizeReplicasCache contains the result of the regex compilation
+type synchronizeReplicasCache struct {
+	compiledPatterns []regexp.Regexp `json:"-"`
+	compiled         bool            `json:"-"`
+	compileErrors    []error         `json:"-"`
+}
+
+func (r *SynchronizeReplicasConfiguration) compileRegex() synchronizeReplicasCache {
+	var result synchronizeReplicasCache
+
 	if r == nil {
-		return nil
-	}
-	if r.compiled {
-		return r.compileErrors
+		return result
 	}
 
 	var errs []error
@@ -169,12 +175,12 @@ func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
 			errs = append(errs, err)
 			continue
 		}
-		r.compiledPatterns = append(r.compiledPatterns, *re)
+		result.compiledPatterns = append(result.compiledPatterns, *re)
 	}
 
-	r.compiled = true
-	r.compileErrors = errs
-	return errs
+	result.compiled = true
+	result.compileErrors = errs
+	return result
 }
 
 // GetEnabled returns false if synchronized replication slots are disabled, defaults to true
@@ -187,7 +193,7 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 
 // ValidateRegex returns all the errors that happened during the regex compilation
 func (r *SynchronizeReplicasConfiguration) ValidateRegex() []error {
-	return r.compileRegex()
+	return r.compileRegex().compileErrors
 }
 
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
@@ -196,12 +202,14 @@ func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bo
 		return false, nil
 	}
 
+	compilationResult := r.compileRegex()
+
 	// this is an unexpected issue, validation should happen at webhook level
-	if errs := r.compileRegex(); len(errs) > 0 {
-		return false, errs[0]
+	if len(compilationResult.compileErrors) > 0 {
+		return false, compilationResult.compileErrors[0]
 	}
 
-	for _, re := range r.compiledPatterns {
+	for _, re := range compilationResult.compiledPatterns {
 		if re.MatchString(slotName) {
 			return true, nil
 		}

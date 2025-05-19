@@ -1268,14 +1268,6 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				Expect(isExcludedByUser).To(BeTrue())
 			})
 
-			It("should compile patterns before checking for exclusion when compile is not called", func() {
-				Expect(synchronizeReplicas.compiledPatterns).To(BeEmpty())
-				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(isExcludedByUser, err).To(BeTrue())
-				Expect(synchronizeReplicas.compiledPatterns).To(HaveLen(2))
-			})
-
 			It("should return an error in case of an invalid pattern", func() {
 				synchronizeReplicas.ExcludePatterns = []string{"([a-zA-Z]+"}
 				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("test")
