@@ -110,14 +110,22 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - Support for Local Persistent Volumes with PVC templates.
     - Reuse of Persistent Volumes storage in Pods.
     - Separate volumes for WAL files and tablespaces.
-- Backup and recovery options, including:
-    - Integration with the [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud)
-      for continuous online backup via WAL archiving to AWS S3, S3-compatible
-      services, Azure Blob Storage, and Google Cloud Storage, with support for
-      retention policies based on a configurable recovery window.
-    - Backups using volume snapshots (where supported by storage classes).
-    - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
-    - Backup from standby replicas to reduce primary workload impact.
+- Backup and Recovery via CNPG-I Plugins:
+    - Pluggable architecture for continuous physical backup and recovery.
+    - Hot and cold base backups.
+    - WAL archiving.
+    - Full and Point-In-Time Recovery (PITR).
+    - Scheduled and on-demand backups.
+    - Backup from standbys to reduce primary load.
+- Community-Supported Barman Cloud Plugin:
+    - WAL archiving to object stores with support for full/PITR recovery.
+    - Retention policies based on configurable recovery windows.
+    - Supported as a CNPG-I plugin (recommended approach).
+- Native Backup Methods:
+    - Continuous backup and full/PITR recovery via volume snapshots (if
+      supported by the storage class).
+    - Native integration with Barman Cloud for object store backups via
+      `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
 - Offline in-place major upgrades of PostgreSQL
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.

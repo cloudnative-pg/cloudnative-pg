@@ -441,9 +441,9 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
     By default the `recovery` method strictly uses the `name` of the
     cluster in the `externalClusters` section to locate the main folder
     of the backup data within the object store, which is normally reserved
-    for the name of the server. You can specify a different one with the
-    `barmanObjectStore.serverName` property (by default assigned to the
-    value of `name` in the external cluster definition).
+    for the name of the server. Backup plugins provide ways to specify a
+    different one. For example, the Barman Cloud Plugin provides the [`serverName` parameter](https://cloudnative-pg.io/plugin-barman-cloud/docs/parameters/)
+    (by default assigned to the value of `name` in the external cluster definition).
 
 ### Bootstrap from a backup (`recovery`)
 
