@@ -379,39 +379,37 @@ in the archive. In addition, `Instance Manager` checks
 the correctness of the archive destination by performing the `barman-cloud-check-wal-archive`
 command before beginning to ship the first set of WAL files.
 
-### PostgreSQL backups
+### PostgreSQL Backups
 
-The operator was designed to provide application-level backups using
-PostgreSQL’s native continuous hot backup technology based on
-physical base backups and continuous WAL archiving.
-Base backups can be saved on:
+CloudNativePG provides a pluggable interface (CNPG-I) for managing
+application-level backups using PostgreSQL’s native physical backup
+mechanisms—namely base backups and continuous WAL archiving. This
+design enables flexibility and extensibility while ensuring consistency and
+performance.
 
-- Kubernetes volume snapshots
-- Object stores (AWS S3 and S3-compatible, Azure Blob Storage, Google Cloud
-  Storage, and gateways like MinIO)
+The CloudNativePG Community officially supports the [Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/),
+which enables continuous physical backups to object stores, along with full and
+Point-In-Time Recovery (PITR) capabilities.
 
-Base backups are defined at the cluster level, declaratively,
-through the `backup` parameter in the cluster definition.
+In addition to CNPG-I plugins, CloudNativePG also natively supports backups
+using Kubernetes volume snapshots, when supported by the underlying storage
+class and CSI driver.
 
-You can define base backups in two ways:
+You can initiate base backups in two ways:
 
-- On-demand, through the `Backup` custom resource definition
-- Scheduled, through the `ScheduledBackup`custom resource definition, using a cron-like syntax
+- On-demand, using the `Backup` custom resource
+- Scheduled, using the `ScheduledBackup` custom resource, with a cron-like
+  schedule format
 
-Volume snapshots rely directly on the Kubernetes API, which delegates this
-capability to the underlying storage classes and CSI drivers. Volume snapshot
-backups are suitable for very large database (VLDB) contexts.
+Volume snapshots leverage the Kubernetes API and are particularly effective for
+very large databases (VLDBs) due to their speed and storage efficiency.
 
-Object store backups rely on `barman-cloud-backup` for the job (distributed as
-part of the application container image) to relay backups in the same endpoint,
-alongside WAL files.
+Both volume snapshots and CNPG-I-based backups support:
 
-Both `barman-cloud-wal-restore` and `barman-cloud-backup` are distributed in
-the application container image under GNU GPL 3 terms.
-
-Object store backups and volume snapshot backups are taken while PostgreSQL is
-up and running (hot backups). Volume snapshots also support taking consistent
-database snapshots with cold backups.
+- Hot backups: Taken while PostgreSQL is running, ensuring minimal
+  disruption.
+- Cold backups: Performed by temporarily stopping PostgreSQL to ensure a
+  fully consistent snapshot, when required.
 
 ### Backups from a standby
 
@@ -423,8 +421,8 @@ operations.
 ### Full restore from a backup
 
 The operator enables you to bootstrap a new cluster (with its settings)
-starting from an existing and accessible backup, either on a volume snapshot
-or in an object store.
+starting from an existing and accessible backup, either on a volume snapshot,
+or in an object store, or via a plugin.
 
 Once the bootstrap process is completed, the operator initiates the instance in
 recovery mode. It replays all available WAL files from the specified archive,

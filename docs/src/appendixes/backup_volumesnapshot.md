@@ -1,12 +1,10 @@
-# Backup on volume snapshots
+# Appendix A - Backup on volume snapshots
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Warning
-    As noted in the [backup document](backup.md), a cold snapshot explicitly
-    set to target the primary will result in the primary being fenced for
-    the duration of the backup, rendering the cluster read-only during that
-    For safety, in a cluster already containing fenced instances, a cold
-    snapshot is rejected.
+!!! Important
+    Please refer to the official Kubernetes documentation for a list of all
+    the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
+    that provide snapshotting capabilities.
 
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
@@ -64,7 +62,7 @@ CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
 
 !!! Info
-    Please refer to [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+    Please refer to [`VolumeSnapshotConfiguration`](../cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
     in the API reference for a full list of options.
 
 A generic example with volume snapshots (assuming that PGDATA and WALs share
@@ -96,7 +94,7 @@ spec:
 
 As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 (controlling physical base backups on volume snapshots) and the
-`barmanObjectStore` one (controlling the [WAL archive](wal_archiving.md)).
+`barmanObjectStore` one (controlling the [WAL archive](../wal_archiving.md)).
 
 !!! Info
     Once you have defined the `barmanObjectStore`, you can decide to use
@@ -117,6 +115,13 @@ Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
 
 ## Hot and cold backups
+
+!!! Warning
+    As noted in the [backup document](../backup.md), a cold snapshot explicitly
+    set to target the primary will result in the primary being fenced for
+    the duration of the backup, rendering the cluster read-only during that
+    For safety, in a cluster already containing fenced instances, a cold
+    snapshot is rejected.
 
 By default, CloudNativePG requests an online/hot backup on volume snapshots, using the
 [PostgreSQL defaults of the low-level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP):
@@ -349,7 +354,7 @@ volume snapshot class.
 
 The following manifest creates a `Cluster` that is ready to be used for volume
 snapshots and that stores the WAL archive in a S3 bucket via IAM role for the
-Service Account (IRSA, see [AWS S3](appendixes/object_stores.md#aws-s3)):
+Service Account (IRSA, see [AWS S3](object_stores.md#aws-s3)):
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1

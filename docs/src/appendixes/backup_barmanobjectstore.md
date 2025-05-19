@@ -1,11 +1,14 @@
-# Backup on object stores
+# Appendix B - Backup on object stores
+
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Warning
-    With the deprecation of native Barman Cloud support in CloudNativePG in
-    favor of the Barman Cloud Plugin, this page—and the backup and recovery
-    documentation—may undergo changes before the official release of version
-    1.26.0.
+    As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
+    favor of the **Barman Cloud Plugin**. This page has been moved to the appendix
+    for reference purposes. While the native integration remains functional for
+    now, we strongly recommend beginning a gradual migration to the plugin-based
+    interface after appropriate testing.  For guidance, see
+    [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 
 CloudNativePG natively supports **online/hot backup** of PostgreSQL
 clusters through continuous physical backup and WAL archiving on an object
@@ -34,23 +37,91 @@ as it is composed of a community PostgreSQL image and the latest
 
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
-[replica clusters](replica_cluster.md)
+[replica clusters](../replica_cluster.md)
 for more information about designated primary instances), or alternatively
-on a [standby](backup.md#backup-from-a-standby).
+on a [standby](../backup.md#backup-from-a-standby).
 
 ## Common object stores
 
 If you are looking for a specific object store such as
-[AWS S3](appendixes/object_stores.md#aws-s3),
-[Microsoft Azure Blob Storage](appendixes/object_stores.md#azure-blob-storage),
-[Google Cloud Storage](appendixes/object_stores.md#google-cloud-storage), or
-[MinIO Gateway](appendixes/object_stores.md#minio-gateway), or a compatible
-provider, please refer to [Appendix A - Common object stores](appendixes/object_stores.md).
+[AWS S3](object_stores.md#aws-s3),
+[Microsoft Azure Blob Storage](object_stores.md#azure-blob-storage),
+[Google Cloud Storage](object_stores.md#google-cloud-storage), or
+[MinIO Gateway](object_stores.md#minio-gateway), or a compatible
+provider, please refer to [Appendix C - Common object stores for backups](object_stores.md).
 
-## Retention policies
+## WAL archiving
+
+WAL archiving is the process that feeds a [WAL archive](../backup.md#wal-archive)
+in CloudNativePG.
+
+The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
+a `Cluster` resource.
+
+!!! Info
+    Please refer to [`BarmanObjectStoreConfiguration`](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)
+    in the barman-cloud API for a full list of options.
+
+If required, you can choose to compress WAL files as soon as they
+are uploaded and/or encrypt them:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      wal:
+        compression: gzip
+        encryption: AES256
+```
+
+You can configure the encryption directly in your bucket, and the operator
+will use it unless you override it in the cluster configuration.
+
+PostgreSQL implements a sequential archiving scheme, where the
+`archive_command` will be executed sequentially for every WAL
+segment to be archived.
 
 !!! Important
-    Retention policies are not currently available on volume snapshots.
+    By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
+    that WAL files, even in case of low workloads, are closed and archived
+    at least every 5 minutes, providing a deterministic time-based value for
+    your Recovery Point Objective ([RPO](before_you_start.md#rpo)). Even though you change the value
+    of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
+    our experience suggests that the default value set by the operator is
+    suitable for most use cases.
+
+When the bandwidth between the PostgreSQL instance and the object
+store allows archiving more than one WAL file in parallel, you
+can use the parallel WAL archiving feature of the instance manager
+like in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      wal:
+        compression: gzip
+        maxParallel: 8
+        encryption: AES256
+```
+
+In the previous example, the instance manager optimizes the WAL
+archiving process by archiving in parallel at most eight ready
+WALs, including the one requested by PostgreSQL.
+
+When PostgreSQL will request the archiving of a WAL that has
+already been archived by the instance manager as an optimization,
+that archival request will be just dismissed with a positive status.
+
+## Retention policies
 
 CloudNativePG can manage the automated deletion of backup files from
 the backup object store, using **retention policies** based on the recovery
@@ -209,3 +280,62 @@ spec:
         - "--max-concurrency=1"
         - "--read-timeout=60"
 ```
+
+## Recovery from an object store
+
+You can recover from a backup created by Barman Cloud and stored on a supported
+object store. After you define the external cluster, including all the required
+configuration in the `barmanObjectStore` section, you need to reference it in
+the `.spec.recovery.source` option.
+
+This example defines a recovery object store in a blob container in Azure:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  [...]
+
+  superuserSecret:
+    name: superuser-secret
+
+  bootstrap:
+    recovery:
+      source: clusterBackup
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: https://STORAGEACCOUNTNAME.blob.core.windows.net/CONTAINERNAME/
+        azureCredentials:
+          storageAccount:
+            name: recovery-object-store-secret
+            key: storage_account_name
+          storageKey:
+            name: recovery-object-store-secret
+            key: storage_account_key
+        wal:
+          maxParallel: 8
+```
+
+The previous example assumes that the application database and its owning user
+are named `app` by default. If the PostgreSQL cluster being restored uses
+different names, you must specify these names before exiting the recovery phase,
+as documented in ["Configure the application database"](#configure-the-application-database).
+
+!!! Important
+    By default, the `recovery` method strictly uses the `name` of the
+    cluster in the `externalClusters` section as the name of the main folder
+    of the backup data within the object store. This name is normally reserved
+    for the name of the server. You can specify a different folder name
+    using the `barmanObjectStore.serverName` property.
+
+!!! Note
+    This example takes advantage of the parallel WAL restore feature,
+    dedicating up to 8 jobs to concurrently fetch the required WAL files from the
+    archive. This feature can appreciably reduce the recovery time. Make sure that
+    you plan ahead for this scenario and correctly tune the value of this parameter
+    for your environment. It will make a difference when you need it, and you will.
+

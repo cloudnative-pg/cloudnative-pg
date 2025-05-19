@@ -505,6 +505,7 @@ Uncomment
 Unrealizable
 UpdateStrategy
 VLDB
+VLDBs
 VM
 VMs
 VOLNAME
