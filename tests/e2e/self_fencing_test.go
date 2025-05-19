@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -125,6 +126,17 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		By("reconnecting the isolated Node", func() {
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network connect kind %v", isolatedNode))
 			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				node := corev1.Node{}
+				err := env.Client.Get(env.Ctx, client.ObjectKey{Namespace: "", Name: isolatedNode}, &node)
+				g.Expect(err).ToNot(HaveOccurred())
+				for _, condition := range node.Status.Conditions {
+					if condition.Type == corev1.NodeReady {
+						g.Expect(condition.Status).To(Equal(corev1.ConditionTrue))
+					}
+				}
+			}, 60).Should(Succeed())
 
 			// Assert that the oldPrimary comes back as a replica
 			namespacedName := types.NamespacedName{
