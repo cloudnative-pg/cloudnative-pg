@@ -61,6 +61,9 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var pgUpgrade string
+	var pgUpgradeArgs []string
+	var initdb string
+	var initdbArgs []string
 
 	cmd := &cobra.Command{
 		Use:  "execute [options]",
@@ -84,7 +87,15 @@ func NewCmd() *cobra.Command {
 			}
 
 			oldBinDir := strings.TrimSpace(string(oldBinDirBytes))
-			return upgradeSubCommand(ctx, instance, pgData, oldBinDir, pgUpgrade)
+			info := upgradeInfo{
+				pgData:        pgData,
+				oldBinDir:     oldBinDir,
+				pgUpgrade:     pgUpgrade,
+				pgUpgradeArgs: pgUpgradeArgs,
+				initdb:        initdb,
+				initdbArgs:    initdbArgs,
+			}
+			return info.upgradeSubCommand(ctx, instance)
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -104,18 +115,29 @@ func NewCmd() *cobra.Command {
 		"the current cluster in k8s, used to download TLS certificates")
 	cmd.Flags().StringVar(&pgUpgrade, "pg-upgrade", env.GetOrDefault("PG_UPGRADE", "pg_upgrade"),
 		`The path of "pg_upgrade" executable. Defaults to "pg_upgrade".`)
+	cmd.Flags().StringArrayVar(&pgUpgradeArgs, "pg-upgrade-args", nil,
+		`Additional arguments for "pg_upgrade" invocation. `+
+			`Use the --pg-upgrade-args flag multiple times to pass multiple arguments.`)
+	cmd.Flags().StringVar(&initdb, "initdb", env.GetOrDefault("INITDB", "initdb"),
+		`The path of "initdb" executable. Defaults to "initdb".`)
+	cmd.Flags().StringArrayVar(&initdbArgs, "initdb-args", nil,
+		`Additional arguments for "initdb" invocation.`+
+			`Use the --initdb-args flag multiple times to pass multiple arguments.`)
 
 	return cmd
 }
 
+type upgradeInfo struct {
+	pgData        string
+	oldBinDir     string
+	pgUpgrade     string
+	pgUpgradeArgs []string
+	initdb        string
+	initdbArgs    []string
+}
+
 // nolint:gocognit
-func upgradeSubCommand(
-	ctx context.Context,
-	instance *postgres.Instance,
-	pgData string,
-	oldBinDir string,
-	pgUpgrade string,
-) error {
+func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	contextLogger := log.FromContext(ctx)
 
 	client, err := management.NewControllerRuntimeClient()
@@ -184,7 +206,7 @@ func upgradeSubCommand(
 	}
 
 	// Extract controldata information from the old data directory
-	controlData, err := getControlData(oldBinDir, pgData)
+	controlData, err := getControlData(ui.oldBinDir, ui.pgData)
 	if err != nil {
 		return fmt.Errorf("error while getting old data directory control data: %w", err)
 	}
@@ -195,7 +217,7 @@ func upgradeSubCommand(
 	}
 
 	contextLogger.Info("Creating data directory", "directory", newDataDir)
-	if err := runInitDB(newDataDir, newWalDir, controlData, targetVersion); err != nil {
+	if err := runInitDB(newDataDir, newWalDir, controlData, targetVersion, ui.initdb, ui.initdbArgs); err != nil {
 		return fmt.Errorf("error while creating the data directory: %w", err)
 	}
 
@@ -206,7 +228,7 @@ func upgradeSubCommand(
 
 	contextLogger.Info("Checking if we have anything to update")
 	// Read pg_version from both the old and new data directories
-	oldVersion, err := postgresutils.GetMajorVersionFromPgData(pgData)
+	oldVersion, err := postgresutils.GetMajorVersionFromPgData(ui.pgData)
 	if err != nil {
 		return fmt.Errorf("error while reading the old version: %w", err)
 	}
@@ -226,17 +248,17 @@ func upgradeSubCommand(
 
 	// We need to make sure that the permissions are the right ones
 	// in some systems they may be messed up even if we fix them before
-	_ = fileutils.EnsurePgDataPerms(pgData)
+	_ = fileutils.EnsurePgDataPerms(ui.pgData)
 	_ = fileutils.EnsurePgDataPerms(newDataDir)
 
 	contextLogger.Info("Running pg_upgrade")
 
-	if err := runPgUpgrade(pgData, pgUpgrade, newDataDir, oldBinDir); err != nil {
+	if err := ui.runPgUpgrade(newDataDir); err != nil {
 		// TODO: in case of failures we should dump the content of the pg_upgrade logs
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
 	}
 
-	err = moveDataInPlace(ctx, pgData, oldVersion, newDataDir, newWalDir)
+	err = moveDataInPlace(ctx, ui.pgData, oldVersion, newDataDir, newWalDir)
 	if err != nil {
 		contextLogger.Error(err,
 			"Error while moving the data in place, saving the new data directory to avoid data loss")
@@ -245,7 +267,7 @@ func upgradeSubCommand(
 
 		dirToBeSaved := []string{
 			newDataDir,
-			pgData + ".old",
+			ui.pgData + ".old",
 		}
 		if newWalDir != nil {
 			dirToBeSaved = append(dirToBeSaved,
@@ -281,7 +303,14 @@ func getControlData(binDir, pgData string) (map[string]string, error) {
 	return utils.ParsePgControldataOutput(string(out)), nil
 }
 
-func runInitDB(destDir string, walDir *string, pgControlData map[string]string, targetMajorVersion int) error {
+func runInitDB(
+	destDir string,
+	walDir *string,
+	pgControlData map[string]string,
+	targetMajorVersion int,
+	initdb string,
+	initdbArgs []string,
+) error {
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
@@ -305,13 +334,15 @@ func runInitDB(destDir string, walDir *string, pgControlData map[string]string, 
 		return err
 	}
 
+	options = append(options, initdbArgs...)
+
 	// Certain CSI drivers may add setgid permissions on newly created folders.
 	// A default umask is set to attempt to avoid this, by revoking group/other
 	// permission bits on the PGDATA
 	_ = compatibility.Umask(0o077)
 
-	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
-	if err := execlog.RunStreaming(initdbCmd, constants.InitdbName); err != nil {
+	initdbCmd := exec.Command(initdb, options...) // #nosec
+	if err := execlog.RunStreaming(initdbCmd, initdb); err != nil {
 		return err
 	}
 
@@ -391,17 +422,22 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	return nil
 }
 
-func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBinDir string) error {
-	// Run the pg_upgrade command
-	cmd := exec.Command(pgUpgrade,
+func (ui upgradeInfo) runPgUpgrade(
+	newDataDir string,
+) error {
+	args := []string{
 		"--link",
 		"--username", "postgres",
-		"--old-bindir", oldBinDir,
-		"--old-datadir", oldDataDir,
+		"--old-bindir", ui.oldBinDir,
+		"--old-datadir", ui.pgData,
 		"--new-datadir", newDataDir,
-	) // #nosec
+	}
+	args = append(args, ui.pgUpgradeArgs...)
+
+	// Run the pg_upgrade command
+	cmd := exec.Command(ui.pgUpgrade, args...) // #nosec
 	cmd.Dir = newDataDir
-	if err := execlog.RunStreaming(cmd, path.Base(pgUpgrade)); err != nil {
+	if err := execlog.RunStreaming(cmd, path.Base(ui.pgUpgrade)); err != nil {
 		return fmt.Errorf("error while running %q: %w", cmd, err)
 	}
 
