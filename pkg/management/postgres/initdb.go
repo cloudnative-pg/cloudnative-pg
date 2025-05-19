@@ -158,6 +158,21 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 
 	out, err := info.GetInstance().GetPgControldata()
 	if err == nil {
+		typedClient, err := management.NewControllerRuntimeClient()
+		if err == nil {
+			return err
+		}
+		cluster, err := info.loadCluster(ctx, typedClient)
+		if err != nil {
+			return err
+		}
+		// If the user specified an existing directory, we will reuse it.
+		if cluster.Spec.Bootstrap != nil &&
+			cluster.Spec.Bootstrap.InitDB != nil &&
+			cluster.Spec.Bootstrap.InitDB.ReuseExistingDirectory == true {
+			contextLogger.Info("Reusing an existing PGDATA directory.")
+			return nil
+		}
 		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
 		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
 	}
@@ -218,6 +233,12 @@ func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pg
 
 // CreateDataDirectory creates a new data directory given the configuration
 func (info InitInfo) CreateDataDirectory() error {
+	if exists, _ := fileutils.FileExists(info.PgData); exists {
+		// This should only occur if the user has specified reuseExistingDirectory,
+		// in which case we should not do anything.
+		return nil
+	}
+
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
