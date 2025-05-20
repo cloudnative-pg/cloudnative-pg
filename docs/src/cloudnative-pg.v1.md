@@ -6094,8 +6094,7 @@ quorum of the PG cluster.</p>
 <i>string</i>
 </td>
 <td>
-   <p>SynchronousStandbyNamesList is the list of potentially synchronous
-instance names</p>
+   <p>Contains the latest reported Method value.</p>
 </td>
 </tr>
 <tr><td><code>standbyNames</code><br/>

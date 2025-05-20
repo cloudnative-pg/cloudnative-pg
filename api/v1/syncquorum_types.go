@@ -69,8 +69,7 @@ type SyncQuorumSpec struct {
 // SyncQuorumStatus is the latest observed status of the synchronous
 // quorum of the PG cluster.
 type SyncQuorumStatus struct {
-	// SynchronousStandbyNamesList is the list of potentially synchronous
-	// instance names
+	// Contains the latest reported Method value.
 	// +optional
 	Method string `json:"method,omitempty"`
 
