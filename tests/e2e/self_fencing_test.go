@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -132,11 +133,15 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 				Name:      oldPrimaryPod.Name,
 			}
 			timeout := 180
-			Eventually(func() (bool, error) {
+			Eventually(func(g Gomega) {
 				pod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, namespacedName, &pod)
-				return utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod), err
-			}, timeout).Should(BeTrue())
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(utils.IsPodActive(pod)).To(BeTrue())
+				g.Expect(utils.IsPodReady(pod)).To(BeTrue())
+				g.Expect(specs.IsPodStandby(pod)).To(BeTrue())
+				g.Expect(nodes.IsNodeReachable(env.Ctx, env.Client, isolatedNode)).To(BeTrue())
+			}, timeout).Should(Succeed())
 		})
 	})
 })
