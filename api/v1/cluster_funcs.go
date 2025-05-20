@@ -154,33 +154,47 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
-// synchronizeReplicasCache contains the result of the regex compilation
-type synchronizeReplicasCache struct {
-	compiledPatterns []regexp.Regexp `json:"-"`
-	compiled         bool            `json:"-"`
-	compileErrors    []error         `json:"-"`
+type regexErrors struct {
+	errs []error
 }
 
-func (r *SynchronizeReplicasConfiguration) compileRegex() synchronizeReplicasCache {
-	var result synchronizeReplicasCache
+func (r regexErrors) Error() string {
+	if len(r.errs) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("failed to compile regex patterns: ")
+	for _, err := range r.errs {
+		sb.WriteString(err.Error())
+		sb.WriteString("; ")
+	}
+	return sb.String()
+}
 
+func (r *SynchronizeReplicasConfiguration) compileRegex() ([]regexp.Regexp, error) {
 	if r == nil {
-		return result
+		return nil, nil
 	}
 
-	var errs []error
-	for _, pattern := range r.ExcludePatterns {
+	var (
+		compiledPatterns = make([]regexp.Regexp, len(r.ExcludePatterns))
+		compileErrors    []error
+	)
+
+	for idx, pattern := range r.ExcludePatterns {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			errs = append(errs, err)
+			compileErrors = append(compileErrors, err)
 			continue
 		}
-		result.compiledPatterns = append(result.compiledPatterns, *re)
+		compiledPatterns[idx] = *re
 	}
 
-	result.compiled = true
-	result.compileErrors = errs
-	return result
+	if len(compileErrors) > 0 {
+		return nil, regexErrors{errs: compileErrors}
+	}
+
+	return compiledPatterns, nil
 }
 
 // GetEnabled returns false if synchronized replication slots are disabled, defaults to true
@@ -192,8 +206,9 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 }
 
 // ValidateRegex returns all the errors that happened during the regex compilation
-func (r *SynchronizeReplicasConfiguration) ValidateRegex() []error {
-	return r.compileRegex().compileErrors
+func (r *SynchronizeReplicasConfiguration) ValidateRegex() error {
+	_, err := r.compileRegex()
+	return err
 }
 
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
@@ -202,14 +217,14 @@ func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bo
 		return false, nil
 	}
 
-	compilationResult := r.compileRegex()
+	compiledPatterns, err := r.compileRegex()
 
 	// this is an unexpected issue, validation should happen at webhook level
-	if len(compilationResult.compileErrors) > 0 {
-		return false, compilationResult.compileErrors[0]
+	if err != nil {
+		return false, err
 	}
 
-	for _, re := range compilationResult.compiledPatterns {
+	for _, re := range compiledPatterns {
 		if re.MatchString(slotName) {
 			return true, nil
 		}

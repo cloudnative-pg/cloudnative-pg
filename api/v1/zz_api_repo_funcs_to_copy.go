@@ -23,8 +23,3 @@ package v1
 // This file contains the functions that need to be copied from the api/v1 package to the cloudnative-pg/api
 // repository. This is currently required because the controller-gen tool cannot generate DeepCopyInto for the
 // regexp type. This will be removed once the controller-gen tool supports this feature.
-
-// DeepCopyInto needs to be manually added for the controller-gen compiler to work correctly, given that it cannot
-// generate the DeepCopyInto for the regexp type.
-// The method is empty because we don't want to transfer the cache when invoking DeepCopyInto.
-func (receiver synchronizeReplicasCache) DeepCopyInto(*synchronizeReplicasCache) {}
