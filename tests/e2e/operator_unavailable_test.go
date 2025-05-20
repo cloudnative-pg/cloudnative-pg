@@ -211,7 +211,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
 				}, timeout).Should(Succeed())
 				Eventually(func() (bool, error) {
-					return operator.IsDeploymentReady(env.Ctx, env.Client)
+					return operator.IsReady(env.Ctx, env.Client, true)
 				}, timeout).Should(BeTrue())
 			})
 

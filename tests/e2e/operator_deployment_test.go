@@ -22,6 +22,7 @@ package e2e
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,10 +39,11 @@ var _ = Describe("PostgreSQL operator deployment", Label(tests.LabelBasic, tests
 
 	It("sets up the operator", func() {
 		By("having a pod for the operator in state ready", func() {
-			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
+			Expect(operator.WaitForReady(env.Ctx, env.Client, uint(testTimeouts[timeouts.OperatorIsReady]),
+				true)).Should(Succeed())
 		})
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsReady(env.Ctx, env.Client, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
