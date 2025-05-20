@@ -68,9 +68,7 @@ spec:
             description: Most recently observed status of the sync quorum.
             properties:
               method:
-                description: |-
-                  SynchronousStandbyNamesList is the list of potentially synchronous
-                  instance names
+                description: Contains the latest reported Method value.
                 type: string
               primary:
                 description: |-
