@@ -89,7 +89,7 @@ segment to be archived.
     By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
     that WAL files, even in case of low workloads, are closed and archived
     at least every 5 minutes, providing a deterministic time-based value for
-    your Recovery Point Objective ([RPO](before_you_start.md#rpo)). Even though you change the value
+    your Recovery Point Objective ([RPO](../before_you_start.md#rpo)). Even though you change the value
     of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
     our experience suggests that the default value set by the operator is
     suitable for most use cases.
@@ -323,7 +323,7 @@ spec:
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
 different names, you must specify these names before exiting the recovery phase,
-as documented in ["Configure the application database"](#configure-the-application-database).
+as documented in ["Configure the application database"](../recovery.md#configure-the-application-database).
 
 !!! Important
     By default, the `recovery` method strictly uses the `name` of the
