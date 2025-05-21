@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"regexp"
-
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1073,18 +1071,6 @@ type SynchronizeReplicasConfiguration struct {
 	// List of regular expression patterns to match the names of replication slots to be excluded (by default empty)
 	// +optional
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
-
-	synchronizeReplicasCache `json:"-"`
-}
-
-// synchronizeReplicasCache contains the result of the regex compilation
-// +kubebuilder:object:generate:=false
-type synchronizeReplicasCache struct {
-	compiledPatterns []regexp.Regexp `json:"-"`
-
-	compiled bool `json:"-"`
-
-	compileErrors []error `json:"-"`
 }
 
 // ReplicationSlotsConfiguration encapsulates the configuration

@@ -137,27 +137,47 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
-func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
-	if r == nil {
-		return nil
+type regexErrors struct {
+	errs []error
+}
+
+func (r regexErrors) Error() string {
+	if len(r.errs) == 0 {
+		return ""
 	}
-	if r.compiled {
-		return r.compileErrors
+	var sb strings.Builder
+	sb.WriteString("failed to compile regex patterns: ")
+	for _, err := range r.errs {
+		sb.WriteString(err.Error())
+		sb.WriteString("; ")
+	}
+	return sb.String()
+}
+
+func (r *SynchronizeReplicasConfiguration) compileRegex() ([]regexp.Regexp, error) {
+	if r == nil {
+		return nil, nil
 	}
 
-	var errs []error
-	for _, pattern := range r.ExcludePatterns {
+	var (
+		compiledPatterns = make([]regexp.Regexp, len(r.ExcludePatterns))
+		compileErrors    []error
+	)
+
+	for idx, pattern := range r.ExcludePatterns {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			errs = append(errs, err)
+			compileErrors = append(compileErrors, err)
 			continue
 		}
-		r.compiledPatterns = append(r.compiledPatterns, *re)
+		compiledPatterns[idx] = *re
 	}
 
-	r.compiled = true
-	r.compileErrors = errs
-	return errs
+	if len(compileErrors) > 0 {
+		return nil, regexErrors{errs: compileErrors}
+	}
+
+	return compiledPatterns, nil
 }
 
 // GetEnabled returns false if synchronized replication slots are disabled, defaults to true
@@ -169,8 +189,9 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 }
 
 // ValidateRegex returns all the errors that happened during the regex compilation
-func (r *SynchronizeReplicasConfiguration) ValidateRegex() []error {
-	return r.compileRegex()
+func (r *SynchronizeReplicasConfiguration) ValidateRegex() error {
+	_, err := r.compileRegex()
+	return err
 }
 
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
@@ -179,12 +200,13 @@ func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bo
 		return false, nil
 	}
 
+	compiledPatterns, err := r.compileRegex()
 	// this is an unexpected issue, validation should happen at webhook level
-	if errs := r.compileRegex(); len(errs) > 0 {
-		return false, errs[0]
+	if err != nil {
+		return false, err
 	}
 
-	for _, re := range r.compiledPatterns {
+	for _, re := range compiledPatterns {
 		if re.MatchString(slotName) {
 			return true, nil
 		}

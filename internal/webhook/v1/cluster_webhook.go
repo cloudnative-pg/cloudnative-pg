@@ -2047,11 +2047,11 @@ func (v *ClusterCustomValidator) validateReplicationSlots(r *apiv1.Cluster) fiel
 		return nil
 	}
 
-	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.ValidateRegex(); len(errs) > 0 {
+	if err := r.Spec.ReplicationSlots.SynchronizeReplicas.ValidateRegex(); err != nil {
 		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
-				errs,
+				err,
 				"Cannot configure synchronizeReplicas. Invalid regexes were found"),
 		}
 	}
