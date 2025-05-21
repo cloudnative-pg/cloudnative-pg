@@ -46,8 +46,7 @@ on a [standby](../backup.md#backup-from-a-standby).
 If you are looking for a specific object store such as
 [AWS S3](object_stores.md#aws-s3),
 [Microsoft Azure Blob Storage](object_stores.md#azure-blob-storage),
-[Google Cloud Storage](object_stores.md#google-cloud-storage), or
-[MinIO Gateway](object_stores.md#minio-gateway), or a compatible
+[Google Cloud Storage](object_stores.md#google-cloud-storage), or a compatible
 provider, please refer to [Appendix C - Common object stores for backups](object_stores.md).
 
 ## WAL archiving
