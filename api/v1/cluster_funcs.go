@@ -218,7 +218,6 @@ func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bo
 	}
 
 	compiledPatterns, err := r.compileRegex()
-
 	// this is an unexpected issue, validation should happen at webhook level
 	if err != nil {
 		return false, err
