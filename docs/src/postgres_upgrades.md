@@ -54,6 +54,11 @@ CloudNativePG performs an **offline in-place major upgrade** when a new operand
 container image with a higher PostgreSQL major version is declaratively
 requested for a cluster.
 
+!!! Important
+    Major upgrades are only supported between images based on the same
+    operating system distribution. For example, if your previous version uses a
+    `bullseye` image, you cannot upgrade to a `bookworm` image.
+
 You can trigger the upgrade in one of two ways:
 
 - By updating the major version in the image tag via the `.spec.imageName`
