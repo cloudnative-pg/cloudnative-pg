@@ -1,11 +1,13 @@
-# Appendix A - Common object stores for backups
+# Appendix C - Common object stores for backups
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Warning
-    With the deprecation of native Barman Cloud support in CloudNativePG in
-    favor of the Barman Cloud Plugin, this page—and the backup and recovery
-    documentation—may undergo changes before the official release of version
-    1.26.0.
+    As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
+    favor of the **Barman Cloud Plugin**. While the native integration remains
+    functional for now, we strongly recommend beginning a gradual migration to
+    the plugin-based interface after appropriate testing. The Barman Cloud
+    Plugin documentation describes
+    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
 
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
@@ -348,125 +350,3 @@ Now the operator will use the credentials to authenticate against Google Cloud S
     This way of authentication will create a JSON file inside the container with all the needed
     information to access your Google Cloud Storage bucket, meaning that if someone gets access to the pod
     will also have write permissions to the bucket.
-
-## MinIO Gateway
-
-Optionally, you can use MinIO Gateway as a common interface which
-relays backup objects to other cloud storage solutions, like S3 or GCS.
-For more information, please refer to [MinIO official documentation](https://docs.min.io/).
-
-Specifically, the CloudNativePG cluster can directly point to a local
-MinIO Gateway as an endpoint, using previously created credentials and service.
-
-MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
-Therefore, you must create them in the same namespace:
-
-```sh
-kubectl create secret generic minio-creds \
-  --from-literal=MINIO_ACCESS_KEY=<minio access key here> \
-  --from-literal=MINIO_SECRET_KEY=<minio secret key here>
-```
-
-!!! Note
-    Cloud Object Storage credentials will be used only by MinIO Gateway in this case.
-
-!!! Important
-    In order to allow PostgreSQL to reach MinIO Gateway, it is necessary to create a
-    `ClusterIP` service on port `9000` bound to the MinIO Gateway instance.
-
-For example:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: minio-gateway-service
-spec:
-  type: ClusterIP
-  ports:
-    - port: 9000
-      targetPort: 9000
-      protocol: TCP
-  selector:
-    app: minio
-```
-
-!!! Warning
-    At the time of writing this documentation, the official
-    [MinIO Operator](https://github.com/minio/minio-operator/issues/71)
-    for Kubernetes does not support the gateway feature. As such, we will use a
-    `deployment` instead.
-
-The MinIO deployment will use cloud storage credentials to upload objects to the
-remote bucket and relay backup files to different locations.
-
-Here is an example using AWS S3 as Cloud Object Storage:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-[...]
-spec:
-  containers:
-  - name: minio
-    image: minio/minio:RELEASE.2020-06-03T22-13-49Z
-    args:
-    - gateway
-    - s3
-    env:
-    # MinIO access key and secret key
-    - name: MINIO_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: minio-creds
-          key: MINIO_ACCESS_KEY
-    - name: MINIO_SECRET_KEY
-      valueFrom:
-        secretKeyRef:
-          name: minio-creds
-          key: MINIO_SECRET_KEY
-    # AWS credentials
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: aws-creds
-          key: ACCESS_KEY_ID
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: aws-creds
-          key: ACCESS_SECRET_KEY
-# Uncomment the below section if session token is required
-#   - name: AWS_SESSION_TOKEN
-#     valueFrom:
-#       secretKeyRef:
-#         name: aws-creds
-#         key: ACCESS_SESSION_TOKEN
-        ports:
-        - containerPort: 9000
-```
-
-Proceed by configuring MinIO Gateway service as the `endpointURL` in the `Cluster`
-definition, then choose a bucket name to replace `BUCKET_NAME`:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      destinationPath: s3://BUCKET_NAME/
-      endpointURL: http://minio-gateway-service:9000
-      s3Credentials:
-        accessKeyId:
-          name: minio-creds
-          key: MINIO_ACCESS_KEY
-        secretAccessKey:
-          name: minio-creds
-          key: MINIO_SECRET_KEY
-    [...]
-```
-
-Verify on `s3://BUCKET_NAME/` the presence of archived WAL files before
-proceeding with a backup.

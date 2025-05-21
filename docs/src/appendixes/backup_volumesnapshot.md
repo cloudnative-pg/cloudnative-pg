@@ -1,12 +1,10 @@
-# Backup on volume snapshots
+# Appendix A - Backup on volume snapshots
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Warning
-    As noted in the [backup document](backup.md), a cold snapshot explicitly
-    set to target the primary will result in the primary being fenced for
-    the duration of the backup, rendering the cluster read-only during that
-    For safety, in a cluster already containing fenced instances, a cold
-    snapshot is rejected.
+!!! Important
+    Please refer to the official Kubernetes documentation for a list of all
+    the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
+    that provide snapshotting capabilities.
 
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
@@ -53,18 +51,16 @@ volumes of a given storage class, and managed as `VolumeSnapshot` and
 !!! Important
     It is your responsibility to verify with the third party vendor
     that volume snapshots are supported. CloudNativePG only interacts
-    with the Kubernetes API on this matter and we cannot support issues
+    with the Kubernetes API on this matter, and we cannot support issues
     at the storage level for each specific CSI driver.
 
 ## How to configure Volume Snapshot backups
-
-<!-- TODO: Change before 1.26.0 -->
 
 CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
 
 !!! Info
-    Please refer to [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+    Please refer to [`VolumeSnapshotConfiguration`](../cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
     in the API reference for a full list of options.
 
 A generic example with volume snapshots (assuming that PGDATA and WALs share
@@ -89,18 +85,21 @@ spec:
     # Volume snapshot backups
     volumeSnapshot:
        className: @VOLUME_SNAPSHOT_CLASS_NAME@
-    # WAL archive
-    barmanObjectStore:
-       # ...
+       
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: @OBJECTSTORE_NAME@
 ```
 
 As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 (controlling physical base backups on volume snapshots) and the
-`barmanObjectStore` one (controlling the [WAL archive](wal_archiving.md)).
+`plugins` one (controlling the [WAL archive](../wal_archiving.md)).
 
 !!! Info
-    Once you have defined the `barmanObjectStore`, you can decide to use
-    both volume snapshot and object store backup strategies simultaneously
+    Once you have defined the `plugin`, you can decide to use
+    both volume snapshot and plugin backup strategies simultaneously
     to take physical backups.
 
 The `volumeSnapshot.className` option allows you to reference the default
@@ -117,6 +116,13 @@ Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
 
 ## Hot and cold backups
+
+!!! Warning
+    As noted in the [backup document](../backup.md), a cold snapshot explicitly
+    set to target the primary will result in the primary being fenced for
+    the duration of the backup, making the cluster read-only during this
+    period. For safety, in a cluster already containing fenced instances, a cold
+    snapshot is rejected.
 
 By default, CloudNativePG requests an online/hot backup on volume snapshots, using the
 [PostgreSQL defaults of the low-level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP):
@@ -335,8 +341,6 @@ spec:
 
 ## Example of Volume Snapshot Backup
 
-<!-- TODO: Change before 1.26.0 -->
-
 The following example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`
 volume snapshot class.
@@ -349,7 +353,7 @@ volume snapshot class.
 
 The following manifest creates a `Cluster` that is ready to be used for volume
 snapshots and that stores the WAL archive in a S3 bucket via IAM role for the
-Service Account (IRSA, see [AWS S3](appendixes/object_stores.md#aws-s3)):
+Service Account (IRSA, see [AWS S3](object_stores.md#aws-s3)):
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -369,13 +373,12 @@ spec:
   backup:
     volumeSnapshot:
        className: csi-aws-vsc
-    barmanObjectStore:
-      destinationPath: s3://@BUCKET_NAME@/
-      s3Credentials:
-        inheritFromIAMRole: true
-      wal:
-        compression: gzip
-        maxParallel: 2
+
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: @OBJECTSTORE_NAME@
 
   serviceAccountTemplate:
     metadata:
