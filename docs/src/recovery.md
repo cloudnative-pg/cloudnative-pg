@@ -38,7 +38,7 @@ recovery from volume snapshots.
 
 !!! Important
     For legacy documentation, see
-    [Appendix B – Recovery from an Object Store](backup_barmanobjectstore.md#recovery-from-an-object-store).
+    [Appendix B – Recovery from an Object Store](appendixes/backup_barmanobjectstore.md#recovery-from-an-object-store).
 
 ## Recovery from an Object Store with the Barman Cloud Plugin
 
