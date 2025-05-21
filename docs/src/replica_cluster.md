@@ -195,6 +195,7 @@ local object store. This object store is also accessible by the PostgreSQL
 Kubernetes cluster. Initially, `cluster-eu-central` functions as a replica
 cluster. Following a symmetric approach, it also has a local object store for
 continuous backup, which needs to be read by `cluster-eu-south`.
+
 In this example, recovery is performed solely through WAL shipping, without any
 streaming replication between the two clusters. However, you can configure the
 setup to use streaming replication alone or adopt a hybrid approach—streaming
