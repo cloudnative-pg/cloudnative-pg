@@ -163,9 +163,6 @@ continuous recovery are thoroughly explained below.
 
 ## Distributed Topology
 
-!!! Important
-    The Distributed Topology strategy was introduced in CloudNativePG 1.24.
-
 ### Planning for a Distributed PostgreSQL Database
 
 As Dwight Eisenhower famously said, "Planning is everything", and this holds
@@ -189,9 +186,14 @@ local object store. This object store is also accessible by the PostgreSQL
 `Cluster` named `cluster-eu-central`, installed in the Central European
 Kubernetes cluster. Initially, `cluster-eu-central` functions as a replica
 cluster. Following a symmetric approach, it also has a local object store for
-continuous backup, which needs to be read by `cluster-eu-south`. The recovery
-in this setup relies solely on WAL shipping, with no streaming connection
-between the two clusters.
+continuous backup, which needs to be read by `cluster-eu-south`.
+
+In this example, recovery is performed solely through WAL shipping, without any
+streaming replication between the two clusters. However, you can configure the
+setup to use streaming replication alone or adopt a hybrid approach—streaming
+replication with WAL shipping as a fallback—as described in the
+[“Configuring replication”](replica_cluster.md#defining-an-external-cluster)
+section.
 
 Here’s how you would configure the `externalClusters` section for both
 `Cluster` resources:
