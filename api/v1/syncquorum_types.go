@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,10 +60,7 @@ type SyncQuorum struct {
 
 // SyncQuorumSpec contains the pointer to the cluster that should keep
 // the status updated.
-type SyncQuorumSpec struct {
-	// The name of the PostgreSQL cluster hosting the database.
-	ClusterRef corev1.LocalObjectReference `json:"cluster"`
-}
+type SyncQuorumSpec struct{}
 
 // SyncQuorumStatus is the latest observed status of the synchronous
 // quorum of the PG cluster.
