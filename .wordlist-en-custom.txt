@@ -24,7 +24,7 @@ AvailableArchitectures
 AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
-BDR
+BUSL
 BackupConfiguration
 BackupFrom
 BackupLabelFile
@@ -253,6 +253,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenBao
 OpenID
 OpenSSL
 OpenShift
