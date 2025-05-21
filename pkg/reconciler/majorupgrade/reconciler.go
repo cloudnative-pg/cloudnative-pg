@@ -69,7 +69,7 @@ func Reconcile(
 		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
 		return nil, err
 	}
-	if requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
+	if cluster.Status.PGDataImageInfo == nil || requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
 		return nil, nil
 	}
 
