@@ -6062,18 +6062,7 @@ desired state that was synchronized</p>
 the status updated.</p>
 
 
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
-</td>
-<td>
-   <p>The name of the PostgreSQL cluster hosting the database.</p>
-</td>
-</tr>
-</tbody>
-</table>
+
 
 ## SyncQuorumStatus     {#postgresql-cnpg-io-v1-SyncQuorumStatus}
 

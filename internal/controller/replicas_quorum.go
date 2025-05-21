@@ -24,7 +24,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -152,11 +151,6 @@ func (r *ClusterReconciler) ensureSyncQuorumObjectExists(ctx context.Context, cl
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
-		},
-		Spec: apiv1.SyncQuorumSpec{
-			ClusterRef: corev1.LocalObjectReference{
-				Name: cluster.Name,
-			},
 		},
 	}
 	cluster.SetInheritedDataAndOwnership(&syncQuorum.ObjectMeta)
