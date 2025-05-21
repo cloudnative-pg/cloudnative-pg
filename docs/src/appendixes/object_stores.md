@@ -1,6 +1,14 @@
 # Appendix C - Common object stores for backups
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
+!!! Warning
+    As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
+    favor of the **Barman Cloud Plugin**. While the native integration remains
+    functional for now, we strongly recommend beginning a gradual migration to
+    the plugin-based interface after appropriate testing. The Barman Cloud
+    Plugin documentation describes
+    [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
+
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 

@@ -234,7 +234,7 @@ spec:
 You can append additional options to the `barman-cloud-backup` and `barman-cloud-wal-archive` commands by using
 the `additionalCommandArgs` property in the
 `.spec.backup.barmanObjectStore.data` and `.spec.backup.barmanObjectStore.wal` sections respectively.
-This properties are lists of strings that will be appended to the
+These properties are lists of strings that will be appended to the
 `barman-cloud-backup` and `barman-cloud-wal-archive` commands.
 
 For example, you can use the `--read-timeout=60` to customize the connection
@@ -338,4 +338,3 @@ as documented in ["Configure the application database"](../recovery.md#configure
     archive. This feature can appreciably reduce the recovery time. Make sure that
     you plan ahead for this scenario and correctly tune the value of this parameter
     for your environment. It will make a difference when you need it, and you will.
-

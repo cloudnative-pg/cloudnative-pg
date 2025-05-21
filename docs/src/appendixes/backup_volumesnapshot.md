@@ -51,12 +51,10 @@ volumes of a given storage class, and managed as `VolumeSnapshot` and
 !!! Important
     It is your responsibility to verify with the third party vendor
     that volume snapshots are supported. CloudNativePG only interacts
-    with the Kubernetes API on this matter and we cannot support issues
+    with the Kubernetes API on this matter, and we cannot support issues
     at the storage level for each specific CSI driver.
 
 ## How to configure Volume Snapshot backups
-
-<!-- TODO: Change before 1.26.0 -->
 
 CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
@@ -87,18 +85,21 @@ spec:
     # Volume snapshot backups
     volumeSnapshot:
        className: @VOLUME_SNAPSHOT_CLASS_NAME@
-    # WAL archive
-    barmanObjectStore:
-       # ...
+       
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: @OBJECTSTORE_NAME@
 ```
 
 As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 (controlling physical base backups on volume snapshots) and the
-`barmanObjectStore` one (controlling the [WAL archive](../wal_archiving.md)).
+`plugins` one (controlling the [WAL archive](../wal_archiving.md)).
 
 !!! Info
-    Once you have defined the `barmanObjectStore`, you can decide to use
-    both volume snapshot and object store backup strategies simultaneously
+    Once you have defined the `plugin`, you can decide to use
+    both volume snapshot and plugin backup strategies simultaneously
     to take physical backups.
 
 The `volumeSnapshot.className` option allows you to reference the default
@@ -119,8 +120,8 @@ a `ScheduledBackup` resource that requests such backups on a periodic basis.
 !!! Warning
     As noted in the [backup document](../backup.md), a cold snapshot explicitly
     set to target the primary will result in the primary being fenced for
-    the duration of the backup, rendering the cluster read-only during that
-    For safety, in a cluster already containing fenced instances, a cold
+    the duration of the backup, making the cluster read-only during this
+    period. For safety, in a cluster already containing fenced instances, a cold
     snapshot is rejected.
 
 By default, CloudNativePG requests an online/hot backup on volume snapshots, using the
@@ -340,8 +341,6 @@ spec:
 
 ## Example of Volume Snapshot Backup
 
-<!-- TODO: Change before 1.26.0 -->
-
 The following example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`
 volume snapshot class.
@@ -374,13 +373,12 @@ spec:
   backup:
     volumeSnapshot:
        className: csi-aws-vsc
-    barmanObjectStore:
-      destinationPath: s3://@BUCKET_NAME@/
-      s3Credentials:
-        inheritFromIAMRole: true
-      wal:
-        compression: gzip
-        maxParallel: 2
+
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: @OBJECTSTORE_NAME@
 
   serviceAccountTemplate:
     metadata:
