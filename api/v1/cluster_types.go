@@ -1317,7 +1317,6 @@ type SynchronousReplicaConfiguration struct {
 	// to allow for operational continuity. This setting is only applicable if both
 	// `standbyNamesPre` and `standbyNamesPost` are unset (empty).
 	// +kubebuilder:validation:Enum=required;preferred
-	// +kubebuilder:default:=required
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
 }
