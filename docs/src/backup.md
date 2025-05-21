@@ -64,7 +64,7 @@ is fundamental for the following reasons:
 - **Hot backups**: the possibility to take physical base backups from any
   instance in the Postgres cluster (either primary or standby) without shutting
   down the server; they are also known as online backups
-- **Point in Time recovery** (PITR): to possibility to recover at any point in
+- **Point in Time recovery** (PITR): the possibility to recover at any point in
   time from the first available base backup in your system
 
 !!! Warning
@@ -86,20 +86,20 @@ recovery, even across regions.
 
 !!! Important
     Our recommendation is to always setup the WAL archive in production.
-    There are known use cases - normally involving staging and development
-    environments - where none of the above benefits are needed and the WAL
+    There are known use cases — normally involving staging and development
+    environments — where none of the above benefits are needed and the WAL
     archive is not necessary. RPO in this case can be any value, such as
     24 hours (daily backups) or infinite (no backup at all).
 
 ### Cold and Hot backups
 
 Hot backups have already been defined in the previous section. They require the
-presence of a WAL archive and they are the norm in any modern database management
-system.
+presence of a WAL archive, and they are the norm in any modern database
+management system.
 
 **Cold backups**, also known as offline backups, are instead physical base backups
 taken when the PostgreSQL instance (standby or primary) is shut down. They are
-consistent per definition and they represent a snapshot of the database at the
+consistent per definition, and they represent a snapshot of the database at the
 time it was shut down.
 
 As a result, PostgreSQL instances can be restarted from a cold backup without
@@ -130,19 +130,21 @@ CloudNativePG currently supports two main approaches for physical backups:
 
 Backups to an object store (e.g. AWS S3, Azure Blob, GCS):
 
-- **Always require WAL archiving**
-- **Support hot backups only**
-- **Do not support incremental or differential copies**
+- Always require WAL archiving
+- Support hot backups only
+- Do not support incremental or differential copies
+- Support retention policies
 
 ### Volume Snapshots
 
 Native volume snapshots:
 
-- **Do not require WAL archiving**, though its use is still **strongly
-  recommended in production**
-- **Support incremental and differential copies**, depending on the
+- Do not require WAL archiving, though its use is still strongly
+  recommended in production
+- Support incremental and differential copies, depending on the
   capabilities of the underlying storage class
-- **Support both hot and cold backups**
+- Support both hot and cold backups
+- Do not support retention policies
 
 ### Choosing Between the Two
 
@@ -165,15 +167,16 @@ Consider the following factors:
 ### Comparison Summary
 
 | Feature                           | Object Store |   Volume Snapshots   |
-| --------------------------------- | :----------: | :------------------: |
-| **WAL archiving**                 |   Required   |     Recommended¹     |
-| **Cold backup**                   |       ✗      |           ✓          |
-| **Hot backup**                    |       ✓      |           ✓          |
-| **Incremental copy**              |       ✗      |          ✓²          |
-| **Differential copy**             |       ✗      |          ✓²          |
-| **Backup from a standby**         |       ✓      |           ✓          |
-| **Snapshot recovery**             |      ✗³      |           ✓          |
-| **Point-in-Time Recovery (PITR)** |       ✓      | Requires WAL archive |
+|-----------------------------------|:------------:|:--------------------:|
+| **WAL archiving**                 |   Required   |    Recommended^1^    |
+| **Cold backup**                   |      ❌       |          ✅           |
+| **Hot backup**                    |      ✅       |          ✅           |
+| **Incremental copy**              |      ❌       |         ✅^2^         |
+| **Differential copy**             |      ❌       |         ✅^2^         |
+| **Backup from a standby**         |      ✅       |          ✅           |
+| **Snapshot recovery**             |     ❌^3^     |          ✅           |
+| **Retention policies**            |      ✅       |          ❌           |
+| **Point-in-Time Recovery (PITR)** |      ✅       | Requires WAL archive |
 | **Underlying technology**         | Barman Cloud |    Kubernetes API    |
 
 ---
@@ -444,7 +447,7 @@ spec:
 ### Overriding the Cluster-Wide Target
 
 You can override the cluster-level target on a per-backup basis, using either
-`Backup` or `ScheduledBackup` resources. Here's an example for an on-demand
+`Backup` or `ScheduledBackup` resources. Here's an example of an on-demand
 backup:
 
 ```yaml
@@ -472,10 +475,10 @@ built-in capabilities and scope of CloudNativePG.
 As part of this transition, the `spec.backup.retentionPolicy` field in the
 `Cluster` resource is **deprecated** and will be removed in a future release.
 
+For more details on available retention features, refer to your chosen plugin’s documentation.
+For example: ["Retention Policies" with Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/retention/).
+
 !!! Important
     Users are encouraged to rely on the retention mechanisms provided by the
     backup plugin they are using. This ensures better flexibility and consistency
     with the backup method in use.
-
-For more details on available retention features, refer to your chosen plugin’s documentation.
-For example: ["Retention Policies" with Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/retention/).

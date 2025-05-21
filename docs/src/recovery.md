@@ -383,6 +383,11 @@ targetTime
    [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format.
    (The precise stopping point is also influenced by the `exclusive` option.)
 
+!!! Warning
+    PostgreSQL recovery will stop when it encounters the first transaction that
+    occurs after the specified time. If no such transaction exists after the
+    target time, the recovery process will fail.
+
 targetXID
 :  Transaction ID up to which recovery proceeds.
    (The precise stopping point is also influenced by the `exclusive` option.)
@@ -547,10 +552,10 @@ When the base backup recovery process is complete, the operator starts the
 Postgres instance in recovery mode. In this phase, PostgreSQL is up, though not
 able to accept connections, and the pod is healthy according to the
 liveness probe. By way of the `restore_command`, PostgreSQL starts fetching WAL
-files from the archive. (You can speed up this phase by setting the
-`maxParallel` option and enabling the parallel WAL restore capability.)
+files from the archive. You can speed up this phase by setting the
+`maxParallel` option and enabling the parallel WAL restore capability.
 
-This phase terminates when PostgreSQL reaches the target (either the end of the
+This phase terminates when PostgreSQL reaches the target, either the end of the
 WAL or the required target in case of PITR. You can optionally specify a
 `recoveryTarget` to perform a PITR. If left unspecified, the recovery continues
 up to the latest available WAL on the default target timeline (`latest`).
@@ -587,4 +592,3 @@ data.
     cluster. However, this is strongly discouraged unless you are highly
     familiar with PostgreSQL's recovery process. Skipping the check incorrectly can
     lead to severe data loss. Use with caution and only in expert scenarios.
-

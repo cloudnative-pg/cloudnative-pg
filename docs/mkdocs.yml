@@ -14,6 +14,7 @@ markdown_extensions:
   - def_list
   - attr_list
   - footnotes
+  - pymdownx.caret
 
 nav:
   - index.md
