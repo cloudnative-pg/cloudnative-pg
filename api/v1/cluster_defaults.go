@@ -102,6 +102,13 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
 	}
 
+	// Default synchronous_commit method if not specified.
+	// This is done after the general parameter sanitization to ensure
+	// that if Synchronous is defined, its Method subfield gets a default.
+	if r.Spec.PostgresConfiguration.Synchronous != nil && r.Spec.PostgresConfiguration.Synchronous.Method == "" {
+		r.Spec.PostgresConfiguration.Synchronous.Method = "any"
+	}
+
 	if r.Spec.LogLevel == "" {
 		r.Spec.LogLevel = log.InfoLevelString
 	}

@@ -317,3 +317,45 @@ var _ = Describe("setDefaultPlugins", func() {
 			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
 	})
 })
+
+var _ = Describe("Cluster synchronous commit defaults", func() {
+	It("should default Synchronous.Method to 'any' when Synchronous is present and Method is empty", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{},
+				},
+			},
+		}
+		cluster.SetDefaults() // Use SetDefaults to apply all defaults including the new one
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.Method).To(Equal(SynchronousReplicaConfigurationMethodAny))
+	})
+
+	It("should not panic and leave Synchronous nil if it's not defined", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: nil,
+				},
+			},
+		}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).To(BeNil())
+	})
+
+	It("should not overwrite an existing Synchronous.Method", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Method: SynchronousReplicaConfigurationMethodFirst,
+					},
+				},
+			},
+		}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.Method).To(Equal(SynchronousReplicaConfigurationMethodFirst))
+	})
+})
