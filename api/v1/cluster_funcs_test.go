@@ -1189,7 +1189,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 	Context("CompileRegex", func() {
 		It("should return no errors when SynchronizeReplicasConfiguration is nil", func() {
 			synchronizeReplicas = nil
-			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
+			Expect(synchronizeReplicas.ValidateRegex()).ToNot(HaveOccurred())
 		})
 
 		Context("when SynchronizeReplicasConfiguration is not nil", func() {
@@ -1198,7 +1198,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 			})
 
 			It("should compile patterns without errors", func() {
-				Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
+				Expect(synchronizeReplicas.ValidateRegex()).ToNot(HaveOccurred())
 			})
 
 			Context("when a pattern fails to compile", func() {
@@ -1207,15 +1207,10 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				})
 
 				It("should return errors for the invalid pattern", func() {
-					errors := synchronizeReplicas.ValidateRegex()
-					Expect(errors).To(HaveLen(1))
+					err := synchronizeReplicas.ValidateRegex()
+					Expect(err).To(HaveOccurred())
 				})
 			})
-		})
-
-		It("should return no errors on subsequent calls when compile is called multiple times", func() {
-			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
-			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
 		})
 	})
 
@@ -1268,19 +1263,12 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				Expect(isExcludedByUser).To(BeTrue())
 			})
 
-			It("should compile patterns before checking for exclusion when compile is not called", func() {
-				Expect(synchronizeReplicas.compiledPatterns).To(BeEmpty())
-				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
-				Expect(err).ToNot(HaveOccurred())
-				Expect(isExcludedByUser, err).To(BeTrue())
-				Expect(synchronizeReplicas.compiledPatterns).To(HaveLen(2))
-			})
-
 			It("should return an error in case of an invalid pattern", func() {
 				synchronizeReplicas.ExcludePatterns = []string{"([a-zA-Z]+"}
 				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("test")
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal("error parsing regexp: missing closing ): `([a-zA-Z]+`"))
+				Expect(err.Error()).To(Equal("failed to compile regex patterns: error parsing regexp: " +
+					"missing closing ): `([a-zA-Z]+`; "))
 				Expect(isExcludedByUser).To(BeFalse())
 			})
 		})
