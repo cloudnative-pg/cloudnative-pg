@@ -254,7 +254,6 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-<!--
 ### Upgrading to 1.26.0 or 1.25.2
 
 !!! Important
@@ -262,10 +261,11 @@ only the operator itself.
     1.26.0 or at least to the latest stable version of the minor release you are
     currently using (namely 1.25.x).
 
-- TOD: Mention hibernate command
-- TOD: Mention Barman Cloud
-
--->
+In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
+to a declarative approach for cluster hibernation. The `hibernate on` and
+`hibernate off` commands are now convenient shortcuts that apply declarative
+changes to enable or disable hibernation. The `hibernate status` command has
+been removed, as its purpose is now fulfilled by the standard `status` command.
 
 ### Upgrading to 1.25 from a previous minor version
 
