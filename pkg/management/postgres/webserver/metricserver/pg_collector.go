@@ -360,6 +360,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
+	log.Info("XXX collecting metrics")
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
