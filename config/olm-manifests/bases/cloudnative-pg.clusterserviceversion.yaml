@@ -472,21 +472,6 @@ spec:
         description: Configuration of the probes to be injected in the PostgreSQL instances
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.liveness
-        displayName: Liveness Probe configuration
-        description: Configuration of the liveness probe
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.startup
-        displayName: Startup Probe configuration
-        description: Configuration of the startup probe
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.readiness
-        displayName: Readiness Probe configuration
-        description: Configuration of the readiness probe
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       # Affinity section
       - path: affinity
         displayName: Pod Affinity
