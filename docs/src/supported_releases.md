@@ -82,8 +82,9 @@ Git tags for versions are prefixed with `v`.
 
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.25.x          | Yes                  | Dec 23, 2024 | ~ Jun/July 2025 | 1.29, 1.30, 1.31, 1.32        | 1.27, 1.28                | 13 - 17                     |
-| 1.24.x          | Yes                  | Aug 22, 2024 | Mar 23, 2025    | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 13 - 17                     |
+| 1.26.x          | Yes                  | May 22, 2025 | ~ Nov 2025      | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
+| 1.25.x          | Yes                  | Dec 23, 2024 | 22 Aug 2025     | 1.29, 1.30, 1.31, 1.32        | 1.33                      | 13 - 17                     |
+| 1.24.x          | Yes                  | Aug 22, 2024 | Mar 23, 2025    | 1.28, 1.29, 1.30, 1.31        |                           | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
 
 <!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
@@ -121,10 +122,9 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.26.0  | ~ Mar, 2025  | ~ Dec, 2025 |
-| 1.27.0  | ~ Jun, 2025  | ~ Mar, 2026 |
-| 1.28.0  | ~ Sep, 2025  | ~ Jun, 2026 |
-| 1.29.0  | ~ Dec, 2025  | ~ Sep, 2026 |
+| 1.27.0  | ~ Aug, 2025  | ~ Feb, 2026 |
+| 1.28.0  | ~ Nov, 2025  | ~ May, 2026 |
+| 1.29.0  | ~ Feb, 2025  | ~ Aug, 2026 |
 
 !!! Note
     Feature freeze occurs 1-2 weeks before the release, at which point a
