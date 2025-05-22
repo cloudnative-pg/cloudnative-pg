@@ -331,6 +331,76 @@ type QueryCollector struct {
 	variableLabels VariableSet
 }
 
+// refresh reruns a given SQL query and updates the metrics associated to the query
+func (c QueryCollector) refresh(conn *sql.DB) error {
+	tx, err := createMonitoringTx(conn)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := tx.Commit(); err != nil {
+			log.Error(err, "Error while committing metrics extraction")
+		}
+	}()
+
+	shouldBeCollected, err := c.userQuery.isCollectable(tx)
+	if err != nil {
+		return err
+	}
+
+	if !shouldBeCollected {
+		return nil
+	}
+
+	rows, err := tx.Query(c.userQuery.Query)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Warning("Error while closing metrics extraction",
+				"err", err.Error())
+		}
+	}()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	columnData := make([]interface{}, len(columns))
+	scanArgs := make([]interface{}, len(columns))
+	for i := range columnData {
+		scanArgs[i] = &columnData[i]
+	}
+
+	if len(columns) != len(c.columnMapping) {
+		log.Warning("Columns number mismatch",
+			"name", c.namespace,
+			"columnNumberFromDB", len(columns),
+			"columnNumberFromConfiguration", len(c.columnMapping))
+		return nil
+	}
+
+	for rows.Next() {
+		if err = rows.Scan(scanArgs...); err != nil {
+			return err
+		}
+
+		labels, done := c.collectLabels(columns, columnData)
+		if done {
+			c.refreshColumns(columns, columnData, labels)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Warning("Error while loading metrics",
+			"err", err.Error())
+		return err
+	}
+	return nil
+}
+
 // collect retrieves metrics from query and exposes them to prometheus
 func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error {
 	tx, err := createMonitoringTx(conn)
@@ -422,6 +492,48 @@ func (c QueryCollector) collectLabels(columns []string, columnData []interface{}
 }
 
 // Collect the metrics from the database columns
+func (c QueryCollector) refreshColumns(columns []string, columnData []interface{},
+	labels []string,
+) {
+	for idx, columnName := range columns {
+		mapping, ok := c.columnMapping[columnName]
+		if !ok {
+			log.Warning("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
+			continue
+		}
+
+		// There is a strong difference between histogram and non-histogram metrics in
+		// postgres_exporter. The first ones are looked up by column name and the second
+		// ones are looked up just using the index.
+		//
+		// We implemented the same behavior here.
+
+		switch {
+		case mapping.Discard || mapping.Label:
+			continue
+
+		case mapping.Histogram:
+			histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
+			if err != nil {
+				log.Error(err, "Cannot process histogram metric",
+					"columns", columns,
+					"columnName", columnName,
+					"mapping.Name", mapping.Name,
+					"mappings", c.columnMapping,
+					"mapping", mapping,
+					"columnData", columnData,
+					"labels", labels)
+			} else {
+				c.collectHistogramMetric(mapping, histogramData, labels, ch)
+			}
+
+		default:
+			c.collectConstMetric(mapping, columnData[idx], labels, ch)
+		}
+	}
+}
+
+// Collect the metrics from the database columns
 func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
 	labels []string, ch chan<- prometheus.Metric,
 ) {
@@ -502,6 +614,36 @@ func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
 	for _, mapSet := range c.columnMapping {
 		ch <- mapSet.Desc
 	}
+}
+
+// createConstMetric reports to the prometheus library a constant metric
+func (c QueryCollector) createConstMetric(
+	mapping MetricMap, value interface{}, variableLabels []string,
+) prometheus.Metric {
+	if mapping.Conversion == nil {
+		log.Warning("Missing conversion while parsing value",
+			"namespace", c.namespace,
+			"value", value,
+			"mapping", mapping)
+		return nil
+	}
+
+	floatData, ok := mapping.Conversion(value)
+	if !ok {
+		log.Warning("Error while parsing value",
+			"namespace", c.namespace,
+			"value", value,
+			"mapping", mapping)
+		return nil
+	}
+
+	// Generate the metric
+	metric, err := prometheus.NewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
+	if err != nil {
+		log.Error(err, "while collecting constant metric", "metric", mapping.Name)
+		return nil
+	}
+	return metric
 }
 
 // collectConstMetric reports to the prometheus library a constant metric

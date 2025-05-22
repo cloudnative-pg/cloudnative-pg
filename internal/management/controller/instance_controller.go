@@ -865,7 +865,8 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 	return false, nil
 }
 
-// reconcileMetrics updates any required metrics
+// reconcileMetrics updates the prometheus metrics that deal with instance
+// manager or cluster data: manual_switchover_required, sync_replicas, replica_mode
 func (r *InstanceReconciler) reconcileMetrics(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
