@@ -139,7 +139,6 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    # Backup Section
     - kind: Backup
       name: backups.postgresql.cnpg.io
       displayName: Backups
@@ -164,7 +163,6 @@ spec:
         path: phase
         x-descriptors:
         - 'urn:alm:descriptor:io.kubernetes.phase'
-    # Cluster Section
     - kind: Cluster
       name: clusters.postgresql.cnpg.io
       version: v1
@@ -321,18 +319,6 @@ spec:
         description: Boolean to enable TLS
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
-      - path: postgresql.synchronous
-        displayName: Synchronous Replication Configuration
-        description: Configuration of the synchronous replication feature
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: postgresql.synchronous.method
-        displayName: Synchronous Replication Configuration Method
-        description: The method to use for synchronous replication feature
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:select:any'
-          - 'urn:alm:descriptor:com.tectonic.ui:select:first'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: tablespaces
         displayName: Tablespaces
         description: Configuration of the tablespaces
@@ -465,27 +451,6 @@ spec:
           complete
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      # Probes configuration section
-      - path: probes
-        display: Probes Configuration
-        description: Configuration of the probes to be injected in the PostgreSQL instances
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.liveness
-        displayName: Liveness Probe configuration
-        description: Configuration of the liveness probe
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.startup
-        displayName: Startup Probe configuration
-        description: Configuration of the startup probe
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: probes.readiness
-        displayName: Readiness Probe configuration
-        description: Configuration of the readiness probe
-        x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       # Affinity section
       - path: affinity
