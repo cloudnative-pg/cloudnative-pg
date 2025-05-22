@@ -4149,7 +4149,6 @@ spec:
                       feature
                     properties:
                       dataDurability:
-                        default: required
                         description: |-
                           If set to "required", data durability is strictly enforced. Write operations
                           with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will

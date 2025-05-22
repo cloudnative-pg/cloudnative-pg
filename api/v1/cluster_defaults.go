@@ -132,6 +132,11 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultTablespaces()
 	}
 
+	if r.Spec.PostgresConfiguration.Synchronous != nil &&
+		r.Spec.PostgresConfiguration.Synchronous.DataDurability == "" {
+		r.Spec.PostgresConfiguration.Synchronous.DataDurability = DataDurabilityLevelRequired
+	}
+
 	r.setDefaultPlugins(configuration.Current)
 }
 
