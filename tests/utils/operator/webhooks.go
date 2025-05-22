@@ -187,7 +187,7 @@ func getCNPGsMutatingWebhookConf(
 	return mutatingWebhookConfiguration, err
 }
 
-// CheckWebhookSetup checks if the webhook denies a invalid request
+// CheckWebhookSetup checks if the webhook denies an invalid request
 func isWebhookWorking(
 	ctx context.Context,
 	crudClient client.Client,

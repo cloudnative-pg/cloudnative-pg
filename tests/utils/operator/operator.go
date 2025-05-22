@@ -205,7 +205,7 @@ func IsReady(
 	return isWebhookWorking(ctx, crudClient)
 }
 
-// WaitForReady waits for the operator deployment to be ready
+// WaitForReady waits for the operator deployment to be ready.
 // If checkWebhook is true, it will also check that the webhook is replying
 func WaitForReady(
 	ctx context.Context,
