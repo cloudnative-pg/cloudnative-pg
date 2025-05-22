@@ -317,3 +317,45 @@ var _ = Describe("setDefaultPlugins", func() {
 			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
 	})
 })
+
+var _ = Describe("default dataDurability", func() {
+	It("should default dataDurability to 'required' when synchronous is present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{},
+				},
+			},
+		}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.DataDurability).To(Equal(DataDurabilityLevelRequired))
+	})
+
+	It("should not touch synchronous if nil", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: nil,
+				},
+			},
+		}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).To(BeNil())
+	})
+
+	It("should not change the dataDurability when set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						DataDurability: DataDurabilityLevelPreferred,
+					},
+				},
+			},
+		}
+		cluster.SetDefaults()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.DataDurability).To(Equal(DataDurabilityLevelPreferred))
+	})
+})
