@@ -1556,6 +1556,7 @@ type BootstrapInitDB struct {
 	// caution and is only intended for advanced users. You almost never want to use
 	// this unless you have a very well-defined reason to do so.
 	// +optional
+	// +kubebuilder:default:=false
 	ReuseExistingDirectory bool `json:"reuseExistingDirectory,omitempty"`
 
 	// The value to be passed as option `--lc-collate` for initdb (default:`C`)

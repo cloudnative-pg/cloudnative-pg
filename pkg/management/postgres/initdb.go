@@ -25,6 +25,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -158,21 +159,6 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 
 	out, err := info.GetInstance().GetPgControldata()
 	if err == nil {
-		typedClient, err := management.NewControllerRuntimeClient()
-		if err == nil {
-			return err
-		}
-		cluster, err := info.loadCluster(ctx, typedClient)
-		if err != nil {
-			return err
-		}
-		// If the user specified an existing directory, we will reuse it.
-		if cluster.Spec.Bootstrap != nil &&
-			cluster.Spec.Bootstrap.InitDB != nil &&
-			cluster.Spec.Bootstrap.InitDB.ReuseExistingDirectory == true {
-			contextLogger.Info("Reusing an existing PGDATA directory.")
-			return nil
-		}
 		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
 		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
 	}
@@ -232,11 +218,14 @@ func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pg
 }
 
 // CreateDataDirectory creates a new data directory given the configuration
-func (info InitInfo) CreateDataDirectory() error {
+func (info InitInfo) CreateDataDirectory(reuseDirectory bool) error {
 	if exists, _ := fileutils.FileExists(info.PgData); exists {
-		// This should only occur if the user has specified reuseExistingDirectory,
-		// in which case we should not do anything.
-		return nil
+		// This should only occur if the user has specified reuseExistingDirectory
+		// in the spec, in which case we should not do anything.
+		if reuseDirectory {
+			return nil
+		}
+		return errors.New("Data directory already exists.")
 	}
 
 	// Invoke initdb to generate a data directory
@@ -457,13 +446,13 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 }
 
 // Bootstrap creates and configures this new PostgreSQL instance
-func (info InitInfo) Bootstrap(ctx context.Context) error {
+func (info InitInfo) Bootstrap(ctx context.Context, reuseDirectory bool) error {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
 
-	cluster, err := info.loadCluster(ctx, typedClient)
+	cluster, err := info.LoadCluster(ctx, typedClient)
 	if err != nil {
 		return err
 	}
@@ -473,7 +462,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	err = info.CreateDataDirectory()
+	err = info.CreateDataDirectory(reuseDirectory)
 	if err != nil {
 		return err
 	}
