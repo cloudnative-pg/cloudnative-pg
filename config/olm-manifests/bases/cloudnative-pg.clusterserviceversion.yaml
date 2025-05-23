@@ -65,6 +65,7 @@ spec:
     - Offline and online import of PostgreSQL databases, including major upgrades:
         - *Offline Import*: Direct restore from existing databases.
         - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
+    - Offline In-Place Major Upgrades of PostgreSQL
     - High Availability physical replication slots, including synchronization of
       user-defined replication slots.
     - Parallel WAL archiving and restore, ensuring high-performance data
