@@ -505,24 +505,19 @@ scalability of PostgreSQL databases, ensuring a streamlined and optimized
 experience for managing large scale data storage in cloud-native environments.
 Support for temporary tablespaces is also included.
 
-### Startup, Liveness, and Readiness Probes
+### Customizable Startup, Liveness, and Readiness Probes
 
 CloudNativePG configures startup, liveness, and readiness probes for PostgreSQL
 containers, which are managed by the Kubernetes kubelet. These probes interact
-with the `/healthz` and `/readyz` endpoints exposed by the instance manager's
-web server to monitor the Pod's health and readiness.
-
-The startup and liveness probes use the `pg_isready` utility. A Pod is
-considered healthy if `pg_isready` returns an exit code of 0 (indicating the
-server is accepting connections) or 1 (indicating the server is rejecting
-connections, such as during startup).
-
-The readiness probe executes a simple SQL query (`;`) to verify that the
-PostgreSQL server is ready to accept client connections.
+with the `/startupz`, `/healthz`, and `/readyz` endpoints exposed by
+the instance manager's web server to monitor the Pod's health and readiness.
 
 All probes are configured with default settings but can be fully customized to
 meet specific needs, allowing for fine-tuning to align with your environment
 and workloads.
+
+For detailed configuration options and advanced usage,
+refer to the [Postgres instance manager](instance_manager.md) documentation.
 
 ### Rolling deployments
 
@@ -567,21 +562,12 @@ that, until the fence is lifted, data on the pod isn't modified by PostgreSQL
 and that you can investigate file system for debugging and troubleshooting
 purposes.
 
-### Hibernation (declarative)
+### Hibernation
 
 CloudNativePG supports [hibernation of a running PostgreSQL cluster](declarative_hibernation.md)
 in a declarative manner, through the `cnpg.io/hibernation` annotation.
 Hibernation enables saving CPU power by removing the database pods while
 keeping the database PVCs. This feature simulates scaling to 0 instances.
-
-### Hibernation (imperative)
-
-CloudNativePG supports [hibernation of a running PostgreSQL cluster](kubectl-plugin.md#cluster-hibernation)
-by way of the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
-high-availability cluster and keeps a static copy of the PVC group of the
-primary. The copy contains `PGDATA` and WALs. The plugin enables you to exit the
-hibernation phase by resuming the primary and then recreating all the
-replicas, if they exist.
 
 ### Reuse of persistent volumes storage in pods
 
