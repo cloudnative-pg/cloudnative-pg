@@ -221,6 +221,8 @@ LDAPBindAsAuth
 LDAPBindSearchAuth
 LDAPConfig
 LDAPScheme
+LF
+LLC
 LPV
 LSN
 LTS
@@ -518,6 +520,7 @@ YXBw
 YY
 YYYY
 Zalando
+Zstandard
 abd
 accessKeyId
 accessModes
@@ -1188,6 +1191,7 @@ robfig
 roleRef
 rollingupdatestatus
 rollout
+rollouts
 rpo
 rto
 runonserver
