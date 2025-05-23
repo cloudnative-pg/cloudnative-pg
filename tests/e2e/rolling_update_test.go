@@ -25,6 +25,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -234,7 +235,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// we give 10 seconds to the apiserver to update the endpoint
 		timeout := 10
 		Eventually(func() (string, error) {
-			endpoint := &corev1.Endpoints{}
+			endpoint := &discoveryv1.EndpointSlice{}
 			err := env.Client.Get(env.Ctx, endpointNamespacedName, endpoint)
 			return testsUtils.FirstEndpointIP(endpoint), err
 		}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
@@ -243,22 +244,16 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	// Verify that the IPs of the podutils match the ones in the -r endpoint and
 	// that the amount of podutils is the expected one
 	AssertReadyEndpoint := func(namespace string, clusterName string, expectedEndpoints int) {
-		endpointName := clusterName + "-r"
-		endpoint := &corev1.Endpoints{}
-		endpointNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      endpointName,
-		}
-		err := env.Client.Get(env.Ctx, endpointNamespacedName,
-			endpoint)
+		readServiceName := clusterName + "-r"
+		endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, readServiceName)
 		Expect(err).ToNot(HaveOccurred())
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 		Expect(expectedEndpoints, err).To(BeEquivalentTo(len(podList.Items)))
 		matchingIP := 0
 		for _, pod := range podList.Items {
 			ip := pod.Status.PodIP
-			for _, addr := range endpoint.Subsets[0].Addresses {
-				if ip == addr.IP {
+			for _, addr := range endpointSlice.Endpoints[0].Addresses {
+				if ip == addr {
 					matchingIP++
 				}
 			}
