@@ -34,14 +34,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -52,35 +51,21 @@ import (
 func ReloadDeployment(
 	ctx context.Context,
 	crudClient client.Client,
-	kubeInterface kubernetes.Interface,
 	timeoutSeconds uint,
 ) error {
 	operatorPod, err := GetPod(ctx, crudClient)
 	if err != nil {
 		return err
 	}
-	zero := int64(0)
+
 	err = crudClient.Delete(ctx, &operatorPod,
-		&client.DeleteOptions{GracePeriodSeconds: &zero},
+		&client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(1))},
 	)
 	if err != nil {
 		return err
 	}
-	err = retry.Do(
-		func() error {
-			ready, err := IsReady(ctx, crudClient, kubeInterface)
-			if err != nil {
-				return err
-			}
-			if !ready {
-				return fmt.Errorf("operator pod %v is not ready", operatorPod.Name)
-			}
-			return nil
-		},
-		retry.Delay(time.Second),
-		retry.Attempts(timeoutSeconds),
-	)
-	return err
+	// Wait for the operator pod to be ready
+	return WaitForReady(ctx, crudClient, timeoutSeconds, true)
 }
 
 // Dump logs the JSON for the deployment in an operator namespace, its pods and endpoints
@@ -155,7 +140,7 @@ func GetDeployment(ctx context.Context, crudClient client.Client) (appsv1.Deploy
 func GetPod(ctx context.Context, crudClient client.Client) (corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
-	// This will work for newer version of the operator, which are using
+	// This will work for newer versions of the operator, which are using
 	// our custom label
 	if err := objects.List(
 		ctx, crudClient,
@@ -163,29 +148,6 @@ func GetPod(ctx context.Context, crudClient client.Client) (corev1.Pod, error) {
 		return corev1.Pod{}, err
 	}
 	activePods := utils.FilterActivePods(podList.Items)
-	switch {
-	case len(activePods) > 1:
-		err := fmt.Errorf("number of running operator pods greater than 1: %v pods running", len(activePods))
-		return corev1.Pod{}, err
-
-	case len(activePods) == 1:
-		return activePods[0], nil
-	}
-
-	operatorNamespace, err := NamespaceName(ctx, crudClient)
-	if err != nil {
-		return corev1.Pod{}, err
-	}
-
-	// This will work for older version of the operator, which are using
-	// the default label from kube-builder
-	if err := objects.List(
-		ctx, crudClient, podList,
-		client.MatchingLabels{"control-plane": "controller-manager"},
-		client.InNamespace(operatorNamespace)); err != nil {
-		return corev1.Pod{}, err
-	}
-	activePods = utils.FilterActivePods(podList.Items)
 	if len(activePods) != 1 {
 		err := fmt.Errorf("number of running operator different than 1: %v pods running", len(activePods))
 		return corev1.Pod{}, err
@@ -207,23 +169,26 @@ func NamespaceName(ctx context.Context, crudClient client.Client) (string, error
 func IsReady(
 	ctx context.Context,
 	crudClient client.Client,
-	kubeInterface kubernetes.Interface,
+	checkWebhook bool,
 ) (bool, error) {
-	pod, err := GetPod(ctx, crudClient)
+	if ready, err := isDeploymentReady(ctx, crudClient); err != nil || !ready {
+		return ready, err
+	}
+
+	// If the operator is not managing webhooks, we don't need to check. Exit early
+	if !checkWebhook {
+		return true, nil
+	}
+
+	deploy, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return false, err
 	}
-
-	isPodReady := utils.IsPodReady(pod)
-	if !isPodReady {
-		return false, err
-	}
-
-	namespace := pod.Namespace
+	namespace := deploy.GetNamespace()
 
 	// Detect if we are running under OLM
 	var webhookManagedByOLM bool
-	for _, envVar := range pod.Spec.Containers[0].Env {
+	for _, envVar := range deploy.Spec.Template.Spec.Containers[0].Env {
 		if envVar.Name == "WEBHOOK_CERT_DIR" {
 			webhookManagedByOLM = true
 		}
@@ -231,58 +196,52 @@ func IsReady(
 
 	// If the operator is managing certificates for webhooks, check that the setup is completed
 	if !webhookManagedByOLM {
-		err = checkWebhookReady(ctx, crudClient, kubeInterface, namespace)
+		err = checkWebhookSetup(ctx, crudClient, namespace)
 		if err != nil {
 			return false, err
 		}
 	}
 
-	// Dry run object creation to check that webhook Service is correctly running
-	testCluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "readiness-check-" + rand.String(5),
-			Namespace: "default",
-		},
-		Spec: apiv1.ClusterSpec{
-			Instances: 3,
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size: "1Gi",
-			},
-		},
-	}
-	_, err = objects.Create(
-		ctx,
-		crudClient,
-		testCluster,
-		&client.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	)
-	if err != nil {
-		return false, err
-	}
-
-	return true, err
+	return isWebhookWorking(ctx, crudClient)
 }
 
-// IsDeploymentReady returns true if the operator deployment has the expected number
+// WaitForReady waits for the operator deployment to be ready.
+// If checkWebhook is true, it will also check that the webhook is replying
+func WaitForReady(
+	ctx context.Context,
+	crudClient client.Client,
+	timeoutSeconds uint,
+	checkWebhook bool,
+) error {
+	return retry.Do(
+		func() error {
+			ready, err := IsReady(ctx, crudClient, checkWebhook)
+			if err != nil || !ready {
+				return fmt.Errorf("operator deployment is not ready")
+			}
+			return nil
+		},
+		retry.Delay(time.Second),
+		retry.Attempts(timeoutSeconds),
+	)
+}
+
+// isDeploymentReady returns true if the operator deployment has the expected number
 // of ready pods.
 // It returns an error if there was a problem getting the operator deployment
-func IsDeploymentReady(ctx context.Context, crudClient client.Client) (bool, error) {
+func isDeploymentReady(ctx context.Context, crudClient client.Client) (bool, error) {
 	operatorDeployment, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return false, err
 	}
 
-	if operatorDeployment.Spec.Replicas != nil &&
-		operatorDeployment.Status.ReadyReplicas != *operatorDeployment.Spec.Replicas {
-		return false, fmt.Errorf("deployment not ready %v of %v ready",
-			operatorDeployment.Status.ReadyReplicas, operatorDeployment.Status.ReadyReplicas)
-	}
-
-	return true, nil
+	return deployments.IsReady(operatorDeployment), nil
 }
 
-// ScaleOperatorDeployment will scale the operator to n replicas and return error in case of failure
-func ScaleOperatorDeployment(ctx context.Context, crudClient client.Client, replicas int32) error {
+// ScaleOperatorDeployment will scale the operator to n replicas and return an error in case of failure
+func ScaleOperatorDeployment(
+	ctx context.Context, crudClient client.Client, replicas int32,
+) error {
 	operatorDeployment, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return err
@@ -291,20 +250,13 @@ func ScaleOperatorDeployment(ctx context.Context, crudClient client.Client, repl
 	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
 	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
 
-	// Scale down operator deployment to zero replicas
 	err = crudClient.Patch(ctx, &updatedOperatorDeployment, client.MergeFrom(&operatorDeployment))
 	if err != nil {
 		return err
 	}
 
-	return retry.Do(
-		func() error {
-			_, err := IsDeploymentReady(ctx, crudClient)
-			return err
-		},
-		retry.Delay(time.Second),
-		retry.Attempts(120),
-	)
+	// Wait for the operator deployment to be ready
+	return WaitForReady(ctx, crudClient, 120, replicas > 0)
 }
 
 // PodRenamed checks if the operator pod was renamed
