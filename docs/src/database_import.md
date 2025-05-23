@@ -241,6 +241,8 @@ There are a few things you need to be aware of when using the `monolith` type:
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
+- If the to be imported database is named `app` and has a different owner then `app`
+  you have to specify `initdb.import.owner` otherwise the default owner `app` will be used.
 
 ## Import optimizations
 
