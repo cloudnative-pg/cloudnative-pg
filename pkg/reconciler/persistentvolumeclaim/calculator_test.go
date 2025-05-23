@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -54,7 +55,7 @@ var _ = Describe("pvc role test", func() {
 
 		role := NewPgDataCalculator()
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgData))
-		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + configuration.Current.DataVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusInitializing))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName))
@@ -91,7 +92,7 @@ var _ = Describe("pvc role test", func() {
 
 		role := NewPgWalCalculator()
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgWal))
-		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.WalArchiveVolumeSuffix))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + configuration.Current.WalArchiveVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName + "-wal"))
