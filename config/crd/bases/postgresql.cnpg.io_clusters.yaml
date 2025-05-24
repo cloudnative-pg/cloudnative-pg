@@ -3939,6 +3939,9 @@ spec:
                           type: string
                       type: object
                     type: array
+                  podMonitorScrapeClass:
+                    description: Specifies the `PodMonitor` scrape class.
+                    type: string
                   tls:
                     description: |-
                       Configure TLS communication for the metrics endpoint.

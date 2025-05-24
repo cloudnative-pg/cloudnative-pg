@@ -65,6 +65,7 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 
 	spec := monitoringv1.PodMonitorSpec{
+		ScrapeClassName: c.pooler.Spec.Monitoring.GetPodMonitorScrapeClass(),
 		Selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				utils.PgbouncerNameLabel: c.pooler.Name,
