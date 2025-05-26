@@ -42,7 +42,7 @@ specification using the `logLevel` option. Available log levels are: `error`,
     Changes to the log level in the cluster specification after the cluster has
     started will only apply to new pods, not existing ones.
 
-## Operator Logs
+## Operator Logs {#operator-logs}
 
 The logs produced by the operator pod can be configured with log
 levels, same as instance pods: `error`, `warning`, `info` (default), `debug`,
@@ -51,6 +51,53 @@ and `trace`.
 The log level for the operator can be configured by editing the `Deployment`
 definition of the operator and setting the `--log-level` command line argument
 to the desired value.
+
+!!! Important
+    Changing the log-level of the operator will not affect the log level of the
+    [instance manager](/instance_manager/) or other components.
+
+### Adding a custom log-level
+Assuming you have installed the operator in the `cnpg-system` namespace, you can
+use the following command to set the log level to `trace`:
+```bash
+# Set desired log level
+target_arg="log-level"
+desired_log_level="trace"
+
+# Add log-level argument
+kubectl patch deployment cnpg-controller-manager -n cnpg-system --type=json \
+  -p="[{\"op\": \"add\", \"path\": \"/spec/template/spec/containers/0/args/-\", \"value\": \"--$target_arg=$desired_log_level\"}]"
+```
+
+### Changing a custom log-level
+```bash
+# Set target argument and desired log level
+target_arg="log-level"
+desired_log_level="debug"
+
+# Find index of current --log-level argument
+arg_index=$(kubectl get deployment cnpg-controller-manager -n cnpg-system -o jsonpath='{.spec.template.spec.containers[0].args}' | tr -d '[]"' | tr ',' '\n' | awk "/$target_arg/{print NR-1}")
+
+# Update existing --log-level argument
+kubectl patch deployment cnpg-controller-manager -n cnpg-system --type=json \
+-p="[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/args/$arg_index\", \"value\": \"--$target_arg=$desired_log_level\"}]"
+```
+
+### Removing a custom log-level
+To revert to the default log level (info), you can remove the custom log-level argument:
+```bash
+# Set target argument
+target_arg="log-level"
+
+# Find index of current --log-level argument
+arg_index=$(kubectl get deployment cnpg-controller-manager -n cnpg-system -o jsonpath='{.spec.template.spec.containers[0].args}' | tr -d '[]"' | tr ',' '\n' | awk "/$target_arg/{print NR-1}")
+
+# Remove --log-level argument (this will set the log level to the default: info)
+kubectl patch deployment cnpg-controller-manager -n cnpg-system --type=json \
+-p="[{\"op\": \"remove\", \"path\": \"/spec/template/spec/containers/0/args/$arg_index\"}]"
+```
+
+The operator pod will be restarted automatically to apply the new log level.
 
 ## PostgreSQL Logs
 
