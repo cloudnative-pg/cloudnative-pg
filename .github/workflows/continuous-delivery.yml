@@ -1877,6 +1877,9 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
