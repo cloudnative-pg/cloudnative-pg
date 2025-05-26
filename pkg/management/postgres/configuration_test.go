@@ -178,10 +178,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 
 	It("doesn't set temp_tablespaces if there are no declared tablespaces", func(ctx SpecContext) {
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&clusterWithoutTablespaces,
-			true,
-			defaultMajor,
+			ctx, &clusterWithoutTablespaces, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -190,10 +187,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 
 	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func(ctx SpecContext) {
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&clusterWithoutTemporaryTablespaces,
-			true,
-			defaultMajor,
+			ctx, &clusterWithoutTemporaryTablespaces, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -202,10 +196,7 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 
 	It("sets temp_tablespaces when there are temporary tablespaces", func(ctx SpecContext) {
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&clusterWithTemporaryTablespaces,
-			true,
-			defaultMajor,
+			ctx, &clusterWithTemporaryTablespaces, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -267,10 +258,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(primaryCluster.IsReplica()).To(BeFalse())
 
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&primaryCluster,
-			true,
-			defaultMajor,
+			ctx, &primaryCluster, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -281,10 +269,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(replicaCluster.IsReplica()).To(BeTrue())
 
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&replicaCluster,
-			true,
-			defaultMajor,
+			ctx, &replicaCluster, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -295,10 +280,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(replicaClusterWithNoDelay.IsReplica()).To(BeTrue())
 
 		config, _, err := createPostgresqlConfiguration(
-			ctx,
-			&replicaClusterWithNoDelay,
-			true,
-			defaultMajor,
+			ctx, &replicaClusterWithNoDelay, true, defaultMajor,
 			postgres.OperationType_TYPE_UNSPECIFIED,
 		)
 		Expect(err).ToNot(HaveOccurred())
