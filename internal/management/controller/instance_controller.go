@@ -131,7 +131,7 @@ func (r *InstanceReconciler) Reconcile(
 	requeueOnMissingPermissions := r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
-	r.reconcileMetrics(cluster)
+	r.reconcileMetrics(ctx, cluster)
 	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Verify that the promotion token is usable before changing the archive mode and triggering restarts
@@ -797,6 +797,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 
 // reconcileMetrics updates any required metrics
 func (r *InstanceReconciler) reconcileMetrics(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) {
 	exporter := r.metricsServerExporter
@@ -813,7 +814,7 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 
-	syncReplicas := replication.GetExpectedSyncReplicasNumber(cluster)
+	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
 
 	if cluster.IsReplica() {
