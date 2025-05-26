@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/openshift"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -123,7 +124,8 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		By("Applying the initial subscription", func() {
 			err := openshift.CreateSubscription(env.Ctx, env.Client, initialSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
+			Expect(operator.WaitForReady(env.Ctx, env.Client, uint(testTimeouts[timeouts.OperatorIsReady]),
+				true)).Should(Succeed())
 		})
 
 		// Gather the version and semantic Versions of the operator
@@ -155,7 +157,8 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 				return openshift.GetSubscriptionVersion(env.Ctx, env.Client)
 			}, 300).
 				ShouldNot(BeEquivalentTo(currentVersion))
-			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
+			Expect(operator.WaitForReady(env.Ctx, env.Client, uint(testTimeouts[timeouts.OperatorIsReady]),
+				true)).Should(Succeed())
 		})
 
 		// Check if the upgrade was successful by making sure all the pods
