@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -38,7 +37,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/strings/slices"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -451,23 +449,6 @@ func AssertConnection(
 			g.Expect(strings.TrimSpace(rawValue)).To(BeEquivalentTo("1"))
 		}, RetryTimeout).Should(Succeed())
 	})
-}
-
-// AssertOperatorIsReady verifies that the operator is ready
-func AssertOperatorIsReady(
-	ctx context.Context,
-	crudClient ctrlclient.Client,
-	kubeInterface kubernetes.Interface,
-) {
-	Eventually(func() (bool, error) {
-		ready, err := operator.IsReady(ctx, crudClient, kubeInterface)
-		if ready && err == nil {
-			return true, nil
-		}
-		// Waiting a bit to avoid overloading the API server
-		time.Sleep(1 * time.Second)
-		return ready, err
-	}, testTimeouts[timeouts.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
 }
 
 type TableLocator struct {

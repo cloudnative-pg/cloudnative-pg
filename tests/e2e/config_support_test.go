@@ -79,7 +79,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		err = env.Client.Delete(env.Ctx, secret)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = operator.ReloadDeployment(env.Ctx, env.Client, env.Interface, 120)
+		err = operator.ReloadDeployment(env.Ctx, env.Client, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -113,7 +113,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		}, 10).Should(HaveLen(1))
 
 		// Reload the operator with the new config
-		err = operator.ReloadDeployment(env.Ctx, env.Client, env.Interface, 120)
+		err = operator.ReloadDeployment(env.Ctx, env.Client, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

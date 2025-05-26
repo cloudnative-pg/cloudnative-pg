@@ -132,3 +132,32 @@ func DescribeKubernetesNodes(ctx context.Context, crudClient client.Client) (str
 	}
 	return report.String(), nil
 }
+
+// IsNodeReachable checks if a node is:
+// 1. Ready
+// 2. Not tainted with the unreachable taint
+func IsNodeReachable(
+	ctx context.Context,
+	crudClient client.Client,
+	nodeName string,
+) (bool, error) {
+	node := &v1.Node{}
+	err := crudClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
+	if err != nil {
+		return false, err
+	}
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady && condition.Status == v1.ConditionFalse {
+			return false, nil
+		}
+	}
+
+	// check that the node does not have the unreachable taint
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == v1.TaintNodeUnreachable {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
