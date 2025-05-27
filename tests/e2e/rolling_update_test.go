@@ -231,7 +231,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 10
 		Eventually(func() (string, error) {
 			endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, endpointName)
-			return testsUtils.FirstEndpointIP(endpointSlice), err
+			return testsUtils.FirstEndpointSliceIP(endpointSlice), err
 		}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
 	}
 

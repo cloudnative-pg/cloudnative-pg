@@ -1231,18 +1231,14 @@ func AssertFastFailOver(
 	// point there. We verify this.
 	By("having the current primary on node1", func() {
 		rwServiceName := clusterName + "-rw"
-
-		podName := clusterName + "-1"
-		pod := &corev1.Pod{}
-		podNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      podName,
-		}
 		endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, rwServiceName)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-		Expect(testsUtils.FirstEndpointIP(endpointSlice), err).To(
-			BeEquivalentTo(pod.Status.PodIP))
+
+		pod := &corev1.Pod{}
+		podName := clusterName + "-1"
+		err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: podName}, pod)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(testsUtils.FirstEndpointSliceIP(endpointSlice)).To(BeEquivalentTo(pod.Status.PodIP))
 	})
 
 	By("preparing the db for the test scenario", func() {
@@ -2216,11 +2212,10 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	poolerYamlFilePath string,
 	expectedPodCount int,
 ) {
-	var pgBouncerPods []*corev1.Pod
-	endpointSlice := &discoveryv1.EndpointSlice{}
 	poolerServiceName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 
+	endpointSlice := &discoveryv1.EndpointSlice{}
 	Eventually(func(g Gomega) {
 		var err error
 		endpointSlice, err = testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, poolerServiceName)
@@ -2235,6 +2230,7 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	Expect(err).ToNot(HaveOccurred())
 	Expect(endpointSlice.Endpoints).ToNot(BeEmpty())
 
+	var pgBouncerPods []*corev1.Pod
 	for _, endpoint := range endpointSlice.Endpoints {
 		ip := endpoint.Addresses[0]
 		for podIndex, pod := range podList.Items {

@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// FirstEndpointIP returns the IP of first Address in the Endpoint
-func FirstEndpointIP(endpoint *discoveryv1.EndpointSlice) string {
+// FirstEndpointSliceIP returns the IP of the first Address in the EndpointSlice
+func FirstEndpointSliceIP(endpoint *discoveryv1.EndpointSlice) string {
 	if endpoint == nil {
 		return ""
 	}

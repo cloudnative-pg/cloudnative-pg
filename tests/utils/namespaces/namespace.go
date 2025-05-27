@@ -319,10 +319,10 @@ func DumpNamespaceObjects(
 				Namespace: namespace,
 				Name:      cluster.Name + suffix,
 			}
-			endpoint := &discoveryv1.EndpointSlice{}
-			_ = crudClient.Get(ctx, namespacedName, endpoint)
-			out, _ := json.MarshalIndent(endpoint, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+			endpointSlice := &discoveryv1.EndpointSlice{}
+			_ = crudClient.Get(ctx, namespacedName, endpointSlice)
+			out, _ := json.MarshalIndent(endpointSlice, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpointSlice\n", namespace, endpointSlice.Name)
 			_, _ = fmt.Fprintln(w, string(out))
 		}
 	}
