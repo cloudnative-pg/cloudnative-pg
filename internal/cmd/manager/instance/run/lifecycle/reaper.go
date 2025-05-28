@@ -102,7 +102,7 @@ func (z *PostgresOrphansReaper) handleSignal(contextLogger log.Logger) error {
 	pidFile := path.Join(z.instance.PgData, postgres.PostgresqlPidFile)
 	_, postMasterPid, _ := z.instance.GetPostmasterPidFromFile(pidFile)
 	for _, p := range processes {
-		if p.PPid() == 1 && p.Executable() == "postgres" {
+		if p.PPid() == 1 && p.Executable() == postgres.GetPostgresExecutableName() {
 			pid := p.Pid()
 			if pid == postMasterPid {
 				continue

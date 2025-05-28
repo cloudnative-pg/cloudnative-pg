@@ -52,7 +52,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance := NewInstance()
 		instance.PgData = pgdata
 		instance.SocketDirectory = socketDir
-		process, err := instance.CheckForExistingPostmaster(postgresName)
+		process, err := instance.CheckForExistingPostmaster(GetPostgresExecutableName())
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(process).To(BeNil())
 	})
@@ -70,7 +70,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		err = os.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("1234"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		process, err := instance.CheckForExistingPostmaster(postgresName)
+		process, err := instance.CheckForExistingPostmaster(GetPostgresExecutableName())
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(process).To(BeNil())
 
