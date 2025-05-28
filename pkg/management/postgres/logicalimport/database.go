@@ -129,6 +129,9 @@ func (ds *databaseSnapshotter) importDatabases(
 	target pool.Pooler,
 	databases []string,
 	extraOptions []string,
+	predataOptions []string,
+	dataOptions []string,
+	postdataOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -162,7 +165,27 @@ func (ds *databaseSnapshotter) importDatabases(
 				generateFileNameForDatabase(database),
 			}
 
-			options = append(options, extraOptions...)
+			switch section {
+			case "pre-data":
+				if len(predataOptions) > 0 {
+					options = append(options, predataOptions...)
+				} else {
+					options = append(options, extraOptions...)
+				}
+			case "data":
+				if len(dataOptions) > 0 {
+					options = append(options, dataOptions...)
+				} else {
+					options = append(options, extraOptions...)
+				}
+			case "post-data":
+				if len(postdataOptions) > 0 {
+					options = append(options, postdataOptions...)
+				} else {
+					options = append(options, extraOptions...)
+				}
+			}
+
 			options = append(options, alwaysPresentOptions...)
 
 			contextLogger.Info("Running pg_restore",
@@ -187,6 +210,9 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 	targetDatabase string,
 	owner string,
 	extraOptions []string,
+	predataOptions []string,
+	dataOptions []string,
+	postdataOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -214,6 +240,27 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 
 		var options []string
 
+		switch section {
+		case "pre-data":
+			if len(predataOptions) > 0 {
+				options = append(options, predataOptions...)
+			} else {
+				options = append(options, extraOptions...)
+			}
+		case "data":
+			if len(dataOptions) > 0 {
+				options = append(options, dataOptions...)
+			} else {
+				options = append(options, extraOptions...)
+			}
+		case "post-data":
+			if len(postdataOptions) > 0 {
+				options = append(options, postdataOptions...)
+			} else {
+				options = append(options, extraOptions...)
+			}
+		}
+
 		alwaysPresentOptions := []string{
 			"-U", "postgres",
 			"--no-owner",
@@ -224,7 +271,6 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			generateFileNameForDatabase(database),
 		}
 
-		options = append(options, extraOptions...)
 		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
