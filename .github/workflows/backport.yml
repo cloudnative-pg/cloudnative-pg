@@ -11,6 +11,7 @@ on:
 permissions: read-all
 
 env:
+  # renovate: datasource=golang-version depName=golang versioning=loose
   GOLANG_VERSION: "1.24.x"
 
 jobs:
