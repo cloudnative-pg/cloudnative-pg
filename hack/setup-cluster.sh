@@ -264,7 +264,7 @@ deploy_fluentd() {
   ITER=0
   NODE=$(kubectl get nodes --no-headers | wc -l | tr -d " ")
   while true; do
-    if [[ $ITER -ge 300 ]]; then
+    if [[ $ITER -ge 600 ]]; then
       echo "Time out waiting for FluentD readiness"
       exit 1
     fi
@@ -324,7 +324,7 @@ deploy_csi_host_path() {
   echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
   while true; do
-    if [[ $ITER -ge 300 ]]; then
+    if [[ $ITER -ge 600 ]]; then
       echo "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
       exit 1
     fi
