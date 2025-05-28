@@ -115,24 +115,15 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	// Node 1 should be the primary, so the -rw service should
 	// point there. We verify this.
 	By("having the current primary on node1", func() {
-		endpointName := clusterName + "-rw"
-		endpoint := &corev1.Endpoints{}
-		endpointNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      endpointName,
-		}
+		rwServiceName := clusterName + "-rw"
+		endpointSlice, err := utils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, rwServiceName)
+		Expect(err).ToNot(HaveOccurred())
+
 		oldPrimary = clusterName + "-1"
 		pod := &corev1.Pod{}
-		podNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      oldPrimary,
-		}
-		err := env.Client.Get(env.Ctx, endpointNamespacedName,
-			endpoint)
+		err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: oldPrimary}, pod)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-		Expect(utils.FirstEndpointIP(endpoint), err).To(
-			BeEquivalentTo(pod.Status.PodIP))
+		Expect(utils.FirstEndpointSliceIP(endpointSlice)).To(BeEquivalentTo(pod.Status.PodIP))
 	})
 	By("preparing the db for the test scenario", func() {
 		// Create the table used by the scenario

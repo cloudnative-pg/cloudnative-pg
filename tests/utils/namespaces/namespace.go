@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	v1 "k8s.io/api/events/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -318,10 +319,10 @@ func DumpNamespaceObjects(
 				Namespace: namespace,
 				Name:      cluster.Name + suffix,
 			}
-			endpoint := &corev1.Endpoints{}
-			_ = crudClient.Get(ctx, namespacedName, endpoint)
-			out, _ := json.MarshalIndent(endpoint, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+			endpointSlice := &discoveryv1.EndpointSlice{}
+			_ = crudClient.Get(ctx, namespacedName, endpointSlice)
+			out, _ := json.MarshalIndent(endpointSlice, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpointSlice\n", namespace, endpointSlice.Name)
 			_, _ = fmt.Fprintln(w, string(out))
 		}
 	}
