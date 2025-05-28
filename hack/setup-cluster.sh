@@ -416,7 +416,7 @@ deploy_operator() {
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-r] <command> [-f <fluentd-timeout>] [-c <csi-timeout>]
+Usage: $0 [-k <version>] [-f <fluentd-timeout>] [-c <csi-timeout>] [-r] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -570,7 +570,7 @@ pyroscope() {
 main() {
   if ! getopt -T > /dev/null; then
     # GNU enhanced getopt is available
-    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry,fluentd-timeout:,csi-timeout:" -- "$@") || usage
   else
     # Original getopt is available
     parsed_opts=$(getopt e:k:n:r "$@") || usage
