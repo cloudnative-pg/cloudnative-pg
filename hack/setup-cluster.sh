@@ -606,7 +606,7 @@ main() {
       shift
       # no-op, kept for compatibility
       ;;
-    --fluentd-timeout)
+    -f | --fluentd-timeout)
         shift
         FLUENTD_TIMEOUT="$1"
         shift
@@ -616,7 +616,7 @@ main() {
         usage
         fi
         ;;
-    --csi-timeout)
+    -c | --csi-timeout)
         shift
         CSI_TIMEOUT="$1"
         shift
@@ -627,11 +627,11 @@ main() {
         fi
         ;;
     --)
-        shift
-        break
+      shift
+      break
         ;;
     esac
-done
+  done
 
   # Check if command is missing
   if [ "$#" -eq 0 ]; then
