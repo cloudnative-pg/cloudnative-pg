@@ -38,7 +38,7 @@ permissions: read-all
 env:
   GOLANG_VERSION: "1.24.x"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.27.0"
+  KIND_VERSION: "v0.29.0"
   ROOK_VERSION: "v1.17.1"
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.2.1"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -373,7 +373,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@76f9fa3a758507623da19f6092dc4089a7e61592 # v6
+        uses: docker/bake-action@37816e747588cb137173af99ab33873600c46ea8 # v6
         id: bake-push
         env:
           environment: "testing"
@@ -389,7 +389,7 @@ jobs:
       -
         name: Install cosign
         if: env.SIGN_IMAGES == 'true'
-        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
@@ -458,7 +458,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         id: build-prime
         if: |
           always() && !cancelled() &&
