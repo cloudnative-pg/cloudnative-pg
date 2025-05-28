@@ -35,6 +35,7 @@ import (
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -1229,24 +1230,15 @@ func AssertFastFailOver(
 	// Node 1 should be the primary, so the -rw service should
 	// point there. We verify this.
 	By("having the current primary on node1", func() {
-		endpointName := clusterName + "-rw"
-		endpoint := &corev1.Endpoints{}
-		endpointNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      endpointName,
-		}
-		podName := clusterName + "-1"
-		pod := &corev1.Pod{}
-		podNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      podName,
-		}
-		err = env.Client.Get(env.Ctx, endpointNamespacedName,
-			endpoint)
+		rwServiceName := clusterName + "-rw"
+		endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, rwServiceName)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-		Expect(testsUtils.FirstEndpointIP(endpoint), err).To(
-			BeEquivalentTo(pod.Status.PodIP))
+
+		pod := &corev1.Pod{}
+		podName := clusterName + "-1"
+		err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: podName}, pod)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(testsUtils.FirstEndpointSliceIP(endpointSlice)).To(BeEquivalentTo(pod.Status.PodIP))
 	})
 
 	By("preparing the db for the test scenario", func() {
@@ -2220,13 +2212,13 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	poolerYamlFilePath string,
 	expectedPodCount int,
 ) {
-	var pgBouncerPods []*corev1.Pod
-	endpoint := &corev1.Endpoints{}
-	endpointName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
+	poolerServiceName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 
+	endpointSlice := &discoveryv1.EndpointSlice{}
 	Eventually(func(g Gomega) {
-		err := env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: endpointName}, endpoint)
+		var err error
+		endpointSlice, err = testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, poolerServiceName)
 		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
@@ -2236,18 +2228,20 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
 		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 	Expect(err).ToNot(HaveOccurred())
-	Expect(endpoint.Subsets).ToNot(BeEmpty())
+	Expect(endpointSlice.Endpoints).ToNot(BeEmpty())
 
-	for _, ip := range endpoint.Subsets[0].Addresses {
+	var pgBouncerPods []*corev1.Pod
+	for _, endpoint := range endpointSlice.Endpoints {
+		ip := endpoint.Addresses[0]
 		for podIndex, pod := range podList.Items {
-			if pod.Status.PodIP == ip.IP {
+			if pod.Status.PodIP == ip {
 				pgBouncerPods = append(pgBouncerPods, &podList.Items[podIndex])
 				continue
 			}
 		}
 	}
 
-	Expect(pgBouncerPods).Should(HaveLen(expectedPodCount), "Pod length or IP mismatch in ep")
+	Expect(pgBouncerPods).Should(HaveLen(expectedPodCount), "Pod length or IP mismatch in endpoint")
 }
 
 // assertPGBouncerHasServiceNameInsideHostParameter makes sure that the service name is contained inside the host file
