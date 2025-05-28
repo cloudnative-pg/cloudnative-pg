@@ -1,23 +1,21 @@
 # Contributing to CloudNativePG
 
-Welcome! We are glad that you want to contribute to our CloudNativePG project! 💖
+Welcome! We are glad that you want to contribute to the CloudNativePG project! 💖
 
-As you get started, you are in the best position to give us feedbacks on areas of
-our project that we need help with, including:
+To get started, here's some areas the project could really use some help with:
 
 * Problems found while setting up the development environment
 * Gaps in our documentation
-* Bugs in our Github actions
+* Bugs in our GitHub actions
 * Promotion of PostgreSQL on Kubernetes with our operator
 
 First, though, it is important that you read the
 [code of conduct](CODE_OF_CONDUCT.md).
 
 The guidelines below are a starting point. We don't want to limit your
-creativity, passion, and initiative. If you think there's a better way, please
-feel free to bring it up in a Github discussion, or open a pull request. We're
-certain there are always better ways to do things, we just need to start some
-constructive dialogue!
+creativity, passion, and initiative. If you think there are other things 
+you can contribute, please feel free to bring it up in a GitHub Issue, 
+or open a Pull Request!
 
 ## Ways to contribute
 
@@ -28,10 +26,10 @@ We welcome many types of contributions including:
 * Bug fixes
 * [Documentation](docs/README.md)
 * Issue Triage
-* Answering questions on Slack or Github Discussions
-* [Website](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
+* Answering questions on [Slack](README.md#communications) or GitHub Discussions
+* The [website](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
 * Communications / Social Media / Blog Posts
-* Events participation
+* Advocacy at Events (let us know when your talk about CloudNativePG is accepted!)
 * Release management
 
 For development contributions, please refer to the separate section called
@@ -40,16 +38,16 @@ For development contributions, please refer to the separate section called
 ## Ask for Help
 
 The best way to reach us with a question when contributing is to drop a line in
-our [Slack channel](README.md#communications), or start a new Github discussion.
+our [Slack channel](README.md#communications), or start a new GitHub discussion.
 
 ## Raising Issues
 
-When raising issues, please specify the following:
+When raising [Issues](https://github.com/cloudnative-pg/cloudnative-pg/issues), please specify the following:
 
-- Setup details as specified in the issue template
-- A scenario where the issue occurred (with details on how to reproduce it)
-- Errors and log messages that are displayed by the involved software
-- Any other detail that might be useful
+* Setup details as specified in the Issue template
+* A scenario where the issue occurred (with details on how to reproduce it)
+* Errors and log messages that are displayed by the involved software
+* Any other detail that might be useful
 
 If you are trying to report a vulnerability, please refer to the
 [security policy](SECURITY.md).
