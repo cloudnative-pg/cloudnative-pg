@@ -567,6 +567,11 @@ func (p *PgConfiguration) GetConfigurationParameters() map[string]string {
 	return p.configs
 }
 
+// SetConfigurationParameters sets the configuration parameters
+func (p *PgConfiguration) SetConfigurationParameters(configs map[string]string) {
+	p.configs = configs
+}
+
 // OverwriteConfig overwrites a configuration in the map, given the key/value pair.
 // If the map is nil, it is created and the pair is added
 func (p *PgConfiguration) OverwriteConfig(key, value string) {
