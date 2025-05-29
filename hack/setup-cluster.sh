@@ -573,7 +573,7 @@ main() {
     parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry,fluentd-timeout:,csi-timeout:" -- "$@") || usage
   else
     # Original getopt is available
-    parsed_opts=$(getopt e:k:n:r:f:c "$@") || usage
+    parsed_opts=$(getopt e:k:n:f:c:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
   for o; do
@@ -629,7 +629,7 @@ main() {
     --)
       shift
       break
-        ;;
+      ;;
     esac
   done
 
