@@ -75,6 +75,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertsCASecret
@@ -140,6 +141,7 @@ DisabledDefaultServices
 DoD
 DockerHub
 Dockle
+eBPF
 EBS
 EDB
 EKS
@@ -209,6 +211,7 @@ Innocenti
 InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
+Isovalent
 Istio
 Istio's
 JSON
@@ -268,6 +271,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicy
 Niccolò
 NodeAffinity
 NodeMaintenanceWindow
