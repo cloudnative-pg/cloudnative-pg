@@ -340,7 +340,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("can bootstrap a replica cluster from a backup", Ordered, Label(tests.LabelBackupRestore), func() {
+	Context("can bootstrap a replica cluster from a backup", Label(tests.LabelBackupRestore), Ordered, func() {
 		const (
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
