@@ -59,7 +59,6 @@ import (
 )
 
 const (
-	postgresName      = "postgres"
 	pgCtlName         = "pg_ctl"
 	pgRewindName      = "pg_rewind"
 	pgBaseBackupName  = "pg_basebackup"
@@ -72,6 +71,15 @@ const (
 	pqPingNoResponse = 2 // could not establish connection
 	pgPingNoAttempt  = 3 // connection not attempted (bad params)
 )
+
+// GetPostgresExecutableName returns the name of the PostgreSQL executable
+func GetPostgresExecutableName() string {
+	if name := os.Getenv("POSTGRES_NAME"); name != "" {
+		return name
+	}
+
+	return "postgres"
+}
 
 // shutdownMode represent a way to request the postmaster shutdown
 type shutdownMode string
@@ -670,7 +678,7 @@ func (instance *Instance) Reload(ctx context.Context) error {
 // Run this instance returning an OS process needed
 // to control the instance execution
 func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
-	process, err := instance.CheckForExistingPostmaster(postgresName)
+	process, err := instance.CheckForExistingPostmaster(GetPostgresExecutableName())
 	if err != nil {
 		return nil, err
 	}
@@ -703,11 +711,11 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 		return nil, err
 	}
 
-	postgresCmd := exec.Command(postgresName, options...) // #nosec
+	postgresCmd := exec.Command(GetPostgresExecutableName(), options...) // #nosec
 	postgresCmd.Env = instance.Env
 	compatibility.AddInstanceRunCommands(postgresCmd)
 
-	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
+	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, GetPostgresExecutableName())
 	if err != nil {
 		return nil, err
 	}
