@@ -74,7 +74,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 		return false, err
 	}
 
-	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgMajor)
+	postgresConfiguration, sha256 := createPostgresqlConfiguration(ctx, cluster, preserveUserSettings, pgMajor)
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,
@@ -379,6 +379,7 @@ func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (chan
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be
 // used for this cluster and return it and its sha256 checksum
 func createPostgresqlConfiguration(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 	majorVersion int,
@@ -392,7 +393,7 @@ func createPostgresqlConfiguration(
 		IsReplicaCluster:                 cluster.IsReplica(),
 		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
 		IsAlterSystemEnabled:             cluster.Spec.PostgresConfiguration.EnableAlterSystem,
-		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(cluster),
+		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(ctx, cluster),
 	}
 
 	if preserveUserSettings {
