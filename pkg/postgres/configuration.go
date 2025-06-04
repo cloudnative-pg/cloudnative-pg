@@ -99,9 +99,9 @@ const (
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
@@ -133,6 +133,12 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 # Grant local access ('local' user map)
 local {{.Username}} postgres
+
+# Grant streaming_replica access ('cnpg_streaming_replica' user map)
+cnpg_streaming_replica streaming_replica streaming_replica
+
+# Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
+cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
