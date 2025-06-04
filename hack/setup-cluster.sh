@@ -570,7 +570,7 @@ pyroscope() {
 main() {
   if ! getopt -T > /dev/null; then
     # GNU enhanced getopt is available
-    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry,fluentd-timeout:,csi-timeout:" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:f:c:r -l "engine:,k8s-version:,nodes:,registry,fluentd-timeout:,csi-timeout:" -- "$@") || usage
   else
     # Original getopt is available
     parsed_opts=$(getopt e:k:n:f:c:r "$@") || usage
