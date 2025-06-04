@@ -2289,7 +2289,7 @@ TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
 WAL file, and Time of latest checkpoint</p>
 </td>
 </tr>
-<tr><td><code>systemID</code> <B>[Required]</B><br/>
+<tr><td><code>systemID</code><br/>
 <i>string</i>
 </td>
 <td>

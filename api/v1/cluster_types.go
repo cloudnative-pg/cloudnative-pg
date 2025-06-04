@@ -958,6 +958,7 @@ type ClusterStatus struct {
 	DemotionToken string `json:"demotionToken,omitempty"`
 
 	// SystemID is the latest detected PostgreSQL SystemID
+	// +optional
 	SystemID string `json:"systemID,omitempty"`
 }
 

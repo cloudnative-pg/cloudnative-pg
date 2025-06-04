@@ -753,7 +753,6 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	statuses postgres.PostgresqlStatusList,
 ) error {
 	existingClusterStatus := cluster.Status
-
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
 	// we extract the instances reported state
@@ -779,23 +778,29 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	}
 
 	// we update the system ID field in the cluster status
-	switch {
-	case detectedSystemID.Len() == 0:
+	switch detectedSystemID.Len() {
+	case 0:
 		cluster.Status.SystemID = ""
+
+		message := "No instances are present in the cluster to report a system ID."
+		if len(statuses.Items) > 0 {
+			message = "Instances are present, but none have reported a system ID."
+		}
+
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionFalse,
-			Reason:  "EmptyCluster",
-			Message: "Cluster has no instances",
+			Reason:  "NotFound",
+			Message: message,
 		})
 
-	case detectedSystemID.Len() == 1:
+	case 1:
 		cluster.Status.SystemID = detectedSystemID.ToList()[0]
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
 			Status:  metav1.ConditionTrue,
-			Reason:  "AllInstancesAgree",
-			Message: "All instances report the same system ID",
+			Reason:  "Unique",
+			Message: "A single, unique system ID was found across reporting instances.",
 		})
 
 	default:
@@ -803,9 +808,9 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		cluster.Status.SystemID = ""
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    string(apiv1.ConditionConsistentSystemID),
-			Status:  metav1.ConditionTrue,
-			Reason:  "MismatchDetected",
-			Message: fmt.Sprintf("Instance system IDs differ: %q", detectedSystemID.ToSortedList()),
+			Status:  metav1.ConditionFalse,
+			Reason:  "Mismatch",
+			Message: fmt.Sprintf("Multiple differing system IDs reported by instances: %q", detectedSystemID.ToSortedList()),
 		})
 	}
 
