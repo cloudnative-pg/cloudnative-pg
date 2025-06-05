@@ -9,7 +9,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.3.1
-	github.com/cloudnative-pg/cnpg-i v0.2.1
+	github.com/cloudnative-pg/cnpg-i v0.2.2-0.20250604112552-98f6620152b1
 	github.com/cloudnative-pg/machinery v0.2.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.11
@@ -36,7 +36,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.32.0
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.72.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.1
 	k8s.io/apiextensions-apiserver v0.33.1
