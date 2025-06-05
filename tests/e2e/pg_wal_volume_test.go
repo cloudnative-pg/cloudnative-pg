@@ -55,7 +55,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 		By("checking that pg_wal PVC has been created", func() {
 			for _, pod := range podList.Items {
-				pvcName := pod.GetName() + "-wal"
+				pvcName := pod.GetName() + testWalArchiveVolumeSuffix
 				pvc := &corev1.PersistentVolumeClaim{}
 				namespacedPVCName := types.NamespacedName{
 					Namespace: namespace,
