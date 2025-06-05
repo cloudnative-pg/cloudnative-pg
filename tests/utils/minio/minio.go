@@ -50,8 +50,8 @@ import (
 )
 
 const (
-	minioImage       = "minio/minio:RELEASE.2022-06-20T23-13-45Z"
-	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
+	minioImage       = "minio/minio:RELEASE.2025-05-24T17-08-30Z"
+	minioClientImage = "minio/mc:RELEASE.2025-05-21T01-59-54Z"
 )
 
 // Env contains all the information related or required by MinIO deployment and
