@@ -176,7 +176,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 					}, "postgres",
 					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
-				Expect(strings.TrimSpace(stdout), err).To(Equal("C.utf8"))
+				Expect(strings.TrimSpace(stdout), err).To(Equal("C"))
 			})
 		})
 	})

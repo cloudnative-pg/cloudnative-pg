@@ -5,7 +5,7 @@ metadata:
 spec:
   name: declarative
   owner: app
-  localeCType: "C.utf8"
+  localeCType: C
   localeCollate: C
   encoding: SQL_ASCII
   template: template0
