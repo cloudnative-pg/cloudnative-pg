@@ -2289,6 +2289,13 @@ TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
 WAL file, and Time of latest checkpoint</p>
 </td>
 </tr>
+<tr><td><code>systemID</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>SystemID is the latest detected PostgreSQL SystemID</p>
+</td>
+</tr>
 </tbody>
 </table>
 
