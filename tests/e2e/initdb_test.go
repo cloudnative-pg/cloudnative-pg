@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"strings"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
@@ -179,7 +181,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 					}, exec.DatabaseName("postgres"),
 					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
-				Expect(stdout, err).To(Equal("en_US.utf8\n"))
+				Expect(strings.TrimSpace(stdout), err).To(Equal("C"))
 			})
 		})
 	})
