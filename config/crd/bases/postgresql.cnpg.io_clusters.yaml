@@ -6338,6 +6338,9 @@ spec:
                       of switching a cluster to a replica cluster.
                     type: boolean
                 type: object
+              systemID:
+                description: SystemID is the latest detected PostgreSQL SystemID
+                type: string
               tablespacesStatus:
                 description: TablespacesStatus reports the state of the declarative
                   tablespaces in the cluster

@@ -28,9 +28,11 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -762,12 +764,53 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	}
 
 	// we update any relevant cluster status that depends on the primary instance
+	detectedSystemID := stringset.New()
 	for _, item := range statuses.Items {
 		// we refresh the last known timeline on the status root.
 		// This avoids to have a zero timeline id in case that no primary instance is up during reconciliation.
 		if item.IsPrimary && item.TimeLineID != 0 {
 			cluster.Status.TimelineID = item.TimeLineID
 		}
+		if item.SystemID != "" {
+			detectedSystemID.Put(item.SystemID)
+		}
+	}
+
+	// we update the system ID field in the cluster status
+	switch detectedSystemID.Len() {
+	case 0:
+		cluster.Status.SystemID = ""
+
+		message := "No instances are present in the cluster to report a system ID."
+		if len(statuses.Items) > 0 {
+			message = "Instances are present, but none have reported a system ID."
+		}
+
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionConsistentSystemID),
+			Status:  metav1.ConditionFalse,
+			Reason:  "NotFound",
+			Message: message,
+		})
+
+	case 1:
+		cluster.Status.SystemID = detectedSystemID.ToList()[0]
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionConsistentSystemID),
+			Status:  metav1.ConditionTrue,
+			Reason:  "Unique",
+			Message: "A single, unique system ID was found across reporting instances.",
+		})
+
+	default:
+		// the instances are reporting an inconsistent system ID
+		cluster.Status.SystemID = ""
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    string(apiv1.ConditionConsistentSystemID),
+			Status:  metav1.ConditionFalse,
+			Reason:  "Mismatch",
+			Message: fmt.Sprintf("Multiple differing system IDs reported by instances: %q", detectedSystemID.ToSortedList()),
+		})
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
