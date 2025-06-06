@@ -853,6 +853,10 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+
+	// SystemID is the latest detected PostgreSQL SystemID
+	// +optional
+	SystemID string `json:"systemID,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -876,6 +880,9 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+	// ConditionConsistentSystemID is true when the all the instances of the
+	// cluster report the same System ID.
+	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
 )
 
 // ConditionStatus defines conditions of resources

@@ -5457,6 +5457,9 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              systemID:
+                description: SystemID is the latest detected PostgreSQL SystemID
+                type: string
               tablespacesStatus:
                 description: TablespacesStatus reports the state of the declarative
                   tablespaces in the cluster

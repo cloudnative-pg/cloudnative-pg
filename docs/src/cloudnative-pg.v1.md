@@ -1892,6 +1892,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
 </td>
 </tr>
+<tr><td><code>systemID</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>SystemID is the latest detected PostgreSQL SystemID</p>
+</td>
+</tr>
 </tbody>
 </table>
 

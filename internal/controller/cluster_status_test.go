@@ -24,11 +24,14 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -172,5 +175,214 @@ var _ = Describe("cluster_status unit tests", func() {
 					len(mr.pvcs.Items) == len(pvcs)
 			}))
 		})
+	})
+})
+
+var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
+	var (
+		env     *testingEnvironment
+		cluster *v1.Cluster
+	)
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		cluster = newFakeCNPGCluster(env.client, newFakeNamespace(env.client))
+	})
+
+	It("should handle empty status list", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(BeEmpty())
+		Expect(cluster.Status.SystemID).To(BeEmpty())
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, string(v1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal("NotFound"))
+		Expect(condition.Message).To(Equal("No instances are present in the cluster to report a system ID."))
+	})
+
+	It("should handle instances without SystemID", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+					SystemID:   "",
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary: false,
+					SystemID:  "",
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		Expect(cluster.Status.TimelineID).To(Equal(123))
+		Expect(cluster.Status.SystemID).To(BeEmpty())
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, string(v1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal("NotFound"))
+		Expect(condition.Message).To(Equal("Instances are present, but none have reported a system ID."))
+	})
+
+	It("should handle instances with a single SystemID", func(ctx SpecContext) {
+		const systemID = "system123"
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+					SystemID:   systemID,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary: false,
+					SystemID:  systemID,
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		Expect(cluster.Status.TimelineID).To(Equal(123))
+		Expect(cluster.Status.SystemID).To(Equal(systemID))
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, string(v1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(condition.Reason).To(Equal("Unique"))
+		Expect(condition.Message).To(Equal("A single, unique system ID was found across reporting instances."))
+	})
+
+	It("should handle instances with multiple SystemIDs", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+					SystemID:   "system1",
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary: false,
+					SystemID:  "system2",
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+		Expect(cluster.Status.TimelineID).To(Equal(123))
+		Expect(cluster.Status.SystemID).To(BeEmpty())
+
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, string(v1.ConditionConsistentSystemID))
+		Expect(condition).ToNot(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal("Mismatch"))
+		Expect(condition.Message).To(ContainSubstring("Multiple differing system IDs reported by instances:"))
+		Expect(condition.Message).To(ContainSubstring("system1"))
+		Expect(condition.Message).To(ContainSubstring("system2"))
+	})
+
+	It("should update timeline ID from the primary instance", func(ctx SpecContext) {
+		const timelineID = 999
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: timelineID,
+					SystemID:   "system1",
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 123,
+					SystemID:   "system1",
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.TimelineID).To(Equal(timelineID))
+	})
+
+	It("should correctly populate InstancesReportedState", func(ctx SpecContext) {
+		statuses := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.1"},
+					},
+					IsPrimary:  true,
+					TimeLineID: 123,
+				},
+				{
+					Pod: &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+						Status:     corev1.PodStatus{PodIP: "192.168.1.2"},
+					},
+					IsPrimary:  false,
+					TimeLineID: 123,
+				},
+			},
+		}
+
+		err := env.clusterReconciler.updateClusterStatusThatRequiresInstancesState(ctx, cluster, statuses)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.InstancesReportedState).To(HaveLen(2))
+
+		state1 := cluster.Status.InstancesReportedState["pod-1"]
+		Expect(state1.IsPrimary).To(BeTrue())
+		Expect(state1.TimeLineID).To(Equal(123))
+
+		state2 := cluster.Status.InstancesReportedState["pod-2"]
+		Expect(state2.IsPrimary).To(BeFalse())
+		Expect(state2.TimeLineID).To(Equal(123))
 	})
 })
