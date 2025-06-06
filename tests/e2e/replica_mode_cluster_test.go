@@ -135,7 +135,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("archive mode set to 'always' on designated primary", func() {
+	Context("archive mode set to 'always' on designated primary", Label(tests.LabelBackupRestore), func() {
 		It("verifies replica cluster can archive WALs from the designated primary", func() {
 			const (
 				replicaClusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
@@ -206,7 +206,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("can bootstrap a replica cluster from a backup", Ordered, func() {
+	Context("can bootstrap a replica cluster from a backup", Label(tests.LabelBackupRestore), Ordered, func() {
 		const (
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
