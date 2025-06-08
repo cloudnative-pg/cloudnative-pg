@@ -175,18 +175,18 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 		},
 	}
 
-	It("doesn't set temp_tablespaces if there are no declared tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithoutTablespaces, true, defaultMajor)
+	It("doesn't set temp_tablespaces if there are no declared tablespaces", func(ctx SpecContext) {
+		config, _ := createPostgresqlConfiguration(ctx, &clusterWithoutTablespaces, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
-	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true, defaultMajor)
+	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func(ctx SpecContext) {
+		config, _ := createPostgresqlConfiguration(ctx, &clusterWithoutTemporaryTablespaces, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
-	It("sets temp_tablespaces when there are temporary tablespaces", func() {
-		config, _ := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true, defaultMajor)
+	It("sets temp_tablespaces when there are temporary tablespaces", func(ctx SpecContext) {
+		config, _ := createPostgresqlConfiguration(ctx, &clusterWithTemporaryTablespaces, true, defaultMajor)
 		Expect(config).To(ContainSubstring("temp_tablespaces = 'other_temporary_tablespace,temporary_tablespace'"))
 	})
 })
@@ -241,24 +241,24 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		},
 	}
 
-	It("do not set recovery_min_apply_delay in primary clusters", func() {
+	It("do not set recovery_min_apply_delay in primary clusters", func(ctx SpecContext) {
 		Expect(primaryCluster.IsReplica()).To(BeFalse())
 
-		config, _ := createPostgresqlConfiguration(&primaryCluster, true, defaultMajor)
+		config, _ := createPostgresqlConfiguration(ctx, &primaryCluster, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 
-	It("set recovery_min_apply_delay in replica clusters when set", func() {
+	It("set recovery_min_apply_delay in replica clusters when set", func(ctx SpecContext) {
 		Expect(replicaCluster.IsReplica()).To(BeTrue())
 
-		config, _ := createPostgresqlConfiguration(&replicaCluster, true, defaultMajor)
+		config, _ := createPostgresqlConfiguration(ctx, &replicaCluster, true, defaultMajor)
 		Expect(config).To(ContainSubstring("recovery_min_apply_delay = '3600s'"))
 	})
 
-	It("do not set recovery_min_apply_delay in replica clusters when not set", func() {
+	It("do not set recovery_min_apply_delay in replica clusters when not set", func(ctx SpecContext) {
 		Expect(replicaClusterWithNoDelay.IsReplica()).To(BeTrue())
 
-		config, _ := createPostgresqlConfiguration(&replicaClusterWithNoDelay, true, defaultMajor)
+		config, _ := createPostgresqlConfiguration(ctx, &replicaClusterWithNoDelay, true, defaultMajor)
 		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 })
