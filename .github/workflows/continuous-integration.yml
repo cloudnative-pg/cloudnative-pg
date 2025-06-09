@@ -187,7 +187,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Validate Renovate JSON
-        run:  npx --yes --package renovate -- renovate-config-validator
+        run: npx --yes --package renovate@40.48.6 -- renovate-config-validator
 
   go-vulncheck:
     name: Run govulncheck
