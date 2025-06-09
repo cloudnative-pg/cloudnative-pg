@@ -33,14 +33,17 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -447,6 +450,15 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	defer pluginCli.Close(ctx)
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
+
 	coredumpFilter := cluster.GetCoredumpFilter()
 	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
@@ -464,7 +476,12 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Import != nil
 
-	if applied, err := instance.RefreshConfigurationFilesFromCluster(ctx, cluster, true); err != nil {
+	if applied, err := instance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		cluster,
+		true,
+		postgres.OperationType_TYPE_INIT,
+	); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")
