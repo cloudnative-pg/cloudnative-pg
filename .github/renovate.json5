@@ -157,6 +157,18 @@
       datasourceTemplate: 'docker',
       versioningTemplate: 'loose',
     },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^tests\\/utils\\/minio\\/minio\\.go$',
+      ],
+      matchStrings: [
+        'minioImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'minioClientImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$"
+    },
   ],
   packageRules: [
     {
@@ -267,6 +279,7 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
+        'minio{/,}**'
       ],
     },
     {
