@@ -54,7 +54,7 @@ POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.17.3
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.9.0
