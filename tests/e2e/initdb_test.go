@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"strings"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
