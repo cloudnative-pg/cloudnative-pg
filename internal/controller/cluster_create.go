@@ -571,8 +571,10 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 			return fmt.Errorf("while getting service account: %w", err)
 		}
 
-		r.Recorder.Event(cluster, "Normal", "CreatingServiceAccount", "Creating ServiceAccount")
-		return r.createServiceAccount(ctx, cluster)
+		if cluster.Spec.ServiceAccount.Create {
+			r.Recorder.Event(cluster, "Normal", "CreatingServiceAccount", "Creating ServiceAccount")
+			return r.createServiceAccount(ctx, cluster)
+		}
 	}
 
 	generatedPullSecretNames, err := r.generateServiceAccountPullSecretsNames(ctx, cluster)
@@ -587,7 +589,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	}
 	// we add the ownerMetadata only when creating the SA
 	cluster.SetInheritedData(&sa.ObjectMeta)
-	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
+	cluster.Spec.ServiceAccount.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
 		return nil
@@ -608,10 +610,21 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while generating pull secret names: %w", err)
 	}
 
+	var serviceAccountName string
+	if cluster.Spec.ServiceAccount.Name != "" {
+		// If the user specified a name, we use it
+		serviceAccountName = cluster.Spec.ServiceAccount.Name
+	} else {
+		// Otherwise we use the cluster name
+		serviceAccountName = cluster.Name
+	}
+
 	serviceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
+			Namespace:   cluster.Namespace,
+			Name:        serviceAccountName,
+			Labels:      cluster.Spec.ServiceAccount.Labels,
+			Annotations: cluster.Spec.ServiceAccount.Annotations,
 		},
 	}
 	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount)
@@ -620,7 +633,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 	}
 
 	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta)
-	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
+	cluster.Spec.ServiceAccount.MergeMetadata(serviceAccount)
 
 	err = r.Create(ctx, serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {

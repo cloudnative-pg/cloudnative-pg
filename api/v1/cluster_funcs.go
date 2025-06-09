@@ -118,7 +118,7 @@ func (e *EphemeralVolumesSizeLimitConfiguration) GetTemporaryDataLimit() *resour
 }
 
 // MergeMetadata adds the passed custom annotations and labels in the service account.
-func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
+func (st *ServiceAccount) MergeMetadata(sa *corev1.ServiceAccount) {
 	if st == nil {
 		return
 	}
@@ -129,8 +129,8 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 		sa.Annotations = map[string]string{}
 	}
 
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+	utils.MergeMap(sa.Labels, st.Labels)
+	utils.MergeMap(sa.Annotations, st.Annotations)
 }
 
 // MatchesTopology checks if the two topologies have
