@@ -92,8 +92,9 @@ func ComparePodSpecs(
 			return currentPodSpec.Hostname == targetPodSpec.Hostname
 		},
 		"termination-grace-period": func() bool {
-			return currentPodSpec.TerminationGracePeriodSeconds == nil && targetPodSpec.TerminationGracePeriodSeconds == nil ||
-				*currentPodSpec.TerminationGracePeriodSeconds == *targetPodSpec.TerminationGracePeriodSeconds
+			return (currentPodSpec.TerminationGracePeriodSeconds == nil && targetPodSpec.TerminationGracePeriodSeconds == nil) ||
+				(currentPodSpec.TerminationGracePeriodSeconds != nil && targetPodSpec.TerminationGracePeriodSeconds != nil &&
+					*currentPodSpec.TerminationGracePeriodSeconds == *targetPodSpec.TerminationGracePeriodSeconds)
 		},
 	}
 

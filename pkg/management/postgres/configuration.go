@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 
+	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -68,13 +70,23 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
+	operationType postgresClient.OperationType_Type,
 ) (bool, error) {
 	pgMajor, err := postgresutils.GetMajorVersionFromPgData(instance.PgData)
 	if err != nil {
 		return false, err
 	}
 
-	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgMajor)
+	postgresConfiguration, sha256, err := createPostgresqlConfiguration(
+		ctx,
+		cluster,
+		preserveUserSettings,
+		pgMajor,
+		operationType,
+	)
+	if err != nil {
+		return false, fmt.Errorf("creating postgresql configuration: %w", err)
+	}
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,
@@ -379,10 +391,12 @@ func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (chan
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be
 // used for this cluster and return it and its sha256 checksum
 func createPostgresqlConfiguration(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 	majorVersion int,
-) (string, string) {
+	operationType postgresClient.OperationType_Type,
+) (string, string, error) {
 	info := postgres.ConfigurationInfo{
 		Settings:                         postgres.CnpgConfigurationSettings,
 		MajorVersion:                     majorVersion,
@@ -417,7 +431,13 @@ func createPostgresqlConfiguration(
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
-	return postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
+	config, err := plugin.CreatePostgresqlConfigurationWithPlugins(ctx, info, operationType)
+	if err != nil {
+		return "", "", err
+	}
+
+	file, sha := postgres.CreatePostgresqlConfFile(config)
+	return file, sha, nil
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import

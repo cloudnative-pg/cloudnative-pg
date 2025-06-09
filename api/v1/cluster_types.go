@@ -970,6 +970,10 @@ type ClusterStatus struct {
 	// WAL file, and Time of latest checkpoint
 	// +optional
 	DemotionToken string `json:"demotionToken,omitempty"`
+
+	// SystemID is the latest detected PostgreSQL SystemID
+	// +optional
+	SystemID string `json:"systemID,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
@@ -1010,6 +1014,9 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+	// ConditionConsistentSystemID is true when the all the instances of the
+	// cluster report the same System ID.
+	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
 )
 
 // ConditionStatus defines conditions of resources
