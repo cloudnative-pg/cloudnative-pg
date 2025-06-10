@@ -252,6 +252,105 @@ There are a few things you need to be aware of when using the `monolith` type:
   database.
 - `postImportApplicationSQL` field is not supported
 
+## Comparing microservice vs monolith imports
+
+There is nothing to stop you from using the `monolith` approach to import a
+single database. It is interesting to see how the results of doing so would
+differ from using the `microservice` approach.
+
+Given a source cluster, for example the following, with a database named
+`mydb` owned by role `me`:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 1
+
+  postgresql:
+    pg_hba:
+      - host all all all trust
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: mydb
+      owner: me
+```
+
+We can import it via `microservice`:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-microservice
+spec:
+  instances: 1
+  
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - mydb
+        source:
+          externalCluster: cluster-example
+
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw
+        dbname: postgres
+```
+
+as well as via monolith:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-monolith
+spec:
+  instances: 1
+  
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: monolith
+        databases:
+          - mydb
+        roles:
+          - me
+        source:
+          externalCluster: cluster-example
+
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw
+        dbname: postgres
+```
+
+In both cases, the database's contents will be imported, but:
+
+- In the microservice case, the database and owner both become `app`. You can
+  configure the database and onwer via the `bootstrap.initdb` stanza's
+  `database` and `owner` fields, as always
+- In the monolith case, the database and owner as kept as in the source cluster,
+  i.e. `mydb` and `me` respectivelly. No `app` database nor user will be
+  created.
+
 ## Import optimizations
 
 During the logical import of a database, CloudNativePG optimizes the
