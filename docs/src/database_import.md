@@ -234,7 +234,8 @@ There are a few things you need to be aware of when using the `monolith` type:
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
 - Currently, the `pg_dump -Fd` result is stored temporarily inside the `dumps`
-  folder in the `PGDATA` volume, so there should be enough available space to
+  folder in the `PGDATA` volume of the destination cluster's instances, so
+  there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
   restored data and indexes. Once the import operation is completed, this
   folder is automatically deleted by the operator.
@@ -250,7 +251,7 @@ There are a few things you need to be aware of when using the `monolith` type:
   and those databases not allowing connections
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
-- `postImportApplicationSQL` field is not supported
+- The `postImportApplicationSQL` field is not supported
 
 ## Comparing microservice vs monolith imports
 
@@ -345,10 +346,10 @@ spec:
 In both cases, the database's contents will be imported, but:
 
 - In the microservice case, the database and owner both become `app`. You can
-  configure the database and onwer via the `bootstrap.initdb` stanza's
-  `database` and `owner` fields, as always
-- In the monolith case, the database and owner as kept as in the source cluster,
-  i.e. `mydb` and `me` respectivelly. No `app` database nor user will be
+  configure a different database and owner via the `bootstrap.initdb` stanza's
+  `database` and `owner` fields.
+- In the monolith case, the database and owner are kept exactly as in the source
+  cluster, i.e. `mydb` and `me` respectively. No `app` database nor user will be
   created.
 
 ## Import optimizations
