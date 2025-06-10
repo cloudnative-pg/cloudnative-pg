@@ -5217,6 +5217,12 @@ spec:
                       If not specified, the generated PVCs will use the
                       default storage class
                     type: string
+                  volumeAttributesClassName:
+                    description: |-
+                      VolumeAttributesClass to use for PVCs. Applied after
+                      evaluating the PVC template, if available.
+                      If not specified, the generated PVCs will not use a VolumeAttributesClass.
+                    type: string
                 type: object
               superuserSecret:
                 description: |-
@@ -5474,6 +5480,12 @@ spec:
                             evaluating the PVC template, if available.
                             If not specified, the generated PVCs will use the
                             default storage class
+                          type: string
+                        volumeAttributesClassName:
+                          description: |-
+                            VolumeAttributesClass to use for PVCs. Applied after
+                            evaluating the PVC template, if available.
+                            If not specified, the generated PVCs will not use a VolumeAttributesClass.
                           type: string
                       type: object
                     temporary:
@@ -5884,6 +5896,12 @@ spec:
                       evaluating the PVC template, if available.
                       If not specified, the generated PVCs will use the
                       default storage class
+                    type: string
+                  volumeAttributesClassName:
+                    description: |-
+                      VolumeAttributesClass to use for PVCs. Applied after
+                      evaluating the PVC template, if available.
+                      If not specified, the generated PVCs will not use a VolumeAttributesClass.
                     type: string
                 type: object
             required:

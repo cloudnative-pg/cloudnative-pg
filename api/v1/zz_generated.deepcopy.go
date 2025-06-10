@@ -2896,6 +2896,11 @@ func (in *StorageConfiguration) DeepCopyInto(out *StorageConfiguration) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.VolumeAttributesClassName != nil {
+		in, out := &in.VolumeAttributesClassName, &out.VolumeAttributesClassName
+		*out = new(string)
+		**out = **in
+	}
 	if in.ResizeInUseVolumes != nil {
 		in, out := &in.ResizeInUseVolumes, &out.ResizeInUseVolumes
 		*out = new(bool)

@@ -1891,6 +1891,12 @@ type StorageConfiguration struct {
 	// +optional
 	Size string `json:"size,omitempty"`
 
+	// VolumeAttributesClass to use for PVCs. Applied after
+	// evaluating the PVC template, if available.
+	// If not specified, the generated PVCs will not use a VolumeAttributesClass.
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
+
 	// Resize existent PVCs, defaults to true
 	// +optional
 	// +kubebuilder:default:=true

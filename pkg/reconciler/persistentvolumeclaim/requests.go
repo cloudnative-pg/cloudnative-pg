@@ -83,10 +83,14 @@ func reconcilePVCQuantity(
 	}
 	currentSize := pvc.Spec.Resources.Requests["storage"]
 
-	switch currentSize.AsDec().Cmp(parsedSize.AsDec()) {
-	case 0:
+	sizeCmp := currentSize.AsDec().Cmp(parsedSize.AsDec())
+	classNeedsUpdate := needsVolumeAttributesClassUpdate(pvc, storageConfiguration.VolumeAttributesClassName)
+
+	if sizeCmp == 0 && !classNeedsUpdate {
 		return nil
-	case 1:
+	}
+
+	if sizeCmp > 0 {
 		contextLogger.Warning("cannot decrease storage requirement",
 			"from", currentSize, "to", parsedSize,
 			"pvcName", pvc.Name)
@@ -97,6 +101,7 @@ func reconcilePVCQuantity(
 	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
 	pvc = resources.NewPersistentVolumeClaimBuilderFromPVC(pvc).
 		WithRequests(corev1.ResourceList{"storage": *parsedSize}).
+		WithVolumeAttributesClassName(storageConfiguration.VolumeAttributesClassName).
 		Build()
 
 	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
@@ -109,4 +114,13 @@ func reconcilePVCQuantity(
 	}
 
 	return nil
+}
+func needsVolumeAttributesClassUpdate(pvc *corev1.PersistentVolumeClaim, desired *string) bool {
+	if pvc.Spec.VolumeAttributesClassName == nil && desired == nil {
+		return false
+	}
+	if pvc.Spec.VolumeAttributesClassName == nil || desired == nil {
+		return true
+	}
+	return *pvc.Spec.VolumeAttributesClassName != *desired
 }
