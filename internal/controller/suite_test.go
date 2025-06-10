@@ -78,8 +78,24 @@ func buildTestEnvironment() *testingEnvironment {
 		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
 			&corev1.ConfigMap{}, &corev1.Secret{}).
 		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
+<<<<<<< HEAD
 		WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj client.Object) []string {
 			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
+=======
+		WithIndex(&corev1.Pod{}, podOwnerKey, func(rawObj client.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			if ownerName, ok := IsOwnedByCluster(pod); ok {
+				return []string{ownerName}
+			}
+			return nil
+		}).
+		WithIndex(&corev1.PersistentVolumeClaim{}, pvcOwnerKey, func(rawObj client.Object) []string {
+			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
+			if ownerName, ok := IsOwnedByCluster(persistentVolumeClaim); ok {
+				return []string{ownerName}
+			}
+			return nil
+>>>>>>> 46b614bad (Fixes Issue 7793: Stuck reconciliation fixes)
 		}).
 		Build()
 	Expect(err).ToNot(HaveOccurred())

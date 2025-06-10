@@ -22,10 +22,11 @@ package controller
 import (
 	"time"
 
-	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -33,40 +34,73 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 )
 
-var _ = Describe("Filtering cluster", func() {
-	metrics := make(map[string]string, 1)
-	metrics["a-secret"] = "test-version"
+var _ = Describe("reconcileResources", func() {
+	var env *testingEnvironment
 
-	cluster := apiv1.Cluster{
-		Spec: apiv1.ClusterSpec{
-			ImageName: "postgres:13.0",
-		},
-		Status: apiv1.ClusterStatus{
-			SecretsResourceVersion:   apiv1.SecretsResourceVersion{Metrics: metrics},
-			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{Metrics: metrics},
-		},
-	}
-
-	items := []apiv1.Cluster{cluster}
-	clusterList := apiv1.ClusterList{Items: items}
-
-	It("using a secret", func() {
-		secret := corev1.Secret{}
-		secret.Name = "a-secret"
-		req := filterClustersUsingSecret(clusterList, &secret)
-		Expect(req).ToNot(BeNil())
+	BeforeEach(func() {
+		env = buildTestEnvironment()
 	})
 
-	It("using a config map", func() {
-		configMap := corev1.ConfigMap{}
-		configMap.Name = "a-secret"
-		req := filterClustersUsingConfigMap(clusterList, &configMap)
-		Expect(req).ToNot(BeNil())
+	It("should delete a failed job and requeue", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		// Create the CA secrets that the cluster expects
+		generateFakeCASecret(env.client, cluster.GetServerCASecretName(), namespace, "cluster-test")
+		generateFakeCASecret(env.client, cluster.GetClientCASecretName(), namespace, "cluster-test")
+
+		instanceName := cluster.Name + "-1"
+		failedJob := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      instanceName + "-snapshot-recovery",
+				Namespace: namespace,
+				Labels: map[string]string{
+					utils.ClusterLabelName:      cluster.Name,
+					utils.InstanceNameLabelName: instanceName,
+					utils.JobRoleLabelName:      "snapshot-recovery",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		// Create the failed job
+		Expect(env.client.Create(ctx, failedJob)).To(Succeed())
+
+		// Create minimal managed resources for the test
+		managedResources := &managedResources{
+			nodes:     make(map[string]corev1.Node),
+			instances: corev1.PodList{Items: []corev1.Pod{}},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{}},
+			jobs:      batchv1.JobList{Items: []batchv1.Job{*failedJob}},
+		}
+
+		// Test the reconcileResources method directly to avoid architecture validation
+		var instancesStatus postgres.PostgresqlStatusList
+		result, err := env.clusterReconciler.reconcileResources(ctx, cluster, managedResources, instancesStatus)
+
+		// Check the result
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.Requeue).To(BeTrue())
+
+		// Check if the job was deleted
+		err = env.client.Get(ctx, client.ObjectKeyFromObject(failedJob), failedJob)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
 })
 

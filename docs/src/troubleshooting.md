@@ -796,6 +796,68 @@ Networking issues are reflected in the status column as follows:
 Instance Status Extraction Error: HTTP communication issue
 ```
 
+### Understanding stuck reconciliation error messages
+
+CloudNativePG automatically detects and recovers from stuck reconciliation states
+by cleaning up failed or stuck jobs. When this happens, detailed troubleshooting
+information is preserved in the cluster status that you can view with:
+
+```sh
+kubectl cnpg status <CLUSTER_NAME>
+```
+
+Or directly from the cluster custom resource:
+
+```sh
+kubectl get cluster <CLUSTER_NAME> -o yaml | grep -A5 -B5 "phase\|phaseReason"
+```
+
+For a more focused view of just the status information:
+
+```sh
+kubectl get cluster <CLUSTER_NAME> -o jsonpath='{.status.phase}: {.status.phaseReason}{"\n"}'
+```
+
+The enhanced error messages help you understand what went wrong before the
+automatic cleanup occurred:
+
+**Failed Jobs**: When a job fails during scaling operations:
+``` text
+Phase Reason: Recovering from failed job cluster-4-snapshot-recovery (active:0 succeeded:0 failed:1 age:15m2s)
+```
+
+**Stuck Jobs with Missing PVCs**: When jobs can't start due to missing storage:
+``` text
+Phase Reason: Recovering from stuck job cluster-4-snapshot-recovery - missing PVCs: [cluster-4-pgdata] (age:12m)
+```
+
+**Long-running Jobs**: When jobs run too long without progress:
+``` text
+Phase Reason: Long-running jobs detected: equilibrium state detected: job cluster-4-snapshot-recovery stuck due to missing PVCs: missing PVCs: [cluster-4-pgdata]
+```
+
+**Stuck Jobs without PVC Issues**: When jobs are pending for other reasons:
+``` text
+Phase Reason: Recovering from stuck job cluster-4-snapshot-recovery (no active pods for 10m)
+```
+
+These messages provide crucial information for troubleshooting:
+
+- **Job name**: Which specific job encountered issues
+- **Job statistics**: Active, succeeded, and failed pod counts
+- **Age**: How long the job was running before cleanup
+- **Root cause**: Specific issues like missing PVCs
+
+If you see these messages, check:
+
+1. **Storage**: Ensure PVCs mentioned in the error exist and are bound
+2. **Resources**: Verify sufficient CPU/memory for job pods
+3. **Node availability**: Check if nodes can schedule the workload
+4. **Recent changes**: Review any recent cluster or storage configuration changes
+
+The operator will automatically retry the operation after cleanup, but addressing
+the root cause will prevent future occurrences.
+
 ### Networking is impaired by installed Network Policies
 
 As pointed out in the [networking section](#networking), local network policies
