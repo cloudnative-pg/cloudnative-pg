@@ -303,20 +303,22 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
-	var existsRole bool
-	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		info.ApplicationUser)
-	err = userRow.Scan(&existsRole)
-	if err != nil {
-		return err
-	}
-
-	if !existsRole {
-		_, err = dbSuperUser.Exec(fmt.Sprintf(
-			"CREATE ROLE %v LOGIN",
-			pgx.Identifier{info.ApplicationUser}.Sanitize()))
+	if info.ApplicationUser != "" {
+		var existsRole bool
+		userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+			info.ApplicationUser)
+		err = userRow.Scan(&existsRole)
 		if err != nil {
 			return err
+		}
+
+		if !existsRole {
+			_, err = dbSuperUser.Exec(fmt.Sprintf(
+				"CREATE ROLE %v LOGIN",
+				pgx.Identifier{info.ApplicationUser}.Sanitize()))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
