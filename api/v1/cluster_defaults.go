@@ -237,6 +237,11 @@ func (r *Cluster) defaultInitDB() {
 		}
 	}
 
+	if r.Spec.Bootstrap.InitDB.Import != nil &&
+		r.Spec.Bootstrap.InitDB.Import.Type == MonolithSnapshotType {
+		return
+	}
+
 	if r.Spec.Bootstrap.InitDB.Database == "" {
 		r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
 	}
