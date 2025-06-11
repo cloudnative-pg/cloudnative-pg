@@ -66,6 +66,7 @@ func (b *PersistentVolumeClaimBuilder) WithStorageClass(storageClass *string) *P
 	return b
 }
 
+// WithVolumeAttributesClassName adds the volumeAttributesClassName to the object being build
 func (b *PersistentVolumeClaimBuilder) WithVolumeAttributesClassName(className *string) *PersistentVolumeClaimBuilder {
 	b.pvc.Spec.VolumeAttributesClassName = className
 	return b
