@@ -78,6 +78,20 @@ func buildTestEnvironment() *testingEnvironment {
 		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
 			&corev1.ConfigMap{}, &corev1.Secret{}).
 		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
+		WithIndex(&corev1.Pod{}, podOwnerKey, func(rawObj client.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			if ownerName, ok := IsOwnedByCluster(pod); ok {
+				return []string{ownerName}
+			}
+			return nil
+		}).
+		WithIndex(&corev1.PersistentVolumeClaim{}, pvcOwnerKey, func(rawObj client.Object) []string {
+			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
+			if ownerName, ok := IsOwnedByCluster(persistentVolumeClaim); ok {
+				return []string{ownerName}
+			}
+			return nil
+		}).
 		Build()
 	Expect(err).ToNot(HaveOccurred())
 
