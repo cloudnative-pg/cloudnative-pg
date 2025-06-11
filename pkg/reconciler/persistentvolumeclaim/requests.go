@@ -115,6 +115,7 @@ func reconcilePVCQuantity(
 
 	return nil
 }
+
 func needsVolumeAttributesClassUpdate(pvc *corev1.PersistentVolumeClaim, desired *string) bool {
 	if pvc.Spec.VolumeAttributesClassName == nil && desired == nil {
 		return false
