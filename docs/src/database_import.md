@@ -345,12 +345,15 @@ spec:
 
 In both cases, the database's contents will be imported, but:
 
-- In the microservice case, the database and owner both become `app`. You can
-  configure a different database and owner via the `bootstrap.initdb` stanza's
-  `database` and `owner` fields.
+- In the microservice case, the imported database's name and owner both become
+  `app`, or whichever configuration for the fields `database` and `owner` are
+  set in the `bootstrap.initdb` stanza.
 - In the monolith case, the database and owner are kept exactly as in the source
   cluster, i.e. `mydb` and `me` respectively. No `app` database nor user will be
-  created.
+  created. If there are custom settings for `database` and `owner` in the
+  `bootstrap.initdb` stanza that don't match the source databases/owners to
+  import, the instance manager will create a new empty application database and
+  owner role, but will leave the imported databases/owners intact.
 
 ## Import optimizations
 
