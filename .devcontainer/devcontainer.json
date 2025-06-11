@@ -12,7 +12,7 @@
       "cilium": "none"
     },
     "ghcr.io/guiyomh/features/golangci-lint:0": {},
-    "ghcr.io/devcontainers-contrib/features/kubectx-kubens:1": {},
+    "ghcr.io/devcontainers-extra/features/kubectx-kubens:1": {},
     "ghcr.io/dhoeric/features/stern:1": {}
   },
 

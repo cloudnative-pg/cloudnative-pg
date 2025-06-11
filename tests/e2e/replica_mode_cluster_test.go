@@ -269,7 +269,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("archive mode set to 'always' on designated primary", func() {
+	Context("archive mode set to 'always' on designated primary", Label(tests.LabelBackupRestore), func() {
 		It("verifies replica cluster can archive WALs from the designated primary", func() {
 			const (
 				replicaClusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
@@ -340,7 +340,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("can bootstrap a replica cluster from a backup", Ordered, func() {
+	Context("can bootstrap a replica cluster from a backup", Label(tests.LabelBackupRestore), Ordered, func() {
 		const (
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
@@ -492,7 +492,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
-var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, func() {
+var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
 		namespacePrefix             = "replica-switchover"

@@ -40,6 +40,7 @@ import (
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -817,6 +818,15 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		}
 	}()
 
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	defer pluginCli.Close(ctx)
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
+
 	temporaryInitInfo := InitInfo{
 		PgData:    tempDataDir,
 		Temporary: true,
@@ -838,7 +848,12 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 	if err != nil {
 		return fmt.Errorf("while generating pg_ident.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(ctx, cluster, false)
+	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		cluster,
+		false,
+		postgres.OperationType_TYPE_RESTORE,
+	)
 	if err != nil {
 		return fmt.Errorf("while generating Postgres configuration: %w", err)
 	}

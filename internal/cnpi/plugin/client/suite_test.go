@@ -27,10 +27,12 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"google.golang.org/grpc"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 
@@ -105,6 +107,14 @@ type fakeConnection struct {
 	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
 	name                  string
 	operatorClient        *fakeOperatorClient
+}
+
+func (f *fakeConnection) PostgresClient() postgresClient.PostgresClient {
+	panic("implement me")
+}
+
+func (f *fakeConnection) PostgresCapabilities() []postgresClient.PostgresCapability_RPC_Type {
+	panic("implement me")
 }
 
 func (f *fakeConnection) RestoreJobHooksClient() restore.RestoreJobHooksClient {
@@ -187,4 +197,8 @@ func (f *fakeConnection) Ping(_ context.Context) error {
 
 func (f *fakeConnection) Close() error {
 	panic("not implemented") // TODO: Implement
+}
+
+type fakeCluster struct {
+	k8client.Object
 }

@@ -25,7 +25,7 @@ spec:
       owner: app
       options:
       - "--locale"
-      - "en_US.utf8"
+      - "C"
 
   # Persistent storage configuration
   storage:

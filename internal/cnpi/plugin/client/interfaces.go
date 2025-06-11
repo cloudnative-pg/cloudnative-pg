@@ -17,17 +17,23 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package connection
+package client
 
-// Metadata expose the metadata as discovered
-// from a plugin
-type Metadata struct {
-	Name                       string
-	Version                    string
-	Capabilities               []string
-	OperatorCapabilities       []string
-	WALCapabilities            []string
-	BackupCapabilities         []string
-	RestoreJobHookCapabilities []string
-	PostgresCapabilities       []string
+import (
+	"context"
+
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// PostgresConfigurationCapabilities is the interface that defines the
+// capabilities of interacting with PostgreSQL.
+type PostgresConfigurationCapabilities interface {
+	// EnrichConfiguration is the method that enriches the PostgreSQL configuration
+	EnrichConfiguration(
+		ctx context.Context,
+		cluster client.Object,
+		config map[string]string,
+		operationType postgres.OperationType_Type,
+	) (map[string]string, error)
 }
