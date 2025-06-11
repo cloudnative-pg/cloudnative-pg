@@ -77,6 +77,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 
 	spec := monitoringv1.PodMonitorSpec{
+		ScrapeClassName: c.cluster.Spec.Monitoring.GetPodMonitorScrapeClass(),
 		Selector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				utils.ClusterLabelName: c.cluster.Name,
