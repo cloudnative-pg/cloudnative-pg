@@ -29,11 +29,12 @@ import (
 )
 
 var _ = Describe("cluster default configuration", func() {
-	It("defaults to creating an application database", func() {
+	It("defaults to initdb", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("app"))
-		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("app"))
+		Expect(cluster.Spec.Bootstrap.InitDB).ToNot(BeNil())
+		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(BeEmpty())
 	})
 
 	It("defaults the owner user with the database name", func() {
@@ -51,7 +52,7 @@ var _ = Describe("cluster default configuration", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
 
-	It("defaults to create an application database if recovery is used", func() {
+	It("defaults to not create an application database if recovery is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -60,9 +61,9 @@ var _ = Describe("cluster default configuration", func() {
 			},
 		}
 		cluster.Default()
-		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).Should(BeTrue())
-		Expect(cluster.Spec.Bootstrap.Recovery.Database).ShouldNot(BeEmpty())
-		Expect(cluster.Spec.Bootstrap.Recovery.Owner).ShouldNot(BeEmpty())
+		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).Should(BeFalse())
+		Expect(cluster.Spec.Bootstrap.Recovery.Database).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.Recovery.Owner).Should(BeEmpty())
 		Expect(cluster.Spec.Bootstrap.Recovery.Secret).Should(BeNil())
 	})
 
@@ -81,7 +82,7 @@ var _ = Describe("cluster default configuration", func() {
 		Expect(cluster.Spec.Bootstrap.Recovery.Owner).To(Equal("appdb"))
 	})
 
-	It("defaults to create an application database if pg_basebackup is used", func() {
+	It("defaults to not create an application database if pg_basebackup is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -90,9 +91,9 @@ var _ = Describe("cluster default configuration", func() {
 			},
 		}
 		cluster.Default()
-		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).Should(BeTrue())
-		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Database).ShouldNot(BeEmpty())
-		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).ShouldNot(BeEmpty())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).Should(BeFalse())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Database).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).Should(BeEmpty())
 		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Secret).Should(BeNil())
 	})
 
@@ -142,13 +143,6 @@ var _ = Describe("cluster default configuration", func() {
 		}
 		cluster.Default()
 		Expect(cluster.Spec.ImageName).To(Equal("test:13"))
-	})
-
-	It("should setup the application database name", func() {
-		cluster := Cluster{}
-		cluster.Default()
-		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("app"))
-		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("app"))
 	})
 
 	It("should set the owner name as the database name", func() {

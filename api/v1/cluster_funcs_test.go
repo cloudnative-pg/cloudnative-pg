@@ -265,8 +265,9 @@ var _ = Describe("Bootstrap via initdb", func() {
 		// InitDB is the default bootstrap method, and is triggered by
 		// the defaulting webhook if nothing else is specified by the user
 		cluster.Default()
-		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
-		Expect(cluster.ShouldCreateApplicationSecret()).To(BeTrue())
+		Expect(cluster.Spec.Bootstrap.InitDB).ToNot(BeNil())
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
 	})
 })
 
