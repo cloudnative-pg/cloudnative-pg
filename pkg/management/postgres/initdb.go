@@ -339,16 +339,14 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	var existsRole bool
 	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
 		info.ApplicationUser)
-	err = userRow.Scan(&existsRole)
-	if err != nil {
+	if err = userRow.Scan(&existsRole); err != nil {
 		return err
 	}
 
 	if !existsRole {
-		_, err = dbSuperUser.Exec(fmt.Sprintf(
+		if _, err = dbSuperUser.Exec(fmt.Sprintf(
 			"CREATE ROLE %v LOGIN",
-			pgx.Identifier{info.ApplicationUser}.Sanitize()))
-		if err != nil {
+			pgx.Identifier{info.ApplicationUser}.Sanitize())); err != nil {
 			return err
 		}
 	}
