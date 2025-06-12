@@ -6,6 +6,9 @@ docs_dir: src
 theme:
   name: readthedocs
 
+extra:
+   version: !ENV [CNPG_VERSION]
+
 extra_css:
   - css/override.css
 
@@ -79,3 +82,4 @@ nav:
     - appendixes/backup_volumesnapshot.md
     - appendixes/backup_barmanobjectstore.md
     - appendixes/object_stores.md
+
