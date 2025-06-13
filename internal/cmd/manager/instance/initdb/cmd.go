@@ -153,12 +153,27 @@ func NewCmd() *cobra.Command {
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	contextLogger := log.FromContext(ctx)
-	err := info.EnsureTargetDirectoriesDoNotExist(ctx)
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
+	cluster, err := info.LoadCluster(ctx, typedClient)
+	if err != nil {
+		return err
+	}
+	// If the user specified an existing directory, we will reuse it.
+	reuseDirectory := cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.InitDB != nil &&
+		cluster.Spec.Bootstrap.InitDB.ReuseExistingDirectory
+	//reuseDirectory := true
+	if !reuseDirectory {
+		err := info.EnsureTargetDirectoriesDoNotExist(ctx)
+		if err != nil {
+			return err
+		}
+	}
 
-	err = info.Bootstrap(ctx)
+	err = info.Bootstrap(ctx, reuseDirectory)
 	if err != nil {
 		contextLogger.Error(err, "Error while bootstrapping data directory")
 		return err
