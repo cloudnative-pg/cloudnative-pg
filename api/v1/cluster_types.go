@@ -1702,7 +1702,10 @@ type Import struct {
 	// does not validate their content. Be aware that certain options may
 	// conflict with the operator's intended functionality or design.
 	// +optional
-	PgRestoreExtraOptions []string `json:"pgRestoreExtraOptions,omitempty"`
+	PgRestoreExtraOptions    []string `json:"pgRestoreExtraOptions,omitempty"`
+	PgRestorePredataOptions  []string `json:"pgRestorePredataOptions,omitempty"`
+	PgRestoreDataOptions     []string `json:"pgRestoreDataOptions,omitempty"`
+	PgRestorePostdataOptions []string `json:"pgRestorePostdataOptions,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot
