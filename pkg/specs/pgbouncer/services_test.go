@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package pgbouncer
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/hash"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -27,7 +28,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
