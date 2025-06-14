@@ -186,7 +186,7 @@ func (r *instanceClientImpl) GetPgControlDataFromInstance(
 
 	scheme := GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +207,7 @@ func (r *instanceClientImpl) GetPgControlDataFromInstance(
 		return "", err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return "", &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
@@ -293,7 +293,7 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 ) (result postgres.PostgresqlStatus) {
 	scheme := GetStatusSchemeFromPod(&pod)
 	statusURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
 	if err != nil {
 		result.Error = err
 		return result
@@ -319,7 +319,7 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 		return result
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		result.Error = &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 		return result
 	}
@@ -375,7 +375,7 @@ func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.
 
 	statusURL := url.Build(
 		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "POST", statusURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, statusURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -395,7 +395,7 @@ func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.
 		return "", err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return "", &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
