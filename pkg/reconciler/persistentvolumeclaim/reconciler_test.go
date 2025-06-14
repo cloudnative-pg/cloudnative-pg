@@ -156,6 +156,142 @@ var _ = Describe("Reconcile Metadata", func() {
 	})
 })
 
+var _ = Describe("PVC VolumeAttributesClassName reconciliation", func() {
+	const clusterName = "cluster-pvc-volumeattributesclass"
+	var (
+		cluster *apiv1.Cluster
+		pvc     corev1.PersistentVolumeClaim
+		cli     client.Client
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterName,
+			},
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		pvc = makePVC(clusterName, "1", "1", NewPgDataCalculator(), false)
+		pvc.Labels = map[string]string{
+			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+		}
+		pvc.Spec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{
+			"storage": resource.MustParse("1Gi"),
+		}
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, &pvc).
+			Build()
+	})
+
+	It("dynamically updates VolumeAttributesClassName on the PVC when the spec changes", func() {
+		// Set initial VolumeAttributesClassName in the spec
+		initialClass := "fast"
+		cluster.Spec.StorageConfiguration.VolumeAttributesClassName = &initialClass
+
+		// Reconcile with the initial value
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&pvc)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetch and check the PVC
+		var fetchedPVC corev1.PersistentVolumeClaim
+		err = cli.Get(context.Background(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &fetchedPVC)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fetchedPVC.Spec.VolumeAttributesClassName).ToNot(BeNil())
+		Expect(*fetchedPVC.Spec.VolumeAttributesClassName).To(Equal(initialClass))
+
+		// Change the VolumeAttributesClassName in the spec
+		updatedClass := "ultra"
+		cluster.Spec.StorageConfiguration.VolumeAttributesClassName = &updatedClass
+
+		// Reconcile again
+		err = reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&fetchedPVC)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetch and check the PVC again
+		var updatedPVC corev1.PersistentVolumeClaim
+		err = cli.Get(context.Background(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &updatedPVC)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedPVC.Spec.VolumeAttributesClassName).ToNot(BeNil())
+		Expect(*updatedPVC.Spec.VolumeAttributesClassName).To(Equal(updatedClass))
+	})
+
+	It("sets VolumeAttributesClassName on the PVC when the initial value is nil and the spec provides a value", func() {
+		// Ensure the initial value is nil
+		Expect(pvc.Spec.VolumeAttributesClassName).To(BeNil())
+		Expect(cluster.Spec.StorageConfiguration.VolumeAttributesClassName).To(BeNil())
+
+		// Set VolumeAttributesClassName in the spec
+		newClass := "premium"
+		cluster.Spec.StorageConfiguration.VolumeAttributesClassName = &newClass
+
+		// Reconcile
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&pvc)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetch and check the PVC
+		var updatedPVC corev1.PersistentVolumeClaim
+		err = cli.Get(context.Background(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &updatedPVC)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedPVC.Spec.VolumeAttributesClassName).ToNot(BeNil())
+		Expect(*updatedPVC.Spec.VolumeAttributesClassName).To(Equal(newClass))
+	})
+
+	It("removes VolumeAttributesClassName from the PVC when the spec is set to nil", func() {
+		// Set an initial value in the spec and on the PVC
+		initialClass := "fast"
+		cluster.Spec.StorageConfiguration.VolumeAttributesClassName = &initialClass
+
+		// Reconcile to set the initial value
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&pvc)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetch and check the PVC has the initial value
+		var fetchedPVC corev1.PersistentVolumeClaim
+		err = cli.Get(context.Background(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &fetchedPVC)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fetchedPVC.Spec.VolumeAttributesClassName).ToNot(BeNil())
+		Expect(*fetchedPVC.Spec.VolumeAttributesClassName).To(Equal(initialClass))
+
+		// Set the spec value to nil (remove the class)
+		cluster.Spec.StorageConfiguration.VolumeAttributesClassName = nil
+
+		// Reconcile again
+		err = reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&fetchedPVC)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetch and check the PVC no longer has the field set
+		var updatedPVC corev1.PersistentVolumeClaim
+		err = cli.Get(context.Background(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, &updatedPVC)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedPVC.Spec.VolumeAttributesClassName).To(BeNil())
+	})
+})
+
 var _ = Describe("Reconcile resource requests", func() {
 	cli := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).Build()
 	cluster := &apiv1.Cluster{}
