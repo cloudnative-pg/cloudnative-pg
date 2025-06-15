@@ -25,9 +25,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
@@ -942,6 +944,30 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
+	r.instance.Env = buildPostmasterEnv(cluster)
+}
+
+func buildPostmasterEnv(cluster *apiv1.Cluster) []string {
+	env := make([]string, 0, len(os.Environ()))
+	for _, envVar := range os.Environ() {
+		if strings.HasPrefix(envVar, "LD_LIBRARY_PATH") {
+			continue
+		}
+		env = append(env, envVar)
+	}
+
+	ldLibraryPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		ldLibraryPaths = append(ldLibraryPaths, GetLibraryPath(&extension))
+	}
+	env = append(env, "LD_LIBRARY_PATH="+strings.Join(ldLibraryPaths, ":"))
+
+	return env
+}
+
+// GetLibraryPath returns the PATH to the directory containing the libraries of a given Extension
+func GetLibraryPath(extension *apiv1.ExtensionConfiguration) string {
+	return fmt.Sprintf("/extensions/%s/lib", extension.Name)
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
