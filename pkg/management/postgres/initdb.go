@@ -291,6 +291,33 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
+	// Execute the custom set of init queries
+	log.Info("Executing post-init SQL instructions")
+	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
+		return err
+	}
+
+	dbTemplate, err := instance.GetTemplateDB()
+	if err != nil {
+		return fmt.Errorf("while getting template database: %w", err)
+	}
+	// Execute the custom set of init queries of the template
+	log.Info("Executing post-init template SQL instructions")
+	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
+		return fmt.Errorf("could not execute init Template queries: %w", err)
+	}
+
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
+	}
+
+	if info.ApplicationUser == "" {
+		return nil
+	}
+
 	var existsRole bool
 	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
 		info.ApplicationUser)
@@ -308,32 +335,14 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		}
 	}
 
-	// Execute the custom set of init queries
-	log.Info("Executing post-init SQL instructions")
-	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
-		return err
-	}
-
-	dbTemplate, err := instance.GetTemplateDB()
-	if err != nil {
-		return fmt.Errorf("while getting template database: %w", err)
-	}
-	// Execute the custom set of init queries of the template
-	log.Info("Executing post-init template SQL instructions")
-	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
-		return fmt.Errorf("could not execute init Template queries: %w", err)
-	}
-
 	if info.ApplicationDatabase == "" {
 		return nil
 	}
 
 	var existsDB bool
-	dbRow := dbSuperUser.QueryRow(
-		"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
+	dbRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
 		info.ApplicationDatabase)
-	err = dbRow.Scan(&existsDB)
-	if err != nil {
+	if err = dbRow.Scan(&existsDB); err != nil {
 		return err
 	}
 
@@ -358,13 +367,6 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 
 	if err = info.executePostInitApplicationSQLRefs(appDB); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
-	}
-
-	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
-	// We create the check empty wal archive file to tell that we should check if the
-	// destination path it is empty
-	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
-		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil
