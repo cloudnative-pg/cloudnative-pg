@@ -33,14 +33,17 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -300,23 +303,6 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
-	var existsRole bool
-	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		info.ApplicationUser)
-	err = userRow.Scan(&existsRole)
-	if err != nil {
-		return err
-	}
-
-	if !existsRole {
-		_, err = dbSuperUser.Exec(fmt.Sprintf(
-			"CREATE ROLE %v LOGIN",
-			pgx.Identifier{info.ApplicationUser}.Sanitize()))
-		if err != nil {
-			return err
-		}
-	}
-
 	// Execute the custom set of init queries for the `postgres` database
 	log.Info("Executing post-init SQL instructions")
 	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
@@ -338,16 +324,41 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err = info.executeSQLRefs(dbTemplate, info.PostInitTemplateSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
+
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
+	}
+
+	if info.ApplicationUser == "" {
+		return nil
+	}
+
+	var existsRole bool
+	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+		info.ApplicationUser)
+	if err = userRow.Scan(&existsRole); err != nil {
+		return err
+	}
+
+	if !existsRole {
+		if _, err = dbSuperUser.Exec(fmt.Sprintf(
+			"CREATE ROLE %v LOGIN",
+			pgx.Identifier{info.ApplicationUser}.Sanitize())); err != nil {
+			return err
+		}
+	}
+
 	if info.ApplicationDatabase == "" {
 		return nil
 	}
 
 	var existsDB bool
-	dbRow := dbSuperUser.QueryRow(
-		"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
+	dbRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
 		info.ApplicationDatabase)
-	err = dbRow.Scan(&existsDB)
-	if err != nil {
+	if err = dbRow.Scan(&existsDB); err != nil {
 		return err
 	}
 
@@ -372,13 +383,6 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 
 	if err = info.executeSQLRefs(appDB, info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
-	}
-
-	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
-	// We create the check empty wal archive file to tell that we should check if the
-	// destination path it is empty
-	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
-		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil
@@ -447,6 +451,15 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	defer pluginCli.Close(ctx)
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
+
 	coredumpFilter := cluster.GetCoredumpFilter()
 	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
@@ -464,7 +477,12 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Import != nil
 
-	if applied, err := instance.RefreshConfigurationFilesFromCluster(ctx, cluster, true); err != nil {
+	if applied, err := instance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		cluster,
+		true,
+		postgres.OperationType_TYPE_INIT,
+	); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")

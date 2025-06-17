@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
@@ -63,6 +64,7 @@ type Interface interface {
 	BackupClient() backup.BackupClient
 	ReconcilerHooksClient() reconciler.ReconcilerHooksClient
 	RestoreJobHooksClient() restore.RestoreJobHooksClient
+	PostgresClient() postgresClient.PostgresClient
 
 	PluginCapabilities() []identity.PluginCapability_Service_Type
 	OperatorCapabilities() []operator.OperatorCapability_RPC_Type
@@ -71,6 +73,7 @@ type Interface interface {
 	BackupCapabilities() []backup.BackupCapability_RPC_Type
 	ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind
 	RestoreJobHooksCapabilities() []restore.RestoreJobHooksCapability_Kind
+	PostgresCapabilities() []postgresClient.PostgresCapability_RPC_Type
 
 	Ping(ctx context.Context) error
 	Close() error
@@ -85,6 +88,7 @@ type data struct {
 	backupClient          backup.BackupClient
 	reconcilerHooksClient reconciler.ReconcilerHooksClient
 	restoreJobHooksClient restore.RestoreJobHooksClient
+	postgresClient        postgresClient.PostgresClient
 
 	name                        string
 	version                     string
@@ -95,6 +99,7 @@ type data struct {
 	backupCapabilities          []backup.BackupCapability_RPC_Type
 	reconcilerCapabilities      []reconciler.ReconcilerHooksCapability_Kind
 	restoreJobHooksCapabilities []restore.RestoreJobHooksCapability_Kind
+	postgresCapabilities        []postgresClient.PostgresCapability_RPC_Type
 }
 
 func newPluginDataFromConnection(ctx context.Context, connection Handler) (data, error) {
@@ -122,6 +127,7 @@ func newPluginDataFromConnection(ctx context.Context, connection Handler) (data,
 		backupClient:          backup.NewBackupClient(connection),
 		reconcilerHooksClient: reconciler.NewReconcilerHooksClient(connection),
 		restoreJobHooksClient: restore.NewRestoreJobHooksClient(connection),
+		postgresClient:        postgresClient.NewPostgresClient(connection),
 	}
 
 	return result, err
@@ -264,6 +270,27 @@ func (pluginData *data) loadRestoreJobHooksCapabilities(ctx context.Context) err
 	return nil
 }
 
+func (pluginData *data) loadPostgresCapabilities(ctx context.Context) error {
+	var postgresCapabilitiesResponse *postgresClient.PostgresCapabilitiesResult
+	var err error
+
+	if postgresCapabilitiesResponse, err = pluginData.postgresClient.GetCapabilities(
+		ctx,
+		&postgresClient.PostgresCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin operator capabilities: %w", err)
+	}
+
+	pluginData.postgresCapabilities = make(
+		[]postgresClient.PostgresCapability_RPC_Type,
+		len(postgresCapabilitiesResponse.Capabilities))
+	for i := range pluginData.postgresCapabilities {
+		pluginData.postgresCapabilities[i] = postgresCapabilitiesResponse.Capabilities[i].GetRpc().Type
+	}
+
+	return nil
+}
+
 // Metadata extracts the plugin metadata reading from
 // the internal metadata
 func (pluginData *data) Metadata() Metadata {
@@ -275,6 +302,7 @@ func (pluginData *data) Metadata() Metadata {
 		WALCapabilities:            make([]string, len(pluginData.walCapabilities)),
 		BackupCapabilities:         make([]string, len(pluginData.backupCapabilities)),
 		RestoreJobHookCapabilities: make([]string, len(pluginData.restoreJobHooksCapabilities)),
+		PostgresCapabilities:       make([]string, len(pluginData.postgresCapabilities)),
 	}
 
 	for i := range pluginData.capabilities {
@@ -333,6 +361,10 @@ func (pluginData *data) ReconcilerHooksClient() reconciler.ReconcilerHooksClient
 	return pluginData.reconcilerHooksClient
 }
 
+func (pluginData *data) PostgresClient() postgresClient.PostgresClient {
+	return pluginData.postgresClient
+}
+
 func (pluginData *data) PluginCapabilities() []identity.PluginCapability_Service_Type {
 	return pluginData.capabilities
 }
@@ -359,6 +391,10 @@ func (pluginData *data) ReconcilerCapabilities() []reconciler.ReconcilerHooksCap
 
 func (pluginData *data) RestoreJobHooksCapabilities() []restore.RestoreJobHooksCapability_Kind {
 	return pluginData.restoreJobHooksCapabilities
+}
+
+func (pluginData *data) PostgresCapabilities() []postgresClient.PostgresCapability_RPC_Type {
+	return pluginData.postgresCapabilities
 }
 
 func (pluginData *data) Ping(ctx context.Context) error {
@@ -423,6 +459,14 @@ func LoadPlugin(ctx context.Context, handler Handler) (Interface, error) {
 	// capabilities
 	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RESTORE_JOB) {
 		if err = result.loadRestoreJobHooksCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the postgres service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_POSTGRES) {
+		if err = result.loadPostgresCapabilities(ctx); err != nil {
 			return nil, err
 		}
 	}

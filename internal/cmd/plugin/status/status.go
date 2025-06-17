@@ -1206,6 +1206,8 @@ func (fullStatus *PostgresqlStatus) printPluginStatus(verbosity int) {
 				result[idx] = "Operator Service"
 			case identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE.String():
 				result[idx] = "Lifecycle Service"
+			case identity.PluginCapability_Service_TYPE_POSTGRES.String():
+				result[idx] = "Postgres Service"
 			case identity.PluginCapability_Service_TYPE_UNSPECIFIED.String():
 				continue
 			default:

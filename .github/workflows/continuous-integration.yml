@@ -18,9 +18,12 @@ permissions: read-all
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.24.x"
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.24.4"
+  # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
   GOLANGCI_LINT_VERSION: "v2.1.6"
   KUBEBUILDER_VERSION: "2.3.1"
+  # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.29.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
@@ -184,7 +187,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Validate Renovate JSON
-        run:  npx --yes --package renovate -- renovate-config-validator
+        run: npx --yes --package renovate@40.48.6 -- renovate-config-validator
 
   go-vulncheck:
     name: Run govulncheck
@@ -614,7 +617,7 @@ jobs:
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
+        uses: github/codeql-action/upload-sarif@ce28f5bb42b7a9f2c824e633a3f6ee835bab6858 # v3
         if: |
           !github.event.repository.fork && 
           !github.event.pull_request.head.repo.fork

@@ -10,7 +10,8 @@ on:
 permissions: read-all
 
 env:
-  GOLANG_VERSION: "1.24.x"
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.24.4"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -74,7 +75,7 @@ jobs:
             /src/docs/src/${{ env.FILE }}
       -
         name: Release
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
         with:
           body_path: release_notes.md
           draft: false

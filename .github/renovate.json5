@@ -34,54 +34,27 @@
   customManagers: [
     {
       customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
+      managerFilePatterns: [
+        '/^Makefile$/',
       ],
       matchStrings: [
-        'KUSTOMIZE_VERSION \\?= (?<currentValue>.*?)\\n',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\?=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
       ],
-      datasourceTemplate: 'go',
-      depNameTemplate: 'sigs.k8s.io/kustomize/kustomize/v5',
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
+      managerFilePatterns: [
+        '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
       ],
       matchStrings: [
-        'CONTROLLER_TOOLS_VERSION \\?= (?<currentValue>.*?)\\n',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
       ],
-      datasourceTemplate: 'go',
-      depNameTemplate: 'sigs.k8s.io/controller-tools',
-    },
-{
-      customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'GENREF_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'go',
-      depNameTemplate: 'github.com/kubernetes-sigs/reference-docs/genref',
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'GORELEASER_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'go',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'github.com/goreleaser/goreleaser',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^.github/workflows/continuous-delivery.yml',
-        '^hack/setup-cluster.sh$',
+      managerFilePatterns: [
+        '/^.github/workflows/continuous-delivery.yml/',
+        '/^hack/setup-cluster.sh$/',
       ],
       matchStrings: [
         'EXTERNAL_SNAPSHOTTER_VERSION: "(?<currentValue>.*?)"',
@@ -94,8 +67,8 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^hack/setup-cluster.sh$',
+      managerFilePatterns: [
+        '/^hack/setup-cluster.sh$/',
       ],
       matchStrings: [
         'EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n',
@@ -107,8 +80,8 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^hack/setup-cluster.sh$',
+      managerFilePatterns: [
+        '/^hack/setup-cluster.sh$/',
       ],
       matchStrings: [
         'EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n',
@@ -120,8 +93,8 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^hack/setup-cluster.sh$',
+      managerFilePatterns: [
+        '/^hack/setup-cluster.sh$/',
       ],
       matchStrings: [
         'EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n',
@@ -133,8 +106,8 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^hack/setup-cluster.sh$',
+      managerFilePatterns: [
+        '/^hack/setup-cluster.sh$/',
       ],
       matchStrings: [
         'CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
@@ -146,34 +119,9 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^.github/workflows/continuous-delivery.yml',
-      ],
-      matchStrings: [
-        'ROOK_VERSION: "(?<currentValue>.*?)"',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'rook/rook',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^.github/workflows/continuous-delivery.yml',
-        '^.github/workflows/continuous-integration.yml',
-      ],
-      matchStrings: [
-        'KIND_VERSION: "(?<currentValue>.*?)"',
-      ],
-      datasourceTemplate: 'github-tags',
-      depNameTemplate: 'kubernetes-sigs/kind',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^hack/setup-cluster.sh$',
-        '^hack/e2e/run-e2e-kind.sh$',
+      managerFilePatterns: [
+        '/^hack/setup-cluster.sh$/',
+        '/^hack/e2e/run-e2e-kind.sh$/',
       ],
       matchStrings: [
         'KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
@@ -184,72 +132,9 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'SPELLCHECK_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'docker',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'jonasbn/github-action-spellcheck',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'WOKE_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'docker',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'getwoke/woke',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'OPERATOR_SDK_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'operator-framework/operator-sdk',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'OPM_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'operator-framework/operator-registry',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^Makefile$',
-      ],
-      matchStrings: [
-        'PREFLIGHT_VERSION \\?= (?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'redhat-openshift-ecosystem/openshift-preflight',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^config\\/olm-scorecard\\/patches\\/basic\\.config\\.yaml$',
-        '^config\\/olm-scorecard\\/patches\\/olm\\.config\\.yaml$',
+      managerFilePatterns: [
+        '/^config\\/olm-scorecard\\/patches\\/basic\\.config\\.yaml$/',
+        '/^config\\/olm-scorecard\\/patches\\/olm\\.config\\.yaml$/',
       ],
       matchStrings: [
         'image: quay.io/operator-framework/scorecard-test:(?<currentValue>.*?)\\n',
@@ -261,9 +146,9 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^pkg\\/versions\\/versions\\.go$',
-        '^pkg\\/specs\\/pgbouncer\\/deployments\\.go$',
+      managerFilePatterns: [
+        '/^pkg\\/versions\\/versions\\.go$/',
+        '/^pkg\\/specs\\/pgbouncer\\/deployments\\.go$/',
       ],
       matchStrings: [
         'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
@@ -275,54 +160,14 @@
     {
       customType: 'regex',
       fileMatch: [
-        '^\\.github\\/workflows\\/[^/]+\\.ya?ml$',
+        '^tests\\/utils\\/minio\\/minio\\.go$',
       ],
       matchStrings: [
-        'GOLANG_VERSION: "(?<currentValue>.*?)\\.x"',
+        'minioImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'minioClientImage = "(?<depName>.+?):(?<currentValue>.*?)"',
       ],
-      datasourceTemplate: 'golang-version',
-      depNameTemplate: 'golang',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^\\.github\\/workflows\\/[^/]+\\.ya?ml$',
-      ],
-      matchStrings: [
-        'GOLANGCI_LINT_VERSION: "v(?<currentValue>.*?)"',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'golangci/golangci-lint',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^.github/workflows/continuous-delivery.yml',
-      ],
-      matchStrings: [
-        'VELERO_VERSION: "v(?<currentValue>.*?)"',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'vmware-tanzu/velero',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^.github/workflows/continuous-delivery.yml',
-      ],
-      matchStrings: [
-        'VELERO_AWS_PLUGIN_VERSION: "v(?<currentValue>.*?)"',
-      ],
-      datasourceTemplate: 'github-releases',
-      depNameTemplate: 'vmware-tanzu/velero-plugin-for-aws',
-      versioningTemplate: 'loose',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+      datasourceTemplate: 'docker',
+      versioningTemplate: "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$"
     },
   ],
   packageRules: [
@@ -408,16 +253,16 @@
     },
     {
       matchDatasources: [
-        'github-tags'
+        'github-tags',
       ],
       matchUpdateTypes: [
         'digest',
         'pinDigest',
         'minor',
-        'patch'
+        'patch',
       ],
       groupName: 'all non-major github action',
-      pinDigests: true
+      pinDigests: true,
     },
     {
       groupName: 'kubernetes CSI',
@@ -434,6 +279,7 @@
       pinDigests: false,
       matchPackageNames: [
         'vmware-tanzu{/,}**',
+        'minio{/,}**'
       ],
     },
     {
