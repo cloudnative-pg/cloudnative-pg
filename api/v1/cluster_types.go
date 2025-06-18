@@ -566,6 +566,26 @@ type Probe struct {
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+
+	// Configuration for the isolation check functionality
+	// +optional
+	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
+}
+
+// IsolationCheckConfiguration contains the configuration for the isolation check
+// functionality in the liveness probe
+type IsolationCheckConfiguration struct {
+	// Whether isolation checking is enabled for the liveness probe
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Timeout in milliseconds for requests during the isolation check
+	// +optional
+	RequestTimeout int `json:"requestTimeout,omitempty"`
+
+	// Timeout in milliseconds for connections during the isolation check
+	// +optional
+	ConnectionTimeout int `json:"connectionTimeout,omitempty"`
 }
 
 const (

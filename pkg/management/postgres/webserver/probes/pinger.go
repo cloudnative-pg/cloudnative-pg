@@ -20,9 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package probes
 
 import (
-	"context"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -30,75 +28,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/log"
-	"k8s.io/utils/ptr"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	cnpgUrl "github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// LivenessPingerCfg if the configuration of the instance
-// reachability checker
-type LivenessPingerCfg struct {
-	Enabled           *bool `json:"enabled"`
-	RequestTimeout    int   `json:"requestTimeout,omitempty"`
-	ConnectionTimeout int   `json:"connectionTimeout,omitempty"`
-}
-
-func (probe *LivenessPingerCfg) isEnabled() bool {
-	if probe == nil || probe.Enabled == nil {
-		return false
-	}
-
-	return *probe.Enabled
-}
-
-// NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
-// in the cluster definition
-func NewLivenessPingerConfigFromAnnotations(
-	ctx context.Context,
-	annotations map[string]string,
-) (*LivenessPingerCfg, error) {
-	const (
-		// defaultRequestTimeout is the default value of the request timeout
-		defaultRequestTimeout = 500
-
-		// defaultConnectionTimeout is the default value of the connection timeout
-		defaultConnectionTimeout = 1000
-	)
-
-	contextLogger := log.FromContext(ctx)
-
-	v, ok := annotations[utils.LivenessPingerAnnotationName]
-	if !ok {
-		contextLogger.Debug("pinger config not found in the cluster annotations")
-		return &LivenessPingerCfg{
-			Enabled: ptr.To(false),
-		}, nil
-	}
-
-	var cfg LivenessPingerCfg
-	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
-		contextLogger.Error(err, "failed to unmarshal pinger config")
-		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
-	}
-
-	if cfg.Enabled == nil {
-		return nil, fmt.Errorf("pinger config is missing the enabled field")
-	}
-
-	if cfg.RequestTimeout == 0 {
-		cfg.RequestTimeout = defaultRequestTimeout
-	}
-	if cfg.ConnectionTimeout == 0 {
-		cfg.ConnectionTimeout = defaultConnectionTimeout
-	}
-
-	return &cfg, nil
-}
 
 // pinger can check if a certain instance is reachable by using
 // the failsafe REST endpoint
@@ -106,13 +40,13 @@ type pinger struct {
 	dialer *net.Dialer
 	client *http.Client
 
-	config LivenessPingerCfg
+	config *apiv1.IsolationCheckConfiguration
 }
 
 // buildInstanceReachabilityChecker creates a new instance reachability checker by loading
 // the server CA certificate from the same location that will be used by PostgreSQL.
 // In this case, we avoid using the API Server as it may be unreliable.
-func buildInstanceReachabilityChecker(cfg LivenessPingerCfg) (*pinger, error) {
+func buildInstanceReachabilityChecker(cfg *apiv1.IsolationCheckConfiguration) (*pinger, error) {
 	certificateLocation := postgresSpec.ServerCACertificateLocation
 	caCertificate, err := os.ReadFile(certificateLocation) //nolint:gosec
 	if err != nil {
@@ -182,7 +116,7 @@ type pingError struct {
 	host string
 	ip   string
 
-	config LivenessPingerCfg
+	config *apiv1.IsolationCheckConfiguration
 
 	err error
 }

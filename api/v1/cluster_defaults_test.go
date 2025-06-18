@@ -20,9 +20,11 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"k8s.io/utils/ptr"
+	"context"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -357,5 +359,97 @@ var _ = Describe("default dataDurability", func() {
 		cluster.SetDefaults()
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous.DataDurability).To(Equal(DataDurabilityLevelPreferred))
+	})
+})
+
+var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
+	It("returns a disabled configuration when annotation is not present", func(ctx SpecContext) {
+		annotations := map[string]string{}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(BeFalse())
+	})
+
+	It("returns an error when annotation contains invalid JSON", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: "{invalid_json",
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).To(HaveOccurred())
+		Expect(config).To(BeNil())
+	})
+
+	It("applies default values when timeouts are not specified", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(BeTrue())
+		Expect(config.RequestTimeout).To(Equal(500))
+		Expect(config.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("preserves values when all fields are specified", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 300, "connectionTimeout": 600}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(BeTrue())
+		Expect(config.RequestTimeout).To(Equal(300))
+		Expect(config.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("correctly sets enabled to false when specified", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": false, "requestTimeout": 300, "connectionTimeout": 600}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(BeFalse())
+		Expect(config.RequestTimeout).To(Equal(300))
+		Expect(config.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("correctly handles zero values for timeouts", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 0, "connectionTimeout": 0}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.RequestTimeout).To(Equal(500))
+		Expect(config.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("defaults enabled to false when not specified", func(ctx SpecContext) {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"requestTimeout": 300, "connectionTimeout": 600}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(BeFalse())
+		Expect(config.RequestTimeout).To(Equal(300))
+		Expect(config.ConnectionTimeout).To(Equal(600))
 	})
 })

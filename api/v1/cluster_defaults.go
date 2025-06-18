@@ -20,6 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/utils/ptr"
@@ -138,6 +142,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 
 	r.setDefaultPlugins(configuration.Current)
+	r.convertLivenessPinger()
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -268,4 +273,73 @@ func (r *Cluster) defaultPgBaseBackup() {
 	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
 	}
+}
+
+func (r *Cluster) convertLivenessPinger() {
+	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
+		return
+	}
+	v, err := NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	if err != nil {
+		// the error will be raised by the validation webhook
+		return
+	}
+
+	if r.Spec.Probes == nil {
+		r.Spec.Probes = &ProbesConfiguration{}
+	}
+	if r.Spec.Probes.Liveness == nil {
+		r.Spec.Probes.Liveness = &Probe{}
+	}
+
+	// we don't override the isolation check if it is already set
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           v.Enabled,
+		RequestTimeout:    v.RequestTimeout,
+		ConnectionTimeout: v.ConnectionTimeout,
+	}
+}
+
+// NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
+// in the cluster definition
+func NewLivenessPingerConfigFromAnnotations(
+	ctx context.Context,
+	annotations map[string]string,
+) (*IsolationCheckConfiguration, error) {
+	const (
+		// defaultRequestTimeout is the default value of the request timeout
+		defaultRequestTimeout = 500
+
+		// defaultConnectionTimeout is the default value of the connection timeout
+		defaultConnectionTimeout = 1000
+	)
+
+	contextLogger := log.FromContext(ctx)
+
+	v, ok := annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		contextLogger.Debug("pinger config not found in the cluster annotations")
+		return &IsolationCheckConfiguration{
+			Enabled: false,
+		}, nil
+	}
+
+	var cfg IsolationCheckConfiguration
+	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
+		contextLogger.Error(err, "failed to unmarshal pinger config")
+		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
+	}
+
+	if cfg.RequestTimeout == 0 {
+		cfg.RequestTimeout = defaultRequestTimeout
+	}
+	if cfg.ConnectionTimeout == 0 {
+		cfg.ConnectionTimeout = defaultConnectionTimeout
+	}
+
+	return &cfg, nil
 }

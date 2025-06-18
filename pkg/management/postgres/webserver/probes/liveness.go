@@ -151,11 +151,15 @@ func evaluateLivenessPinger(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	cfg, err := NewLivenessPingerConfigFromAnnotations(ctx, cluster.Annotations)
-	if err != nil {
-		return err
+	var cfg *apiv1.IsolationCheckConfiguration
+	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
+		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
 	}
-	if !cfg.isEnabled() {
+	if cfg == nil {
+		return nil
+	}
+
+	if !cfg.Enabled {
 		contextLogger.Debug("pinger config not enabled, skipping")
 		return nil
 	}
@@ -165,7 +169,7 @@ func evaluateLivenessPinger(
 		return nil
 	}
 
-	checker, err := buildInstanceReachabilityChecker(*cfg)
+	checker, err := buildInstanceReachabilityChecker(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}
