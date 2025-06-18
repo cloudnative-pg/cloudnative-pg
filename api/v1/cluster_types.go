@@ -581,10 +581,12 @@ type IsolationCheckConfiguration struct {
 
 	// Timeout in milliseconds for requests during the isolation check
 	// +optional
+	// +kubebuilder:default:=1000
 	RequestTimeout int `json:"requestTimeout,omitempty"`
 
 	// Timeout in milliseconds for connections during the isolation check
 	// +optional
+	// +kubebuilder:default:=1000
 	ConnectionTimeout int `json:"connectionTimeout,omitempty"`
 }
 
