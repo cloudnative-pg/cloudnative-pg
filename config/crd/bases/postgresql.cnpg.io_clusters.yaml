@@ -4249,6 +4249,24 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      isolationCheck:
+                        description: Configuration for the isolation check functionality
+                        properties:
+                          connectionTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for connections during
+                              the isolation check
+                            type: integer
+                          enabled:
+                            description: Whether isolation checking is enabled for
+                              the liveness probe
+                            type: boolean
+                          requestTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for requests during
+                              the isolation check
+                            type: integer
+                        type: object
                       periodSeconds:
                         description: |-
                           How often (in seconds) to perform the probe.
@@ -4298,6 +4316,24 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      isolationCheck:
+                        description: Configuration for the isolation check functionality
+                        properties:
+                          connectionTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for connections during
+                              the isolation check
+                            type: integer
+                          enabled:
+                            description: Whether isolation checking is enabled for
+                              the liveness probe
+                            type: boolean
+                          requestTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for requests during
+                              the isolation check
+                            type: integer
+                        type: object
                       maximumLag:
                         anyOf:
                         - type: integer
@@ -4361,6 +4397,24 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      isolationCheck:
+                        description: Configuration for the isolation check functionality
+                        properties:
+                          connectionTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for connections during
+                              the isolation check
+                            type: integer
+                          enabled:
+                            description: Whether isolation checking is enabled for
+                              the liveness probe
+                            type: boolean
+                          requestTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for requests during
+                              the isolation check
+                            type: integer
+                        type: object
                       maximumLag:
                         anyOf:
                         - type: integer
