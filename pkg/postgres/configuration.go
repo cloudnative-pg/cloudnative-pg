@@ -48,6 +48,12 @@ const (
 
 	// ParameterRecoveryMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
 	ParameterRecoveryMinApplyDelay = "recovery_min_apply_delay"
+
+	// ParameterSyncReplicationSlots the configuration key containing the sync_replication_slots value
+	ParameterSyncReplicationSlots = "sync_replication_slots"
+
+	// ParameterHotStandbyFeedback the configuration key containing the hot_standby_feedback value
+	ParameterHotStandbyFeedback = "hot_standby_feedback"
 )
 
 // An acceptable wal_level value
@@ -297,6 +303,9 @@ type ConfigurationInfo struct {
 	// The synchronous_standby_names configuration to be applied
 	SynchronousStandbyNames string
 
+	// The synchronized_standby_slots configuration to be applied
+	SynchronizedStandbySlots []string
+
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
 
@@ -365,6 +374,23 @@ func (e ManagedExtension) IsUsed(userConfigs map[string]string) bool {
 		}
 	}
 	return false
+}
+
+// IsManagedExtensionUsed checks whether a configuration namespace in the named extension namespaces list
+// is used in the user-provided configuration
+func IsManagedExtensionUsed(name string, userConfigs map[string]string) bool {
+	var extension *ManagedExtension
+	for _, ext := range ManagedExtensions {
+		if ext.Name == name {
+			extension = &ext
+			break
+		}
+	}
+	if extension == nil {
+		return false
+	}
+
+	return extension.IsUsed(userConfigs)
 }
 
 var (
@@ -443,6 +469,7 @@ var (
 		"log_rotation_size":                      blockedConfigurationParameter,
 		"log_truncate_on_rotation":               blockedConfigurationParameter,
 		"pg_failover_slots.primary_dsn":          fixedConfigurationParameter,
+		"pg_failover_slots.standby_slot_names":   fixedConfigurationParameter,
 		"promote_trigger_file":                   blockedConfigurationParameter,
 		"recovery_end_command":                   blockedConfigurationParameter,
 		"recovery_min_apply_delay":               blockedConfigurationParameter,
@@ -459,6 +486,7 @@ var (
 		"ssl_prefer_server_ciphers":              fixedConfigurationParameter,
 		"stats_temp_directory":                   blockedConfigurationParameter,
 		"synchronous_standby_names":              fixedConfigurationParameter,
+		"synchronized_standby_slots":             fixedConfigurationParameter,
 		"syslog_facility":                        blockedConfigurationParameter,
 		"syslog_ident":                           blockedConfigurationParameter,
 		"syslog_sequence_numbers":                blockedConfigurationParameter,
@@ -663,6 +691,19 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	syncStandbyNames := info.SynchronousStandbyNames
 	if len(syncStandbyNames) > 0 {
 		configuration.OverwriteConfig(SynchronousStandbyNames, syncStandbyNames)
+	}
+
+	if len(info.SynchronizedStandbySlots) > 0 {
+		synchronizedStandbySlots := strings.Join(info.SynchronizedStandbySlots, ",")
+		if IsManagedExtensionUsed("pg_failover_slots", info.UserSettings) {
+			configuration.OverwriteConfig("pg_failover_slots.standby_slot_names", synchronizedStandbySlots)
+		}
+
+		if info.MajorVersion >= 17 {
+			if isEnabled, _ := ParsePostgresConfigBoolean(info.UserSettings["sync_replication_slots"]); isEnabled {
+				configuration.OverwriteConfig("synchronized_standby_slots", synchronizedStandbySlots)
+			}
+		}
 	}
 
 	if info.ClusterName != "" {

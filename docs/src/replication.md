@@ -734,6 +734,24 @@ spec:
     size: 1Gi
 ```
 
+### Logical Decoding Slot Synchronization
+
+CloudNativePG can now synchronize logical decoding (replication) slots across all nodes in a high-availability cluster.
+To enable this, set:
+
+```yaml
+replicationSlots:
+  highAvailability:
+    synchronizeLogicalDecoding: true
+```
+
+When enabled, the operator manages logical decoding slot state across failover and switchover events.
+For PostgreSQL 17 and later, this uses the built-in `sync_replication_slots` parameter.
+For older versions, `pg_failover_slots` is used as a fallback.
+
+This ensures logical replication clients can continue from the correct position after failover,
+preventing data loss or slot invalidation.
+
 ### Capping the WAL size retained for replication slots
 
 When replication slots is enabled, you might end up running out of disk space

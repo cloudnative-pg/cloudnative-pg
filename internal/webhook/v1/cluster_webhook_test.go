@@ -3686,6 +3686,126 @@ var _ = Describe("validation of replication slots configuration", func() {
 		errors := v.validateReplicationSlots(cluster)
 		Expect(errors).To(BeEmpty())
 	})
+
+	It("returns no errors when synchronizeLogicalDecoding is disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: false,
+					},
+				},
+			},
+		}
+
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(BeNil())
+	})
+
+	It("returns no errors when pg_failover_slots is enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":                     "true",
+						"pg_failover_slots.synchronize_slot_names": "name_like:%",
+					},
+				},
+			},
+		}
+
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(BeNil())
+	})
+
+	It("returns an error when Postgres version is < 17 and pg_failover_slots is not enabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+			},
+		}
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Error()).To(ContainSubstring("pg_failover_slots extension must be enabled"))
+	})
+
+	It("returns an error when Postgres version is 17 and hot_standby_feedback is disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17",
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"sync_replication_slots": "on",
+						"hot_standby_feedback":   "off",
+					},
+				},
+			},
+		}
+
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Error()).To(ContainSubstring("`hot_standby_feedback` must be enabled"))
+	})
+
+	It("returns an error when Postgres version is 17 and sync_replication_slots is disabled", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17",
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":   "on",
+						"sync_replication_slots": "off",
+					},
+				},
+			},
+		}
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Error()).To(ContainSubstring(
+			"`sync_replication_slots` setting or pg_failover_slots extension must be enabled"))
+	})
+
+	It("returns no errors when all conditions are met", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:17",
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						SynchronizeLogicalDecoding: true,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":   "on",
+						"sync_replication_slots": "on",
+					},
+				},
+			},
+		}
+
+		result := v.validateSynchronizeLogicalDecoding(cluster)
+		Expect(result).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Environment variables validation", func() {
@@ -3994,7 +4114,7 @@ var _ = Describe("Managed Extensions validation", func() {
 				},
 			},
 		}
-		Expect(v.validatePgFailoverSlots(cluster)).To(HaveLen(2))
+		Expect(v.validatePgFailoverSlots(cluster)).To(HaveLen(1))
 	})
 
 	It("should succeed if pg_failover_slots and its prerequisites are enabled", func() {

@@ -1210,6 +1210,18 @@ type ReplicationSlotsHAConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[0-9a-z_]*$
 	// +optional
 	SlotPrefix string `json:"slotPrefix,omitempty"`
+
+	// When enabled, the operator automatically manages synchronization of logical
+	// decoding (replication) slots across high-availability clusters. This
+	// feature primarily uses the sync_replication_slots server parameter
+	// (introduced in PostgreSQL 17) for native and robust slot synchronization.
+	// For clusters running older PostgreSQL versions, the pg_failover_slots
+	// extension is used as a fallback mechanism. This ensures that changes are
+	// not consumed from logical replication failover slots until they are received
+	// and flushed to all physical standby nodes, providing reliable logical
+	// replication continuity during failover events.
+	// +optional
+	SynchronizeLogicalDecoding bool `json:"synchronizeLogicalDecoding,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
