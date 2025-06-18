@@ -53,7 +53,9 @@ type SubscriptionSpec struct {
 	DBName string `json:"dbname"`
 
 	// Subscription parameters part of the `WITH` clause as expected by
-	// PostgreSQL `CREATE SUBSCRIPTION` command
+	// PostgreSQL `CREATE SUBSCRIPTION` command.
+	// Altering these parameters after the subscription creation will be ignored exept from a limited number of them
+	// documented at https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
