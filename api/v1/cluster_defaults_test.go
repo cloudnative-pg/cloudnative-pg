@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"context"
-
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"k8s.io/utils/ptr"

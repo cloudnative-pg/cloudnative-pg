@@ -3210,6 +3210,45 @@ conflict with the operator's intended functionality or design.</p>
 </tbody>
 </table>
 
+## IsolationCheckConfiguration     {#postgresql-cnpg-io-v1-IsolationCheckConfiguration}
+
+
+**Appears in:**
+
+- [Probe](#postgresql-cnpg-io-v1-Probe)
+
+
+<p>IsolationCheckConfiguration contains the configuration for the isolation check
+functionality in the liveness probe</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>enabled</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether isolation checking is enabled for the liveness probe</p>
+</td>
+</tr>
+<tr><td><code>requestTimeout</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Timeout in milliseconds for requests during the isolation check</p>
+</td>
+</tr>
+<tr><td><code>connectionTimeout</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Timeout in milliseconds for connections during the isolation check</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## LDAPBindAsAuth     {#postgresql-cnpg-io-v1-LDAPBindAsAuth}
 
 
@@ -4479,6 +4518,13 @@ Value must be non-negative integer. The value zero indicates stop immediately vi
 the kill signal (no opportunity to shut down).
 This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
+</td>
+</tr>
+<tr><td><code>isolationCheck</code><br/>
+<a href="#postgresql-cnpg-io-v1-IsolationCheckConfiguration"><i>IsolationCheckConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration for the isolation check functionality</p>
 </td>
 </tr>
 </tbody>
