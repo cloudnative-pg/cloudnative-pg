@@ -143,8 +143,9 @@ var _ = Describe("subscription sql", func() {
 				Name:            "test_sub",
 				PublicationName: "test_pub",
 				Parameters: map[string]string{
-					"param1": "value1",
-					"param2": "value2",
+					"copy_data": "true",
+					"origin":    "none",
+					"failover":  "true",
 				},
 			},
 		}
@@ -153,7 +154,7 @@ var _ = Describe("subscription sql", func() {
 		sqls := toSubscriptionAlterSQL(obj, connString)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
-		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("param1" = 'value1', "param2" = 'value2')`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true', "origin" = 'none')`))
 	})
 
 	It("returns correct SQL for altering subscription with no owner or parameters", func() {

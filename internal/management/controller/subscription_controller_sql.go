@@ -133,12 +133,35 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 			fmt.Sprintf(
 				"ALTER SUBSCRIPTION %s SET (%s)",
 				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				toPostgresParameters(obj.Spec.Parameters),
+				toPostgresParameters(filterSubscriptionUpdatableParameters(obj.Spec.Parameters)),
 			),
 		)
 	}
 
 	return result
+}
+
+func filterSubscriptionUpdatableParameters(parameters map[string]string) map[string]string {
+	// Only a limited set of the parameters can be updated
+	// see https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET
+	allowedParameters := []string{
+		"slot_name",
+		"synchronous_commit",
+		"binary",
+		"streaming",
+		"disable_on_error",
+		"password_required",
+		"run_as_owner",
+		"origin",
+		"failover",
+	}
+	filteredParameters := make(map[string]string, len(parameters))
+	for _, key := range allowedParameters {
+		if _, present := parameters[key]; present {
+			filteredParameters[key] = parameters[key]
+		}
+	}
+	return filteredParameters
 }
 
 func executeDropSubscription(ctx context.Context, db *sql.DB, name string) error {
