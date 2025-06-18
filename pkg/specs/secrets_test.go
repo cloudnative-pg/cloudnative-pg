@@ -44,6 +44,14 @@ var _ = Describe("Secret creation", func() {
 		Expect(secret.StringData["jdbc-uri"]).To(
 			Equal("jdbc:postgresql://thishost.namespace:5432/thisdb?password=thispassword&user=thisuser"),
 		)
+
+		Expect(secret.StringData["fqdn-uri"]).To(
+			Equal("postgresql://thisuser:thispassword@thishost.namespace.svc.cluster.local:5432/thisdb"),
+		)
+		Expect(secret.StringData["fqdn-jdbc-uri"]).To(
+			Equal("jdbc:postgresql://thishost.namespace.svc.cluster.local:5432/thisdb?password=thispassword&user=thisuser"),
+		)
+
 		Expect(secret.Labels).To(
 			HaveKeyWithValue(utils.UserTypeLabelName, string(utils.UserTypeApp)))
 	})
