@@ -179,6 +179,11 @@ func newFakeCNPGCluster(
 			Labels:      map[string]string{},
 		},
 		Spec: apiv1.ClusterSpec{
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				InitDB: &apiv1.BootstrapInitDB{
+					Database: "app",
+				},
+			},
 			Instances: instances,
 			Certificates: &apiv1.CertificatesConfiguration{
 				ServerCASecret: caServer,
