@@ -5120,7 +5120,7 @@ var _ = Describe("", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.LivenessPingerAnnotationName: `{"requestTimeout": 5000}`,
+					utils.LivenessPingerAnnotationName: `{"requestTi`,
 				},
 			},
 		}
