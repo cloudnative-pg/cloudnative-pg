@@ -712,7 +712,12 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 	}
 
 	postgresCmd := exec.Command(GetPostgresExecutableName(), options...) // #nosec
-	postgresCmd.Env = instance.Env
+	postgresCmd.Env = os.Environ()
+	postgresCmd.Env = append(postgresCmd.Env,
+		"PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj",
+		"PG_OOM_ADJUST_VALUE=0",
+	)
+	postgresCmd.Env = append(postgresCmd.Env, instance.Env...)
 	compatibility.AddInstanceRunCommands(postgresCmd)
 
 	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, GetPostgresExecutableName())
