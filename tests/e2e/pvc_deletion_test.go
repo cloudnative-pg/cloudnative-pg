@@ -143,7 +143,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 
 			// removing WalStorage PVC if needed
 			if walStorageEnabled {
-				walPvcName := fmt.Sprintf("%v-wal", pvcName)
+				walPvcName := fmt.Sprintf("%v%s", pvcName, testDataVolumeSuffix)
 				namespacedWalPVCName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      walPvcName,
