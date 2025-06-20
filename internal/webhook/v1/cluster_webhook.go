@@ -873,19 +873,6 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	}
 
 	memoryRequest := r.Spec.Resources.Requests.Memory()
-	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
-	if !memoryRequest.IsZero() && rawSharedBuffer != "" {
-		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
-			if memoryRequest.Cmp(sharedBuffers) < 0 {
-				result = append(result, field.Invalid(
-					field.NewPath("spec", "resources", "requests", "memory"),
-					memoryRequest.String(),
-					"Memory request is lower than PostgreSQL `shared_buffers` value",
-				))
-			}
-		}
-	}
-
 	memoryLimits := r.Spec.Resources.Limits.Memory()
 	if !memoryRequest.IsZero() && !memoryLimits.IsZero() {
 		memoryRequestGtThanLimit := memoryRequest.Cmp(*memoryLimits) > 0
@@ -895,6 +882,29 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 				memoryRequest.String(),
 				"Memory request is greater than the limit",
 			))
+		}
+	}
+
+	hugePages, hugePagesErrors := validateHugePagesResources(r)
+	result = append(result, hugePagesErrors...)
+	if cpuRequest.IsZero() && cpuLimits.IsZero() && memoryRequest.IsZero() && memoryLimits.IsZero() &&
+		len(hugePages) > 0 {
+		result = append(result, field.Forbidden(
+			field.NewPath("spec", "resources"),
+			"HugePages require cpu or memory",
+		))
+	}
+
+	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
+	if rawSharedBuffer != "" {
+		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
+			if !hasEnoughMemoryForSharedBuffers(sharedBuffers, memoryRequest, hugePages) {
+				result = append(result, field.Invalid(
+					field.NewPath("spec", "resources", "requests"),
+					memoryRequest.String(),
+					"Memory request is lower than PostgreSQL `shared_buffers` value",
+				))
+			}
 		}
 	}
 
@@ -912,6 +922,51 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	}
 
 	return result
+}
+
+func validateHugePagesResources(r *apiv1.Cluster) (map[corev1.ResourceName]resource.Quantity, field.ErrorList) {
+	var result field.ErrorList
+	hugepages := make(map[corev1.ResourceName]resource.Quantity)
+	for name, quantity := range r.Spec.Resources.Limits {
+		if strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix) {
+			hugepages[name] = quantity
+		}
+	}
+	for name, quantity := range r.Spec.Resources.Requests {
+		if strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix) {
+			if existingQuantity, exists := hugepages[name]; exists {
+				if existingQuantity.Cmp(quantity) != 0 {
+					result = append(result, field.Invalid(
+						field.NewPath("spec", "resources", "requests", string(name)),
+						quantity.String(),
+						"HugePages requests must equal the limits",
+					))
+				}
+				continue
+			}
+			hugepages[name] = quantity
+		}
+	}
+	return hugepages, result
+}
+
+func hasEnoughMemoryForSharedBuffers(
+	sharedBuffers resource.Quantity,
+	memoryRequest *resource.Quantity,
+	hugePages map[corev1.ResourceName]resource.Quantity,
+) bool {
+	if memoryRequest == nil && len(hugePages) == 0 {
+		return true
+	}
+	if memoryRequest != nil && sharedBuffers.Cmp(*memoryRequest) <= 0 {
+		return true
+	}
+	for _, quantity := range hugePages {
+		if sharedBuffers.Cmp(quantity) <= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv1.Cluster) field.ErrorList {
