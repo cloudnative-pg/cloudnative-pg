@@ -357,7 +357,8 @@ deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
+  kubectl create ns pyroscope
+  helm -n pyroscope install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   service_file="${TEMP_DIR}/pyroscope_service.yaml"
 
@@ -376,7 +377,7 @@ spec:
   selector:
     app.kubernetes.io/name: cloudnative-pg
 EOF
-  kubectl -n cnpg-system apply -f "${service_file}"
+  kubectl -n pyroscope apply -f "${service_file}"
 
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
@@ -393,6 +394,16 @@ spec:
 EOF
 
   kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+
+  configMaps="${TEMP_DIR}/cnpg_configmap_config.yaml"
+  cat >"${configMaps}" <<-EOF
+data:
+   INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
+   PPROF_HTTP_SERVER: "0.0.0.0:6060"
+   PLUGIN_PPROF_SERVER: "0.0.0.0:6061"
+EOF
+ configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+ kubectl -n cnpg-system patch configmap ${configMapName} --patch-file "${configMaps}"
 }
 
 deploy_prometheus_crds() {
