@@ -21,6 +21,7 @@ package probes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -159,7 +160,12 @@ func evaluateLivenessPinger(
 		return nil
 	}
 
-	if !cfg.Enabled {
+	// This should never happen given that we set a default value. Fail fast.
+	if cfg.Enabled == nil {
+		return errors.New("enabled field is not set in the liveness isolation check configuration")
+	}
+
+	if !*cfg.Enabled {
 		contextLogger.Debug("pinger config not enabled, skipping")
 		return nil
 	}
