@@ -303,6 +303,23 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
+	if info.ApplicationUser != "" {
+		var existsRole bool
+		userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+			info.ApplicationUser)
+		if err = userRow.Scan(&existsRole); err != nil {
+			return err
+		}
+
+		if !existsRole {
+			if _, err = dbSuperUser.Exec(fmt.Sprintf(
+				"CREATE ROLE %v LOGIN",
+				pgx.Identifier{info.ApplicationUser}.Sanitize())); err != nil {
+				return err
+			}
+		}
+	}
+
 	// Execute the custom set of init queries for the `postgres` database
 	log.Info("Executing post-init SQL instructions")
 	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
@@ -332,26 +349,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
-	if info.ApplicationUser == "" {
-		return nil
-	}
-
-	var existsRole bool
-	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		info.ApplicationUser)
-	if err = userRow.Scan(&existsRole); err != nil {
-		return err
-	}
-
-	if !existsRole {
-		if _, err = dbSuperUser.Exec(fmt.Sprintf(
-			"CREATE ROLE %v LOGIN",
-			pgx.Identifier{info.ApplicationUser}.Sanitize())); err != nil {
-			return err
-		}
-	}
-
-	if info.ApplicationDatabase == "" {
+	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {
 		return nil
 	}
 
