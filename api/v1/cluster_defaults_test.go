@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -439,12 +440,78 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 })
 
 var _ = Describe("probe defaults", func() {
-	It("should set isolationCheck probe to true by default", func() {
+	It("should set isolationCheck probe to true by default when no probes are specified", func() {
 		cluster := &Cluster{}
 		cluster.Default()
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(500))
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("should not override isolationCheck probe if already set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Probes: &ProbesConfiguration{
+					Liveness: &Probe{
+						IsolationCheck: &IsolationCheckConfiguration{
+							Enabled:           ptr.To(false),
+							RequestTimeout:    300,
+							ConnectionTimeout: 600,
+						},
+					},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeFalse()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("should set isolationCheck probe when it is not set but liveness probe is present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Probes: &ProbesConfiguration{
+					Liveness: &Probe{},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(500))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("should convert the existing annotations if set to true", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 300, "connectionTimeout": 600}`,
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("should convert the existing annotations if set to false", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"enabled": false, "requestTimeout": 300, "connectionTimeout": 600}`,
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeFalse()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
 	})
 })
