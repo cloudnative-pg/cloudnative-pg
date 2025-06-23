@@ -171,6 +171,16 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 		)
 	}
 
+	if configuration.Current.PprofHTTPServer != "" {
+		config.EnvVars = append(
+			config.EnvVars,
+			corev1.EnvVar{
+				Name:  "PPROF_HTTP_SERVER",
+				Value: configuration.Current.PprofHTTPServer,
+			},
+		)
+	}
+
 	hashValue, _ := hash.ComputeHash(config)
 	config.Hash = hashValue
 	return config
@@ -272,6 +282,11 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				{
 					Name:          "status",
 					ContainerPort: url.StatusPort,
+					Protocol:      "TCP",
+				},
+				{
+					Name:          "pprof",
+					ContainerPort: 6060,
 					Protocol:      "TCP",
 				},
 			},

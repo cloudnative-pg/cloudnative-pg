@@ -165,6 +165,9 @@ type Data struct {
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// PprofHTTPServer enables the pprof HTTP server
+	PprofHTTPServer string `json:"pprofHTTPServer" env:"PPROF_HTTP_SERVER"`
 }
 
 // Current is the configuration used by the operator
