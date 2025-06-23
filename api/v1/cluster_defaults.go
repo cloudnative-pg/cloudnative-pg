@@ -142,7 +142,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 
 	r.setDefaultPlugins(configuration.Current)
-	r.convertLivenessPinger()
+	r.setProbes()
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -275,25 +275,50 @@ func (r *Cluster) defaultPgBaseBackup() {
 	}
 }
 
-func (r *Cluster) convertLivenessPinger() {
-	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
-		return
-	}
-	v, err := NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
-	if err != nil {
-		// the error will be raised by the validation webhook
-		return
-	}
+const (
+	// defaultRequestTimeout is the default value of the request timeout
+	defaultRequestTimeout = 500
 
+	// defaultConnectionTimeout is the default value of the connection timeout
+	defaultConnectionTimeout = 1000
+)
+
+func (r *Cluster) setProbes() {
 	if r.Spec.Probes == nil {
 		r.Spec.Probes = &ProbesConfiguration{}
 	}
+
 	if r.Spec.Probes.Liveness == nil {
 		r.Spec.Probes.Liveness = &Probe{}
 	}
 
 	// we don't override the isolation check if it is already set
 	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 1: check if the alpha annotation is present, in that case convert it to spec
+	r.tryConvertAlphaLivenessPinger()
+
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 2: set defaults.
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           ptr.To(true),
+		RequestTimeout:    defaultRequestTimeout,
+		ConnectionTimeout: defaultConnectionTimeout,
+	}
+}
+
+func (r *Cluster) tryConvertAlphaLivenessPinger() {
+	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
+		return
+	}
+	v, err := NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	if err != nil || v == nil {
+		// the error will be raised by the validation webhook
 		return
 	}
 
@@ -310,28 +335,21 @@ func NewLivenessPingerConfigFromAnnotations(
 	ctx context.Context,
 	annotations map[string]string,
 ) (*IsolationCheckConfiguration, error) {
-	const (
-		// defaultRequestTimeout is the default value of the request timeout
-		defaultRequestTimeout = 500
-
-		// defaultConnectionTimeout is the default value of the connection timeout
-		defaultConnectionTimeout = 1000
-	)
-
 	contextLogger := log.FromContext(ctx)
 
 	v, ok := annotations[utils.LivenessPingerAnnotationName]
 	if !ok {
-		contextLogger.Debug("pinger config not found in the cluster annotations")
-		return &IsolationCheckConfiguration{
-			Enabled: false,
-		}, nil
+		return nil, nil
 	}
 
 	var cfg IsolationCheckConfiguration
 	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
 		contextLogger.Error(err, "failed to unmarshal pinger config")
 		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
+	}
+
+	if cfg.Enabled == nil {
+		return nil, fmt.Errorf("pinger config is missing the enabled field")
 	}
 
 	if cfg.RequestTimeout == 0 {

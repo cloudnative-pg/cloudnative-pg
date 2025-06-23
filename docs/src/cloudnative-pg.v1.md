@@ -4524,7 +4524,7 @@ Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
 <a href="#postgresql-cnpg-io-v1-IsolationCheckConfiguration"><i>IsolationCheckConfiguration</i></a>
 </td>
 <td>
-   <p>Configuration for the isolation check functionality</p>
+   <p>Configuration for the isolation check functionality. Enabled by default.</p>
 </td>
 </tr>
 </tbody>

@@ -20,9 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"k8s.io/utils/ptr"
+
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -361,14 +362,13 @@ var _ = Describe("default dataDurability", func() {
 })
 
 var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
-	It("returns a disabled configuration when annotation is not present", func(ctx SpecContext) {
+	It("returns a nil configuration when annotation is not present", func(ctx SpecContext) {
 		annotations := map[string]string{}
 
 		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(config).ToNot(BeNil())
-		Expect(config.Enabled).To(BeFalse())
+		Expect(config).To(BeNil())
 	})
 
 	It("returns an error when annotation contains invalid JSON", func(ctx SpecContext) {
@@ -391,7 +391,7 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
-		Expect(config.Enabled).To(BeTrue())
+		Expect(config.Enabled).To(HaveValue(BeTrue()))
 		Expect(config.RequestTimeout).To(Equal(500))
 		Expect(config.ConnectionTimeout).To(Equal(1000))
 	})
@@ -405,7 +405,7 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
-		Expect(config.Enabled).To(BeTrue())
+		Expect(config.Enabled).To(HaveValue(BeTrue()))
 		Expect(config.RequestTimeout).To(Equal(300))
 		Expect(config.ConnectionTimeout).To(Equal(600))
 	})
@@ -419,7 +419,7 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
-		Expect(config.Enabled).To(BeFalse())
+		Expect(config.Enabled).To(HaveValue(BeFalse()))
 		Expect(config.RequestTimeout).To(Equal(300))
 		Expect(config.ConnectionTimeout).To(Equal(600))
 	})
@@ -436,18 +436,15 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 		Expect(config.RequestTimeout).To(Equal(500))
 		Expect(config.ConnectionTimeout).To(Equal(1000))
 	})
+})
 
-	It("defaults enabled to false when not specified", func(ctx SpecContext) {
-		annotations := map[string]string{
-			utils.LivenessPingerAnnotationName: `{"requestTimeout": 300, "connectionTimeout": 600}`,
-		}
-
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(config).ToNot(BeNil())
-		Expect(config.Enabled).To(BeFalse())
-		Expect(config.RequestTimeout).To(Equal(300))
-		Expect(config.ConnectionTimeout).To(Equal(600))
+var _ = Describe("probe defaults", func() {
+	It("should set isolationCheck probe to true by default", func() {
+		cluster := &Cluster{}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(500))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
 	})
 })

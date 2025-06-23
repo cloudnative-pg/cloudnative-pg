@@ -567,7 +567,7 @@ type Probe struct {
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 
-	// Configuration for the isolation check functionality
+	// Configuration for the isolation check functionality. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
@@ -577,11 +577,12 @@ type Probe struct {
 type IsolationCheckConfiguration struct {
 	// Whether isolation checking is enabled for the liveness probe
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
+	// +kubebuilder:default:=true
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// Timeout in milliseconds for requests during the isolation check
 	// +optional
-	// +kubebuilder:default:=1000
+	// +kubebuilder:default:=500
 	RequestTimeout int `json:"requestTimeout,omitempty"`
 
 	// Timeout in milliseconds for connections during the isolation check
