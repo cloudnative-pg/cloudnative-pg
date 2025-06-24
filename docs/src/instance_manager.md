@@ -199,14 +199,14 @@ following conditions are met:
 
 The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
 
-It is **disabled by default** and can be enabled by adding the following:
+It is **enabled by default** and can be disabled by adding the following:
 
 ```yaml
 spec:
   probes:
     liveness:
       isolationCheck:
-        enabled: true
+        enabled: false
 ```
 
 !!! Important

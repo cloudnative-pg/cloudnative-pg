@@ -393,7 +393,7 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
 		Expect(config.Enabled).To(HaveValue(BeTrue()))
-		Expect(config.RequestTimeout).To(Equal(500))
+		Expect(config.RequestTimeout).To(Equal(1000))
 		Expect(config.ConnectionTimeout).To(Equal(1000))
 	})
 
@@ -434,7 +434,7 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
-		Expect(config.RequestTimeout).To(Equal(500))
+		Expect(config.RequestTimeout).To(Equal(1000))
 		Expect(config.ConnectionTimeout).To(Equal(1000))
 	})
 })
@@ -445,7 +445,7 @@ var _ = Describe("probe defaults", func() {
 		cluster.Default()
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
-		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(500))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(1000))
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
 	})
 
@@ -481,7 +481,7 @@ var _ = Describe("probe defaults", func() {
 		cluster.Default()
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
-		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(500))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(1000))
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
 	})
 
