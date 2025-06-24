@@ -21,7 +21,11 @@ package postgres
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
+
+	"github.com/DATA-DOG/go-sqlmock"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -123,5 +127,75 @@ var _ = Describe("renameExistingTargetDataDirectories", func() {
 		filelist, err = filepath.Glob(initInfo.PgWal + "_*")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(filelist).To(BeEmpty())
+	})
+})
+
+var _ = Describe("ConfigureNewInstance role creation", func() {
+	var (
+		info          InitInfo
+		mi            *mockInstance
+		mockSuperUser sqlmock.Sqlmock
+		testDir       string
+	)
+
+	BeforeEach(func() {
+		var err error
+
+		testDir = path.Join(GinkgoT().TempDir(), "initdb_test")
+
+		Expect(os.MkdirAll(testDir, 0o700)).To(Succeed())
+
+		mi = &mockInstance{}
+		mi.superUserDB, mockSuperUser, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		mi.appDB, _, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+
+		info = InitInfo{
+			ApplicationUser: "app_user",
+			PostInitSQL:     []string{"CREATE ROLE post_init_role LOGIN"},
+			PgData:          testDir,
+		}
+	})
+
+	AfterEach(func() {
+		Expect(mockSuperUser.ExpectationsWereMet()).NotTo(HaveOccurred())
+	})
+
+	It("ensures that we create the application user before postIniSQL", func() {
+		// Expect check if application role exists
+		mockSuperUser.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+			WithArgs("app_user").
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+
+		mockSuperUser.ExpectExec(`CREATE ROLE \"app_user\" LOGIN`).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mockSuperUser.ExpectExec("CREATE ROLE post_init_role LOGIN").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := info.ConfigureNewInstance(mi)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("ensures that we do not create the application user if already exists", func() {
+		// Expect check if application role exists - return true this time
+		mockSuperUser.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1")).
+			WithArgs("app_user").
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+
+		// No direct role creation expected
+
+		mockSuperUser.ExpectExec("CREATE ROLE post_init_role LOGIN").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		// Execute function under test
+		err := info.ConfigureNewInstance(mi)
+
+		// Verify results
+		Expect(err).NotTo(HaveOccurred())
+		Expect(mockSuperUser.ExpectationsWereMet()).NotTo(HaveOccurred())
 	})
 })
