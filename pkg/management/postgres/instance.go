@@ -778,7 +778,7 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance
-func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
+func (instance *Instance) ConnectionPool() pool.Pooler {
 	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
