@@ -4264,7 +4264,7 @@ spec:
                               the liveness probe
                             type: boolean
                           requestTimeout:
-                            default: 500
+                            default: 1000
                             description: Timeout in milliseconds for requests during
                               the isolation check
                             type: integer
@@ -4333,7 +4333,7 @@ spec:
                               the liveness probe
                             type: boolean
                           requestTimeout:
-                            default: 500
+                            default: 1000
                             description: Timeout in milliseconds for requests during
                               the isolation check
                             type: integer
@@ -4416,7 +4416,7 @@ spec:
                               the liveness probe
                             type: boolean
                           requestTimeout:
-                            default: 500
+                            default: 1000
                             description: Timeout in milliseconds for requests during
                               the isolation check
                             type: integer

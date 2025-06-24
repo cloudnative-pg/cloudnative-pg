@@ -277,7 +277,7 @@ func (r *Cluster) defaultPgBaseBackup() {
 
 const (
 	// defaultRequestTimeout is the default value of the request timeout
-	defaultRequestTimeout = 500
+	defaultRequestTimeout = 1000
 
 	// defaultConnectionTimeout is the default value of the connection timeout
 	defaultConnectionTimeout = 1000
