@@ -188,7 +188,7 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         name: Login to ghcr.io
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
@@ -214,7 +214,7 @@ jobs:
           targets: "default"
       -
         name: Install cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3
+        uses: sigstore/cosign-installer@fb28c2b6339dcd94da6e4cbcbc5e888961f6f8c3 # v3
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
@@ -268,7 +268,7 @@ jobs:
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Login to ghcr.io
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
