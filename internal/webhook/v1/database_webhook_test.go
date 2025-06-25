@@ -45,7 +45,14 @@ var _ = Describe("Database validation", func() {
 			},
 		}
 	}
-
+	createFDWSpec := func(name string) apiv1.FDWSpec {
+		return apiv1.FDWSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   name,
+				Ensure: apiv1.EnsurePresent,
+			},
+		}
+	}
 	BeforeEach(func() {
 		v = &DatabaseCustomValidator{}
 	})
@@ -103,6 +110,33 @@ var _ = Describe("Database validation", func() {
 				},
 			},
 			1,
+		),
+
+		Entry(
+			"complain if there are duplicate FDWs",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						createFDWSpec("postgre_fdw"),
+						createFDWSpec("mysql_fdw"),
+						createFDWSpec("postgre_fdw"),
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"Doesn't complain if there are no duplicate FDWs",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						createFDWSpec("nosql_fdw"),
+						createFDWSpec("sqlite_fdw"),
+					},
+				},
+			},
+			0,
 		),
 	)
 })

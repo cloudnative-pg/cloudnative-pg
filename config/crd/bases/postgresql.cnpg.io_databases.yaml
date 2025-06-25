@@ -161,6 +161,65 @@ spec:
                   - name
                   type: object
                 type: array
+              fdws:
+                description: The list of foreign data wrappers to be managed in the
+                  database
+                items:
+                  description: FDWSpec configures an Foreign Data Wrapper in a database
+                  properties:
+                    ensure:
+                      default: present
+                      description: |-
+                        Specifies whether an extension/schema should be present or absent in
+                        the database. If set to `present`, the extension/schema will be
+                        created if it does not exist. If set to `absent`, the
+                        extension/schema will be removed if it exists.
+                      enum:
+                      - present
+                      - absent
+                      type: string
+                    handler:
+                      description: Name of the handler function (e.g., "postgres_fdw_handler")
+                      type: string
+                    name:
+                      description: Name of the extension/schema
+                      type: string
+                    options:
+                      description: Optional FDW-level options (e.g., use_remote_estimate)
+                      items:
+                        description: OptSpec configures a option instance
+                        properties:
+                          ensure:
+                            default: present
+                            description: |-
+                              Specifies whether an extension/schema should be present or absent in
+                              the database. If set to `present`, the extension/schema will be
+                              created if it does not exist. If set to `absent`, the
+                              extension/schema will be removed if it exists.
+                            enum:
+                            - present
+                            - absent
+                            type: string
+                          name:
+                            description: Name of the extension/schema
+                            type: string
+                          value:
+                            description: The value associated with the name (e.g.,
+                              value for "host" might be "db.cluster.local")
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                    validator:
+                      description: Name of the validator function (e.g., "postgres_fdw_validator")
+                      type: string
+                  required:
+                  - handler
+                  - name
+                  - validator
+                  type: object
+                type: array
               icuLocale:
                 description: |-
                   Maps to the `ICU_LOCALE` parameter of `CREATE DATABASE`. This
@@ -310,6 +369,28 @@ spec:
                 type: boolean
               extensions:
                 description: Extensions is the status of the managed extensions
+                items:
+                  description: DatabaseObjectStatus is the status of the managed database
+                    objects
+                  properties:
+                    applied:
+                      description: |-
+                        True of the object has been installed successfully in
+                        the database
+                      type: boolean
+                    message:
+                      description: Message is the object reconciliation message
+                      type: string
+                    name:
+                      description: The name of the object
+                      type: string
+                  required:
+                  - applied
+                  - name
+                  type: object
+                type: array
+              fdws:
+                description: FDWs is the status of the managed FDWs
                 items:
                   description: DatabaseObjectStatus is the status of the managed database
                     objects
