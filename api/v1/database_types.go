@@ -173,6 +173,10 @@ type DatabaseSpec struct {
 	// The list of extensions to be managed in the database
 	// +optional
 	Extensions []ExtensionSpec `json:"extensions,omitempty"`
+
+	// The list of foreign data wrappers to be managed in the database
+	// +optional
+	FDWs []FDWSpec `json:"fdws,omitempty"`
 }
 
 // DatabaseObjectSpec contains the fields which are common to every
@@ -220,6 +224,54 @@ type ExtensionSpec struct {
 	Schema string `json:"schema,omitempty"`
 }
 
+// FDWSpec configures an Foreign Data Wrapper in a database
+type FDWSpec struct {
+	DatabaseObjectSpec `json:",inline"`
+
+	// Name of the handler function (e.g., "postgres_fdw_handler")
+	Handler string `json:"handler"`
+
+	// Name of the validator function (e.g., "postgres_fdw_validator")
+	Validator string `json:"validator"`
+
+	// Optional FDW-level options (e.g., use_remote_estimate)
+	Options []OptSpec `json:"options,omitempty"`
+}
+
+//// ForeignServerSpec configures a foreign server for a FDW
+//type ForeignServerSpec struct {
+//	DatabaseObjectSpec `json:",inline"`
+//
+//	// Type of the foreign server (e.g., "postgres", "mysql")
+//	Type string `json:"type,omitempty"`
+//
+//	// Optional server version string (e.g., "15", "5.7")
+//	Version string `json:"version,omitempty"`
+//
+//	// List of user mappings defining access rules from local users to this server
+//	UserMappings []UserMappingSpec `json:"userMapping,omitempty"`
+//
+//	// Server-level connection options (e.g., host, port, dbname)
+//	Options []OptSpec `json:"server_opts,omitempty"`
+//}
+//
+//// UserMappingSpec configures a usermapping that maps the local user to a remote user
+//type UserMappingSpec struct {
+//	// Local user role being mapped in DatabaseObjectSpec.name(e.g., "app_user", "PUBLIC")
+//	DatabaseObjectSpec `json:",inline"`
+//
+//	// Optional options for authentication (e.g., user, password)
+//	Options []OptSpec `json:"userMapping_opts,omitempty"`
+//}
+
+// OptSpec configures a option instance
+type OptSpec struct {
+	DatabaseObjectSpec `json:",inline"`
+
+	// The value associated with the name (e.g., value for "host" might be "db.cluster.local")
+	Value string `json:"value,omitempty"`
+}
+
 // DatabaseStatus defines the observed state of Database
 type DatabaseStatus struct {
 	// A sequence number representing the latest
@@ -242,6 +294,10 @@ type DatabaseStatus struct {
 	// Extensions is the status of the managed extensions
 	// +optional
 	Extensions []DatabaseObjectStatus `json:"extensions,omitempty"`
+
+	// FDWs is the status of the managed FDWs
+	// +optional
+	FDWs []DatabaseObjectStatus `json:"fdws,omitempty"`
 }
 
 // DatabaseObjectStatus is the status of the managed database objects
