@@ -215,7 +215,7 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 }
 
 // validateFDWs validates the database Foreign Data Wrappers
-// FDW name, Servers, Usermappings must be unique in .spec.fdws
+// FDWs must be unique in .spec.fdws
 func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
 	var result field.ErrorList
 
@@ -233,40 +233,6 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 		}
 
 		FDWNames.Put(name)
-
-		// Servers must be unique in .spec.fdws.servers
-		ServerNames := stringset.New()
-		for j, server := range fdw.Servers {
-			server_name := server.Name
-			if ServerNames.Has(server_name) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "servers").Index(j).Child("name"),
-						name,
-					),
-				)
-			}
-
-			ServerNames.Put(server_name)
-
-			// Usermappings must be unique in .spec.fdws.servers.usermappings
-			LocalUserNames := stringset.New()
-			for k, localuser := range server.UserMappings {
-				localuser_name := localuser.Name
-				if LocalUserNames.Has(localuser_name) {
-					result = append(
-						result,
-						field.Duplicate(
-							field.NewPath("spec", "localusers").Index(k).Child("name"),
-							name,
-						),
-					)
-				}
-
-				LocalUserNames.Put(localuser_name)
-			}
-		}
 	}
 
 	return result
