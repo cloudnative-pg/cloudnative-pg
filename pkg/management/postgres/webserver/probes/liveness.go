@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,9 +53,12 @@ func NewLivenessChecker(
 // tryRefreshLatestCluster refreshes the latest cluster definition, returns a bool indicating if the operation was
 // successful
 func (e *livenessExecutor) tryRefreshLatestCluster(ctx context.Context) bool {
+	timeoutContext, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+
 	var cluster apiv1.Cluster
 	err := e.cli.Get(
-		ctx,
+		timeoutContext,
 		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
 		&cluster,
 	)
