@@ -55,7 +55,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 )
 
 // backupPhase indicates the path inside the Backup kind
@@ -133,7 +132,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, nil, fmt.Errorf("while getting cluster %s: %w", clusterName, err))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
+			fmt.Errorf("while getting cluster %s: %w", clusterName, err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
 			"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 		return ctrl.Result{}, nil
@@ -143,7 +143,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		message := "cannot proceed with the backup as the cluster has no plugin configured"
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return ctrl.Result{}, nil
 	}
 
@@ -151,7 +151,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		message := "cannot proceed with the backup as the cluster has no backup section"
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return ctrl.Result{}, nil
 	}
 
@@ -181,7 +181,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return ctrl.Result{}, nil
 	}
 
@@ -205,7 +205,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-			tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 				errors.New("no barmanObjectStore section defined on the target cluster"))
 			return ctrl.Result{}, nil
 		}
@@ -248,7 +248,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 		if err != nil {
-			tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
 				cluster.Status.TargetPrimary)
 			return ctrl.Result{}, nil
@@ -273,13 +273,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// This backup can be started
 		if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
 			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
-			tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 				fmt.Errorf("encountered an error while taking the backup: %w", err))
 			return ctrl.Result{}, nil
 		}
 	case apiv1.BackupMethodVolumeSnapshot:
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-			tryFlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 				errors.New("no volumeSnapshot section defined on the target cluster"))
 			return ctrl.Result{}, nil
 		}
@@ -405,7 +405,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	if err != nil {
-		tryFlagBackupAsFailed(ctx, r.Client, backup, cluster, fmt.Errorf("while getting pod: %w", err))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
 		return &ctrl.Result{}, nil
@@ -475,7 +475,8 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
 		r.Recorder.Eventf(backup, "Warning", "Error", "snapshot backup failed: %v", err)
-		tryFlagBackupAsFailed(ctx, r.Client, backup, cluster, fmt.Errorf("can't execute snapshot backup: %w", err))
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster,
+			fmt.Errorf("can't execute snapshot backup: %w", err))
 		return nil, volumesnapshot.EnsurePodIsUnfenced(ctx, r.Client, r.Recorder, cluster, backup, targetPod)
 	}
 
@@ -658,20 +659,10 @@ func startInstanceManagerBackup(
 	})
 	if err != nil {
 		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
-		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))
-		status.CommandError = stderr
-		status.CommandError = stdout
-
-		// Update backup status in cluster conditions
-		if errCond := resourcestatus.PatchConditionsWithOptimisticLock(
-			ctx,
-			client,
-			cluster,
-			apiv1.BuildClusterBackupFailedCondition(err),
-		); errCond != nil {
-			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
+		setCommandErr := func(backup *apiv1.Backup) {
+			backup.Status.CommandError = fmt.Sprintf("with stderr: %s, with stdout: %s", stderr, stdout)
 		}
-		return postgres.PatchBackupStatusAndRetry(ctx, client, backup)
+		return resourcestatus.FlagBackupAsFailed(ctx, client, backup, cluster, err, setCommandErr)
 	}
 
 	return nil
@@ -715,53 +706,4 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	// will allow that
 	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	return controllerBuilder.Complete(r)
-}
-
-func tryFlagBackupAsFailed(
-	ctx context.Context,
-	cli client.Client,
-	backup *apiv1.Backup,
-	cluster *apiv1.Cluster,
-	err error,
-) {
-	contextLogger := log.FromContext(ctx)
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var livingBackup *apiv1.Backup
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(backup), livingBackup); err != nil {
-			return err
-		}
-		origBackup := livingBackup.DeepCopy()
-		backup.Status.SetAsFailed(err)
-		backup.Status.Method = backup.Spec.Method
-		return cli.Status().Patch(ctx, backup, client.MergeFrom(origBackup))
-	}); err != nil {
-		contextLogger.Error(err, "while flagging backup as failed")
-		return
-	}
-
-	if cluster == nil {
-		return
-	}
-
-	if err := resourcestatus.PatchWithOptimisticLock(
-		ctx,
-		cli,
-		cluster,
-		func(cluster *apiv1.Cluster) {
-			cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
-		},
-	); err != nil {
-		contextLogger.Error(err, "while patching cluster with failed backup condition")
-		return
-	}
-
-	if err := resourcestatus.PatchConditionsWithOptimisticLock(
-		ctx,
-		cli,
-		cluster,
-		apiv1.BuildClusterBackupFailedCondition(err),
-	); err != nil {
-		contextLogger.Error(err, "Error while updating backup condition (backup failed)")
-		return
-	}
 }
