@@ -24,6 +24,7 @@ package pool
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -51,7 +52,8 @@ type ConnectionPool struct {
 	connectionProfile ConnectionProfile
 
 	// A map of connection for every used database
-	connectionMap map[string]*sql.DB
+	connectionMap      map[string]*sql.DB
+	connectionMapMutex sync.Mutex
 }
 
 // NewPostgresqlConnectionPool creates a new connectionMap of connections given
@@ -78,6 +80,8 @@ func newConnectionPool(baseConnectionString string, connectionProfile Connection
 
 // Connection gets the connection for the given database
 func (pool *ConnectionPool) Connection(dbname string) (*sql.DB, error) {
+	pool.connectionMapMutex.Lock()
+	defer pool.connectionMapMutex.Unlock()
 	if result, ok := pool.connectionMap[dbname]; ok {
 		return result, nil
 	}
