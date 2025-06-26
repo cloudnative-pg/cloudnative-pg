@@ -56,14 +56,14 @@ into the destination cluster:
 - **monolith approach**: the destination cluster is designed to host multiple
   databases and different users, imported from the source cluster
 
-The first import method is available via the `microservice` type, while the
-latter by the `monolith` type.
+The first import method is available via the `microservice` type, the
+second via the `monolith` type.
 
 !!! Warning
     It is your responsibility to ensure that the destination cluster can
     access the source cluster with a superuser or a user having enough
     privileges to take a logical backup with `pg_dump`. Please refer to the
-    [PostgreSQL documentation on "SQL Dump"](https://www.postgresql.org/docs/current/app-pgdump.html)
+    [PostgreSQL documentation on pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
 
 ## The `microservice` type
@@ -81,6 +81,10 @@ performed in 4 steps:
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
 - execution of `ANALYZE VERBOSE` on the imported database
+
+In the below figure, a single PostgreSQL cluster with N databases is imported
+into N separate CloudNativePG clusters, each using a `microservice` import
+for one of the N source databases.
 
 ![Example of microservice import type](./images/microservice-import.png)
 
@@ -135,7 +139,7 @@ spec:
     and unsupported versions of Postgres too, giving you the chance to move your
     legacy data to a better system, inside Kubernetes.
     This is the main reason why we used 9.6 in the examples of this section.
-    We'd be interested to hear from you should you experience any issues in this area.
+    We'd be interested to hear from you, should you experience any issues in this area.
 
 There are a few things you need to be aware of when using the `microservice` type:
 
@@ -153,6 +157,12 @@ There are a few things you need to be aware of when using the `microservice` typ
   folder is automatically deleted by the operator.
 - Only one database can be specified inside the `initdb.import.databases` array
 - Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
+
+!!! Hint
+    The microservice approach follows CloudNativePG conventions and defaults.
+    Notably, if you don't specify `initdb.database` or `initdb.owner` for
+    the destination cluster, the default of `app` will be used for both, and
+    your chosen source database/owner may be renamed to `app`.
 
 ## The `monolith` type
 
