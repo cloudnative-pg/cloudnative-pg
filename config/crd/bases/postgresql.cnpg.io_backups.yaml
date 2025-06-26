@@ -77,6 +77,9 @@ spec:
                 - volumeSnapshot
                 - plugin
                 type: string
+                x-kubernetes-validations:
+                - message: method is immutable once set
+                  rule: oldSelf == '' || self == oldSelf
               online:
                 description: |-
                   Whether the default type of backup with volume snapshots is
