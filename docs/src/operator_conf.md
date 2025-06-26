@@ -14,6 +14,10 @@ By default, the operator is installed in the `cnpg-system`
 namespace as a Kubernetes `Deployment` called `cnpg-controller-manager`.
 
 !!! Note
+    The operator's log level is configured using the `--log-level` command line argument. See the
+    [Operator Logs](logging.md#operator-logs) section for more details.
+
+!!! Note
     In the examples below we assume the default name and namespace for the operator deployment.
 
 The behavior of the operator can be customized through a `ConfigMap`/`Secret` that
