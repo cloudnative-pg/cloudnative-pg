@@ -46,8 +46,8 @@ const (
 	// ParameterWalLogHints the configuration key containing the wal_log_hints value
 	ParameterWalLogHints = "wal_log_hints"
 
-	// ParameterRecoveyMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
-	ParameterRecoveyMinApplyDelay = "recovery_min_apply_delay"
+	// ParameterRecoveryMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
+	ParameterRecoveryMinApplyDelay = "recovery_min_apply_delay"
 )
 
 // An acceptable wal_level value
@@ -354,8 +354,8 @@ type ManagedExtension struct {
 	SkipCreateExtension bool
 }
 
-// IsUsed checks whether a configuration namespace in the namespaces list
-// is used in the user provided configuration
+// IsUsed checks whether a configuration namespace in the extension namespaces list
+// is used in the user-provided configuration
 func (e ManagedExtension) IsUsed(userConfigs map[string]string) bool {
 	for k := range userConfigs {
 		for _, namespace := range e.Namespaces {
@@ -681,7 +681,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		// primary and on the replicas, setting it on both
 		// is a safe approach.
 		configuration.OverwriteConfig(
-			ParameterRecoveyMinApplyDelay,
+			ParameterRecoveryMinApplyDelay,
 			fmt.Sprintf("%vs", math.Floor(info.RecoveryMinApplyDelay.Seconds())))
 	}
 
