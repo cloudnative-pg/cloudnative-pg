@@ -377,7 +377,7 @@ var _ = Describe("recovery_min_apply_delay", func() {
 			RecoveryMinApplyDelay:           0,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(config.GetConfig(ParameterRecoveyMinApplyDelay)).To(BeEmpty())
+		Expect(config.GetConfig(ParameterRecoveryMinApplyDelay)).To(BeEmpty())
 	})
 
 	It("is added to the configuration when specified", func() {
@@ -390,6 +390,6 @@ var _ = Describe("recovery_min_apply_delay", func() {
 			RecoveryMinApplyDelay:           1 * time.Hour,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(config.GetConfig(ParameterRecoveyMinApplyDelay)).To(Equal("3600s"))
+		Expect(config.GetConfig(ParameterRecoveryMinApplyDelay)).To(Equal("3600s"))
 	})
 })
