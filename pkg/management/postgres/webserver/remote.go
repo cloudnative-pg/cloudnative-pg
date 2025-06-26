@@ -231,7 +231,7 @@ func (ws *remoteWebserverEndpoints) failSafe(w http.ResponseWriter, _ *http.Requ
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-// This is the failsafe probe
+// This is the liveness probe
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, req *http.Request) {
 	ws.livenessChecker.IsHealthy(req.Context(), w)
 }
