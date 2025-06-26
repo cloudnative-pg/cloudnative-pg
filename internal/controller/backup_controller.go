@@ -29,7 +29,6 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
@@ -475,16 +474,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// Volume Snapshot errors are not retryable, we need to set this backup as failed
 		// and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
-		// Update backup status in cluster conditions
-		if errCond := resourcestatus.PatchConditionsWithOptimisticLock(
-			ctx,
-			r.Client,
-			cluster,
-			apiv1.BuildClusterBackupFailedCondition(err),
-		); errCond != nil {
-			contextLogger.Error(errCond, "Error while updating backup condition (backup snapshot failed)")
-		}
-
 		r.Recorder.Eventf(backup, "Warning", "Error", "snapshot backup failed: %v", err)
 		tryFlagBackupAsFailed(ctx, r.Client, backup, cluster, fmt.Errorf("can't execute snapshot backup: %w", err))
 		return nil, volumesnapshot.EnsurePodIsUnfenced(ctx, r.Client, r.Recorder, cluster, backup, targetPod)
@@ -759,11 +748,20 @@ func tryFlagBackupAsFailed(
 		cli,
 		cluster,
 		func(cluster *apiv1.Cluster) {
-			meta.SetStatusCondition(&cluster.Status.Conditions, apiv1.BuildClusterBackupFailedCondition(err))
 			cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
 		},
 	); err != nil {
 		contextLogger.Error(err, "while patching cluster with failed backup condition")
+		return
+	}
+
+	if err := resourcestatus.PatchConditionsWithOptimisticLock(
+		ctx,
+		cli,
+		cluster,
+		apiv1.BuildClusterBackupFailedCondition(err),
+	); err != nil {
+		contextLogger.Error(err, "Error while updating backup condition (backup failed)")
 		return
 	}
 }
