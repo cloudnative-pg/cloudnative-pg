@@ -89,6 +89,7 @@ func (e *pinger) ping(host, ip string) error {
 	if res, err = e.client.Get(failsafeURL.String()); err != nil {
 		return &pingError{
 			host:   host,
+			ip:     ip,
 			err:    err,
 			config: e.config,
 		}

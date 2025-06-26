@@ -103,7 +103,8 @@ func (e *livenessExecutor) IsHealthy(
 		// quickly as possible.
 		if err := evaluateLivenessPinger(ctx, e.lastestKnownCluster.DeepCopy()); err != nil {
 			contextLogger.Warning(
-				"Instance connectivity error - liveness probe failing but API server is reachable",
+				"Instance connectivity error - liveness probe succeeding because "+
+					"the API server is reachable",
 				"err",
 				err.Error(),
 			)
