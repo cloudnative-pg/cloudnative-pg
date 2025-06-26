@@ -24,14 +24,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/machinery/pkg/log"
-	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 )
 
+// BackupTransaction is a function that modifies a Backup object.
 type BackupTransaction func(*apiv1.Backup)
 
 type flagBackupErrors struct {
@@ -76,17 +77,27 @@ func FlagBackupAsFailed(
 	var flagErr flagBackupErrors
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var livingBackup *apiv1.Backup
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(backup), livingBackup); err != nil {
+		var livingBackup apiv1.Backup
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(backup), &livingBackup); err != nil {
+			contextLogger.Error(err, "failed to get backup")
 			return err
 		}
 		origBackup := livingBackup.DeepCopy()
-		backup.Status.SetAsFailed(err)
-		backup.Status.Method = backup.Spec.Method
+		livingBackup.Status.SetAsFailed(err)
+		livingBackup.Status.Method = livingBackup.Spec.Method
 		for _, transaction := range transactions {
-			transaction(backup)
+			transaction(&livingBackup)
 		}
-		return cli.Status().Patch(ctx, backup, client.MergeFrom(origBackup))
+
+		err := cli.Status().Patch(ctx, &livingBackup, client.MergeFrom(origBackup))
+		if err != nil {
+			contextLogger.Error(err, "while patching backup status")
+			return err
+		}
+		// we mutate the original object
+		backup.Status = livingBackup.Status
+
+		return nil
 	}); err != nil {
 		contextLogger.Error(err, "while flagging backup as failed")
 		flagErr.backupErr = err
