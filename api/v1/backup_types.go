@@ -138,6 +138,7 @@ type BackupSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot;plugin
 	// +kubebuilder:default:=barmanObjectStore
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="method is immutable once set"
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Configuration parameters passed to the plugin managing this backup
