@@ -735,7 +735,7 @@ func (r *ClusterReconciler) reconcileResources(
 		cluster,
 		resources.instances.Items,
 		resources.pvcs.Items,
-	); !res.IsZero() || err != nil {
+	); err != nil || !res.IsZero() {
 		return res, err
 	}
 
