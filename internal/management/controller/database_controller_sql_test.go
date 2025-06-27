@@ -516,3 +516,86 @@ var _ = Describe("Managed schema SQL", func() {
 		})
 	})
 })
+
+var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		fdw    apiv1.FDWSpec
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		fdw = apiv1.FDWSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   "testfdw",
+				Ensure: "present",
+			},
+			Handler:   "testhandler",
+			Validator: "testvalidator",
+			Owner:     "testowner",
+		}
+
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	Context("getDatabaseFDWInfo", func() {
+		It("returns info when the fdw exits", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseFDWSQL).
+				WithArgs(fdw.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"fdwname", "fdwhandler", "fdwvalidator", "fdwowner"}).
+						AddRow("testfdw", "testhandler", "testvalidator", "testowner"),
+				)
+			fdwInfo, err := getDatabaseFDWInfo(ctx, db, fdw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fdwInfo).ToNot(BeNil())
+			Expect(fdwInfo.Name).To(Equal("testfdw"))
+			Expect(fdwInfo.Handler).To(Equal("testhandler"))
+			Expect(fdwInfo.Validator).To(Equal("testvalidator"))
+			Expect(fdwInfo.Owner).To(Equal("testowner"))
+		})
+
+		It("returns nil info when the fdw does not exist", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseFDWSQL).
+				WithArgs(fdw.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"fdwname", "fdwhandler", "fdwvalidator", "fdwowner"}),
+				)
+			fdwInfo, err := getDatabaseFDWInfo(ctx, db, fdw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fdwInfo).To(BeNil())
+		})
+
+	})
+
+	Context("createDatabaseFDW", func() {
+		createFDWSQL := "CREATE FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\" VALIDATOR \"testvalidator\""
+
+		It("returns success when the fdw has been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createFDWSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(createDatabaseFDW(ctx, db, fdw)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when the fdw could not be created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createFDWSQL).
+				WillReturnError(testError)
+			Expect(createDatabaseFDW(ctx, db, fdw)).Error().To(Equal(testError))
+		})
+	})
+
+})
