@@ -43,6 +43,14 @@ type schemaInfo struct {
 	Owner string `json:"owner"`
 }
 
+type fdwInfo struct {
+	Name      string `json:"name"`
+	Handler   string `json:"handler"`
+	Validator string `json:"validator"`
+	Owner     string `json:"owner"`
+	//Options   []apiv1.OptSpec `json:"options"`
+}
+
 func detectDatabase(
 	ctx context.Context,
 	db *sql.DB,
@@ -402,5 +410,105 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 		return err
 	}
 	contextLogger.Info("dropped schema", "name", schema.Name)
+	return nil
+}
+
+//const detectDatabaseFDWSQL = `
+//SELECT
+//  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
+//  a.rolname AS owner
+//FROM pg_foreign_data_wrapper f
+//JOIN pg_authid a ON f.fdwowner = a.oid
+//WHERE fdwname = $1
+//`
+
+const detectDatabaseFDWSQL = `
+SELECT 
+ fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, a.rolname AS owner
+FROM pg_foreign_data_wrapper f
+JOIN pg_authid a ON f.fdwowner = a.oid
+WHERE fdwname = $1
+`
+
+func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
+	row := db.QueryRowContext(
+		ctx, detectDatabaseFDWSQL,
+		fdw.Name)
+	if row.Err() != nil {
+		return nil, fmt.Errorf("while checking if FDW %q exists: %w", fdw.Name, row.Err())
+	}
+
+	var (
+		// optionsRaw pq.StringArray
+		result fdwInfo
+	)
+	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &result.Owner); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if FDW %q exists: %w", fdw.Name, err)
+	}
+
+	// Extract options from SQL raw format to type OptSpec
+	//var opts []apiv1.OptSpec
+	//for _, opt := range optionsRaw {
+	//	parts := strings.SplitN(opt, "=", 2)
+	//	if len(parts) == 2 {
+	//		opts = append(opts, apiv1.OptSpec{
+	//			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+	//				Name: parts[0],
+	//			},
+	//			Value: parts[1],
+	//		})
+	//	}
+	//}
+	//result.Options = opts
+
+	return &result, nil
+}
+
+func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateFDW strings.Builder
+	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+	if len(fdw.Handler) > 0 {
+		sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+	}
+	if len(fdw.Validator) > 0 {
+		sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+	}
+
+	// TODO: format options here
+	//if len(fdw.Options) > 0 {
+	//	//sqlCreateFDW.WriteString(fmt.Sprintf("OPTIONS (%s) ", fdw.Options))
+	//}
+
+	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating foreign data wrapper", "query", sqlCreateFDW.String())
+		return err
+	}
+	contextLogger.Info("created foreign data wrapper", "name", fdw.Name)
+
+	return nil
+}
+
+func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
+	//contextLogger := log.FromContext(ctx)
+
+	return nil
+}
+
+func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+	query := fmt.Sprintf("DROP FOREIGN DATA WRAPPER IF EXISTS %s", pgx.Identifier{fdw.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	if err != nil {
+		contextLogger.Error(err, "while dropping foreign data wrapper", "query", query)
+	}
+	contextLogger.Info("dropped foreign data wrapper", "name", fdw.Name)
 	return nil
 }
