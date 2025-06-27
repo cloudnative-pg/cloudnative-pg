@@ -50,10 +50,10 @@ func NewLivenessChecker(
 	}
 }
 
-// tryRefreshLatestCluster refreshes the latest cluster definition, returns a bool indicating if the operation was
-// successful
-func (e *livenessExecutor) tryRefreshLatestCluster(ctx context.Context) bool {
-	timeoutContext, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+// tryRefreshLatestClusterWithTimeout refreshes the latest cluster definition, returns a bool indicating if the
+// operation was successful
+func (e *livenessExecutor) tryRefreshLatestClusterWithTimeout(ctx context.Context, timeout time.Duration) bool {
+	timeoutContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var cluster apiv1.Cluster
@@ -91,7 +91,7 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	if clusterRefreshed := e.tryRefreshLatestCluster(ctx); clusterRefreshed {
+	if clusterRefreshed := e.tryRefreshLatestClusterWithTimeout(ctx, 500*time.Millisecond); clusterRefreshed {
 		// We correctly reached the API server but, as a failsafe measure, we
 		// exercise the reachability checker and leave a log message if something
 		// is not right.
