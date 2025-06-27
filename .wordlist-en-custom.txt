@@ -1328,6 +1328,7 @@ switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeLogicalDecoding
 synchronizeReplicas
 synchronizeReplicasCache
 sys
