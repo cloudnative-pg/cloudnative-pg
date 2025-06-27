@@ -495,8 +495,9 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 }
 
 func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
+	// TODO: add update database FDW logic
 	//contextLogger := log.FromContext(ctx)
-
+	//if len()
 	return nil
 }
 
@@ -508,6 +509,7 @@ func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 		query)
 	if err != nil {
 		contextLogger.Error(err, "while dropping foreign data wrapper", "query", query)
+		return err
 	}
 	contextLogger.Info("dropped foreign data wrapper", "name", fdw.Name)
 	return nil
