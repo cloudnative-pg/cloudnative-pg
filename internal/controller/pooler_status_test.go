@@ -23,6 +23,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -93,6 +94,39 @@ var _ = Describe("pooler_status unit tests", func() {
 		err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
+	})
+
+	It("should correctly set pod resources to the bootstrap init container", func() {
+		cluster := newFakeCNPGCluster(env.client, "test-namespace")
+
+		pooler := &v1.Pooler{
+			Spec: v1.PoolerSpec{
+				Template: &v1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Resources: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dep, err := pgbouncer.Deployment(pooler, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		// check that the init container has the correct resources
+		Expect(dep.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+		initResources := dep.Spec.Template.Spec.InitContainers[0].Resources
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("200m")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("256Mi")))
 	})
 
 	It("should correctly interact with the api server", func() {

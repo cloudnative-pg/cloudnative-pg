@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 
 package v1
 
+import corev1 "k8s.io/api/core/v1"
+
 // IsPaused returns whether all database should be paused or not.
 func (in PgBouncerSpec) IsPaused() bool {
 	return in.Paused != nil && *in.Paused
@@ -57,4 +59,17 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 		return false
 	}
 	return true
+}
+
+// GetResourcesRequirements returns the resource requirements for the Pooler
+func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
+	if in.Spec.Template == nil {
+		return corev1.ResourceRequirements{}
+	}
+
+	if in.Spec.Template.Spec.Resources == nil {
+		return corev1.ResourceRequirements{}
+	}
+
+	return *in.Spec.Template.Spec.Resources
 }
