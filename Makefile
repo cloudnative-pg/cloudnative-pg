@@ -67,7 +67,7 @@ OPERATOR_SDK_VERSION ?= v1.40.0
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.55.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.13.3
+PREFLIGHT_VERSION ?= 1.14.0
 OPENSHIFT_VERSIONS ?= v4.12-v4.19
 ARCH ?= amd64
 
