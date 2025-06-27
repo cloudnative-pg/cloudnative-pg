@@ -229,13 +229,18 @@ type FDWSpec struct {
 	DatabaseObjectSpec `json:",inline"`
 
 	// Name of the handler function (e.g., "postgres_fdw_handler")
-	Handler string `json:"handler"`
+	Handler string `json:"handler,omitempty"`
 
 	// Name of the validator function (e.g., "postgres_fdw_validator")
-	Validator string `json:"validator"`
+	Validator string `json:"validator,omitempty"`
+
+	// Owner specifies the database user who will own the Foreign Data Wrapper.
+	// By default, the owner of a new FDW is the current session user.
+	// Even if an owner is explicitly specified during creation, it will be ignored.
+	Owner string `json:"owner,omitempty"`
 
 	// Optional FDW-level options (e.g., use_remote_estimate)
-	Options []OptSpec `json:"options,omitempty"`
+	// Options []OptSpec `json:"options,omitempty"`
 }
 
 //// ForeignServerSpec configures a foreign server for a FDW
