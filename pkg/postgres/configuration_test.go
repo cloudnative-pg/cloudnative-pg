@@ -391,3 +391,50 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(config.GetConfig(ParameterRecoveryMinApplyDelay)).To(Equal("3600s"))
 	})
 })
+
+var _ = Describe("PostgreSQL Extensions", func() {
+	Context("configuring extension_control_path and dynamic_library_path", func() {
+		It("both empty when there are no Extensions defined", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(BeEmpty())
+			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEmpty())
+		})
+
+		It("configures them when an Extension is defined", func() {
+			info := ConfigurationInfo{
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          18,
+				IncludingMandatory:    true,
+				ImageVolumeExtensions: []string{"postgis", "pgvector"},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(
+				BeEquivalentTo("$system:/extensions/postgis/share:/extensions/pgvector/share"))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(
+				BeEquivalentTo("$libdir:/extensions/postgis/lib:/extensions/pgvector/lib"))
+		})
+
+		It("correctly merges the configuration with UserSettings", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				UserSettings: map[string]string{
+					ExtensionControlPath: "/my/extension/path",
+					DynamicLibraryPath:   "/my/library/path",
+				},
+				ImageVolumeExtensions: []string{"postgis", "pgvector"},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(
+				BeEquivalentTo("$system:/extensions/postgis/share:/extensions/pgvector/share:/my/extension/path"))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(
+				BeEquivalentTo("$libdir:/extensions/postgis/lib:/extensions/pgvector/lib:/my/library/path"))
+		})
+	})
+})
