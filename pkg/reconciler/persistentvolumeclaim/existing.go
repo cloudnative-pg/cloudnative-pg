@@ -39,7 +39,7 @@ type reconciliationUnit func(
 	pvc *corev1.PersistentVolumeClaim,
 ) error
 
-// reconcileExistingPVCs align the resource requests
+// reconcileExistingPVCs align the existing pvcs to the desired state
 func reconcileExistingPVCs(
 	ctx context.Context,
 	c client.Client,
