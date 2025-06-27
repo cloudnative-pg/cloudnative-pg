@@ -21,6 +21,7 @@ package probes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -95,7 +96,8 @@ func (e *livenessExecutor) IsHealthy(
 		// quickly as possible.
 		if err := evaluateLivenessPinger(ctx, e.lastestKnownCluster.DeepCopy()); err != nil {
 			contextLogger.Warning(
-				"Instance connectivity error - liveness probe failing but API server is reachable",
+				"Instance connectivity error - liveness probe succeeding because "+
+					"the API server is reachable",
 				"err",
 				err.Error(),
 			)
@@ -144,11 +146,20 @@ func evaluateLivenessPinger(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	cfg, err := NewLivenessPingerConfigFromAnnotations(ctx, cluster.Annotations)
-	if err != nil {
-		return err
+	var cfg *apiv1.IsolationCheckConfiguration
+	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Liveness != nil {
+		cfg = cluster.Spec.Probes.Liveness.IsolationCheck
 	}
-	if !cfg.isEnabled() {
+	if cfg == nil {
+		return nil
+	}
+
+	// This should never happen given that we set a default value. Fail fast.
+	if cfg.Enabled == nil {
+		return errors.New("enabled field is not set in the liveness isolation check configuration")
+	}
+
+	if !*cfg.Enabled {
 		contextLogger.Debug("pinger config not enabled, skipping")
 		return nil
 	}
@@ -158,7 +169,7 @@ func evaluateLivenessPinger(
 		return nil
 	}
 
-	checker, err := buildInstanceReachabilityChecker(*cfg)
+	checker, err := buildInstanceReachabilityChecker(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}
