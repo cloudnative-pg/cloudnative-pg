@@ -64,6 +64,7 @@ func (f flagBackupErrors) toError() error {
 	return nil
 }
 
+// FlagBackupAsFailed updates the status of a Backup object to indicate that it has failed.
 func FlagBackupAsFailed(
 	ctx context.Context,
 	cli client.Client,
