@@ -399,8 +399,6 @@ EOF
   cat >"${configMaps}" <<-EOF
 data:
    INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
-   PPROF_HTTP_SERVER: "0.0.0.0:6060"
-   PLUGIN_PPROF_SERVER: "0.0.0.0:6061"
 EOF
  configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
  kubectl -n cnpg-system patch configmap ${configMapName} --patch-file "${configMaps}"

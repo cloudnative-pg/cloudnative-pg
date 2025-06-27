@@ -171,16 +171,6 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 		)
 	}
 
-	if configuration.Current.PprofHTTPServer != "" {
-		config.EnvVars = append(
-			config.EnvVars,
-			corev1.EnvVar{
-				Name:  "PPROF_HTTP_SERVER",
-				Value: configuration.Current.PprofHTTPServer,
-			},
-		)
-	}
-
 	hashValue, _ := hash.ComputeHash(config)
 	config.Hash = hashValue
 	return config
@@ -284,14 +274,19 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					ContainerPort: url.StatusPort,
 					Protocol:      "TCP",
 				},
-				{
-					Name:          "pprof",
-					ContainerPort: 6060,
-					Protocol:      "TCP",
-				},
 			},
 			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 		},
+	}
+
+	if cluster.Annotations[utils.EnableInstancePprofAnnotationName] == "true" {
+		containers[0].Ports = append(containers[0].Ports, corev1.ContainerPort{
+			Name:          "pprof",
+			ContainerPort: 6060,
+			Protocol:      "TCP",
+		})
+
+		containers[0].Command = append(containers[0].Command, "--pprof-server")
 	}
 
 	if enableHTTPS {
@@ -470,7 +465,7 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
+// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
 	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")
