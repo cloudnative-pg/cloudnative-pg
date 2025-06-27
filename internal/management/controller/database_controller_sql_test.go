@@ -598,4 +598,22 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		})
 	})
 
+	Context("dropDatabaseFDW", func() {
+		dropFDWSQL := "DROP FOREIGN DATA WRAPPER IF EXISTS \"testfdw\""
+
+		It("returns success when the foreign data wrapper has been dropped", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropFDWSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(dropDatabaseFDW(ctx, db, fdw)).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when the DROP statement failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropFDWSQL).
+				WillReturnError(testError)
+
+			Expect(dropDatabaseFDW(ctx, db, fdw)).Error().To(Equal(testError))
+		})
+	})
 })
