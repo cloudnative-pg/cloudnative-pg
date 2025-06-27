@@ -51,7 +51,7 @@ import (
 
 const (
 	// minioImage is the image used to run a MinIO server
-	minioImage = "minio/minio:RELEASE.2025-05-24T17-08-30Z"
+	minioImage = "minio/minio:RELEASE.2025-06-13T11-33-47Z"
 	// minioClientImage is the image used to run a MinIO client
 	minioClientImage = "minio/mc:RELEASE.2025-05-21T01-59-54Z"
 )
