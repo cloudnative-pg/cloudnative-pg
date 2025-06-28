@@ -5680,6 +5680,15 @@ Changes to this field are automatically reapplied to the created PVCs.
 Size cannot be decreased.</p>
 </td>
 </tr>
+<tr><td><code>volumeAttributesClassName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>VolumeAttributesClass to use for PVCs. Applied after
+evaluating the PVC template, if available.
+If not specified, the generated PVCs will not use a VolumeAttributesClass.</p>
+</td>
+</tr>
 <tr><td><code>resizeInUseVolumes</code><br/>
 <i>bool</i>
 </td>
