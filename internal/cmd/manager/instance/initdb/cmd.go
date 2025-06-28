@@ -120,9 +120,9 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&appDBName, "app-db-name", "app",
+	cmd.Flags().StringVar(&appDBName, "app-db-name", "",
 		"The name of the application containing the database")
-	cmd.Flags().StringVar(&appUser, "app-user", "app",
+	cmd.Flags().StringVar(&appUser, "app-user", "",
 		"The name of the application user")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
