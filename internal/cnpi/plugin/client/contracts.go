@@ -42,6 +42,7 @@ type Client interface {
 	BackupCapabilities
 	RestoreJobHooksCapabilities
 	PostgresConfigurationCapabilities
+	MetricsCapabilities
 }
 
 // SetPluginClientInContext records the plugin client in the given context

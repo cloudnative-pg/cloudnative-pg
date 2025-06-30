@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package metricserver
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -54,6 +55,9 @@ type Exporter struct {
 	// - to ensure we are able to unit test
 	// - to make the struct adhere to the composition pattern instead of hardcoding dependencies inside the functions
 	getCluster func() (*apiv1.Cluster, error)
+
+	// pluginCollector is used to collect metrics from plugins
+	pluginCollector m.PluginCollector
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -90,12 +94,18 @@ type PgStatWalMetrics struct {
 	WalSyncTime    *prometheus.GaugeVec
 }
 
+/*
+-> factory del pluginmetrics collector
+*/
+
 // NewExporter creates an exporter
-func NewExporter(instance *postgres.Instance) *Exporter {
+func NewExporter(instance *postgres.Instance, pluginCollector m.PluginCollector) *Exporter {
+	clusterGetter := local.NewClient().Cache().GetCluster
 	return &Exporter{
-		instance:   instance,
-		Metrics:    newMetrics(),
-		getCluster: local.NewClient().Cache().GetCluster,
+		instance:        instance,
+		Metrics:         newMetrics(),
+		getCluster:      clusterGetter,
+		pluginCollector: pluginCollector,
 	}
 }
 
@@ -303,6 +313,10 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 			e.Metrics.PgStatWalMetrics.WalSyncTime.Describe(ch)
 		}
 	}
+
+	if cluster, _ := e.getCluster(); cluster != nil {
+		e.pluginCollector.Describe(context.Background(), ch, cluster)
+	}
 }
 
 // Collect implements prometheus.Collector, collecting the Metrics values to
@@ -337,6 +351,14 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
 			e.Metrics.PgStatWalMetrics.WalWriteTime.Collect(ch)
 			e.Metrics.PgStatWalMetrics.WalSyncTime.Collect(ch)
+		}
+	}
+
+	if cluster, _ := e.getCluster(); cluster != nil {
+		if err := e.pluginCollector.Collect(context.Background(), ch, cluster); err != nil {
+			log.Error(err, "error while collecting plugin metrics")
+			e.Metrics.Error.Set(1)
+			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PluginMetrics").Inc()
 		}
 	}
 }

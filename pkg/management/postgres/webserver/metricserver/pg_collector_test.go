@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package metricserver
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -36,13 +37,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type fakePluginCollector struct{}
+
+func (f fakePluginCollector) Collect(context.Context, chan<- prometheus.Metric, *apiv1.Cluster) error {
+	return nil
+}
+
+func (f fakePluginCollector) Describe(context.Context, chan<- *prometheus.Desc, *apiv1.Cluster) {
+}
+
 var _ = Describe("test metrics parsing", func() {
 	var exporter *Exporter
 
 	BeforeEach(func() {
 		cache.Delete(cache.ClusterKey)
 		instance := postgres.NewInstance()
-		exporter = NewExporter(instance)
+		exporter = NewExporter(instance, fakePluginCollector{})
 	})
 
 	It("fails if there's no cluster in the cache", func() {

@@ -55,6 +55,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -218,7 +219,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	}
 	defer pluginRepository.Close()
 
-	metricsExporter := metricserver.NewExporter(instance)
+	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
