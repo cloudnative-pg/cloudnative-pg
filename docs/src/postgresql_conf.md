@@ -133,24 +133,26 @@ archiving and replication.
 ### Write-Ahead Log Level
 
 The [`wal_level`](https://www.postgresql.org/docs/current/runtime-config-wal.html)
-parameter in PostgreSQL determines the amount of information written to the
+parameter in PostgreSQL determines the amount of data written to the
 Write-Ahead Log (WAL). It accepts the following values:
 
-- `minimal`: Writes only the information required for crash recovery
-  (CloudNativePG uses this setting only for single-instance clusters with WAL
-  archiving disabled).
+- `minimal`: Writes only the information required for crash recovery.
 - `replica`: Adds sufficient information to support WAL archiving and streaming
   replication, including the ability to run read-only queries on standby
   instances.
 - `logical`: Includes all information from `replica`, plus additional data
   required for logical decoding and replication.
 
-Unlike upstream PostgreSQL, CloudNativePG sets `wal_level` to `logical` by
-default. This is to enable logical replication out of the box, making it easier
-to support use cases such as migrations from external PostgreSQL servers.
+By default, upstream PostgreSQL sets `wal_level` to `replica`. CloudNativePG,
+instead, sets `wal_level` to `logical` by default to enable logical replication
+out of the box. This makes it easier to support use cases such as migrations
+from external PostgreSQL servers.
 
 If your cluster does not require logical replication, it is recommended to set
 `wal_level` to `replica` to reduce WAL volume and overhead.
+
+Finally, CloudNativePG allows `wal_level` to be set to `minimal` only for
+single-instance clusters with WAL archiving disabled.
 
 ### Replication Settings
 
