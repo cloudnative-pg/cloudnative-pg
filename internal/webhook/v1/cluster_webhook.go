@@ -1039,21 +1039,19 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		}
 	}
 
-	if _, fieldError := validateBooleanPostgresParameter(r,
-		postgres.ParameterHotStandbyFeedback, false); fieldError != nil {
+	if _, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterHotStandbyFeedback); fieldError != nil {
 		result = append(result, fieldError)
 	}
 
-	if _, fieldError := validateBooleanPostgresParameter(r,
-		postgres.ParameterSyncReplicationSlots, false); fieldError != nil {
+	if _, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterSyncReplicationSlots); fieldError != nil {
 		result = append(result, fieldError)
 	}
 
-	walLogHintsActivated, fieldError := validateBooleanPostgresParameter(r, postgres.ParameterWalLogHints, true)
+	walLogHintsActivated, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterWalLogHints)
 	if fieldError != nil {
 		result = append(result, fieldError)
 	}
-	if !walLogHintsActivated && r.Spec.Instances > 1 {
+	if walLogHintsActivated != nil && !*walLogHintsActivated && r.Spec.Instances > 1 {
 		result = append(
 			result,
 			field.Invalid(
@@ -1075,19 +1073,22 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	return result
 }
 
-func validateBooleanPostgresParameter(r *apiv1.Cluster, parameterName string, defaultValue bool) (bool, *field.Error) {
+// tryParseBooleanPostgresParameter attempts to parse a boolean PostgreSQL parameter
+// from the cluster specification. If the parameter is not set, it returns nil.
+func tryParseBooleanPostgresParameter(r *apiv1.Cluster, parameterName string) (*bool, *field.Error) {
 	stringValue, hasParameter := r.Spec.PostgresConfiguration.Parameters[parameterName]
-	if hasParameter {
-		value, err := postgres.ParsePostgresConfigBoolean(stringValue)
-		if err != nil {
-			return defaultValue, field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", parameterName),
-				stringValue,
-				fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", parameterName))
-		}
-		return value, nil
+	if !hasParameter {
+		return nil, nil
 	}
-	return defaultValue, nil
+
+	value, err := postgres.ParsePostgresConfigBoolean(stringValue)
+	if err != nil {
+		return nil, field.Invalid(
+			field.NewPath("spec", "postgresql", "parameters", parameterName),
+			stringValue,
+			fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", parameterName))
+	}
+	return &value, nil
 }
 
 // validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
