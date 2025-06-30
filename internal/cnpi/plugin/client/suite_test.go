@@ -26,6 +26,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/backup"
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
+	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
@@ -107,6 +108,22 @@ type fakeConnection struct {
 	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
 	name                  string
 	operatorClient        *fakeOperatorClient
+}
+
+func (f *fakeConnection) MetricsClient() metrics.MetricsClient {
+	panic("implement me")
+}
+
+func (f *fakeConnection) MetricsCapabilities() []metrics.MetricsCapability_RPC_Type {
+	panic("implement me")
+}
+
+func (f *fakeConnection) GetMetricsDefinitions(context.Context, k8client.Object) (PluginMetrics, error) {
+	panic("implement me")
+}
+
+func (f *fakeConnection) CollectMetrics(context.Context, k8client.Object) ([]*metrics.CollectMetric, error) {
+	panic("implement me")
 }
 
 func (f *fakeConnection) PostgresClient() postgresClient.PostgresClient {

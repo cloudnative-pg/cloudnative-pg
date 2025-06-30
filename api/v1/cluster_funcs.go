@@ -108,6 +108,28 @@ func (cluster *Cluster) GetInstanceEnabledPluginNames() (result []string) {
 	return instanceEnabled
 }
 
+// GetMetricsEnabledPluginNames gets the name of the plugins that are available to the metrics webserver
+func (cluster *Cluster) GetMetricsEnabledPluginNames() (result []string) {
+	var metrics []string
+	for _, pluginStatus := range cluster.Status.PluginStatus {
+		if slices.Contains(pluginStatus.Capabilities,
+			identity.PluginCapability_Service_TYPE_METRICS.String()) {
+			metrics = append(metrics, pluginStatus.Name)
+		}
+	}
+
+	enabled := GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+
+	var metricsEnabled []string
+	for _, pluginName := range metrics {
+		if slices.Contains(enabled, pluginName) {
+			metricsEnabled = append(metricsEnabled, pluginName)
+		}
+	}
+
+	return metricsEnabled
+}
+
 // GetJobEnabledPluginNames gets the name of the plugins that are available to the job container
 func (cluster *Cluster) GetJobEnabledPluginNames() (result []string) {
 	var instance []string

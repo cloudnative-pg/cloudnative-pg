@@ -27,11 +27,15 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"time"
 
 	"github.com/blang/semver"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics/histogram"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -545,4 +549,100 @@ func (c QueryCollector) collectHistogramMetric(
 		return
 	}
 	ch <- metric
+}
+
+// PluginCollector is the interface for collecting metrics from plugins
+type PluginCollector interface {
+	// Collect collects the metrics from the plugins
+	Collect(ctx context.Context, ch chan<- prometheus.Metric, cluster *apiv1.Cluster) error
+	// Describe describes the metrics from the plugins
+	Describe(ctx context.Context, ch chan<- *prometheus.Desc, cluster *apiv1.Cluster)
+}
+
+type pluginCollector struct {
+	pluginRepository repository.Interface
+}
+
+// NewPluginCollector creates a new PluginCollector that collects metrics from plugins
+func NewPluginCollector(
+	pluginRepository repository.Interface,
+) PluginCollector {
+	return &pluginCollector{pluginRepository: pluginRepository}
+}
+
+func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, cluster *apiv1.Cluster) {
+	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_describe")
+
+	if len(cluster.GetMetricsEnabledPluginNames()) == 0 {
+		contextLogger.Debug("No plugins enabled for metrics collection")
+		return
+	}
+
+	cli, err := p.getClient(ctx, cluster)
+	if err != nil {
+		contextLogger.Error(err, "failed to get plugin client")
+		return
+	}
+	defer cli.Close(ctx)
+
+	pluginsMetrics, err := cli.GetMetricsDefinitions(ctx, cluster)
+	if err != nil {
+		contextLogger.Error(err, "failed to get plugin metrics")
+		return
+	}
+
+	for _, metric := range pluginsMetrics {
+		ch <- metric.Desc
+	}
+}
+
+func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metric, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_collect")
+
+	if len(cluster.GetMetricsEnabledPluginNames()) == 0 {
+		contextLogger.Debug("No plugins enabled for metrics collection")
+		return nil
+	}
+
+	cli, err := p.getClient(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin client: %w", err)
+	}
+	defer cli.Close(ctx)
+
+	pluginsMetrics, err := cli.GetMetricsDefinitions(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin metrics during collect: %w", err)
+	}
+
+	res, err := cli.CollectMetrics(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("failed to collect metrics from plugins: %w", err)
+	}
+
+	for _, data := range res {
+		definition := pluginsMetrics.GetPluginMetric(data.FqName)
+		if definition == nil {
+			return fmt.Errorf("metric definition not found for fqName: %s", data.FqName)
+		}
+
+		m, err := prometheus.NewConstMetric(definition.Desc, definition.ValueType, data.Value, data.VariableLabels...)
+		if err != nil {
+			return fmt.Errorf("failed to create metric %s: %w", data.FqName, err)
+		}
+		ch <- m
+	}
+
+	return nil
+}
+
+func (p *pluginCollector) getClient(ctx context.Context, cluster *apiv1.Cluster) (pluginClient.Client, error) {
+	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelPluginLoading()
+
+	return pluginClient.WithPlugins(
+		pluginLoadingContext,
+		p.pluginRepository,
+		cluster.GetMetricsEnabledPluginNames()...,
+	)
 }
