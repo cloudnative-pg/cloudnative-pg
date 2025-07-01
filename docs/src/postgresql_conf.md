@@ -133,14 +133,14 @@ archiving and replication.
 ### Write-Ahead Log Level
 
 The [`wal_level`](https://www.postgresql.org/docs/current/runtime-config-wal.html)
-parameter in PostgreSQL determines the amount of data written to the
+parameter in PostgreSQL determines the amount of information written to the
 Write-Ahead Log (WAL). It accepts the following values:
 
 - `minimal`: Writes only the information required for crash recovery.
 - `replica`: Adds sufficient information to support WAL archiving and streaming
   replication, including the ability to run read-only queries on standby
   instances.
-- `logical`: Includes all information from `replica`, plus additional data
+- `logical`: Includes all information from `replica`, plus additional info
   required for logical decoding and replication.
 
 By default, upstream PostgreSQL sets `wal_level` to `replica`. CloudNativePG,
