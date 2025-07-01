@@ -148,16 +148,8 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		image := extension.ImageVolumeSource
-		result = append(result,
-			corev1.Volume{
-				Name: extension.Name,
-				VolumeSource: corev1.VolumeSource{
-					Image: &image,
-				},
-			},
-		)
+	if cluster.ContainsExtensions() {
+		result = append(result, createExtensionVolumes(cluster)...)
 	}
 
 	return result
@@ -289,13 +281,8 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		}
 	}
 
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      extension.Name,
-				MountPath: fmt.Sprintf("/extensions/%s", extension.Name),
-			},
-		)
+	if cluster.ContainsExtensions() {
+		volumeMounts = append(volumeMounts, createExtensionVolumeMounts(&cluster)...)
 	}
 
 	return volumeMounts
@@ -335,4 +322,34 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 			Projected: cluster.Spec.ProjectedVolumeTemplate.DeepCopy(),
 		},
 	}
+}
+
+func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
+	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		extensionVolumes = append(extensionVolumes,
+			corev1.Volume{
+				Name: extension.Name,
+				VolumeSource: corev1.VolumeSource{
+					Image: &extension.ImageVolumeSource,
+				},
+			},
+		)
+	}
+
+	return extensionVolumes
+}
+
+func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
+	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		extensionVolumeMounts = append(extensionVolumeMounts,
+			corev1.VolumeMount{
+				Name:      extension.Name,
+				MountPath: fmt.Sprintf("/extensions/%s", extension.Name),
+			},
+		)
+	}
+
+	return extensionVolumeMounts
 }
