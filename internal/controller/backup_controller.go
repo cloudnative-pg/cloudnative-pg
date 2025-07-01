@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -204,7 +205,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if isRunning && backup.GetOnlineOrDefault(&cluster) {
-		if err := r.ensureTargetPodHealthy(ctx, &backup); err != nil {
+		if err := r.ensureTargetPodHealthy(ctx, &backup, &cluster); err != nil {
 			contextLogger.Error(err, "while ensuring target pod is healthy")
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
 				fmt.Errorf("while ensuring target pod is healthy: %w", err))
@@ -719,27 +720,29 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	return controllerBuilder.Complete(r)
 }
 
-func (r *BackupReconciler) ensureTargetPodHealthy(ctx context.Context, backup *apiv1.Backup) error {
+func (r *BackupReconciler) ensureTargetPodHealthy(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) error {
 	if backup.Status.InstanceID == nil || len(backup.Status.InstanceID.PodName) == 0 {
 		return fmt.Errorf("no target pod assigned for backup %s", backup.Name)
 	}
 
-	var pod corev1.Pod
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Status.InstanceID.PodName,
-	}, &pod); err != nil {
-		return fmt.Errorf("while getting target pod %s for backup %s: %w",
-			backup.Status.InstanceID.PodName, backup.Name, err)
+	podName := backup.Status.InstanceID.PodName
+
+	healthyPods, ok := cluster.Status.InstancesStatus[apiv1.PodHealthy]
+	if !ok {
+		return fmt.Errorf("no status found for target pod %s in cluster %s", podName, cluster.Name)
 	}
 
-	if !utils.IsPodReady(pod) {
-		return fmt.Errorf("target pod %s for backup %s is not ready", pod.Name, backup.Name)
+	if !slices.Contains(healthyPods, podName) {
+		return fmt.Errorf("target pod %s is not healthy for backup in cluster %s", podName, cluster.Name)
 	}
 
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Target pod is healthy for backup",
-		"podName", pod.Name,
+		"podName", podName,
 		"backupName", backup.Name,
 	)
 	return nil
