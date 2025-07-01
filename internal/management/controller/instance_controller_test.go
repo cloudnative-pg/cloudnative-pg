@@ -37,47 +37,48 @@ var _ = Describe("buildPostmasterEnv", func() {
 	const (
 		customPaths = ":/extensions/foo/lib:/extensions/bar/lib"
 	)
+	var cluster apiv1.Cluster
 
 	BeforeEach(func() {
 		err := os.Unsetenv("LD_LIBRARY_PATH")
 		Expect(err).ToNot(HaveOccurred())
-	})
 
-	cluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-example",
-			Namespace: "default",
-		},
-		Spec: apiv1.ClusterSpec{
-			PostgresConfiguration: apiv1.PostgresConfiguration{
-				Extensions: []apiv1.ExtensionConfiguration{
-					{
-						Name: "foo",
-						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: "foo:dev",
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "foo:dev",
+							},
 						},
-					},
-					{
-						Name: "bar",
-						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: "bar:dev",
+						{
+							Name: "bar",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "bar:dev",
+							},
 						},
 					},
 				},
 			},
-		},
-	}
+		}
+	})
 
 	When("Extensions are enabled", func() {
 		It("LD_LIBRARY_PATH should be defined", func() {
-			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(cluster))
+			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(&cluster))
 			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=%s", customPaths)))
 		})
 		It("LD_LIBRARY_PATH should retain existing values", func() {
 			err := os.Setenv("LD_LIBRARY_PATH", ":/my/library/path")
 			Expect(err).ToNot(HaveOccurred())
 
-			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(cluster))
+			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(&cluster))
 			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:/my/library/path%s", customPaths)))
 		})
 	})
@@ -86,7 +87,7 @@ var _ = Describe("buildPostmasterEnv", func() {
 		It("LD_LIBRARY_PATH should be empty", func() {
 			cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
 
-			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(cluster))
+			ldLibraryPath := getLdLibraryPath(buildPostmasterEnv(&cluster))
 			Expect(ldLibraryPath).To(BeEquivalentTo("LD_LIBRARY_PATH="))
 		})
 	})
