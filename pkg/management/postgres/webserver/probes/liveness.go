@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,12 +50,15 @@ func NewLivenessChecker(
 	}
 }
 
-// tryRefreshLatestCluster refreshes the latest cluster definition, returns a bool indicating if the operation was
-// successful
-func (e *livenessExecutor) tryRefreshLatestCluster(ctx context.Context) bool {
+// tryRefreshLatestClusterWithTimeout refreshes the latest cluster definition, returns a bool indicating if the
+// operation was successful
+func (e *livenessExecutor) tryRefreshLatestClusterWithTimeout(ctx context.Context, timeout time.Duration) bool {
+	timeoutContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	var cluster apiv1.Cluster
 	err := e.cli.Get(
-		ctx,
+		timeoutContext,
 		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
 		&cluster,
 	)
@@ -87,7 +91,10 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	if clusterRefreshed := e.tryRefreshLatestCluster(ctx); clusterRefreshed {
+	// We set a safe context timeout of 500ms to avoid a failed request from taking
+	// more time than the minimum configurable timeout (1s) of the container's livenessProbe,
+	// which otherwise could have triggered a restart of the instance.
+	if clusterRefreshed := e.tryRefreshLatestClusterWithTimeout(ctx, 500*time.Millisecond); clusterRefreshed {
 		// We correctly reached the API server but, as a failsafe measure, we
 		// exercise the reachability checker and leave a log message if something
 		// is not right.
