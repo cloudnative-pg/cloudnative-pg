@@ -140,7 +140,7 @@ Write-Ahead Log (WAL). It accepts the following values:
 - `replica`: Adds sufficient information to support WAL archiving and streaming
   replication, including the ability to run read-only queries on standby
   instances.
-- `logical`: Includes all information from `replica`, plus additional info
+- `logical`: Includes all information from `replica`, plus additional information
   required for logical decoding and replication.
 
 By default, upstream PostgreSQL sets `wal_level` to `replica`. CloudNativePG,
