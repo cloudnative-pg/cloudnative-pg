@@ -203,6 +203,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	if isRunning && backup.GetOnlineOrDefault(&cluster) {
+		if err := r.ensureTargetPodHealthy(ctx, &backup); err != nil {
+			contextLogger.Error(err, "while ensuring target pod is healthy")
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
+				fmt.Errorf("while ensuring target pod is healthy: %w", err))
+			r.Recorder.Eventf(&backup, "Warning", "TargetPodNotHealthy",
+				"Error ensuring target pod is healthy: %s", err.Error())
+			return ctrl.Result{}, nil
+		}
+	}
+
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
@@ -706,4 +717,30 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	// will allow that
 	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	return controllerBuilder.Complete(r)
+}
+
+func (r *BackupReconciler) ensureTargetPodHealthy(ctx context.Context, backup *apiv1.Backup) error {
+	if backup.Status.InstanceID == nil || len(backup.Status.InstanceID.PodName) == 0 {
+		return fmt.Errorf("no target pod assigned for backup %s", backup.Name)
+	}
+
+	var pod corev1.Pod
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Status.InstanceID.PodName,
+	}, &pod); err != nil {
+		return fmt.Errorf("while getting target pod %s for backup %s: %w",
+			backup.Status.InstanceID.PodName, backup.Name, err)
+	}
+
+	if !utils.IsPodReady(pod) {
+		return fmt.Errorf("target pod %s for backup %s is not ready", pod.Name, backup.Name)
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Debug("Target pod is healthy for backup",
+		"podName", pod.Name,
+		"backupName", backup.Name,
+	)
+	return nil
 }
