@@ -21,6 +21,7 @@ package replication
 
 import (
 	"context"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
