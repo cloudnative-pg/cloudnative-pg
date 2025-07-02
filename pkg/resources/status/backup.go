@@ -116,7 +116,7 @@ func FlagBackupAsFailed(
 			cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
 		},
 	); err != nil {
-		contextLogger.Error(err, "while patching cluster with failed backup condition")
+		contextLogger.Error(err, "while patching cluster status with last failed backup")
 		flagErr.clusterStatusErr = err
 	}
 
@@ -126,7 +126,7 @@ func FlagBackupAsFailed(
 		cluster,
 		apiv1.BuildClusterBackupFailedCondition(err),
 	); err != nil {
-		contextLogger.Error(err, "Error while updating backup condition (backup failed)")
+		contextLogger.Error(err, "while patching backup condition in the cluster status (backup failed)")
 		flagErr.clusterConditionErr = err
 	}
 
