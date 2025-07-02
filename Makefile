@@ -64,6 +64,12 @@ SPELLCHECK_VERSION ?= 0.51.0
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.40.0
+# renovate: datasource=go depName=sigs.k8s.io/controller-runtime/tools/setup-envtest
+ENVTEST_VERSION ?= v0.21.0
+# renovate: datasource=go depName=github.com/google/go-licenses
+GO_LICENSES_VERSION ?= v1.6.0
+# renovate: datasource=go depName=golang.org/x/vuln/cmd/govulncheck
+GOVULNCHECK_VERSION ?= v1.1.4
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.55.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
@@ -335,7 +341,7 @@ kustomize: ## Download kustomize locally if necessary.
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 GENREF = $(LOCALBIN)/genref
 genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
@@ -343,7 +349,7 @@ genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
-	$(call go-install-tool,$(GO_LICENSES),github.com/google/go-licenses@latest)
+	$(call go-install-tool,$(GO_LICENSES),github.com/google/go-licenses@$(GO_LICENSES_VERSION))
 
 GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
@@ -352,7 +358,7 @@ go-releaser: ## Download go-releaser locally if necessary.
 .PHONY: govulncheck
 GOVULNCHECK = $(LOCALBIN)/govulncheck
 govulncheck: ## Download govulncheck locally if necessary.
-	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck@latest)
+	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION))
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # go-install-tool will 'go install' any package $2 and install it to $1.
