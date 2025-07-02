@@ -210,7 +210,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if isRunning && backup.GetOnlineOrDefault(&cluster) {
-		if err := r.ensureTargetPodHealthy(ctx, &backup, &cluster); err != nil {
+		if err := r.ensureTargetPodHealthy(ctx, r.Client, &backup, &cluster); err != nil {
 			contextLogger.Error(err, "while ensuring target pod is healthy")
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
 				fmt.Errorf("while ensuring target pod is healthy: %w", err))
@@ -729,6 +729,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 
 func (r *BackupReconciler) ensureTargetPodHealthy(
 	ctx context.Context,
+	cli client.Client,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 ) error {
@@ -738,6 +739,22 @@ func (r *BackupReconciler) ensureTargetPodHealthy(
 
 	podName := backup.Status.InstanceID.PodName
 
+	var pod corev1.Pod
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      podName,
+	}, &pod); err != nil {
+		if apierrs.IsNotFound(err) {
+			return fmt.Errorf("target pod %s not found in namespace %s for backup %s", podName, backup.Namespace, backup.Name)
+		}
+		return fmt.Errorf(
+			"error getting target pod %s in namespace %s for backup %s: %w", podName, backup.Namespace,
+			backup.Name,
+			err,
+		)
+	}
+
+	// if the pod is present we evaluate its health status
 	healthyPods, ok := cluster.Status.InstancesStatus[apiv1.PodHealthy]
 	if !ok {
 		return fmt.Errorf("no status found for target pod %s in cluster %s", podName, cluster.Name)
