@@ -238,6 +238,8 @@ func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client
 
 // GetOnlineOrDefault returns the online value for the backup.
 func (backup *Backup) GetOnlineOrDefault(cluster *Cluster) bool {
+	// Offline backups are supported only with the
+	// volume snapshot backup method,
 	if backup.Spec.Method != BackupMethodVolumeSnapshot {
 		return true
 	}
@@ -251,7 +253,6 @@ func (backup *Backup) GetOnlineOrDefault(cluster *Cluster) bool {
 	}
 
 	config := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-
 	if config.Online != nil {
 		return *config.Online
 	}
