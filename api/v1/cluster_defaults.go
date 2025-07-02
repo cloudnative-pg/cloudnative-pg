@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -316,7 +315,7 @@ func (r *Cluster) tryConvertAlphaLivenessPinger() {
 	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
 		return
 	}
-	v, err := NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	v, err := NewLivenessPingerConfigFromAnnotations(r.Annotations)
 	if err != nil || v == nil {
 		// the error will be raised by the validation webhook
 		return
@@ -332,10 +331,8 @@ func (r *Cluster) tryConvertAlphaLivenessPinger() {
 // NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
 // in the cluster definition
 func NewLivenessPingerConfigFromAnnotations(
-	ctx context.Context,
 	annotations map[string]string,
 ) (*IsolationCheckConfiguration, error) {
-	contextLogger := log.FromContext(ctx)
 
 	v, ok := annotations[utils.LivenessPingerAnnotationName]
 	if !ok {
@@ -344,7 +341,6 @@ func NewLivenessPingerConfigFromAnnotations(
 
 	var cfg IsolationCheckConfiguration
 	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
-		contextLogger.Error(err, "failed to unmarshal pinger config")
 		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
 	}
 

@@ -363,32 +363,32 @@ var _ = Describe("default dataDurability", func() {
 })
 
 var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
-	It("returns a nil configuration when annotation is not present", func(ctx SpecContext) {
+	It("returns a nil configuration when annotation is not present", func() {
 		annotations := map[string]string{}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).To(BeNil())
 	})
 
-	It("returns an error when annotation contains invalid JSON", func(ctx SpecContext) {
+	It("returns an error when annotation contains invalid JSON", func() {
 		annotations := map[string]string{
 			utils.LivenessPingerAnnotationName: "{invalid_json",
 		}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).To(HaveOccurred())
 		Expect(config).To(BeNil())
 	})
 
-	It("applies default values when timeouts are not specified", func(ctx SpecContext) {
+	It("applies default values when timeouts are not specified", func() {
 		annotations := map[string]string{
 			utils.LivenessPingerAnnotationName: `{"enabled": true}`,
 		}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
@@ -397,12 +397,12 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 		Expect(config.ConnectionTimeout).To(Equal(1000))
 	})
 
-	It("preserves values when all fields are specified", func(ctx SpecContext) {
+	It("preserves values when all fields are specified", func() {
 		annotations := map[string]string{
 			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 300, "connectionTimeout": 600}`,
 		}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
@@ -411,12 +411,12 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 		Expect(config.ConnectionTimeout).To(Equal(600))
 	})
 
-	It("correctly sets enabled to false when specified", func(ctx SpecContext) {
+	It("correctly sets enabled to false when specified", func() {
 		annotations := map[string]string{
 			utils.LivenessPingerAnnotationName: `{"enabled": false, "requestTimeout": 300, "connectionTimeout": 600}`,
 		}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())
@@ -425,12 +425,12 @@ var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
 		Expect(config.ConnectionTimeout).To(Equal(600))
 	})
 
-	It("correctly handles zero values for timeouts", func(ctx SpecContext) {
+	It("correctly handles zero values for timeouts", func() {
 		annotations := map[string]string{
 			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 0, "connectionTimeout": 0}`,
 		}
 
-		config, err := NewLivenessPingerConfigFromAnnotations(ctx, annotations)
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(config).ToNot(BeNil())

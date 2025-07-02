@@ -2507,7 +2507,7 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 		return nil
 	}
 
-	_, err := apiv1.NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	_, err := apiv1.NewLivenessPingerConfigFromAnnotations(r.Annotations)
 	if err != nil {
 		return field.ErrorList{
 			field.Invalid(
