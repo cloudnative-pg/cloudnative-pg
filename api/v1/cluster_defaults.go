@@ -333,7 +333,6 @@ func (r *Cluster) tryConvertAlphaLivenessPinger() {
 func NewLivenessPingerConfigFromAnnotations(
 	annotations map[string]string,
 ) (*IsolationCheckConfiguration, error) {
-
 	v, ok := annotations[utils.LivenessPingerAnnotationName]
 	if !ok {
 		return nil, nil

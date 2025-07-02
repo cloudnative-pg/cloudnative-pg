@@ -21,6 +21,7 @@ package probes
 
 import (
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -47,6 +48,10 @@ type pinger struct {
 // the server CA certificate from the same location that will be used by PostgreSQL.
 // In this case, we avoid using the API Server as it may be unreliable.
 func buildInstanceReachabilityChecker(cfg *apiv1.IsolationCheckConfiguration) (*pinger, error) {
+	if cfg == nil {
+		return nil, errors.New("isolation check configuration is nil")
+	}
+
 	certificateLocation := postgresSpec.ServerCACertificateLocation
 	caCertificate, err := os.ReadFile(certificateLocation) //nolint:gosec
 	if err != nil {
