@@ -356,3 +356,6 @@ Instances status
 
 Currently, you can't remove tablespaces from an existing CloudNativePG
 cluster.
+
+When you add or remove a tablespace in an existing cluster, recovery
+from WAL will fail, until you take a new base backup. Testing recommended.
