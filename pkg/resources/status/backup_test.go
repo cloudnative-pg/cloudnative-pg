@@ -21,6 +21,7 @@ package status
 
 import (
 	"errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -62,12 +63,12 @@ var _ = Describe("FlagBackupAsFailed", func() {
 		Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 		Expect(k8sClient.Create(ctx, backup)).To(Succeed())
 
-		err := FlagBackupAsFailed(ctx, k8sClient, backup, cluster, errors.New("my dummy error"))
+		err := FlagBackupAsFailed(ctx, k8sClient, backup, cluster, errors.New("my sample error"))
 		Expect(err).NotTo(HaveOccurred())
 
 		// Backup status assertions
 		Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
-		Expect(backup.Status.Error).To(BeEquivalentTo("my dummy error"))
+		Expect(backup.Status.Error).To(BeEquivalentTo("my sample error"))
 
 		// Cluster status assertions
 		Expect(cluster.Status.LastFailedBackup).ToNot(BeEmpty())
@@ -75,7 +76,7 @@ var _ = Describe("FlagBackupAsFailed", func() {
 			if condition.Type == string(apiv1.ConditionBackup) {
 				Expect(condition.Status).To(BeEquivalentTo(metav1.ConditionFalse))
 				Expect(condition.Reason).To(BeEquivalentTo(string(apiv1.ConditionReasonLastBackupFailed)))
-				Expect(condition.Message).To(BeEquivalentTo("my dummy error"))
+				Expect(condition.Message).To(BeEquivalentTo("my sample error"))
 			}
 		}
 	})
