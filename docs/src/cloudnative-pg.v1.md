@@ -3215,7 +3215,7 @@ conflict with the operator's intended functionality or design.</p>
 
 **Appears in:**
 
-- [Probe](#postgresql-cnpg-io-v1-Probe)
+- [LivenessProbe](#postgresql-cnpg-io-v1-LivenessProbe)
 
 
 <p>IsolationCheckConfiguration contains the configuration for the isolation check
@@ -3229,21 +3229,21 @@ functionality in the liveness probe</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Whether isolation checking is enabled for the liveness probe</p>
+   <p>Whether primary isolation checking is enabled for the liveness probe</p>
 </td>
 </tr>
 <tr><td><code>requestTimeout</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Timeout in milliseconds for requests during the isolation check</p>
+   <p>Timeout in milliseconds for requests during the primary isolation check</p>
 </td>
 </tr>
 <tr><td><code>connectionTimeout</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Timeout in milliseconds for connections during the isolation check</p>
+   <p>Timeout in milliseconds for connections during the primary isolation check</p>
 </td>
 </tr>
 </tbody>
@@ -3406,6 +3406,41 @@ the bind+search LDAP authentication process</p>
 
 
 
+
+## LivenessProbe     {#postgresql-cnpg-io-v1-LivenessProbe}
+
+
+**Appears in:**
+
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+
+
+<p>LivenessProbe is the configuration of the liveness probe</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>Probe</code><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>(Members of <code>Probe</code> are embedded into this type.)
+   <p>Probe is the standard probe configuration</p>
+</td>
+</tr>
+<tr><td><code>isolationCheck</code><br/>
+<a href="#postgresql-cnpg-io-v1-IsolationCheckConfiguration"><i>IsolationCheckConfiguration</i></a>
+</td>
+<td>
+   <p>Configure the feature that extends the liveness probe for a primary
+instance. In addition to the basic checks, this verifies whether the
+primary is isolated from the Kubernetes API server and from its
+replicas, ensuring that it can be safely shut down if network
+partition or API unavailability is detected. Enabled by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## ManagedConfiguration     {#postgresql-cnpg-io-v1-ManagedConfiguration}
 
@@ -4451,9 +4486,9 @@ the primary server of the cluster as part of rolling updates</p>
 
 **Appears in:**
 
-- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
+- [LivenessProbe](#postgresql-cnpg-io-v1-LivenessProbe)
 
-- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
 
 
 <p>Probe describes a health check to be performed against a container to determine whether it is
@@ -4518,13 +4553,6 @@ Value must be non-negative integer. The value zero indicates stop immediately vi
 the kill signal (no opportunity to shut down).
 This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
-</td>
-</tr>
-<tr><td><code>isolationCheck</code><br/>
-<a href="#postgresql-cnpg-io-v1-IsolationCheckConfiguration"><i>IsolationCheckConfiguration</i></a>
-</td>
-<td>
-   <p>Configuration for the isolation check functionality. Enabled by default.</p>
 </td>
 </tr>
 </tbody>
@@ -4606,7 +4634,7 @@ to be injected in the PostgreSQL Pods</p>
 </td>
 </tr>
 <tr><td><code>liveness</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+<a href="#postgresql-cnpg-io-v1-LivenessProbe"><i>LivenessProbe</i></a>
 </td>
 <td>
    <p>The liveness probe configuration</p>

@@ -288,7 +288,7 @@ func (r *Cluster) setProbes() {
 	}
 
 	if r.Spec.Probes.Liveness == nil {
-		r.Spec.Probes.Liveness = &Probe{}
+		r.Spec.Probes.Liveness = &LivenessProbe{}
 	}
 
 	// we don't override the isolation check if it is already set

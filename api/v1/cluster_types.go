@@ -490,7 +490,7 @@ type ProbesConfiguration struct {
 	Startup *ProbeWithStrategy `json:"startup,omitempty"`
 
 	// The liveness probe configuration
-	Liveness *Probe `json:"liveness,omitempty"`
+	Liveness *LivenessProbe `json:"liveness,omitempty"`
 
 	// The readiness probe configuration
 	Readiness *ProbeWithStrategy `json:"readiness,omitempty"`
@@ -566,8 +566,18 @@ type Probe struct {
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+}
 
-	// Configuration for the isolation check functionality. Enabled by default.
+// LivenessProbe is the configuration of the liveness probe
+type LivenessProbe struct {
+	// Probe is the standard probe configuration
+	Probe `json:",inline"`
+
+	// Configure the feature that extends the liveness probe for a primary
+	// instance. In addition to the basic checks, this verifies whether the
+	// primary is isolated from the Kubernetes API server and from its
+	// replicas, ensuring that it can be safely shut down if network
+	// partition or API unavailability is detected. Enabled by default.
 	// +optional
 	IsolationCheck *IsolationCheckConfiguration `json:"isolationCheck,omitempty"`
 }
@@ -575,17 +585,17 @@ type Probe struct {
 // IsolationCheckConfiguration contains the configuration for the isolation check
 // functionality in the liveness probe
 type IsolationCheckConfiguration struct {
-	// Whether isolation checking is enabled for the liveness probe
+	// Whether primary isolation checking is enabled for the liveness probe
 	// +optional
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Timeout in milliseconds for requests during the isolation check
+	// Timeout in milliseconds for requests during the primary isolation check
 	// +optional
 	// +kubebuilder:default:=1000
 	RequestTimeout int `json:"requestTimeout,omitempty"`
 
-	// Timeout in milliseconds for connections during the isolation check
+	// Timeout in milliseconds for connections during the primary isolation check
 	// +optional
 	// +kubebuilder:default:=1000
 	ConnectionTimeout int `json:"connectionTimeout,omitempty"`

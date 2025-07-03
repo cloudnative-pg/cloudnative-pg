@@ -453,7 +453,7 @@ var _ = Describe("probe defaults", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Probes: &ProbesConfiguration{
-					Liveness: &Probe{
+					Liveness: &LivenessProbe{
 						IsolationCheck: &IsolationCheckConfiguration{
 							Enabled:           ptr.To(false),
 							RequestTimeout:    300,
@@ -474,7 +474,7 @@ var _ = Describe("probe defaults", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Probes: &ProbesConfiguration{
-					Liveness: &Probe{},
+					Liveness: &LivenessProbe{},
 				},
 			},
 		}
