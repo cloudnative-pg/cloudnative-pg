@@ -254,6 +254,31 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
+<!--
+### Upgrading to 1.27.0 or 1.26.2
+
+!!! Important
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.27.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.26.x).
+
+Version 1.27 introduces a change in the default behaviour of the
+[liveness probe](instance_manager.md#liveness-probe): it now enforces the
+[shutdown of an isolated primary](instance_manager.md#primary-isolation)
+within the `livenessProbeTimeout` (30 seconds).
+
+If this behaviour is not suitable for your environment, you can disable the
+*isolation check* in the liveness probe with the following configuration:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: false
+```
+-->
+
 ### Upgrading to 1.26.0 or 1.25.2
 
 !!! Important
