@@ -161,9 +161,8 @@ There are a few things you need to be aware of when using the `microservice` typ
 !!! Hint
     The microservice approach follows CloudNativePG conventions and defaults for
     the destination cluster.
-    Notably, if you don't explicitly set `initdb.database` or `initdb.owner` for
-    the destination cluster, the default of `app` will be used for both, and
-    your chosen source database may be renamed to `app`.
+    Notably, if you don’t set `initdb.database` or `initdb.owner` for the
+    destination cluster, both will default to `app`.
 
 ## The `monolith` type
 
