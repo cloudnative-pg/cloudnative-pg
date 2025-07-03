@@ -135,7 +135,7 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 				continue
 			}
 
-			err = collector.collect(conn, ch)
+			err = collector.collect(conn)
 			if err != nil {
 				queryLogger.Error(err, "Error collecting user query",
 					"targetDatabase", targetDatabase)
@@ -143,6 +143,7 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
 			}
 		}
+		collector.collectMetrics(ch)
 	}
 	return nil
 }
@@ -325,14 +326,15 @@ func (q *QueriesCollector) InjectUserQueries(defaultQueries UserQueries) {
 // QueryCollector is the implementation of PgCollector for a certain
 // custom query supplied by the user
 type QueryCollector struct {
-	namespace      string
-	userQuery      UserQuery
-	columnMapping  MetricMapSet
-	variableLabels VariableSet
+	namespace       string
+	userQuery       UserQuery
+	columnMapping   MetricMapSet
+	variableLabels  VariableSet
+	computedMetrics []prometheus.Metric
 }
 
-// refresh reruns a given SQL query and updates the metrics associated to the query
-func (c QueryCollector) refresh(conn *sql.DB) error {
+// collect retrieves metrics from query and exposes them to prometheus
+func (c QueryCollector) collect(conn *sql.DB) error {
 	tx, err := createMonitoringTx(conn)
 	if err != nil {
 		return err
@@ -388,7 +390,7 @@ func (c QueryCollector) refresh(conn *sql.DB) error {
 			return err
 		}
 
-		labels, done := c.collectLabels(columns, columnData)
+		labels, done := c.listLabels(columns, columnData)
 		if done {
 			c.refreshColumns(columns, columnData, labels)
 		}
@@ -398,82 +400,13 @@ func (c QueryCollector) refresh(conn *sql.DB) error {
 			"err", err.Error())
 		return err
 	}
-	return nil
-}
 
-// collect retrieves metrics from query and exposes them to prometheus
-func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error {
-	tx, err := createMonitoringTx(conn)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err := tx.Commit(); err != nil {
-			log.Error(err, "Error while committing metrics extraction")
-		}
-	}()
-
-	shouldBeCollected, err := c.userQuery.isCollectable(tx)
-	if err != nil {
-		return err
-	}
-
-	if !shouldBeCollected {
-		return nil
-	}
-
-	rows, err := tx.Query(c.userQuery.Query)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Warning("Error while closing metrics extraction",
-				"err", err.Error())
-		}
-	}()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
-	}
-
-	columnData := make([]interface{}, len(columns))
-	scanArgs := make([]interface{}, len(columns))
-	for i := range columnData {
-		scanArgs[i] = &columnData[i]
-	}
-
-	if len(columns) != len(c.columnMapping) {
-		log.Warning("Columns number mismatch",
-			"name", c.namespace,
-			"columnNumberFromDB", len(columns),
-			"columnNumberFromConfiguration", len(c.columnMapping))
-		return nil
-	}
-
-	for rows.Next() {
-		if err = rows.Scan(scanArgs...); err != nil {
-			return err
-		}
-
-		labels, done := c.collectLabels(columns, columnData)
-		if done {
-			c.collectColumns(columns, columnData, labels, ch)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		log.Warning("Error while loading metrics",
-			"err", err.Error())
-		return err
-	}
 	return nil
 }
 
 // Collect the list of labels from the database, and returns true if the
 // label extraction succeeded, false otherwise
-func (c QueryCollector) collectLabels(columns []string, columnData []interface{}) ([]string, bool) {
+func (c QueryCollector) listLabels(columns []string, columnData []interface{}) ([]string, bool) {
 	var labels []string
 	for idx, columnName := range columns {
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
@@ -524,54 +457,21 @@ func (c QueryCollector) refreshColumns(columns []string, columnData []interface{
 					"columnData", columnData,
 					"labels", labels)
 			} else {
-				c.collectHistogramMetric(mapping, histogramData, labels, ch)
+				c.computedMetrics = append(c.computedMetrics, c.createHistogramMetric(mapping, histogramData, labels))
 			}
 
 		default:
-			c.collectConstMetric(mapping, columnData[idx], labels, ch)
+			c.computedMetrics = append(c.computedMetrics, c.createConstMetric(mapping, columnData[idx], labels))
 		}
 	}
 }
 
-// Collect the metrics from the database columns
-func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
-	labels []string, ch chan<- prometheus.Metric,
+// collectMetrics iterates over the previously computed metrics
+func (c QueryCollector) collectMetrics(
+	ch chan<- prometheus.Metric,
 ) {
-	for idx, columnName := range columns {
-		mapping, ok := c.columnMapping[columnName]
-		if !ok {
-			log.Warning("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
-			continue
-		}
-
-		// There is a strong difference between histogram and non-histogram metrics in
-		// postgres_exporter. The first ones are looked up by column name and the second
-		// ones are looked up just using the index.
-		//
-		// We implemented the same behavior here.
-
-		switch {
-		case mapping.Discard || mapping.Label:
-			continue
-
-		case mapping.Histogram:
-			histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
-			if err != nil {
-				log.Error(err, "Cannot process histogram metric",
-					"columns", columns,
-					"columnName", columnName,
-					"mapping.Name", mapping.Name,
-					"mappings", c.columnMapping,
-					"mapping", mapping,
-					"columnData", columnData,
-					"labels", labels)
-			} else {
-				c.collectHistogramMetric(mapping, histogramData, labels, ch)
-			}
-
-		default:
-			c.collectConstMetric(mapping, columnData[idx], labels, ch)
-		}
+	for _, m := range c.computedMetrics {
+		ch <- m
 	}
 }
 
@@ -676,13 +576,12 @@ func (c QueryCollector) collectConstMetric(
 	ch <- metric
 }
 
-// collectHistogramMetric reports to the prometheus library an histogram-based metric
-func (c QueryCollector) collectHistogramMetric(
+// createHistogramMetric reports to the prometheus library an histogram-based metric
+func (c QueryCollector) createHistogramMetric(
 	mapping MetricMap,
 	columnData *histogram.Value,
 	variableLabels []string,
-	ch chan<- prometheus.Metric,
-) {
+) prometheus.Metric {
 	metric, err := prometheus.NewConstHistogram(
 		mapping.Desc,
 		columnData.Count, columnData.Sum, columnData.Buckets,
@@ -690,9 +589,9 @@ func (c QueryCollector) collectHistogramMetric(
 	)
 	if err != nil {
 		log.Error(err, "while collecting histogram metric", "metric", mapping.Name)
-		return
+		return nil
 	}
-	ch <- metric
+	return metric
 }
 
 // PluginCollector is the interface for collecting metrics from plugins

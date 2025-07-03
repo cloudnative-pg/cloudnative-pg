@@ -124,7 +124,7 @@ var _ = Describe("QueryCollector tests", func() {
 						},
 					},
 				}
-				labels, success := qc.collectLabels(
+				labels, success := qc.listLabels(
 					[]string{"LABEL_ENABLED", "LABEL_NOT_ENABLED"},
 					[]interface{}{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
 				)
@@ -141,7 +141,7 @@ var _ = Describe("QueryCollector tests", func() {
 						},
 					},
 				}
-				labels, success := qc.collectLabels(
+				labels, success := qc.listLabels(
 					[]string{"LABEL_ENABLED"},
 					// int is not supported
 					[]interface{}{234},
