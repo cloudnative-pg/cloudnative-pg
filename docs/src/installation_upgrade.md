@@ -262,7 +262,7 @@ only the operator itself.
     1.27.0, or at least to the latest stable version of your current minor release
     (e.g., 1.26.x).
 
-Version 1.27 introduces a change in the default behaviour of the
+Version 1.27 introduces a change in the default behavior of the
 [liveness probe](instance_manager.md#liveness-probe): it now enforces the
 [shutdown of an isolated primary](instance_manager.md#primary-isolation)
 within the `livenessProbeTimeout` (30 seconds).
