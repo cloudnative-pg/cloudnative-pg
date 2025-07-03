@@ -1,6 +1,6 @@
-# Securing CloudNativePG Network with CiliumAdd commentMore actions
+# Securing CloudNativePG Network with Cilium
 
-Cilium is a CNCF Sandbox project, accepted in 2021 under the sponsorship of Isovalent. It is an
+[Cilium](https://cilium.io/) is a CNCF Graduated project, accepted in 2021 under the sponsorship of Isovalent. It is an
 advanced networking, security, and observability solution for cloud-native environments, built on
 top of eBPF (Extended Berkeley Packet Filter) technology. Cilium manages network traffic in
 Kubernetes clusters by dynamically injecting eBPF programs into the Linux kernel, enabling
@@ -8,11 +8,11 @@ low-latency, high-performance communication and enforcing fine-grained security 
 
 Key features of Cilium:
 
-● Advanced L3-L7 security policies for fine-grained network traffic control
-● Efficient, kernel-level traffic management via eBPF
-● Service Mesh integration (Cilium Service Mesh)
-● Support for both NetworkPolicy and CiliumNetworkPolicy
-● Built-in observability and monitoring with Hubble
+- Advanced L3-L7 security policies for fine-grained network traffic control
+- Efficient, kernel-level traffic management via eBPF
+- Service Mesh integration (Cilium Service Mesh)
+- Support for both NetworkPolicy and CiliumNetworkPolicy
+- Built-in observability and monitoring with Hubble
 
 ## Pod-to-Pod Network Security with CloudNativePG and Cilium
 
