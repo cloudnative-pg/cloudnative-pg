@@ -267,7 +267,7 @@ Version 1.27 introduces a change in the default behavior of the
 [shutdown of an isolated primary](instance_manager.md#primary-isolation)
 within the `livenessProbeTimeout` (30 seconds).
 
-If this behaviour is not suitable for your environment, you can disable the
+If this behavior is not suitable for your environment, you can disable the
 *isolation check* in the liveness probe with the following configuration:
 
 ```yaml
