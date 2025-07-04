@@ -132,7 +132,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 		err = r.instance.Rewind(ctx)
 		if err != nil {
-			return fmt.Errorf("while exucuting pg_rewind: %w", err)
+			return fmt.Errorf("while executing pg_rewind: %w", err)
 		}
 
 		// Now I can demote myself
