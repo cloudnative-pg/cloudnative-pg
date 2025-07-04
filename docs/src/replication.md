@@ -736,8 +736,10 @@ spec:
 
 ### Logical Decoding Slot Synchronization
 
-CloudNativePG can now synchronize logical decoding (replication) slots across all nodes in a high-availability cluster.
-To enable this, set:
+CloudNativePG can synchronize logical decoding (replication) slots across all
+nodes in a high-availability cluster, ensuring seamless continuation of logical
+replication after a failover or switchover. This feature is disabled by default
+and can be enabled with:
 
 ```yaml
 replicationSlots:
@@ -745,12 +747,32 @@ replicationSlots:
     synchronizeLogicalDecoding: true
 ```
 
-When enabled, the operator manages logical decoding slot state across failover and switchover events.
-For PostgreSQL 17 and later, this uses the built-in `sync_replication_slots` parameter.
-For older versions, `pg_failover_slots` is used as a fallback.
+When enabled, the operator automatically manages the state of logical decoding
+slots during failover and switchover events, avoiding slot invalidation or data
+loss for logical replication clients.
 
-This ensures logical replication clients can continue from the correct position after failover,
-preventing data loss or slot invalidation.
+#### Behavior on PostgreSQL 17 and later
+
+For PostgreSQL 17 and newer, CloudNativePG transparently manages the
+[`sync_replication_slots` parameter](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-SYNCHRONIZED-STANDBY-SLOTS).
+Logical WAL sender processes will send decoded changes to plugins only after
+the specified replication slots confirm receiving and flushing the relevant
+WAL, ensuring that:
+
+- logical replication slots do not consume changes until they are safely
+  received by the replicas, and
+- logical replication connections can safely switch to a promoted standby
+  without missing data.
+
+If your logical replication client is designed to reconnect to a promoted
+standby after failover, ensure the relevant physical replication slot for that
+standby is included in your configuration.
+
+#### Behavior on PostgreSQL 16 and earlier
+
+For PostgreSQL 16 and older versions, CloudNativePG uses the
+`pg_failover_slots` extension to maintain synchronization of logical
+replication slots across failovers.
 
 ### Capping the WAL size retained for replication slots
 
