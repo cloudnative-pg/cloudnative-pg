@@ -185,10 +185,20 @@ rules:
   resources:
   - clusters/status
   - poolers/status
+  - syncquorums/status
   verbs:
   - get
   - patch
   - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - syncquorums
+  verbs:
+  - create
+  - get
+  - list
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io

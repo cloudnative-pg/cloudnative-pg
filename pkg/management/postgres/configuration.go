@@ -78,10 +78,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	}
 
 	postgresConfiguration, sha256, err := createPostgresqlConfiguration(
-		ctx,
-		cluster,
-		preserveUserSettings,
-		pgMajor,
+		ctx, cluster, preserveUserSettings, pgMajor,
 		operationType,
 	)
 	if err != nil {
@@ -406,7 +403,7 @@ func createPostgresqlConfiguration(
 		IsReplicaCluster:                 cluster.IsReplica(),
 		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
 		IsAlterSystemEnabled:             cluster.Spec.PostgresConfiguration.EnableAlterSystem,
-		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(cluster),
+		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(ctx, cluster),
 	}
 
 	if preserveUserSettings {
