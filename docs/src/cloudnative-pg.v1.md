@@ -2426,6 +2426,9 @@ PostgreSQL cluster from an existing storage</p>
 
 - [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
 
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
 
@@ -2724,6 +2727,13 @@ tablespace used for objects created in this database.</p>
    <p>The list of extensions to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-FDWSpec"><i>[]FDWSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign data wrappers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2775,6 +2785,13 @@ desired state that was synchronized</p>
 </td>
 <td>
    <p>Extensions is the status of the managed extensions</p>
+</td>
+</tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>FDWs is the status of the managed FDWs</p>
 </td>
 </tr>
 </tbody>
@@ -3038,6 +3055,52 @@ secure and efficient password management for external clusters.</p>
 <td>
    <p>The configuration of the plugin that is taking care
 of WAL archiving and backups for this external cluster</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FDWSpec     {#postgresql-cnpg-io-v1-FDWSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>FDWSpec configures an Foreign Data Wrapper in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>handler</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)</p>
+</td>
+</tr>
+<tr><td><code>validator</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner specifies the database user who will own the Foreign Data Wrapper.
+By default, the owner of a new FDW is the current session user.
+Even if an owner is explicitly specified during creation, it will be ignored.</p>
 </td>
 </tr>
 </tbody>
