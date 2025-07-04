@@ -374,6 +374,13 @@ recovery target.
     It's your responsibility to ensure that the end time of the base backup in
     the volume snapshot is before the recovery target timestamp.
 
+!!! Warning
+    If you recently added or removed a [tablespace](tablespaces.md) in your
+    cluster, replaying the WAL will fail. You need a base backup between the
+    time of the tablespace change and the recovery target timestamp. When you
+    plan to add or remove a tablespace and rely on PITR recovery, testing is
+    recommended.
+
 ### Recovery targets
 
 Here are the recovery target criteria you can use:
