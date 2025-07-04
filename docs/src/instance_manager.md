@@ -188,9 +188,9 @@ spec:
       failureThreshold: 10
 ```
 
-### Primary Isolation (alpha)
+### Primary Isolation
 
-CloudNativePG 1.26 introduces an opt-in experimental behavior for the liveness
+CloudNativePG 1.27 introduces an additional behavior for the liveness
 probe of a PostgreSQL primary, which will report a failure if **both** of the
 following conditions are met:
 
@@ -199,35 +199,34 @@ following conditions are met:
 
 The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
 
-It is **disabled by default** and can be enabled by adding the following
-annotation to the `Cluster` resource:
+It is **enabled by default** and can be disabled by adding the following:
 
 ```yaml
-metadata:
-  annotations:
-    alpha.cnpg.io/livenessPinger: '{"enabled": true}'
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: false
 ```
 
-!!! Warning
-    This feature is experimental and will be introduced in a future CloudNativePG
-    release with a new API. If you decide to use it now, note that the API **will
-    change**.
-
 !!! Important
-    If you plan to enable this experimental feature, be aware that the default
-    liveness probe settings—automatically derived from `livenessProbeTimeout`—might
+    Be aware that the default liveness probe settings—automatically derived from `livenessProbeTimeout`—might
     be aggressive (30 seconds). As such, we recommend explicitly setting the
     liveness probe configuration to suit your environment.
 
-The annotation also accepts two optional network settings: `requestTimeout`
-and `connectionTimeout`, both defaulting to `500` (in milliseconds).
+The spec also accepts two optional network settings: `requestTimeout`
+and `connectionTimeout`, both defaulting to `1000` (in milliseconds).
 In cloud environments, you may need to increase these values.
 For example:
 
 ```yaml
-metadata:
-  annotations:
-    alpha.cnpg.io/livenessPinger: '{"enabled": true,"requestTimeout":1000,"connectionTimeout":1000}'
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: true
+        requestTimeout: "2000"
+        connectionTimeout: "2000"
 ```
 
 ## Readiness Probe

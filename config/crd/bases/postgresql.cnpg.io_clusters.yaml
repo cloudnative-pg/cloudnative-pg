@@ -4249,6 +4249,30 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      isolationCheck:
+                        description: |-
+                          Configure the feature that extends the liveness probe for a primary
+                          instance. In addition to the basic checks, this verifies whether the
+                          primary is isolated from the Kubernetes API server and from its
+                          replicas, ensuring that it can be safely shut down if network
+                          partition or API unavailability is detected. Enabled by default.
+                        properties:
+                          connectionTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for connections during
+                              the primary isolation check
+                            type: integer
+                          enabled:
+                            default: true
+                            description: Whether primary isolation checking is enabled
+                              for the liveness probe
+                            type: boolean
+                          requestTimeout:
+                            default: 1000
+                            description: Timeout in milliseconds for requests during
+                              the primary isolation check
+                            type: integer
+                        type: object
                       periodSeconds:
                         description: |-
                           How often (in seconds) to perform the probe.

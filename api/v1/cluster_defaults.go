@@ -20,6 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/utils/ptr"
@@ -138,6 +141,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 
 	r.setDefaultPlugins(configuration.Current)
+	r.setProbes()
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -268,4 +272,87 @@ func (r *Cluster) defaultPgBaseBackup() {
 	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
 	}
+}
+
+const (
+	// defaultRequestTimeout is the default value of the request timeout
+	defaultRequestTimeout = 1000
+
+	// defaultConnectionTimeout is the default value of the connection timeout
+	defaultConnectionTimeout = 1000
+)
+
+func (r *Cluster) setProbes() {
+	if r.Spec.Probes == nil {
+		r.Spec.Probes = &ProbesConfiguration{}
+	}
+
+	if r.Spec.Probes.Liveness == nil {
+		r.Spec.Probes.Liveness = &LivenessProbe{}
+	}
+
+	// we don't override the isolation check if it is already set
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 1: check if the alpha annotation is present, in that case convert it to spec
+	r.tryConvertAlphaLivenessPinger()
+
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 2: set defaults.
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           ptr.To(true),
+		RequestTimeout:    defaultRequestTimeout,
+		ConnectionTimeout: defaultConnectionTimeout,
+	}
+}
+
+func (r *Cluster) tryConvertAlphaLivenessPinger() {
+	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
+		return
+	}
+	v, err := NewLivenessPingerConfigFromAnnotations(r.Annotations)
+	if err != nil || v == nil {
+		// the error will be raised by the validation webhook
+		return
+	}
+
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           v.Enabled,
+		RequestTimeout:    v.RequestTimeout,
+		ConnectionTimeout: v.ConnectionTimeout,
+	}
+}
+
+// NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
+// in the cluster definition
+func NewLivenessPingerConfigFromAnnotations(
+	annotations map[string]string,
+) (*IsolationCheckConfiguration, error) {
+	v, ok := annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		return nil, nil
+	}
+
+	var cfg IsolationCheckConfiguration
+	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
+		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
+	}
+
+	if cfg.Enabled == nil {
+		return nil, fmt.Errorf("pinger config is missing the enabled field")
+	}
+
+	if cfg.RequestTimeout == 0 {
+		cfg.RequestTimeout = defaultRequestTimeout
+	}
+	if cfg.ConnectionTimeout == 0 {
+		cfg.ConnectionTimeout = defaultConnectionTimeout
+	}
+
+	return &cfg, nil
 }

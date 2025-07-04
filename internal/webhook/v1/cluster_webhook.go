@@ -49,7 +49,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -2508,7 +2507,7 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 		return nil
 	}
 
-	_, err := probes.NewLivenessPingerConfigFromAnnotations(context.Background(), r.Annotations)
+	_, err := apiv1.NewLivenessPingerConfigFromAnnotations(r.Annotations)
 	if err != nil {
 		return field.ErrorList{
 			field.Invalid(
