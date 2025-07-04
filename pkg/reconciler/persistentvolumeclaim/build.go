@@ -61,7 +61,8 @@ func Build(
 		EndMetadata().
 		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).
 		WithSource(configuration.Source).
-		WithDefaultAccessMode(corev1.ReadWriteOnce)
+		WithDefaultAccessMode(corev1.ReadWriteOnce).
+		WithVolumeAttributesClassName(configuration.Storage.VolumeAttributesClassName)
 
 	// If the customer specified a storage class, let's use it
 	if configuration.Storage.StorageClass != nil {
