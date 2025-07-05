@@ -4844,6 +4844,15 @@ spec:
                           This can only be set at creation time. By default set to `_cnpg_`.
                         pattern: ^[0-9a-z_]*$
                         type: string
+                      synchronizeLogicalDecoding:
+                        description: |-
+                          When enabled, the operator automatically manages synchronization of logical
+                          decoding (replication) slots across high-availability clusters.
+
+                          Requires one of the following conditions:
+                          - PostgreSQL version 17 or later
+                          - PostgreSQL version < 17 with pg_failover_slots extension enabled
+                        type: boolean
                     type: object
                   synchronizeReplicas:
                     description: Configures the synchronization of the user defined

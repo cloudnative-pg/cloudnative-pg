@@ -12,6 +12,14 @@ connect to publications on a publisher node. Subscribers pull data changes from
 these publications and can re-publish them, enabling cascading replication and
 complex topologies.
 
+!!! Important
+    To protect your logical replication subscribers after a failover of the
+    publisher cluster in CloudNativePG, ensure that replication slot
+    synchronization for logical decoding is enabled. Without this, your logical
+    replication clients may lose data and fail to continue seamlessly after a
+    failover. For configuration details, see
+    ["Replication: Logical Decoding Slot Synchronization"](replication.md#logical-decoding-slot-synchronization).
+
 This flexible model is particularly useful for:
 
 - Online data migrations
