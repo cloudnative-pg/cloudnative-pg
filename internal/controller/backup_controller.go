@@ -116,7 +116,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	switch backup.Status.Phase {
-	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
+	case apiv1.BackupPhaseFailed:
+		return ctrl.Result{}, nil
+
+	case apiv1.BackupPhaseCompleted:
+		if backup.Spec.Method == apiv1.BackupMethodPlugin {
+			if err := updateClusterWithPluginBackupTimes(ctx, r.Client, &backup); err != nil {
+				contextLogger.Error(err, "could not update cluster with plugin backup metadata")
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -563,6 +571,44 @@ func updateClusterWithSnapshotsBackupTimes(
 
 	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
 		err = cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))
+		if err != nil {
+			return wrapErr("could not patch cluster status", err)
+		}
+	}
+	return nil
+}
+
+// updateClusterWithPluginBackupTimes updates a Cluster's FirstRecoverabilityPoint
+// and LastSuccessfulBackup fields based on a completed plugin-based backup.
+func updateClusterWithPluginBackupTimes(
+	ctx context.Context,
+	cli client.Client,
+	backup *apiv1.Backup,
+) error {
+	wrapErr := func(msg string, err error) error {
+		return fmt.Errorf("in updateClusterWithPluginBackupTimes, %s: %w", msg, err)
+	}
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Spec.Cluster.Name,
+	}, &cluster); err != nil {
+		return fmt.Errorf("could not fetch cluster %s/%s: %w", backup.Namespace, backup.Spec.Cluster.Name, err)
+	}
+
+	origCluster := cluster.DeepCopy()
+
+	firstPoint := backup.Status.StartedAt.Time
+	lastBackup := backup.Status.StoppedAt.Time
+
+	cluster.UpdateBackupTimes(
+		apiv1.BackupMethodPlugin,
+		&firstPoint,
+		&lastBackup,
+	)
+
+	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
+		err := cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))
 		if err != nil {
 			return wrapErr("could not patch cluster status", err)
 		}
