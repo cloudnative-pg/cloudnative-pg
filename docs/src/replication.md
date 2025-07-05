@@ -738,41 +738,55 @@ spec:
 
 CloudNativePG can synchronize logical decoding (replication) slots across all
 nodes in a high-availability cluster, ensuring seamless continuation of logical
-replication after a failover or switchover. This feature is disabled by default
-and can be enabled with:
+replication after a failover or switchover. This feature is disabled by
+default, and enabling it requires two steps.
+
+The first step is to enable logical decoding slot synchronization:
 
 ```yaml
-replicationSlots:
-  highAvailability:
-    synchronizeLogicalDecoding: true
+  # ...
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
 ```
 
-When enabled, the operator automatically manages the state of logical decoding
-slots during failover and switchover events, avoiding slot invalidation or data
+The second step involves configuring PostgreSQL parameters: the required
+configuration depends on your PostgreSQL version, as explained below.
+
+When enabled, the operator automatically manages logical decoding slot states
+during failover and switchover, preventing slot invalidation and avoiding data
 loss for logical replication clients.
 
 #### Behavior on PostgreSQL 17 and later
 
 For PostgreSQL 17 and newer, CloudNativePG transparently manages the
 [`sync_replication_slots` parameter](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-SYNCHRONIZED-STANDBY-SLOTS).
-Logical WAL sender processes will send decoded changes to plugins only after
-the specified replication slots confirm receiving and flushing the relevant
-WAL, ensuring that:
+You must enable both `sync_replication_slots` and `hot_standby_feedback` in
+your PostgreSQL configuration:
+
+```yaml
+  # ...
+  postgresql:
+    parameters:
+      # ...
+      hot_standby_feedback: 'on'
+      sync_replication_slots: 'on'
+```
+
+When configured, logical WAL sender processes send decoded changes to plugins
+only after the specified replication slots confirm receiving and flushing the
+relevant WAL, ensuring that:
 
 - logical replication slots do not consume changes until they are safely
-  received by the replicas, and
-- logical replication connections can safely switch to a promoted standby
-  without missing data.
-
-If your logical replication client is designed to reconnect to a promoted
-standby after failover, ensure the relevant physical replication slot for that
-standby is included in your configuration.
+  received by replicas, and
+- logical replication clients can safely reconnect to a promoted standby
+  without missing data after failover.
 
 #### Behavior on PostgreSQL 16 and earlier
 
 For PostgreSQL 16 and older versions, CloudNativePG uses the
-`pg_failover_slots` extension to maintain synchronization of logical
-replication slots across failovers.
+[`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots)
+to maintain synchronization of logical replication slots across failovers.
 
 ### Capping the WAL size retained for replication slots
 
