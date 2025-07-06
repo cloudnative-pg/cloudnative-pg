@@ -1,6 +1,6 @@
 # Securing CloudNativePG Network with Cilium
 
-[Cilium](https://cilium.io/) is a CNCF Graduated project, accepted in 2021 under the sponsorship of Isovalent. It is an
+[Cilium](https://cilium.io/) is a CNCF Graduated project that was accepted as an Incubating project in 2021 and graduated in 2023 under the sponsorship of Isovalent. It is an
 advanced networking, security, and observability solution for cloud-native environments, built on
 top of eBPF (Extended Berkeley Packet Filter) technology. Cilium manages network traffic in
 Kubernetes clusters by dynamically injecting eBPF programs into the Linux kernel, enabling
