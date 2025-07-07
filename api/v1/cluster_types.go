@@ -668,9 +668,6 @@ const (
 
 	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
 	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
-
-	// PhaseNotEnoughSpace is set by the operator when there is not enough disk space and this is preventing postgres from starting
-	PhaseNotEnoughSpace = "Not enough disk space"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
