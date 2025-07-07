@@ -640,6 +640,9 @@ const (
 	// loaded still
 	PhaseUnknownPlugin = "Cluster cannot proceed to reconciliation due to an unknown plugin being required"
 
+	// PhaseFailurePlugin is triggered when the cluster cannot proceed to reconciliation due to an interaction failure
+	PhaseFailurePlugin = "Cluster cannot proceed to reconciliation due to a failure while interacting with plugins"
+
 	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
 	// apply because of an invalid or incomplete catalog
 	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
