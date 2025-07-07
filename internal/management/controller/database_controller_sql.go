@@ -51,6 +51,16 @@ type fdwInfo struct {
 	//Options   []apiv1.OptSpec `json:"options"`
 }
 
+// sqlObjectBuilder builds a SQL query to create a database object
+type sqlObjectBuilder func(b *strings.Builder, obj interface{}) error
+
+type sqlObjectConfig struct {
+	objectType    string
+	name          string
+	builder       sqlObjectBuilder
+	logObjectName string
+}
+
 func detectDatabase(
 	ctx context.Context,
 	db *sql.DB,
@@ -239,6 +249,34 @@ func dropDatabase(
 	return nil
 }
 
+func createDatabaseObject(
+	ctx context.Context,
+	db *sql.DB,
+	config sqlObjectConfig,
+	obj interface{},
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlBuilder strings.Builder
+	sqlBuilder.WriteString(fmt.Sprintf("CREATE %s %s ",
+		config.objectType,
+		pgx.Identifier{config.name}.Sanitize()))
+
+	if err := config.builder(&sqlBuilder, obj); err != nil {
+		return err
+	}
+
+	_, err := db.ExecContext(ctx, sqlBuilder.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating "+config.logObjectName,
+			"query", sqlBuilder.String())
+		return err
+	}
+
+	contextLogger.Info("created "+config.logObjectName, "name", config.name)
+	return nil
+}
+
 const detectDatabaseExtensionSQL = `
 SELECT e.extname, e.extversion, n.nspname
 FROM pg_catalog.pg_extension e
@@ -265,26 +303,26 @@ func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext apiv1.Extensi
 	return &result, nil
 }
 
-func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
-	contextLogger := log.FromContext(ctx)
-
-	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize()))
-	if len(ext.Version) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" VERSION %s", pgx.Identifier{ext.Version}.Sanitize()))
-	}
-	if len(ext.Schema) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize()))
+func buildCreateExtensionSQL(b *strings.Builder, obj interface{}) error {
+	extension := obj.(apiv1.ExtensionSpec)
+	if len(extension.Version) > 0 {
+		b.WriteString(fmt.Sprintf("VERSION %s ", pgx.Identifier{extension.Version}.Sanitize()))
 	}
 
-	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
-	if err != nil {
-		contextLogger.Error(err, "while creating extension", "query", sqlCreateExtension.String())
-		return err
+	if len(extension.Schema) > 0 {
+		b.WriteString(fmt.Sprintf("SCHEMA %s ", pgx.Identifier{extension.Schema}.Sanitize()))
 	}
-	contextLogger.Info("created extension", "name", ext.Name)
 
 	return nil
+}
+
+func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
+	return createDatabaseObject(ctx, db, sqlObjectConfig{
+		objectType:    "EXTENSION",
+		name:          ext.Name,
+		builder:       buildCreateExtensionSQL,
+		logObjectName: "extension",
+	}, ext)
 }
 
 func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
@@ -361,23 +399,21 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 	return &result, nil
 }
 
-func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
-	contextLogger := log.FromContext(ctx)
-
-	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
+func buildCreateSchemaSQL(b *strings.Builder, obj interface{}) error {
+	schema := obj.(apiv1.SchemaSpec)
 	if len(schema.Owner) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
+		b.WriteString(fmt.Sprintf("AUTHORIZATION %s ", pgx.Identifier{schema.Owner}.Sanitize()))
 	}
-
-	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
-	if err != nil {
-		contextLogger.Error(err, "while creating schema", "query", sqlCreateExtension.String())
-		return err
-	}
-	contextLogger.Info("created schema", "name", schema.Name)
-
 	return nil
+}
+
+func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
+	return createDatabaseObject(ctx, db, sqlObjectConfig{
+		objectType:    "SCHEMA",
+		name:          schema.Name,
+		builder:       buildCreateSchemaSQL,
+		logObjectName: "schema",
+	}, schema)
 }
 
 func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec, info *schemaInfo) error {
@@ -467,31 +503,26 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	return &result, nil
 }
 
-func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
-	contextLogger := log.FromContext(ctx)
-
-	var sqlCreateFDW strings.Builder
-	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+func buildCreateFDWSQL(b *strings.Builder, obj interface{}) error {
+	fdw := obj.(apiv1.FDWSpec)
 	if len(fdw.Handler) > 0 {
-		sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+		b.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
 	}
+
 	if len(fdw.Validator) > 0 {
-		sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+		b.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
 	}
-
-	// TODO: format options here
-	//if len(fdw.Options) > 0 {
-	//	//sqlCreateFDW.WriteString(fmt.Sprintf("OPTIONS (%s) ", fdw.Options))
-	//}
-
-	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
-	if err != nil {
-		contextLogger.Error(err, "while creating foreign data wrapper", "query", sqlCreateFDW.String())
-		return err
-	}
-	contextLogger.Info("created foreign data wrapper", "name", fdw.Name)
-
+	// TODO: Handle fdw.Options when implemented
 	return nil
+}
+
+func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
+	return createDatabaseObject(ctx, db, sqlObjectConfig{
+		objectType:    "FOREIGN DATA WRAPPER",
+		name:          fdw.Name,
+		builder:       buildCreateFDWSQL,
+		logObjectName: "foreign data wrapper",
+	}, fdw)
 }
 
 func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
