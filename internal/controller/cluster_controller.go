@@ -207,6 +207,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				)
 		}
 
+		if regErr := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseFailurePlugin,
+			fmt.Sprintf("Error while discovering plugins: %s", err.Error()),
+		); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
+
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err
 	}
@@ -224,6 +233,20 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, utils.ErrTerminateLoop) {
 		return ctrl.Result{}, nil
 	}
+
+	// we do not override others error phases
+	if (cluster.Status.Phase == apiv1.PhaseHealthy || cluster.Status.Phase == "") && isPluginError(err) {
+		if regErr := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseFailurePlugin,
+			fmt.Sprintf("Encountered an error while interacting with plugins: %s", err.Error()),
+		); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -271,7 +294,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we load all the plugins that are required to reconcile this cluster
 	if err := r.updatePluginsStatus(ctx, cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot reconcile required plugins: %w", err)
+		return ctrl.Result{}, toPluginError(fmt.Errorf("cannot reconcile required plugins: %w", err))
 	}
 
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
@@ -317,7 +340,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
 		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
 			"hookResult", hookResult)
-		return hookResult.Result, hookResult.Err
+		return hookResult.Result, toPluginError(hookResult.Err)
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -527,10 +550,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		!hookResult.Result.IsZero() {
 		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
 			"hookResult", hookResult)
-		return hookResult.Result, hookResult.Err
+		return hookResult.Result, toPluginError(hookResult.Err)
 	}
 
-	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	statusRes, err := setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	if err != nil {
+		return ctrl.Result{}, toPluginError(err)
+	}
+
+	return statusRes, nil
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
