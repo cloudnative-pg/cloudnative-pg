@@ -73,7 +73,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	contextLogger := log.FromContext(ctx).WithValues(
 		"pluginConfiguration", b.Backup.Spec.PluginConfiguration,
 		"backupName", b.Backup.Name,
-		"backupNamespace", b.Backup.Name)
+		"backupNamespace", b.Backup.Namespace)
 
 	plugins := repository.New()
 	defer plugins.Close()
