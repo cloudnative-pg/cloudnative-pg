@@ -41,6 +41,14 @@ func (data *data) Restore(
 	ctx context.Context,
 	cluster gvkEnsurer,
 ) (*restore.RestoreResponse, error) {
+	r, err := data.innerRestore(ctx, cluster)
+	return r, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerRestore(
+	ctx context.Context,
+	cluster gvkEnsurer,
+) (*restore.RestoreResponse, error) {
 	cluster.EnsureGVKIsPresent()
 
 	for idx := range data.plugins {
