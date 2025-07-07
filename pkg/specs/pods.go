@@ -484,13 +484,13 @@ func NewInstance(
 
 	podClientObject, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbEvaluate, &cluster, pod)
 	if err != nil {
-		return nil, cnpgiClient.ToPluginError(fmt.Errorf("while invoking the lifecycle instance evaluation hook: %w", err))
+		return nil, fmt.Errorf("while invoking the lifecycle instance evaluation hook: %w", err)
 	}
 
 	var ok bool
 	pod, ok = podClientObject.(*corev1.Pod)
 	if !ok {
-		return nil, cnpgiClient.ToPluginError(fmt.Errorf("while casting the clientObject to the pod type"))
+		return nil, fmt.Errorf("while casting the clientObject to the pod type")
 	}
 
 	return pod, nil

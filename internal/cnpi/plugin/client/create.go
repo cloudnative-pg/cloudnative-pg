@@ -31,6 +31,11 @@ import (
 
 // NewClient creates a new CNPI client
 func NewClient(ctx context.Context, enabledPlugin *stringset.Data) (Client, error) {
+	cli, err := innerNewClient(ctx, enabledPlugin)
+	return cli, wrapAsPluginErrorIfNeeded(err)
+}
+
+func innerNewClient(ctx context.Context, enabledPlugin *stringset.Data) (Client, error) {
 	contextLogger := log.FromContext(ctx)
 	plugins := repository.New()
 

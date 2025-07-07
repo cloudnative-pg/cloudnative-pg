@@ -22,7 +22,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -96,11 +95,16 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 }
 
 var (
-	errInvalidJSON        = errors.New("invalid json")
-	errSetStatusInCluster = errors.New("SetStatusInCluster invocation failed")
+	errInvalidJSON        = newPluginError("invalid json")
+	errSetStatusInCluster = newPluginError("SetStatusInCluster invocation failed")
 )
 
 func (data *data) SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
+	m, err := data.innerSetStatusInCluster(ctx, cluster)
+	return m, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerSetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
 	contextLogger := log.FromContext(ctx)
 	serializedObject, err := json.Marshal(cluster)
 	if err != nil {
