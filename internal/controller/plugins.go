@@ -21,7 +21,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -32,29 +31,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 )
-
-type pluginError struct {
-	innerErr error
-}
-
-func (e *pluginError) Error() string {
-	return e.innerErr.Error()
-}
-
-func toPluginError(err error) error {
-	return &pluginError{
-		innerErr: err,
-	}
-}
-
-func isPluginError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var pluginErr *pluginError
-	return errors.As(err, &pluginErr)
-}
 
 // preReconcilePluginHooks ensures we call the pre-reconcile plugin hooks
 func preReconcilePluginHooks(
