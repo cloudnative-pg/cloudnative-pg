@@ -1429,6 +1429,21 @@ type PostgresConfiguration struct {
 	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
+
+	// The configuration of the extensions to be added
+	// +optional
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
+}
+
+// ExtensionConfiguration is the configuration used to add
+// a PostgreSQL extensions to the Cluster
+type ExtensionConfiguration struct {
+	// The name of the extension, required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// The image containing the extension, required
+	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
