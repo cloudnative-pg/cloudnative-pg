@@ -234,8 +234,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	// we do not override others error phases
-	if (cluster.Status.Phase == apiv1.PhaseHealthy || cluster.Status.Phase == "") && isPluginError(err) {
+	// This code assumes that we always end the reconciliation loop if we encounter an error.
+	// In case that the assumption is false this code could overwrite an error phase.
+	if cnpgiClient.IsPluginError(err) {
 		if regErr := r.RegisterPhase(
 			ctx,
 			cluster,
@@ -294,7 +295,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we load all the plugins that are required to reconcile this cluster
 	if err := r.updatePluginsStatus(ctx, cluster); err != nil {
-		return ctrl.Result{}, toPluginError(fmt.Errorf("cannot reconcile required plugins: %w", err))
+		return ctrl.Result{}, cnpgiClient.ToPluginError(fmt.Errorf("cannot reconcile required plugins: %w", err))
 	}
 
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
@@ -340,7 +341,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
 		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
 			"hookResult", hookResult)
-		return hookResult.Result, toPluginError(hookResult.Err)
+		return hookResult.Result, cnpgiClient.ToPluginError(hookResult.Err)
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -550,12 +551,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		!hookResult.Result.IsZero() {
 		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
 			"hookResult", hookResult)
-		return hookResult.Result, toPluginError(hookResult.Err)
+		return hookResult.Result, cnpgiClient.ToPluginError(hookResult.Err)
 	}
 
 	statusRes, err := setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
 	if err != nil {
-		return ctrl.Result{}, toPluginError(err)
+		return ctrl.Result{}, cnpgiClient.ToPluginError(err)
 	}
 
 	return statusRes, nil
@@ -588,7 +589,7 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 	if err := r.RegisterPhase(
 		ctx,
 		cluster,
-		"Not enough disk space",
+		apiv1.PhaseNotEnoughSpace,
 		reason,
 	); err != nil {
 		return ctrl.Result{}, err
