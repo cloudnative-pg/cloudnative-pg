@@ -253,7 +253,7 @@ the `Subscription` status will reflect the following:
 If an error occurs during reconciliation, `status.applied` will be `false`, and
 an error message will be included in the `status.message` field.
 
-### Removing a subscription
+### Removing a Subscription
 
 The `subscriptionReclaimPolicy` field controls the behavior when deleting a
 `Subscription` object:
@@ -281,6 +281,13 @@ spec:
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
+
+### Resilience to Failovers
+
+To ensure that your logical replication subscriptions remain operational after
+a failover of the publisher, configure CloudNativePG to synchronize logical
+decoding slots across the cluster. For detailed instructions, see
+[Logical Decoding Slot Synchronization](replication.md#logical-decoding-slot-synchronization).
 
 ## Limitations
 

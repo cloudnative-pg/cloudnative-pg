@@ -760,17 +760,32 @@ loss for logical replication clients.
 #### Behavior on PostgreSQL 17 and later
 
 For PostgreSQL 17 and newer, CloudNativePG transparently manages the
-[`sync_replication_slots` parameter](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-SYNCHRONIZED-STANDBY-SLOTS).
+[`synchronized_standby_slots` parameter](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-SYNCHRONIZED-STANDBY-SLOTS).
+
 You must enable both `sync_replication_slots` and `hot_standby_feedback` in
 your PostgreSQL configuration:
 
 ```yaml
-  # ...
-  postgresql:
-    parameters:
-      # ...
-      hot_standby_feedback: 'on'
-      sync_replication_slots: 'on'
+# ...
+postgresql:
+  parameters:
+    # ...
+    hot_standby_feedback: 'on'
+    sync_replication_slots: 'on'
+```
+
+Additionally, you must create the logical replication `Subscription` with the
+`failover` option enabled, for example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+# ...
+spec:
+# ...
+  parameters:
+    failover: 'true'
+# ...
 ```
 
 When configured, logical WAL sender processes send decoded changes to plugins
@@ -778,9 +793,12 @@ only after the specified replication slots confirm receiving and flushing the
 relevant WAL, ensuring that:
 
 - logical replication slots do not consume changes until they are safely
-  received by replicas, and
-- logical replication clients can safely reconnect to a promoted standby
+  received by the replicas of the publisher, and
+- logical replication clients can seamlessly reconnect to a promoted standby
   without missing data after failover.
+
+For more details on logical replication slot synchronization, see the
+PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
 
 #### Behavior on PostgreSQL 16 and earlier
 
