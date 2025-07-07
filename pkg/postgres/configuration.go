@@ -708,10 +708,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	if len(info.ImageVolumeExtensions) > 0 {
-		// Set all ExtensionControlPaths
 		setExtensionControlPath(info, configuration)
-
-		// Set all DynamicLibraryPaths
 		setDynamicLibraryPath(info, configuration)
 	}
 

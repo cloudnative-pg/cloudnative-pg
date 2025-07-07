@@ -4041,6 +4041,7 @@ spec:
                           type: object
                         name:
                           description: The name of the extension, required
+                          minLength: 1
                           type: string
                       required:
                       - image

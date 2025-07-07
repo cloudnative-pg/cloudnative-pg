@@ -1416,6 +1416,7 @@ type PostgresConfiguration struct {
 // a PostgreSQL extensions to the Cluster
 type ExtensionConfiguration struct {
 	// The name of the extension, required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// The image containing the extension, required
