@@ -44,9 +44,6 @@ spec:
             type: string
           metadata:
             type: object
-          spec:
-            description: Specification of the cluster that will refresh this data
-            type: object
           status:
             description: Most recently observed status of the sync quorum.
             properties:
@@ -73,7 +70,6 @@ spec:
             type: object
         required:
         - metadata
-        - spec
         type: object
     served: true
     storage: true
