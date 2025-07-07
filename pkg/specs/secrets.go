@@ -41,21 +41,24 @@ func CreateSecret(
 	password string,
 	usertype utils.UserType,
 ) *corev1.Secret {
+	hostWithNamespace := fmt.Sprintf("%s.%s:%d", hostname, namespace, postgres.ServerPort)
+	hostWithFQDN := fmt.Sprintf(
+		"%s.%s.svc.%s:%d",
+		hostname,
+		namespace,
+		configuration.Current.KubernetesClusterDomain,
+		postgres.ServerPort,
+	)
+
 	namespacedBuilder := &connectionStringBuilder{
-		host:     fmt.Sprintf("%s.%s:%d", hostname, namespace, postgres.ServerPort),
+		host:     hostWithNamespace,
 		dbname:   dbname,
 		username: username,
 		password: password,
 	}
 
 	fqdnBuilder := &connectionStringBuilder{
-		host: fmt.Sprintf(
-			"%s.%s.svc.%s:%d",
-			hostname,
-			namespace,
-			configuration.Current.KubernetesClusterDomain,
-			postgres.ServerPort,
-		),
+		host:     hostWithFQDN,
 		dbname:   dbname,
 		username: username,
 		password: password,
