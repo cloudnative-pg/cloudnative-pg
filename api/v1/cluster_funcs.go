@@ -1004,6 +1004,11 @@ func (cluster *Cluster) ContainsTablespaces() bool {
 	return len(cluster.Spec.Tablespaces) != 0
 }
 
+// ContainsExtensions returns true if this cluster has Extensions configured
+func (cluster *Cluster) ContainsExtensions() bool {
+	return len(cluster.Spec.PostgresConfiguration.Extensions) != 0
+}
+
 // GetPostgresUID returns the UID that is being used for the "postgres"
 // user
 func (cluster Cluster) GetPostgresUID() int64 {
