@@ -50,17 +50,10 @@ type SyncQuorum struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// Specification of the cluster that will refresh this data
-	Spec SyncQuorumSpec `json:"spec"`
-
 	// Most recently observed status of the sync quorum.
 	// +optional
 	Status SyncQuorumStatus `json:"status"`
 }
-
-// SyncQuorumSpec contains the pointer to the cluster that should keep
-// the status updated.
-type SyncQuorumSpec struct{}
 
 // SyncQuorumStatus is the latest observed status of the synchronous
 // quorum of the PG cluster.

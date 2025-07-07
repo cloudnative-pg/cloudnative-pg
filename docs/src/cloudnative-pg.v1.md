@@ -356,13 +356,6 @@ an update.</p>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
 </tr>
-<tr><td><code>spec</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-SyncQuorumSpec"><i>SyncQuorumSpec</i></a>
-</td>
-<td>
-   <p>Specification of the cluster that will refresh this data</p>
-</td>
-</tr>
 <tr><td><code>status</code><br/>
 <a href="#postgresql-cnpg-io-v1-SyncQuorumStatus"><i>SyncQuorumStatus</i></a>
 </td>
@@ -6050,20 +6043,6 @@ desired state that was synchronized</p>
 </tbody>
 </table>
 
-## SyncQuorumSpec     {#postgresql-cnpg-io-v1-SyncQuorumSpec}
-
-
-**Appears in:**
-
-- [SyncQuorum](#postgresql-cnpg-io-v1-SyncQuorum)
-
-
-<p>SyncQuorumSpec contains the pointer to the cluster that should keep
-the status updated.</p>
-
-
-
-
 ## SyncQuorumStatus     {#postgresql-cnpg-io-v1-SyncQuorumStatus}
 
 
@@ -6258,7 +6237,7 @@ to allow for operational continuity. This setting is only applicable if both
 <i>bool</i>
 </td>
 <td>
-   <p>QuorumFailoverProtection enables quorum-based check before a failover, ensuring
+   <p>QuorumFailoverProtection enables quorum-based check before failover, ensuring
 no data loss at the expense of availability.</p>
 </td>
 </tr>
