@@ -821,6 +821,7 @@ fio
 fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
+fqdn
 freddie
 fuzzystrmatch
 gapped
