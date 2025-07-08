@@ -17,3 +17,8 @@ spec:
   schemas:
   - name: test_schema
     ensure: present
+  fdws:
+  - name: postgres_fdw
+    handler: postgres_fdw_handler
+    validator: postgres_fdw_validator
+    ensure: present
