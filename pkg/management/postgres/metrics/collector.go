@@ -70,7 +70,12 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	// Reset before collecting
 	q.errorUserQueries.Reset()
 
-	err := q.collectUserQueries(ch)
+	err := q.recomputeUserQueries()
+	if err != nil {
+		return err
+	}
+
+	err = q.collectUserQueries(ch)
 	if err != nil {
 		return err
 	}
@@ -82,7 +87,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
+func (q *QueriesCollector) recomputeUserQueries() error {
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -135,7 +140,7 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 				continue
 			}
 
-			err = collector.collect(conn)
+			err = collector.refresh(conn)
 			if err != nil {
 				queryLogger.Error(err, "Error collecting user query",
 					"targetDatabase", targetDatabase)
@@ -143,6 +148,30 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
 			}
 		}
+	}
+	return nil
+}
+
+func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
+	isPrimary, err := q.instance.IsPrimary()
+	if err != nil {
+		return err
+	}
+
+	for name, userQuery := range q.userQueries {
+		queryLogger := log.WithValues("query", name)
+		collector := QueryCollector{
+			namespace:      name,
+			userQuery:      userQuery,
+			columnMapping:  q.mappings[name],
+			variableLabels: q.variableLabels[name],
+		}
+
+		if !q.toBeChecked(name, userQuery, isPrimary, queryLogger) {
+			continue
+		}
+
+		queryLogger.Debug("Collecting data")
 		collector.collectMetrics(ch)
 	}
 	return nil
@@ -333,8 +362,8 @@ type QueryCollector struct {
 	computedMetrics []prometheus.Metric
 }
 
-// collect retrieves metrics from query and exposes them to prometheus
-func (c QueryCollector) collect(conn *sql.DB) error {
+// refresh retrieves metrics from query and exposes them to prometheus
+func (c QueryCollector) refresh(conn *sql.DB) error {
 	tx, err := createMonitoringTx(conn)
 	if err != nil {
 		return err
