@@ -345,7 +345,7 @@ type ConfigurationInfo struct {
 	RecoveryMinApplyDelay time.Duration
 
 	// The list of extensions to be loaded
-	ImageVolumeExtensions []string
+	ImageVolumeExtensions []ImageVolumeExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -836,13 +836,30 @@ func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
 }
 
+// ImageVolumeExtensionConfiguration is the configuration for an Extension added via ImageVolume
+type ImageVolumeExtensionConfiguration struct {
+	// The name of the Extension
+	Name string
+	// The list of directories that should be added to ExtensionControlPath.
+	ExtensionControlPath []string
+	// The list of directories that should be added to DynamicLibraryPath.
+	DynamicLibraryPath []string
+}
+
 // setExtensionControlPath manages the `extension_control_path` GUC, merging
 // the paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
 func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	extensionControlPath := []string{"$system"}
 	for _, extension := range info.ImageVolumeExtensions {
-		extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
+		// If we have custom ExtensionControlPaths we set those, otherwise we default to "/share"
+		if len(extension.ExtensionControlPath) > 0 {
+			for _, path := range extension.ExtensionControlPath {
+				extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/%s", extension.Name, path))
+			}
+		} else {
+			extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension.Name))
+		}
 	}
 
 	userDefinedPath := strings.Split(configuration.GetConfig(ExtensionControlPath), ":")
@@ -862,7 +879,14 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	dynamicLibraryPath := []string{"$libdir"}
 	for _, extension := range info.ImageVolumeExtensions {
-		dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
+		// If we have custom DynamicLibraryPaths we set those, otherwise we default to "/lib"
+		if len(extension.DynamicLibraryPath) > 0 {
+			for _, path := range extension.DynamicLibraryPath {
+				dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/%s", extension.Name, path))
+			}
+		} else {
+			dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension.Name))
+		}
 	}
 
 	userDefinedPath := strings.Split(configuration.GetConfig(DynamicLibraryPath), ":")

@@ -407,10 +407,17 @@ var _ = Describe("PostgreSQL Extensions", func() {
 
 		It("configures them when an Extension is defined", func() {
 			info := ConfigurationInfo{
-				Settings:              CnpgConfigurationSettings,
-				MajorVersion:          18,
-				IncludingMandatory:    true,
-				ImageVolumeExtensions: []string{"postgis", "pgvector"},
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+					{
+						Name: "postgis",
+					},
+					{
+						Name: "pgvector",
+					},
+				},
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig(ExtensionControlPath)).To(
@@ -428,13 +435,47 @@ var _ = Describe("PostgreSQL Extensions", func() {
 					ExtensionControlPath: "/my/extension/path",
 					DynamicLibraryPath:   "/my/library/path",
 				},
-				ImageVolumeExtensions: []string{"postgis", "pgvector"},
+				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+					{
+						Name: "postgis",
+					},
+					{
+						Name: "pgvector",
+					},
+				},
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig(ExtensionControlPath)).To(
 				BeEquivalentTo("$system:/extensions/postgis/share:/extensions/pgvector/share:/my/extension/path"))
 			Expect(config.GetConfig(DynamicLibraryPath)).To(
 				BeEquivalentTo("$libdir:/extensions/postgis/lib:/extensions/pgvector/lib:/my/library/path"))
+		})
+
+		It("when custom paths are provided (multi-extension)", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+					{
+						Name:                 "geo",
+						ExtensionControlPath: []string{"postgis/share", "pgrouting/share"},
+						DynamicLibraryPath:   []string{"postgis/lib", "pgrouting/lib"},
+					},
+					{
+						Name:                 "utility",
+						ExtensionControlPath: []string{"pgaudit/share", "pg-failover-slots/share"},
+						DynamicLibraryPath:   []string{"pgaudit/lib", "pg-failover-slots/lib"},
+					},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(
+				BeEquivalentTo("$system:/extensions/geo/postgis/share:/extensions/geo/pgrouting/share" +
+					":/extensions/utility/pgaudit/share:/extensions/utility/pg-failover-slots/share"))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(
+				BeEquivalentTo("$libdir:/extensions/geo/postgis/lib:/extensions/geo/pgrouting/lib" +
+					":/extensions/utility/pgaudit/lib:/extensions/utility/pg-failover-slots/lib"))
 		})
 	})
 })
