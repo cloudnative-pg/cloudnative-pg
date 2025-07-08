@@ -5108,6 +5108,19 @@ It may only contain lower case letters, numbers, and the underscore character.
 This can only be set at creation time. By default set to <code>_cnpg_</code>.</p>
 </td>
 </tr>
+<tr><td><code>synchronizeLogicalDecoding</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>When enabled, the operator automatically manages synchronization of logical
+decoding (replication) slots across high-availability clusters.</p>
+<p>Requires one of the following conditions:</p>
+<ul>
+<li>PostgreSQL version 17 or later</li>
+<li>PostgreSQL version &lt; 17 with pg_failover_slots extension enabled</li>
+</ul>
+</td>
+</tr>
 </tbody>
 </table>
 

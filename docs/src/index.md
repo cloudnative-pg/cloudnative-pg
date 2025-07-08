@@ -131,7 +131,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - *Offline Import*: Direct restore from existing databases.
     - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
 - High Availability physical replication slots, including synchronization of
-  user-defined replication slots.
+  user-defined replication slots and logical decoding failover.
 - Parallel WAL archiving and restore, ensuring high-performance data
   synchronization in high-write environments.
 - TLS support, including:

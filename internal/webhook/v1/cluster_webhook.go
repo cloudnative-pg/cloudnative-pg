@@ -209,6 +209,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateSynchronousReplicaConfiguration,
 		v.validateLDAP,
 		v.validateReplicationSlots,
+		v.validateSynchronizeLogicalDecoding,
 		v.validateEnv,
 		v.validateManagedServices,
 		v.validateManagedRoles,
@@ -1038,25 +1039,25 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		}
 	}
 
-	walLogHintsValue, walLogHintsSet := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints]
-	if walLogHintsSet {
-		walLogHintsActivated, err := postgres.ParsePostgresConfigBoolean(walLogHintsValue)
-		if err != nil {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
-					walLogHintsValue,
-					"invalid `wal_log_hints`. Must be a postgres boolean"))
-		}
-		if r.Spec.Instances > 1 && !walLogHintsActivated {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
-					r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
-					"`wal_log_hints` must be set to `on` when `instances` > 1"))
-		}
+	if _, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterHotStandbyFeedback); fieldError != nil {
+		result = append(result, fieldError)
+	}
+
+	if _, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterSyncReplicationSlots); fieldError != nil {
+		result = append(result, fieldError)
+	}
+
+	walLogHintsActivated, fieldError := tryParseBooleanPostgresParameter(r, postgres.ParameterWalLogHints)
+	if fieldError != nil {
+		result = append(result, fieldError)
+	}
+	if walLogHintsActivated != nil && !*walLogHintsActivated && r.Spec.Instances > 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
+				r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
+				"`wal_log_hints` must be set to `on` when `instances` > 1"))
 	}
 
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
@@ -1070,6 +1071,24 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	}
 
 	return result
+}
+
+// tryParseBooleanPostgresParameter attempts to parse a boolean PostgreSQL parameter
+// from the cluster specification. If the parameter is not set, it returns nil.
+func tryParseBooleanPostgresParameter(r *apiv1.Cluster, parameterName string) (*bool, *field.Error) {
+	stringValue, hasParameter := r.Spec.PostgresConfiguration.Parameters[parameterName]
+	if !hasParameter {
+		return nil, nil
+	}
+
+	value, err := postgres.ParsePostgresConfigBoolean(stringValue)
+	if err != nil {
+		return nil, field.Invalid(
+			field.NewPath("spec", "postgresql", "parameters", parameterName),
+			stringValue,
+			fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", parameterName))
+	}
+	return &value, nil
 }
 
 // validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
@@ -2070,6 +2089,62 @@ func (v *ClusterCustomValidator) validateReplicationSlots(r *apiv1.Cluster) fiel
 	return nil
 }
 
+func (v *ClusterCustomValidator) validateSynchronizeLogicalDecoding(r *apiv1.Cluster) field.ErrorList {
+	replicationSlots := r.Spec.ReplicationSlots
+	if replicationSlots.HighAvailability == nil || !replicationSlots.HighAvailability.SynchronizeLogicalDecoding {
+		return nil
+	}
+
+	if postgres.IsManagedExtensionUsed("pg_failover_slots", r.Spec.PostgresConfiguration.Parameters) {
+		return nil
+	}
+
+	pgMajor, err := r.GetPostgresqlMajorVersion()
+	if err != nil {
+		return nil
+	}
+
+	if pgMajor < 17 {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding"),
+				replicationSlots.HighAvailability.SynchronizeLogicalDecoding,
+				"pg_failover_slots extension must be enabled to use synchronizeLogicalDecoding with Postgres versions < 17",
+			),
+		}
+	}
+
+	result := field.ErrorList{}
+
+	hotStandbyFeedback, _ := postgres.ParsePostgresConfigBoolean(
+		r.Spec.PostgresConfiguration.Parameters[postgres.ParameterHotStandbyFeedback])
+	if !hotStandbyFeedback {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterHotStandbyFeedback),
+				hotStandbyFeedback,
+				fmt.Sprintf("`%s` must be enabled to enable "+
+					"`spec.replicationSlots.highAvailability.synchronizeLogicalDecoding`",
+					postgres.ParameterHotStandbyFeedback)))
+	}
+
+	const syncReplicationSlotsKey = "sync_replication_slots"
+	syncReplicationSlots, _ := postgres.ParsePostgresConfigBoolean(
+		r.Spec.PostgresConfiguration.Parameters[syncReplicationSlotsKey])
+	if !syncReplicationSlots {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", syncReplicationSlotsKey),
+				syncReplicationSlots,
+				fmt.Sprintf("either `%s` setting or pg_failover_slots extension must be enabled to enable "+
+					"`spec.replicationSlots.highAvailability.synchronizeLogicalDecoding`", syncReplicationSlotsKey)))
+	}
+
+	return result
+}
+
 func (v *ClusterCustomValidator) validateReplicationSlotsChange(r, old *apiv1.Cluster) field.ErrorList {
 	newReplicationSlots := r.Spec.ReplicationSlots
 	oldReplicationSlots := old.Spec.ReplicationSlots
@@ -2276,38 +2351,20 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 	var result field.ErrorList
 	var pgFailoverSlots postgres.ManagedExtension
 
-	for i, ext := range postgres.ManagedExtensions {
-		if ext.Name == "pg_failover_slots" {
-			pgFailoverSlots = postgres.ManagedExtensions[i]
-		}
-	}
-	if !pgFailoverSlots.IsUsed(r.Spec.PostgresConfiguration.Parameters) {
+	if !postgres.IsManagedExtensionUsed("pg_failover_slots", r.Spec.PostgresConfiguration.Parameters) {
 		return nil
 	}
 
-	const hotStandbyFeedbackKey = "hot_standby_feedback"
-	hotStandbyFeedbackActivated := false
-	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
-	if hasHotStandbyFeedback {
-		var err error
-		hotStandbyFeedbackActivated, err = postgres.ParsePostgresConfigBoolean(hotStandbyFeedback)
-		if err != nil {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
-					hotStandbyFeedback,
-					fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", hotStandbyFeedbackKey)))
-		}
-	}
-
-	if !hotStandbyFeedbackActivated {
+	hotStandbyFeedback, _ := postgres.ParsePostgresConfigBoolean(
+		r.Spec.PostgresConfiguration.Parameters[postgres.ParameterHotStandbyFeedback])
+	if !hotStandbyFeedback {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterHotStandbyFeedback),
 				hotStandbyFeedback,
-				fmt.Sprintf("`%s` must be enabled to use %s extension", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
+				fmt.Sprintf("`%s` must be enabled to use %s extension",
+					postgres.ParameterHotStandbyFeedback, pgFailoverSlots.Name)))
 	}
 
 	if r.Spec.ReplicationSlots == nil {

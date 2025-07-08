@@ -1210,6 +1210,16 @@ type ReplicationSlotsHAConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[0-9a-z_]*$
 	// +optional
 	SlotPrefix string `json:"slotPrefix,omitempty"`
+
+	// When enabled, the operator automatically manages synchronization of logical
+	// decoding (replication) slots across high-availability clusters.
+	//
+	// Requires one of the following conditions:
+	// - PostgreSQL version 17 or later
+	// - PostgreSQL version < 17 with pg_failover_slots extension enabled
+	//
+	// +optional
+	SynchronizeLogicalDecoding bool `json:"synchronizeLogicalDecoding,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
