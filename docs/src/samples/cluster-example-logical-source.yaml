@@ -3,9 +3,9 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  instances: 1
+  instances: 3
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
 
   storage:
     size: 1Gi
@@ -25,11 +25,21 @@ spec:
         - INSERT INTO another_schema.numbers_three (m) (SELECT generate_series(1,10000))
         - ALTER TABLE another_schema.numbers_three OWNER TO app
 
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+
   managed:
     roles:
       - name: app
         login: true
         replication: true
+
+  postgresql:
+    parameters:
+      hot_standby_feedback: 'on'
+      sync_replication_slots: 'on'
+
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Publication
