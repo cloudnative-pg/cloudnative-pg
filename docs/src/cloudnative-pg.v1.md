@@ -2854,6 +2854,29 @@ a PostgreSQL extensions to the Cluster</p>
    <p>The image containing the extension, required</p>
 </td>
 </tr>
+<tr><td><code>extension_control_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to extension_control_path.
+If not defined, defaults to &quot;/share&quot;.</p>
+</td>
+</tr>
+<tr><td><code>dynamic_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to dynamic_library_path.
+If not defined, defaults to &quot;/lib&quot;.</p>
+</td>
+</tr>
+<tr><td><code>ld_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to ld_library_path.</p>
+</td>
+</tr>
 </tbody>
 </table>
 

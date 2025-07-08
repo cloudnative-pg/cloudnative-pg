@@ -4018,6 +4018,20 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         a PostgreSQL extensions to the Cluster
                       properties:
+                        dynamic_library_path:
+                          description: |-
+                            The list of directories inside the image which should be added to dynamic_library_path.
+                            If not defined, defaults to "/lib".
+                          items:
+                            type: string
+                          type: array
+                        extension_control_path:
+                          description: |-
+                            The list of directories inside the image which should be added to extension_control_path.
+                            If not defined, defaults to "/share".
+                          items:
+                            type: string
+                          type: array
                         image:
                           description: The image containing the extension, required
                           properties:
@@ -4039,9 +4053,19 @@ spec:
                                 container images in workload controllers like Deployments and StatefulSets.
                               type: string
                           type: object
+                          x-kubernetes-validations:
+                          - message: An image reference is required
+                            rule: has(self.reference)
+                        ld_library_path:
+                          description: The list of directories inside the image which
+                            should be added to ld_library_path.
+                          items:
+                            type: string
+                          type: array
                         name:
                           description: The name of the extension, required
                           minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                           type: string
                       required:
                       - image
