@@ -366,6 +366,12 @@ spec:
     It's your responsibility to ensure that the end time of the base backup in
     the volume snapshot is before the recovery target timestamp.
 
+!!! Warning
+    If you added or removed a [tablespace](tablespaces.md) in your cluster
+    since the last base backup, replaying the WAL will fail. You need a base
+    backup between the time of the tablespace change and the recovery target
+    timestamp.
+
 ### Recovery targets
 
 Here are the recovery target criteria you can use:
