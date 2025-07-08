@@ -958,16 +958,26 @@ func buildPostmasterEnv(cluster *apiv1.Cluster) []string {
 
 	ldLibraryPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		ldLibraryPaths = append(ldLibraryPaths, GetLibraryPath(&extension))
+		ldLibraryPaths = append(ldLibraryPaths, GetLdLibraryPaths(&extension)...)
 	}
 	env = append(env, "LD_LIBRARY_PATH="+strings.Join(ldLibraryPaths, ":"))
 
 	return env
 }
 
-// GetLibraryPath returns the PATH to the directory containing the libraries of a given Extension
-func GetLibraryPath(extension *apiv1.ExtensionConfiguration) string {
-	return fmt.Sprintf("/extensions/%s/lib", extension.Name)
+// GetLdLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
+// given an extension
+func GetLdLibraryPaths(extension *apiv1.ExtensionConfiguration) []string {
+	if extension.LdLibraryPath == nil {
+		return []string{}
+	}
+
+	libraryPaths := make([]string, 0, len(extension.LdLibraryPath))
+	for _, libraryPath := range extension.LdLibraryPath {
+		libraryPaths = append(libraryPaths, fmt.Sprintf("/extensions/%s/%s", extension.Name, libraryPath))
+	}
+
+	return libraryPaths
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
