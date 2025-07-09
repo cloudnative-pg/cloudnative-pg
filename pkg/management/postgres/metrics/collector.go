@@ -56,6 +56,8 @@ type QueriesCollector struct {
 
 	errorUserQueries      *prometheus.CounterVec
 	errorUserQueriesGauge prometheus.Gauge
+
+	computedMetrics []prometheus.Metric
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
@@ -70,15 +72,12 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	// Reset before collecting
 	q.errorUserQueries.Reset()
 
-	err := q.recomputeUserQueries()
+	err := q.createMetricsFromUserQueries()
 	if err != nil {
 		return err
 	}
 
-	err = q.collectUserQueries(ch)
-	if err != nil {
-		return err
-	}
+	q.collectComputedMetrics(ch)
 
 	// Add errors into errorUserQueriesVec and errorUserQueriesGauge metrics
 	q.errorUserQueriesGauge.Collect(ch)
@@ -87,7 +86,10 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (q *QueriesCollector) recomputeUserQueries() error {
+func (q *QueriesCollector) createMetricsFromUserQueries() error {
+	// refresh
+	q.computedMetrics = []prometheus.Metric{}
+
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -99,7 +101,7 @@ func (q *QueriesCollector) recomputeUserQueries() error {
 
 	for name, userQuery := range q.userQueries {
 		queryLogger := log.WithValues("query", name)
-		collector := QueryCollector{
+		queryRunner := QueryRunner{
 			namespace:      name,
 			userQuery:      userQuery,
 			columnMapping:  q.mappings[name],
@@ -140,41 +142,23 @@ func (q *QueriesCollector) recomputeUserQueries() error {
 				continue
 			}
 
-			err = collector.refresh(conn)
+			computedMetrics, err := queryRunner.computeMetrics(conn)
 			if err != nil {
 				queryLogger.Error(err, "Error collecting user query",
 					"targetDatabase", targetDatabase)
 				// Increment metrics counters.
 				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
 			}
+			q.computedMetrics = append(q.computedMetrics, computedMetrics...)
 		}
 	}
 	return nil
 }
 
-func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
-	isPrimary, err := q.instance.IsPrimary()
-	if err != nil {
-		return err
+func (q *QueriesCollector) collectComputedMetrics(ch chan<- prometheus.Metric) {
+	for _, m := range q.computedMetrics {
+		ch <- m
 	}
-
-	for name, userQuery := range q.userQueries {
-		queryLogger := log.WithValues("query", name)
-		collector := QueryCollector{
-			namespace:      name,
-			userQuery:      userQuery,
-			columnMapping:  q.mappings[name],
-			variableLabels: q.variableLabels[name],
-		}
-
-		if !q.toBeChecked(name, userQuery, isPrimary, queryLogger) {
-			continue
-		}
-
-		queryLogger.Debug("Collecting data")
-		collector.collectMetrics(ch)
-	}
-	return nil
 }
 
 func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger log.Logger) bool {
@@ -269,7 +253,7 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 // Describe implements the prometheus.Collector and defines the metrics with return
 func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 	for name, userQuery := range q.userQueries {
-		collector := QueryCollector{
+		collector := QueryRunner{
 			namespace:     name,
 			userQuery:     userQuery,
 			columnMapping: q.mappings[name],
@@ -352,22 +336,22 @@ func (q *QueriesCollector) InjectUserQueries(defaultQueries UserQueries) {
 	}
 }
 
-// QueryCollector is the implementation of PgCollector for a certain
-// custom query supplied by the user
-type QueryCollector struct {
-	namespace       string
-	userQuery       UserQuery
-	columnMapping   MetricMapSet
-	variableLabels  VariableSet
-	computedMetrics []prometheus.Metric
+// QueryRunner computes a custom user query and generates Prometheus metrics
+// from the results
+type QueryRunner struct {
+	namespace      string
+	userQuery      UserQuery
+	columnMapping  MetricMapSet
+	variableLabels VariableSet
 }
 
-// refresh retrieves metrics from query and exposes them to prometheus
-func (c QueryCollector) refresh(conn *sql.DB) error {
+// computeMetrics runs the queries and generates prometheus metrics from them
+func (c QueryRunner) computeMetrics(conn *sql.DB) ([]prometheus.Metric, error) {
 	tx, err := createMonitoringTx(conn)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var computedMetrics []prometheus.Metric
 
 	defer func() {
 		if err := tx.Commit(); err != nil {
@@ -377,16 +361,16 @@ func (c QueryCollector) refresh(conn *sql.DB) error {
 
 	shouldBeCollected, err := c.userQuery.isCollectable(tx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !shouldBeCollected {
-		return nil
+		return nil, nil
 	}
 
 	rows, err := tx.Query(c.userQuery.Query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -397,7 +381,7 @@ func (c QueryCollector) refresh(conn *sql.DB) error {
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	columnData := make([]interface{}, len(columns))
@@ -411,31 +395,31 @@ func (c QueryCollector) refresh(conn *sql.DB) error {
 			"name", c.namespace,
 			"columnNumberFromDB", len(columns),
 			"columnNumberFromConfiguration", len(c.columnMapping))
-		return nil
+		return nil, nil
 	}
 
 	for rows.Next() {
 		if err = rows.Scan(scanArgs...); err != nil {
-			return err
+			return nil, err
 		}
 
 		labels, done := c.listLabels(columns, columnData)
 		if done {
-			c.refreshColumns(columns, columnData, labels)
+			computedMetrics = append(computedMetrics, c.createMetricsFromColumns(columns, columnData, labels)...)
 		}
 	}
 	if err := rows.Err(); err != nil {
 		log.Warning("Error while loading metrics",
 			"err", err.Error())
-		return err
+		return nil, err
 	}
 
-	return nil
+	return computedMetrics, nil
 }
 
 // Collect the list of labels from the database, and returns true if the
 // label extraction succeeded, false otherwise
-func (c QueryCollector) listLabels(columns []string, columnData []interface{}) ([]string, bool) {
+func (c QueryRunner) listLabels(columns []string, columnData []interface{}) ([]string, bool) {
 	var labels []string
 	for idx, columnName := range columns {
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
@@ -453,10 +437,13 @@ func (c QueryCollector) listLabels(columns []string, columnData []interface{}) (
 	return labels, true
 }
 
-// Collect the metrics from the database columns
-func (c QueryCollector) refreshColumns(columns []string, columnData []interface{},
+// createMetricsFromColumns generates Prometheus metrics from the result columns
+func (c QueryRunner) createMetricsFromColumns(
+	columns []string,
+	columnData []interface{},
 	labels []string,
-) {
+) []prometheus.Metric {
+	var computedMetrics []prometheus.Metric
 	for idx, columnName := range columns {
 		mapping, ok := c.columnMapping[columnName]
 		if !ok {
@@ -486,22 +473,20 @@ func (c QueryCollector) refreshColumns(columns []string, columnData []interface{
 					"columnData", columnData,
 					"labels", labels)
 			} else {
-				c.computedMetrics = append(c.computedMetrics, c.createHistogramMetric(mapping, histogramData, labels))
+				m := c.createHistogramMetric(mapping, histogramData, labels)
+				if m != nil {
+					computedMetrics = append(computedMetrics, m)
+				}
 			}
 
 		default:
-			c.computedMetrics = append(c.computedMetrics, c.createConstMetric(mapping, columnData[idx], labels))
+			m := c.createConstMetric(mapping, columnData[idx], labels)
+			if m != nil {
+				computedMetrics = append(computedMetrics, m)
+			}
 		}
 	}
-}
-
-// collectMetrics iterates over the previously computed metrics
-func (c QueryCollector) collectMetrics(
-	ch chan<- prometheus.Metric,
-) {
-	for _, m := range c.computedMetrics {
-		ch <- m
-	}
+	return computedMetrics
 }
 
 // createMonitoringTx create a monitoring transaction with read-only access
@@ -539,14 +524,14 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 }
 
 // describe puts in the channel the metadata we have for the queries we collect
-func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
+func (c QueryRunner) describe(ch chan<- *prometheus.Desc) {
 	for _, mapSet := range c.columnMapping {
 		ch <- mapSet.Desc
 	}
 }
 
 // createConstMetric reports to the prometheus library a constant metric
-func (c QueryCollector) createConstMetric(
+func (c QueryRunner) createConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string,
 ) prometheus.Metric {
 	if mapping.Conversion == nil {
@@ -575,38 +560,8 @@ func (c QueryCollector) createConstMetric(
 	return metric
 }
 
-// collectConstMetric reports to the prometheus library a constant metric
-func (c QueryCollector) collectConstMetric(
-	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric,
-) {
-	if mapping.Conversion == nil {
-		log.Warning("Missing conversion while parsing value",
-			"namespace", c.namespace,
-			"value", value,
-			"mapping", mapping)
-		return
-	}
-
-	floatData, ok := mapping.Conversion(value)
-	if !ok {
-		log.Warning("Error while parsing value",
-			"namespace", c.namespace,
-			"value", value,
-			"mapping", mapping)
-		return
-	}
-
-	// Generate the metric
-	metric, err := prometheus.NewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
-	if err != nil {
-		log.Error(err, "while collecting constant metric", "metric", mapping.Name)
-		return
-	}
-	ch <- metric
-}
-
 // createHistogramMetric reports to the prometheus library an histogram-based metric
-func (c QueryCollector) createHistogramMetric(
+func (c QueryRunner) createHistogramMetric(
 	mapping MetricMap,
 	columnData *histogram.Value,
 	variableLabels []string,
