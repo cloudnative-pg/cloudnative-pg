@@ -14,6 +14,8 @@ spec:
   extensions:
   - name: bloom
     ensure: present
+  - name: postgres_fdw
+    ensure: present
   schemas:
   - name: test_schema
     ensure: present

@@ -48,7 +48,7 @@ type fdwInfo struct {
 	Handler   string `json:"handler"`
 	Validator string `json:"validator"`
 	Owner     string `json:"owner"`
-	//Options   []apiv1.OptSpec `json:"options"`
+	// Options   []apiv1.OptSpec `json:"options"`
 }
 
 // sqlObjectBuilder builds a SQL query to create a database object
@@ -306,11 +306,11 @@ func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext apiv1.Extensi
 func buildCreateExtensionSQL(b *strings.Builder, obj interface{}) error {
 	extension := obj.(apiv1.ExtensionSpec)
 	if len(extension.Version) > 0 {
-		b.WriteString(fmt.Sprintf("VERSION %s ", pgx.Identifier{extension.Version}.Sanitize()))
+		fmt.Fprintf(b, "VERSION %s ", pgx.Identifier{extension.Version}.Sanitize())
 	}
 
 	if len(extension.Schema) > 0 {
-		b.WriteString(fmt.Sprintf("SCHEMA %s ", pgx.Identifier{extension.Schema}.Sanitize()))
+		fmt.Fprintf(b, "SCHEMA %s ", pgx.Identifier{extension.Schema}.Sanitize())
 	}
 
 	return nil
@@ -402,7 +402,7 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 func buildCreateSchemaSQL(b *strings.Builder, obj interface{}) error {
 	schema := obj.(apiv1.SchemaSpec)
 	if len(schema.Owner) > 0 {
-		b.WriteString(fmt.Sprintf("AUTHORIZATION %s ", pgx.Identifier{schema.Owner}.Sanitize()))
+		fmt.Fprintf(b, "AUTHORIZATION %s ", pgx.Identifier{schema.Owner}.Sanitize())
 	}
 	return nil
 }
@@ -449,15 +449,6 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 	return nil
 }
 
-//const detectDatabaseFDWSQL = `
-//SELECT
-//  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
-//  a.rolname AS owner
-//FROM pg_foreign_data_wrapper f
-//JOIN pg_authid a ON f.fdwowner = a.oid
-//WHERE fdwname = $1
-//`
-
 const detectDatabaseFDWSQL = `
 SELECT 
  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, a.rolname AS owner
@@ -474,10 +465,8 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 		return nil, fmt.Errorf("while checking if FDW %q exists: %w", fdw.Name, row.Err())
 	}
 
-	var (
-		// optionsRaw pq.StringArray
-		result fdwInfo
-	)
+	// optionsRaw pq.StringArray
+	var result fdwInfo
 	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -485,32 +474,17 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 		return nil, fmt.Errorf("while scanning if FDW %q exists: %w", fdw.Name, err)
 	}
 
-	// Extract options from SQL raw format to type OptSpec
-	//var opts []apiv1.OptSpec
-	//for _, opt := range optionsRaw {
-	//	parts := strings.SplitN(opt, "=", 2)
-	//	if len(parts) == 2 {
-	//		opts = append(opts, apiv1.OptSpec{
-	//			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
-	//				Name: parts[0],
-	//			},
-	//			Value: parts[1],
-	//		})
-	//	}
-	//}
-	//result.Options = opts
-
 	return &result, nil
 }
 
 func buildCreateFDWSQL(b *strings.Builder, obj interface{}) error {
 	fdw := obj.(apiv1.FDWSpec)
 	if len(fdw.Handler) > 0 {
-		b.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+		fmt.Fprintf(b, "HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize())
 	}
 
 	if len(fdw.Validator) > 0 {
-		b.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+		fmt.Fprintf(b, "VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize())
 	}
 	// TODO: Handle fdw.Options when implemented
 	return nil

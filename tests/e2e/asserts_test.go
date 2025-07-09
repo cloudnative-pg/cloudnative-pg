@@ -554,7 +554,7 @@ func schemaExistsQuery(namespaceName string) string {
 }
 
 func fdwExistsQuery(fdwName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_data_wrapper WHERE fdwname='%v'", fdwName)
+	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_data_wrapper WHERE fdwname='%v')", fdwName)
 }
 
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table
