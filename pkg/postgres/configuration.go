@@ -24,6 +24,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -251,6 +252,9 @@ local {{.Username}} postgres
 
 	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
 	DynamicLibraryPath = "dynamic_library_path"
+
+	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
+	ExtensionsBaseDirectory = "/extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -855,10 +859,10 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 		// If we have custom ExtensionControlPaths we set those, otherwise we default to "/share"
 		if len(extension.ExtensionControlPath) > 0 {
 			for _, path := range extension.ExtensionControlPath {
-				extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/%s", extension.Name, path))
+				extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
 			}
 		} else {
-			extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension.Name))
+			extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "share"))
 		}
 	}
 
@@ -882,10 +886,10 @@ func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguratio
 		// If we have custom DynamicLibraryPaths we set those, otherwise we default to "/lib"
 		if len(extension.DynamicLibraryPath) > 0 {
 			for _, path := range extension.DynamicLibraryPath {
-				dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/%s", extension.Name, path))
+				dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
 			}
 		} else {
-			dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension.Name))
+			dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "lib"))
 		}
 	}
 

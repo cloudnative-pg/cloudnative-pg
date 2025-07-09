@@ -974,7 +974,7 @@ func GetLdLibraryPaths(extension *apiv1.ExtensionConfiguration) []string {
 
 	libraryPaths := make([]string, 0, len(extension.LdLibraryPath))
 	for _, libraryPath := range extension.LdLibraryPath {
-		libraryPaths = append(libraryPaths, fmt.Sprintf("/extensions/%s/%s", extension.Name, libraryPath))
+		libraryPaths = append(libraryPaths, filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath))
 	}
 
 	return libraryPaths
