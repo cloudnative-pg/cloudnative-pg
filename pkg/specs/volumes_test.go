@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -586,13 +587,17 @@ var _ = Describe("ImageVolume Extensions", func() {
 		})
 		When("Extensions are enabled", func() {
 			It("should create a VolumeMount for each Extension", func() {
+				const (
+					fooMountPath = postgres.ExtensionsBaseDirectory + "/foo"
+					barMountPath = postgres.ExtensionsBaseDirectory + "/bar"
+				)
 				Expect(cluster.ContainsExtensions()).To(BeTrue())
 				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(2))
 				Expect(extensionVolumeMounts[0].Name).To(Equal("foo"))
-				Expect(extensionVolumeMounts[0].MountPath).To(Equal("/extensions/foo"))
+				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
 				Expect(extensionVolumeMounts[1].Name).To(Equal("bar"))
-				Expect(extensionVolumeMounts[1].MountPath).To(Equal("/extensions/bar"))
+				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
 			})
 		})
 	})

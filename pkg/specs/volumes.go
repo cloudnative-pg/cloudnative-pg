@@ -22,6 +22,7 @@ package specs
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -346,7 +347,7 @@ func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
 				Name:      extension.Name,
-				MountPath: fmt.Sprintf("/extensions/%s", extension.Name),
+				MountPath: filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name),
 			},
 		)
 	}

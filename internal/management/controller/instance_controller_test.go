@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,22 +75,29 @@ var _ = Describe("buildPostmasterEnv", func() {
 	})
 
 	Context("Extensions enabled, LD_LIBRARY_PATH defined", func() {
-		const finalPaths = ":/extensions/foo/system:/extensions/bar/system:/extensions/bar/sample"
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/system"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/system"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
 		BeforeEach(func() {
-			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"system"}
-			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"system", "sample"}
+			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"/system", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"./system", "./sample/"}
 		})
 
 		It("should be defined", func() {
 			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			err := os.Setenv("LD_LIBRARY_PATH", ":/my/library/path")
 			Expect(err).ToNot(HaveOccurred())
 
 			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:/my/library/path%s", finalPaths)))
+			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:/my/library/path:%s", finalPaths)))
 		})
 	})
 
