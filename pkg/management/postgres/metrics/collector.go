@@ -136,13 +136,13 @@ func (q *QueriesCollector) createMetricsFromUserQueries() error {
 
 		allTargetDatabases := q.expandTargetDatabases(targetDatabases, allAccessibleDatabasesCache)
 		for targetDatabase := range allTargetDatabases {
-			conn, err := q.instance.ConnectionPool().Connection(targetDatabase)
+			db, err := q.instance.ConnectionPool().Connection(targetDatabase)
 			if err != nil {
 				q.reportUserQueryErrorMetric(name + ": " + err.Error())
 				continue
 			}
 
-			computedMetrics, err := queryRunner.computeMetrics(conn)
+			computedMetrics, err := queryRunner.computeMetrics(db)
 			if err != nil {
 				queryLogger.Error(err, "Error collecting user query",
 					"targetDatabase", targetDatabase)
