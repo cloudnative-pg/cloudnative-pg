@@ -165,6 +165,9 @@ ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
 FailoverQuorum
@@ -841,6 +844,8 @@ faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -1443,6 +1448,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized
