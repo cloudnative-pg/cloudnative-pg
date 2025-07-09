@@ -238,36 +238,7 @@ type FDWSpec struct {
 	// By default, the owner of a new FDW is the current session user.
 	// Even if an owner is explicitly specified during creation, it will be ignored.
 	Owner string `json:"owner,omitempty"`
-
-	// Optional FDW-level options (e.g., use_remote_estimate)
-	// Options []OptSpec `json:"options,omitempty"`
 }
-
-//// ForeignServerSpec configures a foreign server for a FDW
-//type ForeignServerSpec struct {
-//	DatabaseObjectSpec `json:",inline"`
-//
-//	// Type of the foreign server (e.g., "postgres", "mysql")
-//	Type string `json:"type,omitempty"`
-//
-//	// Optional server version string (e.g., "15", "5.7")
-//	Version string `json:"version,omitempty"`
-//
-//	// List of user mappings defining access rules from local users to this server
-//	UserMappings []UserMappingSpec `json:"userMapping,omitempty"`
-//
-//	// Server-level connection options (e.g., host, port, dbname)
-//	Options []OptSpec `json:"server_opts,omitempty"`
-//}
-//
-//// UserMappingSpec configures a usermapping that maps the local user to a remote user
-//type UserMappingSpec struct {
-//	// Local user role being mapped in DatabaseObjectSpec.name(e.g., "app_user", "PUBLIC")
-//	DatabaseObjectSpec `json:",inline"`
-//
-//	// Optional options for authentication (e.g., user, password)
-//	Options []OptSpec `json:"userMapping_opts,omitempty"`
-//}
 
 // OptSpec configures a option instance
 type OptSpec struct {
