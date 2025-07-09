@@ -35,6 +35,8 @@ import (
 
 // nolint: dupl
 var _ = Describe("subscription sql", func() {
+	const defaultPostgresMajorVersion = 17
+
 	var (
 		dbMock sqlmock.Sqlmock
 		db     *sql.DB
@@ -132,12 +134,12 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString)
+		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 	})
 
-	It("generates correct SQL for altering subscription with parameters", func() {
+	It("generates correct SQL for altering subscription with parameters for PostgreSQL 17", func() {
 		obj := &apiv1.Subscription{
 			Spec: apiv1.SubscriptionSpec{
 				Name:            "test_sub",
@@ -146,15 +148,38 @@ var _ = Describe("subscription sql", func() {
 					"copy_data": "true",
 					"origin":    "none",
 					"failover":  "true",
+					"two_phase": "true",
 				},
 			},
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString)
+		sqls := toSubscriptionAlterSQL(obj, connString, 17)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true', "origin" = 'none')`))
+	})
+
+	It("generates correct SQL for altering subscription with parameters for PostgreSQL 18", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+				Parameters: map[string]string{
+					"copy_data": "true",
+					"origin":    "none",
+					"failover":  "true",
+					"two_phase": "true",
+				},
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionAlterSQL(obj, connString, 18)
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
+		Expect(sqls).To(ContainElement(
+			`ALTER SUBSCRIPTION "test_sub" SET ("failover" = 'true', "origin" = 'none', "two_phase" = 'true')`))
 	})
 
 	It("returns correct SQL for altering subscription with no owner or parameters", func() {
@@ -166,7 +191,7 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionAlterSQL(obj, connString)
+		sqls := toSubscriptionAlterSQL(obj, connString, defaultPostgresMajorVersion)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 	})
