@@ -254,6 +254,10 @@ tablespace map) both on object stores and volume snapshots.
     backup. The lag will be resolved in a maximum of 5 minutes, with the next
     reconciliation.
 
+!!! Warning
+    When you add or remove a tablespace in an existing cluster, recovery
+    from WAL will fail until you take a new base backup.
+
 Once a cluster with tablespaces has a base backup, you can restore a
 new cluster from it. When it comes to the recovery side, it's your
 responsibility to ensure that the `Cluster` definition of the recovered

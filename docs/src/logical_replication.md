@@ -12,6 +12,14 @@ connect to publications on a publisher node. Subscribers pull data changes from
 these publications and can re-publish them, enabling cascading replication and
 complex topologies.
 
+!!! Important
+    To protect your logical replication subscribers after a failover of the
+    publisher cluster in CloudNativePG, ensure that replication slot
+    synchronization for logical decoding is enabled. Without this, your logical
+    replication clients may lose data and fail to continue seamlessly after a
+    failover. For configuration details, see
+    ["Replication: Logical Decoding Slot Synchronization"](replication.md#logical-decoding-slot-synchronization).
+
 This flexible model is particularly useful for:
 
 - Online data migrations
@@ -245,7 +253,7 @@ the `Subscription` status will reflect the following:
 If an error occurs during reconciliation, `status.applied` will be `false`, and
 an error message will be included in the `status.message` field.
 
-### Removing a subscription
+### Removing a Subscription
 
 The `subscriptionReclaimPolicy` field controls the behavior when deleting a
 `Subscription` object:
@@ -273,6 +281,13 @@ spec:
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
+
+### Resilience to Failovers
+
+To ensure that your logical replication subscriptions remain operational after
+a failover of the publisher, configure CloudNativePG to synchronize logical
+decoding slots across the cluster. For detailed instructions, see
+[Logical Decoding Slot Synchronization](replication.md#logical-decoding-slot-synchronization).
 
 ## Limitations
 

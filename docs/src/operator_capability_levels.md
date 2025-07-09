@@ -115,11 +115,11 @@ than `1`, the operator manages `instances -1` replicas, including high
 availability (HA) through automated failover and rolling updates through
 switchover operations.
 
-CloudNativePG manages replication slots for all the replicas
-in the HA cluster. The implementation is inspired by the previously
-proposed patch for PostgreSQL, called
-[failover slots](https://wiki.postgresql.org/wiki/Failover_slots), and
-also supports user defined physical replication slots on the primary.
+CloudNativePG manages replication slots for all replicas in the
+high-availability cluster. It also supports user-defined physical replication
+slots on the primary and enables logical decoding failover—natively for
+PostgreSQL 17 and later using `sync_replication_slots`, and through the
+`pg_failover_slots` extension for earlier versions.
 
 ### Service Configuration
 

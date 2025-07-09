@@ -831,6 +831,7 @@ fio
 fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
+fqdn
 freddie
 fuzzystrmatch
 gapped
@@ -1332,6 +1333,7 @@ switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeLogicalDecoding
 synchronizeReplicas
 synchronizeReplicasCache
 sys
