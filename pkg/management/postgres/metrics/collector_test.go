@@ -68,42 +68,40 @@ var _ = Describe("Set default queries", Ordered, func() {
 var _ = Describe("QueryCollector tests", func() {
 	Context("collect metric tests", func() {
 		It("should ensure that a metric without conversion is discarded", func() {
-			qc := QueryCollector{}
-			ch := make(chan prometheus.Metric, 10)
+			qc := QueryRunner{}
 			metricMap := MetricMap{
 				Name:       "MALFORMED_COUNTER",
 				Discard:    true,
 				Conversion: nil,
 				Label:      false,
 			}
-			qc.collectConstMetric(
+			m := qc.createConstMetric(
 				metricMap,
 				"COUNTER_TEST",
 				[]string{"COUNTER_TEST"},
-				ch,
 			)
-			Expect(ch).To(BeEmpty())
+			Expect(m).To(BeNil())
 		})
 
 		It("should ensure that a metric with a bad conversion value is discarded", func() {
-			qc := QueryCollector{}
-			ch := make(chan prometheus.Metric, 10)
+			qc := QueryRunner{}
 			cm := ColumnMapping{Usage: COUNTER}
 			cs := cm.ToMetricMap("TEST_COLUMN", "TEST_NAMESPACE", []string{"TEST_VARIABLE"})
 			for _, metricMap := range cs {
 				// int are not converted
-				qc.collectConstMetric(metricMap, 12, []string{"TEST"}, ch)
+				m := qc.createConstMetric(metricMap, 12, []string{"TEST"})
+				Expect(m).To(BeNil())
 			}
-			Expect(ch).To(BeEmpty())
 		})
 
 		It("should ensure that a correctly formed counter is sent", func() {
-			qc := QueryCollector{}
+			qc := QueryRunner{}
 			ch := make(chan prometheus.Metric, 10)
 			cm := ColumnMapping{Usage: COUNTER}
 			cs := cm.ToMetricMap("TEST_COLUMN", "TEST_NAMESPACE", []string{"TEST_VARIABLE"})
 			for _, metricMap := range cs {
-				qc.collectConstMetric(metricMap, int64(12), []string{"TEST"}, ch)
+				m := qc.createConstMetric(metricMap, int64(12), []string{"TEST"})
+				ch <- m
 			}
 			Expect(ch).To(HaveLen(1))
 			res := <-ch
@@ -114,7 +112,7 @@ var _ = Describe("QueryCollector tests", func() {
 
 		Context("fetch label testing", func() {
 			It("should correctly fetch the mapped labels", func() {
-				qc := QueryCollector{
+				qc := QueryRunner{
 					columnMapping: map[string]MetricMap{
 						"LABEL_ENABLED": {
 							Label: true,
@@ -134,7 +132,7 @@ var _ = Describe("QueryCollector tests", func() {
 			})
 
 			It("should report success false when the fetched data conversion is not supported", func() {
-				qc := QueryCollector{
+				qc := QueryRunner{
 					columnMapping: map[string]MetricMap{
 						"LABEL_ENABLED": {
 							Label: true,
