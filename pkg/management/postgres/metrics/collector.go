@@ -67,8 +67,8 @@ func (q QueriesCollector) Name() string {
 
 var isPathPattern = regexp.MustCompile(`[][*?]`)
 
-// Collect loads data from the actual PostgreSQL instance
-func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
+// Update recomputes the metrics from the user queries
+func (q QueriesCollector) Update() error {
 	// Reset before collecting
 	q.errorUserQueries.Reset()
 
@@ -76,14 +76,16 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
+// Collect sends the updated values to the output channel
+func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	q.collectComputedMetrics(ch)
 
 	// Add errors into errorUserQueriesVec and errorUserQueriesGauge metrics
 	q.errorUserQueriesGauge.Collect(ch)
 	q.errorUserQueries.Collect(ch)
-
-	return nil
 }
 
 func (q *QueriesCollector) createMetricsFromUserQueries() error {

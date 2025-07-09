@@ -318,8 +318,11 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector, collecting the Metrics values to
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.collectPgMetrics(ch)
+	e.updatePgMetrics()
 
+	if e.queries != nil {
+		e.queries.Collect(ch)
+	}
 	ch <- e.Metrics.CollectionsTotal
 	ch <- e.Metrics.Error
 	e.Metrics.PgCollectionErrors.Collect(ch)
@@ -359,8 +362,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
-	log.Info("XXX collecting metrics")
+// updatePgMetrics updates instance metrics and userQuery-derived metrics
+// NOTE: it runs on each scrape of the prometheus endpoint
+func (e *Exporter) updatePgMetrics() {
+	log.Info("XXX updating metrics")
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
@@ -400,8 +405,8 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	if e.queries != nil {
 		label := "Collect." + e.queries.Name()
 		collectionStart := time.Now()
-		if err := e.queries.Collect(ch); err != nil {
-			log.Error(err, "Error during collection", "collector", e.queries.Name())
+		if err := e.queries.Update(); err != nil {
+			log.Error(err, "Error during query update", "collector", e.queries.Name())
 			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
 			e.Metrics.Error.Set(1)
 		}
