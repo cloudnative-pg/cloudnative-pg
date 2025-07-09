@@ -144,8 +144,8 @@ spec:
 
 ## Configuration via a PVC template
 
-To further customize the generated PVCs, you can provide a PVC template inside
-the custom resource, as shown below:
+To further customize the generated PVCs, you can provide a PVC template inside the custom resource,
+like in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -165,14 +165,6 @@ spec:
       storageClassName: standard
       volumeMode: Filesystem
 ```
-
-!!! Info
-    Depending on your Kubernetes cluster configuration, you can also specify a
-    `VolumeAttributesClass` in the `pvcTemplate`.
-    [Volume Attributes Classes](https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/),
-    promoted to beta in Kubernetes 1.31 (disabled by default), allow administrators
-    (typically cloud providers) to define mutable "classes" of storage that map to
-    different quality-of-service levels.
 
 ## Volume for WAL
 
