@@ -85,7 +85,9 @@ func (q *QueriesCollector) Update() error {
 	return nil
 }
 
-// Collect sends the updated values to the output channel
+// Collect sends the pre-computed metrics to the output channel.
+// These metrics were cached during the last Update() call and are not
+// fetched from the database during collection.
 func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	q.collectComputedMetrics(ch)
 
