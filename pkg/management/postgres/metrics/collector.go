@@ -65,10 +65,16 @@ func (q QueriesCollector) Name() string {
 	return q.collectorName
 }
 
+// GetComputedMetricsCount returns the number of constant Prometheus metrics that
+// are updated and ready for collection
+func (q QueriesCollector) GetComputedMetricsCount() int {
+	return len(q.computedMetrics)
+}
+
 var isPathPattern = regexp.MustCompile(`[][*?]`)
 
 // Update recomputes the metrics from the user queries
-func (q QueriesCollector) Update() error {
+func (q *QueriesCollector) Update() error {
 	// Reset before collecting
 	q.errorUserQueries.Reset()
 

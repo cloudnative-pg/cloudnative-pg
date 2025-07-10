@@ -1184,6 +1184,18 @@ func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	return false
 }
 
+// GetMetricsRefreshInterval returns the interval between updates of the metrics queries.
+// Default value is 30 seconds
+func (cluster *Cluster) GetMetricsRefreshInterval() *metav1.Duration {
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.RefreshInterval != nil {
+		return cluster.Spec.Monitoring.RefreshInterval
+	}
+
+	return &metav1.Duration{
+		Duration: 30 * time.Second,
+	}
+}
+
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not
 func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 	if cluster.Spec.EnableSuperuserAccess != nil {
