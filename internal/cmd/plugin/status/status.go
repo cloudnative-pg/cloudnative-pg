@@ -280,7 +280,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		// Avoid printing the start time when hibernated or fenced
 		primaryStartTime := getPrimaryStartTime(cluster)
 		if len(primaryStartTime) > 0 {
-			summary.AddLine("Primary start time:", primaryStartTime)
+			summary.AddLine("Primary promotion time:", primaryStartTime)
 		}
 		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
