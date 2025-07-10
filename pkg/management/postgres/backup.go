@@ -35,7 +35,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -155,36 +154,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 	)
 
 	if err := b.takeBackup(ctx); err != nil {
-		backupStatus := b.Backup.GetStatus()
-
 		// record the failure
 		b.Log.Error(err, "Backup failed")
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
 
-		// update backup status as failed
-		backupStatus.SetAsFailed(err)
-		if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-			b.Log.Error(err, "Can't mark backup as failed")
-			// We do not terminate here because we still want to do the maintenance
-			// activity on the backups and to set the condition on the cluster.
-		}
-
-		// add backup failed condition to the cluster
-		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
-			return status.PatchWithOptimisticLock(
-				ctx,
-				b.Client,
-				b.Cluster,
-				func(cluster *apiv1.Cluster) {
-					meta.SetStatusCondition(&cluster.Status.Conditions, apiv1.BuildClusterBackupFailedCondition(err))
-					cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
-				},
-			)
-		}); failErr != nil {
-			b.Log.Error(failErr, "while setting cluster condition for failed backup")
-			// We do not terminate here because it's more important to properly handle
-			// the backup maintenance activity than putting a condition in the cluster
-		}
+		_ = status.FlagBackupAsFailed(ctx, b.Client, b.Backup, b.Cluster, err)
 	}
 
 	b.backupMaintenance(ctx)

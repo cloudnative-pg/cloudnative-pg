@@ -62,7 +62,9 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			Startup: &apiv1.ProbeWithStrategy{
 				Probe: probeConfiguration,
 			},
-			Liveness: probeConfiguration.DeepCopy(),
+			Liveness: &apiv1.LivenessProbe{
+				Probe: probeConfiguration,
+			},
 			Readiness: &apiv1.ProbeWithStrategy{
 				Probe: probeConfiguration,
 			},

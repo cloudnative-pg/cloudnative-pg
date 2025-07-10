@@ -45,7 +45,7 @@ func Reconcile(
 		return res, err
 	}
 
-	if err := reconcileResourceRequests(ctx, c, cluster, pvcs); err != nil {
+	if err := reconcileExistingPVCs(ctx, c, cluster, pvcs); err != nil {
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
 			return ctrl.Result{Requeue: true}, nil

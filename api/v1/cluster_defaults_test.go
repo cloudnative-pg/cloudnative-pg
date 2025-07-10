@@ -20,9 +20,11 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -357,5 +359,159 @@ var _ = Describe("default dataDurability", func() {
 		cluster.SetDefaults()
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous).ToNot(BeNil())
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous.DataDurability).To(Equal(DataDurabilityLevelPreferred))
+	})
+})
+
+var _ = Describe("NewLivenessPingerConfigFromAnnotations", func() {
+	It("returns a nil configuration when annotation is not present", func() {
+		annotations := map[string]string{}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).To(BeNil())
+	})
+
+	It("returns an error when annotation contains invalid JSON", func() {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: "{invalid_json",
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).To(HaveOccurred())
+		Expect(config).To(BeNil())
+	})
+
+	It("applies default values when timeouts are not specified", func() {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(HaveValue(BeTrue()))
+		Expect(config.RequestTimeout).To(Equal(1000))
+		Expect(config.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("preserves values when all fields are specified", func() {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 300, "connectionTimeout": 600}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(HaveValue(BeTrue()))
+		Expect(config.RequestTimeout).To(Equal(300))
+		Expect(config.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("correctly sets enabled to false when specified", func() {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": false, "requestTimeout": 300, "connectionTimeout": 600}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.Enabled).To(HaveValue(BeFalse()))
+		Expect(config.RequestTimeout).To(Equal(300))
+		Expect(config.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("correctly handles zero values for timeouts", func() {
+		annotations := map[string]string{
+			utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 0, "connectionTimeout": 0}`,
+		}
+
+		config, err := NewLivenessPingerConfigFromAnnotations(annotations)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.RequestTimeout).To(Equal(1000))
+		Expect(config.ConnectionTimeout).To(Equal(1000))
+	})
+})
+
+var _ = Describe("probe defaults", func() {
+	It("should set isolationCheck probe to true by default when no probes are specified", func() {
+		cluster := &Cluster{}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(1000))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("should not override isolationCheck probe if already set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Probes: &ProbesConfiguration{
+					Liveness: &LivenessProbe{
+						IsolationCheck: &IsolationCheckConfiguration{
+							Enabled:           ptr.To(false),
+							RequestTimeout:    300,
+							ConnectionTimeout: 600,
+						},
+					},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeFalse()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("should set isolationCheck probe when it is not set but liveness probe is present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Probes: &ProbesConfiguration{
+					Liveness: &LivenessProbe{},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(1000))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(1000))
+	})
+
+	It("should convert the existing annotations if set to true", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"enabled": true, "requestTimeout": 300, "connectionTimeout": 600}`,
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeTrue()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
+	})
+
+	It("should convert the existing annotations if set to false", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.LivenessPingerAnnotationName: `{"enabled": false, "requestTimeout": 300, "connectionTimeout": 600}`,
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck).ToNot(BeNil())
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.Enabled).To(HaveValue(BeFalse()))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.RequestTimeout).To(Equal(300))
+		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
 	})
 })
