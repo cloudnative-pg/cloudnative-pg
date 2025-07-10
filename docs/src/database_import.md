@@ -271,27 +271,62 @@ unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 
 ## Customizing `pg_dump` and `pg_restore` Behavior
 
-You can customize the behavior of `pg_dump` and `pg_restore` by specifying
-additional options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions`
-parameters. For instance, you can enable parallel jobs to speed up data
-import/export processes, as shown in the following example:
+You can customize the behavior of `pg_dump` and `pg_restore` by specifying additional options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions` parameters. This is especially useful for improving performance or managing import/export complexity.
+
+For example, enabling parallel jobs can significantly speed up data transfer:
 
 ```yaml
-  # <snip>
-  bootstrap:
-    initdb:
-      import:
-        type: microservice
-        databases:
-        - app
-        source:
-          externalCluster: cluster-example
-        pgDumpExtraOptions:
-        - '--jobs=2'
-        pgRestoreExtraOptions:
-        - '--jobs=2'
-  # <snip>
+bootstrap:
+  initdb:
+    import:
+      type: microservice
+      databases:
+      - app
+      source:
+        externalCluster: cluster-example
+      pgDumpExtraOptions:
+      - '--jobs=2'
+      pgRestoreExtraOptions:
+      - '--jobs=2'
 ```
+
+### Stage-Specific `pg_restore` Options
+
+For more fine-grained control during import, CloudNativePG also supports **stage-specific `pg_restore` options** for the following phases:
+
+* **Predata**: e.g., schema definitions
+* **Data**: e.g., table contents
+* **Postdata**: e.g., indexes, constraints, and triggers
+
+This allows you to apply different parallelism or flags tailored to the characteristics of each stage.
+
+```yaml
+bootstrap:
+  initdb:
+    import:
+      type: microservice
+      schemaOnly: false
+      databases:
+        - mynewdb
+      source:
+        externalCluster: sourcedb-external
+      pgRestorePredataOptions:
+        - '--jobs=1'
+      pgRestoreDataOptions:
+        - '--jobs=4'
+      pgRestorePostdataOptions:
+        - '--jobs=2'
+```
+
+In the example above:
+
+* `--jobs=1` is used for predata to ensure ordering of schema creation
+* `--jobs=4` increases parallelism for large data imports
+* `--jobs=2` balances parallelism and dependency handling for postdata steps
+
+These options are particularly useful when dealing with large databases or resource-sensitive environments.
+
+> **Note:** These stage-specific options take precedence over the general `pgRestoreExtraOptions` when provided.
 
 !!! Warning
     Use the `pgDumpExtraOptions` and `pgRestoreExtraOptions` fields with
