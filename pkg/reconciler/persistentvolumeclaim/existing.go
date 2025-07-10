@@ -21,6 +21,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -31,21 +32,90 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// reconcileResourceRequests align the resource requests
-func reconcileResourceRequests(
+type reconciliationUnit func(
+	ctx context.Context,
+	c client.Client,
+	storageConfiguration *apiv1.StorageConfiguration,
+	pvc *corev1.PersistentVolumeClaim,
+) error
+
+// reconcileExistingPVCs align the existing pvcs to the desired state
+func reconcileExistingPVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	if !cluster.ShouldResizeInUseVolumes() {
+	if len(pvcs) == 0 {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+
+	var reconciliationUnits []reconciliationUnit
+
+	if cluster.ShouldResizeInUseVolumes() {
+		reconciliationUnits = append(reconciliationUnits, reconcilePVCQuantity)
+	}
+	if cluster.Spec.StorageConfiguration.PersistentVolumeClaimTemplate != nil {
+		reconciliationUnits = append(reconciliationUnits, reconcileVolumeAttributeClass)
+	}
+
+	if len(reconciliationUnits) == 0 {
 		return nil
 	}
 
 	for idx := range pvcs {
-		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx]); err != nil {
+		pvc := &pvcs[idx]
+
+		pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
+		if err != nil {
+			contextLogger.Error(err,
+				"encountered an error while trying to get pvc role from label",
+				"role", pvc.Labels[utils.PvcRoleLabelName],
+			)
 			return err
 		}
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		if err != nil {
+			contextLogger.Error(err,
+				"encountered an error while trying to obtain the storage configuration",
+				"role", pvc.Labels[utils.PvcRoleLabelName],
+				"pvcName", pvc.Name,
+			)
+			return err
+		}
+
+		for _, reconciler := range reconciliationUnits {
+			if err := reconciler(ctx, c, &storageConfiguration, pvc); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func reconcileVolumeAttributeClass(
+	ctx context.Context,
+	c client.Client,
+	storageConfiguration *apiv1.StorageConfiguration,
+	pvc *corev1.PersistentVolumeClaim,
+) error {
+	if storageConfiguration.PersistentVolumeClaimTemplate == nil {
+		return nil
+	}
+
+	expectedVolumeAttributesClassName := storageConfiguration.PersistentVolumeClaimTemplate.VolumeAttributesClassName
+	if expectedVolumeAttributesClassName == pvc.Spec.VolumeAttributesClassName {
+		return nil
+	}
+
+	oldPVC := pvc.DeepCopy()
+	pvc.Spec.VolumeAttributesClassName = expectedVolumeAttributesClassName
+	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
+		return fmt.Errorf("error while changing PVC volume attributes class name: %w", err)
 	}
 
 	return nil
@@ -54,28 +124,10 @@ func reconcileResourceRequests(
 func reconcilePVCQuantity(
 	ctx context.Context,
 	c client.Client,
-	cluster *apiv1.Cluster,
+	storageConfiguration *apiv1.StorageConfiguration,
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
-	if err != nil {
-		contextLogger.Error(err,
-			"encountered an error while trying to get pvc role from label",
-			"role", pvc.Labels[utils.PvcRoleLabelName],
-		)
-		return err
-	}
-
-	storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
-	if err != nil {
-		contextLogger.Error(err,
-			"encountered an error while trying to obtain the storage configuration",
-			"role", pvc.Labels[utils.PvcRoleLabelName],
-			"pvcName", pvc.Name,
-		)
-		return err
-	}
 
 	parsedSize := storageConfiguration.GetSizeOrNil()
 	if parsedSize == nil {
@@ -105,7 +157,7 @@ func reconcilePVCQuantity(
 			"pvc", pvc,
 			"requests", pvc.Spec.Resources.Requests,
 			"oldRequests", oldPVC.Spec.Resources.Requests)
-		return err
+		return fmt.Errorf("error while changing PVC storage requirement: %w", err)
 	}
 
 	return nil

@@ -161,7 +161,7 @@ var _ = Describe("Reconcile resource requests", func() {
 	cluster := &apiv1.Cluster{}
 
 	It("Reconcile resources with empty PVCs shouldn't fail", func() {
-		err := reconcileResourceRequests(
+		err := reconcileExistingPVCs(
 			context.Background(),
 			cli,
 			cluster,
@@ -178,7 +178,7 @@ var _ = Describe("Reconcile resource requests", func() {
 		}
 
 		cli := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).WithObjects(cluster).Build()
-		err := reconcileResourceRequests(
+		err := reconcileExistingPVCs(
 			context.Background(),
 			cli,
 			cluster,
@@ -486,11 +486,13 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 	})
 
 	It("fail if we dont' have the proper role", func() {
-		err := reconcilePVCQuantity(
-			context.Background(),
-			cli,
-			cluster,
-			&pvc)
+		pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconcilePVCQuantity(context.Background(), cli, &storageConfiguration, &pvc)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -499,10 +501,16 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
 
-		err := reconcilePVCQuantity(
+		pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconcilePVCQuantity(
 			context.Background(),
 			cli,
-			cluster,
+			&storageConfiguration,
 			&pvc)
 		Expect(err).To(HaveOccurred())
 	})
@@ -510,11 +518,17 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 	It("If we don't have the proper storage configuration it should fail", func() {
 		cluster.Spec.StorageConfiguration = apiv1.StorageConfiguration{}
 
+		pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
 		// If we don't have a proper storage configuration we should also fail
-		err := reconcilePVCQuantity(
+		err = reconcilePVCQuantity(
 			context.Background(),
 			cli,
-			cluster,
+			&storageConfiguration,
 			&pvc)
 		Expect(err).To(HaveOccurred())
 	})
@@ -525,10 +539,16 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 		}
 		cluster.Spec.StorageConfiguration.Size = "1Gi"
 
-		err := reconcilePVCQuantity(
+		pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconcilePVCQuantity(
 			context.Background(),
 			cli,
-			cluster,
+			&storageConfiguration,
 			&pvc)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -544,10 +564,16 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			},
 		}
 
-		err := reconcilePVCQuantity(
+		pvcRole, err := GetExpectedObjectCalculator(pvc2.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconcilePVCQuantity(
 			context.Background(),
 			cli,
-			cluster,
+			&storageConfiguration,
 			&pvc2)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -563,11 +589,101 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			},
 		}
 
-		err := reconcilePVCQuantity(
+		pvcRole, err := GetExpectedObjectCalculator(pvc2.GetLabels())
+		Expect(err).ToNot(HaveOccurred())
+
+		storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconcilePVCQuantity(
 			context.Background(),
 			cli,
-			cluster,
+			&storageConfiguration,
 			&pvc2)
 		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("Reconcile Volume Attribute Class", func() {
+	var (
+		clusterName = "cluster-volume-attr"
+		cluster     *apiv1.Cluster
+		pvc         corev1.PersistentVolumeClaim
+		cli         client.Client
+		ctx         context.Context
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterName,
+			},
+		}
+		pvc = makePVC(clusterName, "1", "1", NewPgDataCalculator(), false)
+		cli = fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, &pvc).
+			Build()
+	})
+
+	It("does nothing if PersistentVolumeClaimTemplate is nil", func() {
+		storage := &apiv1.StorageConfiguration{
+			Size:                          "1Gi",
+			PersistentVolumeClaimTemplate: nil,
+		}
+
+		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Spec.VolumeAttributesClassName).To(BeNil())
+	})
+
+	It("does nothing if VolumeAttributesClassName is already the expected value", func() {
+		className := "fast-class"
+		pvc.Spec.VolumeAttributesClassName = &className
+
+		storage := &apiv1.StorageConfiguration{
+			Size: "1Gi",
+			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+				VolumeAttributesClassName: &className,
+			},
+		}
+
+		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(className))
+	})
+
+	It("updates VolumeAttributesClassName when it differs from the expected value", func() {
+		currentClassName := "slow-class"
+		expectedClassName := "fast-class"
+		pvc.Spec.VolumeAttributesClassName = &currentClassName
+
+		storage := &apiv1.StorageConfiguration{
+			Size: "1Gi",
+			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+				VolumeAttributesClassName: &expectedClassName,
+			},
+		}
+
+		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*pvc.Spec.VolumeAttributesClassName).To(Equal(expectedClassName))
+	})
+
+	It("sets VolumeAttributesClassName to nil when template specifies nil", func() {
+		className := "existing-class"
+		pvc.Spec.VolumeAttributesClassName = &className
+
+		storage := &apiv1.StorageConfiguration{
+			Size: "1Gi",
+			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+				VolumeAttributesClassName: nil,
+			},
+		}
+
+		err := reconcileVolumeAttributeClass(ctx, cli, storage, &pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Spec.VolumeAttributesClassName).To(BeNil())
 	})
 })

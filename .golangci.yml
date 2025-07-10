@@ -68,6 +68,10 @@ linters:
           - staticcheck
         path: api/
         text: 'ST1016:'
+      - linters:
+          - revive
+        path: /(utils|common)/[^/]+.go
+        text: avoid meaningless package names
     paths:
       - zz_generated.*
       - third_party$

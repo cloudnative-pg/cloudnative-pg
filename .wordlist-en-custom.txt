@@ -208,6 +208,7 @@ InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
+IsolationCheckConfiguration
 Istio
 Istio's
 JSON
@@ -698,6 +699,7 @@ conn
 connectionLimit
 connectionParameters
 connectionString
+connectionTimeout
 conninfo
 containerImage
 containerPort
@@ -829,6 +831,7 @@ fio
 fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
+fqdn
 freddie
 fuzzystrmatch
 gapped
@@ -910,6 +913,7 @@ ips
 isPrimary
 isTemplate
 isWALArchiver
+isolationCheck
 issuecomment
 italy
 jdbc
@@ -1193,6 +1197,7 @@ repmgr
 reportNonRedacted
 reportRedacted
 req
+requestTimeout
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1328,6 +1333,7 @@ switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeLogicalDecoding
 synchronizeReplicas
 synchronizeReplicasCache
 sys
