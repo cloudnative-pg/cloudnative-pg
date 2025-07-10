@@ -219,10 +219,10 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
 	var result field.ErrorList
 
-	FDWNames := stringset.New()
+	fdwNames := stringset.New()
 	for i, fdw := range d.Spec.FDWs {
 		name := fdw.Name
-		if FDWNames.Has(name) {
+		if fdwNames.Has(name) {
 			result = append(
 				result,
 				field.Duplicate(
@@ -232,7 +232,7 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 			)
 		}
 
-		FDWNames.Put(name)
+		fdwNames.Put(name)
 	}
 
 	return result
