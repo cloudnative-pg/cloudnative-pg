@@ -2222,6 +2222,11 @@ type MonitoringConfiguration struct {
 	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+
+	// The interval between updates of the monitoring query metrics.
+	// If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+	// +optional
+	RefreshInterval *metav1.Duration `json:"refreshInterval,omitempty"`
 }
 
 // ClusterMonitoringTLSConfiguration is the type containing the TLS configuration

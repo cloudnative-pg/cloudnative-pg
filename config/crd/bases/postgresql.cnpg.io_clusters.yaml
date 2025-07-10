@@ -4022,6 +4022,11 @@ spec:
                           type: string
                       type: object
                     type: array
+                  refreshInterval:
+                    description: |-
+                      The interval between updates of the monitoring query metrics.
+                      If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+                    type: string
                   tls:
                     description: |-
                       Configure TLS communication for the metrics endpoint.

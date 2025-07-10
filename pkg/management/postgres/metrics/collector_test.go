@@ -163,13 +163,13 @@ var _ = Describe("QueryRunner tests", func() {
 			err    error
 		)
 
-		qry := `SELECT pg_catalog.current_database() as datname, relpages as lo_pages
+		loPagesQuery := `SELECT pg_catalog.current_database() as datname, relpages as lo_pages
 			FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
 			WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';`
 
 		defaultQueries := UserQueries{
 			"collector": UserQuery{
-				Query:           qry,
+				Query:           loPagesQuery,
 				TargetDatabases: []string{"*"},
 				Metrics: []Mapping{
 					{
@@ -223,17 +223,17 @@ var _ = Describe("QueryRunner tests", func() {
 			dbMock.ExpectExec("SET application_name TO cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectExec("SET standard_conforming_strings TO on").WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectExec("SET ROLE TO pg_monitor").WillReturnResult(sqlmock.NewResult(0, 1))
-			dbMock.ExpectQuery(qry).WillReturnRows(sqlmock.NewRows(
+			dbMock.ExpectQuery(loPagesQuery).WillReturnRows(sqlmock.NewRows(
 				[]string{"datname", "lo_pages"}).
-				AddRow(`app`, 0))
+				AddRow(`app`, 3))
 			m, err := qc.computeMetrics(db)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m).To(HaveLen(1))
 			Expect(m[0].Desc().String()).To(ContainSubstring(
 				defaultQueries["collector"].Metrics[1]["lo_pages"].Description))
-			var foo io_prometheus_client.Metric
-			Expect(m[0].Write(&foo)).To(Succeed())
-			Expect(foo.GetGauge().GetValue()).To(BeEquivalentTo(0))
+			var gauge io_prometheus_client.Metric
+			Expect(m[0].Write(&gauge)).To(Succeed())
+			Expect(gauge.GetGauge().GetValue()).To(BeEquivalentTo(3))
 			Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 		})
 	})
