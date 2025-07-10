@@ -97,9 +97,6 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (q *QueriesCollector) createMetricsFromUserQueries() error {
-	// refresh
-	q.computedMetrics = []prometheus.Metric{}
-
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -109,6 +106,7 @@ func (q *QueriesCollector) createMetricsFromUserQueries() error {
 	// we need to get them just once
 	var allAccessibleDatabasesCache []string
 
+	var generatedMetrics []prometheus.Metric
 	for name, userQuery := range q.userQueries {
 		queryLogger := log.WithValues("query", name)
 		queryRunner := QueryRunner{
@@ -159,9 +157,10 @@ func (q *QueriesCollector) createMetricsFromUserQueries() error {
 				// Increment metrics counters.
 				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
 			}
-			q.computedMetrics = append(q.computedMetrics, computedMetrics...)
+			generatedMetrics = append(generatedMetrics, computedMetrics...)
 		}
 	}
+	q.computedMetrics = generatedMetrics
 	return nil
 }
 
