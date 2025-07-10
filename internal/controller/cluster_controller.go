@@ -136,6 +136,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=events,verbs=create
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;patch;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
@@ -514,6 +515,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 	if result != nil {
 		return *result, nil
+	}
+
+	err = r.reconcileRemapping(ctx, cluster, resources, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Updates all the objects managed by the controller
