@@ -263,7 +263,12 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	ctx context.Context,
 	obj *apiv1.Database,
 ) error {
-	if len(obj.Spec.Schemas) == 0 && len(obj.Spec.Extensions) == 0 && len(obj.Spec.FDWs) == 0 {
+	objectCount := 0
+	objectCount += len(obj.Spec.Schemas)
+	objectCount += len(obj.Spec.Extensions)
+	objectCount += len(obj.Spec.FDWs)
+
+	if objectCount == 0 {
 		return nil
 	}
 
