@@ -486,3 +486,13 @@ data:
             description: "An update is available"
       target_databases:
         - '*'
+    pg_alter_system_overrides:
+      query: |
+        SELECT
+          COUNT(*) AS override_count
+        FROM pg_settings
+        WHERE sourcefile = '/var/lib/postgresql/data/pgdata/postgresql.auto.conf'
+      metrics:
+        - override_count:
+            usage: "GAUGE"
+            description: "Number of settings overridden via ALTER SYSTEM (postgresql.auto.conf)"
