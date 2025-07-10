@@ -36,6 +36,14 @@ func (data *data) ArchiveWAL(
 	cluster client.Object,
 	sourceFileName string,
 ) error {
+	return wrapAsPluginErrorIfNeeded(data.innerArchiveWAL(ctx, cluster, sourceFileName))
+}
+
+func (data *data) innerArchiveWAL(
+	ctx context.Context,
+	cluster client.Object,
+	sourceFileName string,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	serializedCluster, err := json.Marshal(cluster)
@@ -75,6 +83,16 @@ func (data *data) ArchiveWAL(
 }
 
 func (data *data) RestoreWAL(
+	ctx context.Context,
+	cluster client.Object,
+	sourceWALName string,
+	destinationFileName string,
+) (bool, error) {
+	b, err := data.innerRestoreWAL(ctx, cluster, sourceWALName, destinationFileName)
+	return b, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerRestoreWAL(
 	ctx context.Context,
 	cluster client.Object,
 	sourceWALName string,
