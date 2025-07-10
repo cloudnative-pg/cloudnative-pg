@@ -5839,7 +5839,9 @@ the &quot;subscriber&quot; cluster</p>
 </td>
 <td>
    <p>Subscription parameters part of the <code>WITH</code> clause as expected by
-PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
+PostgreSQL <code>CREATE SUBSCRIPTION</code> command.
+Altering these parameters after the subscription creation will be ignored except from a limited number of them
+documented at https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET</p>
 </td>
 </tr>
 <tr><td><code>publicationName</code> <B>[Required]</B><br/>
