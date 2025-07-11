@@ -418,7 +418,7 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 const detectDatabaseFDWSQL = `
 SELECT
  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
- a.rolname
+ a.rolname AS owner
 FROM pg_foreign_data_wrapper f
 JOIN pg_authid a ON f.fdwowner = a.oid
 WHERE fdwname = $1
@@ -433,30 +433,29 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	}
 
 	var (
-		// optionsRaw pq.StringArray
-		result fdwInfo
+		result     fdwInfo
+		optionsRaw []string
 	)
-	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &result.Owner); err != nil {
+
+	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, optionsRaw, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("while scanning if FDW %q exists: %w", fdw.Name, err)
 	}
 
-	// Extract options from SQL raw format to type OptSpec
-	//var opts []apiv1.OptSpec
-	//for _, opt := range optionsRaw {
-	//	parts := strings.SplitN(opt, "=", 2)
-	//	if len(parts) == 2 {
-	//		opts = append(opts, apiv1.OptSpec{
-	//			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
-	//				Name: parts[0],
-	//			},
-	//			Value: parts[1],
-	//		})
-	//	}
-	//}
-	//result.Options = opts
+	// Extract options from SQL raw format(e.g. -{host=localhost,port=5432}) to type OptSpec
+	opts := make([]apiv1.OptSpec, 0, len(optionsRaw))
+	for _, opt := range optionsRaw {
+		parts := strings.SplitN(opt, "=", 2)
+		if len(parts) == 2 {
+			opts = append(opts, apiv1.OptSpec{
+				Name:  parts[0],
+				Value: parts[1],
+			})
+		}
+	}
+	result.Options = opts
 
 	return &result, nil
 }
@@ -464,12 +463,6 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 //nolint:dupl
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
-
-	// TODO: Remove the test code
-	for _, opt := range fdw.Options {
-		contextLogger.Info("Processing FDWSpec", "fdw", fdw.Name, "option", opt.Name,
-			"Value", opt.Value, "Ensure", opt.Ensure)
-	}
 
 	var sqlCreateFDW strings.Builder
 	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
@@ -481,9 +474,6 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 	}
 
 	// TODO: format options here
-	//if len(fdw.Options) > 0 {
-	//	//sqlCreateFDW.WriteString(fmt.Sprintf("OPTIONS (%s) ", fdw.Options))
-	//}
 
 	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
 	if err != nil {
