@@ -517,6 +517,7 @@ var _ = Describe("Managed schema SQL", func() {
 	})
 })
 
+// TODO: update tests for new column of options
 var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 	var (
 		dbMock sqlmock.Sqlmock
