@@ -173,6 +173,10 @@ type DatabaseSpec struct {
 	// The list of extensions to be managed in the database
 	// +optional
 	Extensions []ExtensionSpec `json:"extensions,omitempty"`
+
+	// The list of foreign data wrappers to be managed in the database
+	// +optional
+	FDWs []FDWSpec `json:"fdws,omitempty"`
 }
 
 // DatabaseObjectSpec contains the fields which are common to every
@@ -220,6 +224,41 @@ type ExtensionSpec struct {
 	Schema string `json:"schema,omitempty"`
 }
 
+// FDWSpec configures an Foreign Data Wrapper in a database
+type FDWSpec struct {
+	DatabaseObjectSpec `json:",inline"`
+
+	// Name of the handler function (e.g., "postgres_fdw_handler")
+	Handler string `json:"handler,omitempty"`
+
+	// Name of the validator function (e.g., "postgres_fdw_validator")
+	Validator string `json:"validator,omitempty"`
+
+	// Owner specifies the database user who will own the Foreign Data Wrapper.
+	// By default, the owner of a new FDW is the current session user.
+	// Even if an owner is explicitly specified during creation, it will be ignored.
+	Owner string `json:"owner,omitempty"`
+
+	Options []OptSpec `json:"options,omitempty"`
+}
+
+// OptSpec configures a option instance
+type OptSpec struct {
+	Name string `json:"name"`
+
+	// The value associated with the name (e.g., value for "host" might be "db.cluster.local")
+	Value string `json:"value,omitempty"`
+
+	// Specifies whether an option should be present or absent in
+	// the database. If set to `present`, the option will be
+	// created if it does not exist. If set to `absent`, the
+	// option will be removed if it exists.
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure"`
+}
+
 // DatabaseStatus defines the observed state of Database
 type DatabaseStatus struct {
 	// A sequence number representing the latest
@@ -242,6 +281,10 @@ type DatabaseStatus struct {
 	// Extensions is the status of the managed extensions
 	// +optional
 	Extensions []DatabaseObjectStatus `json:"extensions,omitempty"`
+
+	// FDWs is the status of the managed FDWs
+	// +optional
+	FDWs []DatabaseObjectStatus `json:"fdws,omitempty"`
 }
 
 // DatabaseObjectStatus is the status of the managed database objects

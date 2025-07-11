@@ -154,6 +154,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 	validations := []validationFunc{
 		v.validateExtensions,
 		v.validateSchemas,
+		v.validateFDWs,
 	}
 
 	for _, validate := range validations {
@@ -208,6 +209,30 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 		}
 
 		schemaNames.Put(name)
+	}
+
+	return result
+}
+
+// validateFDWs validates the database Foreign Data Wrappers
+// FDWs must be unique in .spec.fdws
+func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+
+	fdwNames := stringset.New()
+	for i, fdw := range d.Spec.FDWs {
+		name := fdw.Name
+		if fdwNames.Has(name) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "fdws").Index(i).Child("name"),
+					name,
+				),
+			)
+		}
+
+		fdwNames.Put(name)
 	}
 
 	return result

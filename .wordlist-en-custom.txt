@@ -162,6 +162,9 @@ EphemeralVolumesSizeLimitConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
 Fei
@@ -821,6 +824,8 @@ faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -1412,6 +1417,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized
