@@ -211,12 +211,14 @@ var _ = Describe("Storage source", func() {
 	})
 })
 
-var _ = Describe("candidate backups", func() {
+var _ = Describe("replica backup method preference", func() {
 	now := time.Now()
-	completedBackup := apiv1.Backup{
+	ctx := context.Background()
+
+	volumeSnapshotBackup := apiv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.NewTime(now),
-			Name:              "completed-backup",
+			Name:              "volume-snapshot-backup",
 		},
 		Spec: apiv1.BackupSpec{
 			Method: apiv1.BackupMethodVolumeSnapshot,
@@ -226,7 +228,7 @@ var _ = Describe("candidate backups", func() {
 			BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
-						Name: "completed-backup",
+						Name: "volume-snapshot-backup",
 						Type: string(utils.PVCRolePgData),
 					},
 				},
@@ -234,42 +236,10 @@ var _ = Describe("candidate backups", func() {
 		},
 	}
 
-	oldCompletedBackup := apiv1.Backup{
+	barmanBackup := apiv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Hour)),
-			Name:              "old-backup",
-		},
-		Spec: apiv1.BackupSpec{
-			Method: apiv1.BackupMethodVolumeSnapshot,
-		},
-		Status: apiv1.BackupStatus{
-			Phase: apiv1.BackupPhaseCompleted,
-			BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
-				Elements: []apiv1.BackupSnapshotElementStatus{
-					{
-						Name: "bad-name",
-						Type: string(utils.PVCRolePgData),
-					},
-				},
-			},
-		},
-	}
-
-	nonCompletedBackup := apiv1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.NewTime(now),
-			Name:              "non-completed-backup",
-		},
-		Spec: apiv1.BackupSpec{
-			Method: apiv1.BackupMethodVolumeSnapshot,
-		},
-		Status: apiv1.BackupStatus{},
-	}
-
-	objectStoreBackup := apiv1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.NewTime(now),
-			Name:              "object-store-backup",
+			CreationTimestamp: metav1.NewTime(now.Add(1 * time.Hour)),
+			Name:              "barman-backup",
 		},
 		Spec: apiv1.BackupSpec{
 			Method: apiv1.BackupMethodBarmanObjectStore,
@@ -279,34 +249,117 @@ var _ = Describe("candidate backups", func() {
 		},
 	}
 
-	It("takes the most recent candidate backup as source", func(ctx context.Context) {
-		backupList := apiv1.BackupList{
-			Items: []apiv1.Backup{
-				objectStoreBackup,
-				nonCompletedBackup,
-				oldCompletedBackup,
-				completedBackup,
+	clusterWithBackupConfig := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now.Add(-1 * time.Hour)),
+		},
+		Spec: apiv1.ClusterSpec{
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
 			},
-		}
-		backupList.SortByReverseCreationTime()
+		},
+	}
 
-		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(-1*time.Hour)), backupList)
-		Expect(source).ToNot(BeNil())
-		Expect(source.DataSource.Name).To(Equal("completed-backup"))
+	When("preference is set to volumeSnapshot", func() {
+		It("should prefer volume snapshots over barman backups", func() {
+			cluster := clusterWithBackupConfig.DeepCopy()
+			cluster.Spec.Backup.ReplicaMethodPreference = apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{volumeSnapshotBackup, barmanBackup},
+			}
+
+			source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+			Expect(source).ToNot(BeNil())
+			Expect(source.DataSource.Name).To(Equal("volume-snapshot-backup"))
+		})
+
+		It("should fall back to barman backups if no volume snapshots", func() {
+			cluster := clusterWithBackupConfig.DeepCopy()
+			cluster.Spec.Backup.ReplicaMethodPreference = apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{barmanBackup},
+			}
+
+			source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+			Expect(source).ToNot(BeNil())
+			Expect(source.DataSource.Kind).To(Equal("BarmanBackup"))
+			Expect(source.DataSource.Name).To(Equal("barman-backup"))
+		})
 	})
 
-	It("will refuse to use automatically use snapshots if they are older than the Cluster", func(ctx context.Context) {
-		backupList := apiv1.BackupList{
-			Items: []apiv1.Backup{
-				objectStoreBackup,
-				nonCompletedBackup,
-				oldCompletedBackup,
-				completedBackup,
+	When("preference is set to barmanObjectStore", func() {
+		It("should prefer barman backups over volume snapshots", func() {
+			cluster := clusterWithBackupConfig.DeepCopy()
+			cluster.Spec.Backup.ReplicaMethodPreference = apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore
+
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{volumeSnapshotBackup, barmanBackup},
+			}
+
+			source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+			Expect(source).ToNot(BeNil())
+			Expect(source.DataSource.Kind).To(Equal("BarmanBackup"))
+			Expect(source.DataSource.Name).To(Equal("barman-backup"))
+		})
+
+		It("should fall back to volume snapshots if no barman backups", func() {
+			cluster := clusterWithBackupConfig.DeepCopy()
+			cluster.Spec.Backup.ReplicaMethodPreference = apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore
+
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{volumeSnapshotBackup},
+			}
+
+			source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+			Expect(source).ToNot(BeNil())
+			Expect(source.DataSource.Name).To(Equal("volume-snapshot-backup"))
+		})
+	})
+
+	When("preference is not set", func() {
+		It("should default to volumeSnapshot behavior", func() {
+			cluster := clusterWithBackupConfig.DeepCopy()
+			// Don't set ReplicaMethodPreference, should default to volumeSnapshot
+
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{volumeSnapshotBackup, barmanBackup},
+			}
+
+			source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+			Expect(source).ToNot(BeNil())
+			Expect(source.DataSource.Name).To(Equal("volume-snapshot-backup"))
+		})
+	})
+})
+
+var _ = Describe("getReplicaBackupMethodPreference", func() {
+	It("should return volumeSnapshot when backup is nil", func() {
+		cluster := &apiv1.Cluster{}
+		preference := getReplicaBackupMethodPreference(cluster)
+		Expect(preference).To(Equal(apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot))
+	})
+
+	It("should return volumeSnapshot when ReplicaMethodPreference is empty", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{},
 			},
 		}
-		backupList.SortByReverseCreationTime()
+		preference := getReplicaBackupMethodPreference(cluster)
+		Expect(preference).To(Equal(apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot))
+	})
 
-		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(1*time.Hour)), backupList)
-		Expect(source).To(BeNil())
+	It("should return the configured preference", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					ReplicaMethodPreference: apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore,
+				},
+			},
+		}
+		preference := getReplicaBackupMethodPreference(cluster)
+		Expect(preference).To(Equal(apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore))
 	})
 })
