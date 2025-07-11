@@ -7,10 +7,3 @@ spec:
   owner: app
   cluster:
     name: cluster-example
-  fdws:
-    - name: postgres_fdw
-      options:
-        - name: host
-          value: "postgres"
-        - name: port
-          value: "5432"
