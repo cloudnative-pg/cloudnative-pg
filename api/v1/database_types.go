@@ -238,14 +238,25 @@ type FDWSpec struct {
 	// By default, the owner of a new FDW is the current session user.
 	// Even if an owner is explicitly specified during creation, it will be ignored.
 	Owner string `json:"owner,omitempty"`
+
+	Options []OptSpec `json:"options,omitempty"`
 }
 
 // OptSpec configures a option instance
 type OptSpec struct {
-	DatabaseObjectSpec `json:",inline"`
+	Name string `json:"name"`
 
 	// The value associated with the name (e.g., value for "host" might be "db.cluster.local")
 	Value string `json:"value,omitempty"`
+
+	// Specifies whether an option should be present or absent in
+	// the database. If set to `present`, the option will be
+	// created if it does not exist. If set to `absent`, the
+	// option will be removed if it exists.
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure"`
 }
 
 // DatabaseStatus defines the observed state of Database
