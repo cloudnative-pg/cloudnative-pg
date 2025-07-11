@@ -279,6 +279,18 @@ spec:
 ```
 -->
 
+### Upgrading to 1.26 from a previous minor version
+
+
+!!! Important
+    Due to changes in the startup probe for the manager component
+    ([#6623](https://github.com/cloudnative-pg/cloudnative-pg/pull/6623)),
+    upgrading the operator will cause a restart of your PostgreSQL clusters,
+    even if the in-place update feature is enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES`
+    set to `true`). As a result, your applications will have to reconnect to PostgreSQL
+    after the upgrade.
+
+
 ### Upgrading to 1.26.0 or 1.25.2
 
 !!! Important
