@@ -75,13 +75,15 @@ var isPathPattern = regexp.MustCompile(`[][*?]`)
 
 // Update recomputes the metrics from the user queries
 func (q *QueriesCollector) Update() error {
+	isPrimary, err := q.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("while updating query metrics, could not check for primary: %w", err)
+	}
+
 	// Reset before collecting
 	q.errorUserQueries.Reset()
 
-	err := q.createMetricsFromUserQueries()
-	if err != nil {
-		return err
-	}
+	q.createMetricsFromUserQueries(isPrimary)
 	return nil
 }
 
@@ -96,12 +98,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	q.errorUserQueries.Collect(ch)
 }
 
-func (q *QueriesCollector) createMetricsFromUserQueries() error {
-	isPrimary, err := q.instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-
+func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 	// In case more than one user query specify a pattern in target_databases,
 	// we need to get them just once
 	var allAccessibleDatabasesCache []string
@@ -161,7 +158,6 @@ func (q *QueriesCollector) createMetricsFromUserQueries() error {
 		}
 	}
 	q.computedMetrics = generatedMetrics
-	return nil
 }
 
 func (q *QueriesCollector) collectComputedMetrics(ch chan<- prometheus.Metric) {
