@@ -44,11 +44,11 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string `json:"name"`
-	Handler   string `json:"handler"`
-	Validator string `json:"validator"`
-	Owner     string `json:"owner"`
-	//Options   []apiv1.OptSpec `json:"options"`
+	Name      string          `json:"name"`
+	Handler   string          `json:"handler"`
+	Validator string          `json:"validator"`
+	Owner     string          `json:"owner"`
+	Options   []apiv1.OptSpec `json:"options"`
 }
 
 func detectDatabase(
@@ -415,18 +415,10 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 	return nil
 }
 
-//const detectDatabaseFDWSQL = `
-//SELECT
-//  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
-//  a.rolname AS owner
-//FROM pg_foreign_data_wrapper f
-//JOIN pg_authid a ON f.fdwowner = a.oid
-//WHERE fdwname = $1
-//`
-
 const detectDatabaseFDWSQL = `
-SELECT 
- fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, a.rolname AS owner
+SELECT
+ fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
+ a.rolname
 FROM pg_foreign_data_wrapper f
 JOIN pg_authid a ON f.fdwowner = a.oid
 WHERE fdwname = $1
@@ -472,6 +464,12 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 //nolint:dupl
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
+
+	// TODO: Remove the test code
+	for _, opt := range fdw.Options {
+		contextLogger.Info("Processing FDWSpec", "fdw", fdw.Name, "option", opt.Name,
+			"Value", opt.Value, "Ensure", opt.Ensure)
+	}
 
 	var sqlCreateFDW strings.Builder
 	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
