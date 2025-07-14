@@ -641,10 +641,9 @@ func (v *ClusterCustomValidator) validateBootstrapMethod(r *apiv1.Cluster) field
 	if bootstrapMethods > 1 {
 		result = append(
 			result,
-			field.Invalid(
+			field.Forbidden(
 				field.NewPath("spec", "bootstrap"),
-				"",
-				"Too many bootstrap types specified"))
+				"Only one bootstrap method can be specified at a time"))
 	}
 
 	return result

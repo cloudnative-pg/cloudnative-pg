@@ -54,6 +54,9 @@ specification. CloudNativePG currently supports the following bootstrap methods:
   [`pg_basebackup` subsection](#bootstrap-from-a-live-cluster-pg_basebackup)
   carefully.
 
+Only one bootstrap method can be specified in the manifest.
+Attempting to define multiple bootstrap methods will result in validation errors.
+
 In contrast to the `initdb` method, both `recovery` and `pg_basebackup`
 create a new cluster based on another one (either offline or online) and can be
 used to spin up replica clusters. They both rely on the definition of external
