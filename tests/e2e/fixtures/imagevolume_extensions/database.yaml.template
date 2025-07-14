@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: postgresql-with-extensions
+  extensions:
+  - name: postgis
+    ensure: present
+  - name: postgis_raster
+    ensure: present
+  - name: postgis_sfcgal
+    ensure: present
+  - name: fuzzystrmatch
+    ensure: present
+  - name: address_standardizer
+    ensure: present
+  - name: address_standardizer_data_us
+    ensure: present
+  - name: postgis_tiger_geocoder
+    ensure: present
+  - name: postgis_topology
+    ensure: present
