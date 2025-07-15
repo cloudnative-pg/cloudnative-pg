@@ -574,8 +574,8 @@ func NewPluginCollector(
 func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_describe")
 
-	if len(cluster.GetMetricsEnabledPluginNames()) == 0 {
-		contextLogger.Debug("No plugins enabled for metrics collection")
+	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
+		contextLogger.Info("No plugins enabled for metrics collection")
 		return
 	}
 
@@ -600,8 +600,8 @@ func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.De
 func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metric, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_collect")
 
-	if len(cluster.GetMetricsEnabledPluginNames()) == 0 {
-		contextLogger.Debug("No plugins enabled for metrics collection")
+	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
+		contextLogger.Info("No plugins enabled for metrics collection")
 		return nil
 	}
 
@@ -651,6 +651,6 @@ func (p *pluginCollector) getClient(ctx context.Context, cluster *apiv1.Cluster)
 	return pluginClient.WithPlugins(
 		pluginLoadingContext,
 		p.pluginRepository,
-		cluster.GetMetricsEnabledPluginNames()...,
+		cluster.GetInstanceEnabledPluginNames()...,
 	)
 }
