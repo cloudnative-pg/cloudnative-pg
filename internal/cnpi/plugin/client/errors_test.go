@@ -59,6 +59,7 @@ var _ = Describe("wrapAsPluginErrorIfNeeded", func() {
 		Expect(result).ToNot(Equal(wrappedErr))
 		Expect(ContainsPluginError(result)).To(BeTrue())
 		Expect(result.Error()).To(Equal(wrappedErr.Error()))
+		Expect(errors.Is(result, originalErr)).To(BeTrue())
 	})
 
 	It("should not double-wrap an already wrapped plugin error", func() {
