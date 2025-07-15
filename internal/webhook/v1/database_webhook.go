@@ -216,7 +216,6 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 
 // validateFDWs validates the database Foreign Data Wrappers
 // FDWs must be unique in .spec.fdws
-// Options must be unique in .spec.fdws.options
 func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
 	var result field.ErrorList
 
@@ -231,22 +230,6 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 					name,
 				),
 			)
-		}
-
-		// Options of each FDW must be unique
-		optNames := stringset.New()
-		for j, opt := range fdw.Options {
-			if optNames.Has(opt.Name) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "fdws").Index(i).Child("options").
-							Index(j).Child("name"),
-						opt.Name,
-					),
-				)
-			}
-			optNames.Put(opt.Name)
 		}
 
 		fdwNames.Put(name)
