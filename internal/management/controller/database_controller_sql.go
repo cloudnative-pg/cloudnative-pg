@@ -473,7 +473,21 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
 	}
 
-	// TODO: format options here
+	if len(fdw.Options) > 0 {
+		sqlCreateFDW.WriteString("OPTIONS (")
+		first := true
+		for _, opt := range fdw.Options {
+			if opt.Ensure == apiv1.EnsureAbsent {
+				continue
+			}
+			if !first {
+				sqlCreateFDW.WriteString(", ")
+			}
+			first = false
+			sqlCreateFDW.WriteString(fmt.Sprintf("%s '%s'", opt.Name, opt.Value))
+		}
+		sqlCreateFDW.WriteString(")")
+	}
 
 	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
 	if err != nil {
@@ -539,7 +553,8 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 
 		contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
 	}
-	// TODO: add options in alter foreign data wrapper
+
+	// Alter Options
 
 	// Alter the owner
 	if len(fdw.Owner) > 0 && fdw.Owner != info.Owner {
