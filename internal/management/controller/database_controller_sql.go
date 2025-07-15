@@ -24,6 +24,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/lib/pq"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -44,11 +45,11 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string          `json:"name"`
-	Handler   string          `json:"handler"`
-	Validator string          `json:"validator"`
-	Owner     string          `json:"owner"`
-	Options   []apiv1.OptSpec `json:"options"`
+	Name      string                           `json:"name"`
+	Handler   string                           `json:"handler"`
+	Validator string                           `json:"validator"`
+	Owner     string                           `json:"owner"`
+	Options   map[string]apiv1.OptionSpecValue `json:"options"`
 }
 
 func detectDatabase(
@@ -434,10 +435,10 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 
 	var (
 		result     fdwInfo
-		optionsRaw []string
+		optionsRaw pq.StringArray
 	)
 
-	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, optionsRaw, &result.Owner); err != nil {
+	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -445,14 +446,13 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	}
 
 	// Extract options from SQL raw format(e.g. -{host=localhost,port=5432}) to type OptSpec
-	opts := make([]apiv1.OptSpec, 0, len(optionsRaw))
+	opts := make(map[string]apiv1.OptionSpecValue, len(optionsRaw))
 	for _, opt := range optionsRaw {
 		parts := strings.SplitN(opt, "=", 2)
 		if len(parts) == 2 {
-			opts = append(opts, apiv1.OptSpec{
-				Name:  parts[0],
+			opts[parts[0]] = apiv1.OptionSpecValue{
 				Value: parts[1],
-			})
+			}
 		}
 	}
 	result.Options = opts
@@ -476,15 +476,15 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 	if len(fdw.Options) > 0 {
 		sqlCreateFDW.WriteString("OPTIONS (")
 		first := true
-		for _, opt := range fdw.Options {
-			if opt.Ensure == apiv1.EnsureAbsent {
+		for name, optionSpec := range fdw.Options {
+			if optionSpec.Ensure == apiv1.EnsureAbsent {
 				continue
 			}
 			if !first {
 				sqlCreateFDW.WriteString(", ")
 			}
 			first = false
-			sqlCreateFDW.WriteString(fmt.Sprintf("%s '%s'", opt.Name, opt.Value))
+			sqlCreateFDW.WriteString(fmt.Sprintf("%s '%s'", name, optionSpec.Value))
 		}
 		sqlCreateFDW.WriteString(")")
 	}
@@ -555,6 +555,59 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 	}
 
 	// Alter Options
+	if len(fdw.Options) > 0 {
+		var changeOptionSQL strings.Builder
+		changeOptionSQL.WriteString(fmt.Sprintf(
+			"ALTER FOREIGN DATA WRAPPER %s OPTIONS (",
+			pgx.Identifier{fdw.Name}.Sanitize(),
+		))
+
+		first := true
+		for name, desiredOptSpec := range fdw.Options {
+			curOptSpec, exists := info.Options[name]
+
+			switch {
+			case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
+				if !first {
+					changeOptionSQL.WriteString(", ")
+				}
+				first = false
+				changeOptionSQL.WriteString(fmt.Sprintf("ADD %s '%s'",
+					pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value,
+				))
+
+			case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
+				if desiredOptSpec.Value != curOptSpec.Value {
+					if !first {
+						changeOptionSQL.WriteString(", ")
+					}
+					first = false
+					changeOptionSQL.WriteString(fmt.Sprintf("SET %s '%s'",
+						pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value,
+					))
+				}
+
+			case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
+				if !first {
+					changeOptionSQL.WriteString(", ")
+				}
+				first = false
+				changeOptionSQL.WriteString(fmt.Sprintf("DROP %s",
+					pgx.Identifier{name}.Sanitize()),
+				)
+			}
+
+		}
+		changeOptionSQL.WriteString(")")
+
+		if !first {
+			if _, err := db.ExecContext(ctx, changeOptionSQL.String()); err != nil {
+				return fmt.Errorf("altering options of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
+		}
+	}
 
 	// Alter the owner
 	if len(fdw.Owner) > 0 && fdw.Owner != info.Owner {
