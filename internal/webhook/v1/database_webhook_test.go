@@ -45,12 +45,13 @@ var _ = Describe("Database validation", func() {
 			},
 		}
 	}
-	createFDWSpec := func(name string) apiv1.FDWSpec {
+	createFDWSpec := func(name string, options []apiv1.OptSpec) apiv1.FDWSpec {
 		return apiv1.FDWSpec{
 			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
 				Name:   name,
 				Ensure: apiv1.EnsurePresent,
 			},
+			Options: options,
 		}
 	}
 	BeforeEach(func() {
@@ -117,9 +118,9 @@ var _ = Describe("Database validation", func() {
 			&apiv1.Database{
 				Spec: apiv1.DatabaseSpec{
 					FDWs: []apiv1.FDWSpec{
-						createFDWSpec("postgre_fdw"),
-						createFDWSpec("mysql_fdw"),
-						createFDWSpec("postgre_fdw"),
+						createFDWSpec("postgre_fdw", []apiv1.OptSpec{}),
+						createFDWSpec("mysql_fdw", []apiv1.OptSpec{}),
+						createFDWSpec("postgre_fdw", []apiv1.OptSpec{}),
 					},
 				},
 			},
@@ -131,12 +132,33 @@ var _ = Describe("Database validation", func() {
 			&apiv1.Database{
 				Spec: apiv1.DatabaseSpec{
 					FDWs: []apiv1.FDWSpec{
-						createFDWSpec("nosql_fdw"),
-						createFDWSpec("sqlite_fdw"),
+						createFDWSpec("nosql_fdw", []apiv1.OptSpec{}),
+						createFDWSpec("sqlite_fdw", []apiv1.OptSpec{}),
 					},
 				},
 			},
 			0,
+		),
+
+		Entry(
+			"complain if there are duplicate options",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						createFDWSpec("postgre_fdw", []apiv1.OptSpec{
+							{
+								Name:  "host",
+								Value: "localhost",
+							},
+							{
+								Name:  "host",
+								Value: "192.168.0.1",
+							},
+						}),
+					},
+				},
+			},
+			1,
 		),
 	)
 })
