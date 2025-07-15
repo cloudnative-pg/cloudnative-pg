@@ -185,8 +185,9 @@ spec:
                       description: Name of the extension/schema
                       type: string
                     options:
-                      items:
-                        description: OptSpec configures a option instance
+                      additionalProperties:
+                        description: OptionSpecValue holds both the value and the
+                          ensure field for an option
                         properties:
                           ensure:
                             default: present
@@ -199,16 +200,12 @@ spec:
                             - present
                             - absent
                             type: string
-                          name:
-                            type: string
                           value:
-                            description: The value associated with the name (e.g.,
-                              value for "host" might be "db.cluster.local")
                             type: string
-                        required:
-                        - name
                         type: object
-                      type: array
+                      description: Options specifies options for the FDW(key is option
+                        name, value is option value)
+                      type: object
                     owner:
                       description: |-
                         Owner specifies the database user who will own the Foreign Data Wrapper.
