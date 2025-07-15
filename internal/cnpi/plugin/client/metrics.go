@@ -96,8 +96,9 @@ func (data *data) GetMetricsDefinitions(
 		for _, element := range res.Metrics {
 			desc := prometheus.NewDesc(element.FqName, element.Help, element.VariableLabels, element.ConstLabels)
 			results = append(results, PluginMetricDefinition{
-				FqName: element.FqName,
-				Desc:   desc,
+				FqName:    element.FqName,
+				Desc:      desc,
+				ValueType: prometheus.ValueType(element.ValueType.Type),
 			})
 		}
 	}
