@@ -34,16 +34,17 @@ import (
 // MetricsCapabilities defines the interface for plugins that can provide metrics capabilities.
 type MetricsCapabilities interface {
 	// GetMetricsDefinitions retrieves the definitions of the metrics that will be collected from the plugins.
-	GetMetricsDefinitions(ctx context.Context, cluster client.Object) (PluginMetrics, error)
+	GetMetricsDefinitions(ctx context.Context, cluster client.Object) (PluginMetricDefinitions, error)
 	// CollectMetrics collects the metrics from the plugins.
 	CollectMetrics(ctx context.Context, cluster client.Object) ([]*metrics.CollectMetric, error)
 }
 
-// PluginMetrics is a slice of PluginMetric, representing the metrics definitions returned by plugins.
-type PluginMetrics []PluginMetric
+// PluginMetricDefinitions is a slice of PluginMetricDefinition, representing the metrics definitions returned
+// by plugins.
+type PluginMetricDefinitions []PluginMetricDefinition
 
-// GetPluginMetric returns the PluginMetric with the given fully qualified name (FqName).
-func (p PluginMetrics) GetPluginMetric(fqName string) *PluginMetric {
+// Get returns the PluginMetricDefinition with the given fully qualified name (FqName), returns nil if not found.
+func (p PluginMetricDefinitions) Get(fqName string) *PluginMetricDefinition {
 	for _, metric := range p {
 		if metric.FqName == fqName {
 			return &metric
@@ -53,8 +54,8 @@ func (p PluginMetrics) GetPluginMetric(fqName string) *PluginMetric {
 	return nil
 }
 
-// PluginMetric represents a metric definition returned by a plugin.
-type PluginMetric struct {
+// PluginMetricDefinition represents a metric definition returned by a plugin.
+type PluginMetricDefinition struct {
 	FqName    string
 	ValueType prometheus.ValueType
 	Desc      *prometheus.Desc
@@ -63,7 +64,7 @@ type PluginMetric struct {
 func (data *data) GetMetricsDefinitions(
 	ctx context.Context,
 	cluster client.Object,
-) (PluginMetrics, error) {
+) (PluginMetricDefinitions, error) {
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_definitions")
 
 	clusterDefinition, marshalErr := json.Marshal(cluster)
@@ -71,7 +72,7 @@ func (data *data) GetMetricsDefinitions(
 		return nil, marshalErr
 	}
 
-	var results PluginMetrics
+	var results PluginMetricDefinitions
 
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
@@ -94,7 +95,7 @@ func (data *data) GetMetricsDefinitions(
 		contextLogger.Debug("plugin returned metrics definitions", "plugin", plugin.Name(), "metrics", res.Metrics)
 		for _, element := range res.Metrics {
 			desc := prometheus.NewDesc(element.FqName, element.Help, element.VariableLabels, element.ConstLabels)
-			results = append(results, PluginMetric{
+			results = append(results, PluginMetricDefinition{
 				FqName: element.FqName,
 				Desc:   desc,
 			})

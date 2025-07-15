@@ -118,7 +118,7 @@ func (f *fakeConnection) MetricsCapabilities() []metrics.MetricsCapability_RPC_T
 	panic("implement me")
 }
 
-func (f *fakeConnection) GetMetricsDefinitions(context.Context, k8client.Object) (PluginMetrics, error) {
+func (f *fakeConnection) GetMetricsDefinitions(context.Context, k8client.Object) (PluginMetricDefinitions, error) {
 	panic("implement me")
 }
 

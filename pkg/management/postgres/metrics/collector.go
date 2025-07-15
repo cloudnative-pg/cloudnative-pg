@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -610,7 +611,7 @@ func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metr
 	}
 	defer cli.Close(ctx)
 
-	pluginsMetrics, err := cli.GetMetricsDefinitions(ctx, cluster)
+	definitions, err := cli.GetMetricsDefinitions(ctx, cluster)
 	if err != nil {
 		return fmt.Errorf("failed to get plugin metrics during collect: %w", err)
 	}
@@ -620,19 +621,26 @@ func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metr
 		return fmt.Errorf("failed to collect metrics from plugins: %w", err)
 	}
 
-	for _, data := range res {
-		definition := pluginsMetrics.GetPluginMetric(data.FqName)
+	return sendPluginMetrics(definitions, res, ch)
+}
+
+func sendPluginMetrics(
+	definitions pluginClient.PluginMetricDefinitions,
+	metrics []*metrics.CollectMetric,
+	ch chan<- prometheus.Metric,
+) error {
+	for _, metric := range metrics {
+		definition := definitions.Get(metric.FqName)
 		if definition == nil {
-			return fmt.Errorf("metric definition not found for fqName: %s", data.FqName)
+			return fmt.Errorf("metric definition not found for fqName: %s", metric.FqName)
 		}
 
-		m, err := prometheus.NewConstMetric(definition.Desc, definition.ValueType, data.Value, data.VariableLabels...)
+		m, err := prometheus.NewConstMetric(definition.Desc, definition.ValueType, metric.Value, metric.VariableLabels...)
 		if err != nil {
-			return fmt.Errorf("failed to create metric %s: %w", data.FqName, err)
+			return fmt.Errorf("failed to create metric %s: %w", metric.FqName, err)
 		}
 		ch <- m
 	}
-
 	return nil
 }
 
