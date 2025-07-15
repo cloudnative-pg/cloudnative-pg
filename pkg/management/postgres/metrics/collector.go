@@ -575,7 +575,7 @@ func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.De
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_describe")
 
 	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
-		contextLogger.Info("No plugins enabled for metrics collection")
+		contextLogger.Trace("No plugins enabled for metrics collection")
 		return
 	}
 
@@ -601,7 +601,7 @@ func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metr
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_collect")
 
 	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
-		contextLogger.Info("No plugins enabled for metrics collection")
+		contextLogger.Trace("No plugins enabled for metrics collection")
 		return nil
 	}
 
