@@ -94,10 +94,6 @@ type PgStatWalMetrics struct {
 	WalSyncTime    *prometheus.GaugeVec
 }
 
-/*
--> factory del pluginmetrics collector
-*/
-
 // NewExporter creates an exporter
 func NewExporter(instance *postgres.Instance, pluginCollector m.PluginCollector) *Exporter {
 	clusterGetter := local.NewClient().Cache().GetCluster
