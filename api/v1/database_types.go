@@ -239,14 +239,12 @@ type FDWSpec struct {
 	// Even if an owner is explicitly specified during creation, it will be ignored.
 	Owner string `json:"owner,omitempty"`
 
-	Options []OptSpec `json:"options,omitempty"`
+	// Options specifies options for the FDW(key is option name, value is option value)
+	Options map[string]OptionSpecValue `json:"options,omitempty"`
 }
 
-// OptSpec configures a option instance
-type OptSpec struct {
-	Name string `json:"name"`
-
-	// The value associated with the name (e.g., value for "host" might be "db.cluster.local")
+// OptionSpecValue holds both the value and the ensure field for an option
+type OptionSpecValue struct {
 	Value string `json:"value,omitempty"`
 
 	// Specifies whether an option should be present or absent in
@@ -256,7 +254,7 @@ type OptSpec struct {
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
-	Ensure EnsureOption `json:"ensure"`
+	Ensure EnsureOption `json:"ensure,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database
