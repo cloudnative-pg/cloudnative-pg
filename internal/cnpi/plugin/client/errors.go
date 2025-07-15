@@ -43,6 +43,10 @@ func (e *pluginError) Error() string {
 	return e.innerErr.Error()
 }
 
+func (e *pluginError) Unwrap() error {
+	return e.innerErr
+}
+
 func newPluginError(msg string) error {
 	return &pluginError{innerErr: errors.New(msg)}
 }
