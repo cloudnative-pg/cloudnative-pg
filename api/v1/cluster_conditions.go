@@ -51,4 +51,12 @@ var (
 			Message: err.Error(),
 		}
 	}
+	// OutsideWatchScopeCondition is used to indicate that the Cluster resource is
+	// in a namespace not watched by the operator.
+	OutsideWatchScopeCondition = metav1.Condition{
+		Type:    string(ConditionReconciled),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(ConditionReasonOutsideWatchScope),
+		Message: "This Cluster resource is in a namespace not watched by the operator",
+	}
 )
