@@ -16,6 +16,8 @@ spec:
     ensure: present
   - name: postgres_fdw
     ensure: present
+  - name: file_fdw
+    ensure: present
   schemas:
   - name: test_schema
     ensure: present
@@ -23,4 +25,10 @@ spec:
   - name: postgres_fdw
     handler: postgres_fdw_handler
     validator: postgres_fdw_validator
+    ensure: present
+  - name: file_fdw
+    options:
+      filename:
+        value: 'test.csv'
+        ensure: present
     ensure: present
