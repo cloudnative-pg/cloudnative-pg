@@ -76,10 +76,6 @@ const (
 	// get the name of the pull secret
 	ClusterSecretSuffix = "-pull-secret"
 
-	// WalArchiveVolumeSuffix is the suffix appended to the instance name to
-	// get the name of the PVC dedicated to WAL files.
-	WalArchiveVolumeSuffix = "-wal"
-
 	// TablespaceVolumeInfix is the infix added between the instance name
 	// and tablespace name to get the name of PVC for a certain tablespace
 	TablespaceVolumeInfix = "-tbs-"

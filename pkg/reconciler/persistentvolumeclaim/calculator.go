@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -130,7 +131,7 @@ func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 
 // GetName will be used to get the name of the PVC
 func (r pgDataCalculator) GetName(instanceName string) string {
-	return instanceName
+	return instanceName + configuration.Current.DataVolumeSuffix
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
@@ -197,7 +198,7 @@ func (r pgWalCalculator) GetLabels(instanceName string) map[string]string {
 
 // GetName will be used to get the name of the PVC
 func (r pgWalCalculator) GetName(instanceName string) string {
-	return instanceName + apiv1.WalArchiveVolumeSuffix
+	return instanceName + configuration.Current.WalArchiveVolumeSuffix
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
@@ -229,7 +230,7 @@ func (r pgWalCalculator) GetInitialStatus() PVCStatus {
 
 // GetSnapshotName gets the snapshot name for a certain PVC
 func (r pgWalCalculator) GetSnapshotName(backupName string) string {
-	return fmt.Sprintf("%s%s", backupName, apiv1.WalArchiveVolumeSuffix)
+	return fmt.Sprintf("%s%s", backupName, configuration.Current.WalArchiveVolumeSuffix)
 }
 
 // GetVolumeSnapshotClass implements the Role interface
