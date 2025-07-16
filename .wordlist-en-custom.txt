@@ -180,6 +180,7 @@ GUC
 GUCs
 Gabriele
 GaugeVec
+GeoSpatial
 Gi
 GitOps
 GoArch
@@ -204,6 +205,7 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolume
 ImageVolumeSource
 ImportSource
 InfoSec
@@ -883,6 +885,7 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imageVolume
 imagecatalogs
 img
 immediateCheckpoint
@@ -1092,6 +1095,7 @@ pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
 pgRestoreExtraOptions
+pgRouting
 pgSQL
 pgadmin
 pgaudit
