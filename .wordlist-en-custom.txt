@@ -1115,6 +1115,7 @@ podCount
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
+podMonitorScrapeClass
 podName
 podStatuses
 podmonitor

@@ -58,3 +58,11 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 	}
 	return true
 }
+
+// GetPodMonitorScrapeClass returns the PodMonitor scrape class
+func (m *PoolerMonitoringConfiguration) GetPodMonitorScrapeClass() *string {
+	if m == nil || m.PodMonitorScrapeClass == nil {
+		return nil
+	}
+	return m.PodMonitorScrapeClass
+}
