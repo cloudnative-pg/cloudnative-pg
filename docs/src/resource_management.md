@@ -44,19 +44,21 @@ For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
     When the quality of service is set to "Guaranteed", CloudNativePG sets the
     `PG_OOM_ADJUST_VALUE` for the `postmaster` process to `0`, in line with the
     [PostgreSQL documentation](https://www.postgresql.org/docs/current/kernel-resources.html#LINUX-MEMORY-OVERCOMMIT).
-    This allows the `postmaster` to retain its low OOM score (`-997`), while its
-    child processes run with an OOM score adjustment of `0`. As a result, if the
-    OOM killer is triggered, it will terminate the child processes before the
-    `postmaster`. This behaviour helps keep the PostgreSQL instance alive and
-    enables a clean shutdown procedure in the event of an eviction.
+    This allows the `postmaster` to retain its low Out-Of-Memory (OOM) score of
+    `-997`, while its child processes run with an OOM score adjustment of `0`. As a
+    result, if the OOM killer is triggered, it will terminate the child processes
+    before the `postmaster`. This behaviour helps keep the PostgreSQL instance
+    alive for as long as possible and enables a clean shutdown procedure in the
+    event of an eviction.
 
 To avoid resources related issues in Kubernetes, we can refer to the best practices for "out of resource" handling
 while creating a cluster:
 
 -  Specify your required values for memory and CPU in the resources section of the manifest file.
-   This way, you can avoid the `OOM Killed` (where "OOM" stands for Out Of Memory) and `CPU throttle` or any other
+   This way, you can avoid the `OOM Killed` and `CPU throttle` or any other
    resource-related issues on running instances.
--  For your cluster's pods to get assigned to the "Guaranteed" QoS class, you must set limits and requests
+-  For your cluster's pods to get assigned to the "Guaranteed" QoS class, you
+   must set limits and requests
    for both memory and CPU to the same value.
 -  Specify your required PostgreSQL memory parameters consistently with the pod resources (as you would do
    in a VM or physical machine scenario - see below).
