@@ -119,6 +119,7 @@ const (
 )
 
 // BackupSpec defines the desired state of Backup
+// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="BackupSpec is immutable once set"
 type BackupSpec struct {
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster"`
@@ -138,7 +139,6 @@ type BackupSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot;plugin
 	// +kubebuilder:default:=barmanObjectStore
-	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="method is immutable once set"
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Configuration parameters passed to the plugin managing this backup
