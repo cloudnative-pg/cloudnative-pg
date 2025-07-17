@@ -254,18 +254,26 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-### Upgrading to 1.26.0 or 1.25.2
+### Upgrading to 1.26 from a previous minor version
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.26.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.25.x).
+    1.26.1, or at a minimum, to the latest stable version of your current minor
+    release (for example, 1.25.x).
+
+!!! Warning
+    Due to changes in the startup probe for the manager component
+    ([#6623](https://github.com/cloudnative-pg/cloudnative-pg/pull/6623)),
+    upgrading the operator will trigger a restart of your PostgreSQL clusters,
+    even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
+    Your applications will need to reconnect to PostgreSQL after the upgrade.
 
 In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
-to a declarative approach for cluster hibernation. The `hibernate on` and
-`hibernate off` commands are now convenient shortcuts that apply declarative
-changes to enable or disable hibernation. The `hibernate status` command has
-been removed, as its purpose is now fulfilled by the standard `status` command.
+to a [declarative approach for cluster hibernation](declarative_hibernation.md).
+The `hibernate on` and `hibernate off` commands are now convenient shortcuts
+that apply declarative changes to enable or disable hibernation.
+The `hibernate status` command has been removed, as its purpose is now
+fulfilled by the standard `status` command.
 
 ### Upgrading to 1.25 from a previous minor version
 
