@@ -63,7 +63,7 @@ second via the `monolith` type.
     It is your responsibility to ensure that the destination cluster can
     access the source cluster with a superuser or a user having enough
     privileges to take a logical backup with `pg_dump`. Please refer to the
-    [PostgreSQL documentation on pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html)
+    [PostgreSQL documentation on `pg_dump`](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
 
 ## The `microservice` type
@@ -82,9 +82,9 @@ performed in 4 steps:
   database via the `postImportApplicationSQL` parameter
 - execution of `ANALYZE VERBOSE` on the imported database
 
-In the below figure, a single PostgreSQL cluster with N databases is imported
-into separate CloudNativePG clusters, each using a microservice import
-for one of the N source databases.
+In the figure below, a single PostgreSQL cluster containing *N* databases is
+imported into separate CloudNativePG clusters, with each cluster using a
+microservice import for one of the *N* source databases.
 
 ![Example of microservice import type](./images/microservice-import.png)
 
@@ -159,10 +159,10 @@ There are a few things you need to be aware of when using the `microservice` typ
 - Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
 
 !!! Hint
-    The microservice approach follows CloudNativePG conventions and defaults for
-    the destination cluster.
-    Notably, if you don’t set `initdb.database` or `initdb.owner` for the
-    destination cluster, both will default to `app`.
+    The microservice approach adheres to CloudNativePG conventions and defaults
+    for the destination cluster. If you do not set `initdb.database` or
+    `initdb.owner` for the destination cluster, both parameters will default to
+    `app`.
 
 ## The `monolith` type
 
