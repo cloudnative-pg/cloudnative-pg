@@ -47,7 +47,7 @@ For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
     This allows the `postmaster` to retain its low Out-Of-Memory (OOM) score of
     `-997`, while its child processes run with an OOM score adjustment of `0`. As a
     result, if the OOM killer is triggered, it will terminate the child processes
-    before the `postmaster`. This behaviour helps keep the PostgreSQL instance
+    before the `postmaster`. This behavior helps keep the PostgreSQL instance
     alive for as long as possible and enables a clean shutdown procedure in the
     event of an eviction.
 
