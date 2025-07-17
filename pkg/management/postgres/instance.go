@@ -417,7 +417,7 @@ func (instance *Instance) Startup() error {
 	}
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
-	pgCtlCmd.Env = instance.Env
+	pgCtlCmd.Env = instance.buildPostgresEnv()
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error starting PostgreSQL instance: %w", err)
@@ -642,7 +642,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 	}
 
 	postgresCmd := exec.Command(postgresName, options...) // #nosec
-	postgresCmd.Env = instance.Env
+	postgresCmd.Env = instance.buildPostgresEnv()
 	compatibility.AddInstanceRunCommands(postgresCmd)
 
 	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
@@ -651,6 +651,18 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 	}
 
 	return streamingCmd, nil
+}
+
+func (instance *Instance) buildPostgresEnv() []string {
+	env := instance.Env
+	if env == nil {
+		env = os.Environ()
+	}
+	env = append(env,
+		"PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj",
+		"PG_OOM_ADJUST_VALUE=0",
+	)
+	return env
 }
 
 // WithActiveInstance execute the internal function while this
@@ -1021,7 +1033,7 @@ func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Ver
 		"options", options)
 
 	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
-	pgRewindCmd.Env = instance.Env
+	pgRewindCmd.Env = instance.buildPostgresEnv()
 	err = execlog.RunStreaming(pgRewindCmd, pgRewindName)
 	if err != nil {
 		contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
