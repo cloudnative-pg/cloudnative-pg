@@ -40,6 +40,16 @@ section in the Kubernetes documentation.
 
 For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
 
+!!! Info
+    When the quality of service is set to "Guaranteed", CloudNativePG sets the
+    `PG_OOM_ADJUST_VALUE` for the `postmaster` process to `0`, in line with the
+    [PostgreSQL documentation](https://www.postgresql.org/docs/current/kernel-resources.html#LINUX-MEMORY-OVERCOMMIT).
+    This allows the `postmaster` to retain its low OOM score (`-997`), while its
+    child processes run with an OOM score adjustment of `0`. As a result, if the
+    OOM killer is triggered, it will terminate the child processes before the
+    `postmaster`. This behaviour helps keep the PostgreSQL instance alive and
+    enables a clean shutdown procedure in the event of an eviction.
+
 To avoid resources related issues in Kubernetes, we can refer to the best practices for "out of resource" handling
 while creating a cluster:
 
