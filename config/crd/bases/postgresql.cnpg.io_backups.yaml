@@ -77,9 +77,6 @@ spec:
                 - volumeSnapshot
                 - plugin
                 type: string
-                x-kubernetes-validations:
-                - message: method is immutable once set
-                  rule: oldSelf == '' || self == oldSelf
               online:
                 description: |-
                   Whether the default type of backup with volume snapshots is
@@ -145,6 +142,9 @@ spec:
             required:
             - cluster
             type: object
+            x-kubernetes-validations:
+            - message: BackupSpec is immutable once set
+              rule: oldSelf == self
           status:
             description: |-
               Most recently observed status of the backup. This data may not be up to
