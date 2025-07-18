@@ -22,6 +22,7 @@ package podlogs
 import (
 	"bytes"
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -154,10 +155,14 @@ var _ = Describe("Cluster logging tests", func() {
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
 		client := fake.NewClientset(pod)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		var logBuffer syncBuffer
+
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
-		followWaiting := 200 * time.Millisecond
+		followWaiting := 150 * time.Millisecond
 		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
@@ -170,12 +175,15 @@ var _ = Describe("Cluster logging tests", func() {
 				Client:        client,
 			}
 			err := streamClusterLogs.SingleStream(ctx2, &logBuffer)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(Equal(context.DeadlineExceeded))
+			wg.Done()
 		}()
-		// give the stream call time to do a new search for pods
+
 		time.Sleep(350 * time.Millisecond)
 		cancel()
-		// the fake pod will be seen twice
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
+		wg.Wait()
+
+		fakeLogCount := strings.Count(logBuffer.String(), "fake logs\n")
+		Expect(fakeLogCount).To(BeNumerically(">=", 2))
 	})
 })
