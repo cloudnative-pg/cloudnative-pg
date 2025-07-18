@@ -290,6 +290,7 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 							Name:    "azurite",
 							Command: []string{"azurite"},
 							Args: []string{
+								"--skipApiVersionCheck",
 								"-l", "/data", "--cert", "/etc/ssl/certs/azurite.pem",
 								"--key", "/etc/ssl/certs/azurite-key.pem",
 								"--oauth", "basic", "--blobHost", "0.0.0.0",
