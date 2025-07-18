@@ -2428,7 +2428,6 @@ PostgreSQL cluster from an existing storage</p>
 
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
-
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
 
@@ -2836,6 +2835,8 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
+- [OptionSpecValue](#postgresql-cnpg-io-v1-OptionSpecValue)
+
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
 
@@ -3101,6 +3102,13 @@ of WAL archiving and backups for this external cluster</p>
    <p>Owner specifies the database user who will own the Foreign Data Wrapper.
 By default, the owner of a new FDW is the current session user.
 Even if an owner is explicitly specified during creation, it will be ignored.</p>
+</td>
+</tr>
+<tr><td><code>options</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
+</td>
+<td>
+   <p>Options specifies options for the FDW(key is option name, value is option value)</p>
 </td>
 </tr>
 </tbody>
@@ -3990,6 +3998,39 @@ be limited, according to the <code>checkpoint_completion_target</code> setting o
 the PostgreSQL server. If set to true, an immediate checkpoint will be
 used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
+<p>OptionSpecValue holds both the value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Specifies whether an option should be present or absent in
+the database. If set to <code>present</code>, the option will be
+created if it does not exist. If set to <code>absent</code>, the
+option will be removed if it exists.</p>
 </td>
 </tr>
 </tbody>
