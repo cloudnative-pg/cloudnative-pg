@@ -256,6 +256,56 @@ Each schema entry supports the following properties:
     [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
     [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
 
+## Managing Foreign Data Wrappers (FDWs) In a Database
+
+!!! Info 
+    Foreign Data Wrappers (FDWs) are database-scoped objects that typically require
+    superuser privileges to create or modify. CloudNativePG provides a declarative API
+    for managing FDWs, enabling users to define and maintain them in a controlled, 
+    Kubernetes-native way without directly executing SQL commands or escalating privileges.
+
+CloudNativePG enables seamless and automated management of PostgreSQL foreign data wrappers
+in the target database using declarative configuration.
+
+To enable this feature, define the `spec.fdws` field 
+with a list of FDW specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  fdws:
+  - name: postgres_fdw
+    handler: postgres_fdw_handler
+    validator: postgres_fdw_validator
+    ensure: present
+  - name: file_fdw
+    options:
+      filename:
+        value: 'test.csv'
+        ensure: present
+    ensure: present
+# ...
+```
+
+Each FDW entry supports the following properties:
+
+- `name` *(mandatory)*: The name of the foreign data wrapper.
+- `ensure`: Indicates whether the FDW should be `present` or `absent` in the database (default is `present`).
+- `handler`: The name of the handler function used by the FDW.
+- `validator`: The name of the validator function used by the FDW.
+- `options`: A map of FDW options to manage. Each option supports:
+  - `value`: The string value of the option.
+  - `ensure`: Indicates whether the option should be `present` or `absent`.
+
+!!! Info
+ CloudNativePG manages FDWs using PostgreSQL's native SQL commands:
+ [`CREATE FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-createforeigndatawrapper.html),
+ [`ALTER FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-alterforeigndatawrapper.html),
+ and [`DROP FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-dropforeigndatawrapper.html).
+ The `ALTER` command supports option updates.
+
+The operator reconciles only the FDWs explicitly listed in `spec.fdws`. Any existing FDWs not declared in this list are left untouched.
+
 ## Limitations and Caveats
 
 ### Renaming a database
