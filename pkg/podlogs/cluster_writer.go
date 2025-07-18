@@ -223,8 +223,12 @@ func (csr *ClusterWriter) SingleStream(ctx context.Context, writer io.Writer) er
 		if streamSet.isZero() {
 			return nil
 		}
-		// wait before looking for new pods to log
-		time.Sleep(csr.getFollowWaitingTime())
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(csr.getFollowWaitingTime()):
+		}
 	}
 }
 
