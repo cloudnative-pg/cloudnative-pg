@@ -669,10 +669,50 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				Error().To(MatchError(testError))
 		})
 
-		It("updates the fdw options", func(ctx SpecContext) {
+		It("add new fdw options", func(ctx SpecContext) {
 			fdw.Options = map[string]apiv1.OptionSpecValue{
-				"add_option":    {Ensure: apiv1.EnsurePresent, Value: "value"},
+				"add_option": {Ensure: apiv1.EnsurePresent, Value: "value"},
+			}
+			info := &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Options: map[string]apiv1.OptionSpecValue{
+					"modify_option": {Value: "old_value"},
+					"remove_option": {Value: "value"},
+				},
+				Owner: fdw.Owner,
+			}
+
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (ADD \"add_option\" 'value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("modify the fdw options", func(ctx SpecContext) {
+			fdw.Options = map[string]apiv1.OptionSpecValue{
 				"modify_option": {Ensure: apiv1.EnsurePresent, Value: "new_value"},
+			}
+			info := &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Options: map[string]apiv1.OptionSpecValue{
+					"modify_option": {Value: "old_value"},
+					"remove_option": {Value: "value"},
+				},
+				Owner: fdw.Owner,
+			}
+
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (SET \"modify_option\" 'new_value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("remove new fdw options", func(ctx SpecContext) {
+			fdw.Options = map[string]apiv1.OptionSpecValue{
 				"remove_option": {Ensure: apiv1.EnsureAbsent},
 			}
 			info := &fdwInfo{
@@ -686,8 +726,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				Owner: fdw.Owner,
 			}
 
-			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" " +
-				"OPTIONS (ADD \"add_option\" 'value', SET \"modify_option\" 'new_value', DROP \"remove_option\")"
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (DROP \"remove_option\")"
 			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 
 			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
