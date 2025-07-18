@@ -24,11 +24,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/lib/pq"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -266,7 +266,6 @@ func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext apiv1.Extensi
 	return &result, nil
 }
 
-//nolint:dupl
 func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -363,7 +362,6 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 	return &result, nil
 }
 
-//nolint:dupl
 func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -460,7 +458,6 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	return &result, nil
 }
 
-//nolint:dupl
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -473,20 +470,17 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
 	}
 
-	if len(fdw.Options) > 0 {
-		sqlCreateFDW.WriteString("OPTIONS (")
-		first := true
-		for name, optionSpec := range fdw.Options {
-			if optionSpec.Ensure == apiv1.EnsureAbsent {
-				continue
-			}
-			if !first {
-				sqlCreateFDW.WriteString(", ")
-			}
-			first = false
-			sqlCreateFDW.WriteString(fmt.Sprintf("%s '%s'", name, optionSpec.Value))
+	// Extract options
+	opts := make([]string, 0, len(fdw.Options))
+	for name, optionSpec := range fdw.Options {
+		if optionSpec.Ensure == apiv1.EnsureAbsent {
+			continue
 		}
-		sqlCreateFDW.WriteString(")")
+		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{name}.Sanitize(),
+			optionSpec.Value))
+	}
+	if len(opts) > 0 {
+		sqlCreateFDW.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
@@ -495,6 +489,48 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		return err
 	}
 	contextLogger.Info("created foreign data wrapper", "name", fdw.Name)
+
+	return nil
+}
+
+func updateFDWOptions(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Collect individual ALTER-clauses
+	var clauses []string
+	for name, desiredOptSpec := range fdw.Options {
+		curOptSpec, exists := info.Options[name]
+
+		switch {
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
+			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
+				pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value))
+
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
+			if desiredOptSpec.Value != curOptSpec.Value {
+				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
+					pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value))
+			}
+
+		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
+			clauses = append(clauses, fmt.Sprintf("DROP %s", pgx.Identifier{name}.Sanitize()))
+		}
+	}
+
+	if len(clauses) == 0 {
+		return nil
+	}
+
+	// Build SQL
+	changeOptionSQL := fmt.Sprintf(
+		"ALTER FOREIGN DATA WRAPPER %s OPTIONS (%s)", pgx.Identifier{fdw.Name}.Sanitize(),
+		strings.Join(clauses, ", "),
+	)
+
+	if _, err := db.ExecContext(ctx, changeOptionSQL); err != nil {
+		return fmt.Errorf("altering options of foreign data wrapper %w", err)
+	}
+	contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
 
 	return nil
 }
@@ -554,61 +590,6 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 		contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
 	}
 
-	// Alter Options
-	if len(fdw.Options) > 0 {
-		var changeOptionSQL strings.Builder
-		changeOptionSQL.WriteString(fmt.Sprintf(
-			"ALTER FOREIGN DATA WRAPPER %s OPTIONS (",
-			pgx.Identifier{fdw.Name}.Sanitize(),
-		))
-
-		first := true
-		for name, desiredOptSpec := range fdw.Options {
-			curOptSpec, exists := info.Options[name]
-
-			switch {
-			case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
-				if !first {
-					changeOptionSQL.WriteString(", ")
-				}
-				first = false
-				changeOptionSQL.WriteString(fmt.Sprintf("ADD %s '%s'",
-					pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value,
-				))
-
-			case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
-				if desiredOptSpec.Value != curOptSpec.Value {
-					if !first {
-						changeOptionSQL.WriteString(", ")
-					}
-					first = false
-					changeOptionSQL.WriteString(fmt.Sprintf("SET %s '%s'",
-						pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value,
-					))
-				}
-
-			case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
-				if !first {
-					changeOptionSQL.WriteString(", ")
-				}
-				first = false
-				changeOptionSQL.WriteString(fmt.Sprintf("DROP %s",
-					pgx.Identifier{name}.Sanitize()),
-				)
-			}
-
-		}
-		changeOptionSQL.WriteString(")")
-
-		if !first {
-			if _, err := db.ExecContext(ctx, changeOptionSQL.String()); err != nil {
-				return fmt.Errorf("altering options of foreign data wrapper %w", err)
-			}
-
-			contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
-		}
-	}
-
 	// Alter the owner
 	if len(fdw.Owner) > 0 && fdw.Owner != info.Owner {
 		changeOwnerSQL := fmt.Sprintf(
@@ -622,6 +603,11 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 		}
 
 		contextLogger.Info("altered foreign data wrapper owner", "name", fdw.Name, "owner", fdw.Owner)
+	}
+
+	// Alter Options
+	if err := updateFDWOptions(ctx, db, fdw, info); err != nil {
+		return err
 	}
 
 	return nil
