@@ -162,6 +162,9 @@ EphemeralVolumesSizeLimitConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
 Fei
@@ -295,6 +298,7 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpecValue
 OwnNamespace
 PDB
 PDBs
@@ -821,6 +825,8 @@ faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -1412,6 +1418,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized

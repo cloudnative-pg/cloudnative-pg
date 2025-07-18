@@ -516,3 +516,259 @@ var _ = Describe("Managed schema SQL", func() {
 		})
 	})
 })
+
+var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		fdw    apiv1.FDWSpec
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		fdw = apiv1.FDWSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   "testfdw",
+				Ensure: "present",
+			},
+			Handler:   "testhandler",
+			Validator: "testvalidator",
+			Owner:     "owner",
+		}
+
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	Context("getDatabaseFDWInfo", func() {
+		It("returns info when the fdw exits", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseFDWSQL).
+				WithArgs(fdw.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"fdwname", "fdwhandler", "fdwvalidator", "options", "fdwowner"}).
+						AddRow("testfdw", "testhandler", "testvalidator", nil, "testowner"),
+				)
+			fdwInfo, err := getDatabaseFDWInfo(ctx, db, fdw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fdwInfo).ToNot(BeNil())
+			Expect(fdwInfo.Name).To(Equal("testfdw"))
+			Expect(fdwInfo.Handler).To(Equal("testhandler"))
+			Expect(fdwInfo.Validator).To(Equal("testvalidator"))
+			Expect(fdwInfo.Owner).To(Equal("testowner"))
+		})
+
+		It("returns nil info when the fdw does not exist", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseFDWSQL).
+				WithArgs(fdw.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"fdwname", "fdwhandler", "fdwvalidator", "options", "fdwowner"}),
+				)
+			fdwInfo, err := getDatabaseFDWInfo(ctx, db, fdw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fdwInfo).To(BeNil())
+		})
+	})
+
+	Context("createDatabaseFDW", func() {
+		createFDWSQL := "CREATE FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\" VALIDATOR \"testvalidator\""
+
+		It("returns success when the fdw has been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createFDWSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(createDatabaseFDW(ctx, db, fdw)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when the fdw could not be created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createFDWSQL).
+				WillReturnError(testError)
+			Expect(createDatabaseFDW(ctx, db, fdw)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("updateDatabaseFDW", func() {
+		It("does nothing when the fdw has been correctly reconciled", func(ctx SpecContext) {
+			Expect(updateDatabaseFDW(ctx, db, fdw, &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Owner:     fdw.Owner,
+			})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates the fdw handler", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				Error().NotTo(HaveOccurred())
+		})
+
+		It("handles removal of handler when not specified", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" NO HANDLER").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			fdw.Handler = ""
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				Error().NotTo(HaveOccurred())
+		})
+
+		It("fail when setting the handler failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				Error().To(MatchError(testError))
+		})
+
+		It("updates the fdw validator", func(ctx SpecContext) {
+			dbMock.ExpectExec(
+				"ALTER FOREIGN DATA WRAPPER \"testfdw\" VALIDATOR \"testvalidator\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				Error().NotTo(HaveOccurred())
+		})
+
+		It("handles removal of validator when not specified", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" NO VALIDATOR").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			fdw.Validator = ""
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				Error().NotTo(HaveOccurred())
+		})
+
+		It("fail when setting the validator failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" VALIDATOR \"testvalidator\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				Error().To(MatchError(testError))
+		})
+
+		It("add new fdw options", func(ctx SpecContext) {
+			fdw.Options = map[string]apiv1.OptionSpecValue{
+				"add_option": {Ensure: apiv1.EnsurePresent, Value: "value"},
+			}
+			info := &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Options: map[string]apiv1.OptionSpecValue{
+					"modify_option": {Value: "old_value"},
+					"remove_option": {Value: "value"},
+				},
+				Owner: fdw.Owner,
+			}
+
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (ADD \"add_option\" 'value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("modify the fdw options", func(ctx SpecContext) {
+			fdw.Options = map[string]apiv1.OptionSpecValue{
+				"modify_option": {Ensure: apiv1.EnsurePresent, Value: "new_value"},
+			}
+			info := &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Options: map[string]apiv1.OptionSpecValue{
+					"modify_option": {Value: "old_value"},
+					"remove_option": {Value: "value"},
+				},
+				Owner: fdw.Owner,
+			}
+
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (SET \"modify_option\" 'new_value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("remove new fdw options", func(ctx SpecContext) {
+			fdw.Options = map[string]apiv1.OptionSpecValue{
+				"remove_option": {Ensure: apiv1.EnsureAbsent},
+			}
+			info := &fdwInfo{
+				Name:      fdw.Name,
+				Handler:   fdw.Handler,
+				Validator: fdw.Validator,
+				Options: map[string]apiv1.OptionSpecValue{
+					"modify_option": {Value: "old_value"},
+					"remove_option": {Value: "value"},
+				},
+				Owner: fdw.Owner,
+			}
+
+			expectedSQL := "ALTER FOREIGN DATA WRAPPER \"testfdw\" OPTIONS (DROP \"remove_option\")"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates the fdw owner", func(ctx SpecContext) {
+			dbMock.ExpectExec(
+				"ALTER FOREIGN DATA WRAPPER \"testfdw\" OWNER TO \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: fdw.Validator, Owner: "oldowner"})).
+				Error().NotTo(HaveOccurred())
+		})
+
+		It("fail when setting the owner failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" OWNER TO \"owner\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseFDW(ctx, db, fdw,
+				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: fdw.Validator, Owner: "old"})).
+				Error().To(MatchError(testError))
+		})
+	})
+
+	Context("dropDatabaseFDW", func() {
+		dropFDWSQL := "DROP FOREIGN DATA WRAPPER IF EXISTS \"testfdw\""
+
+		It("returns success when the foreign data wrapper has been dropped", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropFDWSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(dropDatabaseFDW(ctx, db, fdw)).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when the DROP statement failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropFDWSQL).
+				WillReturnError(testError)
+
+			Expect(dropDatabaseFDW(ctx, db, fdw)).Error().To(Equal(testError))
+		})
+	})
+})
