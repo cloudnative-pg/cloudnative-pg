@@ -1,35 +1,70 @@
-# ImageVolume Extensions
+# Image Volume Extensions
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-CloudNativePG supports dynamic loading of PostgreSQL extensions into a
-running `Cluster`, leveraging the ImageVolume feature of Kubernetes.
+CloudNativePG supports the **dynamic loading of PostgreSQL extensions** into a
+running `Cluster` using the Kubernetes `ImageVolume` feature and the
+`extension_control_path` GUC introduced in PostgreSQL 18, with contributions
+from this project.
 
-This feature allows mounting a PostgreSQL extension, packaged as an
-OCI-compliant container image, as a read-only and immutable volume
-directly inside a running pod's filesystem at a known path.
+This feature allows you to mount a PostgreSQL extension, packaged as an
+OCI-compliant container image, as a read-only and immutable volume inside a
+running pod at a known filesystem path.
 
-## Requirements:
-* PostgreSQL 18+
-* Kubernetes 1.31+ with the ImageVolume feature gate enabled.
+## Benefits
 
-## Key Concepts
+ImageVolume extensions **decouple the distribution of PostgreSQL operand
+container images from the distribution of extensions**. This eliminates the
+need to define and embed extensions at build time within your PostgreSQL
+images—a major adoption blocker for CloudNativePG, including from a security
+and supply chain perspective.
 
-Each image volume will be mounted at `/extensions/<EXTENSION_NAME>`.
-The operator takes care of automatically managing both
-`extension_control_path` and `dynamic_library_path` GUCs, pointing
-them by default to:
-- `/extension/<EXTENSION_NAME>/share` for `extension_control_path`
-- `/extension/<EXTENSION_NAME>/lib` for `dynamic_library_path`
+As a result, you can:
+
+- Use the [official PostgreSQL `minimal` operand images](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#minimal-images)
+  provided by CloudNativePG.
+- Dynamically add the extensions you need to your `Cluster` definitions,
+  without rebuilding or maintaining custom PostgreSQL images.
+- Reduce your operational surface by using immutable, minimal, and secure base
+  images while adding only the extensions required for each workload.
+
+Extension images must be built following these [specifications](#specifications).
+
+## Requirements
+
+To use image volume extensions with CloudNativePG, you need:
+
+- **PostgreSQL 18 or later**, with support for `extension_control_path`.
+- **Kubernetes 1.33**, with the `ImageVolume` feature gate enabled.
+- **CloudNativePG-compatible extension container images**, ensuring:
+  - Matching PostgreSQL major version of the `Cluster` resource.
+  - Compatible operating system distribution of the `Cluster` resource.
+  - Matching CPU architecture of the `Cluster` resource.
+
+## How It Works
+
+Each image volume is mounted at:
+
+```
+/extensions/<EXTENSION_NAME>
+```
+
+CloudNativePG automatically manages the relevant GUCs, setting:
+
+- `extension_control_path` to `/extensions/<EXTENSION_NAME>/share`
+- `dynamic_library_path` to `/extensions/<EXTENSION_NAME>/lib`
+
+This allows PostgreSQL to discover and load the extension without requiring
+manual configuration inside the pod.
 
 !!! Important
-    The extension container image must be compatible with the PostgreSQL image
-    deployed, meaning that it should have coherent PostgreSQL major version,
-    OS distribution and CPU architecture.
+    The extension container image must match the PostgreSQL container used by
+    your cluster in PostgreSQL major version, Operating system distribution, and
+    CPU architecture to ensure compatibility and prevent runtime issues.
 
-## Adding a new extension
+## Adding a New Extension
 
-Via the `.spec.postgresql.extensions` stanza, you can define a list of
-imageVolume extensions that should be mounted inside a Cluster. For example:
+You can add an `ImageVolume`-based extension to a `Cluster` using the
+`.spec.postgresql.extensions` stanza. For example:
 
 ```yaml
 spec:
@@ -41,20 +76,23 @@ spec:
           pullPolicy: IfNotPresent
 ```
 
-The `name` field is a mandatory unique name that will be used to mount the
-imageVolume, which in this case will result to `/extensions/pgvector`.
-It must consist of lowercase alphanumeric characters or '-', and must start/end
-with an alphanumeric character.
+- The `name` field is **mandatory** and must be **unique within the cluster**.
+- This name determines the mount path, resulting in `/extensions/pgvector`
+- It must consist of **lowercase alphanumeric characters or hyphens (`-`)** and
+  must start and end with an alphanumeric character.
 
 !!! Info
-    When a new extension is applied on a running Cluster, CloudNativePG will
-    perform a [Rolling Update](rolling_update.md) to add the newly requested
+    When a new extension is applied to a running `Cluster`, CloudNativePG will
+    automatically trigger a [Rolling Update](rolling_update.md) to attach the new
     image volume to each pod.
 
-Then, the operator will automatically configure the required GUCs to allow
-PostgreSQL to load extensions from the `pgvector` volume, by appending:
-- `/extension/pgvector/share` to `extension_control_path`
-- `/extension/pgvector/lib` to `dynamic_library_path`
+Once mounted, the operator will automatically configure PostgreSQL by appending:
+
+- `/extensions/pgvector/share` to `extension_control_path`
+- `/extensions/pgvector/lib` to `dynamic_library_path`
+
+This allows PostgreSQL to discover and load the extension from the mounted
+volume without additional manual configuration.
 
 ## Manage extensions via configuration
 
@@ -137,3 +175,7 @@ the path `/extensions/postgis/system`, allowing it to locate and load the requir
     changing this value requires a restart of the Cluster for the new value(s) to be picked up.
     Currently, this is not being done automatically and users have to issue a
     `cnpg restart` after changing this value on a running Cluster.
+
+## Specifications
+
+TODO
