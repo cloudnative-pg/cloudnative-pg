@@ -24,6 +24,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -245,6 +246,15 @@ local {{.Username}} postgres
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// ExtensionControlPath is the postgresql parameter key for extension_control_path
+	ExtensionControlPath = "extension_control_path"
+
+	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
+	DynamicLibraryPath = "dynamic_library_path"
+
+	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
+	ExtensionsBaseDirectory = "/extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -337,6 +347,9 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
+
+	// The list of extensions to be loaded
+	ImageVolumeExtensions []ImageVolumeExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -739,6 +752,11 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
+	if len(info.ImageVolumeExtensions) > 0 {
+		setExtensionControlPath(info, configuration)
+		setDynamicLibraryPath(info, configuration)
+	}
+
 	return configuration
 }
 
@@ -820,4 +838,68 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// ImageVolumeExtensionConfiguration is the configuration for an Extension added via ImageVolume
+type ImageVolumeExtensionConfiguration struct {
+	// The name of the Extension
+	Name string
+	// The list of directories that should be added to ExtensionControlPath.
+	ExtensionControlPath []string
+	// The list of directories that should be added to DynamicLibraryPath.
+	DynamicLibraryPath []string
+}
+
+// setExtensionControlPath manages the `extension_control_path` GUC, merging
+// the paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	extensionControlPath := []string{"$system"}
+	for _, extension := range info.ImageVolumeExtensions {
+		// If we have custom ExtensionControlPaths we set those, otherwise we default to "/share"
+		if len(extension.ExtensionControlPath) > 0 {
+			for _, path := range extension.ExtensionControlPath {
+				extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
+			}
+		} else {
+			extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "share"))
+		}
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(ExtensionControlPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		extensionControlPath = append(extensionControlPath, path)
+	}
+
+	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+}
+
+// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
+// paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	dynamicLibraryPath := []string{"$libdir"}
+	for _, extension := range info.ImageVolumeExtensions {
+		// If we have custom DynamicLibraryPaths we set those, otherwise we default to "/lib"
+		if len(extension.DynamicLibraryPath) > 0 {
+			for _, path := range extension.DynamicLibraryPath {
+				dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
+			}
+		} else {
+			dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "lib"))
+		}
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(DynamicLibraryPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		dynamicLibraryPath = append(dynamicLibraryPath, path)
+	}
+
+	configuration.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }

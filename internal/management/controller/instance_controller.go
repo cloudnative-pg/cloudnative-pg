@@ -25,9 +25,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
@@ -942,6 +944,40 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
+	r.instance.Env = buildPostmasterEnv(cluster)
+}
+
+func buildPostmasterEnv(cluster *apiv1.Cluster) []string {
+	env := make([]string, 0, len(os.Environ()))
+	for _, envVar := range os.Environ() {
+		if strings.HasPrefix(envVar, "LD_LIBRARY_PATH") {
+			continue
+		}
+		env = append(env, envVar)
+	}
+
+	ldLibraryPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		ldLibraryPaths = append(ldLibraryPaths, GetLdLibraryPaths(&extension)...)
+	}
+	env = append(env, "LD_LIBRARY_PATH="+strings.Join(ldLibraryPaths, ":"))
+
+	return env
+}
+
+// GetLdLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
+// given an extension
+func GetLdLibraryPaths(extension *apiv1.ExtensionConfiguration) []string {
+	if extension.LdLibraryPath == nil {
+		return []string{}
+	}
+
+	libraryPaths := make([]string, 0, len(extension.LdLibraryPath))
+	for _, libraryPath := range extension.LdLibraryPath {
+		libraryPaths = append(libraryPaths, filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath))
+	}
+
+	return libraryPaths
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
