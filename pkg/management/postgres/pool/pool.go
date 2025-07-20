@@ -97,6 +97,9 @@ func (pool *ConnectionPool) Connection(dbname string) (*sql.DB, error) {
 
 // ShutdownConnections closes every database connection
 func (pool *ConnectionPool) ShutdownConnections() {
+	pool.connectionMapMutex.Lock()
+	defer pool.connectionMapMutex.Unlock()
+
 	for _, db := range pool.connectionMap {
 		_ = db.Close()
 	}
