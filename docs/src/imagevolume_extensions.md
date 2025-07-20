@@ -65,23 +65,40 @@ manual configuration inside the pod.
     your cluster in PostgreSQL major version, Operating system distribution, and
     CPU architecture to ensure compatibility and prevent runtime issues.
 
-## Adding a New Extension
+## How to Add a New Extension
+
+Adding an extension to a database in CloudNativePG involves two steps:
+
+1. Attach the extension image to the `Cluster` resource so that PostgreSQL can
+   discover and load it.
+2. Declare the extension in the `Database` resource where you want it
+   installed.
+
+For illustration, we will use a fictitious extension named `bozzone`.
+
+### Adding a New Extension to a `Cluster` Resource
 
 You can add an `ImageVolume`-based extension to a `Cluster` using the
 `.spec.postgresql.extensions` stanza. For example:
 
 ```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: bozzone-18
 spec:
+  # ...
   postgresql:
     extensions:
-      - name: pgvector
+      - name: bozzone
         image:
-          reference: <registry-path-for-pgvector>
+          reference: <registry-path-for-bozzone>
           pullPolicy: IfNotPresent
+  # ...
 ```
 
 The `name` field is **mandatory** and **must be unique within the cluster**, as
-it determines the mount path (`/extensions/pgvector` in this example). It must
+it determines the mount path (`/extensions/bozzone` in this example). It must
 consist of *lowercase alphanumeric characters or hyphens (`-`)* and must start
 and end with an alphanumeric character.
 
@@ -89,7 +106,7 @@ The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes
 The `reference` must point to a valid container registry path for the extension
 image.
 
-!!! important
+!!! Important
     When a new extension is added to a running `Cluster`, CloudNativePG will
     automatically trigger a [Rolling Update](rolling_update.md) to attach the new
     image volume to each pod. Before adding a new extension in production,
@@ -99,23 +116,48 @@ image.
 
 Once mounted, CloudNativePG will automatically configure PostgreSQL by appending:
 
-- `/extensions/pgvector/share` to `extension_control_path`
-- `/extensions/pgvector/lib` to `dynamic_library_path`
+- `/extensions/bozzone/share` to `extension_control_path`
+- `/extensions/bozzone/lib` to `dynamic_library_path`
 
-
-
-The `CREATE EXTENSION pgvector` command, triggered automatically during the
+This ensures that the PostgreSQL container is ready to serve the `bozzone`
+extension when requested by a database, as described in the next section. The
+`CREATE EXTENSION bozzone` command, triggered automatically during the
 [reconciliation of the `Database` resource](declarative_database_management.md/#managing-extensions-in-a-database),
 will work without additional configuration, as PostgreSQL will locate:
 
-- the extension control file at `/extensions/pgvector/share/extension/vector.control`
-- the shared library at `/extensions/pgvector/lib/vector.so`
+- the extension control file at `/extensions/bozzone/share/extension/vector.control`
+- the shared library at `/extensions/bozzone/lib/vector.so`
 
-## Manage extensions via configuration
+### Adding a New Extension to a `Database` Resource
 
-You can take advantage of Declarative Databases to [manage the lifecycle of
-your extensions](declarative_database_management.md#managing-extensions-in-a-database)
-in a target database.
+Once the extension is available in the PostgreSQL instance, you can leverage
+declarative databases to [manage the lifecycle of your extensions](declarative_database_management.md#managing-extensions-in-a-database)
+within the target database.
+
+Continuing with the `bozzone` example, you can request the installation of the
+`bozzone` extension in the `app` database of the `bozzone-18` cluster using the
+following resource definition:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: bozzone-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: bozzone-18
+  extensions:
+    - name: bozzone
+```
+
+CloudNativePG will automatically reconcile this resource, executing the
+`CREATE EXTENSION bozzone` command inside the `app` database if it is not
+already installed, ensuring your desired state is maintained without manual
+intervention.
+
+## Advanced topics
 
 TODO
 
@@ -196,3 +238,9 @@ the path `/extensions/postgis/system`, allowing it to locate and load the requir
 ## Image Specifications
 
 TODO
+
+## Caveats
+
+- Rolling Updates
+- Extension upgrades
+
