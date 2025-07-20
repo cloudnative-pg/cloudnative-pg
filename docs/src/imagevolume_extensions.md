@@ -3,12 +3,14 @@
 
 CloudNativePG supports the **dynamic loading of PostgreSQL extensions** into a
 running `Cluster` using the [Kubernetes `ImageVolume` feature](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
-and the `extension_control_path` GUC introduced in PostgreSQL 18, with
-contributions from this project.
+and the `extension_control_path` GUC introduced in PostgreSQL 18, to which this
+project contributed.
 
 This feature allows you to mount a [PostgreSQL extension](https://www.postgresql.org/docs/current/extend-extensions.html),
 packaged as an OCI-compliant container image, as a read-only and immutable
-volume inside a running pod at a known filesystem path.
+volume inside a running pod at a known filesystem path. You can then make the
+extension available to PostgreSQL for the `CREATE EXTENSION` command using the
+[`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database).
 
 ## Benefits
 
@@ -27,11 +29,7 @@ As a result, you can:
 - Reduce your operational surface by using immutable, minimal, and secure base
   images while adding only the extensions required for each workload.
 
-Extension images must be built according to these
-[specifications](#image-specifications).
-Once the images are available in the `Cluster`, you can manage the extensions
-within your databases using the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database)
-feature.
+Extension images must be built according to these [specifications](#image-specifications).
 
 ## Requirements
 
