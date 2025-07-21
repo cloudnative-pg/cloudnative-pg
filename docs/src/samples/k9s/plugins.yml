@@ -68,7 +68,7 @@ plugins:
     background: false
     args:
       - -c
-      - "kubectl cnpg logs cluster $NAME -f -n $NAMESPACE --context $CONTEXT"
+      - "kubectl cnpg logs cluster $NAME -f -n $NAMESPACE --context $CONTEXT | kubectl cnpg logs pretty"
   cnpg-psql:
     shortCut: p
     description: PSQL shell
