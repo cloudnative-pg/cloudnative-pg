@@ -330,6 +330,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
 				utils.JobRoleLabelName:      string(role),
+				utils.ManagedByLabelName:    utils.ManagerName,
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -339,6 +340,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 						utils.InstanceNameLabelName: instanceName,
 						utils.ClusterLabelName:      cluster.Name,
 						utils.JobRoleLabelName:      string(role),
+						utils.ManagedByLabelName:    utils.ManagerName,
 					},
 				},
 				Spec: corev1.PodSpec{
