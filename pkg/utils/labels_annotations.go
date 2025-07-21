@@ -38,6 +38,9 @@ const AlphaMetadataNamespace = "alpha.cnpg.io"
 // MetadataNamespace is the annotation and label namespace used by the operator
 const MetadataNamespace = "cnpg.io"
 
+// ManagerName is the name of the manager for cnpg controlled objects
+const ManagerName = "cloudnative-pg"
+
 // When you add a new label or annotation, please make sure that you also update the
 // publicly visible documentation, namely the `docs/src/labels_annotations.md` file
 const (
@@ -117,6 +120,9 @@ const (
 
 	// LivenessPingerAnnotationName is the name of the pinger configuration
 	LivenessPingerAnnotationName = AlphaMetadataNamespace + "/livenessPinger"
+
+	// ManagedByLabelName is the name of the label applied to all managed objects
+	ManagedByLabelName = "app.kubernetes.io/managed-by"
 )
 
 const (

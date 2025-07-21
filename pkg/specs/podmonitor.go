@@ -45,6 +45,9 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	meta := metav1.ObjectMeta{
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
+		Labels: map[string]string{
+			utils.ManagedByLabelName: utils.ManagerName,
+		},
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
