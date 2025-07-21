@@ -105,7 +105,7 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	defer cancel()
 
 	for _, routine := range ws.routines {
-		routine(subCtx)
+		go routine(subCtx)
 	}
 
 	select {
