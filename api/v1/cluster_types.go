@@ -905,24 +905,24 @@ type ClusterStatus struct {
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 
 	// The first recoverability point, stored as a date in RFC3339 format.
-	// This field is calculated from the content of FirstRecoverabilityPointByMethod
+	// This field is calculated from the content of FirstRecoverabilityPointByMethod (DEPRECATED).
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
-	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
+	// The first recoverability point, stored as a date in RFC3339 format, per backup method type (DEPRECATED).
 	// +optional
 	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
-	// Last successful backup, stored as a date in RFC3339 format
-	// This field is calculated from the content of LastSuccessfulBackupByMethod
+	// Last successful backup, stored as a date in RFC3339 format.
+	// This field is calculated from the content of LastSuccessfulBackupByMethod (DEPRECATED).
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
-	// Last successful backup, stored as a date in RFC3339 format, per backup method type
+	// Last successful backup, stored as a date in RFC3339 format, per backup method type (DEPRECATED).
 	// +optional
 	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
-	// Stored as a date in RFC3339 format
+	// Last failed backup, stored as a date in RFC3339 format (DEPRECATED).
 	// +optional
 	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
 
