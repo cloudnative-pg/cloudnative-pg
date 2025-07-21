@@ -524,6 +524,7 @@ func buildInstance(
 				utils.ClusterLabelName:      cluster.Name,
 				utils.InstanceNameLabelName: podName,
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+				utils.ManagedByLabelName:    utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
