@@ -27,6 +27,8 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
+FLUENTD_TIMEOUT=${FLUENTD_TIMEOUT:-600}
+CSI_TIMEOUT=${CSI_TIMEOUT:-600}
 KIND_NODE_DEFAULT_VERSION=v1.33.1
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
 EXTERNAL_SNAPSHOTTER_VERSION=v8.3.0
@@ -264,7 +266,7 @@ deploy_fluentd() {
   ITER=0
   NODE=$(kubectl get nodes --no-headers | wc -l | tr -d " ")
   while true; do
-    if [[ $ITER -ge 300 ]]; then
+    if [[ $ITER -ge $FLUENTD_TIMEOUT ]]; then
       echo "Time out waiting for FluentD readiness"
       exit 1
     fi
@@ -324,7 +326,7 @@ deploy_csi_host_path() {
   echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
   while true; do
-    if [[ $ITER -ge 300 ]]; then
+    if [[ $ITER -ge $CSI_TIMEOUT ]]; then
       echo "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
       exit 1
     fi
@@ -414,7 +416,7 @@ deploy_operator() {
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-r] <command>
+Usage: $0 [-k <version>] [-f <fluentd-timeout>] [-c <csi-timeout>] [-r] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -437,6 +439,12 @@ Options:
         <NODES>           Create a cluster with the required number of nodes.
                           Used only during "create" command. Default: 3
                           Env: NODES
+
+    -f|--fluentd-timeout
+        <seconds>         Timeout for FluentD readiness (default: 600)
+
+    -c|--csi-timeout
+        <seconds>         Timeout for CSI plugin readiness (default: 600)
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -562,10 +570,10 @@ pyroscope() {
 main() {
   if ! getopt -T > /dev/null; then
     # GNU enhanced getopt is available
-    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:f:c:r -l "engine:,k8s-version:,nodes:,registry,fluentd-timeout:,csi-timeout:" -- "$@") || usage
   else
     # Original getopt is available
-    parsed_opts=$(getopt e:k:n:r "$@") || usage
+    parsed_opts=$(getopt e:k:n:f:c:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
   for o; do
@@ -598,6 +606,26 @@ main() {
       shift
       # no-op, kept for compatibility
       ;;
+    -f | --fluentd-timeout)
+        shift
+        FLUENTD_TIMEOUT="$1"
+        shift
+        if ! [[ $FLUENTD_TIMEOUT =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: FluentD timeout must be a positive integer!" >&2
+        echo >&2
+        usage
+        fi
+        ;;
+    -c | --csi-timeout)
+        shift
+        CSI_TIMEOUT="$1"
+        shift
+        if ! [[ $CSI_TIMEOUT =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: CSI timeout must be a positive integer!" >&2
+        echo >&2
+        usage
+        fi
+        ;;
     --)
       shift
       break
