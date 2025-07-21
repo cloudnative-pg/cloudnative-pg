@@ -156,7 +156,7 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		filenameLog.Info("Terminating log reading process")
-		err := f.SetDeadline(time.Now())
+		err := f.SetDeadline(time.Now().Add(1 * time.Second))
 		if err != nil {
 			filenameLog.Error(err,
 				"Error while setting the deadline for log reading. The instance manager may not refresh "+
