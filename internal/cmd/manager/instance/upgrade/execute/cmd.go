@@ -390,7 +390,9 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
 	}
 
-	// Set `max_slot_wal_keep_size` to the default value because any other value it is not supported in pg_upgrade
+	// Set `max_slot_wal_keep_size` to the default value because any other value causes an error
+	// during pg_upgrade in PostgreSQL 17 before 17.6. The bug has been fixed with the commit
+	// https://github.com/postgres/postgres/commit/f36e5774
 	tmpCluster := cluster.DeepCopy()
 	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
 
