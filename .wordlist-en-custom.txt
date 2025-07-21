@@ -775,6 +775,7 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+discoverable
 displayName
 displayName
 distro

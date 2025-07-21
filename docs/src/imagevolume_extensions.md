@@ -9,13 +9,13 @@ project contributed.
 This feature allows you to mount a [PostgreSQL extension](https://www.postgresql.org/docs/current/extend-extensions.html),
 packaged as an OCI-compliant container image, as a read-only and immutable
 volume inside a running pod at a known filesystem path. You can then make the
-extension available to PostgreSQL for the `CREATE EXTENSION` command using the
-[`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database).
+extension available to a PostgreSQL database for the `CREATE EXTENSION` command
+using the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database).
 
 ## Benefits
 
-ImageVolume extensions **decouple the distribution of PostgreSQL operand
-container images from the distribution of extensions**. This eliminates the
+Image volume extensions decouple the distribution of PostgreSQL operand
+container images from the distribution of extensions. This eliminates the
 need to define and embed extensions at build time within your PostgreSQL
 images—a major adoption blocker for PostgreSQL as a containerized workload,
 including from a security and supply chain perspective.
@@ -45,6 +45,14 @@ To use image volume extensions with CloudNativePG, you need:
 
 ## How it works
 
+Extension images are defined in the `.spec.postgresql.extensions` stanza of a
+`Cluster` resource, which accepts an ordered list of extensions to be added to
+the PostgreSQL cluster.
+
+!!! Info
+    For field-level details, see the
+    [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExtensionConfiguration).
+
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 
 By default, CloudNativePG automatically manages the relevant GUCs, setting:
@@ -53,8 +61,10 @@ By default, CloudNativePG automatically manages the relevant GUCs, setting:
   PostgreSQL to locate any extension control file within `/extensions/<EXTENSION_NAME>/share/extension`
 - `dynamic_library_path` to `/extensions/<EXTENSION_NAME>/lib`
 
-This allows PostgreSQL to discover and load the extension without requiring
-manual configuration inside the pod.
+These values are appended in the order in which the extensions are defined in
+the `extensions` list, ensuring deterministic path resolution within
+PostgreSQL. This allows PostgreSQL to discover and load the extension without
+requiring manual configuration inside the pod.
 
 !!! Info
     Depending on how your extension container images are built and their layout,
@@ -75,7 +85,7 @@ Adding an extension to a database in CloudNativePG involves two steps:
 2. Declare the extension in the `Database` resource where you want it
    installed.
 
-For illustration, we will use a fictitious extension named `bozzone`.
+For illustration, we will use a simple, fictitious extension named `foo`.
 
 ### Adding a new extension to a `Cluster` resource
 
@@ -86,20 +96,19 @@ You can add an `ImageVolume`-based extension to a `Cluster` using the
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: bozzone-18
+  name: foo-18
 spec:
   # ...
   postgresql:
     extensions:
-      - name: bozzone
+      - name: foo
         image:
-          reference: <registry-path-for-bozzone>
-          pullPolicy: IfNotPresent
+          reference: # registry path for your extension image
   # ...
 ```
 
 The `name` field is **mandatory** and **must be unique within the cluster**, as
-it determines the mount path (`/extensions/bozzone` in this example). It must
+it determines the mount path (`/extensions/foo` in this example). It must
 consist of *lowercase alphanumeric characters or hyphens (`-`)* and must start
 and end with an alphanumeric character.
 
@@ -117,17 +126,17 @@ image.
 
 Once mounted, CloudNativePG will automatically configure PostgreSQL by appending:
 
-- `/extensions/bozzone/share` to `extension_control_path`
-- `/extensions/bozzone/lib` to `dynamic_library_path`
+- `/extensions/foo/share` to `extension_control_path`
+- `/extensions/foo/lib` to `dynamic_library_path`
 
-This ensures that the PostgreSQL container is ready to serve the `bozzone`
+This ensures that the PostgreSQL container is ready to serve the `foo`
 extension when requested by a database, as described in the next section. The
-`CREATE EXTENSION bozzone` command, triggered automatically during the
+`CREATE EXTENSION foo` command, triggered automatically during the
 [reconciliation of the `Database` resource](declarative_database_management.md/#managing-extensions-in-a-database),
 will work without additional configuration, as PostgreSQL will locate:
 
-- the extension control file at `/extensions/bozzone/share/extension/vector.control`
-- the shared library at `/extensions/bozzone/lib/vector.so`
+- the extension control file at `/extensions/foo/share/extension/foo.control`
+- the shared library at `/extensions/foo/lib/foo.so`
 
 ### Adding a new extension to a `Database` resource
 
@@ -135,39 +144,64 @@ Once the extension is available in the PostgreSQL instance, you can leverage
 declarative databases to [manage the lifecycle of your extensions](declarative_database_management.md#managing-extensions-in-a-database)
 within the target database.
 
-Continuing with the `bozzone` example, you can request the installation of the
-`bozzone` extension in the `app` database of the `bozzone-18` cluster using the
+Continuing with the `foo` example, you can request the installation of the
+`foo` extension in the `app` database of the `foo-18` cluster using the
 following resource definition:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: bozzone-app
+  name: foo-app
 spec:
   name: app
   owner: app
   cluster:
-    name: bozzone-18
+    name: foo-18
   extensions:
-    - name: bozzone
+    - name: foo
+      version: 1.0
 ```
 
 CloudNativePG will automatically reconcile this resource, executing the
-`CREATE EXTENSION bozzone` command inside the `app` database if it is not
+`CREATE EXTENSION foo` command inside the `app` database if it is not
 already installed, ensuring your desired state is maintained without manual
 intervention.
 
-## Advanced topics
+## Advanced Topics
 
-TODO
+In some cases, the default expected structure may be insufficient for your
+extension image, particularly when:
 
-### Setting custom paths
+- The extension requires additional system libraries.
+- Multiple extensions are bundled in the same image.
+- The image uses a custom directory structure.
 
-If your extension container image doesn't adhere to the default `lib` and `share`
-directories to host the extension's libraries and control files, you can override the
-default behavior and set your own custom paths via the `extension_control_path` and
-`dynamic_library_path` fields. For example:
+Following the *"convention over configuration"* paradigm, CloudNativePG allows
+you to finely control the configuration of each extension image through the
+following fields:
+
+- `extension_control_path`: A list of relative paths within the container image
+  to be appended to PostgreSQL’s `extension_control_path`, allowing it to
+  locate extension control files.
+- `dynamic_library_path`: A list of relative paths within the container image
+  to be appended to PostgreSQL’s `dynamic_library_path`, enabling it to locate
+  shared library files for extensions.
+- `ld_library_path`: A list of relative paths within the container image to be
+  appended to the `LD_LIBRARY_PATH` environment variable of the instance
+  manager process, allowing PostgreSQL to locate required system libraries at
+  runtime.
+
+This flexibility enables you to support complex or non-standard extension
+images while maintaining clarity and predictability.
+
+### Setting Custom Paths
+
+If your extension image does not use the default `lib` and `share` directories
+for its libraries and control files, you can override the defaults by
+explicitly setting `extension_control_path` and `dynamic_library_path`.
+
+For example:
 
 ```yaml
 spec:
@@ -179,22 +213,29 @@ spec:
         dynamic_library_path:
           - my/lib/path
         image:
-          # ...
+          reference: # registry path for your extension image
 ```
 
-This way, the following paths will be configured in PostgreSQL:
-- `/extensions/my-extension/my/share/path` for `extension_control_path`
-- `/extension/my-extension/my/lib/path` for `dynamic_library_path`
+CloudNativePG will configure PostgreSQL with:
 
-### Multi-extension image
+- `/extensions/my-extension/my/share/path` appended to `extension_control_path`
+- `/extensions/my-extension/my/lib/path` appended to `dynamic_library_path`
 
-You may have the necessity to include multiple extensions inside the same container image,
-for example by adopting a structure where the files of each extension reside in its subdirectory.
-The following example demonstrates how to add a GeoSpatial container image that contains both
-PostGIS and pgRouting:
+This allows PostgreSQL to discover your extension’s control files and shared
+libraries correctly, even with a non-standard layout.
+
+### Multi-extension Images
+
+You may need to include multiple extensions within the same container image,
+adopting a structure where each extension’s files reside in their own
+subdirectory.
+
+For example, to package PostGIS and pgRouting together in a single image:
 
 ```yaml
+# ...
 spec:
+  # ...
   postgresql:
     extensions:
       - name: geospatial
@@ -204,43 +245,88 @@ spec:
         dynamic_library_path:
           - postgis/lib
           - pgrouting/lib
+        # ...
         image:
-          # ...
+          reference: # registry path for your geospatial image
+      # ...
+    # ...
+  # ...
 ```
 
-### System libraries
+### Including System Libraries
 
-Some extensions, like PostGIS, require system libraries that may not be included in the default PostgreSQL image.
-To support this, these libraries can be packaged within the extension’s container image and made available to
-PostgreSQL via the `ld_library_path` field.
+Some extensions, such as PostGIS, require system libraries that may not be
+present in the base PostgreSQL image. To support these requirements, you can
+package the necessary libraries within your extension container image and make
+them available to PostgreSQL using the `ld_library_path` field.
 
-In the example below, the `system` directory contains all necessary system libraries for running PostGIS:
+For example, if your extension image includes a `system` directory with the
+required libraries:
 
 ```yaml
+# ...
 spec:
+  # ...
   postgresql:
     extensions:
       - name: postgis
+        # ...
         ld_library_path:
           - system
         image:
-          # ...
+          reference: # registry path for your PostGIS image
+      # ...
+    # ...
+  # ...
 ```
 
-This sets the `LD_LIBRARY_PATH` environment variable for the PostgreSQL process, which will contain
-the path `/extensions/postgis/system`, allowing it to locate and load the required libraries.
+CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
+`/extensions/postgis/system`, allowing PostgreSQL to locate and load these
+system libraries at runtime.
 
 !!! Important
-    Given that `ld_library_path` needs to be set at the start of the PostgreSQL process,
-    changing this value requires a restart of the Cluster for the new value(s) to be picked up.
-    Currently, this is not being done automatically and users have to issue a
-    `cnpg restart` after changing this value on a running Cluster.
+    Since `ld_library_path` must be set when the PostgreSQL process starts,
+    changing this value requires a **cluster restart** for the new value to take effect.
+    CloudNativePG does not currently trigger this restart automatically; you will need to
+    manually restart the cluster (e.g., using `cnpg restart`) after modifying `ld_library_path`.
 
 ## Image Specifications
 
-TODO
+A standard extension container image for CloudNativePG includes two
+required directories at its root:
+
+- `share`: contains the extension control file (e.g., `<EXTENSION>.control`).
+- `lib`: contains the extension's shared library (e.g., `<EXTENSION>.so`) and
+  any additional required libraries.
+
+Following this structure ensures that the extension will be automatically
+discoverable and usable by PostgreSQL within CloudNativePG without requiring
+manual configuration.
+
+!!! Important
+    We encourage PostgreSQL extension developers to publish OCI-compliant extension
+    images following this layout as part of their artifact distribution, making
+    their extensions easily consumable within Kubernetes environments.
+    Ideally, extension images should target a specific operating system
+    distribution and architecture, be tied to a particular PostgreSQL version, and
+    be built using the distribution’s native packaging system (for example, using
+    Debian or RPM packages). This approach ensures consistency, security, and
+    compatibility with the PostgreSQL images used in your clusters.
 
 ## Caveats
 
-- Rolling Updates
-- Extension upgrades
+Currently, adding, removing, or updating an extension image triggers a
+restart of the PostgreSQL pods. This behavior is inherited from how
+[image volumes](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
+work in Kubernetes.
+
+Before performing an extension update, ensure you have:
+
+- Thoroughly tested the update process in a staging environment.
+- Verified that the extension image contains the required upgrade path between
+  the currently installed version and the target version.
+- Updated the `version` field for the extension in the relevant `Database`
+  resource definition to align with the new version in the image.
+
+These steps help prevent downtime or data inconsistencies in your PostgreSQL
+clusters during extension updates.
