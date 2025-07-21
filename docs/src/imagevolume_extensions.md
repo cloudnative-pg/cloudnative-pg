@@ -17,8 +17,8 @@ extension available to PostgreSQL for the `CREATE EXTENSION` command using the
 ImageVolume extensions **decouple the distribution of PostgreSQL operand
 container images from the distribution of extensions**. This eliminates the
 need to define and embed extensions at build time within your PostgreSQL
-images—a major adoption blocker for CloudNativePG, including from a security
-and supply chain perspective.
+images—a major adoption blocker for PostgreSQL as a containerized workload,
+including from a security and supply chain perspective.
 
 As a result, you can:
 
@@ -29,7 +29,8 @@ As a result, you can:
 - Reduce your operational surface by using immutable, minimal, and secure base
   images while adding only the extensions required for each workload.
 
-Extension images must be built according to these [specifications](#image-specifications).
+Extension images must be built according to the
+[documented specifications](#image-specifications).
 
 ## Requirements
 
@@ -42,7 +43,7 @@ To use image volume extensions with CloudNativePG, you need:
     - Compatible operating system distribution of the `Cluster` resource.
     - Matching CPU architecture of the `Cluster` resource.
 
-## How It Works
+## How it works
 
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 
@@ -65,7 +66,7 @@ manual configuration inside the pod.
     your cluster in PostgreSQL major version, Operating system distribution, and
     CPU architecture to ensure compatibility and prevent runtime issues.
 
-## How to Add a New Extension
+## How to add a new extension
 
 Adding an extension to a database in CloudNativePG involves two steps:
 
@@ -76,7 +77,7 @@ Adding an extension to a database in CloudNativePG involves two steps:
 
 For illustration, we will use a fictitious extension named `bozzone`.
 
-### Adding a New Extension to a `Cluster` Resource
+### Adding a new extension to a `Cluster` resource
 
 You can add an `ImageVolume`-based extension to a `Cluster` using the
 `.spec.postgresql.extensions` stanza. For example:
@@ -108,7 +109,7 @@ image.
 
 !!! Important
     When a new extension is added to a running `Cluster`, CloudNativePG will
-    automatically trigger a [Rolling Update](rolling_update.md) to attach the new
+    automatically trigger a [rolling update](rolling_update.md) to attach the new
     image volume to each pod. Before adding a new extension in production,
     ensure you have thoroughly tested it in a staging environment to prevent
     configuration issues that could leave your PostgreSQL cluster in an unhealthy
@@ -128,7 +129,7 @@ will work without additional configuration, as PostgreSQL will locate:
 - the extension control file at `/extensions/bozzone/share/extension/vector.control`
 - the shared library at `/extensions/bozzone/lib/vector.so`
 
-### Adding a New Extension to a `Database` Resource
+### Adding a new extension to a `Database` resource
 
 Once the extension is available in the PostgreSQL instance, you can leverage
 declarative databases to [manage the lifecycle of your extensions](declarative_database_management.md#managing-extensions-in-a-database)
@@ -207,7 +208,7 @@ spec:
           # ...
 ```
 
-### System Libraries
+### System libraries
 
 Some extensions, like PostGIS, require system libraries that may not be included in the default PostgreSQL image.
 To support this, these libraries can be packaged within the extension’s container image and made available to
@@ -226,7 +227,7 @@ spec:
           # ...
 ```
 
-This sets the LD_LIBRARY_PATH environment variable for the PostgreSQL process, which will contain
+This sets the `LD_LIBRARY_PATH` environment variable for the PostgreSQL process, which will contain
 the path `/extensions/postgis/system`, allowing it to locate and load the required libraries.
 
 !!! Important
@@ -243,4 +244,3 @@ TODO
 
 - Rolling Updates
 - Extension upgrades
-
