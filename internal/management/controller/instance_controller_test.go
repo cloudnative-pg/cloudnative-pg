@@ -69,8 +69,8 @@ var _ = Describe("buildPostmasterEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
 		It("should be empty by default", func() {
-			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo("LD_LIBRARY_PATH="))
+			ldLibraryPath := getLibraryPathFromEnv(buildPostgresEnv(&cluster))
+			Expect(ldLibraryPath).To(BeEmpty())
 		})
 	})
 
@@ -89,15 +89,14 @@ var _ = Describe("buildPostmasterEnv", func() {
 		})
 
 		It("should be defined", func() {
-			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:%s", finalPaths)))
+			ldLibraryPath := getLibraryPathFromEnv(buildPostgresEnv(&cluster))
+			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
-			err := os.Setenv("LD_LIBRARY_PATH", ":/my/library/path")
-			Expect(err).ToNot(HaveOccurred())
+			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
 
-			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=:/my/library/path:%s", finalPaths)))
+			ldLibraryPath := getLibraryPathFromEnv(buildPostgresEnv(&cluster))
+			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
 		})
 	})
 
@@ -106,17 +105,18 @@ var _ = Describe("buildPostmasterEnv", func() {
 			cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
-			ldLibraryPath := getLibraryPathFromEnv(buildPostmasterEnv(&cluster))
-			Expect(ldLibraryPath).To(BeEquivalentTo("LD_LIBRARY_PATH="))
+			ldLibraryPath := getLibraryPathFromEnv(buildPostgresEnv(&cluster))
+			Expect(ldLibraryPath).To(BeEmpty())
 		})
 	})
 })
 
 func getLibraryPathFromEnv(envs []string) string {
 	var ldLibraryPath string
-	for _, e := range envs {
-		if strings.HasPrefix(e, "LD_LIBRARY_PATH=") {
-			ldLibraryPath = e
+
+	for i := len(envs) - 1; i >= 0; i-- {
+		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
+			ldLibraryPath = envs[i]
 			break
 		}
 	}

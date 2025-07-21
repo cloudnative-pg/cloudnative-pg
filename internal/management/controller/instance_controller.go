@@ -944,40 +944,46 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
-	r.instance.Env = buildPostmasterEnv(cluster)
+	r.instance.Env = buildPostgresEnv(cluster)
 }
 
-func buildPostmasterEnv(cluster *apiv1.Cluster) []string {
-	env := make([]string, 0, len(os.Environ()))
-	for _, envVar := range os.Environ() {
-		if strings.HasPrefix(envVar, "LD_LIBRARY_PATH") {
-			continue
-		}
-		env = append(env, envVar)
+// buildPostgresEnv builds the environment variables that should be used by PostgreSQL
+// to run the main process, taking care of adding any library path that is needed for
+// extensions.
+func buildPostgresEnv(cluster *apiv1.Cluster) []string {
+	// If there are no additional library paths, we use the environment variables
+	// of the current process
+	additionalLibraryPaths := collectLibraryPaths(cluster.Spec.PostgresConfiguration.Extensions)
+	if len(additionalLibraryPaths) == 0 {
+		return os.Environ()
 	}
 
-	ldLibraryPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		ldLibraryPaths = append(ldLibraryPaths, GetLdLibraryPaths(&extension)...)
+	// We add the additional library paths after the entries that are already
+	// available.
+	currentLibraryPath := os.Getenv("LD_LIBRARY_PATH")
+	if currentLibraryPath != "" {
+		currentLibraryPath += ":"
 	}
-	env = append(env, "LD_LIBRARY_PATH="+strings.Join(ldLibraryPaths, ":"))
+	currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
 
-	return env
+	return append(os.Environ(), "LD_LIBRARY_PATH="+currentLibraryPath)
 }
 
-// GetLdLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
+// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
 // given an extension
-func GetLdLibraryPaths(extension *apiv1.ExtensionConfiguration) []string {
-	if extension.LdLibraryPath == nil {
-		return []string{}
+func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+	result := make([]string, 0, len(extensionList))
+
+	for _, extension := range extensionList {
+		for _, libraryPath := range extension.LdLibraryPath {
+			result = append(
+				result,
+				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
+			)
+		}
 	}
 
-	libraryPaths := make([]string, 0, len(extension.LdLibraryPath))
-	for _, libraryPath := range extension.LdLibraryPath {
-		libraryPaths = append(libraryPaths, filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath))
-	}
-
-	return libraryPaths
+	return result
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
