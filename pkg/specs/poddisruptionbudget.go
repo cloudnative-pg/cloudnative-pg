@@ -43,6 +43,9 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -72,6 +75,9 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
