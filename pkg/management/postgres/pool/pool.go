@@ -107,7 +107,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 	pool.connectionMap = make(map[string]*sql.DB)
 }
 
-// newConnection creates a database connection connectionMap, connecting via
+// newConnection creates a database connection, connecting via
 // Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	dsn := pool.GetDsn(dbname)
