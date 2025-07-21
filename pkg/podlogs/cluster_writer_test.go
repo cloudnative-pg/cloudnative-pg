@@ -165,6 +165,8 @@ var _ = Describe("Cluster logging tests", func() {
 		followWaiting := 150 * time.Millisecond
 		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
+			// we always invoke done no matter what happens
+			defer wg.Done()
 			defer GinkgoRecover()
 			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
@@ -175,8 +177,9 @@ var _ = Describe("Cluster logging tests", func() {
 				Client:        client,
 			}
 			err := streamClusterLogs.SingleStream(ctx2, &logBuffer)
-			Expect(err).To(Equal(context.DeadlineExceeded))
-			wg.Done()
+			// we cannot reliably now if we will close the function before the context
+			// deadline, so we accept both nil and context.DeadlineExceeded
+			Expect(err).To(Or(BeNil(), Equal(context.DeadlineExceeded)))
 		}()
 
 		time.Sleep(350 * time.Millisecond)
