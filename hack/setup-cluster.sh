@@ -179,7 +179,7 @@ EOF
     cat >>"${config_file}" <<-EOF
 
 featureGates:
-  ImageVolume : true
+  ImageVolume: true
 EOF
   fi
 
