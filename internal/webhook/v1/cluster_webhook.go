@@ -220,6 +220,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
+		v.validateExtensions,
 	}
 
 	for _, validate := range validations {
@@ -2629,4 +2630,25 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 	}
 
 	return nil
+}
+
+func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	extensionNames := stringset.New()
+	for i, v := range r.Spec.PostgresConfiguration.Extensions {
+		if extensionNames.Has(v.Name) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "postgresql", "extensions").Index(i).Child("name"),
+					v.Name,
+				),
+			)
+		}
+
+		extensionNames.Put(v.Name)
+	}
+
+	return result
 }
