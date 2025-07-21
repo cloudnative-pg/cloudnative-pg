@@ -149,9 +149,7 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	if cluster.ContainsExtensions() {
-		result = append(result, createExtensionVolumes(cluster)...)
-	}
+	result = append(result, createExtensionVolumes(cluster)...)
 
 	return result
 }
@@ -282,9 +280,7 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		}
 	}
 
-	if cluster.ContainsExtensions() {
-		volumeMounts = append(volumeMounts, createExtensionVolumeMounts(&cluster)...)
-	}
+	volumeMounts = append(volumeMounts, createExtensionVolumeMounts(&cluster)...)
 
 	return volumeMounts
 }
