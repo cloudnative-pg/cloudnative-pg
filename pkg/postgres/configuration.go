@@ -23,8 +23,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"iter"
 	"math"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -348,8 +350,8 @@ type ConfigurationInfo struct {
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
 
-	// The list of extensions to be loaded
-	ImageVolumeExtensions []ImageVolumeExtensionConfiguration
+	// The list of additional extensions to be loaded into the PostgreSQL configuration
+	AdditionalExtensions []AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -752,7 +754,8 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
-	if len(info.ImageVolumeExtensions) > 0 {
+	// Setup additional extensions
+	if len(info.AdditionalExtensions) > 0 {
 		setExtensionControlPath(info, configuration)
 		setDynamicLibraryPath(info, configuration)
 	}
@@ -840,14 +843,50 @@ func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
 }
 
-// ImageVolumeExtensionConfiguration is the configuration for an Extension added via ImageVolume
-type ImageVolumeExtensionConfiguration struct {
+// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
+type AdditionalExtensionConfiguration struct {
 	// The name of the Extension
 	Name string
+
 	// The list of directories that should be added to ExtensionControlPath.
 	ExtensionControlPath []string
+
 	// The list of directories that should be added to DynamicLibraryPath.
 	DynamicLibraryPath []string
+}
+
+// absolutizePaths returns an iterator over the passed paths, absolutized
+// using the name of the extension
+func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, path := range paths {
+			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
+				break
+			}
+		}
+	}
+}
+
+// getRuntimeExtensionControlPath collects the absolute directories to be put
+// into the `extension_control_path` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
+	paths := []string{"share"}
+	if len(ext.ExtensionControlPath) > 0 {
+		paths = ext.ExtensionControlPath
+	}
+
+	return ext.absolutizePaths(paths)
+}
+
+// getRuntimeExtensionControlPath collects the absolute directories to be put
+// into the `"dynamic_library_path"` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
+	paths := []string{"lib"}
+	if len(ext.DynamicLibraryPath) > 0 {
+		paths = ext.DynamicLibraryPath
+	}
+
+	return ext.absolutizePaths(paths)
 }
 
 // setExtensionControlPath manages the `extension_control_path` GUC, merging
@@ -855,24 +894,23 @@ type ImageVolumeExtensionConfiguration struct {
 // `.spec.postgresql.extensions` stanza
 func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	extensionControlPath := []string{"$system"}
-	for _, extension := range info.ImageVolumeExtensions {
-		// If we have custom ExtensionControlPaths we set those, otherwise we default to "/share"
-		if len(extension.ExtensionControlPath) > 0 {
-			for _, path := range extension.ExtensionControlPath {
-				extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
-			}
-		} else {
-			extensionControlPath = append(extensionControlPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "share"))
-		}
+
+	for _, extension := range info.AdditionalExtensions {
+		extensionControlPath = slices.AppendSeq(
+			extensionControlPath,
+			extension.getRuntimeExtensionControlPath(),
+		)
 	}
 
-	userDefinedPath := strings.Split(configuration.GetConfig(ExtensionControlPath), ":")
-	for _, path := range userDefinedPath {
-		if path == "" {
-			continue
-		}
-		extensionControlPath = append(extensionControlPath, path)
-	}
+	extensionControlPath = slices.AppendSeq(
+		extensionControlPath,
+		strings.SplitSeq(configuration.GetConfig(ExtensionControlPath), ":"),
+	)
+
+	extensionControlPath = slices.DeleteFunc(
+		extensionControlPath,
+		func(s string) bool { return s == "" },
+	)
 
 	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
 }
@@ -882,24 +920,21 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 // `.spec.postgresql.extensions` stanza
 func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	dynamicLibraryPath := []string{"$libdir"}
-	for _, extension := range info.ImageVolumeExtensions {
-		// If we have custom DynamicLibraryPaths we set those, otherwise we default to "/lib"
-		if len(extension.DynamicLibraryPath) > 0 {
-			for _, path := range extension.DynamicLibraryPath {
-				dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, path))
-			}
-		} else {
-			dynamicLibraryPath = append(dynamicLibraryPath, filepath.Join(ExtensionsBaseDirectory, extension.Name, "lib"))
-		}
+
+	for _, extension := range info.AdditionalExtensions {
+		dynamicLibraryPath = slices.AppendSeq(
+			dynamicLibraryPath,
+			extension.getDynamicLibraryPath())
 	}
 
-	userDefinedPath := strings.Split(configuration.GetConfig(DynamicLibraryPath), ":")
-	for _, path := range userDefinedPath {
-		if path == "" {
-			continue
-		}
-		dynamicLibraryPath = append(dynamicLibraryPath, path)
-	}
+	dynamicLibraryPath = slices.AppendSeq(
+		dynamicLibraryPath,
+		strings.SplitSeq(configuration.GetConfig(DynamicLibraryPath), ":"))
+
+	dynamicLibraryPath = slices.DeleteFunc(
+		dynamicLibraryPath,
+		func(s string) bool { return s == "" },
+	)
 
 	configuration.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }

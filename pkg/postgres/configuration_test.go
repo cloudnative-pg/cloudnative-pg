@@ -419,7 +419,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       18,
 				IncludingMandatory: true,
-				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
 						Name: "postgis",
 					},
@@ -442,7 +442,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 					ExtensionControlPath: "/my/extension/path",
 					DynamicLibraryPath:   "/my/library/path",
 				},
-				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
 						Name: "postgis",
 					},
@@ -474,7 +474,7 @@ var _ = Describe("PostgreSQL Extensions", func() {
 				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       18,
 				IncludingMandatory: true,
-				ImageVolumeExtensions: []ImageVolumeExtensionConfiguration{
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
 						Name:                 "geo",
 						ExtensionControlPath: []string{"postgis/share", "./pgrouting/share"},
