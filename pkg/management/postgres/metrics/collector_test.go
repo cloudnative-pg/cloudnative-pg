@@ -20,7 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package metrics
 
 import (
+	"database/sql"
+
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
+
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,45 +68,43 @@ var _ = Describe("Set default queries", Ordered, func() {
 	})
 })
 
-var _ = Describe("QueryCollector tests", func() {
+var _ = Describe("QueryRunner tests", func() {
 	Context("collect metric tests", func() {
 		It("should ensure that a metric without conversion is discarded", func() {
-			qc := QueryCollector{}
-			ch := make(chan prometheus.Metric, 10)
+			qc := QueryRunner{}
 			metricMap := MetricMap{
 				Name:       "MALFORMED_COUNTER",
 				Discard:    true,
 				Conversion: nil,
 				Label:      false,
 			}
-			qc.collectConstMetric(
+			m := qc.createConstMetric(
 				metricMap,
 				"COUNTER_TEST",
 				[]string{"COUNTER_TEST"},
-				ch,
 			)
-			Expect(ch).To(BeEmpty())
+			Expect(m).To(BeNil())
 		})
 
 		It("should ensure that a metric with a bad conversion value is discarded", func() {
-			qc := QueryCollector{}
-			ch := make(chan prometheus.Metric, 10)
+			qc := QueryRunner{}
 			cm := ColumnMapping{Usage: COUNTER}
 			cs := cm.ToMetricMap("TEST_COLUMN", "TEST_NAMESPACE", []string{"TEST_VARIABLE"})
 			for _, metricMap := range cs {
 				// int are not converted
-				qc.collectConstMetric(metricMap, 12, []string{"TEST"}, ch)
+				m := qc.createConstMetric(metricMap, 12, []string{"TEST"})
+				Expect(m).To(BeNil())
 			}
-			Expect(ch).To(BeEmpty())
 		})
 
 		It("should ensure that a correctly formed counter is sent", func() {
-			qc := QueryCollector{}
+			qc := QueryRunner{}
 			ch := make(chan prometheus.Metric, 10)
 			cm := ColumnMapping{Usage: COUNTER}
 			cs := cm.ToMetricMap("TEST_COLUMN", "TEST_NAMESPACE", []string{"TEST_VARIABLE"})
 			for _, metricMap := range cs {
-				qc.collectConstMetric(metricMap, int64(12), []string{"TEST"}, ch)
+				m := qc.createConstMetric(metricMap, int64(12), []string{"TEST"})
+				ch <- m
 			}
 			Expect(ch).To(HaveLen(1))
 			res := <-ch
@@ -108,45 +112,127 @@ var _ = Describe("QueryCollector tests", func() {
 			Expect(desc).To(ContainSubstring("TEST_NAMESPACE_TEST_COLUMN"))
 			Expect(desc).To(ContainSubstring("TEST_VARIABLE"))
 		})
+	})
 
-		Context("fetch label testing", func() {
-			It("should correctly fetch the mapped labels", func() {
-				qc := QueryCollector{
-					columnMapping: map[string]MetricMap{
-						"LABEL_ENABLED": {
-							Label: true,
-						},
-						"LABEL_NOT_ENABLED": {
-							Label: false,
+	Context("fetch label testing", func() {
+		It("should correctly fetch the mapped labels", func() {
+			qc := QueryRunner{
+				columnMapping: map[string]MetricMap{
+					"LABEL_ENABLED": {
+						Label: true,
+					},
+					"LABEL_NOT_ENABLED": {
+						Label: false,
+					},
+				},
+			}
+			labels, success := qc.listLabels(
+				[]string{"LABEL_ENABLED", "LABEL_NOT_ENABLED"},
+				[]interface{}{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
+			)
+			Expect(success).To(BeTrue())
+			Expect(labels).To(HaveLen(1))
+			Expect(labels).To(ContainElements("SHOULD_FETCH"))
+		})
+
+		It("should report success false when the fetched data conversion is not supported", func() {
+			qc := QueryRunner{
+				columnMapping: map[string]MetricMap{
+					"LABEL_ENABLED": {
+						Label: true,
+					},
+				},
+			}
+			labels, success := qc.listLabels(
+				[]string{"LABEL_ENABLED"},
+				// int is not supported
+				[]interface{}{234},
+			)
+
+			Expect(success).To(BeFalse())
+			Expect(labels).To(BeZero())
+		})
+	})
+
+	Context("receiving query data from the database", func() {
+		var (
+			dbMock sqlmock.Sqlmock
+			db     *sql.DB
+			err    error
+		)
+
+		loPagesQuery := `SELECT pg_catalog.current_database() as datname, relpages as lo_pages
+			FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
+			WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';`
+
+		defaultQueries := UserQueries{
+			"collector": UserQuery{
+				Query:           loPagesQuery,
+				TargetDatabases: []string{"*"},
+				Metrics: []Mapping{
+					{
+						"datname": ColumnMapping{
+							Usage:       LABEL,
+							Description: "Name of the database",
 						},
 					},
-				}
-				labels, success := qc.collectLabels(
-					[]string{"LABEL_ENABLED", "LABEL_NOT_ENABLED"},
-					[]interface{}{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
-				)
-				Expect(success).To(BeTrue())
-				Expect(labels).To(HaveLen(1))
-				Expect(labels).To(ContainElements("SHOULD_FETCH"))
-			})
-
-			It("should report success false when the fetched data conversion is not supported", func() {
-				qc := QueryCollector{
-					columnMapping: map[string]MetricMap{
-						"LABEL_ENABLED": {
-							Label: true,
+					{
+						"lo_pages": ColumnMapping{
+							Usage:       GAUGE,
+							Description: "Estimated number of pages in the pg_largeobject table",
 						},
 					},
-				}
-				labels, success := qc.collectLabels(
-					[]string{"LABEL_ENABLED"},
-					// int is not supported
-					[]interface{}{234},
-				)
+				},
+			},
+		}
 
-				Expect(success).To(BeFalse())
-				Expect(labels).To(BeZero())
-			})
+		BeforeEach(func() {
+			db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should compute the default metrics successfully", func() {
+			metricMap := MetricMapSet{
+				"datname": MetricMap{
+					Name:       "datname",
+					Discard:    true,
+					Conversion: nil,
+					Label:      true,
+				},
+				"lo_pages": MetricMap{
+					Name:  "lo_pages",
+					Vtype: prometheus.GaugeValue,
+					Desc: prometheus.NewDesc(
+						"collector_lo_pages",
+						defaultQueries["collector"].Metrics[1]["lo_pages"].Description, []string{"lo_pages"}, nil),
+					Conversion: postgresutils.DBToFloat64,
+					Label:      false,
+				},
+			}
+
+			qc := QueryRunner{
+				namespace:      "foo",
+				userQuery:      defaultQueries["collector"],
+				columnMapping:  metricMap,
+				variableLabels: []string{"foo"},
+			}
+			_ = metricMap
+			dbMock.ExpectBegin()
+			dbMock.ExpectExec("SET application_name TO cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.ExpectExec("SET standard_conforming_strings TO on").WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.ExpectExec("SET ROLE TO pg_monitor").WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.ExpectQuery(loPagesQuery).WillReturnRows(sqlmock.NewRows(
+				[]string{"datname", "lo_pages"}).
+				AddRow(`app`, 3))
+			m, err := qc.computeMetrics(db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(m).To(HaveLen(1))
+			Expect(m[0].Desc().String()).To(ContainSubstring(
+				defaultQueries["collector"].Metrics[1]["lo_pages"].Description))
+			var gauge io_prometheus_client.Metric
+			Expect(m[0].Write(&gauge)).To(Succeed())
+			Expect(gauge.GetGauge().GetValue()).To(BeEquivalentTo(3))
+			Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 		})
 	})
 })
