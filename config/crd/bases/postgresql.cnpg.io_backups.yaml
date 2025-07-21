@@ -142,6 +142,9 @@ spec:
             required:
             - cluster
             type: object
+            x-kubernetes-validations:
+            - message: BackupSpec is immutable once set
+              rule: oldSelf == self
           status:
             description: |-
               Most recently observed status of the backup. This data may not be up to
