@@ -91,6 +91,8 @@ spec:
               protocol: TCP
 ```
 
+The policy allows access from `cnpg-system` pods and from default namespace pods that also belong to `cluster-example`. The matchLabels selector requires pods to have the complete set of listed labels. Missing even one label means the pod will not match.
+
 ## Restricting Access to PostgreSQL with Cilium
 
 In this example, we define a `CiliumNetworkPolicy` that allows only Pods labeled `role=backend` in the default namespace
