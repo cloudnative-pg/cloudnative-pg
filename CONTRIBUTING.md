@@ -35,6 +35,14 @@ We welcome many types of contributions including:
 For development contributions, please refer to the separate section called
 ["Contributing to the source code"](contribute/README.md).
 
+## External Contributors vs Maintainers
+
+**External Contributors:** If you're contributing from outside the core team, please note that some instructions in our detailed development docs apply only to maintainers. See the [development contribution guide](contribute/README.md) for complete details, but note:
+
+- **Issue Assignment**: Comment "I'd like to work on this" instead of self-assigning
+- **Testing**: Run local unit tests and basic e2e tests (see [testing guide](contribute/e2e_testing_environment/README.md)); maintainers will handle comprehensive cloud-based E2E testing
+- **Project Boards**: Maintainers will move tickets through project phases
+
 ## Ask for Help
 
 The best way to reach us with a question when contributing is to drop a line in
