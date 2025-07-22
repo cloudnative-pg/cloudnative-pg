@@ -1436,7 +1436,7 @@ type PostgresConfiguration struct {
 }
 
 // ExtensionConfiguration is the configuration used to add
-// a PostgreSQL extensions to the Cluster
+// PostgreSQL extensions to the Cluster.
 type ExtensionConfiguration struct {
 	// The name of the extension, required
 	// +kubebuilder:validation:MinLength=1

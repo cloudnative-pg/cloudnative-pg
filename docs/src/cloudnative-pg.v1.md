@@ -2834,7 +2834,7 @@ storage</p>
 
 
 <p>ExtensionConfiguration is the configuration used to add
-a PostgreSQL extensions to the Cluster</p>
+PostgreSQL extensions to the Cluster.</p>
 
 
 <table class="table">

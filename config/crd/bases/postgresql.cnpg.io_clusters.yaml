@@ -4016,7 +4016,7 @@ spec:
                     items:
                       description: |-
                         ExtensionConfiguration is the configuration used to add
-                        a PostgreSQL extensions to the Cluster
+                        PostgreSQL extensions to the Cluster.
                       properties:
                         dynamic_library_path:
                           description: |-
