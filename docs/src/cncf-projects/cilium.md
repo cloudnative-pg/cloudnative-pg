@@ -1,10 +1,12 @@
 # Cilium
 
-[Cilium](https://cilium.io/) is a CNCF Graduated project that was accepted as an Incubating project in 2021 and graduated in 2023 under the sponsorship of Isovalent. It is an
-advanced networking, security, and observability solution for cloud-native environments, built on
-top of eBPF (Extended Berkeley Packet Filter) technology. Cilium manages network traffic in
-Kubernetes clusters by dynamically injecting eBPF programs into the Linux Kernel, enabling
-low-latency, high-performance communication and enforcing fine-grained security policies.
+## About
+
+[Cilium](https://cilium.io/) is a CNCF Graduated project that was accepted as an Incubating project in 2021 and graduated in 2023 under
+the sponsorship of Isovalent. It is an advanced networking, security, and observability solution for cloud-native
+environments, built on top of eBPF (Extended Berkeley Packet Filter) technology. Cilium manages network traffic in
+Kubernetes clusters by dynamically injecting eBPF programs into the Linux Kernel, enabling low-latency,
+high-performance communication and enforcing fine-grained security policies.
 
 Key features of Cilium:
 
@@ -17,12 +19,13 @@ Key features of Cilium:
 ## Pod-to-Pod Network Security with CloudNativePG and Cilium
 
 Kubernetes’ default behavior is to allow traffic between any two pods in the cluster network.
-Cilium provides advanced L3/L4 network security using the CiliumNetworkPolicy resource. This
+Cilium provides advanced L3/L4 network security using the `CiliumNetworkPolicy` resource. This
 enables fine-grained control over network traffic between Pods within a Kubernetes cluster. It is
 especially useful for securing communication between application workloads and backend
 services.
 
-In the following examples, we demonstrate how Cilium can be used to secure a CloudNativePG PostgreSQL instance by restricting ingress traffic to only authorized Pods.
+In the following examples, we demonstrate how Cilium can be used to secure a CloudNativePG PostgreSQL instance by
+restricting ingress traffic to only authorized Pods.
 
 !!! Important
     Before proceeding, ensure that the `cluster-example` Postgres cluster is up and running in your environment.
@@ -34,7 +37,7 @@ in the target namespace. This is important because the operator needs to be able
 and one of those actions requires to access the port `8000` on the pods to get the current status of the PostgreSQL
 instance running inside.
 
-The following CiliumNetworkPolicy allows the operator to access the pods in the target `default` namespace
+The following `CiliumNetworkPolicy` allows the operator to access the pods in the target `default` namespace
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -56,7 +59,7 @@ spec:
 ```
 !!! Important
     The `cnpg-system` namespace is the default namespace for the operator when using the YAML manifests, if the operator
-    was installed using a different process(Helm,OLM, etc.), the namespace may be different. Make sure to adjust the
+    was installed using a different process(Helm, OLM, etc.), the namespace may be different. Make sure to adjust the
     namespace properly.
 
 ## Allowing access between cluster pods
@@ -88,10 +91,10 @@ spec:
               protocol: TCP
 ```
 
-## Example: Restricting Access to PostgreSQL with Cilium
+## Restricting Access to PostgreSQL with Cilium
 
-In this example, we define a CiliumNetworkPolicy that allows only Pods labeled `role=backend` in the default namespace
-to connect to a PostgreSQL cluster named cluster-example. All other ingress traffic is blocked by default.
+In this example, we define a `CiliumNetworkPolicy` that allows only Pods labeled `role=backend` in the default namespace
+to connect to a PostgreSQL cluster named `cluster-example`. All other ingress traffic is blocked by default.
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -114,11 +117,11 @@ spec:
             protocol: TCP
 ```
 
-This CiliumNetworkPolicy ensures that only Pods labeled with `role=backend` can access the
+This `CiliumNetworkPolicy` ensures that only Pods labeled with `role=backend` can access the
 PostgreSQL instance managed by CloudNativePG via port 5432 in the default namespace.
 
-In the following example, we demonstrate how to allow ingress traffic to port 5432 of a CloudNativePG cluster named
-cluster-example, only from Pods with the label `role=backend` in any namespace.
+In the following policy, we demonstrate how to allow ingress traffic to port 5432 of a PostgreSQL cluster named
+`cluster-example`, only from Pods with the label `role=backend` in any namespace.
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -144,7 +147,7 @@ spec:
             protocol: TCP
 ```
 
-The following example allows ingress traffic to port 5432 of the cluster-example CloudNativePG cluster (located in the
+The following example allows ingress traffic to port 5432 of the `cluster-example` cluster (located in the
 default namespace) from any Pods in the backend namespace.
 
 ```yaml
@@ -168,11 +171,11 @@ spec:
               protocol: TCP
 ```
 
-Using Cilium’s L3/L4 policy model, we define a CiliumNetworkPolicy that explicitly allows ingress
-traffic to CloudNativePG pods only from application pods in the backend namespace. All other
+Using Cilium’s L3/L4 policy model, we define a `CiliumNetworkPolicy` that explicitly allows ingress
+traffic to cluster pods only from application pods in the `backend` namespace. All other
 traffic is implicitly denied unless explicitly permitted by additional policies.
 
-The following example allows ingress traffic to port 5432 of the cluster-example CloudNativePG cluster (located in the
+The following example allows ingress traffic to port 5432 of the `cluster-example` cluster (located in the
 default namespace) from any source within the Kubernetes cluster.
 
 ```yaml
