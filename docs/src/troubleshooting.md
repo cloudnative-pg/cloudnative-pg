@@ -822,7 +822,7 @@ connection more quickly.
 
 ### Accidental deletion of a cluster
 
-If you accidentally delete a cluster and you don't have a backup up to date, you can restore it using the `PersitentVolume` (PV) if it is still available.
+If you accidentally delete a cluster and you don't have an up-to-date backup, you can restore it using the `PersistentVolume` (PV) if it is still available.
 
 !!! Important
     Make sure you configure your Kubernetes PVs with `persistentVolumeReclaimPolicy` set to `Retain` so that the PV is not deleted when the cluster is deleted.
