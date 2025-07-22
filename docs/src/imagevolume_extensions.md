@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG supports the **dynamic loading of PostgreSQL extensions** into a
-running `Cluster` using the [Kubernetes `ImageVolume` feature](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
+`Cluster` at Pod startup using the [Kubernetes `ImageVolume` feature](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
 and the `extension_control_path` GUC introduced in PostgreSQL 18, to which this
 project contributed.
 
@@ -295,7 +295,8 @@ system libraries at runtime.
 A standard extension container image for CloudNativePG includes two
 required directories at its root:
 
-- `share`: contains the extension control file (e.g., `<EXTENSION>.control`).
+- `share`: contains the extension control file (e.g., `<EXTENSION>.control`)
+  and any SQL files.
 - `lib`: contains the extension's shared library (e.g., `<EXTENSION>.so`) and
   any additional required libraries.
 
