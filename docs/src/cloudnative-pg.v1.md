@@ -2149,7 +2149,7 @@ configmap data</p>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format.
 This field is calculated from the content of FirstRecoverabilityPointByMethod.</p>
-<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>firstRecoverabilityPointByMethod</code><br/>
@@ -2157,7 +2157,7 @@ This field is calculated from the content of FirstRecoverabilityPointByMethod.</
 </td>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type.</p>
-<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
@@ -2166,7 +2166,7 @@ This field is calculated from the content of FirstRecoverabilityPointByMethod.</
 <td>
    <p>Last successful backup, stored as a date in RFC3339 format.
 This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
-<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackupByMethod</code><br/>
@@ -2174,7 +2174,7 @@ This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
 </td>
 <td>
    <p>Last successful backup, stored as a date in RFC3339 format, per backup method type.</p>
-<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastFailedBackup</code><br/>
@@ -2182,7 +2182,7 @@ This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
 </td>
 <td>
    <p>Last failed backup, stored as a date in RFC3339 format.</p>
-<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>cloudNativePGCommitHash</code><br/>

@@ -907,32 +907,32 @@ type ClusterStatus struct {
 	// The first recoverability point, stored as a date in RFC3339 format.
 	// This field is calculated from the content of FirstRecoverabilityPointByMethod.
 	//
-	// Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
 	// The first recoverability point, stored as a date in RFC3339 format, per backup method type.
 	//
-	// Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format.
 	// This field is calculated from the content of LastSuccessfulBackupByMethod.
 	//
-	// Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format, per backup method type.
 	//
-	// Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
 	// Last failed backup, stored as a date in RFC3339 format.
 	//
-	// Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
 
