@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("buildPostmasterEnv", func() {
+var _ = Describe("buildPostgresEnv", func() {
 	var cluster apiv1.Cluster
 
 	BeforeEach(func() {

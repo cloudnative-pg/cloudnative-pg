@@ -878,8 +878,8 @@ func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() it
 	return ext.absolutizePaths(paths)
 }
 
-// getRuntimeExtensionControlPath collects the absolute directories to be put
-// into the `"dynamic_library_path"` GUC to support this additional extension
+// getDynamicLibraryPath collects the absolute directories to be put
+// into the `dynamic_library_path` GUC to support this additional extension
 func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
 	paths := []string{"lib"}
 	if len(ext.DynamicLibraryPath) > 0 {
