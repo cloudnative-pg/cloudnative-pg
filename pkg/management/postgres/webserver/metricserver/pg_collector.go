@@ -176,19 +176,20 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "first_recoverability_point",
-			Help:      "The first point of recoverability for the cluster as a unix timestamp",
+			Help:      "The first point of recoverability for the cluster as a unix timestamp"+
+				" (Deprecated)",
 		}),
 		LastAvailableBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "last_available_backup_timestamp",
-			Help:      "The last available backup as a unix timestamp",
+			Help:      "The last available backup as a unix timestamp (Deprecated)",
 		}),
 		LastFailedBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "last_failed_backup_timestamp",
-			Help:      "The last failed backup as a unix timestamp",
+			Help:      "The last failed backup as a unix timestamp (Deprecated)",
 		}),
 		FencingOn: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,

@@ -293,7 +293,7 @@ spec:
     even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
     Your applications will need to reconnect to PostgreSQL after the upgrade.
 
-#### Deprecation of backup fields in the `Cluster` `.status`
+#### Deprecation of backup metrics and fields in the `Cluster` `.status`
 
 With the transition to a backup and recovery agnostic approach based on CNPG-I
 plugins in CloudNativePG, which began with version 1.26.0 for Barman Cloud, we
@@ -306,11 +306,17 @@ section of the `Cluster` resource:
 - `lastSuccessfulBackupByMethod`
 - `lastFailedBackup`
 
+The following Prometheus metrics are also deprecated:
+
+- `cnpg_collector_first_recoverability_point`
+- `cnpg_collector_last_failed_backup_timestamp`
+- `cnpg_collector_last_available_backup_timestamp`
+
 !!! Warning
     If you have migrated to a plugin-based backup and recovery solution such as
-    Barman Cloud, these fields are no longer synchronized and will not be updated.
-    Users still relying on the in-core support for Barman Cloud and volume
-    snapshots can continue to use these fields for the time being.
+    Barman Cloud, these fields and metrics are no longer synchronized and will
+    not be updated. Users still relying on the in-core support for Barman Cloud
+    and volume snapshots can continue to use these fields for the time being.
 
 Under the new plugin-based approach, multiple backup methods can operate
 simultaneously, each with its own timeline for backup and recovery. For
