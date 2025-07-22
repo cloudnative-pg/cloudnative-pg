@@ -22,7 +22,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -34,6 +33,11 @@ import (
 )
 
 func (data *data) MutateCluster(ctx context.Context, object client.Object, mutatedObject client.Object) error {
+	err := data.innerMutateCluster(ctx, object, mutatedObject)
+	return wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerMutateCluster(ctx context.Context, object client.Object, mutatedObject client.Object) error {
 	contextLogger := log.FromContext(ctx)
 
 	serializedObject, err := json.Marshal(object)
@@ -96,11 +100,16 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 }
 
 var (
-	errInvalidJSON        = errors.New("invalid json")
-	errSetStatusInCluster = errors.New("SetStatusInCluster invocation failed")
+	errInvalidJSON        = newPluginError("invalid json")
+	errSetStatusInCluster = newPluginError("SetStatusInCluster invocation failed")
 )
 
 func (data *data) SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
+	m, err := data.innerSetStatusInCluster(ctx, cluster)
+	return m, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerSetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
 	contextLogger := log.FromContext(ctx)
 	serializedObject, err := json.Marshal(cluster)
 	if err != nil {
@@ -151,6 +160,14 @@ func (data *data) ValidateClusterCreate(
 	ctx context.Context,
 	object client.Object,
 ) (field.ErrorList, error) {
+	result, err := data.innerValidateClusterCreate(ctx, object)
+	return result, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerValidateClusterCreate(
+	ctx context.Context,
+	object client.Object,
+) (field.ErrorList, error) {
 	contextLogger := log.FromContext(ctx)
 
 	serializedObject, err := json.Marshal(object)
@@ -189,6 +206,15 @@ func (data *data) ValidateClusterCreate(
 }
 
 func (data *data) ValidateClusterUpdate(
+	ctx context.Context,
+	oldObject client.Object,
+	newObject client.Object,
+) (field.ErrorList, error) {
+	result, err := data.innerValidateClusterUpdate(ctx, oldObject, newObject)
+	return result, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerValidateClusterUpdate(
 	ctx context.Context,
 	oldObject client.Object,
 	newObject client.Object,

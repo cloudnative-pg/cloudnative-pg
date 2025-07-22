@@ -22,7 +22,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -31,20 +30,6 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	// ErrPluginNotLoaded is raised when the plugin that should manage the backup
-	// have not been loaded inside the cluster
-	ErrPluginNotLoaded = errors.New("plugin not loaded")
-
-	// ErrPluginNotSupportBackup is raised when the plugin that should manage the backup
-	// doesn't support the Backup service
-	ErrPluginNotSupportBackup = errors.New("plugin does not support Backup service")
-
-	// ErrPluginNotSupportBackupEndpoint is raised when the plugin that should manage the backup
-	// doesn't support the Backup RPC endpoint
-	ErrPluginNotSupportBackupEndpoint = errors.New("plugin does not support the Backup RPC call")
 )
 
 // BackupResponse is the status of a newly created backup. This is used as a return
@@ -95,6 +80,17 @@ type BackupResponse struct {
 }
 
 func (data *data) Backup(
+	ctx context.Context,
+	cluster client.Object,
+	backupObject client.Object,
+	pluginName string,
+	parameters map[string]string,
+) (*BackupResponse, error) {
+	b, err := data.innerBackup(ctx, cluster, backupObject, pluginName, parameters)
+	return b, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerBackup(
 	ctx context.Context,
 	cluster client.Object,
 	backupObject client.Object,

@@ -160,21 +160,21 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 						if err != nil {
 							return "", err
 						}
-						return cluster.Status.FirstRecoverabilityPoint, err
+						return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 					}, 30).ShouldNot(BeEmpty())
 					Eventually(func() (string, error) {
 						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
-						return cluster.Status.LastSuccessfulBackup, err
+						return cluster.Status.LastSuccessfulBackup, err //nolint:staticcheck
 					}, 30).ShouldNot(BeEmpty())
 					Eventually(func() (string, error) {
 						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
-						return cluster.Status.LastFailedBackup, err
+						return cluster.Status.LastFailedBackup, err //nolint:staticcheck
 					}, 30).Should(BeEmpty())
 				})
 
@@ -321,7 +321,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 		})
@@ -375,7 +375,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 
@@ -439,7 +439,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				// this is the second backup we take on the bucket
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, customClusterName)
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 
@@ -660,7 +660,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 						if err != nil {
 							return "", err
 						}
-						return cluster.Status.FirstRecoverabilityPoint, err
+						return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 					}, 30).ShouldNot(BeEmpty())
 				})
 
@@ -806,7 +806,7 @@ func prepareClusterForPITROnMinio(
 		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
 

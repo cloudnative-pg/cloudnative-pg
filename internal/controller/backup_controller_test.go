@@ -336,9 +336,13 @@ var _ = Describe("update snapshot backup metadata", func() {
 	})
 
 	It("should update cluster with no metadata", func(ctx context.Context) {
+		//nolint:staticcheck
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(BeEmpty())
+		//nolint:staticcheck
 		Expect(cluster.Status.FirstRecoverabilityPointByMethod).To(BeEmpty())
+		//nolint:staticcheck
 		Expect(cluster.Status.LastSuccessfulBackup).To(BeEmpty())
+		//nolint:staticcheck
 		Expect(cluster.Status.LastSuccessfulBackupByMethod).To(BeEmpty())
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
@@ -354,24 +358,34 @@ var _ = Describe("update snapshot backup metadata", func() {
 			Name:      cluster.Name,
 		}, &updatedCluster)
 		Expect(err).ToNot(HaveOccurred())
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod).
 			ToNot(HaveKey(apiv1.BackupMethodBarmanObjectStore))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod).
 			ToNot(HaveKey(apiv1.BackupMethodBarmanObjectStore))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})
 
 	It("should consider other methods when update the metadata", func(ctx context.Context) {
+		//nolint:staticcheck
 		cluster.Status.FirstRecoverabilityPoint = threeHoursAgo.Format(time.RFC3339)
+		//nolint:staticcheck
 		cluster.Status.FirstRecoverabilityPointByMethod = map[apiv1.BackupMethod]metav1.Time{
 			apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
 		}
+		//nolint:staticcheck
 		cluster.Status.LastSuccessfulBackup = now.Format(time.RFC3339)
+		//nolint:staticcheck
 		cluster.Status.LastSuccessfulBackupByMethod = map[apiv1.BackupMethod]metav1.Time{
 			apiv1.BackupMethodBarmanObjectStore: now,
 		}
@@ -389,25 +403,35 @@ var _ = Describe("update snapshot backup metadata", func() {
 			Name:      cluster.Name,
 		}, &updatedCluster)
 		Expect(err).ToNot(HaveOccurred())
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(threeHoursAgo.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(threeHoursAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(now.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(now))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})
 
 	It("should override other method metadata when appropriate", func(ctx context.Context) {
+		//nolint:staticcheck
 		cluster.Status.FirstRecoverabilityPoint = oneHourAgo.Format(time.RFC3339)
+		//nolint:staticcheck
 		cluster.Status.FirstRecoverabilityPointByMethod = map[apiv1.BackupMethod]metav1.Time{
 			apiv1.BackupMethodBarmanObjectStore: oneHourAgo,
 			apiv1.BackupMethodVolumeSnapshot:    now,
 		}
+		//nolint:staticcheck
 		cluster.Status.LastSuccessfulBackup = oneHourAgo.Format(time.RFC3339)
+		//nolint:staticcheck
 		cluster.Status.LastSuccessfulBackupByMethod = map[apiv1.BackupMethod]metav1.Time{
 			apiv1.BackupMethodBarmanObjectStore: twoHoursAgo,
 			apiv1.BackupMethodVolumeSnapshot:    threeHoursAgo,
@@ -426,14 +450,20 @@ var _ = Describe("update snapshot backup metadata", func() {
 			Name:      cluster.Name,
 		}, &updatedCluster)
 		Expect(err).ToNot(HaveOccurred())
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(oneHourAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(twoHoursAgo))
+		//nolint:staticcheck
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})

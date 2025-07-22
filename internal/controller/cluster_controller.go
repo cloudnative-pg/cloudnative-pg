@@ -207,6 +207,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				)
 		}
 
+		if regErr := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseFailurePlugin,
+			fmt.Sprintf("Error while discovering plugins: %s", err.Error()),
+		); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
+
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err
 	}
@@ -224,6 +233,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, utils.ErrTerminateLoop) {
 		return ctrl.Result{}, nil
 	}
+
+	// This code assumes that we always end the reconciliation loop if we encounter an error.
+	// In case that the assumption is false this code could overwrite an error phase.
+	if cnpgiClient.ContainsPluginError(err) {
+		if regErr := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseFailurePlugin,
+			fmt.Sprintf("Encountered an error while interacting with plugins: %s", err.Error()),
+		); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
+
 	if err != nil {
 		return ctrl.Result{}, err
 	}

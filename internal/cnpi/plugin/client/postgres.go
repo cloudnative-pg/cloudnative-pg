@@ -35,6 +35,16 @@ func (data *data) EnrichConfiguration(
 	config map[string]string,
 	operationType postgresClient.OperationType_Type,
 ) (map[string]string, error) {
+	m, err := data.innerEnrichConfiguration(ctx, cluster, config, operationType)
+	return m, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerEnrichConfiguration(
+	ctx context.Context,
+	cluster client.Object,
+	config map[string]string,
+	operationType postgresClient.OperationType_Type,
+) (map[string]string, error) {
 	tempConfig := config
 
 	contextLogger := log.FromContext(ctx).WithName("enrichConfiguration")

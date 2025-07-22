@@ -61,7 +61,7 @@ func newReconcilerRequeueResult(identifier string, after int64) ReconcilerHookRe
 
 // newReconcilerErrorResult creates a new result from an error
 func newReconcilerErrorResult(identifier string, err error) ReconcilerHookResult {
-	return ReconcilerHookResult{Err: err, StopReconciliation: true, Identifier: identifier}
+	return ReconcilerHookResult{Err: wrapAsPluginErrorIfNeeded(err), StopReconciliation: true, Identifier: identifier}
 }
 
 func (data *data) PreReconcile(ctx context.Context, cluster client.Object, object client.Object) ReconcilerHookResult {

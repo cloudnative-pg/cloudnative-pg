@@ -136,7 +136,7 @@ var _ = Describe("testing backup command", func() {
 
 	It("should fail and update cluster and backup resource", func() {
 		backupCommand.run(context.Background())
-		Expect(cluster.Status.LastFailedBackup).ToNot(BeEmpty())
+		Expect(cluster.Status.LastFailedBackup).ToNot(BeEmpty()) //nolint:staticcheck
 
 		clusterCond := meta.FindStatusCondition(cluster.Status.Conditions, string(apiv1.ConditionBackup))
 		Expect(clusterCond.Status).To(Equal(metav1.ConditionFalse))

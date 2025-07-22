@@ -60,17 +60,6 @@ Please refer to the [plugin document](kubectl-plugin.md) for complete instructio
 After getting the cluster manifest with the plugin, you should verify if backups
 are set up and working.
 
-In a cluster with backups set up, you will find, in the cluster Status, the fields
-`lastSuccessfulBackup` and `firstRecoverabilityPoint`. You should make sure
-there is a recent `lastSuccessfulBackup`.
-
-A cluster lacking the `.spec.backup` stanza won't have backups. 
-An insistent message will appear in the PostgreSQL logs:
-
-```
-Backup not configured, skip WAL archiving.
-```
-
 Before proceeding with troubleshooting operations, it may be advisable
 to perform an emergency backup depending on your findings regarding backups.
 Refer to the following section for instructions.
