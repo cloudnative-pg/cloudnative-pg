@@ -343,6 +343,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		}
 
 		scenario := scenarios[scenarioName]
+
+		if scenarioName == postgisEntry && scenario.targetMajor > 17 {
+			// PostGIS images are not available for Postgres versions greater than 17
+			Skip("Skipping major upgrades on PostGIS images for Postgres versions greater than 17")
+		}
+
 		cluster := scenario.startingCluster
 		err := env.Client.Create(env.Ctx, cluster)
 		Expect(err).NotTo(HaveOccurred())
