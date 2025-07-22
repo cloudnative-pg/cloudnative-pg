@@ -667,7 +667,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	ignoreFixedSettingsFromUser := info.IncludingMandatory || !info.PreserveFixedSettingsFromUser
 
 	// Set all the default settings
-	setDefaultConfigurations(info, configuration)
+	configuration.setDefaultConfigurations(info)
 
 	// Apply all the values from the user, overriding defaults,
 	// ignoring those which are fixed if ignoreFixedSettingsFromUser is true
@@ -743,10 +743,10 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	if info.IncludingSharedPreloadLibraries {
 		// Set all managed shared preload libraries
-		setManagedSharedPreloadLibraries(info, configuration)
+		configuration.setManagedSharedPreloadLibraries(info)
 
 		// Set all user provided shared preload libraries
-		setUserSharedPreloadLibraries(info, configuration)
+		configuration.setUserSharedPreloadLibraries(info)
 	}
 
 	// Apply the list of temporary tablespaces
@@ -756,8 +756,8 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	// Setup additional extensions
 	if len(info.AdditionalExtensions) > 0 {
-		setExtensionControlPath(info, configuration)
-		setDynamicLibraryPath(info, configuration)
+		configuration.setExtensionControlPath(info)
+		configuration.setDynamicLibraryPath(info)
 	}
 
 	return configuration
@@ -765,28 +765,28 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 // setDefaultConfigurations sets all default configurations into the configuration map
 // from the provided info
-func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setDefaultConfigurations(info ConfigurationInfo) {
 	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
-		configuration.OverwriteConfig(key, value)
+		p.OverwriteConfig(key, value)
 	}
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range info.Settings.DefaultSettings {
 		if constraints.Min <= info.MajorVersion && info.MajorVersion < constraints.Max {
 			for key, value := range settings {
-				configuration.OverwriteConfig(key, value)
+				p.OverwriteConfig(key, value)
 			}
 		}
 	}
 }
 
 // setManagedSharedPreloadLibraries sets all additional preloaded libraries
-func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setManagedSharedPreloadLibraries(info ConfigurationInfo) {
 	for _, extension := range ManagedExtensions {
 		if extension.IsUsed(info.UserSettings) {
 			for _, library := range extension.SharedPreloadLibraries {
-				configuration.AddSharedPreloadLibrary(library)
+				p.AddSharedPreloadLibrary(library)
 			}
 		}
 	}
@@ -796,8 +796,8 @@ func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgC
 // The resulting list will have all the user provided libraries, followed by all the ones managed
 // by the operator, removing any duplicate and keeping the first occurrence in case of duplicates.
 // Therefore the user provided order is preserved, if an overlap (with the ones already present) happens
-func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
-	oldLibraries := strings.Split(configuration.GetConfig(SharedPreloadLibraries), ",")
+func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) {
+	oldLibraries := strings.Split(p.GetConfig(SharedPreloadLibraries), ",")
 	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
 	var libraries []string
 	for _, library := range append(info.AdditionalSharedPreloadLibraries, oldLibraries...) {
@@ -811,7 +811,7 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 		}
 	}
 	if len(libraries) > 0 {
-		configuration.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
+		p.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
 	}
 }
 
@@ -892,7 +892,7 @@ func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[st
 // setExtensionControlPath manages the `extension_control_path` GUC, merging
 // the paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
-func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
 	extensionControlPath := []string{"$system"}
 
 	for _, extension := range info.AdditionalExtensions {
@@ -904,7 +904,7 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 
 	extensionControlPath = slices.AppendSeq(
 		extensionControlPath,
-		strings.SplitSeq(configuration.GetConfig(ExtensionControlPath), ":"),
+		strings.SplitSeq(p.GetConfig(ExtensionControlPath), ":"),
 	)
 
 	extensionControlPath = slices.DeleteFunc(
@@ -912,13 +912,13 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 		func(s string) bool { return s == "" },
 	)
 
-	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+	p.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
 }
 
 // setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
 // paths defined by the user with the ones provided by the
 // `.spec.postgresql.extensions` stanza
-func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
 	dynamicLibraryPath := []string{"$libdir"}
 
 	for _, extension := range info.AdditionalExtensions {
@@ -929,12 +929,12 @@ func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguratio
 
 	dynamicLibraryPath = slices.AppendSeq(
 		dynamicLibraryPath,
-		strings.SplitSeq(configuration.GetConfig(DynamicLibraryPath), ":"))
+		strings.SplitSeq(p.GetConfig(DynamicLibraryPath), ":"))
 
 	dynamicLibraryPath = slices.DeleteFunc(
 		dynamicLibraryPath,
 		func(s string) bool { return s == "" },
 	)
 
-	configuration.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
+	p.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }
