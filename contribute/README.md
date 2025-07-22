@@ -94,15 +94,19 @@ If you have written code for an improvement to CloudNativePG or a bug fix,
 please follow this procedure to submit a pull request:
 
 1. [Create a fork](development_environment/README.md#forking-the-repository) of CloudNativePG
-2. Self-assign the ticket and begin working on it in the forked project. Move
-   the ticket to `Analysis` or `In Development` phase of
+2. **External contributors**: Comment on the issue with "I'd like to work on this" and wait for assignment. 
+   **Maintainers**: Self-assign the ticket and move it to `Analysis` or `In Development` phase of
    [CloudNativePG operator development](https://github.com/orgs/cloudnative-pg/projects/2)
-3. [Run the e2e tests in the forked repository](e2e_testing_environment/README.md#running-e2e-tests-on-a-fork-of-the-repository)
+3. **External contributors**: Run local unit tests and basic e2e tests using `FEATURE_TYPE=smoke,basic make e2e-test-kind` or `TEST_DEPTH=0 make e2e-test-kind` for critical tests only. 
+   **Maintainers**: [Run the comprehensive e2e tests in the forked repository](e2e_testing_environment/README.md#running-e2e-tests-on-a-fork-of-the-repository)
 4. Once development is finished, create a pull request from your forked project
-   to the CloudNativePG project and move the ticket to the `Waiting for First Review`
-   phase. Please make sure the pull request title and message follow
-   [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
-
+   to the CloudNativePG project. **Maintainers** will move the ticket to the `Waiting for First Review`
+   phase. 
+   
+   > Please make sure the pull request title and message follow
+   > [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+   
+   > To facilitate collaboration, always [allow edits by maintainers](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork)
 
 One of the maintainers will then proceed with the first review and approve the
 CI workflow to run in the CloudNativePG project.  The second reviewer will run

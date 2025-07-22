@@ -268,7 +268,7 @@ func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 	caSecret *v1.Secret,
 ) error {
 	// Generating postgres client certificate
-	replicationSecretName := client.ObjectKey{
+	replicationSecretObjectKey := client.ObjectKey{
 		Namespace: cluster.GetNamespace(),
 		Name:      cluster.GetReplicationSecretName(),
 	}
@@ -278,7 +278,7 @@ func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 		return r.ensureLeafCertificate(
 			ctx,
 			cluster,
-			replicationSecretName,
+			replicationSecretObjectKey,
 			apiv1.StreamingReplicationUser,
 			caSecret,
 			certs.CertTypeClient,
@@ -288,9 +288,9 @@ func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 	}
 
 	var replicationClientSecret v1.Secret
-	if err := r.Get(ctx, replicationSecretName, &replicationClientSecret); apierrors.IsNotFound(err) {
+	if err := r.Get(ctx, replicationSecretObjectKey, &replicationClientSecret); apierrors.IsNotFound(err) {
 		return fmt.Errorf("missing specified replication TLS secret %s: %w",
-			cluster.Status.Certificates.ServerTLSSecret, err)
+			replicationSecretObjectKey.Name, err)
 	} else if err != nil {
 		return err
 	}
