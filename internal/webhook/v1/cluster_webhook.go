@@ -2633,21 +2633,64 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 }
 
 func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.ErrorList {
-	var result field.ErrorList
-
-	extensionNames := stringset.New()
-	for i, v := range r.Spec.PostgresConfiguration.Extensions {
-		if extensionNames.Has(v.Name) {
-			result = append(
-				result,
-				field.Duplicate(
-					field.NewPath("spec", "postgresql", "extensions").Index(i).Child("name"),
-					v.Name,
-				),
+	ensureNotEmptyOrDuplicate := func(path *field.Path, list *stringset.Data, value string) *field.Error {
+		if value == "" {
+			return field.Invalid(
+				path,
+				value,
+				"value cannot be empty",
 			)
 		}
 
+		if list.Has(value) {
+			return field.Duplicate(
+				path,
+				value,
+			)
+		}
+		return nil
+	}
+
+	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	extensionNames := stringset.New()
+
+	for i, v := range r.Spec.PostgresConfiguration.Extensions {
+		basePath := field.NewPath("spec", "postgresql", "extensions").Index(i)
+		if nameErr := ensureNotEmptyOrDuplicate(basePath.Child("name"), extensionNames, v.Name); nameErr != nil {
+			result = append(result, nameErr)
+		}
 		extensionNames.Put(v.Name)
+
+		controlPaths := stringset.New()
+		for j, path := range v.ExtensionControlPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("extension_control_path").Index(j),
+				controlPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			controlPaths.Put(path)
+		}
+
+		libraryPaths := stringset.New()
+		for j, path := range v.DynamicLibraryPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("dynamic_library_path").Index(j),
+				libraryPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			libraryPaths.Put(path)
+		}
 	}
 
 	return result
