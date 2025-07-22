@@ -42,9 +42,10 @@ type SubscriptionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            *postgres.Instance
-	finalizerReconciler *finalizerReconciler[*apiv1.Subscription]
-	getDB               func(name string) (*sql.DB, error)
+	instance                *postgres.Instance
+	finalizerReconciler     *finalizerReconciler[*apiv1.Subscription]
+	getDB                   func(name string) (*sql.DB, error)
+	getPostgresMajorVersion func() (int, error)
 }
 
 // subscriptionReconciliationInterval is the time between the
@@ -189,6 +190,10 @@ func NewSubscriptionReconciler(
 		instance: instance,
 		getDB: func(name string) (*sql.DB, error) {
 			return instance.ConnectionPool().Connection(name)
+		},
+		getPostgresMajorVersion: func() (int, error) {
+			version, err := instance.GetPgVersion()
+			return int(version.Major), err //nolint:gosec
 		},
 	}
 	sr.finalizerReconciler = newFinalizerReconciler(
