@@ -235,16 +235,18 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 				targetMajor:     int(info.targetMajor),
 			},
 			postgresqlEntry: {
-				startingCluster: generatePostgreSQLCluster(namespace, storageClass, strconv.FormatUint(info.currentMajor, 10)),
-				startingMajor:   int(info.currentMajor),
-				targetImage:     targetImages[postgresqlEntry],
-				targetMajor:     int(info.targetMajor),
+				startingCluster: generatePostgreSQLCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10)),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlEntry],
+				targetMajor:   int(info.targetMajor),
 			},
 			postgresqlMinimalEntry: {
-				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass, strconv.FormatUint(info.currentMajor, 10)),
-				startingMajor:   int(info.currentMajor),
-				targetImage:     targetImages[postgresqlMinimalEntry],
-				targetMajor:     int(info.targetMajor),
+				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10)),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlMinimalEntry],
+				targetMajor:   int(info.targetMajor),
 			},
 		}
 	}
