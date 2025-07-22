@@ -141,7 +141,6 @@ DisabledDefaultServices
 DoD
 DockerHub
 Dockle
-eBPF
 EBS
 EDB
 EKS
@@ -787,6 +786,7 @@ downtimes
 dvcmQ
 dwm
 dx
+eBPF
 ecdsa
 edb
 eks
