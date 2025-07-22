@@ -2148,14 +2148,16 @@ configmap data</p>
 </td>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format.
-This field is calculated from the content of FirstRecoverabilityPointByMethod (DEPRECATED).</p>
+This field is calculated from the content of FirstRecoverabilityPointByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
 </td>
 </tr>
 <tr><td><code>firstRecoverabilityPointByMethod</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type (DEPRECATED).</p>
+   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
@@ -2163,21 +2165,24 @@ This field is calculated from the content of FirstRecoverabilityPointByMethod (D
 </td>
 <td>
    <p>Last successful backup, stored as a date in RFC3339 format.
-This field is calculated from the content of LastSuccessfulBackupByMethod (DEPRECATED).</p>
+This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackupByMethod</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type (DEPRECATED).</p>
+   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
 </td>
 </tr>
 <tr><td><code>lastFailedBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Last failed backup, stored as a date in RFC3339 format (DEPRECATED).</p>
+   <p>Last failed backup, stored as a date in RFC3339 format.</p>
+<p>Deprecated: the field is not set for backup plugins. In-tree backup will be removed in 1.28.</p>
 </td>
 </tr>
 <tr><td><code>cloudNativePGCommitHash</code><br/>
