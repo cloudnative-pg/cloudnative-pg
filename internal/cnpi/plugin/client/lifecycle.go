@@ -50,6 +50,16 @@ func (data *data) LifecycleHook(
 	cluster client.Object,
 	object client.Object,
 ) (client.Object, error) {
+	obj, err := data.innerLifecycleHook(ctx, operationType, cluster, object)
+	return obj, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerLifecycleHook(
+	ctx context.Context,
+	operationType plugin.OperationVerb,
+	cluster client.Object,
+	object client.Object,
+) (client.Object, error) {
 	contextLogger := log.FromContext(ctx).WithName("lifecycle_hook")
 
 	typedOperationType, err := operationType.ToOperationType_Type()

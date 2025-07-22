@@ -21,7 +21,6 @@ package client
 
 import (
 	"context"
-	"errors"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"google.golang.org/grpc"
@@ -119,7 +118,7 @@ var _ = Describe("EnrichConfiguration", func() {
 	})
 
 	It("should return error when plugin returns error", func(ctx SpecContext) {
-		expectedErr := errors.New("plugin error")
+		expectedErr := newPluginError("plugin error")
 
 		postgresClient := &fakePostgresClient{
 			enrichConfigError: expectedErr,
