@@ -298,7 +298,7 @@ func prepareClusterBackupOnAzurite(
 		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
 	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
@@ -324,7 +324,7 @@ func prepareClusterForPITROnAzurite(
 		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
 
