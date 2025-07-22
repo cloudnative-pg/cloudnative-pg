@@ -520,7 +520,7 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		return
 	}
 	status := tabby.New()
-	FPoR := cluster.Status.FirstRecoverabilityPoint
+	FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
 	if FPoR == "" {
 		FPoR = "Not Available"
 	}

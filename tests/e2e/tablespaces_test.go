@@ -224,7 +224,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 		})
@@ -316,21 +316,21 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.LastSuccessfulBackup, err
+					return cluster.Status.LastSuccessfulBackup, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.LastFailedBackup, err
+					return cluster.Status.LastFailedBackup, err //nolint:staticcheck
 				}, 30).Should(BeEmpty())
 			})
 		})

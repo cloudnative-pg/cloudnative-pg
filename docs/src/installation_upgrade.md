@@ -268,6 +268,47 @@ only the operator itself.
     even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
     Your applications will need to reconnect to PostgreSQL after the upgrade.
 
+#### Deprecation of backup metrics and fields in the `Cluster` `.status`
+
+With the transition to a backup and recovery agnostic approach based on CNPG-I
+plugins in CloudNativePG, which began with version 1.26.0 for Barman Cloud, we
+are starting the deprecation period for the following fields in the `.status`
+section of the `Cluster` resource:
+
+- `firstRecoverabilityPoint`
+- `firstRecoverabilityPointByMethod`
+- `lastSuccessfulBackup`
+- `lastSuccessfulBackupByMethod`
+- `lastFailedBackup`
+
+The following Prometheus metrics are also deprecated:
+
+- `cnpg_collector_first_recoverability_point`
+- `cnpg_collector_last_failed_backup_timestamp`
+- `cnpg_collector_last_available_backup_timestamp`
+
+!!! Warning
+    If you have migrated to a plugin-based backup and recovery solution such as
+    Barman Cloud, these fields and metrics are no longer synchronized and will
+    not be updated. Users still relying on the in-core support for Barman Cloud
+    and volume snapshots can continue to use these fields for the time being.
+
+Under the new plugin-based approach, multiple backup methods can operate
+simultaneously, each with its own timeline for backup and recovery. For
+example, some plugins may provide snapshots without WAL archiving, while others
+support continuous archiving.
+
+Because of this flexibility, maintaining centralized status fields in the
+`Cluster` resource could be misleading or confusing, as they would not
+accurately represent the state across all configured backup methods.
+For this reason, these fields are being deprecated.
+
+Instead, each plugin is responsible for exposing its own backup status
+information and providing metrics back to the instance manager for monitoring
+and operational awareness.
+
+#### Declarative Hibernation in the `cnpg` plugin
+
 In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
 to a [declarative approach for cluster hibernation](declarative_hibernation.md).
 The `hibernate on` and `hibernate off` commands are now convenient shortcuts

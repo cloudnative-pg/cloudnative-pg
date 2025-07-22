@@ -118,7 +118,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 				}, 30).Should(BeNumerically(">=", 1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 
@@ -485,7 +485,7 @@ func prepareClusterForPITROnAzureBlob(
 		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
 
