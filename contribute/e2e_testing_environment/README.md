@@ -272,10 +272,17 @@ the `kind` engine.
 
 ### Running E2E tests on a fork of the repository
 
-Additionally, if you fork the repository and want to run the tests on your fork, you can do so
+**For maintainers and organization members:** If you fork the repository and want to run the tests on your fork, you can do so
 by running the `/test` command in a Pull Request opened in your forked repository.
 `/test` is used to trigger a run of the end-to-end tests in the GitHub Actions.
 Only users who have `write` permission to the repository can use this command.
+
+**For external contributors:** You can run local e2e tests using:
+- `FEATURE_TYPE=smoke,basic make e2e-test-kind` for smoke and basic tests
+- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only  
+- `TEST_DEPTH=1 make e2e-test-kind` for critical and high priority tests
+
+Maintainers will handle comprehensive cloud-based E2E testing during the pull request review process.
 
 Options supported are:
 
