@@ -898,7 +898,7 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
 	if rawSharedBuffer != "" {
 		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
-			if !hasEnoughMemoryForSharedBuffers(sharedBuffers, memoryRequests, memoryLimits, hugePages) {
+			if !hasEnoughMemoryForSharedBuffers(sharedBuffers, memoryRequests, hugePages) {
 				result = append(result, field.Invalid(
 					field.NewPath("spec", "resources", "requests"),
 					memoryRequests.String(),
@@ -953,23 +953,18 @@ func validateHugePagesResources(r *apiv1.Cluster) (map[corev1.ResourceName]resou
 func hasEnoughMemoryForSharedBuffers(
 	sharedBuffers resource.Quantity,
 	memoryRequest *resource.Quantity,
-	memoryLimits *resource.Quantity,
 	hugePages map[corev1.ResourceName]resource.Quantity,
 ) bool {
-	if memoryRequest.IsZero() && memoryLimits.IsZero() && len(hugePages) == 0 {
+	if memoryRequest.IsZero() || sharedBuffers.Cmp(*memoryRequest) <= 0 {
 		return true
 	}
-	if !memoryRequest.IsZero() && sharedBuffers.Cmp(*memoryRequest) <= 0 {
-		return true
-	}
-	if !memoryLimits.IsZero() && sharedBuffers.Cmp(*memoryLimits) <= 0 {
-		return true
-	}
+
 	for _, quantity := range hugePages {
 		if sharedBuffers.Cmp(quantity) <= 0 {
 			return true
 		}
 	}
+
 	return false
 }
 
