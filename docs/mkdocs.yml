@@ -75,6 +75,7 @@ nav:
   - release_notes.md
   - CNCF Projects Integrations:
     - cncf-projects/external-secrets.md
+    - cncf-projects/cilium.md
   - Appendixes:
     - appendixes/backup_volumesnapshot.md
     - appendixes/backup_barmanobjectstore.md
