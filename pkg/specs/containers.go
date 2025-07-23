@@ -43,7 +43,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		},
 		VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
-		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
+		SecurityContext: cluster.GetSecurityContext(),
 	}
 
 	addManagerLoggingOptions(cluster, &container)
@@ -58,23 +58,4 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
-}
-
-// CreateContainerSecurityContext initializes container security context. It applies the seccomp profile if supported.
-func CreateContainerSecurityContext(seccompProfile *corev1.SeccompProfile) *corev1.SecurityContext {
-	trueValue := true
-	falseValue := false
-
-	return &corev1.SecurityContext{
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{
-				"ALL",
-			},
-		},
-		Privileged:               &falseValue,
-		RunAsNonRoot:             &trueValue,
-		ReadOnlyRootFilesystem:   &trueValue,
-		AllowPrivilegeEscalation: &falseValue,
-		SeccompProfile:           seccompProfile,
-	}
 }
