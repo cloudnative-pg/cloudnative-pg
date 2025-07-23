@@ -86,7 +86,7 @@ requiring manual configuration inside the pod.
 
 Adding an extension to a database in CloudNativePG involves a few steps:
 
-1. Attach the extension image to the `Cluster` resource so that PostgreSQL can
+1. Define the extension image in the `Cluster` resource so that PostgreSQL can
    discover and load it.
 2. Add the library to [`shared_preload_libraries`](postgresql_conf.md#shared-preload-libraries)
    if the extension requires it.
