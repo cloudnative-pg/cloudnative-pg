@@ -8,9 +8,14 @@ project contributed.
 
 This feature allows you to mount a [PostgreSQL extension](https://www.postgresql.org/docs/current/extend-extensions.html),
 packaged as an OCI-compliant container image, as a read-only and immutable
-volume inside a running pod at a known filesystem path. You can then make the
-extension available to a PostgreSQL database for the `CREATE EXTENSION` command
-using the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database).
+volume inside a running pod at a known filesystem path.
+
+You can make the extension available either globally, using the
+[`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries),
+or at the database level through the `CREATE EXTENSION` command. For the
+latter, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database)
+to ensure consistent, automated extension setup within your PostgreSQL
+databases.
 
 ## Benefits
 
@@ -78,14 +83,17 @@ requiring manual configuration inside the pod.
 
 ## How to add a new extension
 
-Adding an extension to a database in CloudNativePG involves two steps:
+Adding an extension to a database in CloudNativePG involves a few steps:
 
 1. Attach the extension image to the `Cluster` resource so that PostgreSQL can
    discover and load it.
-2. Declare the extension in the `Database` resource where you want it
-   installed.
+2. Add the library to [`shared_preload_libraries`](postgresql_conf.md#shared-preload-libraries)
+   if the extension requires it.
+3. Declare the extension in the `Database` resource where you want it
+   installed, if the extension supports `CREATE EXTENSION`.
 
-For illustration, we will use a simple, fictitious extension named `foo`.
+For illustration purposes, this guide uses a simple, fictitious extension named
+`foo` that supports `CREATE EXTENSION`.
 
 ### Adding a new extension to a `Cluster` resource
 
