@@ -25,11 +25,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
@@ -944,46 +942,7 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
-	r.instance.Env = buildPostgresEnv(cluster)
-}
-
-// buildPostgresEnv builds the environment variables that should be used by PostgreSQL
-// to run the main process, taking care of adding any library path that is needed for
-// extensions.
-func buildPostgresEnv(cluster *apiv1.Cluster) []string {
-	// If there are no additional library paths, we use the environment variables
-	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(cluster.Spec.PostgresConfiguration.Extensions)
-	if len(additionalLibraryPaths) == 0 {
-		return os.Environ()
-	}
-
-	// We add the additional library paths after the entries that are already
-	// available.
-	currentLibraryPath := os.Getenv("LD_LIBRARY_PATH")
-	if currentLibraryPath != "" {
-		currentLibraryPath += ":"
-	}
-	currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
-
-	return append(os.Environ(), "LD_LIBRARY_PATH="+currentLibraryPath)
-}
-
-// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
-// given an extension
-func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
-
-	for _, extension := range extensionList {
-		for _, libraryPath := range extension.LdLibraryPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
-			)
-		}
-	}
-
-	return result
+	r.instance.Cluster = cluster
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
