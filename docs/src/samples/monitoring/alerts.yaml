@@ -46,12 +46,12 @@ groups:
     for: 1m
     labels:
       severity: warning
-  - alert: DatabaseDeadlockConflicts 
+  - alert: DatabaseDeadlockConflicts
     annotations:
-      description: There are over 10 deadlock conflicts in {{ $labels.pod }}
+      description: More than 1 deadlock has occurred within the past minute in {{ $labels.pod }}
       summary: Checks the number of database conflicts
     expr: |-
-      cnpg_pg_stat_database_deadlocks > 10
+      increase(cnpg_pg_stat_database_deadlocks[1m]) > 2
     for: 1m
     labels:
       severity: warning
