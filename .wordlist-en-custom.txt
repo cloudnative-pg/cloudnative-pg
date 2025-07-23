@@ -1191,6 +1191,7 @@ recoverytarget
 recv
 redefinitions
 redhat
+registrated
 rehydrate
 rehydrated
 rehydration
