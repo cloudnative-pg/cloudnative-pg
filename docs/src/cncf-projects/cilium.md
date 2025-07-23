@@ -17,7 +17,7 @@ Key features of Cilium:
 - Built-in observability and monitoring with Hubble
 
 To install Cilium in your environment, follow the instructions in the documentation:
-https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/
+[https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/)
 
 ## Pod-to-Pod Network Security with CloudNativePG and Cilium
 
