@@ -1122,6 +1122,7 @@ pgpass
 pgstatstatements
 phaseReason
 pid
+pinger
 pitr
 plpgsql
 pluggable
