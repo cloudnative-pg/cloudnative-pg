@@ -180,9 +180,9 @@ spec:
                       type: string
                     handler:
                       description: |-
-                        The pointer to the name of the handler function (e.g., "postgres_fdw_handler")
-                        It would be nil if the handler is not specified, as commonly the default handler is
-                        registrated when creating the fdw extension.
+                        Name of the handler function (e.g., "postgres_fdw_handler")
+                        It would be empty if no handler is specified, in which case
+                        the default handler is registrated when creating the fdw extensions
                       type: string
                     name:
                       description: Name of the extension/schema
@@ -205,23 +205,20 @@ spec:
                             type: string
                           value:
                             type: string
-                        required:
-                        - value
                         type: object
                       description: Options specifies options for the FDW(key is option
                         name, value is option value)
                       type: object
                     owner:
                       description: |-
-                        Owner specifies the database user who will own the Foreign Data Wrapper.
-                        By default, the owner of a new FDW is the current session user.
-                        Even if an owner is explicitly specified during creation, it will be ignored.
+                        Owner specifies the database role that will own the Foreign Data Wrapper.
+                        The specified role must have superuser privileges in the target database.
                       type: string
                     validator:
                       description: |-
-                        The pointer to the name of the validator function (e.g., "postgres_fdw_validator")
-                        It would be nil if the validator is not specified, as commonly the default validator is
-                        registrated with handler together when creating the fdw extension.
+                        Name of the validator function (e.g., "postgres_fdw_validator")
+                        It would be empty if no validator is specified, in which case
+                        the default validator is registrated when creating the fdw extensions
                       type: string
                   required:
                   - name

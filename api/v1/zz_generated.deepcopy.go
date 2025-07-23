@@ -1377,16 +1377,6 @@ func (in *ExternalCluster) DeepCopy() *ExternalCluster {
 func (in *FDWSpec) DeepCopyInto(out *FDWSpec) {
 	*out = *in
 	out.DatabaseObjectSpec = in.DatabaseObjectSpec
-	if in.Handler != nil {
-		in, out := &in.Handler, &out.Handler
-		*out = new(string)
-		**out = **in
-	}
-	if in.Validator != nil {
-		in, out := &in.Validator, &out.Validator
-		*out = new(string)
-		**out = **in
-	}
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
 		*out = make(map[string]OptionSpecValue, len(*in))
