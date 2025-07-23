@@ -77,9 +77,10 @@ requiring manual configuration inside the pod.
     `dynamic_library_path` values to match the image structure.
 
 !!! Important
-    The extension container image must match the PostgreSQL container used by
-    your cluster in PostgreSQL major version, Operating system distribution, and
-    CPU architecture to ensure compatibility and prevent runtime issues.
+    If the extension image includes shared libraries, they must be compiled
+    with the same PostgreSQL major version, operating system distribution, and CPU
+    architecture as the PostgreSQL container image used by your cluster, to ensure
+    compatibility and prevent runtime issues.
 
 ## How to add a new extension
 
