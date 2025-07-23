@@ -277,6 +277,7 @@ spec:
   - name: postgres_fdw
     handler: postgres_fdw_handler
     validator: postgres_fdw_validator
+    owner: app
     ensure: present
   - name: file_fdw
     options:
@@ -293,6 +294,7 @@ Each FDW entry supports the following properties:
 - `ensure`: Indicates whether the FDW should be `present` or `absent` in the database (default is `present`).
 - `handler`: The name of the handler function used by the FDW.
 - `validator`: The name of the validator function used by the FDW.
+- `owner`: The owner of the FDW.
 - `options`: A map of FDW options to manage. Each option supports:
   - `value`: The string value of the option.
   - `ensure`: Indicates whether the option should be `present` or `absent`.
@@ -306,6 +308,11 @@ Each FDW entry supports the following properties:
 
 The operator reconciles only the FDWs explicitly listed in `spec.fdws`. Any existing FDWs not declared in this list are left untouched.
 
+!!! Warning
+    PostgreSQL restricts ownership of foreign data wrappers to **superuser roles only**. As a result, the `owner` field
+    in the FDW spec is **informational**: it can only be set to the superuser that the CloudNativePG operator uses
+    internally (typically `postgres`). Attempting to assign ownership to a non-superuser (e.g., an app role) will be ignored or rejected, as PostgreSQL does
+    not allow non-superuser ownership of foreign data wrappers.
 ## Limitations and Caveats
 
 ### Renaming a database
