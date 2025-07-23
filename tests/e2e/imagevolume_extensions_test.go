@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -72,7 +72,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 	var namespace, clusterName, databaseName string
 	var err error
 
-	assertVolumeMounts := func(podList *v1.PodList, imageVolumeExtension string) {
+	assertVolumeMounts := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
 		mountPath := filepath.Join(postgres.ExtensionsBaseDirectory, imageVolumeExtension)
 		for _, pod := range podList.Items {
@@ -85,7 +85,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 		Expect(found).To(BeTrue())
 	}
 
-	assertVolumes := func(podList *v1.PodList, imageVolumeExtension string) {
+	assertVolumes := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
 		for _, pod := range podList.Items {
 			for _, volume := range pod.Spec.Volumes {
@@ -197,7 +197,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 				cluster.Spec.PostgresConfiguration.Extensions = append(cluster.Spec.PostgresConfiguration.Extensions,
 					apiv1.ExtensionConfiguration{
 						Name: "pgvector",
-						ImageVolumeSource: v1.ImageVolumeSource{
+						ImageVolumeSource: corev1.ImageVolumeSource{
 							Reference: "ghcr.io/niccolofei/pgvector:18beta1-master-bullseye", // wokeignore:rule=master
 						},
 					})
