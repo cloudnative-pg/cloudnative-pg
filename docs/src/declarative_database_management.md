@@ -292,8 +292,8 @@ Each FDW entry supports the following properties:
 
 - `name` *(mandatory)*: The name of the foreign data wrapper.
 - `ensure`: Indicates whether the FDW should be `present` or `absent` in the database (default is `present`).
-- `handler`: The name of the handler function used by the FDW.
-- `validator`: The name of the validator function used by the FDW.
+- `handler`: The name of the handler function used by the FDW. If not specified, the default handler defined by the FDW extension (if any) will be used.
+- `validator`: The name of the validator function used by the FDW. If not specified, the default validator defined by the FDW extension (if any) will be used.
 - `owner`: The owner of the FDW.
 - `options`: A map of FDW options to manage. Each option supports:
   - `value`: The string value of the option.
