@@ -179,7 +179,10 @@ spec:
                       - absent
                       type: string
                     handler:
-                      description: Name of the handler function (e.g., "postgres_fdw_handler")
+                      description: |-
+                        The pointer to the name of the handler function (e.g., "postgres_fdw_handler")
+                        It would be nil if the handler is not specified, as commonly the default handler is
+                        registrated when creating the fdw extension.
                       type: string
                     name:
                       description: Name of the extension/schema
@@ -202,6 +205,8 @@ spec:
                             type: string
                           value:
                             type: string
+                        required:
+                        - value
                         type: object
                       description: Options specifies options for the FDW(key is option
                         name, value is option value)
@@ -213,7 +218,10 @@ spec:
                         Even if an owner is explicitly specified during creation, it will be ignored.
                       type: string
                     validator:
-                      description: Name of the validator function (e.g., "postgres_fdw_validator")
+                      description: |-
+                        The pointer to the name of the validator function (e.g., "postgres_fdw_validator")
+                        It would be nil if the validator is not specified, as commonly the default validator is
+                        registrated with handler together when creating the fdw extension.
                       type: string
                   required:
                   - name
