@@ -463,11 +463,24 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 
 	var sqlCreateFDW strings.Builder
 	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
-	if len(fdw.Handler) > 0 {
-		sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+
+	// Extract handler and validator
+	// If no handler or validator is provided, the default handler or validator will be used
+	if fdw.Handler != nil {
+		// Handler is set to ""
+		if len(*fdw.Handler) == 0 {
+			sqlCreateFDW.WriteString("NO HANDLER ")
+		} else {
+			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{*fdw.Handler}.Sanitize()))
+		}
 	}
-	if len(fdw.Validator) > 0 {
-		sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+	if fdw.Validator != nil {
+		// Validator is set to ""
+		if len(*fdw.Validator) == 0 {
+			sqlCreateFDW.WriteString("NO VALIDATOR ")
+		} else {
+			sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{*fdw.Validator}.Sanitize()))
+		}
 	}
 
 	// Extract options
@@ -539,55 +552,59 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 	contextLogger := log.FromContext(ctx)
 
 	// Alter Handler
-	if len(fdw.Handler) > 0 && fdw.Handler != info.Handler {
-		changeHandlerSQL := fmt.Sprintf(
-			"ALTER FOREIGN DATA WRAPPER %s HANDLER %s",
-			pgx.Identifier{fdw.Name}.Sanitize(),
-			pgx.Identifier{fdw.Handler}.Sanitize(),
-		)
+	if fdw.Handler != nil {
+		if len(*fdw.Handler) == 0 && info.Handler != "-" {
+			changeHandlerSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s NO HANDLER",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+			)
 
-		if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
-			return fmt.Errorf("altering handler of foreign data wrapper %w", err)
+			if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
+				return fmt.Errorf("removing handler of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("removed foreign data wrapper handler", "name", fdw.Name)
+		} else if len(*fdw.Handler) > 0 && info.Handler != *fdw.Handler {
+			changeHandlerSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s HANDLER %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{*fdw.Handler}.Sanitize(),
+			)
+
+			if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
+				return fmt.Errorf("altering handler of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("altered foreign data wrapper handler", "name", fdw.Name, "handler", *fdw.Handler)
 		}
-
-		contextLogger.Info("altered foreign data wrapper handler", "name", fdw.Name, "handler", fdw.Handler)
-	} else if len(fdw.Handler) == 0 && info.Handler != "-" {
-		changeHandlerSQL := fmt.Sprintf(
-			"ALTER FOREIGN DATA WRAPPER %s NO HANDLER",
-			pgx.Identifier{fdw.Name}.Sanitize(),
-		)
-
-		if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
-			return fmt.Errorf("removing handler of foreign data wrapper %w", err)
-		}
-
-		contextLogger.Info("removed foreign data wrapper handler", "name", fdw.Name)
 	}
 
 	// Alter Validator
-	if len(fdw.Validator) > 0 && fdw.Validator != info.Validator {
-		changeValidatorSQL := fmt.Sprintf(
-			"ALTER FOREIGN DATA WRAPPER %s VALIDATOR %s",
-			pgx.Identifier{fdw.Name}.Sanitize(),
-			pgx.Identifier{fdw.Validator}.Sanitize(),
-		)
+	if fdw.Validator != nil {
+		if len(*fdw.Validator) == 0 && info.Validator != "-" {
+			changeValidatorSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s NO VALIDATOR",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+			)
 
-		if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
-			return fmt.Errorf("altering validator of foreign data wrapper %w", err)
+			if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
+				return fmt.Errorf("removing validator of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
+		} else if len(*fdw.Validator) > 0 && info.Validator != *fdw.Validator {
+			changeValidatorSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s VALIDATOR %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{*fdw.Validator}.Sanitize(),
+			)
+
+			if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
+				return fmt.Errorf("altering validator of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("altered foreign data wrapper validator", "name", fdw.Name, "validator", *fdw.Validator)
 		}
-
-		contextLogger.Info("altered foreign data wrapper validator", "name", fdw.Name, "validator", fdw.Validator)
-	} else if len(fdw.Validator) == 0 && info.Validator != "-" {
-		changeValidatorSQL := fmt.Sprintf(
-			"ALTER FOREIGN DATA WRAPPER %s NO VALIDATOR",
-			pgx.Identifier{fdw.Name}.Sanitize(),
-		)
-
-		if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
-			return fmt.Errorf("removing validator of foreign data wrapper %w", err)
-		}
-
-		contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
 	}
 
 	// Alter the owner
