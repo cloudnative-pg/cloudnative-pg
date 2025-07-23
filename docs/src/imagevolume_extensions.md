@@ -239,7 +239,8 @@ You may need to include multiple extensions within the same container image,
 adopting a structure where each extension’s files reside in their own
 subdirectory.
 
-For example, to package PostGIS and pgRouting together in a single image:
+For example, to package PostGIS and pgRouting together in a single image, each
+in its own subdirectory:
 
 ```yaml
 # ...
