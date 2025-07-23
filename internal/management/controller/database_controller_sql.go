@@ -548,7 +548,6 @@ func updateFDWOptions(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *
 	return nil
 }
 
-// nolint: dupl
 func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
 	contextLogger := log.FromContext(ctx)
 
