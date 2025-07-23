@@ -64,6 +64,7 @@ nav:
   - e2e.md
   - container_images.md
   - imagevolume_extensions.md
+  - cnpg_i.md
   - operator_capability_levels.md
   - controller.md
   - samples.md
