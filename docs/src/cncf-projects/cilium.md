@@ -16,9 +16,12 @@ Key features of Cilium:
 - Support for both NetworkPolicy and CiliumNetworkPolicy
 - Built-in observability and monitoring with Hubble
 
+To install Cilium in your environment, follow the instructions in the documentation:
+https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/
+
 ## Pod-to-Pod Network Security with CloudNativePG and Cilium
 
-Kubernetes’ default behavior is to allow traffic between any two pods in the cluster network.
+Kubernetes’ default behavior is to allow traffic between any two Pods in the cluster network.
 Cilium provides advanced L3/L4 network security using the `CiliumNetworkPolicy` resource. This
 enables fine-grained control over network traffic between Pods within a Kubernetes cluster. It is
 especially useful for securing communication between application workloads and backend
@@ -32,12 +35,12 @@ restricting ingress traffic to only authorized Pods.
 
 ## Making Cilium Network Policies work with CloudNativePG Operator
 
-When working with a network policy, Cilium or not, the first step is to make sure that the operator can reach the pods
-in the target namespace. This is important because the operator needs to be able to perform checks and actions on the pods,
-and one of those actions requires to access the port `8000` on the pods to get the current status of the PostgreSQL
+When working with a network policy, Cilium or not, the first step is to make sure that the operator can reach the Pods
+in the target namespace. This is important because the operator needs to be able to perform checks and actions on the
+Pods, and one of those actions requires to access the port `8000` on the Pods to get the current status of the PostgreSQL
 instance running inside.
 
-The following `CiliumNetworkPolicy` allows the operator to access the pods in the target `default` namespace
+The following `CiliumNetworkPolicy` allows the operator to access the Pods in the target `default` namespace
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -62,10 +65,10 @@ spec:
     was installed using a different process(Helm, OLM, etc.), the namespace may be different. Make sure to adjust the
     namespace properly.
 
-## Allowing access between cluster pods
+## Allowing access between cluster Pods
 
-Since the default policy is deny all, we need to explicitly allow access between the cluster pods in the same namespace.
-We will improve our previous policy by adding the required ingress rule
+Since the default policy is "deny all", we need to explicitly allow access between the cluster Pods in the same namespace.
+We will improve our previous policy by adding the required ingress rule:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -91,11 +94,13 @@ spec:
               protocol: TCP
 ```
 
-The policy allows access from `cnpg-system` pods and from default namespace pods that also belong to `cluster-example`. The matchLabels selector requires pods to have the complete set of listed labels. Missing even one label means the pod will not match.
+The policy allows access from `cnpg-system` Pods and from `default` namespace Pods that also belong to `cluster-example`.
+The `matchLabels` selector requires Pods to have the complete set of listed labels. Missing even one label means the Pod
+will not match.
 
 ## Restricting Access to PostgreSQL with Cilium
 
-In this example, we define a `CiliumNetworkPolicy` that allows only Pods labeled `role=backend` in the default namespace
+In this example, we define a `CiliumNetworkPolicy` that allows only Pods labeled `role=backend` in the `default` namespace
 to connect to a PostgreSQL cluster named `cluster-example`. All other ingress traffic is blocked by default.
 
 ```yaml
@@ -120,7 +125,7 @@ spec:
 ```
 
 This `CiliumNetworkPolicy` ensures that only Pods labeled with `role=backend` can access the
-PostgreSQL instance managed by CloudNativePG via port 5432 in the default namespace.
+PostgreSQL instance managed by CloudNativePG via port 5432 in the `default` namespace.
 
 In the following policy, we demonstrate how to allow ingress traffic to port 5432 of a PostgreSQL cluster named
 `cluster-example`, only from Pods with the label `role=backend` in any namespace.
@@ -150,7 +155,7 @@ spec:
 ```
 
 The following example allows ingress traffic to port 5432 of the `cluster-example` cluster (located in the
-default namespace) from any Pods in the backend namespace.
+`default` namespace) from any Pods in the `backend` namespace.
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -174,11 +179,11 @@ spec:
 ```
 
 Using Cilium’s L3/L4 policy model, we define a `CiliumNetworkPolicy` that explicitly allows ingress
-traffic to cluster pods only from application pods in the `backend` namespace. All other
+traffic to cluster Pods only from application Pods in the `backend` namespace. All other
 traffic is implicitly denied unless explicitly permitted by additional policies.
 
 The following example allows ingress traffic to port 5432 of the `cluster-example` cluster (located in the
-default namespace) from any source within the Kubernetes cluster.
+`default` namespace) from any source within the Kubernetes cluster.
 
 ```yaml
 apiVersion: cilium.io/v2
