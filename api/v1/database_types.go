@@ -228,24 +228,32 @@ type ExtensionSpec struct {
 type FDWSpec struct {
 	DatabaseObjectSpec `json:",inline"`
 
-	// Name of the handler function (e.g., "postgres_fdw_handler")
-	Handler string `json:"handler,omitempty"`
+	// The pointer to the name of the handler function (e.g., "postgres_fdw_handler")
+	// It would be nil if the handler is not specified, as commonly the default handler is
+	// registrated when creating the fdw extension.
+	// +optional
+	Handler *string `json:"handler,omitempty"`
 
-	// Name of the validator function (e.g., "postgres_fdw_validator")
-	Validator string `json:"validator,omitempty"`
+	// The pointer to the name of the validator function (e.g., "postgres_fdw_validator")
+	// It would be nil if the validator is not specified, as commonly the default validator is
+	// registrated with handler together when creating the fdw extension.
+	// +optional
+	Validator *string `json:"validator,omitempty"`
 
 	// Owner specifies the database user who will own the Foreign Data Wrapper.
 	// By default, the owner of a new FDW is the current session user.
 	// Even if an owner is explicitly specified during creation, it will be ignored.
+	// +optional
 	Owner string `json:"owner,omitempty"`
 
 	// Options specifies options for the FDW(key is option name, value is option value)
+	// +optional
 	Options map[string]OptionSpecValue `json:"options,omitempty"`
 }
 
 // OptionSpecValue holds both the value and the ensure field for an option
 type OptionSpecValue struct {
-	Value string `json:"value,omitempty"`
+	Value string `json:"value"`
 
 	// Specifies whether an option should be present or absent in
 	// the database. If set to `present`, the option will be
