@@ -531,13 +531,16 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
+		handler := "testhandler"
+		validator := "testvalidator"
+
 		fdw = apiv1.FDWSpec{
 			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
 				Name:   "testfdw",
 				Ensure: "present",
 			},
-			Handler:   "testhandler",
-			Validator: "testvalidator",
+			Handler:   &handler,
+			Validator: &validator,
 			Owner:     "owner",
 		}
 
@@ -601,8 +604,8 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		It("does nothing when the fdw has been correctly reconciled", func(ctx SpecContext) {
 			Expect(updateDatabaseFDW(ctx, db, fdw, &fdwInfo{
 				Name:      fdw.Name,
-				Handler:   fdw.Handler,
-				Validator: fdw.Validator,
+				Handler:   *fdw.Handler,
+				Validator: *fdw.Validator,
 				Owner:     fdw.Owner,
 			})).Error().NotTo(HaveOccurred())
 		})
@@ -613,7 +616,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: *fdw.Validator, Owner: fdw.Owner})).
 				Error().NotTo(HaveOccurred())
 		})
 
@@ -622,9 +625,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" NO HANDLER").
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
-			fdw.Handler = ""
+			*fdw.Handler = ""
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: *fdw.Validator, Owner: fdw.Owner})).
 				Error().NotTo(HaveOccurred())
 		})
 
@@ -634,7 +637,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnError(testError)
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: fdw.Validator, Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: "oldhandler", Validator: *fdw.Validator, Owner: fdw.Owner})).
 				Error().To(MatchError(testError))
 		})
 
@@ -644,7 +647,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: *fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
 				Error().NotTo(HaveOccurred())
 		})
 
@@ -653,9 +656,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				ExpectExec("ALTER FOREIGN DATA WRAPPER \"testfdw\" NO VALIDATOR").
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
-			fdw.Validator = ""
+			*fdw.Validator = ""
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: *fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
 				Error().NotTo(HaveOccurred())
 		})
 
@@ -665,7 +668,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnError(testError)
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
+				&fdwInfo{Name: fdw.Name, Handler: *fdw.Handler, Validator: "oldvalidator", Owner: fdw.Owner})).
 				Error().To(MatchError(testError))
 		})
 
@@ -675,8 +678,8 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,
-				Handler:   fdw.Handler,
-				Validator: fdw.Validator,
+				Handler:   *fdw.Handler,
+				Validator: *fdw.Validator,
 				Options: map[string]apiv1.OptionSpecValue{
 					"modify_option": {Value: "old_value"},
 					"remove_option": {Value: "value"},
@@ -696,8 +699,8 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,
-				Handler:   fdw.Handler,
-				Validator: fdw.Validator,
+				Handler:   *fdw.Handler,
+				Validator: *fdw.Validator,
 				Options: map[string]apiv1.OptionSpecValue{
 					"modify_option": {Value: "old_value"},
 					"remove_option": {Value: "value"},
@@ -717,8 +720,8 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,
-				Handler:   fdw.Handler,
-				Validator: fdw.Validator,
+				Handler:   *fdw.Handler,
+				Validator: *fdw.Validator,
 				Options: map[string]apiv1.OptionSpecValue{
 					"modify_option": {Value: "old_value"},
 					"remove_option": {Value: "value"},
@@ -738,7 +741,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: fdw.Validator, Owner: "oldowner"})).
+				&fdwInfo{Name: fdw.Name, Handler: *fdw.Handler, Validator: *fdw.Validator, Owner: "oldowner"})).
 				Error().NotTo(HaveOccurred())
 		})
 
@@ -748,7 +751,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnError(testError)
 
 			Expect(updateDatabaseFDW(ctx, db, fdw,
-				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: fdw.Validator, Owner: "old"})).
+				&fdwInfo{Name: fdw.Name, Handler: *fdw.Handler, Validator: *fdw.Validator, Owner: "old"})).
 				Error().To(MatchError(testError))
 		})
 	})
