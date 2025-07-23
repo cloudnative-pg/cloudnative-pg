@@ -4307,8 +4307,56 @@ var _ = Describe("validateResources", func() {
 		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
 	})
 
+	It("returns no errors when no memoryRequest is set", func() {
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
 	It("returns no errors when memoryRequest is greater than or equal to shared_buffers in GB", func() {
 		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns an error when hugepages request is different than hugepages limits", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Limits["hugepages-1Gi"] = resource.MustParse("2Gi")
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("HugePages requests must equal the limits"))
+	})
+
+	It("returns an error when hugepages request is present but no CPU or memory are", func() {
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("HugePages require cpu or memory"))
+	})
+
+	It("returns an error when no request is enough to contain shared_buffers, even if the sum is", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Requests["ugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Requests["hugepages-2Mi"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000000kB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
+	})
+
+	It("returns no errors when hugepages-1Gi request is greater than or equal to shared_buffers in GB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("256Mi")
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when hugepages-2Mi request is greater than or equal to shared_buffers in GB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("256Mi")
+		cluster.Spec.Resources.Limits["hugepages-2Mi"] = resource.MustParse("1Gi")
 		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
 		errors := v.validateResources(cluster)
 		Expect(errors).To(BeEmpty())
