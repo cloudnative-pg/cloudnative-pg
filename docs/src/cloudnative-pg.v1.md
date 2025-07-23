@@ -3081,21 +3081,25 @@ of WAL archiving and backups for this external cluster</p>
 <td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
    <span class="text-muted">No description provided.</span></td>
 </tr>
-<tr><td><code>handler</code> <B>[Required]</B><br/>
+<tr><td><code>handler</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)</p>
+   <p>The pointer to the name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)
+It would be nil if the handler is not specified, as commonly the default handler is
+registrated when creating the fdw extension.</p>
 </td>
 </tr>
-<tr><td><code>validator</code> <B>[Required]</B><br/>
+<tr><td><code>validator</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)</p>
+   <p>The pointer to the name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)
+It would be nil if the validator is not specified, as commonly the default validator is
+registrated with handler together when creating the fdw extension.</p>
 </td>
 </tr>
-<tr><td><code>owner</code> <B>[Required]</B><br/>
+<tr><td><code>owner</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3104,7 +3108,7 @@ By default, the owner of a new FDW is the current session user.
 Even if an owner is explicitly specified during creation, it will be ignored.</p>
 </td>
 </tr>
-<tr><td><code>options</code> <B>[Required]</B><br/>
+<tr><td><code>options</code><br/>
 <a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
 </td>
 <td>

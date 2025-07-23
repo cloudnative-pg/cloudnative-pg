@@ -548,14 +548,16 @@ func updateFDWOptions(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *
 	return nil
 }
 
+// nolint: dupl
 func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Alter Handler
 	if fdw.Handler != nil {
-		if len(*fdw.Handler) == 0 && info.Handler != "-" {
-			changeHandlerSQL := fmt.Sprintf(
-				"ALTER FOREIGN DATA WRAPPER %s NO HANDLER",
+		handler := *fdw.Handler
+		switch {
+		case handler == "" && info.Handler != "-":
+			changeHandlerSQL := fmt.Sprintf("ALTER FOREIGN DATA WRAPPER %s NO HANDLER",
 				pgx.Identifier{fdw.Name}.Sanitize(),
 			)
 
@@ -564,9 +566,9 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 			}
 
 			contextLogger.Info("removed foreign data wrapper handler", "name", fdw.Name)
-		} else if len(*fdw.Handler) > 0 && info.Handler != *fdw.Handler {
-			changeHandlerSQL := fmt.Sprintf(
-				"ALTER FOREIGN DATA WRAPPER %s HANDLER %s",
+
+		case handler != "" && info.Handler != handler:
+			changeHandlerSQL := fmt.Sprintf("ALTER FOREIGN DATA WRAPPER %s HANDLER %s",
 				pgx.Identifier{fdw.Name}.Sanitize(),
 				pgx.Identifier{*fdw.Handler}.Sanitize(),
 			)
@@ -581,7 +583,9 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 
 	// Alter Validator
 	if fdw.Validator != nil {
-		if len(*fdw.Validator) == 0 && info.Validator != "-" {
+		validator := *fdw.Validator
+		switch {
+		case validator == "" && info.Validator != "-":
 			changeValidatorSQL := fmt.Sprintf(
 				"ALTER FOREIGN DATA WRAPPER %s NO VALIDATOR",
 				pgx.Identifier{fdw.Name}.Sanitize(),
@@ -592,7 +596,7 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 			}
 
 			contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
-		} else if len(*fdw.Validator) > 0 && info.Validator != *fdw.Validator {
+		case validator != "" && info.Validator != validator:
 			changeValidatorSQL := fmt.Sprintf(
 				"ALTER FOREIGN DATA WRAPPER %s VALIDATOR %s",
 				pgx.Identifier{fdw.Name}.Sanitize(),
