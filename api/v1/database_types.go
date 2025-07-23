@@ -228,32 +228,30 @@ type ExtensionSpec struct {
 type FDWSpec struct {
 	DatabaseObjectSpec `json:",inline"`
 
-	// The pointer to the name of the handler function (e.g., "postgres_fdw_handler")
-	// It would be nil if the handler is not specified, as commonly the default handler is
-	// registrated when creating the fdw extension.
+	// Name of the handler function (e.g., "postgres_fdw_handler")
+	// It would be empty if no handler is specified, in which case
+	// the default handler is registrated when creating the fdw extensions
 	// +optional
-	Handler *string `json:"handler,omitempty"`
+	Handler string `json:"handler,omitempty"`
 
-	// The pointer to the name of the validator function (e.g., "postgres_fdw_validator")
-	// It would be nil if the validator is not specified, as commonly the default validator is
-	// registrated with handler together when creating the fdw extension.
+	// Name of the validator function (e.g., "postgres_fdw_validator")
+	// It would be empty if no validator is specified, in which case
+	// the default validator is registrated when creating the fdw extensions
 	// +optional
-	Validator *string `json:"validator,omitempty"`
+	Validator string `json:"validator,omitempty"`
 
-	// Owner specifies the database user who will own the Foreign Data Wrapper.
-	// By default, the owner of a new FDW is the current session user.
-	// Even if an owner is explicitly specified during creation, it will be ignored.
+	// Owner specifies the database role that will own the Foreign Data Wrapper.
+	// The specified role must have superuser privileges in the target database.
 	// +optional
 	Owner string `json:"owner,omitempty"`
 
 	// Options specifies options for the FDW(key is option name, value is option value)
-	// +optional
 	Options map[string]OptionSpecValue `json:"options,omitempty"`
 }
 
 // OptionSpecValue holds both the value and the ensure field for an option
 type OptionSpecValue struct {
-	Value string `json:"value"`
+	Value string `json:"value,omitempty"`
 
 	// Specifies whether an option should be present or absent in
 	// the database. If set to `present`, the option will be
