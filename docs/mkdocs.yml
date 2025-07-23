@@ -71,5 +71,6 @@ nav:
   - release_notes.md
   - CNCF Projects Integrations:
     - cncf-projects/external-secrets.md
+    - cncf-projects/cilium.md
   - Appendixes:
     - appendixes/object_stores.md

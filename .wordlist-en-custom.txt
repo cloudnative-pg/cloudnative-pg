@@ -70,6 +70,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertsCASecret
@@ -183,6 +184,8 @@ InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
+IsolationCheckConfiguration
+Isovalent
 Istio
 Istio's
 JSON
@@ -236,6 +239,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicy
 Niccolò
 NodeAffinity
 NodeMaintenanceWindow
@@ -693,6 +697,7 @@ downtimes
 dvcmQ
 dwm
 dx
+eBPF
 ecdsa
 edb
 eks
