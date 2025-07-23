@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -370,6 +371,8 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (reloadNeeded bool, err error) {
+	contextLogger := log.FromContext(ctx)
+
 	reloadNeeded, err = r.refreshPGHBA(ctx, cluster)
 	if err != nil {
 		return false, err
@@ -380,6 +383,20 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
+
+	if r.bootstrapImages == nil {
+		r.bootstrapImages = collectImageNames(cluster)
+		contextLogger.Info(
+			"Detected bootstrap images",
+			"bootstrapImages", r.bootstrapImages,
+		)
+	} else if latestImages := collectImageNames(cluster); !latestImages.Eq(r.bootstrapImages) {
+		contextLogger.Info(
+			"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
+			"bootstrapImages", r.bootstrapImages.ToSortedList(),
+			"latestImages", latestImages.ToSortedList(),
+		)
+	}
 
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
@@ -400,6 +417,12 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
 	return reloadNeeded, nil
+}
+
+func collectImageNames(cluster *apiv1.Cluster) *stringset.Data {
+	images := stringset.New()
+	images.Put(cluster.Spec.ImageName)
+	return images
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
