@@ -63,12 +63,12 @@ type SyncQuorumStatus struct {
 	Method string `json:"method,omitempty"`
 
 	// StandbyNames is the list of potentially synchronous
-	// instance names
+	// instance names.
 	// +optional
 	StandbyNames []string `json:"standbyNames,omitempty"`
 
-	// StandbyNumber is the quorum of instances that will be
-	// synchronous, to be chosen within SynchronousStandbyNamesList
+	// StandbyNumber is the number of synchronous standbys that transactions
+	// need to wait for replies from.
 	// +optional
 	StandbyNumber int `json:"standbyNumber,omitempty"`
 

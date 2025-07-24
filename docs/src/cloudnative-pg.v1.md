@@ -6070,15 +6070,15 @@ quorum of the PG cluster.</p>
 </td>
 <td>
    <p>StandbyNames is the list of potentially synchronous
-instance names</p>
+instance names.</p>
 </td>
 </tr>
 <tr><td><code>standbyNumber</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>StandbyNumber is the quorum of instances that will be
-synchronous, to be chosen within SynchronousStandbyNamesList</p>
+   <p>StandbyNumber is the number of synchronous standbys that transactions
+need to wait for replies from.</p>
 </td>
 </tr>
 <tr><td><code>primary</code><br/>

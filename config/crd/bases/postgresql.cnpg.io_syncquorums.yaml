@@ -58,14 +58,14 @@ spec:
               standbyNames:
                 description: |-
                   StandbyNames is the list of potentially synchronous
-                  instance names
+                  instance names.
                 items:
                   type: string
                 type: array
               standbyNumber:
                 description: |-
-                  StandbyNumber is the quorum of instances that will be
-                  synchronous, to be chosen within SynchronousStandbyNamesList
+                  StandbyNumber is the number of synchronous standbys that transactions
+                  need to wait for replies from.
                 type: integer
             type: object
         required:
