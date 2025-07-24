@@ -2,6 +2,8 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
+  annotations:
+    cnpg.io/syncQuorum: "t"
 spec:
   instances: 3
 
@@ -9,7 +11,6 @@ spec:
     synchronous:
       method: any
       number: 1
-      quorumFailoverProtection: true
 
   storage:
     size: 1G
