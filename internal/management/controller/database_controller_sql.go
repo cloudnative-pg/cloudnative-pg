@@ -572,7 +572,6 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 			}
 			contextLogger.Info("altered foreign data wrapper handler", "name", fdw.Name, "handler", fdw.Handler)
 		}
-
 	}
 
 	// Alter Validator

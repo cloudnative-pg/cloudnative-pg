@@ -300,6 +300,11 @@ Each FDW entry supports the following properties:
   - `ensure`: Indicates whether the option should be `present` or `absent`.
 
 !!! Info
+    Both `handler` and `validator` are optional, and if not specified, the default handler and validator defined by the FDW extension (if any) will be used.
+    Setting `handler` or `validator` to `"-"` will remove the handler or validator from the FDW respectively. This follows the PostgreSQL convention, where "-"
+    denotes the absence of a handler or validator.
+
+!!! Info
  CloudNativePG manages FDWs using PostgreSQL's native SQL commands:
  [`CREATE FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-createforeigndatawrapper.html),
  [`ALTER FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-alterforeigndatawrapper.html),
