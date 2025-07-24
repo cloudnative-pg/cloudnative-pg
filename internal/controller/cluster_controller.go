@@ -145,7 +145,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=imagecatalogs,verbs=get;watch;list
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusterimagecatalogs,verbs=get;watch;list
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=syncquorums,verbs=create;get;watch;list
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=syncquorums,verbs=create;get;watch;delete;list
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=syncquorums/status,verbs=get;patch;update;watch
 
 // Reconcile is the operator reconcile loop
