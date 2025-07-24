@@ -112,7 +112,7 @@ func (r instanceClientImpl) extractInstancesStatus(
 
 	cluster, ok := ctx.Value(contextutils.ContextKeyCluster).(*apiv1.Cluster)
 	if ok && cluster != nil {
-		result.IsReplica = cluster.IsReplica()
+		result.IsReplicaCluster = cluster.IsReplica()
 		result.CurrentPrimary = cluster.Status.CurrentPrimary
 	}
 

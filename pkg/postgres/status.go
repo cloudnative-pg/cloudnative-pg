@@ -220,9 +220,9 @@ func (list PgStatReplicationList) Less(i, j int) bool {
 // PostgresqlStatusList is a list of PostgreSQL status received from the Pods
 // that can be sorted considering the replication status
 type PostgresqlStatusList struct {
-	Items          []PostgresqlStatus `json:"items"`
-	IsReplica      bool               `json:"-"`
-	CurrentPrimary string             `json:"-"`
+	Items            []PostgresqlStatus `json:"items"`
+	IsReplicaCluster bool               `json:"-"`
+	CurrentPrimary   string             `json:"-"`
 }
 
 // GetNames returns a list of names of Pods
@@ -306,7 +306,8 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 		return !list.Items[i].ReplayLsn.Less(list.Items[j].ReplayLsn)
 	}
 
-	if list.IsReplica && (list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
+	if list.IsReplicaCluster &&
+		(list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
 		return true
 	}
 

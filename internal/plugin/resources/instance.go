@@ -81,7 +81,10 @@ func ExtractInstancesStatus(
 	config *rest.Config,
 	filteredPods []corev1.Pod,
 ) (postgres.PostgresqlStatusList, []error) {
-	result := postgres.PostgresqlStatusList{IsReplica: cluster.IsReplica(), CurrentPrimary: cluster.Status.CurrentPrimary}
+	result := postgres.PostgresqlStatusList{
+		IsReplicaCluster: cluster.IsReplica(),
+		CurrentPrimary:   cluster.Status.CurrentPrimary,
+	}
 	var errs []error
 
 	for idx := range filteredPods {
