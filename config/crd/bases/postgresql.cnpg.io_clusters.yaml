@@ -4236,11 +4236,6 @@ spec:
                         - message: The number of synchronous replicas should be greater
                             than zero
                           rule: self > 0
-                      quorumFailoverProtection:
-                        description: |-
-                          QuorumFailoverProtection enables quorum-based check before failover, ensuring
-                          no data loss at the expense of availability.
-                        type: boolean
                       standbyNamesPost:
                         description: |-
                           A user-defined list of application names to be added to

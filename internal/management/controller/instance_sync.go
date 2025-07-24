@@ -32,7 +32,7 @@ import (
 // resetSyncQuorumObject resets the content of the sync quorum object
 // to prevent unsafe failovers when we are changing the configuration
 func (r *InstanceReconciler) resetSyncQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !r.shouldManageSyncQuorumObject(cluster) {
+	if !r.shouldManageSyncQuorumObject(ctx, cluster) {
 		return nil
 	}
 
@@ -52,7 +52,7 @@ func (r *InstanceReconciler) resetSyncQuorumObject(ctx context.Context, cluster 
 // updateSyncQuorumObject updates the sync quorum object reading the
 // current synchronous replica metadata from the PG instance
 func (r *InstanceReconciler) updateSyncQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !r.shouldManageSyncQuorumObject(cluster) {
+	if !r.shouldManageSyncQuorumObject(ctx, cluster) {
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func (r *InstanceReconciler) updateSyncQuorumObject(ctx context.Context, cluster
 	})
 }
 
-func (r *InstanceReconciler) shouldManageSyncQuorumObject(cluster *apiv1.Cluster) bool {
+func (r *InstanceReconciler) shouldManageSyncQuorumObject(ctx context.Context, cluster *apiv1.Cluster) bool {
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() {
 		return false
 	}
@@ -105,7 +105,7 @@ func (r *InstanceReconciler) shouldManageSyncQuorumObject(cluster *apiv1.Cluster
 	if cluster.Spec.PostgresConfiguration.Synchronous == nil {
 		return false
 	}
-	if !cluster.Spec.PostgresConfiguration.Synchronous.QuorumFailoverProtection {
+	if !cluster.IsSyncQuorumFailoverProtectionActive(ctx) {
 		return false
 	}
 

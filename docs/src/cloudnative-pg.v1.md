@@ -6233,14 +6233,6 @@ to allow for operational continuity. This setting is only applicable if both
 <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
-<tr><td><code>quorumFailoverProtection</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>QuorumFailoverProtection enables quorum-based check before failover, ensuring
-no data loss at the expense of availability.</p>
-</td>
-</tr>
 </tbody>
 </table>
 
