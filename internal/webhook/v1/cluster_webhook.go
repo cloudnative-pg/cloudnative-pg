@@ -2455,7 +2455,7 @@ func getStorageWarnings(r *apiv1.Cluster) admission.Warnings {
 			result = append(
 				result,
 				fmt.Sprintf(
-					"%s and %s  are both specified, %s value will be used.",
+					"%s and %s are both specified, %s value will be used.",
 					size,
 					pvcTemplatePath.Child("resources", "requests", "storage").String(),
 					size,
