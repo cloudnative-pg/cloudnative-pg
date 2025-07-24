@@ -40,7 +40,6 @@ type SyncQuorumList struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 
 // SyncQuorum contains the information about the current synchronous
 // quorum status of a PG cluster. It is updated by the instance manager

@@ -14,11 +14,7 @@ spec:
     singular: syncquorum
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .spec.cluster.name
-      name: Cluster
-      type: string
-    name: v1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: |-
