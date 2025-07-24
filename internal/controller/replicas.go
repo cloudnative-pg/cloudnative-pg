@@ -330,7 +330,10 @@ func GetPodsNotOnPrimaryNode(
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
 ) postgres.PostgresqlStatusList {
-	podsOnOtherNodes := postgres.PostgresqlStatusList{}
+	podsOnOtherNodes := postgres.PostgresqlStatusList{
+		IsReplicaCluster: status.IsReplicaCluster,
+		CurrentPrimary:   status.CurrentPrimary,
+	}
 	if primaryPod == nil {
 		return podsOnOtherNodes
 	}

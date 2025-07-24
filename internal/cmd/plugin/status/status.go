@@ -178,6 +178,7 @@ func extractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *Postgr
 	// Get the list of Pods created by this Cluster
 	instancesStatus, errList := resources.ExtractInstancesStatus(
 		ctx,
+		&cluster,
 		plugin.Config,
 		managedPods,
 	)
