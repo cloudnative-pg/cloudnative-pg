@@ -270,9 +270,10 @@ func (r *InstanceReconciler) Reconcile(
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
-		if err = r.updateSyncQuorumObject(ctx, cluster); err != nil {
-			return reconcile.Result{}, err
-		}
+	}
+
+	if err = r.updateSyncQuorumObject(ctx, cluster); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	// IMPORTANT
