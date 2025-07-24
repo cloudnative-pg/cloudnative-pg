@@ -306,6 +306,11 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 		return !list.Items[i].ReplayLsn.Less(list.Items[j].ReplayLsn)
 	}
 
+	// In a replica cluster, all instances are standbys of an external primary.
+	// Therefore, `IsPrimary` is always false for every item in the list.
+	// We rely on the `CurrentPrimary` field to identify the designated primary
+	// instance that is replicating from the external cluster, ensuring it is
+	// sorted first among the standbys.
 	if list.IsReplicaCluster &&
 		(list.Items[i].Pod.Name == list.CurrentPrimary && list.Items[j].Pod.Name != list.CurrentPrimary) {
 		return true
