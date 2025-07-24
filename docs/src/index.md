@@ -61,7 +61,12 @@ The PostgreSQL operand container images are available for all
 across multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Daily jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
+The [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
+and [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
+container images are signed and include SBOM and provenance attestations,
+provided separately for each architecture.
+
+Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
 promptly addressed.
 
 Additionally, the community provides images for the [PostGIS extension](postgis.md).
