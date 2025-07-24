@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: cluster-backup
+  name: cluster-backup-azurite-02
 spec:
   cluster:
     name: pg-backup-azurite
