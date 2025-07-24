@@ -284,6 +284,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
+  postgresql:
     pg_ident:
     - cnpg_streaming_replica streaming-replica.cnpg.svc.cluster.local streaming_replica
 ```
