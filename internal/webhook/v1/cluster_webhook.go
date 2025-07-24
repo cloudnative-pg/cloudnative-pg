@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
@@ -1030,6 +1031,16 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		// Validate parameter name syntax to prevent configuration parsing errors
+		if err := validateParameterName(key); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					key,
+					err.Error()))
+		}
+
 		_, isFixed := postgres.FixedConfigurationParameters[key]
 		sanitizedValue, presentInSanitizedConfiguration := sanitizedParameters[key]
 		if isFixed && (!presentInSanitizedConfiguration || value != sanitizedValue) {
@@ -2625,6 +2636,68 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 				value,
 				fmt.Sprintf("error decoding liveness pinger config: %s", err.Error()),
 			),
+		}
+	}
+
+	return nil
+}
+
+// validateParameterName validates PostgreSQL parameter name syntax
+// to prevent configuration parsing errors that can kill cluster startup
+func validateParameterName(name string) error {
+	if name == "" {
+		return fmt.Errorf("parameter name cannot be empty")
+	}
+
+	// Check for syntax errors that break PostgreSQL configuration parsing
+	// Check for double equals first since it's more specific than single equals
+	if strings.Contains(name, "==") {
+		return fmt.Errorf("parameter name cannot contain '=='")
+	}
+	if strings.HasSuffix(name, "=") {
+		return fmt.Errorf("parameter name cannot end with '='")
+	}
+	if strings.TrimSpace(name) != name {
+		return fmt.Errorf("parameter name cannot have leading/trailing whitespace")
+	}
+
+	// Validate character set following PostgreSQL identifier rules
+	// as referenced in https://github.com/postgres/postgres/blob/master/src/backend/utils/misc/guc.c#L1076
+	return validatePostgreSQLIdentifier(name)
+}
+
+// validatePostgreSQLIdentifier validates parameter name follows PostgreSQL identifier rules
+func validatePostgreSQLIdentifier(name string) error {
+	// Extension parameters (with dots) require each part to be a valid identifier
+	if strings.Contains(name, ".") {
+		parts := strings.Split(name, ".")
+		for _, part := range parts {
+			if err := validateIdentifierPart(part); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Regular parameters must be valid identifiers
+	return validateIdentifierPart(name)
+}
+
+// validateIdentifierPart validates a single identifier part according to PostgreSQL rules
+func validateIdentifierPart(part string) error {
+	if part == "" {
+		return fmt.Errorf("parameter name part cannot be empty")
+	}
+
+	// First character must be letter or underscore
+	if !unicode.IsLetter(rune(part[0])) && part[0] != '_' {
+		return fmt.Errorf("parameter name must start with letter or underscore")
+	}
+
+	// Subsequent characters: letters, digits, underscores, dollar signs
+	for _, char := range part[1:] {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '_' && char != '$' {
+			return fmt.Errorf("parameter name contains invalid character: %c", char)
 		}
 	}
 

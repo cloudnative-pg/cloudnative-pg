@@ -1214,6 +1214,160 @@ var _ = Describe("configuration change validation", func() {
 			Expect(v.validateConfiguration(cluster)).To(BeEmpty())
 		})
 	})
+
+	Context("parameter name syntax validation", func() {
+		It("should reject parameter names ending with '='", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"log_diconnections=": "off", // This is the exact issue from #7045
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Field).To(Equal("spec.postgresql.parameters.log_diconnections="))
+			Expect(errs[0].Detail).To(ContainSubstring("parameter name cannot end with '='"))
+		})
+
+		It("should reject parameter names containing '=='", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"some_param==": "value",
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Field).To(Equal("spec.postgresql.parameters.some_param=="))
+			Expect(errs[0].Detail).To(ContainSubstring("parameter name cannot contain '=='"))
+		})
+
+		It("should reject parameter names with leading/trailing whitespace", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							" param_with_leading_space":  "value",
+							"param_with_trailing_space ": "value",
+							" param_with_both_spaces ":   "value",
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(3))
+			for _, err := range errs {
+				Expect(err.Detail).To(ContainSubstring("parameter name cannot have leading/trailing whitespace"))
+			}
+		})
+
+		It("should reject empty parameter names", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"": "some_value",
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Detail).To(ContainSubstring("parameter name cannot be empty"))
+		})
+
+		It("should accept syntactically valid parameter names", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"valid_param_name":   "value",
+							"another_valid_name": "value",
+							"param123":           "value",
+							"_underscore_start":  "value",
+							"param_with_$dollar": "value",
+							"my_extension.param": "value", // Extension parameter with dot
+							"ext.another_param":  "value", // Another extension parameter
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			// Should have no parameter name syntax validation errors
+			// (there might be other validation errors, but not parameter name syntax errors)
+			for _, err := range errs {
+				Expect(err.Detail).ToNot(ContainSubstring("parameter name cannot"))
+				Expect(err.Detail).ToNot(ContainSubstring("parameter name must start"))
+				Expect(err.Detail).ToNot(ContainSubstring("parameter name contains invalid character"))
+			}
+		})
+
+		It("should reject parameter names with invalid characters", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"param-with-dash":  "value", // Dash not allowed
+							"param@with@at":    "value", // @ not allowed
+							"param.with!bang":  "value", // ! not allowed in extension param part
+							"123numeric_start": "value", // Cannot start with number
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(4))
+
+			// Check that we have the specific validation error messages
+			errorMessages := make([]string, len(errs))
+			for i, err := range errs {
+				errorMessages[i] = err.Detail
+			}
+
+			Expect(errorMessages).To(ContainElement(ContainSubstring("parameter name contains invalid character")))
+			Expect(errorMessages).To(ContainElement(ContainSubstring("parameter name must start with letter or underscore")))
+		})
+
+		It("should handle multiple parameter name syntax errors", func() {
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Parameters: map[string]string{
+							"param_ending_equals=":  "value1", // Ends with =
+							"param_with_space ":     "value2", // Trailing space
+							" param_leading_space":  "value3", // Leading space
+							"param_double_equals==": "value4", // Contains ==
+						},
+					},
+				},
+			}
+
+			errs := v.validateConfiguration(cluster)
+			Expect(errs).To(HaveLen(4))
+
+			// Check that we have the specific syntax error messages we expect
+			errorMessages := make([]string, len(errs))
+			for i, err := range errs {
+				errorMessages[i] = err.Detail
+			}
+
+			Expect(errorMessages).To(ContainElement(ContainSubstring("parameter name cannot end with '='")))
+			Expect(errorMessages).To(ContainElement(ContainSubstring("parameter name cannot have leading/trailing whitespace")))
+			Expect(errorMessages).To(ContainElement(ContainSubstring("parameter name cannot contain '=='")))
+		})
+	})
 })
 
 var _ = Describe("validate image name change", func() {
