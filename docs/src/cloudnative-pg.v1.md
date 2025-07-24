@@ -3085,30 +3085,29 @@ of WAL archiving and backups for this external cluster</p>
 <i>string</i>
 </td>
 <td>
-   <p>The pointer to the name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)
-It would be nil if the handler is not specified, as commonly the default handler is
-registrated when creating the fdw extension.</p>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)
+It would be empty if no handler is specified, in which case
+the default handler is registrated when creating the fdw extensions</p>
 </td>
 </tr>
 <tr><td><code>validator</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The pointer to the name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)
-It would be nil if the validator is not specified, as commonly the default validator is
-registrated with handler together when creating the fdw extension.</p>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)
+It would be empty if no validator is specified, in which case
+the default validator is registrated when creating the fdw extensions</p>
 </td>
 </tr>
 <tr><td><code>owner</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Owner specifies the database user who will own the Foreign Data Wrapper.
-By default, the owner of a new FDW is the current session user.
-Even if an owner is explicitly specified during creation, it will be ignored.</p>
+   <p>Owner specifies the database role that will own the Foreign Data Wrapper.
+The specified role must have superuser privileges in the target database.</p>
 </td>
 </tr>
-<tr><td><code>options</code><br/>
+<tr><td><code>options</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
 </td>
 <td>

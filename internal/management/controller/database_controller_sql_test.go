@@ -583,7 +583,8 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 	})
 
 	Context("createDatabaseFDW", func() {
-		createFDWSQL := "CREATE FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\" VALIDATOR \"testvalidator\" OPTIONS (\"testoption\" 'testvalue')"
+		createFDWSQL := "CREATE FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\" " +
+			"VALIDATOR \"testvalidator\" OPTIONS (\"testoption\" 'testvalue')"
 
 		It("returns success when the fdw has been created", func(ctx SpecContext) {
 			dbMock.
