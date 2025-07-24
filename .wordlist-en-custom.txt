@@ -160,6 +160,7 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
@@ -180,6 +181,7 @@ GUC
 GUCs
 Gabriele
 GaugeVec
+GeoSpatial
 Gi
 GitOps
 GoArch
@@ -204,6 +206,8 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolume
+ImageVolumeSource
 ImportSource
 InfoSec
 Innocenti
@@ -771,6 +775,7 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+discoverable
 displayName
 displayName
 distro
@@ -885,6 +890,7 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imageVolume
 imagecatalogs
 img
 immediateCheckpoint
@@ -951,6 +957,7 @@ lastSuccessfulBackupByMethod
 latestGeneratedNode
 latn
 lc
+ld
 ldap
 ldapBindPassword
 ldaps
@@ -1093,6 +1100,7 @@ pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
 pgRestoreExtraOptions
+pgRouting
 pgSQL
 pgadmin
 pgaudit
