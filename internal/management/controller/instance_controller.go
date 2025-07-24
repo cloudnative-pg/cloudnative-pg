@@ -371,8 +371,6 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (reloadNeeded bool, err error) {
-	contextLogger := log.FromContext(ctx)
-
 	reloadNeeded, err = r.refreshPGHBA(ctx, cluster)
 	if err != nil {
 		return false, err
@@ -384,18 +382,9 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
-	if r.bootstrapImages == nil {
-		r.bootstrapImages = collectImageNames(cluster)
-		contextLogger.Info(
-			"Detected bootstrap images",
-			"bootstrapImages", r.bootstrapImages,
-		)
-	} else if latestImages := collectImageNames(cluster); !latestImages.Eq(r.bootstrapImages) {
-		contextLogger.Info(
-			"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
-			"bootstrapImages", r.bootstrapImages.ToSortedList(),
-			"latestImages", latestImages.ToSortedList(),
-		)
+	// We give priority to image changes before applying the configuration ones.
+	if changed := r.areBootstrapImagesChanged(ctx, cluster); changed {
+		return reloadNeeded, nil
 	}
 
 	// Reconcile PostgreSQL configuration
@@ -419,10 +408,33 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	return reloadNeeded, nil
 }
 
-func collectImageNames(cluster *apiv1.Cluster) *stringset.Data {
-	images := stringset.New()
-	images.Put(cluster.Spec.ImageName)
-	return images
+func (r *InstanceReconciler) areBootstrapImagesChanged(ctx context.Context, cluster *apiv1.Cluster) bool {
+	contextLogger := log.FromContext(ctx)
+
+	latestImages := stringset.New()
+	latestImages.Put(cluster.Spec.ImageName)
+	for _, name := range cluster.Spec.PostgresConfiguration.GetExtensionImages() {
+		latestImages.Put(name)
+	}
+
+	if r.bootstrapImages == nil {
+		r.bootstrapImages = latestImages
+		contextLogger.Info("Detected bootstrap images", "bootstrapImages", r.bootstrapImages)
+
+		return false
+	}
+
+	if latestImages.Eq(r.bootstrapImages) {
+		return false
+	}
+
+	contextLogger.Info(
+		"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
+		"bootstrapImages", r.bootstrapImages.ToSortedList(),
+		"latestImages", latestImages.ToSortedList(),
+	)
+
+	return true
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
