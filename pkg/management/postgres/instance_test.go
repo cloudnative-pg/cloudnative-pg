@@ -314,16 +314,16 @@ var _ = Describe("buildPostgresEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH defined", func() {
 		const (
-			path1 = postgres.ExtensionsBaseDirectory + "/foo/system"
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/syslib"
 			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
-			path3 = postgres.ExtensionsBaseDirectory + "/bar/system"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/syslib"
 			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
 		)
 		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
 
 		BeforeEach(func() {
-			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"/system", "sample/"}
-			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"./system", "./sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"/syslib", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"./syslib", "./sample/"}
 		})
 
 		It("should be defined", func() {

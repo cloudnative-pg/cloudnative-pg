@@ -282,7 +282,7 @@ spec:
       - name: postgis
         # ...
         ld_library_path:
-          - system
+          - syslib
         image:
           reference: # registry path for your PostGIS image
       # ...
