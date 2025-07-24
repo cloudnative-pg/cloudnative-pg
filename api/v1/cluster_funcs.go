@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1559,4 +1560,25 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	}
 
 	return ""
+}
+
+// IsSyncQuorumFailoverProtectionActive check if we should enable the
+// quorum failover protection alpha-feature.
+func (cluster *Cluster) IsSyncQuorumFailoverProtectionActive(ctx context.Context) bool {
+	syncQuorumAnnotation, ok := cluster.GetAnnotations()[utils.SyncQuorumAnnotationName]
+	if !ok || syncQuorumAnnotation == "" {
+		return false
+	}
+
+	v, err := strconv.ParseBool(syncQuorumAnnotation)
+	if err != nil {
+		log.FromContext(ctx).Warning(
+			"Invalid synchronous quorum annotation name",
+			"value", v,
+			"clusterName", cluster.Name,
+		)
+		return false
+	}
+
+	return v
 }

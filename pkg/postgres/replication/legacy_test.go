@@ -21,20 +21,21 @@ package replication
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("ensuring the correctness of synchronous replica data calculation", func() {
-	It("should return all the non primary pods as electable", func() {
+	It("should return all the non primary pods as electable", func(ctx SpecContext) {
 		cluster := createFakeCluster("example")
-		number, names := getSyncReplicasData(cluster)
+		number, names := getSyncReplicasData(ctx, cluster)
 		Expect(number).To(Equal(2))
 		Expect(names).To(Equal([]string{"example-2", "example-3"}))
 	})
 
-	It("should return only the pod in the different AZ", func() {
+	It("should return only the pod in the different AZ", func(ctx SpecContext) {
 		const (
 			primaryPod     = "exampleAntiAffinity-1"
 			sameZonePod    = "exampleAntiAffinity-2"
@@ -61,13 +62,13 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 			},
 		}
 
-		number, names := getSyncReplicasData(cluster)
+		number, names := getSyncReplicasData(ctx, cluster)
 
 		Expect(number).To(Equal(1))
 		Expect(names).To(Equal([]string{differentAZPod}))
 	})
 
-	It("should lower the synchronous replica number to enforce self-healing", func() {
+	It("should lower the synchronous replica number to enforce self-healing", func(ctx SpecContext) {
 		cluster := createFakeCluster("exampleOnePod")
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "exampleOnePod-1",
@@ -76,14 +77,14 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 				apiv1.PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
 			},
 		}
-		number, names := getSyncReplicasData(cluster)
+		number, names := getSyncReplicasData(ctx, cluster)
 
 		Expect(number).To(BeZero())
 		Expect(names).To(BeEmpty())
 		Expect(cluster.Spec.MinSyncReplicas).To(Equal(1))
 	})
 
-	It("should behave correctly if there is no ready host", func() {
+	It("should behave correctly if there is no ready host", func(ctx SpecContext) {
 		cluster := createFakeCluster("exampleNoPods")
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "example-1",
@@ -91,7 +92,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 				apiv1.PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
 			},
 		}
-		number, names := getSyncReplicasData(cluster)
+		number, names := getSyncReplicasData(ctx, cluster)
 
 		Expect(number).To(BeZero())
 		Expect(names).To(BeEmpty())
@@ -99,7 +100,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 })
 
 var _ = Describe("legacy synchronous_standby_names configuration", func() {
-	It("generate the correct value for the synchronous_standby_names parameter", func() {
+	It("generate the correct value for the synchronous_standby_names parameter", func(ctx SpecContext) {
 		cluster := createFakeCluster("exampleNoPods")
 		cluster.Spec.MinSyncReplicas = 2
 		cluster.Spec.MaxSyncReplicas = 2
@@ -109,8 +110,14 @@ var _ = Describe("legacy synchronous_standby_names configuration", func() {
 				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
-		synchronousStandbyNames := legacySynchronousStandbyNames(cluster)
-		Expect(synchronousStandbyNames).
-			To(Equal("ANY 2 (\"one\",\"three\",\"two\")"))
+		synchronousStandbyNames := legacySynchronousStandbyNames(ctx, cluster)
+
+		Expect(synchronousStandbyNames).To(Equal(
+			postgres.SynchronousStandbyNamesConfig{
+				Method:       "ANY",
+				NumSync:      2,
+				StandbyNames: []string{"one", "three", "two"},
+			},
+		))
 	})
 })

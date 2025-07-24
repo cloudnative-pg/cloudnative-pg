@@ -1749,3 +1749,28 @@ var _ = Describe("Probes configuration", func() {
 			"configured probe should not be modified with zero values")
 	})
 })
+
+var _ = Describe("Synchronous quorum annotation", func() {
+	clusterWithAnnotation := func(v string) *Cluster {
+		return &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SyncQuorumAnnotationName: v,
+				},
+			},
+		}
+	}
+
+	DescribeTable(
+		"annotation parsing",
+		func(ctx SpecContext, cluster *Cluster, expected bool) {
+			actual := cluster.IsSyncQuorumFailoverProtectionActive(ctx)
+			Expect(actual).To(Equal(expected))
+		},
+		Entry("with no annotation", &Cluster{}, false),
+		Entry("with empty annotation", clusterWithAnnotation(""), false),
+		Entry("with true annotation", clusterWithAnnotation("t"), true),
+		Entry("with false annotation", clusterWithAnnotation("f"), false),
+		Entry("with invalid annotation", clusterWithAnnotation("xxx"), false),
+	)
+})
