@@ -43,9 +43,9 @@ import (
 // the one of this PostgreSQL instance. Also, the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client          ctrl.Client
-	instance        *postgres.Instance
-	bootstrapImages *stringset.Data
+	client        ctrl.Client
+	instance      *postgres.Instance
+	runningImages *stringset.Data
 
 	secretVersions  map[string]string
 	extensionStatus map[string]bool

@@ -382,8 +382,8 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
-	// We give priority to image changes before applying the configuration ones.
-	if changed := r.areBootstrapImagesChanged(ctx, cluster); changed {
+	// We give priority to images changes before applying the configuration ones.
+	if r.requiresImagesRollout(ctx, cluster) {
 		return reloadNeeded, nil
 	}
 
@@ -408,29 +408,31 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	return reloadNeeded, nil
 }
 
-func (r *InstanceReconciler) areBootstrapImagesChanged(ctx context.Context, cluster *apiv1.Cluster) bool {
+func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
 	contextLogger := log.FromContext(ctx)
 
 	latestImages := stringset.New()
 	latestImages.Put(cluster.Spec.ImageName)
-	for _, name := range cluster.Spec.PostgresConfiguration.GetExtensionImages() {
-		latestImages.Put(name)
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		latestImages.Put(extension.ImageVolumeSource.Reference)
 	}
 
-	if r.bootstrapImages == nil {
-		r.bootstrapImages = latestImages
-		contextLogger.Info("Detected bootstrap images", "bootstrapImages", r.bootstrapImages)
+	if r.runningImages == nil {
+		r.runningImages = latestImages
+		contextLogger.Info("Detected runningImages images", "runningImages", r.runningImages.ToSortedList())
 
 		return false
 	}
 
-	if latestImages.Eq(r.bootstrapImages) {
+	contextLogger.Trace("Calculated image requirements", "latestImages", latestImages.ToSortedList(), "runningImages", r.runningImages.ToSortedList())
+
+	if latestImages.Eq(r.runningImages) {
 		return false
 	}
 
 	contextLogger.Info(
 		"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
-		"bootstrapImages", r.bootstrapImages.ToSortedList(),
+		"runningImages", r.runningImages.ToSortedList(),
 		"latestImages", latestImages.ToSortedList(),
 	)
 

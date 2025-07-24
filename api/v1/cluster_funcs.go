@@ -1465,16 +1465,6 @@ func (cluster *Cluster) EnsureGVKIsPresent() {
 	})
 }
 
-// GetExtensionImages returns the list of images that are used by the extensions
-func (p PostgresConfiguration) GetExtensionImages() []string {
-	var images []string
-	for _, extension := range p.Extensions {
-		images = append(images, extension.ImageVolumeSource.Reference)
-	}
-
-	return images
-}
-
 // BuildPostgresOptions create the list of options that
 // should be added to the PostgreSQL configuration to
 // recover given a certain target
