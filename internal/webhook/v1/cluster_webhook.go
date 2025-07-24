@@ -2421,7 +2421,58 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list := getMaintenanceWindowsAdmissionWarnings(r)
 	list = append(list, getInTreeBarmanWarnings(r)...)
 	list = append(list, getRetentionPolicyWarnings(r)...)
+	list = append(list, getStorageWarnings(r)...)
 	return append(list, getSharedBuffersWarnings(r)...)
+}
+
+func getStorageWarnings(r *apiv1.Cluster) admission.Warnings {
+	generateWarningsFunc := func(path field.Path, configuration *apiv1.StorageConfiguration) admission.Warnings {
+		if configuration == nil {
+			return nil
+		}
+
+		if configuration.PersistentVolumeClaimTemplate == nil {
+			return nil
+		}
+
+		pvcTemplatePath := path.Child("pvcTemplate")
+
+		var result admission.Warnings
+		if configuration.StorageClass != nil && configuration.PersistentVolumeClaimTemplate.StorageClassName != nil {
+			storageClass := path.Child("storageClass").String()
+			result = append(
+				result,
+				fmt.Sprintf("%s and %s are both specified, %s value will be used.",
+					storageClass,
+					pvcTemplatePath.Child("storageClassName"),
+					storageClass,
+				),
+			)
+		}
+		requestsSpecified := !configuration.PersistentVolumeClaimTemplate.Resources.Requests.Storage().IsZero()
+		if configuration.Size != "" && requestsSpecified {
+			size := path.Child("size").String()
+			result = append(
+				result,
+				fmt.Sprintf(
+					"%s and %s  are both specified, %s value will be used.",
+					size,
+					pvcTemplatePath.Child("resources", "requests", "storage").String(),
+					size,
+				),
+			)
+		}
+
+		return result
+	}
+
+	var result admission.Warnings
+
+	storagePath := *field.NewPath("spec", "storage")
+	result = append(result, generateWarningsFunc(storagePath, &r.Spec.StorageConfiguration)...)
+
+	walStoragePath := *field.NewPath("spec", "walStorage")
+	return append(result, generateWarningsFunc(walStoragePath, r.Spec.WalStorage)...)
 }
 
 func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
