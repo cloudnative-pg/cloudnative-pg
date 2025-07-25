@@ -87,7 +87,7 @@ Git tags for versions are prefixed with `v`.
 | 1.25.x          | Yes                  | Dec 23, 2024 | 22 Aug 2025     | 1.29, 1.30, 1.31, 1.32        | 1.33                      | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
 
-<!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
+<sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.

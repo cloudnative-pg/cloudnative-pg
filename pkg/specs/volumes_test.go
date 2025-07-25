@@ -22,9 +22,11 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -519,5 +521,80 @@ var _ = Describe("createEphemeralVolume", func() {
 
 		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
 		Expect(*ephemeralVolume.VolumeSource.EmptyDir.SizeLimit).To(Equal(quantity))
+	})
+})
+
+var _ = Describe("ImageVolume Extensions", func() {
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "foo:dev",
+							},
+						},
+						{
+							Name: "bar",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "bar:dev",
+							},
+						},
+					},
+				},
+			},
+		}
+	})
+
+	Context("createExtensionVolumes", func() {
+		When("Extensions are disabled", func() {
+			It("shouldn't create Volumes", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+				extensionVolumes := createExtensionVolumes(&cluster)
+				Expect(extensionVolumes).To(BeEmpty())
+			})
+		})
+		When("Extensions are enabled", func() {
+			It("should create a Volume for each Extension", func() {
+				extensionVolumes := createExtensionVolumes(&cluster)
+				Expect(len(extensionVolumes)).To(BeEquivalentTo(2))
+				Expect(extensionVolumes[0].Name).To(Equal("foo"))
+				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("foo:dev"))
+				Expect(extensionVolumes[1].Name).To(Equal("bar"))
+				Expect(extensionVolumes[1].VolumeSource.Image.Reference).To(Equal("bar:dev"))
+			})
+		})
+	})
+
+	Context("createExtensionVolumeMounts", func() {
+		When("Extensions are disabled", func() {
+			It("shouldn't create VolumeMounts", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				Expect(extensionVolumeMounts).To(BeEmpty())
+			})
+		})
+		When("Extensions are enabled", func() {
+			It("should create a VolumeMount for each Extension", func() {
+				const (
+					fooMountPath = postgres.ExtensionsBaseDirectory + "/foo"
+					barMountPath = postgres.ExtensionsBaseDirectory + "/bar"
+				)
+				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(2))
+				Expect(extensionVolumeMounts[0].Name).To(Equal("foo"))
+				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
+				Expect(extensionVolumeMounts[1].Name).To(Equal("bar"))
+				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
+			})
+		})
 	})
 })

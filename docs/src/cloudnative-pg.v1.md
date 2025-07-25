@@ -2825,6 +2825,61 @@ storage</p>
 </tbody>
 </table>
 
+## ExtensionConfiguration     {#postgresql-cnpg-io-v1-ExtensionConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>ExtensionConfiguration is the configuration used to add
+PostgreSQL extensions to the Cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the extension, required</p>
+</td>
+</tr>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#imagevolumesource-v1-core"><i>core/v1.ImageVolumeSource</i></a>
+</td>
+<td>
+   <p>The image containing the extension, required</p>
+</td>
+</tr>
+<tr><td><code>extension_control_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to extension_control_path.
+If not defined, defaults to &quot;/share&quot;.</p>
+</td>
+</tr>
+<tr><td><code>dynamic_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to dynamic_library_path.
+If not defined, defaults to &quot;/lib&quot;.</p>
+</td>
+</tr>
+<tr><td><code>ld_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to ld_library_path.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ExtensionSpec     {#postgresql-cnpg-io-v1-ExtensionSpec}
 
 
@@ -4451,6 +4506,13 @@ big enough to simulate an infinite timeout</p>
 on this CloudNativePG Cluster.
 This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
+</td>
+</tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionConfiguration"><i>[]ExtensionConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the extensions to be added</p>
 </td>
 </tr>
 </tbody>

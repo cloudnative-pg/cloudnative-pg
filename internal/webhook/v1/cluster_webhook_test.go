@@ -514,54 +514,6 @@ var _ = Describe("configuration change validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	It("doesn't complain when the configuration is exactly the same", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := clusterOld.DeepCopy()
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("doesn't complain when we change a setting which is not fixed", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("complains when changing postgres major version and settings", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.5",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(HaveLen(1))
-	})
-
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -4508,8 +4460,56 @@ var _ = Describe("validateResources", func() {
 		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
 	})
 
+	It("returns no errors when no memoryRequest is set", func() {
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
 	It("returns no errors when memoryRequest is greater than or equal to shared_buffers in GB", func() {
 		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns an error when hugepages request is different than hugepages limits", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Limits["hugepages-1Gi"] = resource.MustParse("2Gi")
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("HugePages requests must equal the limits"))
+	})
+
+	It("returns an error when hugepages request is present but no CPU or memory are", func() {
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("HugePages require cpu or memory"))
+	})
+
+	It("returns an error when no request is enough to contain shared_buffers, even if the sum is", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Requests["ugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Requests["hugepages-2Mi"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000000kB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
+	})
+
+	It("returns no errors when hugepages-1Gi request is greater than or equal to shared_buffers in GB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("256Mi")
+		cluster.Spec.Resources.Requests["hugepages-1Gi"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when hugepages-2Mi request is greater than or equal to shared_buffers in GB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("256Mi")
+		cluster.Spec.Resources.Limits["hugepages-2Mi"] = resource.MustParse("1Gi")
 		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
 		errors := v.validateResources(cluster)
 		Expect(errors).To(BeEmpty())
@@ -5210,7 +5210,7 @@ var _ = Describe("validatePluginConfiguration", func() {
 	})
 })
 
-var _ = Describe("", func() {
+var _ = Describe("liveness probe validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
@@ -5247,6 +5247,230 @@ var _ = Describe("", func() {
 		errs := v.validateLivenessPingerProbe(cluster)
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Error()).To(ContainSubstring("error decoding liveness pinger config"))
+	})
+})
+
+var _ = Describe("validateExtensions", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("returns no error when extensions are not specified", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns no error if the specified extensions are unique", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+						},
+						{
+							Name: "extTwo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns an error per duplicate extension name", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+						},
+						{
+							Name: "extTwo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+						},
+						{
+							Name: "extTwo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extTwo:1",
+							},
+						},
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne:1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].BadValue).To(Equal("extTwo"))
+		Expect(err[1].BadValue).To(Equal("extOne"))
+	})
+
+	It("returns multiple errors for both invalid ExtensionControlPath and DynamicLibraryPath", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/valid/path",
+								"",
+							},
+							DynamicLibraryPath: []string{
+								"",
+								"/valid/lib/path",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].extension_control_path[1]"))
+		Expect(err[1].Field).To(ContainSubstring("extensions[0].dynamic_library_path[0]"))
+	})
+
+	It("returns no error when ExtensionControlPath and DynamicLibraryPath are valid", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/usr/share/postgresql/extension",
+								"/opt/custom/extensions",
+							},
+							DynamicLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/opt/custom/lib",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns errors for duplicate ExtensionControlPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/usr/share/postgresql/extension",
+								"/opt/custom/extensions",
+								"/usr/share/postgresql/extension", // duplicate
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].extension_control_path[2]"))
+		Expect(err[0].BadValue).To(Equal("/usr/share/postgresql/extension"))
+	})
+
+	It("returns errors for duplicate DynamicLibraryPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							DynamicLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/opt/custom/lib",
+								"/usr/lib/postgresql/lib",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].dynamic_library_path[2]"))
+		Expect(err[0].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns errors for duplicates in both ExtensionControlPath and DynamicLibraryPath", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"/usr/share/postgresql/extension",
+								"/usr/share/postgresql/extension",
+							},
+							DynamicLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/usr/lib/postgresql/lib",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("/usr/share/postgresql/extension"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
 	})
 })
 

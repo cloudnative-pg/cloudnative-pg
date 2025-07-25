@@ -168,7 +168,7 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 		return nil
 	}
 
-	out, err := info.GetInstance().GetPgControldata()
+	out, err := info.GetInstance(nil).GetPgControldata()
 	if err == nil {
 		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
 		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
@@ -295,10 +295,11 @@ func (info InitInfo) CreateDataDirectory() error {
 }
 
 // GetInstance gets the PostgreSQL instance which correspond to these init information
-func (info InitInfo) GetInstance() *Instance {
+func (info InitInfo) GetInstance(cluster *apiv1.Cluster) *Instance {
 	postgresInstance := NewInstance()
 	postgresInstance.PgData = info.PgData
 	postgresInstance.StartupOptions = []string{"listen_addresses='127.0.0.1'"}
+	postgresInstance.Cluster = cluster
 	return postgresInstance
 }
 
@@ -477,7 +478,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	instance := info.GetInstance()
+	instance := info.GetInstance(cluster)
 
 	// Detect an initdb bootstrap with import
 	isImportBootstrap := cluster.Spec.Bootstrap != nil &&

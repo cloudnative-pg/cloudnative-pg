@@ -21,7 +21,6 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -220,6 +219,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
+		v.validateExtensions,
 	}
 
 	for _, validate := range validations {
@@ -240,7 +240,6 @@ func (v *ClusterCustomValidator) validateClusterChanges(r, old *apiv1.Cluster) (
 	type validationFunc func(*apiv1.Cluster, *apiv1.Cluster) field.ErrorList
 	validations := []validationFunc{
 		v.validateImageChange,
-		v.validateConfigurationChange,
 		v.validateStorageChange,
 		v.validateWalStorageChange,
 		v.validateTablespacesChange,
@@ -859,42 +858,52 @@ func (v *ClusterCustomValidator) validateImagePullPolicy(r *apiv1.Cluster) field
 func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	cpuRequest := r.Spec.Resources.Requests.Cpu()
+	cpuRequests := r.Spec.Resources.Requests.Cpu()
 	cpuLimits := r.Spec.Resources.Limits.Cpu()
-	if !cpuRequest.IsZero() && !cpuLimits.IsZero() {
-		cpuRequestGtThanLimit := cpuRequest.Cmp(*cpuLimits) > 0
+	if !cpuRequests.IsZero() && !cpuLimits.IsZero() {
+		cpuRequestGtThanLimit := cpuRequests.Cmp(*cpuLimits) > 0
 		if cpuRequestGtThanLimit {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "resources", "requests", "cpu"),
-				cpuRequest.String(),
+				cpuRequests.String(),
 				"CPU request is greater than the limit",
 			))
 		}
 	}
 
-	memoryRequest := r.Spec.Resources.Requests.Memory()
-	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
-	if !memoryRequest.IsZero() && rawSharedBuffer != "" {
-		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
-			if memoryRequest.Cmp(sharedBuffers) < 0 {
-				result = append(result, field.Invalid(
-					field.NewPath("spec", "resources", "requests", "memory"),
-					memoryRequest.String(),
-					"Memory request is lower than PostgreSQL `shared_buffers` value",
-				))
-			}
-		}
-	}
-
+	memoryRequests := r.Spec.Resources.Requests.Memory()
 	memoryLimits := r.Spec.Resources.Limits.Memory()
-	if !memoryRequest.IsZero() && !memoryLimits.IsZero() {
-		memoryRequestGtThanLimit := memoryRequest.Cmp(*memoryLimits) > 0
+	if !memoryRequests.IsZero() && !memoryLimits.IsZero() {
+		memoryRequestGtThanLimit := memoryRequests.Cmp(*memoryLimits) > 0
 		if memoryRequestGtThanLimit {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "resources", "requests", "memory"),
-				memoryRequest.String(),
+				memoryRequests.String(),
 				"Memory request is greater than the limit",
 			))
+		}
+	}
+
+	hugePages, hugePagesErrors := validateHugePagesResources(r)
+	result = append(result, hugePagesErrors...)
+	if cpuRequests.IsZero() && cpuLimits.IsZero() && memoryRequests.IsZero() && memoryLimits.IsZero() &&
+		len(hugePages) > 0 {
+		result = append(result, field.Forbidden(
+			field.NewPath("spec", "resources"),
+			"HugePages require cpu or memory",
+		))
+	}
+
+	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
+	if rawSharedBuffer != "" {
+		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
+			if !hasEnoughMemoryForSharedBuffers(sharedBuffers, memoryRequests, hugePages) {
+				result = append(result, field.Invalid(
+					field.NewPath("spec", "resources", "requests"),
+					memoryRequests.String(),
+					"Memory request is lower than PostgreSQL `shared_buffers` value",
+				))
+			}
 		}
 	}
 
@@ -912,6 +921,50 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	}
 
 	return result
+}
+
+func validateHugePagesResources(r *apiv1.Cluster) (map[corev1.ResourceName]resource.Quantity, field.ErrorList) {
+	var result field.ErrorList
+	hugepages := make(map[corev1.ResourceName]resource.Quantity)
+	for name, quantity := range r.Spec.Resources.Limits {
+		if strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix) {
+			hugepages[name] = quantity
+		}
+	}
+	for name, quantity := range r.Spec.Resources.Requests {
+		if strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix) {
+			if existingQuantity, exists := hugepages[name]; exists {
+				if existingQuantity.Cmp(quantity) != 0 {
+					result = append(result, field.Invalid(
+						field.NewPath("spec", "resources", "requests", string(name)),
+						quantity.String(),
+						"HugePages requests must equal the limits",
+					))
+				}
+				continue
+			}
+			hugepages[name] = quantity
+		}
+	}
+	return hugepages, result
+}
+
+func hasEnoughMemoryForSharedBuffers(
+	sharedBuffers resource.Quantity,
+	memoryRequest *resource.Quantity,
+	hugePages map[corev1.ResourceName]resource.Quantity,
+) bool {
+	if memoryRequest.IsZero() || sharedBuffers.Cmp(*memoryRequest) <= 0 {
+		return true
+	}
+
+	for _, quantity := range hugePages {
+		if sharedBuffers.Cmp(quantity) <= 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv1.Cluster) field.ErrorList {
@@ -1204,30 +1257,6 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 	}
 
 	return resource.ParseQuantity(value)
-}
-
-// validateConfigurationChange determines whether a PostgreSQL configuration
-// change can be applied
-func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Cluster) field.ErrorList {
-	var result field.ErrorList
-
-	if old.Spec.ImageName != r.Spec.ImageName {
-		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
-			r.Spec.PostgresConfiguration.Parameters)
-		if len(diff) > 0 {
-			jsonDiff, _ := json.Marshal(diff)
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "imageName"),
-					r.Spec.ImageName,
-					fmt.Sprintf("Can't change image name and configuration at the same time. "+
-						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
-			return result
-		}
-	}
-
-	return result
 }
 
 func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElectionConstraints) *field.Error {
@@ -2575,4 +2604,68 @@ func (v *ClusterCustomValidator) validateLivenessPingerProbe(r *apiv1.Cluster) f
 	}
 
 	return nil
+}
+
+func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.ErrorList {
+	ensureNotEmptyOrDuplicate := func(path *field.Path, list *stringset.Data, value string) *field.Error {
+		if value == "" {
+			return field.Invalid(
+				path,
+				value,
+				"value cannot be empty",
+			)
+		}
+
+		if list.Has(value) {
+			return field.Duplicate(
+				path,
+				value,
+			)
+		}
+		return nil
+	}
+
+	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	extensionNames := stringset.New()
+
+	for i, v := range r.Spec.PostgresConfiguration.Extensions {
+		basePath := field.NewPath("spec", "postgresql", "extensions").Index(i)
+		if nameErr := ensureNotEmptyOrDuplicate(basePath.Child("name"), extensionNames, v.Name); nameErr != nil {
+			result = append(result, nameErr)
+		}
+		extensionNames.Put(v.Name)
+
+		controlPaths := stringset.New()
+		for j, path := range v.ExtensionControlPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("extension_control_path").Index(j),
+				controlPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			controlPaths.Put(path)
+		}
+
+		libraryPaths := stringset.New()
+		for j, path := range v.DynamicLibraryPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("dynamic_library_path").Index(j),
+				libraryPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			libraryPaths.Put(path)
+		}
+	}
+
+	return result
 }

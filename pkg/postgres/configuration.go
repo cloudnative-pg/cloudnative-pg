@@ -23,7 +23,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"iter"
 	"math"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -96,9 +99,9 @@ const (
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
@@ -130,6 +133,12 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 # Grant local access ('local' user map)
 local {{.Username}} postgres
+
+# Grant streaming_replica access ('cnpg_streaming_replica' user map)
+cnpg_streaming_replica streaming_replica streaming_replica
+
+# Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
+cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
@@ -245,6 +254,15 @@ local {{.Username}} postgres
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// ExtensionControlPath is the postgresql parameter key for extension_control_path
+	ExtensionControlPath = "extension_control_path"
+
+	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
+	DynamicLibraryPath = "dynamic_library_path"
+
+	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
+	ExtensionsBaseDirectory = "/extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -337,6 +355,9 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
+
+	// The list of additional extensions to be loaded into the PostgreSQL configuration
+	AdditionalExtensions []AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -652,7 +673,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	ignoreFixedSettingsFromUser := info.IncludingMandatory || !info.PreserveFixedSettingsFromUser
 
 	// Set all the default settings
-	setDefaultConfigurations(info, configuration)
+	configuration.setDefaultConfigurations(info)
 
 	// Apply all the values from the user, overriding defaults,
 	// ignoring those which are fixed if ignoreFixedSettingsFromUser is true
@@ -728,10 +749,10 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	if info.IncludingSharedPreloadLibraries {
 		// Set all managed shared preload libraries
-		setManagedSharedPreloadLibraries(info, configuration)
+		configuration.setManagedSharedPreloadLibraries(info)
 
 		// Set all user provided shared preload libraries
-		setUserSharedPreloadLibraries(info, configuration)
+		configuration.setUserSharedPreloadLibraries(info)
 	}
 
 	// Apply the list of temporary tablespaces
@@ -739,33 +760,39 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
+	// Setup additional extensions
+	if len(info.AdditionalExtensions) > 0 {
+		configuration.setExtensionControlPath(info)
+		configuration.setDynamicLibraryPath(info)
+	}
+
 	return configuration
 }
 
 // setDefaultConfigurations sets all default configurations into the configuration map
 // from the provided info
-func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setDefaultConfigurations(info ConfigurationInfo) {
 	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
-		configuration.OverwriteConfig(key, value)
+		p.OverwriteConfig(key, value)
 	}
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range info.Settings.DefaultSettings {
 		if constraints.Min <= info.MajorVersion && info.MajorVersion < constraints.Max {
 			for key, value := range settings {
-				configuration.OverwriteConfig(key, value)
+				p.OverwriteConfig(key, value)
 			}
 		}
 	}
 }
 
 // setManagedSharedPreloadLibraries sets all additional preloaded libraries
-func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setManagedSharedPreloadLibraries(info ConfigurationInfo) {
 	for _, extension := range ManagedExtensions {
 		if extension.IsUsed(info.UserSettings) {
 			for _, library := range extension.SharedPreloadLibraries {
-				configuration.AddSharedPreloadLibrary(library)
+				p.AddSharedPreloadLibrary(library)
 			}
 		}
 	}
@@ -775,8 +802,8 @@ func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgC
 // The resulting list will have all the user provided libraries, followed by all the ones managed
 // by the operator, removing any duplicate and keeping the first occurrence in case of duplicates.
 // Therefore the user provided order is preserved, if an overlap (with the ones already present) happens
-func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
-	oldLibraries := strings.Split(configuration.GetConfig(SharedPreloadLibraries), ",")
+func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) {
+	oldLibraries := strings.Split(p.GetConfig(SharedPreloadLibraries), ",")
 	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
 	var libraries []string
 	for _, library := range append(info.AdditionalSharedPreloadLibraries, oldLibraries...) {
@@ -790,7 +817,7 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 		}
 	}
 	if len(libraries) > 0 {
-		configuration.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
+		p.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
 	}
 }
 
@@ -820,4 +847,100 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
+type AdditionalExtensionConfiguration struct {
+	// The name of the Extension
+	Name string
+
+	// The list of directories that should be added to ExtensionControlPath.
+	ExtensionControlPath []string
+
+	// The list of directories that should be added to DynamicLibraryPath.
+	DynamicLibraryPath []string
+}
+
+// absolutizePaths returns an iterator over the passed paths, absolutized
+// using the name of the extension
+func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, path := range paths {
+			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
+				break
+			}
+		}
+	}
+}
+
+// getRuntimeExtensionControlPath collects the absolute directories to be put
+// into the `extension_control_path` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
+	paths := []string{"share"}
+	if len(ext.ExtensionControlPath) > 0 {
+		paths = ext.ExtensionControlPath
+	}
+
+	return ext.absolutizePaths(paths)
+}
+
+// getDynamicLibraryPath collects the absolute directories to be put
+// into the `dynamic_library_path` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
+	paths := []string{"lib"}
+	if len(ext.DynamicLibraryPath) > 0 {
+		paths = ext.DynamicLibraryPath
+	}
+
+	return ext.absolutizePaths(paths)
+}
+
+// setExtensionControlPath manages the `extension_control_path` GUC, merging
+// the paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
+	extensionControlPath := []string{"$system"}
+
+	for _, extension := range info.AdditionalExtensions {
+		extensionControlPath = slices.AppendSeq(
+			extensionControlPath,
+			extension.getRuntimeExtensionControlPath(),
+		)
+	}
+
+	extensionControlPath = slices.AppendSeq(
+		extensionControlPath,
+		strings.SplitSeq(p.GetConfig(ExtensionControlPath), ":"),
+	)
+
+	extensionControlPath = slices.DeleteFunc(
+		extensionControlPath,
+		func(s string) bool { return s == "" },
+	)
+
+	p.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+}
+
+// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
+// paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
+	dynamicLibraryPath := []string{"$libdir"}
+
+	for _, extension := range info.AdditionalExtensions {
+		dynamicLibraryPath = slices.AppendSeq(
+			dynamicLibraryPath,
+			extension.getDynamicLibraryPath())
+	}
+
+	dynamicLibraryPath = slices.AppendSeq(
+		dynamicLibraryPath,
+		strings.SplitSeq(p.GetConfig(DynamicLibraryPath), ":"))
+
+	dynamicLibraryPath = slices.DeleteFunc(
+		dynamicLibraryPath,
+		func(s string) bool { return s == "" },
+	)
+
+	p.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }
