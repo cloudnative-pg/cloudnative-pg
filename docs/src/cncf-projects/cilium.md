@@ -2,18 +2,18 @@
 
 ## About
 
-[Cilium](https://cilium.io/) is a CNCF Graduated project that was accepted as an Incubating project in 2021 and graduated in 2023 under
-the sponsorship of Isovalent. It is an advanced networking, security, and observability solution for cloud-native
-environments, built on top of eBPF (Extended Berkeley Packet Filter) technology. Cilium manages network traffic in
+[Cilium](https://cilium.io/) is a CNCF Graduated project that was accepted as an Incubating project in 2021 and graduated in 2023. 
+It was originally created by Isovalent. It is an advanced networking, security, and observability solution for cloud native
+environments, built on top of [eBPF](https://ebpf.io/) technology. Cilium manages network traffic in
 Kubernetes clusters by dynamically injecting eBPF programs into the Linux Kernel, enabling low-latency,
-high-performance communication and enforcing fine-grained security policies.
+high-performance communication, and enforcing fine-grained security policies.
 
 Key features of Cilium:
 
 - Advanced L3-L7 security policies for fine-grained network traffic control
 - Efficient, kernel-level traffic management via eBPF
 - Service Mesh integration (Cilium Service Mesh)
-- Support for both NetworkPolicy and CiliumNetworkPolicy
+- Support for both Kubernetes NetworkPolicy and CiliumNetworkPolicy
 - Built-in observability and monitoring with Hubble
 
 To install Cilium in your environment, follow the instructions in the documentation:
@@ -33,11 +33,35 @@ restricting ingress traffic to only authorized Pods.
 !!! Important
     Before proceeding, ensure that the `cluster-example` Postgres cluster is up and running in your environment.
 
+## Default Deny Behavior in Cilium
+
+By default, Cilium does **not** deny all traffic unless explicitly configured to do so. In contrast to Kubernetes
+NetworkPolicy, which uses a deny-by-default model once a policy is present in a namespace, Cilium provides more
+flexible control over default deny behavior.
+
+To enforce a default deny posture with Cilium, you need to explicitly create a policy that denies all traffic to a
+set of Pods unless otherwise allowed. This is commonly achieved by using an **empty `ingress` section** in
+combination with `endpointSelector`, or by enabling **`--enable-default-deny`** at the Cilium agent level for broader enforcement.
+
+A minimal example of a default deny policy:
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: default
+spec:
+  description: "Default deny all ingress traffic to all Pods in this namespace"
+  endpointSelector: {}
+  ingress: []
+```
+
 ## Making Cilium Network Policies work with CloudNativePG Operator
 
 When working with a network policy, Cilium or not, the first step is to make sure that the operator can reach the Pods
 in the target namespace. This is important because the operator needs to be able to perform checks and actions on the
-Pods, and one of those actions requires to access the port `8000` on the Pods to get the current status of the PostgreSQL
+Pods, and one of those actions requires access to the port `8000` on the Pods to get the current status of the PostgreSQL
 instance running inside.
 
 The following `CiliumNetworkPolicy` allows the operator to access the Pods in the target `default` namespace
@@ -46,7 +70,7 @@ The following `CiliumNetworkPolicy` allows the operator to access the Pods in th
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: cnpg-operator-policy
+  name: cnpg-operator-access
   namespace: default
 spec:
   description: "Allow CloudNativePG operator access to any pod in the target namespace"
@@ -61,8 +85,8 @@ spec:
               protocol: TCP
 ```
 !!! Important
-    The `cnpg-system` namespace is the default namespace for the operator when using the YAML manifests, if the operator
-    was installed using a different process(Helm, OLM, etc.), the namespace may be different. Make sure to adjust the
+    The `cnpg-system` namespace is the default namespace for the operator when using the YAML manifests. If the operator
+    was installed using a different process (Helm, OLM, etc.), the namespace may be different. Make sure to adjust the
     namespace properly.
 
 ## Allowing access between cluster Pods
@@ -74,7 +98,7 @@ We will improve our previous policy by adding the required ingress rule:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: cnpg-policy
+  name: cnpg-cluster-internal-access
   namespace: default
 spec:
   description: "Allow CloudNativePG operator access and connection between pods in the same namespace"
@@ -107,7 +131,7 @@ to connect to a PostgreSQL cluster named `cluster-example`. All other ingress tr
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: postgres-policy
+  name: postgres-access-backend-label
   namespace: default
 spec:
   description: "Allow PostgreSQL access on port 5432 from Pods with role=backend"
@@ -134,7 +158,7 @@ In the following policy, we demonstrate how to allow ingress traffic to port 543
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: postgres-policy
+  name: postgres-access-backend-any-ns
   namespace: default
 spec:
   description: "Allow PostgreSQL access on port 5432 from Pods with role=backend in any namespace"
@@ -143,11 +167,12 @@ spec:
       cnpg.io/cluster: cluster-example
   ingress:
     - fromEndpoints:
-       - matchLabels:
-            role: backend
-         matchExpressions:
-          - key: io.kubernetes.pod.namespace
-            operator: Exists
+        - labelSelector:
+            matchLabels:
+              role: backend
+            matchExpressions:
+              - key: io.kubernetes.pod.namespace
+                operator: Exists
       toPorts:
         - ports:
           - port: "5432"
@@ -161,7 +186,7 @@ The following example allows ingress traffic to port 5432 of the `cluster-exampl
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: postgres-policy
+  name: postgres-access-backend-namespace
   namespace: default
 spec:
   description: "Allow PostgreSQL access on port 5432 from any Pods in the backend namespace"
@@ -189,7 +214,7 @@ The following example allows ingress traffic to port 5432 of the `cluster-exampl
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: postgres-policy
+  name: postgres-access-cluster-wide
   namespace: default
 spec:
   description: "Allow ingress traffic to port 5432 of the cluster-example from any pods within the Kubernetes cluster"
@@ -208,3 +233,6 @@ spec:
 You may consider using [editor.networkpolicy.io](https://editor.networkpolicy.io/), a visual and interactive tool that simplifies the creation and
 validation of Cilium Network Policies. It’s especially helpful for avoiding misconfigurations and understanding traffic
 rules more clearly by presenting in a visual way.
+
+With these policies, you've established baseline access controls for PostgreSQL. You can layer additional egress or
+audit rules using Cilium's policy language or extend to L7 enforcement with Envoy.
