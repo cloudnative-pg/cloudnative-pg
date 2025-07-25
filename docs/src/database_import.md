@@ -253,7 +253,15 @@ There are a few things you need to be aware of when using the `monolith` type:
   database.
 - The `postImportApplicationSQL` field is not supported
 
-## Comparing microservice vs monolith imports
+!!! Hint
+    The databases and their owners are preserved exactly as they exist in the
+    source cluster—no `app` database or user will be created during import. If your
+    `bootstrap.initdb` stanza specifies custom `database` and `owner` values that
+    do not match any of the databases or users being imported, the instance
+    manager will create a new, empty application database and owner role with those
+    specified names, while leaving the imported databases and owners unchanged.
+
+## A practical example
 
 There is nothing to stop you from using the `monolith` approach to import a
 single database. It is interesting to see how the results of doing so would
