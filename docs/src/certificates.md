@@ -265,18 +265,18 @@ the following parameters:
 
 #### Customizing the `streaming_replica` client certificate
 
-In some environments it might not be possible to generate a certificate with the common
-name set to `streaming_replica`  due to a company policy or other security concerns,
-like CA shared across multiple clusters. In such cases the user mapping feature can be
-used to allow authentication as the `streaming_replica` user with certificates
-containing different common names.
+In some environments, it may not be possible to generate a certificate with the
+common name `streaming_replica` due to company policies or other security
+concerns, such as a CA shared across multiple clusters. In such cases, the user
+mapping feature can be used to allow authentication as the `streaming_replica`
+user with certificates containing different common names.
 
-The only thing necessary to configure such setup is to add a `pg_ident.conf` entry
-for a predefined map named `cnpg_streaming_replica`.
+To configure this setup, add a `pg_ident.conf` entry for the predefined map
+named `cnpg_streaming_replica`.
 
-For example, to enable `streaming_replica` authentication using a certificate with
-a common name `streaming-replica.cnpg.svc.cluster.local` this should be added to the
-cluster definition:
+For example, to enable `streaming_replica` authentication using a certificate
+with the common name `streaming-replica.cnpg.svc.cluster.local`, add the
+following to your cluster definition:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -289,8 +289,9 @@ spec:
     - cnpg_streaming_replica streaming-replica.cnpg.svc.cluster.local streaming_replica
 ```
 
-For further detail on how `pg_ident.conf` is managed by the operator, see the
-["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_ident-section) of the documentation.
+For further details on how `pg_ident.conf` is managed by the operator, see the
+["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_ident-section) in
+the documentation.
 
 #### Cert-manager example
 
