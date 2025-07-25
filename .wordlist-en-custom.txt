@@ -1019,6 +1019,7 @@ msg
 mspan
 multinamespace
 mutatingwebhookconfigurations
+mutex
 myAKSCluster
 myResourceGroup
 namespace
