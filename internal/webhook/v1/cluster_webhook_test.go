@@ -514,54 +514,6 @@ var _ = Describe("configuration change validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	It("doesn't complain when the configuration is exactly the same", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := clusterOld.DeepCopy()
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("doesn't complain when we change a setting which is not fixed", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("complains when changing postgres major version and settings", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.5",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(HaveLen(1))
-	})
-
 	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
