@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -942,9 +943,31 @@ func (r *ClusterReconciler) reconcilePods(
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
-		cluster.Status.ReadyInstances != len(instancesStatus.Items) ||
-		!instancesStatus.IsComplete() {
+		cluster.Status.ReadyInstances != len(instancesStatus.Items) {
 		contextLogger.Debug("Waiting for Pods to be ready")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
+	// If there is a Pod that doesn't report its HTTP status,
+	// we wait until the Pod gets marked as non ready or until we're
+	// able to connect to it.
+	if !instancesStatus.IsComplete() {
+		podsReportingStatus := stringset.New()
+		podsNotReportingStatus := make(map[string]string)
+		for i := range instancesStatus.Items {
+			podName := instancesStatus.Items[i].Pod.Name
+			if instancesStatus.Items[i].Error != nil {
+				podsNotReportingStatus[podName] = instancesStatus.Items[i].Error.Error()
+			} else {
+				podsReportingStatus.Put(podName)
+			}
+		}
+
+		contextLogger.Info(
+			"Waiting for Pods to report HTTP status",
+			"podsReportingStatus", podsReportingStatus.ToSortedList(),
+			"podsNotReportingStatus", podsNotReportingStatus,
+		)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
