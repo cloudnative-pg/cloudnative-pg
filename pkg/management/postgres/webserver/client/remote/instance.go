@@ -37,10 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
 
 const (
@@ -107,6 +109,12 @@ func (r instanceClientImpl) extractInstancesStatus(
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
 	var result postgres.PostgresqlStatusList
+
+	cluster, ok := ctx.Value(contextutils.ContextKeyCluster).(*apiv1.Cluster)
+	if ok && cluster != nil {
+		result.IsReplicaCluster = cluster.IsReplica()
+		result.CurrentPrimary = cluster.Status.CurrentPrimary
+	}
 
 	for idx := range activePods {
 		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, activePods[idx])

@@ -75,6 +75,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertsCASecret
@@ -159,6 +160,7 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
@@ -182,6 +184,7 @@ GUC
 GUCs
 Gabriele
 GaugeVec
+GeoSpatial
 Gi
 GitOps
 GoArch
@@ -206,12 +209,15 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolume
+ImageVolumeSource
 ImportSource
 InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
+Isovalent
 Istio
 Istio's
 JSON
@@ -271,6 +277,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicy
 Niccolò
 NodeAffinity
 NodeMaintenanceWindow
@@ -772,6 +779,7 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+discoverable
 displayName
 displayName
 distro
@@ -787,6 +795,7 @@ downtimes
 dvcmQ
 dwm
 dx
+eBPF
 ecdsa
 edb
 eks
@@ -887,6 +896,7 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imageVolume
 imagecatalogs
 img
 immediateCheckpoint
@@ -953,6 +963,7 @@ lastSuccessfulBackupByMethod
 latestGeneratedNode
 latn
 lc
+ld
 ldap
 ldapBindPassword
 ldaps
@@ -1095,6 +1106,7 @@ pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
 pgRestoreExtraOptions
+pgRouting
 pgSQL
 pgadmin
 pgaudit

@@ -24,8 +24,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -266,3 +269,95 @@ var _ = Describe("ALTER SYSTEM enable and disable in PostgreSQL <17", func() {
 		Expect(info.Mode()).To(BeEquivalentTo(0o400))
 	})
 })
+
+var _ = Describe("buildPostgresEnv", func() {
+	var cluster apiv1.Cluster
+	var instance Instance
+
+	BeforeEach(func() {
+		err := os.Unsetenv("LD_LIBRARY_PATH")
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "foo:dev",
+							},
+						},
+						{
+							Name: "bar",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "bar:dev",
+							},
+						},
+					},
+				},
+			},
+		}
+		instance.Cluster = &cluster
+	})
+
+	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
+		It("should be empty by default", func() {
+			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
+			Expect(ldLibraryPath).To(BeEmpty())
+		})
+	})
+
+	Context("Extensions enabled, LD_LIBRARY_PATH defined", func() {
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/syslib"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/syslib"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
+		BeforeEach(func() {
+			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"/syslib", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"./syslib", "./sample/"}
+		})
+
+		It("should be defined", func() {
+			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
+			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+		})
+		It("should retain existing values", func() {
+			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
+
+			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
+			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+		})
+	})
+
+	Context("Extensions disabled", func() {
+		BeforeEach(func() {
+			cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+		})
+		It("LD_LIBRARY_PATH should be empty", func() {
+			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
+			Expect(ldLibraryPath).To(BeEmpty())
+		})
+	})
+})
+
+func getLibraryPathFromEnv(envs []string) string {
+	var ldLibraryPath string
+
+	for i := len(envs) - 1; i >= 0; i-- {
+		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
+			ldLibraryPath = envs[i]
+			break
+		}
+	}
+
+	return ldLibraryPath
+}

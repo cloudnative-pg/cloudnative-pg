@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: cluster-backup
+  name: cluster-backup-pitr-sas
 spec:
   cluster:
     name: pg-backup-azure-blob-sas
