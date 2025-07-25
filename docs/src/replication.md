@@ -81,8 +81,8 @@ following excerpt taken from `pg_hba.conf`:
 
 ```
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
 ```
 
 !!! Seealso "Certificates"
