@@ -113,6 +113,37 @@ var _ = Describe("Database validation", func() {
 		),
 
 		Entry(
+			"doesn't complain with distinct FDWs and usage names",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "fdw1",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage1"},
+								{Name: "usage2"},
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "fdw2",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage3"},
+								{Name: "usage4"},
+							},
+						},
+					},
+				},
+			},
+			0,
+		),
+
+		Entry(
 			"complain if there are duplicate FDWs",
 			&apiv1.Database{
 				Spec: apiv1.DatabaseSpec{
@@ -127,16 +158,52 @@ var _ = Describe("Database validation", func() {
 		),
 
 		Entry(
-			"Doesn't complain if there are no duplicate FDWs",
+			"complain if there are duplicate usage names within an FDW",
 			&apiv1.Database{
 				Spec: apiv1.DatabaseSpec{
 					FDWs: []apiv1.FDWSpec{
-						createFDWSpec("nosql_fdw"),
-						createFDWSpec("sqlite_fdw"),
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "postgre_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage1"},
+								{Name: "usage2"},
+								{Name: "usage1"},
+							},
+						},
 					},
 				},
 			},
-			0,
+			1,
+		),
+
+		Entry(
+			"complains for duplicate FDW and duplicate usage names",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "duplicate_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "dup_usage"},
+								{Name: "dup_usage"},
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "duplicate_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			2,
 		),
 	)
 })

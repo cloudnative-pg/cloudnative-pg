@@ -246,12 +246,17 @@ type FDWSpec struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Options specifies options for the FDW(key is option name, value is option value)
+	// +optional
 	Options map[string]OptionSpecValue `json:"options,omitempty"`
+
+	// Usages specifies usages for the FDW
+	// +optional
+	Usages []UsageSpec `json:"usages,omitempty"`
 }
 
 // OptionSpecValue holds both the value and the ensure field for an option
 type OptionSpecValue struct {
-	Value string `json:"value,omitempty"`
+	Value string `json:"value"`
 
 	// Specifies whether an option should be present or absent in
 	// the database. If set to `present`, the option will be
@@ -261,6 +266,17 @@ type OptionSpecValue struct {
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
+}
+
+type UsageSpec struct {
+	// Name of the usage
+	Name string `json:"name"`
+
+	// The type of usage
+	// +kubebuilder:default:="grant"
+	// +kubebuilder:validation:Enum=grant;revoke
+	// +optional
+	Type string `json:"type,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database
