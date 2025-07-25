@@ -50,6 +50,8 @@ type fdwInfo struct {
 	Validator string                           `json:"validator"`
 	Owner     string                           `json:"owner"`
 	Options   map[string]apiv1.OptionSpecValue `json:"options"`
+	// Map of usages (key: usage name, value: type of usage)
+	Usages map[string]string `json:"usages"`
 }
 
 func detectDatabase(
@@ -422,6 +424,11 @@ FROM pg_foreign_data_wrapper f
 JOIN pg_authid a ON f.fdwowner = a.oid
 WHERE fdwname = $1
 `
+
+const detectDatabaseFDWUsageSQL = `
+SELECT rolname
+FROM pg_roles
+WHERE has_fdw_privilege(rolname, $1, 'USAGE') = true`
 
 func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
 	row := db.QueryRowContext(
