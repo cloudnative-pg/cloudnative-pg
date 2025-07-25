@@ -419,12 +419,15 @@ func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster 
 
 	if r.runningImages == nil {
 		r.runningImages = latestImages
-		contextLogger.Info("Detected runningImages images", "runningImages", r.runningImages.ToSortedList())
+		contextLogger.Info("Detected running images", "runningImages", r.runningImages.ToSortedList())
 
 		return false
 	}
 
-	contextLogger.Trace("Calculated image requirements", "latestImages", latestImages.ToSortedList(), "runningImages", r.runningImages.ToSortedList())
+	contextLogger.Trace(
+	        "Calculated image requirements", 
+	        "latestImages", latestImages.ToSortedList(), 
+	        "runningImages", r.runningImages.ToSortedList())
 
 	if latestImages.Eq(r.runningImages) {
 		return false
