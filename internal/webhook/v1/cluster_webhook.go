@@ -976,14 +976,27 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 
 	var result field.ErrorList
 
-	if r.Spec.PostgresConfiguration.Synchronous.Number >= (r.Spec.Instances +
-		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost) +
-		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre)) {
+	cfg := r.Spec.PostgresConfiguration.Synchronous
+	if cfg.Number >= (r.Spec.Instances +
+		len(cfg.StandbyNamesPost) +
+		len(cfg.StandbyNamesPre)) {
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
-			r.Spec.PostgresConfiguration.Synchronous,
+			cfg,
 			"Invalid synchronous configuration: the number of synchronous replicas must be less than the "+
 				"total number of instances and the provided standby names.",
+		)
+		result = append(result, err)
+	}
+
+	syncQuorumActive := r.IsSyncQuorumFailoverProtectionActive(context.Background())
+	if syncQuorumActive && cfg.Number <= len(cfg.StandbyNamesPost)+len(cfg.StandbyNamesPre) {
+		err := field.Invalid(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			cfg,
+			"Invalid syncQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
+				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
+				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
 		)
 		result = append(result, err)
 	}
