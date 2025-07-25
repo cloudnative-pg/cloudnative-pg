@@ -841,7 +841,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				By("checking the the cluster is working", func() {
+				By("checking the cluster is working", func() {
 					// Setting up a cluster with three pods is slow, usually 200-600s
 					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady], env)
 				})
