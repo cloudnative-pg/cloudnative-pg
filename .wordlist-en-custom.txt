@@ -371,6 +371,7 @@ ProbeTerminationGracePeriod
 ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
+Promotable
 PublicationReclaimPolicy
 PublicationSpec
 PublicationStatus
@@ -1174,6 +1175,7 @@ programmatically
 proj
 projectedVolumeTemplate
 prometheus
+promotable
 promotionTimeout
 promotionToken
 provisioner
