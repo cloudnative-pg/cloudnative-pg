@@ -46,7 +46,7 @@ type Manager struct {
 	// used by the unit tests to inject a fake time
 	timeProvider timeFunc
 
-	// The following data is relative to the the last
+	// The following data is relative to the last
 	// rollout
 	lastInstance string
 	lastCluster  client.ObjectKey
