@@ -49,7 +49,13 @@ func NewReplicator(instance *postgres.Instance) *Replicator {
 func (sr *Replicator) Start(ctx context.Context) error {
 	contextLog := log.FromContext(ctx).WithName("Replicator")
 	go func() {
-		config := <-sr.instance.SlotReplicatorChan()
+		var config *apiv1.ReplicationSlotsConfiguration
+		select {
+		case config = <-sr.instance.SlotReplicatorChan():
+		case <-ctx.Done():
+			return
+		}
+
 		updateInterval := config.GetUpdateInterval()
 		ticker := time.NewTicker(updateInterval)
 
