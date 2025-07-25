@@ -24,10 +24,11 @@ Rolling upgrades are triggered when:
   (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
 !!! Warning
-    Any change of container images (including extensions) takes precedence over any
-    other change, potentially triggering multiple restarts. For example, if you
-    change the PostgreSQL configuration and the PostgreSQL version simultaneously,
-    the container image change will take precedence.
+    Any change to container images (including extensions) takes precedence over
+    all other changes and will trigger a rollout first. For example, if you update
+    both the PostgreSQL configuration and the PostgreSQL version at the same time,
+    the container image change will take priority, and the configuration change
+    will be applied in a subsequent rollout.
 
 During a rolling upgrade, the operator upgrades all replicas one Pod at a time,
 starting from the one with the highest serial.
