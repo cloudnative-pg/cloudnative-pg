@@ -164,6 +164,9 @@ ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
 Fei
@@ -302,6 +305,7 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpecValue
 OwnNamespace
 PDB
 PDBs
@@ -830,6 +834,8 @@ faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -1198,6 +1204,7 @@ recoverytarget
 recv
 redefinitions
 redhat
+registrated
 rehydrate
 rehydrated
 rehydration
@@ -1425,6 +1432,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized

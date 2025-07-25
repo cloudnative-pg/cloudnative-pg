@@ -2391,6 +2391,8 @@ PostgreSQL cluster from an existing storage</p>
 
 - [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
 
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
 
@@ -2689,6 +2691,13 @@ tablespace used for objects created in this database.</p>
    <p>The list of extensions to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-FDWSpec"><i>[]FDWSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign data wrappers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2742,6 +2751,13 @@ desired state that was synchronized</p>
    <p>Extensions is the status of the managed extensions</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>FDWs is the status of the managed FDWs</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2783,6 +2799,8 @@ desired state that was synchronized</p>
 - [DatabaseObjectSpec](#postgresql-cnpg-io-v1-DatabaseObjectSpec)
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+- [OptionSpecValue](#postgresql-cnpg-io-v1-OptionSpecValue)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -3003,6 +3021,62 @@ secure and efficient password management for external clusters.</p>
 <td>
    <p>The configuration of the plugin that is taking care
 of WAL archiving and backups for this external cluster</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FDWSpec     {#postgresql-cnpg-io-v1-FDWSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>FDWSpec configures an Foreign Data Wrapper in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>handler</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)
+It would be empty if no handler is specified, in which case
+the default handler is registrated when creating the fdw extensions</p>
+</td>
+</tr>
+<tr><td><code>validator</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)
+It would be empty if no validator is specified, in which case
+the default validator is registrated when creating the fdw extensions</p>
+</td>
+</tr>
+<tr><td><code>owner</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner specifies the database role that will own the Foreign Data Wrapper.
+The specified role must have superuser privileges in the target database.</p>
+</td>
+</tr>
+<tr><td><code>options</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
+</td>
+<td>
+   <p>Options specifies options for the FDW(key is option name, value is option value)</p>
 </td>
 </tr>
 </tbody>
@@ -3843,6 +3917,39 @@ be limited, according to the <code>checkpoint_completion_target</code> setting o
 the PostgreSQL server. If set to true, an immediate checkpoint will be
 used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
+<p>OptionSpecValue holds both the value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Specifies whether an option should be present or absent in
+the database. If set to <code>present</code>, the option will be
+created if it does not exist. If set to <code>absent</code>, the
+option will be removed if it exists.</p>
 </td>
 </tr>
 </tbody>
