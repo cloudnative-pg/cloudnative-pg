@@ -93,11 +93,11 @@ type clusterOwnedResourceWithStatus interface {
 }
 
 func toSliceWithPointers[T any](items []T) []*T {
-	result := make([]*T, len(items))
-	for i, item := range items {
-		result[i] = &item
-	}
-	return result
+        result := make([]*T, len(items))
+        for i := range items {
+                result[i] = &items[i]
+        }
+        return result
 }
 
 // notifyOwnedResourceDeletion deletes finalizers for a given resource type
