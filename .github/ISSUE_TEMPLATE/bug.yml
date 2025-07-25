@@ -51,6 +51,7 @@ body:
         - "1.26 (latest patch)"
         - "1.25 (latest patch)"
         - "trunk (main)"
+        - "older in 1.26.x"
         - "older in 1.25.x"
         - "older minor (unsupported)"
     validations:
