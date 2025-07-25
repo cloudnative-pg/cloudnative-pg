@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -401,6 +402,11 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
+	// We give priority to images changes before applying the configuration ones.
+	if r.requiresImagesRollout(ctx, cluster) {
+		return reloadNeeded, nil
+	}
+
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(
@@ -420,6 +426,40 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
 	return reloadNeeded, nil
+}
+
+func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
+	contextLogger := log.FromContext(ctx)
+
+	latestImages := stringset.New()
+	latestImages.Put(cluster.Spec.ImageName)
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		latestImages.Put(extension.ImageVolumeSource.Reference)
+	}
+
+	if r.runningImages == nil {
+		r.runningImages = latestImages
+		contextLogger.Info("Detected running images", "runningImages", r.runningImages.ToSortedList())
+
+		return false
+	}
+
+	contextLogger.Trace(
+		"Calculated image requirements",
+		"latestImages", latestImages.ToSortedList(),
+		"runningImages", r.runningImages.ToSortedList())
+
+	if latestImages.Eq(r.runningImages) {
+		return false
+	}
+
+	contextLogger.Info(
+		"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
+		"runningImages", r.runningImages.ToSortedList(),
+		"latestImages", latestImages.ToSortedList(),
+	)
+
+	return true
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
