@@ -51,6 +51,7 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				utils.ManagedByLabelName: utils.ManagerName,
+				utils.ClusterLabelName:   cluster.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -73,6 +74,7 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				utils.ManagedByLabelName: utils.ManagerName,
+				utils.ClusterLabelName:   cluster.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -94,6 +96,7 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				utils.ManagedByLabelName: utils.ManagerName,
+				utils.ClusterLabelName:   cluster.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -115,6 +118,7 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				utils.ManagedByLabelName: utils.ManagerName,
+				utils.ClusterLabelName:   cluster.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -166,7 +170,6 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 		builder := servicespec.NewFrom(&serviceConfiguration.ServiceTemplate).
 			WithServiceType(defaultService.Spec.Type, false).
 			WithLabel(utils.IsManagedLabelName, "true").
-			WithLabel(utils.ManagedByLabelName, utils.ManagerName).
 			WithAnnotation(utils.UpdateStrategyAnnotation, string(serviceConfiguration.UpdateStrategy)).
 			SetSelectors(defaultService.Spec.Selector)
 

@@ -43,6 +43,7 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*corev1.Service, err
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithLabel(utils.ManagedByLabelName, string(utils.ManagerName)).
 		WithAnnotation(utils.PoolerSpecHashAnnotationName, poolerHash).
 		WithServiceType(corev1.ServiceTypeClusterIP, false).
 		WithServicePortNoOverwrite(&corev1.ServicePort{
