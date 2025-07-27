@@ -51,9 +51,9 @@ import (
 
 const (
 	// minioImage is the image used to run a MinIO server
-	minioImage = "minio/minio:RELEASE.2025-07-18T21-56-31Z"
+	minioImage = "minio/minio:RELEASE.2025-07-23T15-54-02Z"
 	// minioClientImage is the image used to run a MinIO client
-	minioClientImage = "minio/mc:RELEASE.2025-07-16T15-35-03Z"
+	minioClientImage = "minio/mc:RELEASE.2025-07-21T05-28-08Z"
 )
 
 // Env contains all the information related or required by MinIO deployment and
