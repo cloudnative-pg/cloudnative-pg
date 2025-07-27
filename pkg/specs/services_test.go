@@ -48,6 +48,10 @@ var _ = Describe("Services specification", func() {
 	It("create a configured -any service", func() {
 		service := CreateClusterAnyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-any"))
+		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:   "clustername",
+		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
@@ -58,6 +62,10 @@ var _ = Describe("Services specification", func() {
 	It("create a configured -r service", func() {
 		service := CreateClusterReadService(postgresql)
 		Expect(service.Name).To(Equal("clustername-r"))
+		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:   "clustername",
+		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
@@ -68,6 +76,10 @@ var _ = Describe("Services specification", func() {
 	It("create a configured -ro service", func() {
 		service := CreateClusterReadOnlyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-ro"))
+		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:   "clustername",
+		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
@@ -78,6 +90,10 @@ var _ = Describe("Services specification", func() {
 	It("create a configured -rw service", func() {
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))
+		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:   "clustername",
+		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
@@ -152,6 +168,7 @@ var _ = Describe("BuildManagedServices", func() {
 			Expect(services).NotTo(BeNil())
 			Expect(services).To(HaveLen(1))
 			Expect(services[0].ObjectMeta.Name).To(Equal("test-service"))
+			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.ManagedByLabelName, utils.ManagerName))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.IsManagedLabelName, "true"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue("test-label", "test-value"))
 			Expect(services[0].ObjectMeta.Annotations).To(HaveKeyWithValue("test-annotation", "test-value"))
