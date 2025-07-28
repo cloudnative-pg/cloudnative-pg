@@ -18,9 +18,9 @@ spec:
     extensions:
       - name: postgis
         ld_library_path:
-          - system
+          - syslib
         image:
-          reference: ghcr.io/niccolofei/postgis:18beta1-master-bullseye # wokeignore:rule=master
+          reference: ghcr.io/niccolofei/postgis:18beta2-master-bullseye # wokeignore:rule=master
 
   bootstrap:
     initdb:
