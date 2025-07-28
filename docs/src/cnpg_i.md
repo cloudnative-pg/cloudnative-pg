@@ -29,16 +29,19 @@ in the Operator's Deployment or by deploying it as a standalone
 [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same Operator namespace.
 In both cases, the Plugin must be packaged as a container image to be deployed as a Kubernetes workload.
 
-#### Standalone Deployment
+### Standalone Deployment
 
 Deploying the plugin as a standalone `Deployment` is the recommended approach, as it allows to decouple
 the plugin's lifecycle from the Operator's one, and to scale it independently.
 The container needs to expose the gRPC server implementing the CNPG-I protocol to the network through
 a TCP port and a Kubernetes Service. The Service must have the label `cnpg.io/plugin: <plugin-name>`,
-which is used by the Operator to discover the plugin.
+which is required by the Operator to discover the plugin.
+
+The communication between the Operator and the Plugin is done over gRPC, using mTLS for security. See
+the section on [Communication over mTLS](#communication-over-mtls) for more details.
 
 !!! Note
-    The Operator does not automatically discovery new Plugins after startup. To detect and use newly deployed Plugins, 
+    The Operator does not automatically discover new Plugins after startup. To detect and use newly deployed Plugins,
     you must restart the Operator.
 
 Example of a Plugin as a standalone `Deployment`:
@@ -87,7 +90,7 @@ spec:
     app: cnpg-i-plugin-example
 ```
 
-#### Sidecar Container
+### Sidecar Container
 
 The Plugin can be configured as a [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) 
 in the Operator's `Deployment`. In this case, the Plugin needs to register the gRPC server as a `unix domain socket`. 
@@ -135,3 +138,13 @@ spec:
         - name: cnpg-i-plugins
           emptyDir: {}
 ```
+
+
+### Communication over mTLS
+
+When a Plugin is configured as a standalone Deployment, the communication with the Operator occurs over the network,
+and mTLS is enforced for security. This implies that TLS certificates for both sides of the connection
+needs to be provided.
+The recommended approach to provide the certificates is to use [CertManager](https://cert-manager.io) to create and manage them, but
+also the use of self-provisioned certificates is supported.
+
