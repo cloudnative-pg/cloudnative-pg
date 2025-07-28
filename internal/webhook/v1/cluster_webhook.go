@@ -994,12 +994,21 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 }
 
 func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.ErrorList {
-	syncQuorumActive := r.IsSyncQuorumFailoverProtectionActive(context.Background())
+	var result field.ErrorList
+
+	syncQuorumActive, err := r.IsSyncQuorumFailoverProtectionActive()
+	if err != nil {
+		err := field.Invalid(
+			field.NewPath("metadata", "annotations", utils.SyncQuorumAnnotationName),
+			r.ObjectMeta.Annotations[utils.SyncQuorumAnnotationName],
+			"Invalid syncQuorum annotation value, expected boolean.",
+		)
+		result = append(result, err)
+		return result
+	}
 	if !syncQuorumActive {
 		return nil
 	}
-
-	var result field.ErrorList
 
 	cfg := r.Spec.PostgresConfiguration.Synchronous
 	if cfg == nil {

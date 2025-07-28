@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/util/retry"
@@ -96,6 +97,8 @@ func (r *InstanceReconciler) updateSyncQuorumObject(ctx context.Context, cluster
 }
 
 func (r *InstanceReconciler) shouldManageSyncQuorumObject(ctx context.Context, cluster *apiv1.Cluster) bool {
+	contextLogger := log.FromContext(ctx)
+
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() {
 		return false
 	}
@@ -105,7 +108,14 @@ func (r *InstanceReconciler) shouldManageSyncQuorumObject(ctx context.Context, c
 	if cluster.Spec.PostgresConfiguration.Synchronous == nil {
 		return false
 	}
-	if !cluster.IsSyncQuorumFailoverProtectionActive(ctx) {
+
+	syncQuorumActive, err := cluster.IsSyncQuorumFailoverProtectionActive()
+	if err != nil {
+		contextLogger.Error(err, "Failed to determine if sync quorum is active")
+		syncQuorumActive = false
+	}
+
+	if !syncQuorumActive {
 		return false
 	}
 

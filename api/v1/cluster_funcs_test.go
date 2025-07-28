@@ -1763,14 +1763,19 @@ var _ = Describe("Synchronous quorum annotation", func() {
 
 	DescribeTable(
 		"annotation parsing",
-		func(ctx SpecContext, cluster *Cluster, expected bool) {
-			actual := cluster.IsSyncQuorumFailoverProtectionActive(ctx)
+		func(ctx SpecContext, cluster *Cluster, valueIsCorrect, expected bool) {
+			actual, err := cluster.IsSyncQuorumFailoverProtectionActive()
+			if valueIsCorrect {
+				Expect(err).To(BeNil())
+			} else {
+				Expect(err).ToNot(BeNil())
+			}
 			Expect(actual).To(Equal(expected))
 		},
-		Entry("with no annotation", &Cluster{}, false),
-		Entry("with empty annotation", clusterWithAnnotation(""), false),
-		Entry("with true annotation", clusterWithAnnotation("t"), true),
-		Entry("with false annotation", clusterWithAnnotation("f"), false),
-		Entry("with invalid annotation", clusterWithAnnotation("xxx"), false),
+		Entry("with no annotation", &Cluster{}, true, false),
+		Entry("with empty annotation", clusterWithAnnotation(""), true, false),
+		Entry("with true annotation", clusterWithAnnotation("t"), true, true),
+		Entry("with false annotation", clusterWithAnnotation("f"), true, false),
+		Entry("with invalid annotation", clusterWithAnnotation("xxx"), true, false),
 	)
 })

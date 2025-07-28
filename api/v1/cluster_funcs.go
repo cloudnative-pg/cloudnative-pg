@@ -1564,21 +1564,16 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 
 // IsSyncQuorumFailoverProtectionActive check if we should enable the
 // quorum failover protection alpha-feature.
-func (cluster *Cluster) IsSyncQuorumFailoverProtectionActive(ctx context.Context) bool {
+func (cluster *Cluster) IsSyncQuorumFailoverProtectionActive() (bool, error) {
 	syncQuorumAnnotation, ok := cluster.GetAnnotations()[utils.SyncQuorumAnnotationName]
 	if !ok || syncQuorumAnnotation == "" {
-		return false
+		return false, nil
 	}
 
 	v, err := strconv.ParseBool(syncQuorumAnnotation)
 	if err != nil {
-		log.FromContext(ctx).Warning(
-			"Invalid synchronous quorum annotation name",
-			"value", v,
-			"clusterName", cluster.Name,
-		)
-		return false
+		return false, fmt.Errorf("failed to parse sync quorum annotation '%v': %v", syncQuorumAnnotation, err)
 	}
 
-	return v
+	return v, nil
 }
