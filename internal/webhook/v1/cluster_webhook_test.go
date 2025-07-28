@@ -5796,7 +5796,7 @@ var _ = Describe("getStorageWarnings", func() {
 	})
 })
 
-var _ = Describe("syncQuorum validation", func() {
+var _ = Describe("failoverQuorum validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
@@ -5806,7 +5806,7 @@ var _ = Describe("syncQuorum validation", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.SyncQuorumAnnotationName: "t",
+					utils.FailoverQuorumAnnotationName: "t",
 				},
 			},
 			Spec: apiv1.ClusterSpec{
@@ -5814,7 +5814,7 @@ var _ = Describe("syncQuorum validation", func() {
 			},
 		}
 
-		errList := v.validateSyncQuorum(cluster)
+		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(HaveLen(1))
 	})
 
@@ -5822,7 +5822,7 @@ var _ = Describe("syncQuorum validation", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.SyncQuorumAnnotationName: "t",
+					utils.FailoverQuorumAnnotationName: "t",
 				},
 			},
 			Spec: apiv1.ClusterSpec{
@@ -5835,11 +5835,11 @@ var _ = Describe("syncQuorum validation", func() {
 			},
 		}
 
-		errList := v.validateSyncQuorum(cluster)
+		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(BeEmpty())
 
 		cluster.Spec.Instances = 2
-		errList = v.validateSyncQuorum(cluster)
+		errList = v.validateFailoverQuorum(cluster)
 		Expect(errList).To(HaveLen(1))
 	})
 
@@ -5847,7 +5847,7 @@ var _ = Describe("syncQuorum validation", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.SyncQuorumAnnotationName: "t",
+					utils.FailoverQuorumAnnotationName: "t",
 				},
 			},
 			Spec: apiv1.ClusterSpec{
@@ -5868,7 +5868,7 @@ var _ = Describe("syncQuorum validation", func() {
 			},
 		}
 
-		errList := v.validateSyncQuorum(cluster)
+		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(HaveLen(1))
 	})
 })

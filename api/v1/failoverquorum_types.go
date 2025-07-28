@@ -25,15 +25,15 @@ import (
 
 // +kubebuilder:object:root=true
 
-// SyncQuorumList contains a list of SyncQuorum
-type SyncQuorumList struct {
+// FailoverQuorumList contains a list of FailoverQuorum
+type FailoverQuorumList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	// List of syncquorums
-	Items []SyncQuorum `json:"items"`
+	// List of failoverquorums
+	Items []FailoverQuorum `json:"items"`
 }
 
 // +genclient
@@ -42,22 +42,22 @@ type SyncQuorumList struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// SyncQuorum contains the information about the current synchronous
+// FailoverQuorum contains the information about the current synchronous
 // quorum status of a PG cluster. It is updated by the instance manager
 // of the primary node and reset to zero by the operator to trigger
 // an update.
-type SyncQuorum struct {
+type FailoverQuorum struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
 	// Most recently observed status of the sync quorum.
 	// +optional
-	Status SyncQuorumStatus `json:"status"`
+	Status FailoverQuorumStatus `json:"status"`
 }
 
-// SyncQuorumStatus is the latest observed status of the synchronous
+// FailoverQuorumStatus is the latest observed status of the synchronous
 // quorum of the PG cluster.
-type SyncQuorumStatus struct {
+type FailoverQuorumStatus struct {
 	// Contains the latest reported Method value.
 	// +optional
 	Method string `json:"method,omitempty"`
@@ -79,5 +79,5 @@ type SyncQuorumStatus struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&SyncQuorum{}, &SyncQuorumList{})
+	SchemeBuilder.Register(&FailoverQuorum{}, &FailoverQuorumList{})
 }

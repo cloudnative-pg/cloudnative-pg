@@ -1755,7 +1755,7 @@ var _ = Describe("Synchronous quorum annotation", func() {
 		return &Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.SyncQuorumAnnotationName: v,
+					utils.FailoverQuorumAnnotationName: v,
 				},
 			},
 		}
@@ -1763,12 +1763,12 @@ var _ = Describe("Synchronous quorum annotation", func() {
 
 	DescribeTable(
 		"annotation parsing",
-		func(ctx SpecContext, cluster *Cluster, valueIsCorrect, expected bool) {
-			actual, err := cluster.IsSyncQuorumFailoverProtectionActive()
+		func(cluster *Cluster, valueIsCorrect, expected bool) {
+			actual, err := cluster.IsFailoverQuorumActive()
 			if valueIsCorrect {
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			} else {
-				Expect(err).ToNot(BeNil())
+				Expect(err).To(HaveOccurred())
 			}
 			Expect(actual).To(Equal(expected))
 		},

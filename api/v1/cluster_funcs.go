@@ -1562,17 +1562,17 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	return ""
 }
 
-// IsSyncQuorumFailoverProtectionActive check if we should enable the
+// IsFailoverQuorumActive check if we should enable the
 // quorum failover protection alpha-feature.
-func (cluster *Cluster) IsSyncQuorumFailoverProtectionActive() (bool, error) {
-	syncQuorumAnnotation, ok := cluster.GetAnnotations()[utils.SyncQuorumAnnotationName]
-	if !ok || syncQuorumAnnotation == "" {
+func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
+	failoverQuorumAnnotation, ok := cluster.GetAnnotations()[utils.FailoverQuorumAnnotationName]
+	if !ok || failoverQuorumAnnotation == "" {
 		return false, nil
 	}
 
-	v, err := strconv.ParseBool(syncQuorumAnnotation)
+	v, err := strconv.ParseBool(failoverQuorumAnnotation)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse sync quorum annotation '%v': %v", syncQuorumAnnotation, err)
+		return false, fmt.Errorf("failed to parse sync quorum annotation '%v': %v", failoverQuorumAnnotation, err)
 	}
 
 	return v, nil

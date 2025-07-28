@@ -259,9 +259,9 @@ func (r *InstanceReconciler) Reconcile(
 		// meanwhile a new configuration is applied.
 		//
 		// For this reason, before applying a new configuration we
-		// reset the SyncQuorum object - de facto preventing any failover -
+		// reset the FailoverQuorum object - de facto preventing any failover -
 		// and we update it after.
-		if err = r.resetSyncQuorumObject(ctx, cluster); err != nil {
+		if err = r.resetFailoverQuorumObject(ctx, cluster); err != nil {
 			return reconcile.Result{}, err
 		}
 		if err = r.instance.Reload(ctx); err != nil {
@@ -272,7 +272,7 @@ func (r *InstanceReconciler) Reconcile(
 		}
 	}
 
-	if err = r.updateSyncQuorumObject(ctx, cluster); err != nil {
+	if err = r.updateFailoverQuorumObject(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
 

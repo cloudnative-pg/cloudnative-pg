@@ -184,8 +184,8 @@ rules:
   - postgresql.cnpg.io
   resources:
   - clusters/status
+  - failoverquorums/status
   - poolers/status
-  - syncquorums/status
   verbs:
   - get
   - patch
@@ -194,7 +194,7 @@ rules:
 - apiGroups:
   - postgresql.cnpg.io
   resources:
-  - syncquorums
+  - failoverquorums
   verbs:
   - create
   - delete

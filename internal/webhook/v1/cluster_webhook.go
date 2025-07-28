@@ -207,7 +207,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
 		v.validateSynchronousReplicaConfiguration,
-		v.validateSyncQuorum,
+		v.validateFailoverQuorum,
 		v.validateLDAP,
 		v.validateReplicationSlots,
 		v.validateSynchronizeLogicalDecoding,
@@ -993,20 +993,20 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 	return result
 }
 
-func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	syncQuorumActive, err := r.IsSyncQuorumFailoverProtectionActive()
+	failoverQuorumActive, err := r.IsFailoverQuorumActive()
 	if err != nil {
 		err := field.Invalid(
-			field.NewPath("metadata", "annotations", utils.SyncQuorumAnnotationName),
-			r.ObjectMeta.Annotations[utils.SyncQuorumAnnotationName],
-			"Invalid syncQuorum annotation value, expected boolean.",
+			field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
+			r.Annotations[utils.FailoverQuorumAnnotationName],
+			"Invalid failoverQuorum annotation value, expected boolean.",
 		)
 		result = append(result, err)
 		return result
 	}
-	if !syncQuorumActive {
+	if !failoverQuorumActive {
 		return nil
 	}
 
@@ -1014,7 +1014,7 @@ func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.Erro
 	if cfg == nil {
 		err := field.Required(
 			field.NewPath("spec", "postgresql", "synchronous"),
-			"Invalid syncQuorum configuration: synchronous replication configuration "+
+			"Invalid failoverQuorum configuration: synchronous replication configuration "+
 				"is required.",
 		)
 		result = append(result, err)
@@ -1025,7 +1025,7 @@ func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.Erro
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			cfg,
-			"Invalid syncQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
+			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
 				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
 				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
 		)
@@ -1036,7 +1036,7 @@ func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.Erro
 		err := field.Invalid(
 			field.NewPath("spec", "instances"),
 			r.Spec.Instances,
-			"syncQuorum requires more than 2 instances.",
+			"failoverQuorum requires more than 2 instances.",
 		)
 		result = append(result, err)
 	}

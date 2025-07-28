@@ -44,8 +44,8 @@ func (r *ClusterReconciler) evaluateQuorumCheck(
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithValues("tag", "quorumCheck")
 
-	var syncQuorum apiv1.SyncQuorum
-	if err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &syncQuorum); err != nil {
+	var failoverQuorum apiv1.FailoverQuorum
+	if err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &failoverQuorum); err != nil {
 		if apierrs.IsNotFound(err) {
 			contextLogger.Warning(
 				"Quorum check failed because no synchronous metadata is available. Denying the failover request")
@@ -57,19 +57,19 @@ func (r *ClusterReconciler) evaluateQuorumCheck(
 		return false, err
 	}
 
-	return r.evaluateQuorumCheckWithStatus(ctx, &syncQuorum, statusList)
+	return r.evaluateQuorumCheckWithStatus(ctx, &failoverQuorum, statusList)
 }
 
 // evaluateQuorumCheckWithStatus is used internally by evaluateQuorumCheck,
 // primarily at the benefit of the unit tests
 func (r *ClusterReconciler) evaluateQuorumCheckWithStatus(
 	ctx context.Context,
-	syncQuorum *apiv1.SyncQuorum,
+	failoverQuorum *apiv1.FailoverQuorum,
 	statusList postgres.PostgresqlStatusList,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithValues("tag", "quorumCheck")
 
-	syncStatus := syncQuorum.Status
+	syncStatus := failoverQuorum.Status
 	contextLogger.Trace("Dumping latest synchronous replication status", "syncStatus", syncStatus)
 
 	// Step 1: coherence check of the synchrouous replication information
@@ -133,25 +133,25 @@ func (r *ClusterReconciler) evaluateQuorumCheckWithStatus(
 	return isStronglyConsistent, nil
 }
 
-func (r *ClusterReconciler) reconcileSyncQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) reconcileFailoverQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx).WithValues("tag", "quorumCheck")
 
 	syncConfig := cluster.Spec.PostgresConfiguration.Synchronous
-	syncQuorumActive, err := cluster.IsSyncQuorumFailoverProtectionActive()
+	failoverQuorumActive, err := cluster.IsFailoverQuorumActive()
 	if err != nil {
 		contextLogger.Error(err, "Failed to determine if sync quorum is active")
 	}
-	if syncConfig != nil && syncQuorumActive {
-		return r.ensureSyncQuorumObjectExists(ctx, cluster)
+	if syncConfig != nil && failoverQuorumActive {
+		return r.ensureFailoverQuorumObjectExists(ctx, cluster)
 	}
 
-	return r.ensureSyncQuorumObjectDoesNotExist(ctx, cluster)
+	return r.ensureFailoverQuorumObjectDoesNotExist(ctx, cluster)
 }
 
-func (r *ClusterReconciler) ensureSyncQuorumObjectExists(ctx context.Context, cluster *apiv1.Cluster) error {
-	syncQuorum := apiv1.SyncQuorum{
+func (r *ClusterReconciler) ensureFailoverQuorumObjectExists(ctx context.Context, cluster *apiv1.Cluster) error {
+	failoverQuorum := apiv1.FailoverQuorum{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "SyncQuorum",
+			Kind:       "FailoverQuorum",
 			APIVersion: apiv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -159,21 +159,21 @@ func (r *ClusterReconciler) ensureSyncQuorumObjectExists(ctx context.Context, cl
 			Name:      cluster.Name,
 		},
 	}
-	cluster.SetInheritedDataAndOwnership(&syncQuorum.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&failoverQuorum.ObjectMeta)
 
-	err := r.Create(ctx, &syncQuorum)
+	err := r.Create(ctx, &failoverQuorum)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		log.FromContext(ctx).Error(err, "Unable to create the SyncQuorum", "object", syncQuorum)
+		log.FromContext(ctx).Error(err, "Unable to create the FailoverQuorum", "object", failoverQuorum)
 		return err
 	}
 
 	return nil
 }
 
-func (r *ClusterReconciler) ensureSyncQuorumObjectDoesNotExist(ctx context.Context, cluster *apiv1.Cluster) error {
-	var syncQuorum apiv1.SyncQuorum
+func (r *ClusterReconciler) ensureFailoverQuorumObjectDoesNotExist(ctx context.Context, cluster *apiv1.Cluster) error {
+	var failoverQuorum apiv1.FailoverQuorum
 
-	if err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &syncQuorum); err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(cluster), &failoverQuorum); err != nil {
 		if apierrs.IsNotFound(err) {
 			return nil
 		}
@@ -181,5 +181,5 @@ func (r *ClusterReconciler) ensureSyncQuorumObjectDoesNotExist(ctx context.Conte
 		return err
 	}
 
-	return r.Delete(ctx, &syncQuorum)
+	return r.Delete(ctx, &failoverQuorum)
 }

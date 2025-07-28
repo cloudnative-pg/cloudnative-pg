@@ -11,12 +11,12 @@
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 - [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
 - [Database](#postgresql-cnpg-io-v1-Database)
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
 - [Publication](#postgresql-cnpg-io-v1-Publication)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
 - [Subscription](#postgresql-cnpg-io-v1-Subscription)
-- [SyncQuorum](#postgresql-cnpg-io-v1-SyncQuorum)
 
 ## Backup     {#postgresql-cnpg-io-v1-Backup}
 
@@ -156,6 +156,40 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>Most recently observed status of the Database. This data may not be up to
 date. Populated by the system. Read-only.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FailoverQuorum     {#postgresql-cnpg-io-v1-FailoverQuorum}
+
+
+**Appears in:**
+
+
+
+<p>FailoverQuorum contains the information about the current synchronous
+quorum status of a PG cluster. It is updated by the instance manager
+of the primary node and reset to zero by the operator to trigger
+an update.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>FailoverQuorum</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>status</code><br/>
+<a href="#postgresql-cnpg-io-v1-FailoverQuorumStatus"><i>FailoverQuorumStatus</i></a>
+</td>
+<td>
+   <p>Most recently observed status of the sync quorum.</p>
 </td>
 </tr>
 </tbody>
@@ -328,40 +362,6 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </td>
 <td>
    <span class="text-muted">No description provided.</span></td>
-</tr>
-</tbody>
-</table>
-
-## SyncQuorum     {#postgresql-cnpg-io-v1-SyncQuorum}
-
-
-**Appears in:**
-
-
-
-<p>SyncQuorum contains the information about the current synchronous
-quorum status of a PG cluster. It is updated by the instance manager
-of the primary node and reset to zero by the operator to trigger
-an update.</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
-<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>SyncQuorum</code></td></tr>
-<tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
-</tr>
-<tr><td><code>status</code><br/>
-<a href="#postgresql-cnpg-io-v1-SyncQuorumStatus"><i>SyncQuorumStatus</i></a>
-</td>
-<td>
-   <p>Most recently observed status of the sync quorum.</p>
-</td>
 </tr>
 </tbody>
 </table>
@@ -3038,6 +3038,55 @@ secure and efficient password management for external clusters.</p>
 <td>
    <p>The configuration of the plugin that is taking care
 of WAL archiving and backups for this external cluster</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FailoverQuorumStatus     {#postgresql-cnpg-io-v1-FailoverQuorumStatus}
+
+
+**Appears in:**
+
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
+
+
+<p>FailoverQuorumStatus is the latest observed status of the synchronous
+quorum of the PG cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Contains the latest reported Method value.</p>
+</td>
+</tr>
+<tr><td><code>standbyNames</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>StandbyNames is the list of potentially synchronous
+instance names.</p>
+</td>
+</tr>
+<tr><td><code>standbyNumber</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>StandbyNumber is the number of synchronous standbys that transactions
+need to wait for replies from.</p>
+</td>
+</tr>
+<tr><td><code>primary</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary is the name of the primary instance that updated
+this object the latest time.</p>
 </td>
 </tr>
 </tbody>
@@ -6038,55 +6087,6 @@ desired state that was synchronized</p>
 </td>
 <td>
    <p>InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## SyncQuorumStatus     {#postgresql-cnpg-io-v1-SyncQuorumStatus}
-
-
-**Appears in:**
-
-- [SyncQuorum](#postgresql-cnpg-io-v1-SyncQuorum)
-
-
-<p>SyncQuorumStatus is the latest observed status of the synchronous
-quorum of the PG cluster.</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>method</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Contains the latest reported Method value.</p>
-</td>
-</tr>
-<tr><td><code>standbyNames</code><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>StandbyNames is the list of potentially synchronous
-instance names.</p>
-</td>
-</tr>
-<tr><td><code>standbyNumber</code><br/>
-<i>int</i>
-</td>
-<td>
-   <p>StandbyNumber is the number of synchronous standbys that transactions
-need to wait for replies from.</p>
-</td>
-</tr>
-<tr><td><code>primary</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Primary is the name of the primary instance that updated
-this object the latest time.</p>
 </td>
 </tr>
 </tbody>

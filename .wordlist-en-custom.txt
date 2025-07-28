@@ -166,6 +166,9 @@ ExtensionStatus
 ExternalCluster
 FQDN
 FQDNs
+FailoverQuorum
+FailoverQuorumSpec
+FailoverQuorumStatus
 Fei
 Filesystem
 Fluentd
@@ -486,9 +489,6 @@ SubscriptionStatus
 SuccessfullyExtracted
 SuperUserSecret
 SwitchReplicaClusterStatus
-SyncQuorum
-SyncQuorumSpec
-SyncQuorumStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration

@@ -130,11 +130,11 @@ This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
 Quorum failover can be enabled by setting the annotation
-`cnpg.io/syncQuorum="t"` in the `Cluster` resource.
+`cnpg.io/failoverQuorum="t"` in the `Cluster` resource.
 
 !!! info
     When this feature is out of the experimental phase, the annotation
-    `cnpg.io/syncQuorum` will be replaced by a configuration option in the
+    `cnpg.io/failoverQuorum` will be replaced by a configuration option in the
     `Cluster` resource.
 
 ### How it works
@@ -164,17 +164,17 @@ Users can force a promotion of a replica to primary through the
 `kubectl cnpg promote` command even if the quorum check is failing.
 
 An additional CRD is used to track the quorum state of the cluster. A `Cluster`
-with the quorum failover enabled will have a `SyncQuorum` resource with the same
-name as the `Cluster` resource. The `SyncQuorum` CR is created by the
+with the quorum failover enabled will have a `FailoverQuorum` resource with the same
+name as the `Cluster` resource. The `FailoverQuorum` CR is created by the
 controller when the quorum failover is enabled, and it is updated by the primary
 instance during its reconciliation loop, and read by the operator during quorum
 checks. It is used to track the latest known configuration of the synchronous
-replication. Users should not modify the `SyncQuorum` resource directly. During
+replication. Users should not modify the `FailoverQuorum` resource directly. During
 PostgreSQL configuration changes, when it is not possible to determine the
-configuration, the `SyncQuorum` resource will be reset, preventing any failover
+configuration, the `FailoverQuorum` resource will be reset, preventing any failover
 until the new configuration is applied.
 
-The `SyncQuorum` resource works in conjunction with PostgreSQL synchronous
+The `FailoverQuorum` resource works in conjunction with PostgreSQL synchronous
 replication. There is no guarantee that `COMMIT` operations returned to the
 client but that have not been performed synchronously, such as those made
 explicitly disabling synchronous replication with
@@ -324,7 +324,7 @@ Consider a cluster with `instances: 3`, `synchronous.number=1`, and
   the primary continues to operate, removing unreachable standbys from the
   `synchronous_standby_names` set.
 - If the primary cannot reach the operator or API server, a quorum check is
-  performed. The `SyncQuorum` status cannot have changed, as the primary cannot
+  performed. The `FailoverQuorum` status cannot have changed, as the primary cannot
   have received new configuration. If the operator can reach both replicas,
   failover is allowed (`R=2`). If only one replica is reachable (`R=1`),
   failover is not allowed.

@@ -34,8 +34,8 @@ var _ = Describe("quorum promotion control", func() {
 	r := &ClusterReconciler{}
 
 	When("the information is not consistent because the number of synchronous standbies is zero", func() {
-		sync := &apiv1.SyncQuorum{
-			Status: apiv1.SyncQuorumStatus{
+		sync := &apiv1.FailoverQuorum{
+			Status: apiv1.FailoverQuorumStatus{
 				StandbyNumber: 0,
 			},
 		}
@@ -50,8 +50,8 @@ var _ = Describe("quorum promotion control", func() {
 	})
 
 	When("the information is not consistent because the standby list is empty", func() {
-		sync := &apiv1.SyncQuorum{
-			Status: apiv1.SyncQuorumStatus{
+		sync := &apiv1.FailoverQuorum{
+			Status: apiv1.FailoverQuorumStatus{
 				StandbyNumber: 3,
 				StandbyNames:  nil,
 			},
@@ -67,8 +67,8 @@ var _ = Describe("quorum promotion control", func() {
 	})
 
 	When("there is no quorum", func() {
-		sync := &apiv1.SyncQuorum{
-			Status: apiv1.SyncQuorumStatus{
+		sync := &apiv1.FailoverQuorum{
+			Status: apiv1.FailoverQuorumStatus{
 				StandbyNumber: 1,
 				StandbyNames: []string{
 					"postgres-2",
@@ -99,8 +99,8 @@ var _ = Describe("quorum promotion control", func() {
 	})
 
 	When("there is quorum", func() {
-		sync := &apiv1.SyncQuorum{
-			Status: apiv1.SyncQuorumStatus{
+		sync := &apiv1.FailoverQuorum{
+			Status: apiv1.FailoverQuorumStatus{
 				StandbyNumber: 1,
 				StandbyNames: []string{
 					"postgres-2",

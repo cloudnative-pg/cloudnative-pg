@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: syncquorums.postgresql.cnpg.io
+  name: failoverquorums.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
   names:
-    kind: SyncQuorum
-    listKind: SyncQuorumList
-    plural: syncquorums
-    singular: syncquorum
+    kind: FailoverQuorum
+    listKind: FailoverQuorumList
+    plural: failoverquorums
+    singular: failoverquorum
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -22,7 +22,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          SyncQuorum contains the information about the current synchronous
+          FailoverQuorum contains the information about the current synchronous
           quorum status of a PG cluster. It is updated by the instance manager
           of the primary node and reset to zero by the operator to trigger
           an update.

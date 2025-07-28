@@ -194,9 +194,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 					// we don't have the permissions to cache backups, as the ServiceAccount
 					// doesn't have watch permission on the backup status
 					&apiv1.Backup{},
-					// we don't have the permissions to cache SyncQuorum objects, we can
+					// we don't have the permissions to cache FailoverQuorum objects, we can
 					// only access the object having the same name as the cluster
-					&apiv1.SyncQuorum{},
+					&apiv1.FailoverQuorum{},
 				},
 			},
 		},

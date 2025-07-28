@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-example
   annotations:
-    cnpg.io/syncQuorum: "t"
+    cnpg.io/failoverQuorum: "t"
 spec:
   instances: 3
 

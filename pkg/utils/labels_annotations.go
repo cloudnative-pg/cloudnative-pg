@@ -258,12 +258,12 @@ const (
 	// the validation webhook should be enabled or disabled
 	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
 
-	// SyncQuorumAnnotationName is the name of the annotation that allows the
+	// FailoverQuorumAnnotationName is the name of the annotation that allows the
 	// user to enable synchronous quorum failover protection.
 	//
 	// This feature enables quorum-based check before failover, ensuring
 	// no data loss at the expense of availability.
-	SyncQuorumAnnotationName = MetadataNamespace + "/syncQuorum"
+	FailoverQuorumAnnotationName = MetadataNamespace + "/failoverQuorum"
 )
 
 type annotationStatus string
