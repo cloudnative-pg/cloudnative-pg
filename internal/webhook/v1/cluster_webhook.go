@@ -207,6 +207,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
 		v.validateSynchronousReplicaConfiguration,
+		v.validateSyncQuorum,
 		v.validateLDAP,
 		v.validateReplicationSlots,
 		v.validateSynchronizeLogicalDecoding,
@@ -989,14 +990,44 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 		result = append(result, err)
 	}
 
+	return result
+}
+
+func (v *ClusterCustomValidator) validateSyncQuorum(r *apiv1.Cluster) field.ErrorList {
 	syncQuorumActive := r.IsSyncQuorumFailoverProtectionActive(context.Background())
-	if syncQuorumActive && cfg.Number <= len(cfg.StandbyNamesPost)+len(cfg.StandbyNamesPre) {
+	if !syncQuorumActive {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	cfg := r.Spec.PostgresConfiguration.Synchronous
+	if cfg == nil {
+		err := field.Required(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			"Invalid syncQuorum configuration: synchronous replication configuration "+
+				"is required.",
+		)
+		result = append(result, err)
+		return result
+	}
+
+	if cfg.Number <= len(cfg.StandbyNamesPost)+len(cfg.StandbyNamesPre) {
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			cfg,
 			"Invalid syncQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
 				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
 				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
+		)
+		result = append(result, err)
+	}
+
+	if r.Spec.Instances <= 2 {
+		err := field.Invalid(
+			field.NewPath("spec", "instances"),
+			r.Spec.Instances,
+			"syncQuorum requires more than 2 instances.",
 		)
 		result = append(result, err)
 	}
