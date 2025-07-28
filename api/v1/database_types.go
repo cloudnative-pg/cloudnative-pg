@@ -256,6 +256,7 @@ type FDWSpec struct {
 
 // OptionSpecValue holds both the value and the ensure field for an option
 type OptionSpecValue struct {
+	// Value of the option
 	Value string `json:"value"`
 
 	// Specifies whether an option should be present or absent in
@@ -268,6 +269,7 @@ type OptionSpecValue struct {
 	Ensure EnsureOption `json:"ensure,omitempty"`
 }
 
+// UsageSpec configures a usage for a foreign data wrapper
 type UsageSpec struct {
 	// Name of the usage
 	Name string `json:"name"`
