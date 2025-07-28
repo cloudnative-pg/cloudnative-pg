@@ -1776,6 +1776,6 @@ var _ = Describe("Failover quorum annotation", func() {
 		Entry("with empty annotation", clusterWithAnnotation(""), true, false),
 		Entry("with true annotation", clusterWithAnnotation("t"), true, true),
 		Entry("with false annotation", clusterWithAnnotation("f"), true, false),
-		Entry("with invalid annotation", clusterWithAnnotation("xxx"), true, false),
+		Entry("with invalid annotation", clusterWithAnnotation("xxx"), false, false),
 	)
 })
