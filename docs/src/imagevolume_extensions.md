@@ -93,6 +93,13 @@ Adding an extension to a database in CloudNativePG involves a few steps:
 3. Declare the extension in the `Database` resource where you want it
    installed, if the extension supports `CREATE EXTENSION`.
 
+!!! Warning
+    Avoid making changes to extension images and PostgreSQL configuration
+    settings (such as `shared_preload_libraries`) simultaneously.
+    First, allow the pod to roll out with the new extension image, then update
+    the PostgreSQL configuration.
+    This limitation will be addressed in a future release of CloudNativePG.
+
 For illustration purposes, this guide uses a simple, fictitious extension named
 `foo` that supports `CREATE EXTENSION`.
 
