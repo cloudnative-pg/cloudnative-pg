@@ -168,7 +168,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 
 
 
-<p>FailoverQuorum contains the information about the current synchronous
+<p>FailoverQuorum contains the information about the current failover
 quorum status of a PG cluster. It is updated by the instance manager
 of the primary node and reset to zero by the operator to trigger
 an update.</p>
@@ -189,7 +189,7 @@ an update.</p>
 <a href="#postgresql-cnpg-io-v1-FailoverQuorumStatus"><i>FailoverQuorumStatus</i></a>
 </td>
 <td>
-   <p>Most recently observed status of the sync quorum.</p>
+   <p>Most recently observed status of the failover quorum.</p>
 </td>
 </tr>
 </tbody>
@@ -3051,7 +3051,7 @@ of WAL archiving and backups for this external cluster</p>
 - [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
 
 
-<p>FailoverQuorumStatus is the latest observed status of the synchronous
+<p>FailoverQuorumStatus is the latest observed status of the failover
 quorum of the PG cluster.</p>
 
 

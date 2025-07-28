@@ -1572,7 +1572,7 @@ func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
 
 	v, err := strconv.ParseBool(failoverQuorumAnnotation)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse sync quorum annotation '%v': %v", failoverQuorumAnnotation, err)
+		return false, fmt.Errorf("failed to parse failover quorum annotation '%v': %v", failoverQuorumAnnotation, err)
 	}
 
 	return v, nil

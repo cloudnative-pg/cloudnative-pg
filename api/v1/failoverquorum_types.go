@@ -42,7 +42,7 @@ type FailoverQuorumList struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// FailoverQuorum contains the information about the current synchronous
+// FailoverQuorum contains the information about the current failover
 // quorum status of a PG cluster. It is updated by the instance manager
 // of the primary node and reset to zero by the operator to trigger
 // an update.
@@ -50,12 +50,12 @@ type FailoverQuorum struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// Most recently observed status of the sync quorum.
+	// Most recently observed status of the failover quorum.
 	// +optional
 	Status FailoverQuorumStatus `json:"status"`
 }
 
-// FailoverQuorumStatus is the latest observed status of the synchronous
+// FailoverQuorumStatus is the latest observed status of the failover
 // quorum of the PG cluster.
 type FailoverQuorumStatus struct {
 	// Contains the latest reported Method value.

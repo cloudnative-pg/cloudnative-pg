@@ -22,7 +22,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          FailoverQuorum contains the information about the current synchronous
+          FailoverQuorum contains the information about the current failover
           quorum status of a PG cluster. It is updated by the instance manager
           of the primary node and reset to zero by the operator to trigger
           an update.
@@ -45,7 +45,7 @@ spec:
           metadata:
             type: object
           status:
-            description: Most recently observed status of the sync quorum.
+            description: Most recently observed status of the failover quorum.
             properties:
               method:
                 description: Contains the latest reported Method value.

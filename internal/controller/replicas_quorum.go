@@ -139,7 +139,7 @@ func (r *ClusterReconciler) reconcileFailoverQuorumObject(ctx context.Context, c
 	syncConfig := cluster.Spec.PostgresConfiguration.Synchronous
 	failoverQuorumActive, err := cluster.IsFailoverQuorumActive()
 	if err != nil {
-		contextLogger.Error(err, "Failed to determine if sync quorum is active")
+		contextLogger.Error(err, "Failed to determine if failover quorum is active")
 	}
 	if syncConfig != nil && failoverQuorumActive {
 		return r.ensureFailoverQuorumObjectExists(ctx, cluster)

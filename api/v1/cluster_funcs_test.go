@@ -1750,7 +1750,7 @@ var _ = Describe("Probes configuration", func() {
 	})
 })
 
-var _ = Describe("Synchronous quorum annotation", func() {
+var _ = Describe("Failover quorum annotation", func() {
 	clusterWithAnnotation := func(v string) *Cluster {
 		return &Cluster{
 			ObjectMeta: metav1.ObjectMeta{

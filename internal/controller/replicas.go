@@ -113,7 +113,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	// If quorum check is active, ensure we don't failover in unsafe scenarios.
 	isFailoverQuorumActive, err := cluster.IsFailoverQuorumActive()
 	if err != nil {
-		contextLogger.Error(err, "Failed to determine if sync quorum is active")
+		contextLogger.Error(err, "Failed to determine if failover quorum is active")
 		isFailoverQuorumActive = false
 	}
 
