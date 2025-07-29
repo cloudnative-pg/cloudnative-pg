@@ -204,6 +204,10 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
+			if _, found := pvc.Labels[utils.ManagedByLabelName]; !found {
+				return false
+			}
+
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
@@ -243,6 +247,8 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+
+			pvc.Labels[utils.ManagedByLabelName] = utils.ManagerName
 
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {

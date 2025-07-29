@@ -246,6 +246,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(pvcs.Items[2].Labels).To(BeEquivalentTo(map[string]string{
 			utils.InstanceNameLabelName: clusterName + "-3-wal",
 			utils.PvcRoleLabelName:      "PG_DATA",
+			utils.ManagedByLabelName:    utils.ManagerName,
 			"label1":                    "value",
 			"label2":                    "value",
 		}))
@@ -320,6 +321,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-2",
 			utils.PvcRoleLabelName:      "PG_DATA",
+			utils.ManagedByLabelName:    utils.ManagerName,
 			"label1":                    "value",
 			"label2":                    "value",
 		}))
@@ -328,6 +330,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
 			utils.PvcRoleLabelName:      "PG_WAL",
+			utils.ManagedByLabelName:    utils.ManagerName,
 			"label1":                    "value",
 			"label2":                    "value",
 		}))
@@ -336,6 +339,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
 			utils.PvcRoleLabelName:      "PG_DATA",
+			utils.ManagedByLabelName:    utils.ManagerName,
 			"label1":                    "value",
 			"label2":                    "value",
 		}))
@@ -393,6 +397,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "primary", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "primary",
+			utils.ManagedByLabelName:           utils.ManagerName,
 		}))
 		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
 			utils.ClusterSerialAnnotationName:   "1",
@@ -406,6 +411,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.ManagedByLabelName:           utils.ManagerName,
 		}))
 		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,
@@ -419,6 +425,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.PvcRoleLabelName:             "PG_WAL",
 			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.ManagedByLabelName:           utils.ManagerName,
 		}))
 		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,
@@ -432,6 +439,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.ManagedByLabelName:           utils.ManagerName,
 		}))
 		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,
