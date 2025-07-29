@@ -93,16 +93,16 @@ expected outage.
 Enabling a new configuration option to delay failover provides a mechanism to
 prevent premature failover for short-lived network or node instability.
 
-## Quorum Failover
+## Failover Quorum (Quorum-based Failover)
 
 !!! Warning
-    Quorum failover is an experimental feature introduced in version 1.27.0.
+    *Failover quorum* is an experimental feature introduced in version 1.27.0.
     Use with caution in production environments.
 
-Quorum failover is a mechanism that enhances data durability and safety during
+Failover quorum is a mechanism that enhances data durability and safety during
 failover events in CloudNativePG-managed PostgreSQL clusters.
 
-Quorum failover allows the controller to determine whether to promote a replica
+Quorum-based failover allows the controller to determine whether to promote a replica
 to primary based on the state of a quorum of replicas.
 This is useful when stronger data durability is required than the one offered
 by [synchronous replication](replication.md#synchronous-replication) and
@@ -126,14 +126,14 @@ acknowledged. If both the primary and the aligned standby become unavailable
 latest data. Promoting it could lose some data that the application considered
 committed.
 
-Quorum failover addresses this risk by ensuring that failover only occurs if
-the operator can confirm the presence of all synchronously committed data in
+Quorum-based failover addresses this risk by ensuring that failover only occurs
+if the operator can confirm the presence of all synchronously committed data in
 the instance to promote, and it does not occur otherwise.
 
 This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
-Quorum failover can be enabled by setting the annotation
+Failover quorum can be enabled by setting the annotation
 `cnpg.io/failoverQuorum="true"` in the `Cluster` resource.
 
 !!! info
