@@ -50,8 +50,6 @@ type fdwInfo struct {
 	Validator string                           `json:"validator"`
 	Owner     string                           `json:"owner"`
 	Options   map[string]apiv1.OptionSpecValue `json:"options"`
-	// Map of usages (key: usage name, value: type of usage)
-	Usages map[string]string `json:"usages"`
 }
 
 func detectDatabase(
@@ -425,11 +423,6 @@ JOIN pg_authid a ON f.fdwowner = a.oid
 WHERE fdwname = $1
 `
 
-const detectDatabaseFDWUsageSQL = `
-SELECT rolname
-FROM pg_roles
-WHERE has_fdw_privilege(rolname, $1, 'USAGE') = true`
-
 func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
 	row := db.QueryRowContext(
 		ctx, detectDatabaseFDWSQL,
@@ -465,11 +458,44 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	return &result, nil
 }
 
+// updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper based on the provided FDW specification.
+// It supports granting or revoking usage permissions for specified users.
+func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, usageSpec := range fdw.Usages {
+		switch usageSpec.Type {
+		case "grant":
+			changeUsageSQL := fmt.Sprintf(
+				"GRANT USAGE ON FOREIGN DATA WRAPPER %s TO %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("granting usage of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+		case "revoke":
+			changeUsageSQL := fmt.Sprintf(
+				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("revoking usage of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("revoked usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+		}
+	}
+
+	return nil
+}
+
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateFDW strings.Builder
 	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+
+	// Create Handler
 	if len(fdw.Handler) > 0 {
 		switch fdw.Handler {
 		case "-":
@@ -478,6 +504,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
 		}
 	}
+	// Create Validator
 	if len(fdw.Validator) > 0 {
 		switch fdw.Validator {
 		case "-":
@@ -507,10 +534,17 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 	}
 	contextLogger.Info("created foreign data wrapper", "name", fdw.Name)
 
+	// Update usage permissions
+	if len(fdw.Usages) > 0 {
+		if err := updateDatabaseFDWUsage(ctx, db, &fdw); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func updateFDWOptions(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
+func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info *fdwInfo) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Collect individual ALTER-clauses
@@ -626,8 +660,15 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 	}
 
 	// Alter Options
-	if err := updateFDWOptions(ctx, db, fdw, info); err != nil {
+	if err := updateFDWOptions(ctx, db, &fdw, info); err != nil {
 		return err
+	}
+
+	// Update usage permissions
+	if len(fdw.Usages) > 0 {
+		if err := updateDatabaseFDWUsage(ctx, db, &fdw); err != nil {
+			return err
+		}
 	}
 
 	return nil
