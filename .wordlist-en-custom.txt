@@ -166,6 +166,9 @@ ExtensionStatus
 ExternalCluster
 FQDN
 FQDNs
+FailoverQuorum
+FailoverQuorumSpec
+FailoverQuorumStatus
 Fei
 Filesystem
 Fluentd
@@ -371,6 +374,7 @@ ProbeTerminationGracePeriod
 ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
+Promotable
 PublicationReclaimPolicy
 PublicationSpec
 PublicationStatus
@@ -383,6 +387,7 @@ PushSecret
 QoS
 Quaresima
 QuickStart
+QuorumFailoverProtection
 RBAC
 README
 RHSA
@@ -470,6 +475,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StandbyNames
+StandbyNumber
 StartupProbe
 StartupStrategyType
 StatefulSets
@@ -487,6 +494,7 @@ SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
 SynchronousReplicaConfigurationMethod
+SynchronousStandbyNamesList
 Synopsys
 SystemID
 TCP
@@ -1167,6 +1175,7 @@ programmatically
 proj
 projectedVolumeTemplate
 prometheus
+promotable
 promotionTimeout
 promotionToken
 provisioner
@@ -1182,6 +1191,7 @@ pvcTemplate
 quantile
 queryable
 quickstart
+quorumFailoverProtection
 rbac
 rc
 readService
@@ -1308,8 +1318,10 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNames
 standbyNamesPost
 standbyNamesPre
+standbyNumber
 startDelay
 startedAt
 stateful

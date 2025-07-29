@@ -5795,3 +5795,80 @@ var _ = Describe("getStorageWarnings", func() {
 		Expect(getStorageWarnings(cluster)).To(BeEmpty())
 	})
 })
+
+var _ = Describe("failoverQuorum validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("fails if it is active but no synchronous replication is configured", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: "t",
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
+		}
+
+		errList := v.validateFailoverQuorum(cluster)
+		Expect(errList).To(HaveLen(1))
+	})
+
+	It("requires at least three instances", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: "t",
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Number: 1,
+					},
+				},
+			},
+		}
+
+		errList := v.validateFailoverQuorum(cluster)
+		Expect(errList).To(BeEmpty())
+
+		cluster.Spec.Instances = 2
+		errList = v.validateFailoverQuorum(cluster)
+		Expect(errList).To(HaveLen(1))
+	})
+
+	It("check if the number of external synchronous replicas is coherent", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: "t",
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Number: 1,
+						StandbyNamesPre: []string{
+							"one",
+							"two",
+						},
+						StandbyNamesPost: []string{
+							"three",
+							"four",
+						},
+					},
+				},
+			},
+		}
+
+		errList := v.validateFailoverQuorum(cluster)
+		Expect(errList).To(HaveLen(1))
+	})
+})

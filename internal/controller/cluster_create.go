@@ -101,6 +101,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	err = r.reconcileFailoverQuorumObject(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

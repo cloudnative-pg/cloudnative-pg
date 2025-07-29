@@ -207,6 +207,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
 		v.validateSynchronousReplicaConfiguration,
+		v.validateFailoverQuorum,
 		v.validateLDAP,
 		v.validateReplicationSlots,
 		v.validateSynchronizeLogicalDecoding,
@@ -976,14 +977,66 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 
 	var result field.ErrorList
 
-	if r.Spec.PostgresConfiguration.Synchronous.Number >= (r.Spec.Instances +
-		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost) +
-		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre)) {
+	cfg := r.Spec.PostgresConfiguration.Synchronous
+	if cfg.Number >= (r.Spec.Instances +
+		len(cfg.StandbyNamesPost) +
+		len(cfg.StandbyNamesPre)) {
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
-			r.Spec.PostgresConfiguration.Synchronous,
+			cfg,
 			"Invalid synchronous configuration: the number of synchronous replicas must be less than the "+
 				"total number of instances and the provided standby names.",
+		)
+		result = append(result, err)
+	}
+
+	return result
+}
+
+func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	failoverQuorumActive, err := r.IsFailoverQuorumActive()
+	if err != nil {
+		err := field.Invalid(
+			field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
+			r.Annotations[utils.FailoverQuorumAnnotationName],
+			"Invalid failoverQuorum annotation value, expected boolean.",
+		)
+		result = append(result, err)
+		return result
+	}
+	if !failoverQuorumActive {
+		return nil
+	}
+
+	cfg := r.Spec.PostgresConfiguration.Synchronous
+	if cfg == nil {
+		err := field.Required(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			"Invalid failoverQuorum configuration: synchronous replication configuration "+
+				"is required.",
+		)
+		result = append(result, err)
+		return result
+	}
+
+	if cfg.Number <= len(cfg.StandbyNamesPost)+len(cfg.StandbyNamesPre) {
+		err := field.Invalid(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			cfg,
+			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
+				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
+				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
+		)
+		result = append(result, err)
+	}
+
+	if r.Spec.Instances <= 2 {
+		err := field.Invalid(
+			field.NewPath("spec", "instances"),
+			r.Spec.Instances,
+			"failoverQuorum requires more than 2 instances.",
 		)
 		result = append(result, err)
 	}

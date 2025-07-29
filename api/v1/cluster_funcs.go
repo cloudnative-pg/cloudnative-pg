@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1559,4 +1560,20 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	}
 
 	return ""
+}
+
+// IsFailoverQuorumActive check if we should enable the
+// quorum failover protection alpha-feature.
+func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
+	failoverQuorumAnnotation, ok := cluster.GetAnnotations()[utils.FailoverQuorumAnnotationName]
+	if !ok || failoverQuorumAnnotation == "" {
+		return false, nil
+	}
+
+	v, err := strconv.ParseBool(failoverQuorumAnnotation)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse failover quorum annotation '%v': %v", failoverQuorumAnnotation, err)
+	}
+
+	return v, nil
 }

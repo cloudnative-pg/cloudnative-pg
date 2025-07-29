@@ -20,38 +20,44 @@ SPDX-License-Identifier: Apache-2.0
 package replication
 
 import (
-	"fmt"
+	"context"
 	"sort"
-	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // legacySynchronousStandbyNames sets the standby node list with the
 // legacy API
-func legacySynchronousStandbyNames(cluster *apiv1.Cluster) string {
-	syncReplicas, syncReplicasElectable := getSyncReplicasData(cluster)
+func legacySynchronousStandbyNames(ctx context.Context, cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
+	syncReplicas, syncReplicasElectable := getSyncReplicasData(ctx, cluster)
 
 	if syncReplicasElectable != nil && syncReplicas > 0 {
 		escapedReplicas := make([]string, len(syncReplicasElectable))
 		for idx, name := range syncReplicasElectable {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
-		return fmt.Sprintf(
-			"ANY %v (%v)",
-			syncReplicas,
-			strings.Join(escapedReplicas, ","))
+		return postgres.SynchronousStandbyNamesConfig{
+			Method:       "ANY",
+			NumSync:      syncReplicas,
+			StandbyNames: syncReplicasElectable,
+		}
 	}
 
-	return ""
+	return postgres.SynchronousStandbyNamesConfig{}
 }
 
 // getSyncReplicasData computes the actual number of required synchronous replicas and the names of
 // the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
 // replicas constraints (if any)
-func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyncReplicas []string) {
+func getSyncReplicasData(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (syncReplicas int, electableSyncReplicas []string) {
+	contextLogger := log.FromContext(ctx)
+
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
@@ -76,16 +82,16 @@ func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyn
 	// temporarily unresponsive system)
 	if readyReplicas < cluster.Spec.MinSyncReplicas {
 		syncReplicas = readyReplicas
-		log.Warning("Ignore minSyncReplicas to enforce self-healing",
+		contextLogger.Warning("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,
 			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
-	electableSyncReplicas = getElectableSyncReplicas(cluster)
+	electableSyncReplicas = getElectableSyncReplicas(ctx, cluster)
 	numberOfElectableSyncReplicas := len(electableSyncReplicas)
 	if numberOfElectableSyncReplicas < syncReplicas {
-		log.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
+		contextLogger.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
 			"given the constraints",
 			"electableSyncReplicasWithoutConstraints", syncReplicas,
 			"electableSyncReplicasWithConstraints", numberOfElectableSyncReplicas,
@@ -97,7 +103,9 @@ func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyn
 }
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
-func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
+func getElectableSyncReplicas(ctx context.Context, cluster *apiv1.Cluster) []string {
+	contextLogger := log.FromContext(ctx)
+
 	nonPrimaryInstances := getSortedNonPrimaryHealthyInstanceNames(cluster)
 
 	topology := cluster.Status.Topology
@@ -111,20 +119,20 @@ func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
 	// The same happens if we have failed to extract topology, we want to preserve the current status by adding all the
 	// electable instances.
 	if !topology.SuccessfullyExtracted {
-		log.Warning("topology data not extracted, falling back to all electable sync replicas")
+		contextLogger.Warning("topology data not extracted, falling back to all electable sync replicas")
 		return nonPrimaryInstances
 	}
 
 	currentPrimary := apiv1.PodName(cluster.Status.CurrentPrimary)
 	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
 	if currentPrimary == "" {
-		log.Warning("no primary elected, cannot compute electable sync replicas")
+		contextLogger.Warning("no primary elected, cannot compute electable sync replicas")
 		return nil
 	}
 
 	currentPrimaryTopology, ok := topology.Instances[currentPrimary]
 	if !ok {
-		log.Warning("current primary topology not yet extracted, cannot computed electable sync replicas",
+		contextLogger.Warning("current primary topology not yet extracted, cannot computed electable sync replicas",
 			"instanceName", currentPrimary)
 		return nil
 	}
@@ -136,7 +144,7 @@ func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
 		instanceTopology, ok := topology.Instances[name]
 		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
 		if !ok {
-			log.Warning("current instance topology not found", "instanceName", name)
+			contextLogger.Warning("current instance topology not found", "instanceName", name)
 			continue
 		}
 
