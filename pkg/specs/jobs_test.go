@@ -233,7 +233,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.ManagedByLabelName:    utils.ManagerName,
 			utils.ClusterLabelName:      cluster.Name,
 			utils.JobRoleLabelName:      "initdb",
-			utils.InstanceNameLabelName: "-0",
+			utils.InstanceNameLabelName: "cluster-0",
 		}))
 	})
 })
