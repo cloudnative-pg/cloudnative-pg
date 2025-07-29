@@ -122,6 +122,7 @@ func NewPgTablespaceCalculator(tbsName string) ExpectedObjectCalculator {
 // GetLabels will be used as the label value
 func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
+		utils.ManagedByLabelName:    utils.ManagerName,
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
 	}
@@ -191,6 +192,7 @@ func (r pgWalCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+		utils.ManagedByLabelName:    utils.ManagerName,
 	}
 	return labels
 }
@@ -250,6 +252,7 @@ func (r pgTablespaceCalculator) GetLabels(instanceName string) map[string]string
 	labels := map[string]string{
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRolePgTablespace),
+		utils.ManagedByLabelName:    utils.ManagerName,
 	}
 	// we need empty check here as we don't want to impact the label filter with empty value
 	if r.tablespaceName != "" {
