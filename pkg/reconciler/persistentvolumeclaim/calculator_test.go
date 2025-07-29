@@ -36,6 +36,7 @@ var _ = Describe("pvc role test", func() {
 		expectedLabel := map[string]string{
 			utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
 			utils.InstanceNameLabelName: instanceName,
+			utils.ManagedByLabelName:    utils.ManagerName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -73,6 +74,7 @@ var _ = Describe("pvc role test", func() {
 		expectedLabel := map[string]string{
 			utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
 			utils.InstanceNameLabelName: instanceName,
+			utils.ManagedByLabelName:    utils.ManagerName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -111,6 +113,7 @@ var _ = Describe("pvc role test", func() {
 		tbsName := "tbs1"
 		expectedLabel := map[string]string{
 			utils.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
+			utils.ManagedByLabelName:      utils.ManagerName,
 			utils.InstanceNameLabelName:   instanceName,
 			utils.TablespaceNameLabelName: tbsName,
 		}
