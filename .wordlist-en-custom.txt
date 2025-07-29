@@ -51,6 +51,7 @@ BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
 ByStatus
+CAs
 CIS
 CKA
 CN
@@ -1122,6 +1123,7 @@ pgpass
 pgstatstatements
 phaseReason
 pid
+pinger
 pitr
 plpgsql
 pluggable
