@@ -833,6 +833,7 @@ externalclusters
 facto
 failover
 failoverDelay
+failoverquorums
 failovers
 failureThreshold
 faq
