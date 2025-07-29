@@ -326,3 +326,16 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 		Expect(subscription.Status.Message).ToNot(ContainSubstring("not reconciled"))
 	})
 })
+
+type testStruct struct{ Val int }
+
+var _ = Describe("toSliceWithPointers", func() {
+	It("should return pointers to the original slice elements", func() {
+		items := []testStruct{{1}, {2}, {3}}
+		pointers := toSliceWithPointers(items)
+		Expect(pointers).To(HaveLen(len(items)))
+		for i := range items {
+			Expect(pointers[i]).To(BeIdenticalTo(&items[i]))
+		}
+	})
+})
