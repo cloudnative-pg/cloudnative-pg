@@ -278,6 +278,9 @@ spec:
     handler: postgres_fdw_handler
     validator: postgres_fdw_validator
     owner: app
+    usages:
+      - name: app
+      - type: grant
     ensure: present
   - name: file_fdw
     options:
@@ -295,7 +298,10 @@ Each FDW entry supports the following properties:
 - `handler`: The name of the handler function used by the FDW. If not specified, the default handler defined by the FDW extension (if any) will be used.
 - `validator`: The name of the validator function used by the FDW. If not specified, the default validator defined by the FDW extension (if any) will be used.
 - `owner`: The owner of the FDW.
-- `options`: A map of FDW options to manage. Each option supports:
+- `usages`: The list of usage permissions of the FDW.
+  - `name` : The name of the role to grant the usage permission to.
+  - `type` : The type of the usage permission. Supports `grant` and `revoke`.
+- `options`: A map of FDW options to manage, where each key is the name of an option. Each option supports the following fields:
   - `value`: The string value of the option.
   - `ensure`: Indicates whether the option should be `present` or `absent`.
 

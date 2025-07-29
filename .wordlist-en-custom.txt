@@ -519,6 +519,7 @@ UTF
 Uncomment
 Unrealizable
 UpdateStrategy
+UsageSpec
 VLDB
 VLDBs
 VM
