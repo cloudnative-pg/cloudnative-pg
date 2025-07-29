@@ -199,6 +199,9 @@ var _ = Describe("Job created via InitDB", func() {
 
 	It("contains correct labels", func() {
 		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
 			Spec: apiv1.ClusterSpec{
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
