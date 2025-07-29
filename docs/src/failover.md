@@ -102,35 +102,39 @@ prevent premature failover for short-lived network or node instability.
 Quorum failover is a mechanism that enhances data durability and safety during
 failover events in CloudNativePG-managed PostgreSQL clusters.
 
-Quorum failover allows the controller
-to determine whether to promote a replica to primary based on the state of a
-quorum of replicas. This is useful when stronger data durability is required
-than the one offered by synchronous replication and default automated failover
-procedures.
+Quorum failover allows the controller to determine whether to promote a replica
+to primary based on the state of a quorum of replicas.
+This is useful when stronger data durability is required than the one offered
+by [synchronous replication](replication.md#synchronous-replication) and
+default automated failover procedures.
 
 When synchronous replication is not enabled, some data loss is expected and
-accepted during failover, as a replica may lag behind the primary when promoted.
-With synchronous replication enabled,
-the guarantee is that the application will not receive explicit acknowledgment
-of the successful commit of a transaction until the WAL data is known to be
-safely received by all the synchronous standbys. This is not enough to guarantee
-that the operator is able to promote the most advanced replica.
-For example, in a three-node cluster with synchronous
-replication set to `ANY 1 (...)`, data is written to the primary and one standby
-before a commit is acknowledged. If both the primary and the aligned standby
-become unavailable (such as during a network partition), the remaining replica
-may not have the latest data. Promoting it could lose some data that the
-application considered committed.
-Quorum failover addresses this risk by ensuring
-that failover only occurs if the operator can confirm the presence of all
-synchronously committed data in the instance to promote, and it does not
-occur otherwise.
+accepted during failover, as a replica may lag behind the primary when
+promoted.
+
+With synchronous replication enabled, the guarantee is that the application
+will not receive explicit acknowledgment of the successful commit of a
+transaction until the WAL data is known to be safely received by all required
+synchronous standbys.
+This is not enough to guarantee that the operator is able to promote the most
+advanced replica.
+
+For example, in a three-node cluster with synchronous replication set to `ANY 1
+(...)`, data is written to the primary and one standby before a commit is
+acknowledged. If both the primary and the aligned standby become unavailable
+(such as during a network partition), the remaining replica may not have the
+latest data. Promoting it could lose some data that the application considered
+committed.
+
+Quorum failover addresses this risk by ensuring that failover only occurs if
+the operator can confirm the presence of all synchronously committed data in
+the instance to promote, and it does not occur otherwise.
 
 This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
 Quorum failover can be enabled by setting the annotation
-`cnpg.io/failoverQuorum="t"` in the `Cluster` resource.
+`cnpg.io/failoverQuorum="true"` in the `Cluster` resource.
 
 !!! info
     When this feature is out of the experimental phase, the annotation
@@ -163,28 +167,40 @@ any replica to primary, and will wait for the situation to change.
 Users can force a promotion of a replica to primary through the
 `kubectl cnpg promote` command even if the quorum check is failing.
 
+!!! Warning
+    Manual promotion should only be used as a last resort. Before proceeding,
+    make sure you fully understand the risk of data loss and carefully consider the
+    consequences of prioritizing the resumption of write workloads for your
+    applications.
+
 An additional CRD is used to track the quorum state of the cluster. A `Cluster`
 with the quorum failover enabled will have a `FailoverQuorum` resource with the same
 name as the `Cluster` resource. The `FailoverQuorum` CR is created by the
 controller when the quorum failover is enabled, and it is updated by the primary
 instance during its reconciliation loop, and read by the operator during quorum
 checks. It is used to track the latest known configuration of the synchronous
-replication. Users should not modify the `FailoverQuorum` resource directly. During
-PostgreSQL configuration changes, when it is not possible to determine the
-configuration, the `FailoverQuorum` resource will be reset, preventing any failover
-until the new configuration is applied.
+replication.
+
+!!! Important
+    Users should not modify the `FailoverQuorum` resource directly. During
+    PostgreSQL configuration changes, when it is not possible to determine the
+    configuration, the `FailoverQuorum` resource will be reset, preventing any
+    failover until the new configuration is applied.
 
 The `FailoverQuorum` resource works in conjunction with PostgreSQL synchronous
-replication. There is no guarantee that `COMMIT` operations returned to the
-client but that have not been performed synchronously, such as those made
-explicitly disabling synchronous replication with
-`SET synchronous_commit TO local`, will be present on a promoted replica.
+replication.
+
+!!! Warning
+    There is no guarantee that `COMMIT` operations returned to the
+    client but that have not been performed synchronously, such as those made
+    explicitly disabling synchronous replication with
+    `SET synchronous_commit TO local`, will be present on a promoted replica.
 
 ### Quorum Failover Example Scenarios
 
 In the following scenarios, `R` is the number of promotable replicas, `W` is
 the number of replicas that must acknowledge a write before commit, and `N` is
-the total number of potentially synchronous replicas. The 'Failover' column
+the total number of potentially synchronous replicas. The "Failover" column
 indicates whether failover is allowed under quorum failover rules.
 
 #### Scenario 1: Three-node cluster, failing pod(s)
@@ -199,9 +215,9 @@ A cluster with `instances: 3`, `synchronous.number=1`, and
   prevent possible data loss.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 2 | 1 | 2 | True     |
-| 1 | 1 | 2 | False    |
+|:-:|:-:|:-:|:--------:|
+| 2 | 1 | 2 | ✅       |
+| 1 | 1 | 2 | ❌       |
 
 #### Scenario 2: Three-node cluster, network partition
 
@@ -216,9 +232,9 @@ A cluster with `instances: 3`, `synchronous.number: 1`, and
   failover is not allowed, as the synchronous one may be the other one.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 2 | 1 | 2 | True     |
-| 1 | 1 | 2 | False    |
+|:-:|:-:|:-:|:--------:|
+| 2 | 1 | 2 | ✅       |
+| 1 | 1 | 2 | ❌       |
 
 #### Scenario 3: Five-node cluster, network partition
 
@@ -235,9 +251,9 @@ A cluster with `instances: 5`, `synchronous.number=2`, and
   other one.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 3 | 2 | 4 | True     |
-| 2 | 2 | 4 | False    |
+|:-:|:-:|:-:|:--------:|
+| 3 | 2 | 4 | ✅       |
+| 2 | 2 | 4 | ❌       |
 
 #### Scenario 4: Three-node cluster with remote synchronous replicas
 
@@ -270,9 +286,9 @@ In this configuration, when the primary fails, `R = 2` (the local replicas),
 In case of an additional replica failing (`R = 1`) failover is not allowed.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 3 | 2 | 4 | True     |
-| 2 | 2 | 4 | False    |
+|:-:|:-:|:-:|:--------:|
+| 3 | 2 | 4 | ✅       |
+| 2 | 2 | 4 | ❌       |
 
 Configuration #2 (invalid):
 ```yaml
@@ -291,8 +307,8 @@ Failover is not possible in this setup, so quorum failover can not be
 enabled with this configuration.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 1 | 1 | 2 | False    |
+|:-:|:-:|:-:|:--------:|
+| 1 | 1 | 2 | ❌       |
 
 Configuration #3 (invalid):
 ```yaml
@@ -312,8 +328,8 @@ Failover is not possible in this setup, so quorum failover can not be
 enabled with this configuration.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 0 | 1 | 2 | False    |
+|:-:|:-:|:-:|:--------:|
+| 0 | 1 | 2 | ❌       |
 
 #### Scenario 5: Three-node cluster, preferred data durability, network partition
 
@@ -330,8 +346,8 @@ Consider a cluster with `instances: 3`, `synchronous.number=1`, and
   failover is not allowed.
 
 | R | W | N | Failover |
-|---|---|---|----------|
-| 2 | 1 | 2 | True     |
-| 1 | 1 | 2 | False    |
+|:-:|:-:|:-:|:--------:|
+| 2 | 1 | 2 | ✅       |
+| 1 | 1 | 2 | ❌       |
 
 [^1]: [Dynamo: Amazon’s highly available key-value store](https://www.amazon.science/publications/dynamo-amazons-highly-available-key-value-store)
