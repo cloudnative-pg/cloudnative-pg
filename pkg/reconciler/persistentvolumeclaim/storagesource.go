@@ -90,9 +90,9 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	if result := getCandidateSourceFromBackupList(
+	if result := getCandidateSourceFromBackupListForReplica(
 		ctx,
-		cluster.CreationTimestamp,
+		cluster,
 		backupList,
 	); result != nil {
 		return result
@@ -133,6 +133,52 @@ func getCandidateSourceFromBackupList(
 			contextLogger.Info(
 				"skipping backup as a potential recovery storage source candidate " +
 					"because if was created before the Cluster object")
+			continue
+		}
+
+		contextLogger.Debug("found a backup that is a valid storage source candidate")
+
+		return getCandidateSourceFromBackup(backup)
+	}
+
+	return nil
+}
+
+// getCandidateSourceFromBackupListForReplica gets a candidate storage source
+// given a backup list, with additional checks for major upgrades
+func getCandidateSourceFromBackupListForReplica(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backupList apiv1.BackupList,
+) *StorageSource {
+	contextLogger := log.FromContext(ctx)
+
+	// Check if the cluster has undergone a major upgrade
+	// If PGDataImageInfo is set, it means a major upgrade has occurred
+	// and we should avoid using volume snapshots to prevent compatibility issues
+	if cluster.Status.PGDataImageInfo != nil {
+		contextLogger.Info("Cluster has undergone major upgrade, avoiding volume snapshots to prevent compatibility issues",
+			"currentMajorVersion", cluster.Status.PGDataImageInfo.MajorVersion)
+		// For clusters that have undergone major upgrade, we avoid using volume snapshots
+		// entirely to prevent compatibility issues between old data format and new PostgreSQL version
+		return nil
+	}
+
+	// For clusters that haven't undergone major upgrade, use the original logic
+	backupList.SortByReverseCreationTime()
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues()
+
+		if !backup.IsCompletedVolumeSnapshot() {
+			contextLogger.Trace("skipping backup, not a valid storage source candidate")
+			continue
+		}
+
+		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because it was created before the Cluster object")
 			continue
 		}
 

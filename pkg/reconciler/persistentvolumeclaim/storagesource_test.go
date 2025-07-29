@@ -309,4 +309,57 @@ var _ = Describe("candidate backups", func() {
 		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(1*time.Hour)), backupList)
 		Expect(source).To(BeNil())
 	})
+
+	It("will refuse to use volume snapshots after major upgrade", func(ctx context.Context) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(now.Add(-2 * time.Hour)),
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					MajorVersion: 17,
+				},
+			},
+		}
+
+		backupList := apiv1.BackupList{
+			Items: []apiv1.Backup{
+				objectStoreBackup,
+				nonCompletedBackup,
+				oldCompletedBackup,
+				completedBackup,
+			},
+		}
+		backupList.SortByReverseCreationTime()
+
+		// After major upgrade, no volume snapshots should be used to prevent compatibility issues
+		source := getCandidateSourceFromBackupListForReplica(ctx, &cluster, backupList)
+		Expect(source).To(BeNil())
+	})
+
+	It("will use volume snapshots if no major upgrade has occurred", func(ctx context.Context) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(now.Add(-2 * time.Hour)),
+			},
+			Status: apiv1.ClusterStatus{
+				// No PGDataImageInfo means no major upgrade has occurred
+			},
+		}
+
+		backupList := apiv1.BackupList{
+			Items: []apiv1.Backup{
+				objectStoreBackup,
+				nonCompletedBackup,
+				oldCompletedBackup,
+				completedBackup,
+			},
+		}
+		backupList.SortByReverseCreationTime()
+
+		// Should use the most recent valid backup
+		source := getCandidateSourceFromBackupListForReplica(ctx, &cluster, backupList)
+		Expect(source).ToNot(BeNil())
+		Expect(source.DataSource.Name).To(Equal("completed-backup"))
+	})
 })
