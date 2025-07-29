@@ -227,7 +227,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.ManagedByLabelName:    utils.ManagerName,
 			utils.ClusterLabelName:      cluster.Name,
 			utils.JobRoleLabelName:      "initdb",
-			utils.InstanceNameLabelName: "-0",
+			utils.InstanceNameLabelName: "cluster-0",
 		}))
 		Expect(job.Spec.Template.Labels).To(BeEquivalentTo(map[string]string{
 			utils.ManagedByLabelName:    utils.ManagerName,
