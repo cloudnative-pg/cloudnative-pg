@@ -771,6 +771,19 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				&fdwInfo{Name: fdw.Name, Handler: fdw.Handler, Validator: fdw.Validator, Owner: "old"})).
 				Error().To(MatchError(testError))
 		})
+
+		It("updates the usages permissions of the fdw", func(ctx SpecContext) {
+			dbMock.ExpectExec(
+				"GRANT USAGE ON FOREIGN DATA WRAPPER \"testfdw\" TO \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			fdw.Usages = []apiv1.UsageSpec{
+				{
+					Name: "owner",
+					Type: "grant",
+				},
+			}
+			Expect(updateDatabaseFDWUsage(ctx, db, &fdw)).Error().NotTo(HaveOccurred())
+		})
 	})
 
 	Context("dropDatabaseFDW", func() {
