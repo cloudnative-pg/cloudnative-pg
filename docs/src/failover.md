@@ -134,12 +134,12 @@ This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
 Failover quorum can be enabled by setting the annotation
-`cnpg.io/failoverQuorum="true"` in the `Cluster` resource.
+`alpha.cnpg.io/failoverQuorum="true"` in the `Cluster` resource.
 
 !!! info
     When this feature is out of the experimental phase, the annotation
-    `cnpg.io/failoverQuorum` will be replaced by a configuration option in the
-    `Cluster` resource.
+    `alpha.cnpg.io/failoverQuorum` will be replaced by a configuration option in
+    the `Cluster` resource.
 
 ### How it works
 

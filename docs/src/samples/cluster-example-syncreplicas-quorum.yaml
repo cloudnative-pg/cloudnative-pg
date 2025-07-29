@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-example
   annotations:
-    cnpg.io/failoverQuorum: "t"
+    alpha.cnpg.io/failoverQuorum: "true"
 spec:
   instances: 3
 
@@ -14,4 +14,3 @@ spec:
 
   storage:
     size: 1G
-
