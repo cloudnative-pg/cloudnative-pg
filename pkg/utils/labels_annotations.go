@@ -263,7 +263,7 @@ const (
 	//
 	// This feature enables quorum-based check before failover, ensuring
 	// no data loss at the expense of availability.
-	FailoverQuorumAnnotationName = MetadataNamespace + "/failoverQuorum"
+	FailoverQuorumAnnotationName = AlphaMetadataNamespace + "/failoverQuorum"
 )
 
 type annotationStatus string
