@@ -51,6 +51,7 @@ BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
 ByStatus
+CAs
 CIS
 CKA
 CN
