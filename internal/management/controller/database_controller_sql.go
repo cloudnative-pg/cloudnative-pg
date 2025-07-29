@@ -458,7 +458,8 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	return &result, nil
 }
 
-// updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper based on the provided FDW specification.
+// updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper
+// based on the provided FDW specification.
 // It supports granting or revoking usage permissions for specified users.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
 	contextLogger := log.FromContext(ctx)
@@ -476,7 +477,7 @@ func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec)
 			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
 		case "revoke":
 			changeUsageSQL := fmt.Sprintf(
-				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s",
+				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
 				pgx.Identifier{fdw.Name}.Sanitize(),
 				pgx.Identifier{usageSpec.Name}.Sanitize())
 			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {

@@ -3107,11 +3107,18 @@ the default validator is registrated when creating the fdw extensions</p>
 The specified role must have superuser privileges in the target database.</p>
 </td>
 </tr>
-<tr><td><code>options</code> <B>[Required]</B><br/>
+<tr><td><code>options</code><br/>
 <a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
 </td>
 <td>
    <p>Options specifies options for the FDW(key is option name, value is option value)</p>
+</td>
+</tr>
+<tr><td><code>usages</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>Usages specifies usages for the FDW</p>
 </td>
 </tr>
 </tbody>
@@ -4024,7 +4031,8 @@ possible. <code>false</code> by default.</p>
 <i>string</i>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Value of the option</p>
+</td>
 </tr>
 <tr><td><code>ensure</code><br/>
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
@@ -6504,6 +6512,37 @@ shared nothing architecture on the compute side.</p>
 <td>
    <p>SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
 in synchronous replica election in case of failures</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## UsageSpec     {#postgresql-cnpg-io-v1-UsageSpec}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
+<p>UsageSpec configures a usage for a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the usage</p>
+</td>
+</tr>
+<tr><td><code>type</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The type of usage</p>
 </td>
 </tr>
 </tbody>
