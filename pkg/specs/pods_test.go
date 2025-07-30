@@ -944,10 +944,14 @@ var _ = Describe("NewInstance", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName:    utils.ManagerName,
 			utils.ClusterLabelName:      "test-cluster",
 			utils.InstanceNameLabelName: "test-cluster-1",
 			utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+			utils.AppLabelName:          utils.AppName,
+			utils.InstanceLabelName:     "test-cluster",
+			utils.VersionLabelName:      "17",
+			utils.ComponentLabelName:    "database",
+			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 	})
 
