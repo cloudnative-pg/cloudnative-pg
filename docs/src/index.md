@@ -95,7 +95,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
 - Declarative management of key PostgreSQL configurations, including:
     - PostgreSQL settings.
     - Roles, users, and groups.
-    - Databases, extensions, and schemas.
+    - Databases, extensions, schemas, and foreign data wrappers (FDW).
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
