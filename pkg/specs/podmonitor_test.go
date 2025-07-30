@@ -66,8 +66,12 @@ var _ = Describe("PodMonitor test", func() {
 			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 			monitor := mgr.BuildPodMonitor()
 			Expect(monitor.Labels).To(BeEquivalentTo(map[string]string{
-				utils.ManagedByLabelName: utils.ManagerName,
 				utils.ClusterLabelName:   cluster.Name,
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  cluster.Name,
+				utils.VersionLabelName:   "17",
+				utils.ComponentLabelName: "database",
+				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(monitor.Spec.Selector.MatchLabels).To(BeEquivalentTo(map[string]string{
 				utils.ClusterLabelName: cluster.Name,
