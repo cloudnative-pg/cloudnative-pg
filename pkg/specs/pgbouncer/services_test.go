@@ -78,10 +78,13 @@ var _ = Describe("Pooler Service", func() {
 			Expect(service.Name).To(Equal(pooler.Name))
 			Expect(service.Namespace).To(Equal(pooler.Namespace))
 			Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-				utils.ManagedByLabelName: utils.ManagerName,
 				utils.ClusterLabelName:   cluster.Name,
 				utils.PgbouncerNameLabel: pooler.Name,
 				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  cluster.Name,
+				utils.ComponentLabelName: "pooler",
+				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
 			Expect(service.Spec.Ports).To(ConsistOf(corev1.ServicePort{
