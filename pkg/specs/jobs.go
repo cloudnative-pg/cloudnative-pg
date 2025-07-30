@@ -319,6 +319,7 @@ func (role jobRole) getJobName(instanceName string) string {
 func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
@@ -330,6 +331,10 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
 				utils.JobRoleLabelName:      string(role),
+				utils.AppLabelName:          utils.AppName,
+				utils.InstanceLabelName:     cluster.Name,
+				utils.VersionLabelName:      fmt.Sprint(version),
+				utils.ComponentLabelName:    utils.DatabaseComponentName,
 				utils.ManagedByLabelName:    utils.ManagerName,
 			},
 		},
@@ -340,6 +345,10 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 						utils.InstanceNameLabelName: instanceName,
 						utils.ClusterLabelName:      cluster.Name,
 						utils.JobRoleLabelName:      string(role),
+						utils.AppLabelName:          utils.AppName,
+						utils.InstanceLabelName:     cluster.Name,
+						utils.VersionLabelName:      fmt.Sprint(version),
+						utils.ComponentLabelName:    "database",
 						utils.ManagedByLabelName:    utils.ManagerName,
 					},
 				},

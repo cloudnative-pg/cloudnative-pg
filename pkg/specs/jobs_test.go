@@ -224,16 +224,24 @@ var _ = Describe("Job created via InitDB", func() {
 		}
 		job := CreatePrimaryJobViaInitdb(cluster, 0)
 		Expect(job.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName:    utils.ManagerName,
 			utils.ClusterLabelName:      cluster.Name,
 			utils.JobRoleLabelName:      "initdb",
 			utils.InstanceNameLabelName: "cluster-0",
+			utils.AppLabelName:          utils.AppName,
+			utils.InstanceLabelName:     cluster.Name,
+			utils.VersionLabelName:      "17",
+			utils.ComponentLabelName:    "database",
+			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 		Expect(job.Spec.Template.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName:    utils.ManagerName,
 			utils.ClusterLabelName:      cluster.Name,
 			utils.JobRoleLabelName:      "initdb",
 			utils.InstanceNameLabelName: "cluster-0",
+			utils.AppLabelName:          utils.AppName,
+			utils.InstanceLabelName:     cluster.Name,
+			utils.VersionLabelName:      "17",
+			utils.ComponentLabelName:    "database",
+			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 	})
 })
