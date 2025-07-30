@@ -199,7 +199,7 @@ func (info InitInfo) concludeRestore(
 		}
 
 		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
+		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "", cluster)
 		return err
 	}
 
@@ -728,6 +728,14 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		return fmt.Errorf("cannot erase auto config: %w", err)
 	}
 
+	err = os.WriteFile(
+		path.Join(info.PgData, constants.PostgresExtensionsConfigurationFile),
+		[]byte(""),
+		0o600)
+	if err != nil {
+		return fmt.Errorf("cannot erase extensions config: %w", err)
+	}
+
 	// Create recovery signal file
 	return os.WriteFile(
 		path.Join(info.PgData, "recovery.signal"),
@@ -879,6 +887,13 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		return fmt.Errorf("while installing %v: %w", constants.PostgresqlOverrideConfigurationFile, err)
 	}
 
+	err = fileutils.CopyFile(
+		path.Join(temporaryInitInfo.PgData, constants.PostgresExtensionsConfigurationFile),
+		path.Join(info.PgData, constants.PostgresExtensionsConfigurationFile))
+	if err != nil {
+		return fmt.Errorf("while installing %v: %w", constants.PostgresExtensionsConfigurationFile, err)
+	}
+
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
@@ -945,6 +960,10 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
 	if _, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
 		return fmt.Errorf("while configuring replica: %w", err)
+	}
+
+	if _, err := configureExtensionsConfFile(info.PgData, cluster); err != nil {
+		return fmt.Errorf("while configuring Postgres for extensions: %w", err)
 	}
 
 	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {

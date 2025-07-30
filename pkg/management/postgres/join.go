@@ -92,6 +92,6 @@ func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
 	}
 
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-	_, err := UpdateReplicaConfiguration(info.PgData, info.GetPrimaryConnInfo(), slotName)
+	_, err := UpdateReplicaConfiguration(info.PgData, info.GetPrimaryConnInfo(), slotName, cluster)
 	return err
 }

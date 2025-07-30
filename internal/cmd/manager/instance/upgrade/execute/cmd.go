@@ -389,6 +389,7 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	_, err := configfile.EnsureIncludes(path.Join(destDir, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
 		constants.PostgresqlOverrideConfigurationFile,
+		constants.PostgresExtensionsConfigurationFile,
 	)
 	if err != nil {
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
@@ -438,6 +439,12 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	if err != nil {
 		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
 			constants.PostgresqlOverrideConfigurationFile, err)
+	}
+
+	err = fileutils.CreateEmptyFile(path.Join(destDir, constants.PostgresExtensionsConfigurationFile))
+	if err != nil {
+		return fmt.Errorf("creating the operator managed extension configuration file '%v' resulted in an error: %w",
+			constants.PostgresExtensionsConfigurationFile, err)
 	}
 
 	return nil

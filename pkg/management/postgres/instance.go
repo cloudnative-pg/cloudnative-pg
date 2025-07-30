@@ -900,7 +900,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
 	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
-	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName, cluster)
 	return err
 }
 
@@ -1145,6 +1145,8 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
 		return err
 	}
+
+	// TODO: anything to do for extensions?
 
 	options = append(options, "--restore-target-wal")
 

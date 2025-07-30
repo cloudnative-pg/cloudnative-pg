@@ -24,10 +24,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"iter"
 	"math"
-	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -379,9 +376,6 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
-
-	// The list of additional extensions to be loaded into the PostgreSQL configuration
-	AdditionalExtensions []AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -792,12 +786,6 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
-	// Setup additional extensions
-	if len(info.AdditionalExtensions) > 0 {
-		configuration.setExtensionControlPath(info)
-		configuration.setDynamicLibraryPath(info)
-	}
-
 	return configuration
 }
 
@@ -879,102 +867,6 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
-}
-
-// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
-type AdditionalExtensionConfiguration struct {
-	// The name of the Extension
-	Name string
-
-	// The list of directories that should be added to ExtensionControlPath.
-	ExtensionControlPath []string
-
-	// The list of directories that should be added to DynamicLibraryPath.
-	DynamicLibraryPath []string
-}
-
-// absolutizePaths returns an iterator over the passed paths, absolutized
-// using the name of the extension
-func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for _, path := range paths {
-			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
-				break
-			}
-		}
-	}
-}
-
-// getRuntimeExtensionControlPath collects the absolute directories to be put
-// into the `extension_control_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
-	paths := []string{"share"}
-	if len(ext.ExtensionControlPath) > 0 {
-		paths = ext.ExtensionControlPath
-	}
-
-	return ext.absolutizePaths(paths)
-}
-
-// getDynamicLibraryPath collects the absolute directories to be put
-// into the `dynamic_library_path` GUC to support this additional extension
-func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
-	paths := []string{"lib"}
-	if len(ext.DynamicLibraryPath) > 0 {
-		paths = ext.DynamicLibraryPath
-	}
-
-	return ext.absolutizePaths(paths)
-}
-
-// setExtensionControlPath manages the `extension_control_path` GUC, merging
-// the paths defined by the user with the ones provided by the
-// `.spec.postgresql.extensions` stanza
-func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
-	extensionControlPath := []string{"$system"}
-
-	for _, extension := range info.AdditionalExtensions {
-		extensionControlPath = slices.AppendSeq(
-			extensionControlPath,
-			extension.getRuntimeExtensionControlPath(),
-		)
-	}
-
-	extensionControlPath = slices.AppendSeq(
-		extensionControlPath,
-		strings.SplitSeq(p.GetConfig(ExtensionControlPath), ":"),
-	)
-
-	extensionControlPath = slices.DeleteFunc(
-		extensionControlPath,
-		func(s string) bool { return s == "" },
-	)
-
-	p.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
-}
-
-// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
-// paths defined by the user with the ones provided by the
-// `.spec.postgresql.extensions` stanza
-func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
-	dynamicLibraryPath := []string{"$libdir"}
-
-	for _, extension := range info.AdditionalExtensions {
-		dynamicLibraryPath = slices.AppendSeq(
-			dynamicLibraryPath,
-			extension.getDynamicLibraryPath())
-	}
-
-	dynamicLibraryPath = slices.AppendSeq(
-		dynamicLibraryPath,
-		strings.SplitSeq(p.GetConfig(DynamicLibraryPath), ":"))
-
-	dynamicLibraryPath = slices.DeleteFunc(
-		dynamicLibraryPath,
-		func(s string) bool { return s == "" },
-	)
-
-	p.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }
 
 // String creates the synchronous_standby_names PostgreSQL GUC

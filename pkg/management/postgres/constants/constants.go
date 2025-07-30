@@ -32,6 +32,14 @@ const (
 	// contain HA and DR settings)
 	PostgresqlOverrideConfigurationFile = "override.conf"
 
+	// PostgresExtensionsConfigurationFile is the name of the file containing
+	// the PostgreSQL extensions configuration parameters, which are used to
+	// set up additional extensions in the database.
+	// This file is created by the operator and it contains the settings for
+	// `extension_control_path` and `dynamic_library_path` GUCs, as well as
+	// other settings that may be needed for additional extensions.
+	PostgresExtensionsConfigurationFile = "extensions.conf"
+
 	// PostgresqlHBARulesFile is the name of the file which contains
 	// the host-based access rules
 	PostgresqlHBARulesFile = "pg_hba.conf"

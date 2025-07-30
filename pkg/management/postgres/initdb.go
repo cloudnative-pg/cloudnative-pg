@@ -268,6 +268,7 @@ func (info InitInfo) CreateDataDirectory() error {
 	_, err = configfile.EnsureIncludes(path.Join(info.PgData, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
 		constants.PostgresqlOverrideConfigurationFile,
+		constants.PostgresExtensionsConfigurationFile,
 	)
 	if err != nil {
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
@@ -289,6 +290,13 @@ func (info InitInfo) CreateDataDirectory() error {
 	if err != nil {
 		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
 			constants.PostgresqlOverrideConfigurationFile, err)
+	}
+
+	err = fileutils.CreateEmptyFile(
+		path.Join(info.PgData, constants.PostgresExtensionsConfigurationFile))
+	if err != nil {
+		return fmt.Errorf("creating the operator managed extensions configuration file '%v' resulted in an error: %w",
+			constants.PostgresExtensionsConfigurationFile, err)
 	}
 
 	return nil
@@ -509,6 +517,10 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
+
+		if _, err = configureExtensionsConfFile(info.PgData, cluster); err != nil {
+			return fmt.Errorf("while configuring Postgres for extensions: %w", err)
+		}
 	}
 
 	// Configure the instance and run the logical import process
@@ -535,6 +547,10 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		// Write standard replication configuration
 		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
+		}
+
+		if _, err := configureExtensionsConfFile(info.PgData, cluster); err != nil {
+			return fmt.Errorf("while configuring Postgres for extensions: %w", err)
 		}
 
 		// ... and then run fsync

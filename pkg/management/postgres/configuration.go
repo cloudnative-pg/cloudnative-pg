@@ -253,13 +253,21 @@ func (instance *Instance) RefreshPGIdent(
 
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+func UpdateReplicaConfiguration(
+	pgData, primaryConnInfo, slotName string,
+	cluster *apiv1.Cluster,
+) (changed bool, err error) {
 	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
 	if err != nil {
 		return changed, err
 	}
 
-	return changed, createStandbySignal(pgData)
+	extChanged, err := configureExtensionsConfFile(pgData, cluster)
+	if err != nil {
+		return changed, err
+	}
+
+	return changed || extChanged, createStandbySignal(pgData)
 }
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including
@@ -423,18 +431,6 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
-	// Set additional extensions
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		info.AdditionalExtensions = append(
-			info.AdditionalExtensions,
-			postgres.AdditionalExtensionConfiguration{
-				Name:                 extension.Name,
-				ExtensionControlPath: extension.ExtensionControlPath,
-				DynamicLibraryPath:   extension.DynamicLibraryPath,
-			},
-		)
-	}
-
 	// Setup minimum replay delay if we're on a replica cluster
 	if cluster.IsReplica() && cluster.Spec.ReplicaCluster.MinApplyDelay != nil {
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
@@ -470,6 +466,7 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 // configurePostgresForImport configures Postgres to be optimized for the firt import
 // process, by writing dedicated options the override.conf file just for this phase
 func configurePostgresForImport(ctx context.Context, pgData string) (changed bool, err error) {
+	// TODO: anything special fot extensions during import? --
 	contextLogger := log.FromContext(ctx)
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
