@@ -3079,7 +3079,8 @@ of WAL archiving and backups for this external cluster</p>
 <a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
 </td>
 <td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
-   <span class="text-muted">No description provided.</span></td>
+   <p>Common fields</p>
+</td>
 </tr>
 <tr><td><code>handler</code><br/>
 <i>string</i>
