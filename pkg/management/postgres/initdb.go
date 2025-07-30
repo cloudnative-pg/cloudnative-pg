@@ -514,12 +514,8 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	} else {
 		// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
+		if _, err = configureAdditionalConfFiles(info.PgData, primaryConnInfo, "", cluster); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
-		}
-
-		if _, err = configureExtensionsConfFile(info.PgData, cluster); err != nil {
-			return fmt.Errorf("while configuring Postgres for extensions: %w", err)
 		}
 	}
 
@@ -545,12 +541,8 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	// In case of import bootstrap, we restore the standard configuration file content
 	if isImportBootstrap {
 		// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
+		if _, err = configureAdditionalConfFiles(info.PgData, primaryConnInfo, "", cluster); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
-		}
-
-		if _, err := configureExtensionsConfFile(info.PgData, cluster); err != nil {
-			return fmt.Errorf("while configuring Postgres for extensions: %w", err)
 		}
 
 		// ... and then run fsync

@@ -1123,7 +1123,7 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(ctx context.Context) error {
+func (instance *Instance) Rewind(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
@@ -1142,11 +1142,9 @@ func (instance *Instance) Rewind(ctx context.Context) error {
 	}
 
 	// make sure restore_command is set in override.conf
-	if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
+	if _, err := configureAdditionalConfFiles(instance.PgData, primaryConnInfo, "", cluster); err != nil {
 		return err
 	}
-
-	// TODO: anything to do for extensions?
 
 	options = append(options, "--restore-target-wal")
 

@@ -257,17 +257,25 @@ func UpdateReplicaConfiguration(
 	pgData, primaryConnInfo, slotName string,
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
-	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	changed, err = configureAdditionalConfFiles(pgData, primaryConnInfo, slotName, cluster)
 	if err != nil {
 		return changed, err
 	}
 
+	return changed, createStandbySignal(pgData)
+}
+
+func configureAdditionalConfFiles(pgData, primaryConnInfo, slotName string, cluster *apiv1.Cluster) (bool, error) {
+	changed, err := configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	if err != nil {
+		return changed, err
+	}
 	extChanged, err := configureExtensionsConfFile(pgData, cluster)
 	if err != nil {
-		return changed, err
+		return changed || extChanged, err
 	}
 
-	return changed || extChanged, createStandbySignal(pgData)
+	return changed, err
 }
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including

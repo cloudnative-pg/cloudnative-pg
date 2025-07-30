@@ -958,12 +958,8 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 
 	primaryConnInfo := info.GetPrimaryConnInfo()
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-	if _, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+	if _, err := configureAdditionalConfFiles(info.PgData, primaryConnInfo, slotName, cluster); err != nil {
 		return fmt.Errorf("while configuring replica: %w", err)
-	}
-
-	if _, err := configureExtensionsConfFile(info.PgData, cluster); err != nil {
-		return fmt.Errorf("while configuring Postgres for extensions: %w", err)
 	}
 
 	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {

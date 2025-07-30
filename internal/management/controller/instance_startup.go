@@ -130,7 +130,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
-		err = r.instance.Rewind(ctx)
+		err = r.instance.Rewind(ctx, cluster)
 		if err != nil {
 			return fmt.Errorf("while executing pg_rewind: %w", err)
 		}
