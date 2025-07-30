@@ -49,8 +49,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterAnyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-any"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   "clustername",
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  "clustername",
+			utils.VersionLabelName:   "17",
+			utils.ComponentLabelName: "database",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -63,8 +67,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadService(postgresql)
 		Expect(service.Name).To(Equal("clustername-r"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   "clustername",
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  "clustername",
+			utils.VersionLabelName:   "17",
+			utils.ComponentLabelName: "database",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -77,8 +85,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadOnlyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-ro"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   "clustername",
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  "clustername",
+			utils.VersionLabelName:   "17",
+			utils.ComponentLabelName: "database",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -91,8 +103,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   "clustername",
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  "clustername",
+			utils.VersionLabelName:   "17",
+			utils.ComponentLabelName: "database",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))

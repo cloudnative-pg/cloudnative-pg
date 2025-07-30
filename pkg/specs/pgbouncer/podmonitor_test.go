@@ -77,8 +77,12 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 			Expect(podMonitor.Namespace).To(Equal(pooler.Namespace))
 			Expect(podMonitor.Name).To(Equal(pooler.Name))
 			Expect(podMonitor.Labels).To(Equal(map[string]string{
-				utils.ManagedByLabelName: utils.ManagerName,
 				utils.PgbouncerNameLabel: pooler.Name,
+				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  pooler.Name,
+				utils.ComponentLabelName: "pooler",
+				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 
 			Expect(podMonitor.Spec.Selector.MatchLabels).To(Equal(map[string]string{

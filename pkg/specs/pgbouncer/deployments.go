@@ -58,8 +58,11 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
-		WithLabel(utils.ManagedByLabelName, utils.ManagerName).
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithLabel(utils.AppLabelName, utils.AppName).
+		WithLabel(utils.InstanceLabelName, cluster.Name).
+		WithLabel(utils.ComponentLabelName, utils.PoolerComponentName).
+		WithLabel(utils.ManagedByLabelName, utils.ManagerName).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -142,6 +145,9 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 				utils.ClusterLabelName:   cluster.Name,
 				utils.PgbouncerNameLabel: pooler.Name,
 				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  cluster.Name,
+				utils.ComponentLabelName: "database",
 				utils.ManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{

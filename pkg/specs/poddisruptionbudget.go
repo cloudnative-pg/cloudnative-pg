@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"fmt"
+
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,12 +40,17 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 	}
 	minAvailableReplicas := int32(cluster.Spec.Instances - 2) //nolint:gosec
 	allReplicasButOne := intstr.FromInt32(minAvailableReplicas)
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  cluster.Name,
+				utils.VersionLabelName:   fmt.Sprint(version),
+				utils.ComponentLabelName: utils.DatabaseComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			},
 		},
@@ -71,11 +78,17 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 	}
 	one := intstr.FromInt32(1)
 
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
+				utils.AppLabelName:       utils.AppName,
+				utils.InstanceLabelName:  cluster.Name,
+				utils.VersionLabelName:   fmt.Sprint(version),
+				utils.ComponentLabelName: "database",
 				utils.ManagedByLabelName: utils.ManagerName,
 			},
 		},
