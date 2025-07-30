@@ -759,7 +759,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				instance.Pod.Name,
 				"-",
 				"-",
-				"-",
 				apierrs.ReasonForError(instance.Error),
 				instance.Pod.Status.QOSClass,
 				"-",
