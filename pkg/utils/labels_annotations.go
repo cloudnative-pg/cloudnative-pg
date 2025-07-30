@@ -41,6 +41,15 @@ const MetadataNamespace = "cnpg.io"
 // ManagerName is the name of the manager for cnpg controlled objects
 const ManagerName = "cloudnative-pg"
 
+// AppName is the name of the application
+const AppName = "postgresql"
+
+// DatabaseComponentName is the name of the component for the database.
+const DatabaseComponentName = "database"
+
+// PoolerComponentName is the name of the component for the pooler.
+const PoolerComponentName = "pooler"
+
 // When you add a new label or annotation, please make sure that you also update the
 // publicly visible documentation, namely the `docs/src/labels_annotations.md` file
 const (
@@ -123,6 +132,18 @@ const (
 
 	// ManagedByLabelName is the name of the label applied to all managed objects
 	ManagedByLabelName = "app.kubernetes.io/managed-by"
+
+	// AppLabelName is the name of the label used to indicate the name of the application
+	AppLabelName = "app.kubernetes.io/name"
+
+	// InstanceLabelName is the name of the label used to indicate the unique instance of this application
+	InstanceLabelName = "app.kubernetes.io/instance"
+
+	// VersionLabelName is the name of the label used to indicate the version postgres
+	VersionLabelName = "app.kubernetes.io/version"
+
+	// ComponentLabelName is the name of the label used to indicate the component within the architecture
+	ComponentLabelName = "app.kubernetes.io/component"
 )
 
 const (

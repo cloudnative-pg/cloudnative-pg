@@ -92,10 +92,13 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
 		Expect(deployment.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   cluster.Name,
 			utils.PgbouncerNameLabel: pooler.Name,
 			utils.PodRoleLabelName:   string(utils.PodRolePooler),
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  cluster.Name,
+			utils.ComponentLabelName: "database",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		// Check the DeploymentSpec
 		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
@@ -105,10 +108,13 @@ var _ = Describe("Deployment", func() {
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
 		Expect(podTemplate.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
 			utils.ClusterLabelName:   cluster.Name,
 			utils.PgbouncerNameLabel: pooler.Name,
 			utils.PodRoleLabelName:   string(utils.PodRolePooler),
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  cluster.Name,
+			utils.ComponentLabelName: "pooler",
+			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 
 		// Check the containers

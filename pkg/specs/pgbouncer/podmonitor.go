@@ -50,6 +50,10 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Name:      c.pooler.Name,
 		Labels: map[string]string{
 			utils.PgbouncerNameLabel: c.pooler.Name,
+			utils.PodRoleLabelName:   string(utils.PodRolePooler),
+			utils.AppLabelName:       utils.AppName,
+			utils.InstanceLabelName:  c.pooler.Name,
+			utils.ComponentLabelName: utils.PoolerComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		},
 	}
