@@ -29,18 +29,53 @@ in the Operator's Deployment or by deploying it as a standalone
 [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same Operator namespace.
 In both cases, the Plugin must be packaged as a container image to be deployed as a Kubernetes workload.
 
+### Sidecar Container
+
+The Plugin can be configured as a [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)
+in the Operator's `Deployment`. In this case, the Plugin needs to register the gRPC server as a `unix domain socket`.
+The folder where the socket is created must be shared with the Operator's container and mounted in the path exposed by
+the environment variable `PLUGIN_SOCKET_DIR` (default is `/plugin`).
+
+Example of a Plugin as a Sidecar Container:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - image: cloudnative-pg:latest
+        ...
+        name: manager
+        volumeMounts:
+        - mountPath: /plugins
+          name: cnpg-i-plugins
+            
+      - image: cnpg-i-plugin-example:latest
+        name: cnpg-i-plugin-example
+        volumeMounts:
+        - mountPath: /plugins
+          name: cnpg-i-plugins
+      volumes:
+      - name: cnpg-i-plugins
+        emptyDir: {}
+```
+
 ### Standalone Deployment
 
 Deploying the plugin as a standalone `Deployment` is the recommended approach, as it allows to decouple
 the plugin's lifecycle from the Operator's one, and to scale it independently.
 The container needs to expose the gRPC server implementing the CNPG-I protocol to the network through
-a TCP port and a Kubernetes Service. The Service must have the label `cnpg.io/plugin: <plugin-name>`,
+a TCP port and a Kubernetes Service. The Service must define the label `cnpg.io/plugin: <plugin-name>`,
 which is required by the Operator to discover the plugin.
 
 The communication between the Operator and the Plugin is done over gRPC, using mTLS for security. See
-the section on [Communication over mTLS](#communication-over-mtls) for more details.
+the section on [Configuring TLS Certificates](#configuring-tls-certificates) for more details.
 
-!!! Note
+!!! Warning
     The Operator does not automatically discover new Plugins after startup. To detect and use newly deployed Plugins,
     you must restart the Operator.
 
@@ -51,16 +86,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cnpg-i-plugin-example
-  labels:
-    app: cnpg-i-plugin-example
 spec:
-  selector:
-    matchLabels:
-      app: cnpg-i-plugin-example
   template:
-    metadata:
-      labels:
-        app: cnpg-i-plugin-example
+    ...
     spec:
       containers:
       - name: cnpg-i-plugin-example
@@ -76,10 +104,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: cnpg-i-plugin-example
     cnpg.io/pluginName: cnpg-i-plugin-example.my-org.io
-  annotations:
-    cnpg.io/pluginPort: "9090"
   name: cnpg-i-plugin-example
 spec:
   ports:
@@ -90,61 +115,41 @@ spec:
     app: cnpg-i-plugin-example
 ```
 
-### Sidecar Container
-
-The Plugin can be configured as a [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) 
-in the Operator's `Deployment`. In this case, the Plugin needs to register the gRPC server as a `unix domain socket`. 
-The folder where the socket is created must be shared with the Operator's container and mounted in the path exposed by 
-the environment variable `PLUGIN_SOCKET_DIR` (default is `/plugin`).
-
-Example of a Plugin as a Sidecar Container:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: controller-manager
-  labels:
-    app.kubernetes.io/name: cloudnative-pg
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: cloudnative-pg
-    spec:
-      containers:
-      - command:
-        - /manager
-        args:
-        - controller
-        - --leader-elect
-        - --webhook-port=9443
-        image: ghcr.io/cloudnative-pg/cloudnative-pg:latest
-        name: manager
-        volumeMounts:
-          - mountPath: /plugins
-            name: cnpg-i-plugins
-            
-      - image: cnpg-i-plugin-example:latest
-        name: cnpg-i-plugin-example
-        volumeMounts:
-          - mountPath: /plugins
-            name: cnpg-i-plugins
-      volumes:
-        - name: cnpg-i-plugins
-          emptyDir: {}
-```
-
-
-### Communication over mTLS
+### Configuring TLS Certificates
 
 When a Plugin is configured as a standalone Deployment, the communication with the Operator occurs over the network,
-and mTLS is enforced for security. This implies that TLS certificates for both sides of the connection
-needs to be provided.
-The recommended approach to provide the certificates is to use [CertManager](https://cert-manager.io) to create and manage them, but
-also the use of self-provisioned certificates is supported.
+and mTLS is enforced for security. This implies that TLS certificates need to be provided for both sides of
+the connection.
+The recommended approach to provide the certificates is by using [CertManager](https://cert-manager.io) to create and
+manage them, but also providing self-provisioned ones is supported.
+
+## How to use a plugin
+
+Plugins can be enabled on a Cluster resource by configuring the 
+[.spec.plugins](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
+stanza as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-with-plugins
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+  plugins:
+  - name: cnpg-i-plugin-example.my-org.io
+    enabled: true
+    parameters:
+      key1: value1
+      key2: value2
+```
+!!! Note
+    Each Plugin can support a different set of parameters, so it's recommended to refer to the Plugin's specific documentation
+    to understand the available ones and their usage.
+
+Depending on whether the Plugin is configured as a Sidecar Container or as a Deployment, the field `name`
+must be populated with the Plugin's unix socket file name or the Service `cnpg.io/plugin` annotation value, respectively.
+
 
