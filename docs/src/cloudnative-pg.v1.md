@@ -3079,7 +3079,7 @@ The specified role must have superuser privileges in the target database.</p>
    <p>Options specifies options for the FDW(key is option name, value is option value)</p>
 </td>
 </tr>
-<tr><td><code>usages</code><br/>
+<tr><td><code>usage</code><br/>
 <a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
 </td>
 <td>
