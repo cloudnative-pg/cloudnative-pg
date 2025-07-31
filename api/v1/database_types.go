@@ -251,7 +251,7 @@ type FDWSpec struct {
 
 	// Usages specifies usages for the FDW
 	// +optional
-	Usages []UsageSpec `json:"usages,omitempty"`
+	Usages []UsageSpec `json:"usage,omitempty"`
 }
 
 // OptionSpecValue holds both the value and the ensure field for an option
