@@ -3847,6 +3847,14 @@ Changing tls.enabled option will force a rollout of all instances.</p>
    <p>The list of relabelings for the <code>PodMonitor</code>. Applied to samples before scraping.</p>
 </td>
 </tr>
+<tr><td><code>refreshInterval</code><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
+</td>
+<td>
+   <p>The interval between updates of the monitoring query metrics.
+If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
