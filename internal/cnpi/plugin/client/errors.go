@@ -19,13 +19,12 @@ SPDX-License-Identifier: Apache-2.0
 
 package client
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	// ErrPluginNotLoaded is raised when the plugin that should manage the backup
-	// have not been loaded inside the cluster
-	ErrPluginNotLoaded = newPluginError("plugin not loaded")
-
 	// ErrPluginNotSupportBackup is raised when the plugin that should manage the backup
 	// doesn't support the Backup service
 	ErrPluginNotSupportBackup = newPluginError("plugin does not support Backup service")
@@ -37,6 +36,14 @@ var (
 
 type pluginError struct {
 	innerErr error
+}
+
+type errPluginNotLoaded struct {
+	name string
+}
+
+func (e *errPluginNotLoaded) Error() string {
+	return fmt.Sprintf("plugin %s is not loaded", e.name)
 }
 
 func (e *pluginError) Error() string {
@@ -59,6 +66,21 @@ func ContainsPluginError(err error) bool {
 
 	var pluginErr *pluginError
 	return errors.As(err, &pluginErr)
+}
+
+// IsPluginNotLoadedError checks if the provided error is a plugin not loaded error
+// Returns true if the error is a plugin not loaded error, and the name of the plugin
+func IsPluginNotLoadedError(err error) (bool, string) {
+	if err == nil {
+		return false, ""
+	}
+
+	var pluginNotLoadedErr *errPluginNotLoaded
+	if errors.As(err, &pluginNotLoadedErr) {
+		return true, pluginNotLoadedErr.name
+	}
+
+	return false, ""
 }
 
 func wrapAsPluginErrorIfNeeded(err error) error {

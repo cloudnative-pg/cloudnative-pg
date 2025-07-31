@@ -74,6 +74,10 @@ type Connection interface {
 	MetadataList() []connection.Metadata
 
 	HasPlugin(pluginName string) bool
+
+	// MustHavePlugin checks if the plugin is loaded, and returns an error if it is not
+	// If the pluginName is empty, it returns nil
+	MustHavePlugin(pluginName string) error
 }
 
 // ClusterCapabilities describes a set of behaviour needed to implement the Cluster capabilities

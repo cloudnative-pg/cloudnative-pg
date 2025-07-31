@@ -1032,6 +1032,9 @@ type InstanceReportedState struct {
 	TimeLineID int `json:"timeLineID,omitempty"`
 	// IP address of the instance
 	IP string `json:"ip,omitempty"`
+
+	// MissingPlugins indicates if a requested plugin is missing
+	MissingPlugins []string `json:"missingPlugins,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions

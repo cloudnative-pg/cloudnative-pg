@@ -61,6 +61,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -722,6 +723,13 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	} else if result != nil {
 		return *result, err
+	}
+
+	if result, err := r.deletePodWithMissingPlugins(ctx, cluster, resources); err != nil {
+		contextLogger.Error(err, "While deleting pods with missing plugins")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	} else if result != nil {
+		return *result, nil
 	}
 
 	if !resources.allInstancesAreActive() {
@@ -1532,4 +1540,76 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	}
 
 	return nil
+}
+
+func (r *ClusterReconciler) deletePodWithMissingPlugins(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	getInstancePod := func(instancesWithMissingPlugins []string, instances corev1.PodList) *corev1.Pod {
+		for _, instanceName := range instancesWithMissingPlugins {
+			for i := range instances.Items {
+				if instances.Items[i].Name == instanceName {
+					return &instances.Items[i]
+				}
+			}
+		}
+		return nil
+	}
+
+	var instancesWithMissingPlugins []string // nolint:prealloc
+	for instance, state := range cluster.Status.InstancesReportedState {
+		if len(state.MissingPlugins) == 0 {
+			continue
+		}
+		instancesWithMissingPlugins = append(instancesWithMissingPlugins, string(instance))
+	}
+
+	if len(instancesWithMissingPlugins) == 0 {
+		return nil, nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Deleting pods with missing plugins",
+		"instancesWithMissingPlugins", instancesWithMissingPlugins)
+
+	instance := getInstancePod(instancesWithMissingPlugins, resources.instances)
+	if instance == nil {
+		contextLogger.Info("no instance to delete with missing plugin found")
+		if err := clusterstatus.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
+			for _, state := range c.Status.InstancesReportedState {
+				state.MissingPlugins = []string{}
+			}
+		}); err != nil {
+			return nil, fmt.Errorf("cannot remove lingering instances with missing plugins: %w", err)
+		}
+
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	if instance.GetDeletionTimestamp() != nil {
+		contextLogger.Info("Pod is already being deleted",
+			"podName", instance.Name)
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	contextLogger.Info("Deleting pod with missing plugins",
+		"podName", instance.Name,
+		"instance", instance)
+	if err := r.Delete(ctx, instance); err != nil && !apierrs.IsNotFound(err) {
+		return nil, fmt.Errorf("cannot delete pod %s: %w", instance.Name, err)
+	}
+	r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+		"Deleted pod with missing plugins: %s", instance.Name)
+
+	// we delete one pod at a time
+	if err := clusterstatus.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
+		state := c.Status.InstancesReportedState[apiv1.PodName(instance.Name)]
+		state.MissingPlugins = []string{}
+	}); err != nil {
+		return nil, fmt.Errorf("cannot patch instanceReportedState: %w", err)
+	}
+
+	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
