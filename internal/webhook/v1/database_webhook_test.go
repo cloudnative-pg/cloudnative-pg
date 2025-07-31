@@ -148,9 +148,9 @@ var _ = Describe("Database validation", func() {
 			&apiv1.Database{
 				Spec: apiv1.DatabaseSpec{
 					FDWs: []apiv1.FDWSpec{
-						createFDWSpec("postgre_fdw"),
+						createFDWSpec("postgres_fdw"),
 						createFDWSpec("mysql_fdw"),
-						createFDWSpec("postgre_fdw"),
+						createFDWSpec("postgres_fdw"),
 					},
 				},
 			},
