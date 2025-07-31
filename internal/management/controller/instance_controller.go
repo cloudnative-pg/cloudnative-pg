@@ -416,6 +416,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
 
+	// TODO: in future when tehre is an image change in queue we should ignore this block
 	reloadExtensionsConfig, err := r.instance.RefreshExtensionsConfiguration(cluster)
 	if err != nil {
 		return false, err
