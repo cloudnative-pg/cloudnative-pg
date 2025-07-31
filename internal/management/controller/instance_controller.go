@@ -415,6 +415,14 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
+
+	reloadExtensionsConfig, err := r.instance.RefreshExtensionsConfiguration(cluster)
+	if err != nil {
+		return false, err
+	}
+
+	reloadNeeded = reloadNeeded || reloadExtensionsConfig
+
 	return reloadNeeded, nil
 }
 

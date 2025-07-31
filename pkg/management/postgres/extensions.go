@@ -168,3 +168,13 @@ func setDynamicLibraryPath(config map[string]string, extensions []AdditionalExte
 
 	config[DynamicLibraryPath] = strings.Join(dynamicLibraryPath, ":")
 }
+
+// RefreshExtensionsConfiguration writes the PostgreSQL correct
+// extensions configuration for the cluster, depending on the
+// cluster extensions configuration
+func (instance *Instance) RefreshExtensionsConfiguration(
+	cluster *apiv1.Cluster,
+) (changed bool, err error) {
+	// Configure the extensions.conf file
+	return configureExtensionsConfFile(instance.PgData, cluster)
+}
