@@ -226,6 +226,7 @@ type ExtensionSpec struct {
 
 // FDWSpec configures an Foreign Data Wrapper in a database
 type FDWSpec struct {
+	// Common fields
 	DatabaseObjectSpec `json:",inline"`
 
 	// Name of the handler function (e.g., "postgres_fdw_handler")
