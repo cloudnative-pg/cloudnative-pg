@@ -256,6 +256,7 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 			return ErrFailedDatabaseObjectReconciliation
 		}
 	}
+
 	return nil
 }
 
