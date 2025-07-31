@@ -217,7 +217,7 @@ spec:
                         Owner specifies the database role that will own the Foreign Data Wrapper.
                         The specified role must have superuser privileges in the target database.
                       type: string
-                    usages:
+                    usage:
                       description: Usages specifies usages for the FDW
                       items:
                         description: UsageSpec configures a usage for a foreign data
