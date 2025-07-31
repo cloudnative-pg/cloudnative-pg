@@ -4072,6 +4072,12 @@ spec:
                       - name
                       type: object
                     type: array
+                  extensionsConfiguration:
+                    additionalProperties:
+                      type: string
+                    description: ExtensionsConfiguration configuration options for
+                      the extensions.conf file
+                    type: object
                   ldap:
                     description: Options to specify LDAP configuration
                     properties:

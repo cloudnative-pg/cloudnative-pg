@@ -1404,6 +1404,9 @@ type PostgresConfiguration struct {
 	// +optional
 	PgIdent []string `json:"pg_ident,omitempty"`
 
+	// ExtensionsConfiguration configuration options for the extensions.conf file
+	ExtensionsConfiguration map[string]string `json:"extensionsConfiguration,omitempty"`
+
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
 	// +optional
