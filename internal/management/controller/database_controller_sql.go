@@ -424,6 +424,8 @@ WHERE fdwname = $1
 `
 
 func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
+	contextLogger := log.FromContext(ctx)
+
 	row := db.QueryRowContext(
 		ctx, detectDatabaseFDWSQL,
 		fdw.Name)
@@ -451,6 +453,11 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 			opts[parts[0]] = apiv1.OptionSpecValue{
 				Value: parts[1],
 			}
+		} else {
+			contextLogger.Info(
+				"skipping unparsable option, expected \"keyword=value\"",
+				"optionsRaw", optionsRaw,
+				"fdwName", fdw.Name)
 		}
 	}
 	result.Options = opts
@@ -475,6 +482,7 @@ func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec)
 				return fmt.Errorf("granting usage of foreign data wrapper %w", err)
 			}
 			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+
 		case "revoke":
 			changeUsageSQL := fmt.Sprintf(
 				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
@@ -484,6 +492,11 @@ func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec)
 				return fmt.Errorf("revoking usage of foreign data wrapper %w", err)
 			}
 			contextLogger.Info("revoked usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+
+		default:
+			contextLogger.Warning(
+				"unknown usage type",
+				"type", usageSpec.Type, "fdwName", fdw.Name)
 		}
 	}
 
@@ -505,6 +518,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
 		}
 	}
+
 	// Create Validator
 	if len(fdw.Validator) > 0 {
 		switch fdw.Validator {
