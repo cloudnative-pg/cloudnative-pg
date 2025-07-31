@@ -85,14 +85,14 @@ var _ = Describe("Unrecoverable replicas", func() {
 
 		// this pod will be deleted as it is not the primary nor the candidate primary and is
 		// unrecoverable
-		unrecoverablePodThree := makePodWithUnrecoverableAnnotation("cluster-example-3", "true")
-
-		// this pod will be deleted as it is not the primary nor the candidate primary and is
-		// unrecoverable
 		unrecoverablePodFour := makePodWithUnrecoverableAnnotation("cluster-example-4", "true")
 
 		// this is a standard instance
 		instanceFive := makePodWithUnrecoverableAnnotation("cluster-example-5", "false")
+
+		// this pod will be deleted as it is not the primary nor the candidate primary and is
+		// unrecoverable
+		unrecoverablePodThree := makePodWithUnrecoverableAnnotation("cluster-example-3", "true")
 
 		result := collectNamesOfUnrecoverableInstances(
 			ctx,
@@ -110,6 +110,6 @@ var _ = Describe("Unrecoverable replicas", func() {
 			},
 		)
 
-		Expect(result.ToSortedList()).To(ConsistOf("cluster-example-3", "cluster-example-4"))
+		Expect(result).To(ConsistOf("cluster-example-3", "cluster-example-4"))
 	})
 })
