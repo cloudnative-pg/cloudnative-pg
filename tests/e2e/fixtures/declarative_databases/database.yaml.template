@@ -22,7 +22,7 @@ spec:
   fdws:
     - name: postgres_fdw
       ensure: present
-      usages:
+      usage:
       - name: app
         type: grant
     - name: mywrapper
