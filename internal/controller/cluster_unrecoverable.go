@@ -43,8 +43,8 @@ func (r *ClusterReconciler) reconcileUnrecoverableInstances(
 	logger := log.FromContext(ctx)
 
 	targetInstances := collectNamesOfUnrecoverableInstances(ctx, cluster, resources)
-	if targetInstances.Len() > 0 {
-		podName := targetInstances.ToList()[0]
+	if len(targetInstances) > 0 {
+		podName := targetInstances[0]
 
 		logger.Info("Deleting unrecoverable instance", "podName", podName)
 		if err := r.ensureInstanceIsDeleted(ctx, cluster, podName); err != nil {
@@ -61,7 +61,7 @@ func collectNamesOfUnrecoverableInstances(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	resources *managedResources,
-) *stringset.Data {
+) []string {
 	instancesToDelete := stringset.New()
 
 	logger := log.FromContext(ctx)
@@ -89,7 +89,8 @@ func collectNamesOfUnrecoverableInstances(
 		instancesToDelete.Put(pod.Name)
 	}
 
-	return instancesToDelete
+	// We sort the pods to have a deterministic behavior
+	return instancesToDelete.ToSortedList()
 }
 
 // isPodUnrecoverable checks if a Pod is declared unrecoverable
@@ -98,7 +99,7 @@ func isPodUnrecoverable(ctx context.Context, pod *corev1.Pod) bool {
 	logger := log.FromContext(ctx)
 
 	s, ok := pod.Annotations[utils.UnrecoverableInstanceAnnotationName]
-	if !ok {
+	if !ok || s == "" {
 		return false
 	}
 
