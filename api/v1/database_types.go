@@ -291,6 +291,23 @@ type UsageSpec struct {
 	Type string `json:"type,omitempty"`
 }
 
+// ServerSpec configures a server of a foreign data wrapper
+type ServerSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// fdw name
+	FdwName string `json:"fdw"`
+
+	// Options specifies options for the server(key is option name, value is option value)
+	// +optional
+	Options map[string]OptionSpecValue `json:"options,omitempty"`
+
+	// OptionsRef
+	// +optional
+
+}
+
 // DatabaseStatus defines the observed state of Database
 type DatabaseStatus struct {
 	// A sequence number representing the latest
