@@ -191,7 +191,6 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 			}
 
 			Eventually(func(g Gomega) {
-				// Updating the Cluster
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.PostgresConfiguration.Extensions = append(cluster.Spec.PostgresConfiguration.Extensions,
@@ -201,6 +200,9 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 							Reference: "ghcr.io/niccolofei/pgvector:18rc1-master-trixie", // wokeignore:rule=master
 						},
 					})
+				// Setting some pgvector GUCs
+				cluster.Spec.PostgresConfiguration.Parameters["hnsw.iterative_scan"] = "on"
+				cluster.Spec.PostgresConfiguration.Parameters["ivfflat.iterative_scan"] = "on"
 				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
 
 				// Updating the Database
@@ -224,6 +226,14 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 			assertVolumeMounts(podList, "pgvector")
 			assertVolumes(podList, "pgvector")
 			assertExtensions(namespace, databaseName)
+		})
+
+		By("verifying GUCS have been updated", func() {
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
+			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
 		})
 
 		By("verifying the extension's usage ", func() {
