@@ -64,9 +64,9 @@ case $ARCH in
   aarch64) ARCH="arm64" ;;
 esac
 
-# If arm64 and user did not set it explicitly
-if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
-  DOCKER_DEFAULT_PLATFORM=linux/arm64
+# If user did not set it explicitly
+if [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
+  DOCKER_DEFAULT_PLATFORM="linux/${ARCH}"
 fi
 export DOCKER_DEFAULT_PLATFORM
 
@@ -392,7 +392,7 @@ load_image_registry() {
 
   local image_local_name=${image/${registry_name}/127.0.0.1}
   docker tag "${image}" "${image_local_name}"
-  docker push -q "${image_local_name}"
+  docker push --platform "${DOCKER_DEFAULT_PLATFORM}" -q "${image_local_name}"
 }
 
 load_image() {
