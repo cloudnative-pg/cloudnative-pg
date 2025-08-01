@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -32,10 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
-	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -130,12 +127,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 		// We archive every WAL that have not been archived from the latest postmaster invocation.
 		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {
-			if notLoaded, name := cnpgiClient.IsPluginNotLoadedError(err); notLoaded {
-				if archiverMissErr := r.ensureWALArchiveMissingIsSet(ctx, cluster, name); archiverMissErr != nil {
-					return archiverMissErr
-				}
-			}
-
 			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
@@ -147,37 +138,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		// Now I can demote myself
 		return r.instance.Demote(ctx, cluster)
 	}
-}
-
-func (r *InstanceReconciler) ensureWALArchiveMissingIsSet(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	pluginName string,
-) error {
-	existingState := cluster.Status.InstancesReportedState[apiv1.PodName(r.instance.GetPodName())]
-
-	// If the WAL archiver is already missing, and the name of the plugin
-	// is the same as the one that was not found, we can skip the patching
-	if slices.Contains(existingState.MissingPlugins, pluginName) {
-		return nil
-	}
-
-	tx := func(c *apiv1.Cluster) {
-		state := c.Status.InstancesReportedState[apiv1.PodName(r.instance.GetPodName())]
-
-		if slices.Contains(state.MissingPlugins, pluginName) {
-			return
-		}
-
-		state.MissingPlugins = append(state.MissingPlugins, pluginName)
-	}
-
-	err := clusterstatus.PatchWithOptimisticLock(ctx, r.client, cluster, tx)
-	if err != nil {
-		return fmt.Errorf("while patching cluster for missing WALArchiver: %w", err)
-	}
-
-	return nil
 }
 
 // ReconcileTablespaces ensures the mount points created for the tablespaces

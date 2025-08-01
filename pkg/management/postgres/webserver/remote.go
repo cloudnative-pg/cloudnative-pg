@@ -41,6 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -67,7 +69,8 @@ type remoteWebserverEndpoints struct {
 	currentBackup        *backupConnection
 	ongoingBackupRequest sync.Mutex
 	// livenessChecker is a  stateful probe
-	livenessChecker probes.Checker
+	livenessChecker  probes.Checker
+	pluginRepository repository.Interface
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -92,6 +95,7 @@ func NewRemoteWebServer(
 	instance *postgres.Instance,
 	cancelFunc context.CancelFunc,
 	exitedConditions concurrency.MultipleExecuted,
+	repository repository.Interface,
 ) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -99,9 +103,10 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient:     typedClient,
-		instance:        instance,
-		livenessChecker: probes.NewLivenessChecker(typedClient, instance),
+		typedClient:      typedClient,
+		instance:         instance,
+		livenessChecker:  probes.NewLivenessChecker(typedClient, instance),
+		pluginRepository: repository,
 	}
 
 	serveMux := http.NewServeMux()
@@ -248,13 +253,24 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 }
 
 // This probe is for the instance status, including replication
-func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
-	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus()
+func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, req *http.Request) {
+	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(req.Context(), 5*time.Second)
+	defer cancelPluginLoading()
+
+	pluginClient, err := cnpgiclient.WithPlugins(
+		pluginLoadingContext,
+		ws.pluginRepository,
+		ws.instance.Cluster.GetInstanceEnabledPluginNames()...,
+	)
+	defer pluginClient.Close(req.Context())
 	if err != nil {
-		log.Debug(
-			"Instance status probe failing",
-			"err", err.Error())
+		log.Error(err, "Error loading plugins")
+	}
+
+	// Extract the status of the current instance
+	status, err := ws.instance.GetStatus(pluginClient)
+	if err != nil {
+		log.Debug("Instance status probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

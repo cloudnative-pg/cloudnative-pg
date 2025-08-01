@@ -43,7 +43,7 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 		}
 	}
 
-	return nil, &pluginError{innerErr: &errPluginNotLoaded{name: pluginName}}
+	return nil, ErrPluginNotLoaded
 }
 
 func (data *data) MetadataList() []connection.Metadata {
@@ -60,16 +60,11 @@ func (data *data) HasPlugin(pluginName string) bool {
 	return err == nil
 }
 
-func (data *data) MustHavePlugin(pluginName string) error {
-	if pluginName == "" {
-		return nil
+func (data *data) Close(ctx context.Context) {
+	if data == nil {
+		return
 	}
 
-	_, err := data.getPlugin(pluginName)
-	return err
-}
-
-func (data *data) Close(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
 	for i := range data.plugins {
 		plugin := data.plugins[i]

@@ -61,7 +61,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
-	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -1577,39 +1576,22 @@ func (r *ClusterReconciler) deletePodWithMissingPlugins(
 	instance := getInstancePod(instancesWithMissingPlugins, resources.instances)
 	if instance == nil {
 		contextLogger.Info("no instance to delete with missing plugin found")
-		if err := clusterstatus.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
-			for _, state := range c.Status.InstancesReportedState {
-				state.MissingPlugins = []string{}
-			}
-		}); err != nil {
-			return nil, fmt.Errorf("cannot remove lingering instances with missing plugins: %w", err)
-		}
-
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return nil, nil
 	}
 
 	if instance.GetDeletionTimestamp() != nil {
-		contextLogger.Info("Pod is already being deleted",
-			"podName", instance.Name)
+		contextLogger.Info("Pod is already being deleted", "podName", instance.Name)
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
-	contextLogger.Info("Deleting pod with missing plugins",
-		"podName", instance.Name,
-		"instance", instance)
+	contextLogger.Info("Deleting pod with missing plugins", "podName", instance.Name, "instance", instance)
+
 	if err := r.Delete(ctx, instance); err != nil && !apierrs.IsNotFound(err) {
 		return nil, fmt.Errorf("cannot delete pod %s: %w", instance.Name, err)
 	}
+
 	r.Recorder.Eventf(cluster, "Normal", "DeletePod",
 		"Deleted pod with missing plugins: %s", instance.Name)
-
-	// we delete one pod at a time
-	if err := clusterstatus.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
-		state := c.Status.InstancesReportedState[apiv1.PodName(instance.Name)]
-		state.MissingPlugins = []string{}
-	}); err != nil {
-		return nil, fmt.Errorf("cannot patch instanceReportedState: %w", err)
-	}
 
 	return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }

@@ -315,7 +315,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	// which will imply the deletion of the child onlineUpgradeCtx too, again, terminating all the Runnables.
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
-	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
+	remoteSrv, err := webserver.NewRemoteWebServer(
+		instance,
+		onlineUpgradeCancelFunc,
+		exitedConditions,
+		pluginRepository,
+	)
 	if err != nil {
 		return err
 	}

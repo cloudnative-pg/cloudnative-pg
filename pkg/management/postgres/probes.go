@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -39,7 +40,7 @@ import (
 )
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(cli cnpgiclient.Client) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
@@ -122,6 +123,12 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
+
+	if cli != nil && instance.Cluster.GetEnabledWALArchivePluginName() != "" {
+		if !cli.HasPlugin(instance.Cluster.GetEnabledWALArchivePluginName()) {
+			result.MissingPlugins = []string{instance.Cluster.GetEnabledWALArchivePluginName()}
+		}
+	}
 
 	return result, nil
 }

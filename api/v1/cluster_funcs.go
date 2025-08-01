@@ -89,6 +89,10 @@ func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) 
 
 // GetInstanceEnabledPluginNames gets the name of the plugins that are available to the instance container
 func (cluster *Cluster) GetInstanceEnabledPluginNames() (result []string) {
+	if cluster == nil {
+		return nil
+	}
+
 	var instance []string
 	for _, pluginStatus := range cluster.Status.PluginStatus {
 		if slices.Contains(pluginStatus.Capabilities,

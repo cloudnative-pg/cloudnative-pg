@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -996,7 +997,7 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 		return nil, fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
 	}
 
-	status, err := instance.GetStatus()
+	status, err := instance.GetStatus(cnpgiclient.GetPluginClientFromContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("while applying new configuration: %w", err)
 	}

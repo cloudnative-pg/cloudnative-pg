@@ -287,8 +287,9 @@ func archiveWALViaPlugins(
 	}
 	defer client.Close(ctx)
 
-	if err := client.MustHavePlugin(cluster.GetEnabledWALArchivePluginName()); err != nil {
-		return err
+	enabledArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !client.HasPlugin(enabledArchiverPluginName) {
+		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
 	}
 
 	return client.ArchiveWAL(ctx, cluster, walName)

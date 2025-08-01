@@ -97,6 +97,10 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
+
+	// This fields reports the missing plugins from the instance manager.
+	// Currently, this is only populated with the WALArchiver name.
+	MissingPlugins []string `json:"missingPlugins,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
