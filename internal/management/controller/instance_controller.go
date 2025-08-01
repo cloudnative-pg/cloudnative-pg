@@ -402,10 +402,8 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
-	// We give priority to images changes before applying the configuration ones.
-	if r.requiresImagesRollout(ctx, cluster) {
-		return reloadNeeded, nil
-	}
+	reloadImages := r.requiresImagesRollout(ctx, cluster)
+	reloadNeeded = reloadNeeded || reloadImages
 
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
