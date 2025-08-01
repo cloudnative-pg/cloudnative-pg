@@ -290,6 +290,12 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	// nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
+
+		err = info.checkBackupDestination(ctx, cli, cluster)
+		if err != nil {
+			return err
+		}
+
 		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
 		if err != nil {
 			return err
