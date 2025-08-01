@@ -1,40 +1,47 @@
 # CNPG-I
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-The CloudNativePG Interface (CNPG-I) is a standard for extending and customizing
-the Operator's functionality without modifying the core codebase.
+The CloudNativePG Interface (`CNPG-I`) provides a powerful standard for extending and customizing CloudNativePG's default 
+functionality without altering its core codebase.
 
 ## Why CNPG-I?
 
-Although the Operator already covers a wide range of use cases, there are scenarios where
-the default functionality may not be sufficient, but cannot be either supported directly by the community.
-Prior to the introduction of CNPG-I, users had to fork the project to customise the Operator's behaviour or attempt to 
-integrate changes with the upstream codebase, which could lead to maintenance challenges or delays in meeting the
-business requirements.
+While CloudNativePG effectively handles a wide range of use cases, there are scenarios where its default capabilities 
+may not suffice, or where community support for specific features isn't feasible. Prior to the introduction of `CNPG-I`, 
+users often had to fork the project to implement custom behaviors or attempt to integrate their changes directly with 
+the upstream codebase. Both approaches posed significant challenges, leading to maintenance overhead and potential 
+delays in meeting business requirements.
 
-CNPG-I was develop as a standard to integrate with key operations of the Operator during
-the lifecycle management of a Cluster, such as backups, restores, or sub-resources reconciliation.
+`CNPG-I` was developed to address these issues by offering a standardized way to integrate with key CloudNativePG 
+operations throughout a Cluster's lifecycle. This includes critical functions like backups, restores, and sub-resource
+reconciliation, enabling seamless customization and extending CloudNativePG's capabilities without disrupting the
+core project.
 
 ## How to register a plugin
 
-The implementation of CNPG-I is heavily inspired by the Kubernetes
+The implementation of `CNPG-I` is heavily inspired by the Kubernetes
 [Container Storage Interface](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)
 (CSI). 
-The Operator issues gRPC calls directly to the registered plugins, according to the interface
-defined by the [CNPG-I protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
+The Operator issues gRPC calls directly to the registered plugins,  adhering to the interface
+defined by the [`CNPG-I` protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
 
-The Operator performs a discovery of available Plugins during startup. A workload can be registered as a
-CNPG-I plugin either by configuring it as a [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) 
-in the Operator's Deployment or by deploying it as a standalone 
-[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same Operator namespace.
-In both cases, the Plugin must be packaged as a container image to be deployed as a Kubernetes workload.
+CloudNativePG discovers available plugins during its startup process. You can register a CNPG-I plugin in one of two
+ways:
+
+- **Sidecar Container**: Configure the plugin as a 
+[Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) within the Operator's
+Deployment.
+
+- **Standalone Deployment**: Deploy the plugin as an independent 
+[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same namespace as the Operator.
+
+In both cases, the plugin must be packaged as a container image to be deployed as a Kubernetes workload.
 
 ### Sidecar Container
 
-The Plugin can be configured as a [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)
-in the Operator's `Deployment`. In this case, the Plugin needs to register the gRPC server as a `unix domain socket`.
-The folder where the socket is created must be shared with the Operator's container and mounted in the path exposed by
-the environment variable `PLUGIN_SOCKET_DIR` (default is `/plugin`).
+When configuring a plugin as a Sidecar Container within the Operator's Deployment, the plugin must register its gRPC 
+server as a **Unix domain socket**. The directory where this socket is created must be shared with the Operator's container 
+and mounted to the path specified by the `PLUGIN_SOCKET_DIR` environment variable (which defaults to `/plugin`).
 
 Example of a Plugin as a Sidecar Container:
 
@@ -48,7 +55,7 @@ spec:
     spec:
       containers:
       - image: cloudnative-pg:latest
-        ...
+        [...]
         name: manager
         volumeMounts:
         - mountPath: /plugins
@@ -66,18 +73,18 @@ spec:
 
 ### Standalone Deployment
 
-Deploying the plugin as a standalone `Deployment` is the recommended approach, as it allows to decouple
-the plugin's lifecycle from the Operator's one, and to scale it independently.
-The container needs to expose the gRPC server implementing the CNPG-I protocol to the network through
-a TCP port and a Kubernetes Service. The Service must define the label `cnpg.io/plugin: <plugin-name>`,
-which is required by the Operator to discover the plugin.
+Deploying a plugin as a standalone Deployment is the recommended approach. This method offers several advantages,
+including decoupling the plugin's lifecycle from the CloudNativePG Operator's and allowing for independent scaling of
+the plugin.
 
-The communication between the Operator and the Plugin is done over gRPC, using mTLS for security. See
-the section on [Configuring TLS Certificates](#configuring-tls-certificates) for more details.
+In this setup, the container must expose the gRPC server implementing the `CNPG-I` protocol to the network via a `TCP` 
+port and a Kubernetes Service. Communication between CloudNativePG and the plugin is secured using **mTLS over gRPC**. 
+For detailed information on configuring TLS certificates, refer to the
+[Configuring TLS Certificates](#configuring-tls-certificates) section below.
 
 !!! Warning
-    The Operator does not automatically discover new Plugins after startup. To detect and use newly deployed Plugins,
-    you must restart the Operator.
+    CloudNativePG does not automatically discover newly deployed plugins after startup.
+    To detect and utilize new plugins, you must restart the Operator's Deployment.
 
 Example of a Plugin as a standalone `Deployment`:
 
@@ -88,7 +95,7 @@ metadata:
   name: cnpg-i-plugin-example
 spec:
   template:
-    ...
+    [...]
     spec:
       containers:
       - name: cnpg-i-plugin-example
@@ -97,12 +104,17 @@ spec:
         - containerPort: 9090
           protocol: TCP
 ```
+The accompanying Kubernetes Service for the plugin must include:
 
-The `Service` can be configured as follows:
+- The label `cnpg.io/plugin: <plugin-name>`, which is essential for CloudNativePG to discover the plugin.
+- The annotation `cnpg.io/pluginPort: <port>`, specifying the port on which the plugin's gRPC server is exposed.
+
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    cnpg.io/pluginPort: "9090"
   labels:
     cnpg.io/pluginName: cnpg-i-plugin-example.my-org.io
   name: cnpg-i-plugin-example
@@ -117,17 +129,37 @@ spec:
 
 ### Configuring TLS Certificates
 
-When a Plugin is configured as a standalone Deployment, the communication with the Operator occurs over the network,
-and mTLS is enforced for security. This implies that TLS certificates need to be provided for both sides of
-the connection.
-The recommended approach to provide the certificates is by using [CertManager](https://cert-manager.io) to create and
-manage them, but also providing self-provisioned ones is supported.
+When a plugin is deployed as a standalone Deployment, communication with CloudNativePG happens over the network. To
+ensure security, **mTLS is enforced**, requiring TLS certificates for both sides of the connection.
+These certificates must be stored as
+[Kubernetes TLS Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) and referenced in the 
+plugin's Service using the annotations `cnpg.io/pluginClientSecret` and `cnpg.io/pluginServerSecret`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cnpg.io/pluginClientSecret: cnpg-i-plugin-example-client-tls
+    cnpg.io/pluginServerSecret: cnpg-i-plugin-example-server-tls
+    cnpg.io/pluginPort: "9090"
+  name: barman-cloud
+  namespace: postgresql-operator-system
+spec:
+    [...]
+```
+
+!!! Note
+    While providing self-provisioned certificate bundles is supported, the recommended approach for managing certificates 
+    is by using [CertManager](https://cert-manager.io).
 
 ## How to use a plugin
+Plugins are enabled on a `Cluster` resource by configuring the `.spec.plugins` stanza. Refer to the CloudNativePG 
+documentation for the full 
+[PluginConfiguration](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
+specification.
 
-Plugins can be enabled on a Cluster resource by configuring the 
-[.spec.plugins](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
-stanza as follows:
+Here's an example of how to enable a plugin on a `Cluster` resource:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -146,10 +178,11 @@ spec:
       key2: value2
 ```
 !!! Note
-    Each Plugin can support a different set of parameters, so it's recommended to refer to the Plugin's specific documentation
-    to understand the available ones and their usage.
+    Each plugin may support a unique set of parameters. Always consult the plugin's specific documentation to understand 
+    the available parameters and their proper usage.
 
-Depending on whether the Plugin is configured as a Sidecar Container or as a Deployment, the field `name`
-must be populated with the Plugin's unix socket file name or the Service `cnpg.io/plugin` annotation value, respectively.
+The `name` field in the plugins stanza should be populated based on how the plugin is configured:
 
-
+- If the plugin is a [Sidecar Container](#sidecar-container), use the Unix socket file name.
+- If the plugin is a [Standalone Deployment](#standalone-deployment), use the value of the Service's
+`cnpg.io/pluginName` label.
