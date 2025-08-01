@@ -523,6 +523,11 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("while executing logical import: %w", err)
 			}
+
+			err = configurePoolerIntegrationAfterImport(ctx, instance, cluster)
+			if err != nil {
+				return fmt.Errorf("while configuring pooler integration after import: %w", err)
+			}
 		}
 
 		return nil
@@ -572,6 +577,125 @@ func executeLogicalImport(
 	}
 }
 
+// configurePoolerIntegrationAfterImport configures pooler integration (cnpg_pooler_pgbouncer user and user_search function)
+// after a logical import has completed. This is necessary because the import process brings over existing data
+// but doesn't include the pooler integration that CloudNativePG normally sets up during cluster creation.
+func configurePoolerIntegrationAfterImport(
+	ctx context.Context,
+	instance connectionProvider,
+	cluster *apiv1.Cluster,
+) error {
+	if cluster.Status.PoolerIntegrations == nil ||
+		len(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets) == 0 {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Configuring pooler integration after import")
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while connecting to PostgreSQL as superuser: %w", err)
+	}
+
+	contextLogger.Info("Creating cnpg_pooler_pgbouncer role")
+	_, err = superUserDB.ExecContext(ctx, `
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'cnpg_pooler_pgbouncer') THEN
+				CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
+			END IF;
+		END
+		$$;
+	`)
+	if err != nil {
+		return fmt.Errorf("while creating cnpg_pooler_pgbouncer role: %w", err)
+	}
+
+	databases := []string{"postgres"}
+
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.InitDB != nil &&
+		cluster.Spec.Bootstrap.InitDB.Database != "" {
+		appDB := cluster.Spec.Bootstrap.InitDB.Database
+		if appDB != "postgres" {
+			databases = append(databases, appDB)
+		}
+	}
+
+	rows, err := superUserDB.QueryContext(ctx,
+		"SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')")
+	if err != nil {
+		return fmt.Errorf("while listing databases: %w", err)
+	}
+	defer rows.Close()
+
+	importedDatabases := make([]string, 0)
+	for rows.Next() {
+		var dbName string
+		if err := rows.Scan(&dbName); err != nil {
+			return fmt.Errorf("while scanning database name: %w", err)
+		}
+		importedDatabases = append(importedDatabases, dbName)
+	}
+
+	for _, importedDB := range importedDatabases {
+		found := false
+		for _, existingDB := range databases {
+			if existingDB == importedDB {
+				found = true
+				break
+			}
+		}
+		if !found {
+			databases = append(databases, importedDB)
+		}
+	}
+
+	for _, dbName := range databases {
+		contextLogger.Info("Configuring pooler integration for database", "database", dbName)
+
+		_, err = superUserDB.ExecContext(ctx,
+			fmt.Sprintf("GRANT CONNECT ON DATABASE \"%s\" TO cnpg_pooler_pgbouncer", dbName))
+		if err != nil {
+			return fmt.Errorf("while granting CONNECT on database %s: %w", dbName, err)
+		}
+
+		dbConnPool := instance.ConnectionPool()
+		db, err := dbConnPool.Connection(dbName)
+		if err != nil {
+			return fmt.Errorf("while connecting to database %s: %w", dbName, err)
+		}
+
+		_, err = db.ExecContext(ctx, `
+			CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
+			RETURNS TABLE (usename name, passwd text)
+			LANGUAGE sql SECURITY DEFINER AS
+			'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
+		`)
+		if err != nil {
+			return fmt.Errorf("while creating user_search function in database %s: %w", dbName, err)
+		}
+
+		_, err = db.ExecContext(ctx, `
+			REVOKE ALL ON FUNCTION public.user_search(text) FROM public;
+		`)
+		if err != nil {
+			return fmt.Errorf("while revoking public access to user_search function in database %s: %w", dbName, err)
+		}
+
+		_, err = db.ExecContext(ctx, `
+			GRANT EXECUTE ON FUNCTION public.user_search(text) TO cnpg_pooler_pgbouncer;
+		`)
+		if err != nil {
+			return fmt.Errorf("while granting execute permission to cnpg_pooler_pgbouncer on user_search function in database %s: %w", dbName, err)
+		}
+	}
+
+	contextLogger.Info("Successfully configured pooler integration after import", "databases", databases)
+	return nil
+}
+
 func getConnectionPoolerForExternalCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -616,3 +740,4 @@ func (info InitInfo) initdbSyncOnly(ctx context.Context) error {
 	}
 	return nil
 }
+
