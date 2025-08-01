@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
@@ -69,6 +70,10 @@ var (
 	// errNoFreeWALSpace is raised when there's not enough disk space
 	// to store two WAL files
 	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
+
+	// errWALArchivePluginNotAvailable is raised when there's not enough disk space
+	// to store two WAL files
+	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
 )
 
 func init() {
@@ -114,6 +119,9 @@ func NewCmd() *cobra.Command {
 			if errors.Is(err, errNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
 			}
+			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				os.Exit(apiv1.MissingWALArchivePlugin)
+			}
 
 			return err
 		},
@@ -140,7 +148,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
+func runSubCommand(ctx context.Context, instance *postgres.Instance) error { //nolint:gocognit,gocyclo
 	var err error
 
 	contextLogger := log.FromContext(ctx)
@@ -216,8 +224,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
+	var loadedPluginNames []string
 	pluginRepository := repository.New()
-	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	if loadedPluginNames, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+		configuration.Current.PluginSocketDir,
+	); err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
@@ -372,7 +383,18 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
-		return errNoFreeWALSpace
+		return makeUnretryableError(errNoFreeWALSpace)
+	}
+
+	if instance.Cluster != nil {
+		enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
+		if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
+			contextLogger.Info(
+				"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
+				"enabledArchiverPluginName", enabledArchiverPluginName,
+				"loadedPluginNames", loadedPluginNames)
+			return makeUnretryableError(errWALArchivePluginNotAvailable)
+		}
 	}
 
 	return nil
