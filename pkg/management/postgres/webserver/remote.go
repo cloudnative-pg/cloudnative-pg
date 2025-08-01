@@ -257,20 +257,19 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, req *http.Re
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(req.Context(), 5*time.Second)
 	defer cancelPluginLoading()
 
-	pluginClient, err := cnpgiclient.WithPlugins(
+	var missingPlugins bool
+	_, err := cnpgiclient.WithPlugins(
 		pluginLoadingContext,
 		ws.pluginRepository,
 		ws.instance.Cluster.GetInstanceEnabledPluginNames()...,
 	)
 	if err != nil {
 		log.Error(err, "Error loading plugins")
-	}
-	if pluginClient != nil {
-		defer pluginClient.Close(req.Context())
+		missingPlugins = true
 	}
 
 	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus(pluginClient)
+	status, err := ws.instance.GetStatus(missingPlugins)
 	if err != nil {
 		log.Debug("Instance status probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -128,6 +128,7 @@ func (r *InstanceReconciler) Reconcile(
 		r.pluginRepository,
 		cluster.GetInstanceEnabledPluginNames()...,
 	)
+	// The controller will be repeatedly stuck. This will be detected by the operator through the remote webserver
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err

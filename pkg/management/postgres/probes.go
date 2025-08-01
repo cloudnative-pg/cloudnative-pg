@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -40,11 +39,12 @@ import (
 )
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus(cli cnpgiclient.Client) (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(missingPlugins bool) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
+		MissingPlugins:         missingPlugins,
 	}
 
 	// this deferred function may override the error returned. Take extra care.
@@ -123,14 +123,6 @@ func (instance *Instance) GetStatus(cli cnpgiclient.Client) (result *postgres.Po
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
-
-	if cli != nil {
-		for _, pluginName := range instance.Cluster.GetInstanceEnabledPluginNames() {
-			if !cli.HasPlugin(pluginName) {
-				result.MissingPlugins = append(result.MissingPlugins, pluginName)
-			}
-		}
-	}
 
 	return result, nil
 }

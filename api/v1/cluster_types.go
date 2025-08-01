@@ -1034,7 +1034,7 @@ type InstanceReportedState struct {
 	IP string `json:"ip,omitempty"`
 
 	// MissingPlugins indicates if a requested plugin is missing
-	MissingPlugins []string `json:"missingPlugins,omitempty"`
+	MissingPlugins bool `json:"missingPlugins,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions

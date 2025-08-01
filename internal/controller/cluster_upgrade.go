@@ -505,13 +505,13 @@ func checkPodMissingPlugins(_ context.Context, pod *corev1.Pod, cluster *apiv1.C
 			continue
 		}
 
-		if len(state.MissingPlugins) == 0 {
+		if !state.MissingPlugins {
 			return rollout{}, nil
 		}
 
 		return rollout{
 			required: true,
-			reason:   fmt.Sprintf("the instance is missing plugins: %s", state.MissingPlugins),
+			reason:   "the instance is missing plugins",
 		}, nil
 	}
 
