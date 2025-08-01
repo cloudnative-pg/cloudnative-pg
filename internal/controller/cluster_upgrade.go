@@ -387,6 +387,7 @@ func isPodNeedingRollout(
 		"pod scheduler is outdated":           checkSchedulerIsOutdated,
 		"pod needs updated topology":          checkPodNeedsUpdatedTopology,
 		"pod bootstrap container is outdated": checkPodBootstrapImage,
+		"pod has missing plugins":             checkPodMissingPlugins,
 	}
 	podRollout = applyCheckers(checkers)
 	if podRollout.required {
@@ -496,6 +497,25 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 			pgCurrentImageName, targetImageName),
 		needsChangeOperandImage: true,
 	}, nil
+}
+
+func checkPodMissingPlugins(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
+	for name, state := range cluster.Status.InstancesReportedState {
+		if pod.Name != string(name) {
+			continue
+		}
+
+		if len(state.MissingPlugins) == 0 {
+			return rollout{}, nil
+		}
+
+		return rollout{
+			required: true,
+			reason:   fmt.Sprintf("the instance is missing plugins: %s", state.MissingPlugins),
+		}, nil
+	}
+
+	return rollout{}, nil
 }
 
 func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster) (rollout, error) {

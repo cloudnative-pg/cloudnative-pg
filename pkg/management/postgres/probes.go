@@ -124,9 +124,11 @@ func (instance *Instance) GetStatus(cli cnpgiclient.Client) (result *postgres.Po
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
 
-	if cli != nil && instance.Cluster.GetEnabledWALArchivePluginName() != "" {
-		if !cli.HasPlugin(instance.Cluster.GetEnabledWALArchivePluginName()) {
-			result.MissingPlugins = []string{instance.Cluster.GetEnabledWALArchivePluginName()}
+	if cli != nil {
+		for _, pluginName := range instance.Cluster.GetInstanceEnabledPluginNames() {
+			if !cli.HasPlugin(pluginName) {
+				result.MissingPlugins = append(result.MissingPlugins, pluginName)
+			}
 		}
 	}
 
