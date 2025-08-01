@@ -262,9 +262,11 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, req *http.Re
 		ws.pluginRepository,
 		ws.instance.Cluster.GetInstanceEnabledPluginNames()...,
 	)
-	defer pluginClient.Close(req.Context())
 	if err != nil {
 		log.Error(err, "Error loading plugins")
+	}
+	if pluginClient != nil {
+		defer pluginClient.Close(req.Context())
 	}
 
 	// Extract the status of the current instance

@@ -61,10 +61,6 @@ func (data *data) HasPlugin(pluginName string) bool {
 }
 
 func (data *data) Close(ctx context.Context) {
-	if data == nil {
-		return
-	}
-
 	contextLogger := log.FromContext(ctx)
 	for i := range data.plugins {
 		plugin := data.plugins[i]

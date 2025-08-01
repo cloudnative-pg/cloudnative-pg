@@ -724,13 +724,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	if result, err := r.deletePodWithMissingPlugins(ctx, cluster, resources); err != nil {
-		contextLogger.Error(err, "While deleting pods with missing plugins")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	} else if result != nil {
-		return *result, nil
-	}
-
 	if !resources.allInstancesAreActive() {
 		contextLogger = contextLogger.WithValues(
 			"inactiveInstances", resources.inactiveInstanceNames())
