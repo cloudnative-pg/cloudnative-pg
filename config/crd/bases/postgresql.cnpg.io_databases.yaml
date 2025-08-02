@@ -188,9 +188,11 @@ spec:
                       description: Name of the extension/schema
                       type: string
                     options:
-                      additionalProperties:
-                        description: OptionSpecValue holds both the value and the
-                          ensure field for an option
+                      description: Options specifies options for the FDW(key is option
+                        name, value is option value)
+                      items:
+                        description: OptionSpec holds the name, value and the ensure
+                          field for an option
                         properties:
                           ensure:
                             default: present
@@ -203,15 +205,17 @@ spec:
                             - present
                             - absent
                             type: string
+                          name:
+                            description: Name of the option
+                            type: string
                           value:
                             description: Value of the option
                             type: string
                         required:
+                        - name
                         - value
                         type: object
-                      description: Options specifies options for the FDW(key is option
-                        name, value is option value)
-                      type: object
+                      type: array
                     owner:
                       description: |-
                         Owner specifies the database role that will own the Foreign Data Wrapper.

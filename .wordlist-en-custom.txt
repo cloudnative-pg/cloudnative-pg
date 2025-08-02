@@ -309,6 +309,7 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpec
 OptionSpecValue
 OwnNamespace
 PDB

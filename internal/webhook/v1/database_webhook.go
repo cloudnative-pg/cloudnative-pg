@@ -232,6 +232,23 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 			)
 		}
 
+		// Validate the options of the FDW
+		optionNames := stringset.New()
+		for k, option := range fdw.Options {
+			optionName := option.Name
+			if optionNames.Has(optionName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "fdws").Index(i).Child("options").Index(k).Child("name"),
+						optionName,
+					),
+				)
+			}
+
+			optionNames.Put(optionName)
+		}
+
 		// Validate the usage of the FDW
 		usageNames := stringset.New()
 		for j, usage := range fdw.Usages {
