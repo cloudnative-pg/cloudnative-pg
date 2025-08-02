@@ -264,6 +264,11 @@ const (
 	// This feature enables quorum-based check before failover, ensuring
 	// no data loss at the expense of availability.
 	FailoverQuorumAnnotationName = AlphaMetadataNamespace + "/failoverQuorum"
+
+	// UnrecoverableInstanceAnnotationName is the name of the annotation telling the
+	// operator if a instance is recoverable or not. Not recoverable instances will
+	// be deleted with the contents of their PVCs.
+	UnrecoverableInstanceAnnotationName = AlphaMetadataNamespace + "/unrecoverable"
 )
 
 type annotationStatus string
