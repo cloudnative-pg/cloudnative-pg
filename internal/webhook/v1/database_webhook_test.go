@@ -45,6 +45,7 @@ var _ = Describe("Database validation", func() {
 			},
 		}
 	}
+
 	createFDWSpec := func(name string) apiv1.FDWSpec {
 		return apiv1.FDWSpec{
 			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
@@ -126,6 +127,10 @@ var _ = Describe("Database validation", func() {
 								{Name: "usage1"},
 								{Name: "usage2"},
 							},
+							Options: []apiv1.OptionSpec{
+								{Name: "option1"},
+								{Name: "option2"},
+							},
 						},
 						{
 							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
@@ -135,6 +140,10 @@ var _ = Describe("Database validation", func() {
 							Usages: []apiv1.UsageSpec{
 								{Name: "usage3"},
 								{Name: "usage4"},
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "option3"},
+								{Name: "option4"},
 							},
 						},
 					},
@@ -193,6 +202,10 @@ var _ = Describe("Database validation", func() {
 								{Name: "dup_usage"},
 								{Name: "dup_usage"},
 							},
+							Options: []apiv1.OptionSpec{
+								{Name: "dup_option"},
+								{Name: "dup_option"},
+							},
 						},
 						{
 							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
@@ -203,7 +216,7 @@ var _ = Describe("Database validation", func() {
 					},
 				},
 			},
-			2,
+			3,
 		),
 	)
 })

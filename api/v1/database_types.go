@@ -248,14 +248,23 @@ type FDWSpec struct {
 
 	// Options specifies options for the FDW(key is option name, value is option value)
 	// +optional
-	Options map[string]OptionSpecValue `json:"options,omitempty"`
+	Options []OptionSpec `json:"options,omitempty"`
 
 	// Usages specifies usages for the FDW
 	// +optional
 	Usages []UsageSpec `json:"usage,omitempty"`
 }
 
-// OptionSpecValue holds both the value and the ensure field for an option
+// OptionSpec holds the name, value and the ensure field for an option
+type OptionSpec struct {
+	// Name of the option
+	Name string `json:"name"`
+
+	// Value and ensure field of the option
+	OptionSpecValue `json:",inline"`
+}
+
+// OptionSpecValue holds the value and the ensure field for an option
 type OptionSpecValue struct {
 	// Value of the option
 	Value string `json:"value"`

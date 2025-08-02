@@ -27,7 +27,7 @@ spec:
         type: grant
     - name: mywrapper
       options:
-        debug:
+        - name: debug
           value: 'true'
           ensure: present
       ensure: present

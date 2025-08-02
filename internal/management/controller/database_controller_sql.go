@@ -531,11 +531,11 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 
 	// Extract options
 	opts := make([]string, 0, len(fdw.Options))
-	for name, optionSpec := range fdw.Options {
+	for _, optionSpec := range fdw.Options {
 		if optionSpec.Ensure == apiv1.EnsureAbsent {
 			continue
 		}
-		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{name}.Sanitize(),
+		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{optionSpec.Name}.Sanitize(),
 			optionSpec.Value))
 	}
 	if len(opts) > 0 {
@@ -564,22 +564,22 @@ func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info 
 
 	// Collect individual ALTER-clauses
 	var clauses []string
-	for name, desiredOptSpec := range fdw.Options {
-		curOptSpec, exists := info.Options[name]
+	for _, desiredOptSpec := range fdw.Options {
+		curOptSpec, exists := info.Options[desiredOptSpec.Name]
 
 		switch {
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
 			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
-				pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value))
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
 			if desiredOptSpec.Value != curOptSpec.Value {
 				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
-					pgx.Identifier{name}.Sanitize(), desiredOptSpec.Value))
+					pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 			}
 
 		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
-			clauses = append(clauses, fmt.Sprintf("DROP %s", pgx.Identifier{name}.Sanitize()))
+			clauses = append(clauses, fmt.Sprintf("DROP %s", pgx.Identifier{desiredOptSpec.Name}.Sanitize()))
 		}
 	}
 
