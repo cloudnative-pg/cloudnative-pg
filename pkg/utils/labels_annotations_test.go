@@ -180,3 +180,32 @@ var _ = Describe("Pod spec reconciliation", func() {
 		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeTrue())
 	})
 })
+
+var _ = Describe("Empty WAL archive check annotation management", func() {
+	var objectMeta metav1.ObjectMeta
+
+	BeforeEach(func() {
+		objectMeta = metav1.ObjectMeta{
+			Annotations: make(map[string]string),
+		}
+	})
+
+	It("is enabled by default when annotation doesn't exist", func() {
+		Expect(IsEmptyWalArchiveCheckEnabled(&objectMeta)).To(BeTrue())
+	})
+
+	It("is enabled when annotation exists but value is not 'enabled'", func() {
+		objectMeta.Annotations["cnpg.io/skipEmptyWalArchiveCheck"] = "disabled"
+		Expect(IsEmptyWalArchiveCheckEnabled(&objectMeta)).To(BeTrue())
+	})
+
+	It("is enabled when annotation exists but value is random string", func() {
+		objectMeta.Annotations["cnpg.io/skipEmptyWalArchiveCheck"] = "random"
+		Expect(IsEmptyWalArchiveCheckEnabled(&objectMeta)).To(BeTrue())
+	})
+
+	It("is disabled (skipped) when annotation is set to 'enabled'", func() {
+		objectMeta.Annotations["cnpg.io/skipEmptyWalArchiveCheck"] = "enabled"
+		Expect(IsEmptyWalArchiveCheckEnabled(&objectMeta)).To(BeFalse())
+	})
+})
