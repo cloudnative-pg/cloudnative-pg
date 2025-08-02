@@ -3109,7 +3109,7 @@ The specified role must have superuser privileges in the target database.</p>
 </td>
 </tr>
 <tr><td><code>options</code><br/>
-<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>map[string]OptionSpecValue</i></a>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
 </td>
 <td>
    <p>Options specifies options for the FDW(key is option name, value is option value)</p>
@@ -4014,7 +4014,7 @@ possible. <code>false</code> by default.</p>
 </tbody>
 </table>
 
-## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
+## OptionSpec     {#postgresql-cnpg-io-v1-OptionSpec}
 
 
 **Appears in:**
@@ -4022,7 +4022,38 @@ possible. <code>false</code> by default.</p>
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
 
-<p>OptionSpecValue holds both the value and the ensure field for an option</p>
+<p>OptionSpec holds the name, value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the option</p>
+</td>
+</tr>
+<tr><td><code>OptionSpecValue</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>OptionSpecValue</i></a>
+</td>
+<td>(Members of <code>OptionSpecValue</code> are embedded into this type.)
+   <p>Value and ensure field of the option</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
+
+
+**Appears in:**
+
+- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
+
+
+<p>OptionSpecValue holds the value and the ensure field for an option</p>
 
 
 <table class="table">

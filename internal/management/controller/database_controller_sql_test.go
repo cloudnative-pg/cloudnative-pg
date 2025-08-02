@@ -538,8 +538,13 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 			},
 			Handler:   "testhandler",
 			Validator: "testvalidator",
-			Options: map[string]apiv1.OptionSpecValue{
-				"testoption": {Value: "testvalue"},
+			Options: []apiv1.OptionSpec{
+				{
+					Name: "testoption",
+					OptionSpecValue: apiv1.OptionSpecValue{
+						Value: "testvalue",
+					},
+				},
 			},
 			Owner: "owner",
 		}
@@ -690,8 +695,14 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		})
 
 		It("add new fdw options", func(ctx SpecContext) {
-			fdw.Options = map[string]apiv1.OptionSpecValue{
-				"add_option": {Ensure: apiv1.EnsurePresent, Value: "value"},
+			fdw.Options = []apiv1.OptionSpec{
+				{
+					Name: "add_option",
+					OptionSpecValue: apiv1.OptionSpecValue{
+						Value:  "value",
+						Ensure: apiv1.EnsurePresent,
+					},
+				},
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,
@@ -711,8 +722,14 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		})
 
 		It("modify the fdw options", func(ctx SpecContext) {
-			fdw.Options = map[string]apiv1.OptionSpecValue{
-				"modify_option": {Ensure: apiv1.EnsurePresent, Value: "new_value"},
+			fdw.Options = []apiv1.OptionSpec{
+				{
+					Name: "modify_option",
+					OptionSpecValue: apiv1.OptionSpecValue{
+						Value:  "new_value",
+						Ensure: apiv1.EnsurePresent,
+					},
+				},
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,
@@ -732,8 +749,14 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		})
 
 		It("remove new fdw options", func(ctx SpecContext) {
-			fdw.Options = map[string]apiv1.OptionSpecValue{
-				"remove_option": {Ensure: apiv1.EnsureAbsent},
+			fdw.Options = []apiv1.OptionSpec{
+				{
+					Name: "remove_option",
+					OptionSpecValue: apiv1.OptionSpecValue{
+						Value:  "value",
+						Ensure: apiv1.EnsureAbsent,
+					},
+				},
 			}
 			info := &fdwInfo{
 				Name:      fdw.Name,

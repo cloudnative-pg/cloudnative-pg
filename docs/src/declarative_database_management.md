@@ -284,7 +284,7 @@ spec:
     ensure: present
   - name: file_fdw
     options:
-      filename:
+      - name: filename
         value: 'test.csv'
         ensure: present
     ensure: present
@@ -301,11 +301,12 @@ Each FDW entry supports the following properties:
 - `usage`: The list of usage permissions of the FDW.
   - `name` : The name of the role to grant the usage permission to.
   - `type` : The type of the usage permission. Supports `grant` and `revoke`.
-- `options`: A map of FDW options to manage, where each key is the name of an option. Each option supports the following fields:
+- `options`: The list of FDW options. Each option supports the following fields:
+  - `name`: The name of the option.
   - `value`: The string value of the option.
   - `ensure`: Indicates whether the option should be `present` or `absent`.
 
-!!! Info
+!!! Important
     Both `handler` and `validator` are optional, and if not specified, the default handler and validator defined by the FDW extension (if any) will be used.
     Setting `handler` or `validator` to `"-"` will remove the handler or validator from the FDW respectively. This follows the PostgreSQL convention, where "-"
     denotes the absence of a handler or validator.
