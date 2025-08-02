@@ -932,6 +932,29 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 })
 
 var _ = Describe("NewInstance", func() {
+	It("applies correct labels", func(ctx SpecContext) {
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:      "test-cluster",
+			utils.InstanceNameLabelName: "test-cluster-1",
+			utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+			utils.AppLabelName:          utils.AppName,
+			utils.InstanceLabelName:     "test-cluster",
+			utils.VersionLabelName:      "17",
+			utils.ComponentLabelName:    "database",
+			utils.ManagedByLabelName:    utils.ManagerName,
+		}))
+	})
+
 	It("applies JSON patch from annotation", func(ctx SpecContext) {
 		cluster := v1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
