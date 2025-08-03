@@ -695,6 +695,103 @@ func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Clus
 	return nil
 }
 
+// checkAndClearStuckScalingPhase checks if the cluster is stuck in a scaling phase
+// but already has the correct number of instances, and clears the phase if needed
+func (r *ClusterReconciler) checkAndClearStuckScalingPhase(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Check if we're in a scaling-related phase
+	scalingPhases := []string{
+		"Creating a new replica",
+		"Scaling up",
+		"Scaling down",
+	}
+
+	isInScalingPhase := false
+	for _, phase := range scalingPhases {
+		if cluster.Status.Phase == phase {
+			isInScalingPhase = true
+			break
+		}
+	}
+
+	if !isInScalingPhase {
+		return nil // Not in a scaling phase, nothing to check
+	}
+
+	// Check if we already have the correct number of instances
+	currentInstances := len(resources.instances.Items)
+	desiredInstances := cluster.Spec.Instances
+
+	contextLogger.Debug("Checking scaling phase consistency",
+		"phase", cluster.Status.Phase,
+		"currentInstances", currentInstances,
+		"desiredInstances", desiredInstances,
+		"statusInstances", cluster.Status.Instances)
+
+	// If we have the right number of instances and no running jobs, clear the scaling phase
+	if currentInstances == desiredInstances && len(resources.runningJobNames()) == 0 {
+		contextLogger.Info("Clearing stuck scaling phase - cluster has correct number of instances",
+			"phase", cluster.Status.Phase,
+			"instances", currentInstances)
+
+		r.Recorder.Eventf(cluster, "Normal", "ScalingPhaseCleared",
+			"Cleared stuck scaling phase '%s' - cluster has correct number of instances (%d)",
+			cluster.Status.Phase, currentInstances)
+
+		// Clear the phase to allow normal operation
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+			return fmt.Errorf("failed to clear stuck scaling phase: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// clearStuckScalingPhaseAfterJobDeletion clears scaling phases after deleting failed jobs
+func (r *ClusterReconciler) clearStuckScalingPhaseAfterJobDeletion(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Check if we're in a scaling-related phase that might be stuck due to failed jobs
+	scalingPhases := []string{
+		"Creating a new replica",
+		"Scaling up",
+		"Scaling down",
+	}
+
+	isInScalingPhase := false
+	for _, phase := range scalingPhases {
+		if cluster.Status.Phase == phase {
+			isInScalingPhase = true
+			break
+		}
+	}
+
+	if !isInScalingPhase {
+		return nil // Not in a scaling phase
+	}
+
+	contextLogger.Info("Clearing scaling phase after job deletion to allow retry",
+		"phase", cluster.Status.Phase)
+
+	r.Recorder.Eventf(cluster, "Normal", "ScalingPhaseReset",
+		"Reset scaling phase '%s' after deleting failed job to allow retry",
+		cluster.Status.Phase)
+
+	// Clear the phase reason to allow the scaling operation to be retried
+	// We don't set it to healthy here because the scaling operation should be retried
+	cluster.Status.PhaseReason = ""
+
+	return r.Status().Update(ctx, cluster)
+}
+
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
@@ -703,9 +800,60 @@ func (r *ClusterReconciler) reconcileResources(
 	contextLogger := log.FromContext(ctx)
 	runningJobs := resources.runningJobNames()
 
+	// Check if we're stuck in a scaling phase but already have the correct number of instances
+	if err := r.checkAndClearStuckScalingPhase(ctx, cluster, resources); err != nil {
+		contextLogger.Error(err, "Error while checking stuck scaling phase")
+		return ctrl.Result{}, err
+	}
+
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 
 	if len(runningJobs) > 0 {
+		// Let's check for failed or stuck jobs and handle them
+		stuckJobTimeout := 10 * time.Minute // Jobs stuck for more than 10 minutes are considered failed
+
+		for _, job := range resources.jobs.Items {
+			if !utils.IsJobFailedOrStuck(job, stuckJobTimeout) {
+				continue
+			}
+
+			// This job is failed or stuck. We need to record the event, delete the job
+			// and reconcile again
+			if utils.IsJobFailed(job) {
+				r.Recorder.Eventf(cluster, "Warning", "FailingJob",
+					"Job %v is failing, deleting it to retry", job.Name)
+				contextLogger.Warning("Deleting failed job", "jobName", job.Name)
+			} else {
+				r.Recorder.Eventf(cluster, "Warning", "StuckJob",
+					"Job %v is stuck in pending state, deleting it to retry", job.Name)
+				contextLogger.Warning("Deleting stuck job", "jobName", job.Name,
+					"creationTime", job.CreationTimestamp.Time,
+					"active", job.Status.Active,
+					"succeeded", job.Status.Succeeded,
+					"failed", job.Status.Failed)
+			}
+
+			if err := r.Delete(ctx, &job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				contextLogger.Error(err, "Error while deleting failed/stuck job", "jobName", job.Name)
+				return ctrl.Result{}, err
+			}
+
+			// Clear any stuck scaling phases since we're cleaning up failed jobs
+			if err := r.clearStuckScalingPhaseAfterJobDeletion(ctx, cluster); err != nil {
+				contextLogger.Error(err, "Error clearing stuck scaling phase after job deletion")
+			}
+
+			// Requeue the reconciliation to recreate the job
+			return ctrl.Result{Requeue: true}, nil
+		}
+
+		// Check for equilibrium state - if we have been waiting for jobs for too long
+		// and the cluster state hasn't changed, we might be in a stuck state
+		if err := r.checkForEquilibriumState(ctx, cluster, resources); err != nil {
+			contextLogger.Warning("Detected potential equilibrium state", "error", err)
+			// Continue with normal processing to attempt recovery
+		}
+
 		contextLogger.Debug("A job is currently running. Waiting", "runningJobs", runningJobs)
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
@@ -1529,6 +1677,99 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+// checkForEquilibriumState detects when the cluster is stuck in an equilibrium state
+// where jobs are running but making no progress, potentially due to missing PVCs or other issues
+func (r *ClusterReconciler) checkForEquilibriumState(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Check if we have long-running jobs that might be stuck
+	equilibriumTimeout := 15 * time.Minute // Consider equilibrium after 15 minutes
+
+	for _, job := range resources.jobs.Items {
+		// Skip completed or failed jobs
+		if utils.IsJobComplete(job) || utils.IsJobFailed(job) {
+			continue
+		}
+
+		// Check if job has been running for too long without progress
+		if job.CreationTimestamp.Add(equilibriumTimeout).Before(time.Now()) {
+			// Check if job has no active pods (stuck in pending)
+			if job.Status.Active == 0 && job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+				contextLogger.Warning("Detected job in equilibrium state - no pods created",
+					"jobName", job.Name,
+					"creationTime", job.CreationTimestamp.Time,
+					"age", time.Since(job.CreationTimestamp.Time))
+
+				// Check if there are missing PVCs that might be causing the issue
+				if err := r.checkForMissingPVCs(ctx, cluster, &job); err != nil {
+					return fmt.Errorf("equilibrium state detected: job %s stuck due to missing PVCs: %w",
+						job.Name, err)
+				}
+
+				return fmt.Errorf("equilibrium state detected: job %s has been pending for %v without creating pods",
+					job.Name, time.Since(job.CreationTimestamp.Time))
+			}
+
+			// Check if job has active pods but they're not making progress
+			if job.Status.Active > 0 {
+				contextLogger.Warning("Detected job with long-running active pods",
+					"jobName", job.Name,
+					"activePods", job.Status.Active,
+					"age", time.Since(job.CreationTimestamp.Time))
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkForMissingPVCs checks if a job is stuck due to missing PVCs
+func (r *ClusterReconciler) checkForMissingPVCs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	job *batchv1.Job,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Extract PVC names from job template
+	var requiredPVCs []string
+	for _, volume := range job.Spec.Template.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			requiredPVCs = append(requiredPVCs, volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+
+	if len(requiredPVCs) == 0 {
+		return nil // No PVCs required
+	}
+
+	// Check if required PVCs exist
+	var missingPVCs []string
+	for _, pvcName := range requiredPVCs {
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      pvcName,
+			Namespace: cluster.Namespace,
+		}, pvc)
+
+		if apierrs.IsNotFound(err) {
+			missingPVCs = append(missingPVCs, pvcName)
+		} else if err != nil {
+			contextLogger.Error(err, "Error checking PVC existence", "pvcName", pvcName)
+		}
+	}
+
+	if len(missingPVCs) > 0 {
+		return fmt.Errorf("missing PVCs: %v", missingPVCs)
 	}
 
 	return nil
