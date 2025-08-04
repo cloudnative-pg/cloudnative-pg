@@ -2599,7 +2599,7 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 	if filepath.Ext(cleanPath) == ".template" {
 		preRollingUpdateImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
 		if preRollingUpdateImg == "" {
-			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
+			preRollingUpdateImg = testsUtils.GetPostgresImageForTest()
 		}
 		csiStorageClass := os.Getenv("E2E_CSI_STORAGE_CLASS")
 		if csiStorageClass == "" {
