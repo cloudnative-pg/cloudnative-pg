@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -157,7 +158,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	}
 
 	determineVersionsForTesting := func() versionInfo {
-		currentImage := os.Getenv("POSTGRES_IMG")
+		currentImage := testsUtils.GetPostgresImageForTest()
 		Expect(currentImage).ToNot(BeEmpty())
 
 		currentVersion, err := version.FromTag(reference.New(currentImage).Tag)
