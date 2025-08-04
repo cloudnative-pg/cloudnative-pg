@@ -129,17 +129,24 @@ func (r *InstanceReconciler) Reconcile(
 		cluster.GetInstanceEnabledPluginNames()...,
 	)
 	if err != nil {
-		if !r.firstReconcileDone.Load() {
-			r.systemInitialization.BroadcastError(err)
+		if cluster.Status.CurrentPrimary != r.instance.GetPodName() ||
+			cluster.Spec.PrimaryUpdateMethod != apiv1.PrimaryUpdateMethodSwitchover {
+			if !r.firstReconcileDone.Load() {
+				r.systemInitialization.BroadcastError(err)
+			}
+			contextLogger.Error(err, "Error loading plugins, retrying")
+			return ctrl.Result{}, err
 		}
-		contextLogger.Error(err, "Error loading plugins, retrying")
-		return ctrl.Result{}, err
+		contextLogger.Error(err, "detected an error while loading plugins, but continuing the reconciliation "+
+			"due to the instance being a primary with update method switchover")
 	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
+	if pluginClient != nil {
+		defer func() {
+			pluginClient.Close(ctx)
+		}()
+		ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginClient)
+	}
 
-	ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginClient)
 	ctx = cluster.SetInContext(ctx)
 
 	// Reconcile PostgreSQL instance parameters
