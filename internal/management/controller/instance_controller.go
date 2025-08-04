@@ -129,6 +129,9 @@ func (r *InstanceReconciler) Reconcile(
 		cluster.GetInstanceEnabledPluginNames()...,
 	)
 	if err != nil {
+		if !r.firstReconcileDone.Load() {
+			r.systemInitialization.BroadcastError(err)
+		}
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err
 	}

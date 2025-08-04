@@ -74,6 +74,8 @@ var (
 	// errWALArchivePluginNotAvailable is returned when the configured
 	// WAL archiving plugin is not available or cannot be found.
 	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
+
+	errPluginNotAvailable = fmt.Errorf("required plugin not available")
 )
 
 func init() {
@@ -121,6 +123,9 @@ func NewCmd() *cobra.Command {
 			}
 			if errors.Is(err, errWALArchivePluginNotAvailable) {
 				os.Exit(apiv1.MissingWALArchivePlugin)
+			}
+			if errors.Is(err, errPluginNotAvailable) {
+				os.Exit(apiv1.MissingPlugin)
 			}
 
 			return err
@@ -394,6 +399,16 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error { //n
 				"enabledArchiverPluginName", enabledArchiverPluginName,
 				"loadedPluginNames", loadedPluginNames)
 			return makeUnretryableError(errWALArchivePluginNotAvailable)
+		}
+
+		for _, pluginName := range instance.Cluster.GetInstanceEnabledPluginNames() {
+			if pluginName != "" && !slices.Contains(loadedPluginNames, pluginName) {
+				contextLogger.Info(
+					"Detected missing plugin, waiting for the operator to rollout a new instance Pod",
+					"pluginName", pluginName,
+					"loadedPluginNames", loadedPluginNames)
+				return makeUnretryableError(errPluginNotAvailable)
+			}
 		}
 	}
 
