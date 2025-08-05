@@ -173,7 +173,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 						foreignserverExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})
-			
+
 			By("removing the Database object", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
 			})
