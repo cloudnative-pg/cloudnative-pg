@@ -557,6 +557,10 @@ func fdwExistsQuery(fdwName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_data_wrapper WHERE fdwname='%v')", fdwName)
 }
 
+func foreignserverExistsQuery(serverName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_server WHERE srvname='%v'", serverName)
+}
+
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCount(
 	env *environment.TestingEnvironment,

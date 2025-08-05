@@ -155,6 +155,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 		v.validateExtensions,
 		v.validateSchemas,
 		v.validateFDWs,
+		v.validateForeignServers,
 	}
 
 	for _, validate := range validations {
@@ -267,6 +268,28 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 		}
 
 		fdwNames.Put(name)
+	}
+
+	return result
+}
+
+func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+
+	serverNames := stringset.New()
+	for i, server := range d.Spec.Servers {
+		serverName := server.Name
+		if serverNames.Has(serverName) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "servers").Index(i).Child("name"),
+					serverName,
+				),
+			)
+		}
+
+		serverNames.Put(serverName)
 	}
 
 	return result

@@ -31,3 +31,7 @@ spec:
           value: 'true'
           ensure: present
       ensure: present
+  servers:
+    - name: server1
+      fdw: postgres_fdw
+      ensure: present

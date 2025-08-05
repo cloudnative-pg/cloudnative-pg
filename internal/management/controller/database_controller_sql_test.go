@@ -557,7 +557,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 	})
 
 	Context("getDatabaseFDWInfo", func() {
-		It("returns info when the fdw exits", func(ctx SpecContext) {
+		It("returns info when the fdw exists", func(ctx SpecContext) {
 			dbMock.
 				ExpectQuery(detectDatabaseFDWSQL).
 				WithArgs(fdw.Name).
@@ -825,6 +825,102 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				WillReturnError(testError)
 
 			Expect(dropDatabaseFDW(ctx, db, fdw)).Error().To(Equal(testError))
+		})
+	})
+})
+
+var _ = Describe("Managed Foreign Server SQL", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		server apiv1.ServerSpec
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		server = apiv1.ServerSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   "testserver",
+				Ensure: "present",
+			},
+			FdwName: "testfdw",
+		}
+
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	Context("getDatabaseForeignServerInfo", func() {
+		It("returns info when the foreign server exists", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseForeignServerSQL).
+				WithArgs(server.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"servername", "fdwname"}).
+						AddRow("testserver", "testfdw"),
+				)
+			serverInfo, err := getDatabaseForeignServerInfo(ctx, db, server)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(serverInfo).ToNot(BeNil())
+			Expect(serverInfo.Name).To(Equal("testserver"))
+			Expect(serverInfo.FDWName).To(Equal("testfdw"))
+		})
+
+		It("returns nil info when the foreign server does not exiest", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseForeignServerSQL).
+				WithArgs(server.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"servername", "fdwname"}),
+				)
+			serverInfo, err := getDatabaseForeignServerInfo(ctx, db, server)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(serverInfo).To(BeNil())
+		})
+	})
+
+	Context("createDatabaseForeignServer", func() {
+		createForeignServerSQL := "CREATE SERVER \"testserver\" FOREIGN DATA WRAPPER \"testfdw\""
+
+		It("returns success when the foreign server has been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createForeignServerSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(createDatabaseForeignServer(ctx, db, server)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when the foreign server could not be created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createForeignServerSQL).
+				WillReturnError(testError)
+			Expect(createDatabaseForeignServer(ctx, db, server)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("dropDatabaseForeignServer", func() {
+		dropForeignServerSQL := "DROP SERVER IF EXISTS \"testserver\""
+
+		It("returns success when the foreign server has been dropped", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropForeignServerSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(dropDatabaseForeignServer(ctx, db, server)).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when the DROP statement failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropForeignServerSQL).
+				WillReturnError(testError)
+
+			Expect(dropDatabaseForeignServer(ctx, db, server)).Error().To(Equal(testError))
 		})
 	})
 })

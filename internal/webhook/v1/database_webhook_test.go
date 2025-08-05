@@ -218,5 +218,51 @@ var _ = Describe("Database validation", func() {
 			},
 			3,
 		),
+
+		Entry(
+			"doesn't complain with distinct foreign servers",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server2",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			0,
+		),
+
+		Entry(
+			"complains for duplicate foreign servers",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "dup_server",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "dup_server",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			1,
+		),
 	)
 })

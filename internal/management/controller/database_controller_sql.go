@@ -52,6 +52,13 @@ type fdwInfo struct {
 	Options   map[string]apiv1.OptionSpecValue `json:"options"`
 }
 
+type serverInfo struct {
+	Name       string                           `json:"name"`
+	FDWName    string                           `json:"fdwName"`
+	Options    map[string]apiv1.OptionSpecValue `json:"options"`
+	OptionsRef []apiv1.OptionRefSpec            `json:"optionsRef"`
+}
+
 func detectDatabase(
 	ctx context.Context,
 	db *sql.DB,
@@ -700,5 +707,78 @@ func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 		return err
 	}
 	contextLogger.Info("dropped foreign data wrapper", "name", fdw.Name)
+	return nil
+}
+
+const detectDatabaseForeignServerSQL = `
+SELECT
+	srvname, s.srvfdw::regproc::text
+FROM pg_foreign_server s
+JOIN pg_authid a ON s.srvowner = a.oid
+WHERE srvname = $1
+`
+
+func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) (*serverInfo, error) {
+	row := db.QueryRowContext(
+		ctx, detectDatabaseForeignServerSQL,
+		server.Name)
+	if row.Err() != nil {
+		return nil, fmt.Errorf("while checking if foreign server %q exists: %w", server.Name, row.Err())
+	}
+
+	var (
+		result serverInfo
+		//optionsRaw pq.StringArray
+	)
+
+	if err := row.Scan(&result.Name, &result.FDWName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if foreign server %q exists: %w", server.Name, err)
+	}
+
+	return &result, nil
+}
+
+// createDatabaseForeignServer creates a foreign server in the database.
+func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateServer strings.Builder
+	sqlCreateServer.WriteString(fmt.Sprintf("CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
+		pgx.Identifier{server.Name}.Sanitize(),
+		pgx.Identifier{server.FdwName}.Sanitize()))
+
+	_, err := db.ExecContext(ctx, sqlCreateServer.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating foreign server", "query", sqlCreateServer.String())
+		return err
+	}
+	contextLogger.Info("created foreign server", "name", server.Name)
+
+	return nil
+}
+
+// updateDatabaseForeignServer updates the configuration of a foreign server in the database.
+func updateDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec, info *serverInfo) error {
+
+	// Alter Options
+
+	return nil
+}
+
+// dropDatabaseForeignServer drops a foreign server from the database.
+func dropDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) error {
+	contextLogger := log.FromContext(ctx)
+	query := fmt.Sprintf("DROP SERVER IF EXISTS %s", pgx.Identifier{server.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	if err != nil {
+		contextLogger.Error(err, "while dropping foreign server", "query", query)
+		return err
+	}
+	contextLogger.Info("dropped foreign server", "name", server.Name)
 	return nil
 }
