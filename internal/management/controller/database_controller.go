@@ -75,6 +75,14 @@ var fdwObjectManager = databaseObjectManager[apiv1.FDWSpec, fdwInfo]{
 	drop:   dropDatabaseFDW,
 }
 
+// serverObjectManager is the manager of the server objects
+var serverObjectManager = databaseObjectManager[apiv1.ServerSpec, serverInfo]{
+	get:    getDatabaseForeignServerInfo,
+	create: createDatabaseForeignServer,
+	update: updateDatabaseForeignServer,
+	drop:   dropDatabaseForeignServer,
+}
+
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
 const databaseReconciliationInterval = 30 * time.Second
@@ -256,6 +264,11 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 			return ErrFailedDatabaseObjectReconciliation
 		}
 	}
+	for _, status := range obj.Status.Servers {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
 
 	return nil
 }
@@ -281,7 +294,8 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	obj.Status.Schemas = schemaObjectManager.reconcileList(ctx, db, obj.Spec.Schemas)
 	obj.Status.Extensions = extensionObjectManager.reconcileList(ctx, db, obj.Spec.Extensions)
 	obj.Status.FDWs = fdwObjectManager.reconcileList(ctx, db, obj.Spec.FDWs)
-
+	obj.Status.Servers = serverObjectManager.reconcileList(ctx, db, obj.Spec.Servers)
+	
 	return nil
 }
 

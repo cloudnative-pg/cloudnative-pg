@@ -359,6 +359,33 @@ spec:
                   - name
                   type: object
                 type: array
+              servers:
+                description: The list of foreign servers to be managed in the database
+                items:
+                  description: ServerSpec configures a server of a foreign data wrapper
+                  properties:
+                    ensure:
+                      default: present
+                      description: |-
+                        Specifies whether an extension/schema should be present or absent in
+                        the database. If set to `present`, the extension/schema will be
+                        created if it does not exist. If set to `absent`, the
+                        extension/schema will be removed if it exists.
+                      enum:
+                      - present
+                      - absent
+                      type: string
+                    fdw:
+                      description: fdw name
+                      type: string
+                    name:
+                      description: Name of the extension/schema
+                      type: string
+                  required:
+                  - fdw
+                  - name
+                  type: object
+                type: array
               tablespace:
                 description: |-
                   Maps to the `TABLESPACE` parameter of `CREATE DATABASE`.
@@ -453,6 +480,28 @@ spec:
                 type: integer
               schemas:
                 description: Schemas is the status of the managed schemas
+                items:
+                  description: DatabaseObjectStatus is the status of the managed database
+                    objects
+                  properties:
+                    applied:
+                      description: |-
+                        True of the object has been installed successfully in
+                        the database
+                      type: boolean
+                    message:
+                      description: Message is the object reconciliation message
+                      type: string
+                    name:
+                      description: The name of the object
+                      type: string
+                  required:
+                  - applied
+                  - name
+                  type: object
+                type: array
+              servers:
+                description: Servers is the status of the managed servers
                 items:
                   description: DatabaseObjectStatus is the status of the managed database
                     objects
