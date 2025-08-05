@@ -295,7 +295,7 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	obj.Status.Extensions = extensionObjectManager.reconcileList(ctx, db, obj.Spec.Extensions)
 	obj.Status.FDWs = fdwObjectManager.reconcileList(ctx, db, obj.Spec.FDWs)
 	obj.Status.Servers = serverObjectManager.reconcileList(ctx, db, obj.Spec.Servers)
-	
+
 	return nil
 }
 
