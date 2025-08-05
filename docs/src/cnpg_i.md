@@ -29,17 +29,17 @@ CloudNativePG discovers available plugins during its startup process. You can re
 ways:
 
 - **Sidecar Container**: Configure the plugin as a 
-[Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) within the Operator's
+[Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) within the CloudNativePG's
 Deployment.
 
-- **Standalone Deployment**: Deploy the plugin as an independent 
-[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same namespace as the Operator.
+- **Deployment**: Deploy the plugin as an independent 
+[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same namespace as the CloudNativePG.
 
 In both cases, the plugin must be packaged as a container image to be deployed as a Kubernetes workload.
 
 ### Sidecar Container
 
-When configuring a plugin as a Sidecar Container within the Operator's Deployment, the plugin must register its gRPC 
+When configuring a plugin as a Sidecar Container within the CloudNativePG's Deployment, the plugin must register its gRPC 
 server as a **Unix domain socket**. The directory where this socket is created must be shared with the Operator's container 
 and mounted to the path specified by the `PLUGIN_SOCKET_DIR` environment variable (which defaults to `/plugin`).
 
@@ -71,9 +71,9 @@ spec:
         emptyDir: {}
 ```
 
-### Standalone Deployment
+### Deployment
 
-Deploying a plugin as a standalone Deployment is the recommended approach. This method offers several advantages,
+Deploying a plugin as a Deployment is the recommended approach. This method offers several advantages,
 including decoupling the plugin's lifecycle from the CloudNativePG Operator's and allowing for independent scaling of
 the plugin.
 
@@ -86,7 +86,7 @@ For detailed information on configuring TLS certificates, refer to the
     CloudNativePG does not automatically discover newly deployed plugins after startup.
     To detect and utilize new plugins, you must restart the Operator's Deployment.
 
-Example of a Plugin as a standalone `Deployment`:
+Example of a Plugin as a `Deployment`:
 
 ```yaml
 apiVersion: apps/v1
@@ -129,7 +129,7 @@ spec:
 
 ### Configuring TLS Certificates
 
-When a plugin is deployed as a standalone Deployment, communication with CloudNativePG happens over the network. To
+When a plugin is deployed as a Deployment, communication with CloudNativePG happens over the network. To
 ensure security, **mTLS is enforced**, requiring TLS certificates for both sides of the connection.
 These certificates must be stored as
 [Kubernetes TLS Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) and referenced in the 
@@ -184,5 +184,30 @@ spec:
 The `name` field in the plugins stanza should be populated based on how the plugin is configured:
 
 - If the plugin is a [Sidecar Container](#sidecar-container), use the Unix socket file name.
-- If the plugin is a [Standalone Deployment](#standalone-deployment), use the value of the Service's
+- If the plugin is a [Deployment](#deployment), use the value of the Service's
 `cnpg.io/pluginName` label.
+
+
+## Community plugins
+
+The CNPG-I protocol has established as a solid pattern for extending CloudNativePG's functionality
+and to improve its maintainability long-term. As a result, the Community has developed some plugins and provides direct 
+support for them.
+
+### Barman Cloud
+
+The [Barman Cloud Plugin](https://github.com/cloudnative-pg/plugin-barman-cloud) implements CNPG-I
+to performs Backup, Restore and WAL Archiving operations using
+[Barman Cloud](https://docs.pgbarman.org/release/3.12.1/user_guide/barman_cloud.html).
+
+Historically, CloudNativePG integrated Barman Cloud directly (in-tree), meaning the Barman utilities had to be installed
+and bundled within the CloudNativePG Operator's container image. This approach presented significant challenges for both
+extensibility and maintainability. It made it difficult to update Barman Cloud independently of the Operator and limited
+the ability to add support of backup operations using a different tool.
+
+!!! Important
+    The in-tree support for Barman Cloud is **deprecated** as of CloudNativePG version 1.26 and will be **removed in a
+    future release**.
+
+### Hello World
+
