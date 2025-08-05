@@ -300,5 +300,13 @@
       separateMajorMinor: false,
       pinDigests: false,
     },
+    {
+      groupName: 'container distroless digests',
+      matchPackageNames: [
+        'gcr.io/distroless{/,}**',
+      ],
+      pinDigests: true,
+      separateMajorMinor: false,
+    },
   ],
 }
