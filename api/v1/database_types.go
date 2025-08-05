@@ -177,6 +177,10 @@ type DatabaseSpec struct {
 	// The list of foreign data wrappers to be managed in the database
 	// +optional
 	FDWs []FDWSpec `json:"fdws,omitempty"`
+
+	// The list of foreign servers to be managed in the database
+	// +optional
+	Servers []ServerSpec `json:"servers,omitempty"`
 }
 
 // DatabaseObjectSpec contains the fields which are common to every
@@ -256,6 +260,23 @@ type FDWSpec struct {
 	Usages []UsageSpec `json:"usage,omitempty"`
 }
 
+// ServerSpec configures a server of a foreign data wrapper
+type ServerSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// fdw name
+	FdwName string `json:"fdw"`
+
+	//// Options specifies options for the server(key is option name, value is option value)
+	//// +optional
+	//Options []OptionSpec `json:"options,omitempty"`
+	//
+	//// OptionsRef specfies options refered from Secret/ConfigMap
+	//// +optional
+	//OptionsRef []OptionRefSpec `json:"optionsRef,omitempty"`
+}
+
 // OptionSpec holds the name, value and the ensure field for an option
 type OptionSpec struct {
 	// Name of the option
@@ -292,21 +313,13 @@ type UsageSpec struct {
 	Type string `json:"type,omitempty"`
 }
 
-// ServerSpec configures a server of a foreign data wrapper
-type ServerSpec struct {
-	// Common fields
-	DatabaseObjectSpec `json:",inline"`
+// OptionRefSpec holds the name and key of an option that should be referenced from Secret/ConfigMap
+type OptionRefSpec struct {
+	// Name of the option
+	Name string `json:"name"`
 
-	// fdw name
-	FdwName string `json:"fdw"`
-
-	// Options specifies options for the server(key is option name, value is option value)
-	// +optional
-	Options map[string]OptionSpecValue `json:"options,omitempty"`
-
-	// OptionsRef
-	// +optional
-
+	// Key of the option
+	Key string `json:"key"`
 }
 
 // DatabaseStatus defines the observed state of Database
@@ -335,6 +348,10 @@ type DatabaseStatus struct {
 	// FDWs is the status of the managed FDWs
 	// +optional
 	FDWs []DatabaseObjectStatus `json:"fdws,omitempty"`
+
+	// Servers is the status of the managed servers
+	// +optional
+	Servers []DatabaseObjectStatus `json:"servers,omitempty"`
 }
 
 // DatabaseObjectStatus is the status of the managed database objects
