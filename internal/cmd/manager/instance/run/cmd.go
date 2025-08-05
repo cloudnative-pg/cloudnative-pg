@@ -67,12 +67,12 @@ import (
 var (
 	scheme = runtime.NewScheme()
 
-	// errNoFreeWALSpace is raised when there's not enough disk space
-	// to store two WAL files
+	// errNoFreeWALSpace is returned when there isn't enough disk space
+	// available to store at least two WAL files.
 	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
 
-	// errWALArchivePluginNotAvailable is raised when there's not enough disk space
-	// to store two WAL files
+	// errWALArchivePluginNotAvailable is returned when the configured
+	// WAL archiving plugin is not available or cannot be found.
 	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
 )
 

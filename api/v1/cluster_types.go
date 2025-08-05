@@ -113,9 +113,9 @@ const (
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
 
-	// MissingWALArchivePlugin is the exit code the instance manager
-	// will use to signal it started but the selected WAL archiving
-	// plugin is not available
+	// MissingWALArchivePlugin is the exit code used by the instance manager
+	// to indicate that it started successfully, but the configured WAL
+	// archiving plugin is not available.
 	MissingWALArchivePlugin = 5
 )
 
