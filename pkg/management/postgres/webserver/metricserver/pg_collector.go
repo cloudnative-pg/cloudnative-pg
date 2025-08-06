@@ -310,8 +310,12 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 		}
 	}
 
-	if cluster, _ := e.getCluster(); cluster != nil {
+	if cluster, err := e.getCluster(); cluster != nil {
 		e.pluginCollector.Describe(context.Background(), ch, cluster)
+	} else if err != nil {
+		log.Error(err, "error while retrieving cluster cache object for plugin metrics describe")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Describe.PluginMetrics").Inc()
 	}
 }
 
@@ -350,12 +354,16 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	if cluster, _ := e.getCluster(); cluster != nil {
+	if cluster, err := e.getCluster(); cluster != nil {
 		if err := e.pluginCollector.Collect(context.Background(), ch, cluster); err != nil {
 			log.Error(err, "error while collecting plugin metrics")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PluginMetrics").Inc()
 		}
+	} else if err != nil {
+		log.Error(err, "error while retrieving cluster cache object")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PluginMetrics").Inc()
 	}
 }
 
