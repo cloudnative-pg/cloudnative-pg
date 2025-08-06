@@ -48,6 +48,18 @@ import (
 // and the new primary have not completed the promotion
 var errSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archiving")
 
+// ErrMissingWALArchiverPlugin is raised when we try to archive a WAL
+// file with a CNPG-i plugin whose socket does not exist.
+type ErrMissingWALArchiverPlugin struct {
+	// PluginName is the name of the plugin that is missing
+	PluginName string
+}
+
+// Error implements the error interface
+func (e ErrMissingWALArchiverPlugin) Error() string {
+	return fmt.Sprintf("wal archive plugin is not available: %s", e.PluginName)
+}
+
 // ArchiveAllReadyWALs ensures that all WAL files that are in the "ready"
 // queue have been archived.
 // This is used to ensure that a former primary will archive the WAL files in
@@ -289,7 +301,9 @@ func archiveWALViaPlugins(
 
 	enabledArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
 	if enabledArchiverPluginName != "" && !client.HasPlugin(enabledArchiverPluginName) {
-		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
+		return ErrMissingWALArchiverPlugin{
+			PluginName: enabledArchiverPluginName,
+		}
 	}
 
 	return client.ArchiveWAL(ctx, cluster, walName)

@@ -859,7 +859,19 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
 		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
 	}
+	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+}
 
+// isTerminatedBecauseOfMissingWALArchivePlugin check if a Pod terminated because the
+// WAL archiving plugin was missing when the Pod started
+func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
+	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
+		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
+	}
+	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+}
+
+func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {
 	var pgContainerStatus *corev1.ContainerStatus
 	for i := range pod.Status.ContainerStatuses {
 		status := pod.Status.ContainerStatuses[i]
@@ -877,14 +889,14 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 
 	// If the Pod was terminated because it didn't have enough disk
 	// space, then we have no disk space
-	if isTerminatedForMissingWALDiskSpace(&pgContainerStatus.State) {
+	if reason(&pgContainerStatus.State) {
 		return false
 	}
 
 	// The Pod is now running but not still ready, and last time it
 	// was terminated for missing disk space. Let's wait for it
 	// to be ready before classifying it as having enough disk space
-	if !pgContainerStatus.Ready && isTerminatedForMissingWALDiskSpace(&pgContainerStatus.LastTerminationState) {
+	if !pgContainerStatus.Ready && reason(&pgContainerStatus.LastTerminationState) {
 		return false
 	}
 
