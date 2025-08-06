@@ -24,6 +24,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -45,18 +48,17 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string                           `json:"name"`
-	Handler   string                           `json:"handler"`
-	Validator string                           `json:"validator"`
-	Owner     string                           `json:"owner"`
-	Options   map[string]apiv1.OptionSpecValue `json:"options"`
+	Name      string            `json:"name"`
+	Handler   string            `json:"handler"`
+	Validator string            `json:"validator"`
+	Owner     string            `json:"owner"`
+	Options   map[string]string `json:"options"`
 }
 
 type serverInfo struct {
-	Name       string                           `json:"name"`
-	FDWName    string                           `json:"fdwName"`
-	Options    map[string]apiv1.OptionSpecValue `json:"options"`
-	OptionsRef []apiv1.OptionRefSpec            `json:"optionsRef"`
+	Name    string            `json:"name"`
+	FDWName string            `json:"fdwName"`
+	Options map[string]string `json:"options"`
 }
 
 func detectDatabase(
@@ -453,13 +455,11 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	}
 
 	// Extract options from SQL raw format(e.g. -{host=localhost,port=5432}) to type OptSpec
-	opts := make(map[string]apiv1.OptionSpecValue, len(optionsRaw))
+	opts := make(map[string]string, len(optionsRaw))
 	for _, opt := range optionsRaw {
 		parts := strings.SplitN(opt, "=", 2)
 		if len(parts) == 2 {
-			opts[parts[0]] = apiv1.OptionSpecValue{
-				Value: parts[1],
-			}
+			opts[parts[0]] = parts[1]
 		} else {
 			contextLogger.Info(
 				"skipping unparsable option, expected \"keyword=value\"",
@@ -572,7 +572,7 @@ func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info 
 	// Collect individual ALTER-clauses
 	var clauses []string
 	for _, desiredOptSpec := range fdw.Options {
-		curOptSpec, exists := info.Options[desiredOptSpec.Name]
+		curOptValue, exists := info.Options[desiredOptSpec.Name]
 
 		switch {
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
@@ -580,7 +580,7 @@ func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info 
 				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
-			if desiredOptSpec.Value != curOptSpec.Value {
+			if desiredOptSpec.Value != curOptValue {
 				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
 					pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 			}
@@ -712,13 +712,15 @@ func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 
 const detectDatabaseForeignServerSQL = `
 SELECT
-	srvname, s.srvfdw::regproc::text
+	srvname, s.srvfdw::regproc::text, srvoptions
 FROM pg_foreign_server s
 JOIN pg_authid a ON s.srvowner = a.oid
 WHERE srvname = $1
 `
 
 func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) (*serverInfo, error) {
+	contextLogger := log.FromContext(ctx)
+
 	row := db.QueryRowContext(
 		ctx, detectDatabaseForeignServerSQL,
 		server.Name)
@@ -727,18 +729,53 @@ func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.
 	}
 
 	var (
-		result serverInfo
-		//optionsRaw pq.StringArray
+		result     serverInfo
+		optionsRaw pq.StringArray
 	)
 
-	if err := row.Scan(&result.Name, &result.FDWName); err != nil {
+	if err := row.Scan(&result.Name, &result.FDWName, &optionsRaw); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("while scanning if foreign server %q exists: %w", server.Name, err)
 	}
 
+	opts := make(map[string]string, len(optionsRaw))
+	for _, opt := range optionsRaw {
+		parts := strings.SplitN(opt, "=", 2)
+		if len(parts) == 2 {
+			opts[parts[0]] = parts[1]
+		} else {
+			contextLogger.Info(
+				"skipping unparsable option, expected \"keyword=value\"",
+				"optionsRaw", optionsRaw,
+				"foreignServerName", server.Name)
+		}
+	}
+	result.Options = opts
+
 	return &result, nil
+}
+
+// extractServerOptionsFromRef extract options from Secret
+func extractServerOptionsFromRef(ctx context.Context, kubeClient client.Client, namespace string, server *apiv1.ServerSpec, options map[string]string) error {
+	for _, ref := range server.OptionsRef {
+		var secret corev1.Secret
+		key := types.NamespacedName{Name: ref.Name, Namespace: namespace}
+
+		if err := kubeClient.Get(ctx, key, &secret); err != nil {
+			return fmt.Errorf("failed to get Secret %s: %w", ref.Name, err)
+		}
+
+		valBytes, found := secret.Data[ref.Key]
+		if !found {
+			return fmt.Errorf("key %q not found in Secret %q", ref.Key, ref.Name)
+		}
+
+		options[ref.Key] = string(valBytes)
+	}
+
+	return nil
 }
 
 // createDatabaseForeignServer creates a foreign server in the database.
