@@ -1,32 +1,31 @@
 # CNPG-I
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-The CloudNativePG Interface (`CNPG-I`) provides a powerful standard for extending and customizing CloudNativePG's default 
+The CloudNativePG Interface (**CNPG-I**) provides a powerful standard for extending and customizing CloudNativePG's default 
 functionality without altering its core codebase.
 
 ## Why CNPG-I?
 
 While CloudNativePG effectively handles a wide range of use cases, there are scenarios where its default capabilities 
-may not suffice, or where community support for specific features isn't feasible. Prior to the introduction of `CNPG-I`, 
+may not suffice, or where community support for specific features isn't feasible. Prior to the introduction of CNPG-I, 
 users often had to fork the project to implement custom behaviors or attempt to integrate their changes directly with 
 the upstream codebase. Both approaches posed significant challenges, leading to maintenance overhead and potential 
 delays in meeting business requirements.
 
-`CNPG-I` was developed to address these issues by offering a standardized way to integrate with key CloudNativePG 
+CNPG-I was developed to address these issues by offering a standardized way to integrate with key CloudNativePG 
 operations throughout a Cluster's lifecycle. This includes critical functions like backups, restores, and sub-resource
 reconciliation, enabling seamless customization and extending CloudNativePG's capabilities without disrupting the
 core project.
 
 ## How to register a plugin
 
-The implementation of `CNPG-I` is heavily inspired by the Kubernetes
+The implementation of CNPG-I is heavily inspired by the Kubernetes
 [Container Storage Interface](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)
 (CSI). 
 The Operator issues gRPC calls directly to the registered plugins,  adhering to the interface
-defined by the [`CNPG-I` protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
+defined by the [CNPG-I protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
 
-CloudNativePG discovers available plugins during its startup process. You can register a CNPG-I plugin in one of two
-ways:
+CloudNativePG discovers available plugins during its startup process. Plugins can be registered in one of two ways:
 
 - **Sidecar Container**: Configure the plugin as a 
 [Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) within the CloudNativePG's
@@ -77,8 +76,8 @@ Deploying a plugin as a Deployment is the recommended approach. This method offe
 including decoupling the plugin's lifecycle from the CloudNativePG Operator's and allowing for independent scaling of
 the plugin.
 
-In this setup, the container must expose the gRPC server implementing the `CNPG-I` protocol to the network via a `TCP` 
-port and a Kubernetes Service. Communication between CloudNativePG and the plugin is secured using **mTLS over gRPC**. 
+In this setup, the container must expose the gRPC server implementing the CNPG-I protocol to the network via a `TCP` 
+port and a Service. Communication between CloudNativePG and the plugin is secured using **mTLS over gRPC**. 
 For detailed information on configuring TLS certificates, refer to the
 [Configuring TLS Certificates](#configuring-tls-certificates) section below.
 
@@ -104,7 +103,7 @@ spec:
         - containerPort: 9090
           protocol: TCP
 ```
-The accompanying Kubernetes Service for the plugin must include:
+The related Service for the plugin must include:
 
 - The label `cnpg.io/plugin: <plugin-name>`, which is essential for CloudNativePG to discover the plugin.
 - The annotation `cnpg.io/pluginPort: <port>`, specifying the port on which the plugin's gRPC server is exposed.
@@ -155,7 +154,7 @@ spec:
 
 ## How to use a plugin
 Plugins are enabled on a `Cluster` resource by configuring the `.spec.plugins` stanza. Refer to the CloudNativePG 
-documentation for the full 
+API Reference for the full 
 [PluginConfiguration](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
 specification.
 
@@ -191,8 +190,9 @@ The `name` field in the plugins stanza should be populated based on how the plug
 ## Community plugins
 
 The CNPG-I protocol has established as a solid pattern for extending CloudNativePG's functionality
-and to improve its maintainability long-term. As a result, the Community has developed some plugins and provides direct 
-support for them.
+and to improve its maintainability long-term. As a result, the Community itself has used it to address a set
+of challenges that have emerged over the years, guiding the development of some plugins and providing them with
+direct support.
 
 ### Barman Cloud
 
@@ -200,10 +200,10 @@ The [Barman Cloud Plugin](https://github.com/cloudnative-pg/plugin-barman-cloud)
 to performs Backup, Restore and WAL Archiving operations using
 [Barman Cloud](https://docs.pgbarman.org/release/3.12.1/user_guide/barman_cloud.html).
 
-Historically, CloudNativePG integrated Barman Cloud directly (in-tree), meaning the Barman utilities had to be installed
+Historically, CloudNativePG integrated Barman Cloud directly (**in-tree**), meaning the Barman utilities had to be installed
 and bundled within the CloudNativePG Operator's container image. This approach presented significant challenges for both
 extensibility and maintainability. It made it difficult to update Barman Cloud independently of the Operator and limited
-the ability to add support of backup operations using a different tool.
+the ability to add support of other backup and restore tools.
 
 !!! Important
     The in-tree support for Barman Cloud is **deprecated** as of CloudNativePG version 1.26 and will be **removed in a
@@ -211,3 +211,6 @@ the ability to add support of backup operations using a different tool.
 
 ### Hello World
 
+The [Hello World Plugin](https://github.com/cloudnative-pg/cnpg-i-hello-world) is a project that serves as a
+starting point for developers looking to create their own CNPG-I plugins. It provides a simple implementation
+of some of the protocol APIs, allowing users to understand how to create a plugin and how to interact with it.
