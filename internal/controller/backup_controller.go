@@ -381,7 +381,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 		contextLogger.Info("Backup is already running on",
 			"cluster", cluster.Name,
 			"pod", pod.Name,
-			"started at", backup.Status.StartedAt)
+			"startedAt", backup.Status.StartedAt)
 
 		// Nothing to do here
 		return true, nil

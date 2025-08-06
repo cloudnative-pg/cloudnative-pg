@@ -25,6 +25,9 @@ the areas outlined below.
 
 | Year | Term        | Project                                                                                                                              | Mentee                                   |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| 2025 | 3 (Sep–Nov) | [Chaos Testing](https://mentorship.lfx.linuxfoundation.org/project/0858ce07-0c90-47fa-a1a0-95c6762f00ff) | - |
+| 2025 | 3 (Sep–Nov) | [Rebuild documentation for multi-version support with Docusaurus](https://mentorship.lfx.linuxfoundation.org/project/86a647c1-88c7-474f-b093-6abb58197083) | - |
+| 2025 | 3 (Sep–Nov) | [Refresh cnpg-i-hello-world to align with current CNPG-I](https://mentorship.lfx.linuxfoundation.org/project/cabc7391-4956-42b2-b91c-d261816b7289) | - |
 | 2025 | 2 (Jun–Aug) | [Declarative Management of PostgreSQL FDWs](https://mentorship.lfx.linuxfoundation.org/project/53fa853e-b5fa-4d68-be71-f005c75aea89) | [Ying Zhu](https://github.com/EdwinaZhu) |
 
 ---
