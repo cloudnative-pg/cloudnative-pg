@@ -276,6 +276,7 @@ func newMetrics() *metrics {
 
 // Describe implements prometheus.Collector, defining the Metrics we return.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	log.Info("starting describe")
 	ch <- e.Metrics.CollectionsTotal.Desc()
 	ch <- e.Metrics.Error.Desc()
 	e.Metrics.PgCollectionErrors.Describe(ch)
@@ -322,6 +323,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector, collecting the Metrics values to
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	log.Info("starting collect")
 	e.collectPgMetrics(ch)
 
 	ch <- e.Metrics.CollectionsTotal

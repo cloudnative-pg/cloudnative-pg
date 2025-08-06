@@ -230,9 +230,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error { //n
 		configuration.Current.PluginSocketDir,
 	); err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
+		panic(err)
 	}
 	defer pluginRepository.Close()
 
+	contextLogger.Info("Building metrics exported with plugin collector")
 	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
 	err = ctrl.NewControllerManagedBy(mgr).
