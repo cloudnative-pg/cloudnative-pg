@@ -282,12 +282,6 @@ type OptionSpec struct {
 	// Name of the option
 	Name string `json:"name"`
 
-	// Value and ensure field of the option
-	OptionSpecValue `json:",inline"`
-}
-
-// OptionSpecValue holds the value and the ensure field for an option
-type OptionSpecValue struct {
 	// Value of the option
 	Value string `json:"value"`
 
