@@ -708,9 +708,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				Name:      fdw.Name,
 				Handler:   fdw.Handler,
 				Validator: fdw.Validator,
-				Options: map[string]apiv1.OptionSpecValue{
-					"modify_option": {Value: "old_value"},
-					"remove_option": {Value: "value"},
+				Options: map[string]string{
+					"modify_option": "old_value",
+					"remove_option": "value",
 				},
 				Owner: fdw.Owner,
 			}
@@ -735,9 +735,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				Name:      fdw.Name,
 				Handler:   fdw.Handler,
 				Validator: fdw.Validator,
-				Options: map[string]apiv1.OptionSpecValue{
-					"modify_option": {Value: "old_value"},
-					"remove_option": {Value: "value"},
+				Options: map[string]string{
+					"modify_option": "old_value",
+					"remove_option": "value",
 				},
 				Owner: fdw.Owner,
 			}
@@ -762,9 +762,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 				Name:      fdw.Name,
 				Handler:   fdw.Handler,
 				Validator: fdw.Validator,
-				Options: map[string]apiv1.OptionSpecValue{
-					"modify_option": {Value: "old_value"},
-					"remove_option": {Value: "value"},
+				Options: map[string]string{
+					"modify_option": "old_value",
+					"remove_option": "value",
 				},
 				Owner: fdw.Owner,
 			}
@@ -864,8 +864,8 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 				ExpectQuery(detectDatabaseForeignServerSQL).
 				WithArgs(server.Name).
 				WillReturnRows(
-					sqlmock.NewRows([]string{"servername", "fdwname"}).
-						AddRow("testserver", "testfdw"),
+					sqlmock.NewRows([]string{"servername", "fdwname", "options"}).
+						AddRow("testserver", "testfdw", nil),
 				)
 			serverInfo, err := getDatabaseForeignServerInfo(ctx, db, server)
 			Expect(err).ToNot(HaveOccurred())
