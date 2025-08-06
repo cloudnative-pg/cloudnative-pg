@@ -34,6 +34,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -706,9 +708,9 @@ func (r *InstanceReconciler) reconcileExtensions(
 		// a DDL when it is not really needed.
 
 		if !extension.SkipCreateExtension && extensionIsUsed && !extensionIsInstalled {
-			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", extension.Name))
+			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", pgx.Identifier{extension.Name}.Sanitize()))
 		} else if !extensionIsUsed && extensionIsInstalled {
-			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", extension.Name))
+			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", pgx.Identifier{extension.Name}.Sanitize()))
 		}
 		if err != nil {
 			break
@@ -741,27 +743,29 @@ func (r *InstanceReconciler) reconcilePoolers(
 	}()
 
 	var existsRole bool
-	row := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
-		apiv1.PGBouncerPoolerUserName))
+	row := tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+		apiv1.PGBouncerPoolerUserName)
 	err = row.Scan(&existsRole)
 	if err != nil {
 		return err
 	}
 	if !existsRole {
-		_, err := tx.Exec(fmt.Sprintf("CREATE ROLE %s WITH LOGIN", apiv1.PGBouncerPoolerUserName))
+		_, err := tx.Exec(fmt.Sprintf("CREATE ROLE %s WITH LOGIN", pgx.Identifier{apiv1.PGBouncerPoolerUserName}.Sanitize()))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, apiv1.PGBouncerPoolerUserName))
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+			pgx.Identifier{dbName}.Sanitize(),
+			pgx.Identifier{apiv1.PGBouncerPoolerUserName}.Sanitize()))
 		if err != nil {
 			return err
 		}
 	}
 
 	var existsFunction bool
-	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname='%s' and prosrc='%s'",
+	row = tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname = $1 AND prosrc = $2",
 		userSearchFunctionName,
-		userSearchFunction))
+		userSearchFunction)
 	err = row.Scan(&existsFunction)
 	if err != nil {
 		return err
@@ -769,23 +773,24 @@ func (r *InstanceReconciler) reconcilePoolers(
 	if !existsFunction {
 		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
-			"as '%s' "+
+			"as %s "+
 			"LANGUAGE sql SECURITY DEFINER",
-			userSearchFunctionSchema,
-			userSearchFunctionName,
-			userSearchFunction))
+			pgx.Identifier{userSearchFunctionSchema}.Sanitize(),
+			pgx.Identifier{userSearchFunctionName}.Sanitize(),
+			pq.QuoteLiteral(userSearchFunction)))
 		if err != nil {
 			return err
 		}
 		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s.%s(text) FROM public;",
-			userSearchFunctionSchema, userSearchFunctionName))
+			pgx.Identifier{userSearchFunctionSchema}.Sanitize(),
+			pgx.Identifier{userSearchFunctionName}.Sanitize()))
 		if err != nil {
 			return err
 		}
 		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s.%s(text) TO %s",
-			userSearchFunctionSchema,
-			userSearchFunctionName,
-			apiv1.PGBouncerPoolerUserName))
+			pgx.Identifier{userSearchFunctionSchema}.Sanitize(),
+			pgx.Identifier{userSearchFunctionName}.Sanitize(),
+			pgx.Identifier{apiv1.PGBouncerPoolerUserName}.Sanitize()))
 		if err != nil {
 			return err
 		}
