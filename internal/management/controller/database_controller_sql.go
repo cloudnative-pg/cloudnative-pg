@@ -36,6 +36,10 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// Now we have only string values for options, this could be changed for high compatibility
+// to other types if needed
+type OptionValue = string
+
 type extInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -48,17 +52,17 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string            `json:"name"`
-	Handler   string            `json:"handler"`
-	Validator string            `json:"validator"`
-	Owner     string            `json:"owner"`
-	Options   map[string]string `json:"options"`
+	Name      string                 `json:"name"`
+	Handler   string                 `json:"handler"`
+	Validator string                 `json:"validator"`
+	Owner     string                 `json:"owner"`
+	Options   map[string]OptionValue `json:"options"`
 }
 
 type serverInfo struct {
-	Name    string            `json:"name"`
-	FDWName string            `json:"fdwName"`
-	Options map[string]string `json:"options"`
+	Name    string                 `json:"name"`
+	FDWName string                 `json:"fdwName"`
+	Options map[string]OptionValue `json:"options"`
 }
 
 func detectDatabase(
