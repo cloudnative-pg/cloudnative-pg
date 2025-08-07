@@ -133,7 +133,7 @@ func (bc *backupConnection) startBackup(ctx context.Context, sync *sync.Mutex) {
 			"slot_name => $1, immediately_reserve => true, temporary => true)",
 		slotName,
 	); err != nil {
-		bc.err = fmt.Errorf("while creating the replication slot: %w", bc.err)
+		bc.err = fmt.Errorf("while creating the replication slot: %w", err)
 		return
 	}
 
