@@ -462,10 +462,11 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
-		backup.Status.SetAsStarted(
+		backup.Status.SetAsStartedWithImageInfo(
 			targetPod.Name,
 			targetPod.Status.ContainerStatuses[0].ContainerID,
 			apiv1.BackupMethodVolumeSnapshot,
+			cluster.Status.PGDataImageInfo,
 		)
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
@@ -658,7 +659,12 @@ func startInstanceManagerBackup(
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, backup.Spec.Method)
+	status.SetAsStartedWithImageInfo(
+		pod.Name,
+		pod.Status.ContainerStatuses[0].ContainerID,
+		backup.Spec.Method,
+		cluster.Status.PGDataImageInfo,
+	)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
