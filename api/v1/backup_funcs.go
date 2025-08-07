@@ -72,6 +72,21 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, meth
 	backupStatus.Method = method
 }
 
+// SetAsStartedWithImageInfo marks a certain backup as started and sets the image info
+func (backupStatus *BackupStatus) SetAsStartedWithImageInfo(
+	podName, containerID string,
+	method BackupMethod,
+	imageInfo *ImageInfo,
+) {
+	backupStatus.Phase = BackupPhaseStarted
+	backupStatus.InstanceID = &InstanceID{
+		PodName:     podName,
+		ContainerID: containerID,
+	}
+	backupStatus.Method = method
+	backupStatus.BackupImageInfo = imageInfo
+}
+
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
 func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
