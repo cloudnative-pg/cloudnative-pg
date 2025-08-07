@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/blang/semver"
@@ -574,7 +575,7 @@ func NewPluginCollector(
 func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_describe")
 
-	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
+	if len(p.getEnabledPluginNames(cluster)) == 0 {
 		contextLogger.Trace("No plugins enabled for metrics collection")
 		return
 	}
@@ -600,7 +601,7 @@ func (p *pluginCollector) Describe(ctx context.Context, ch chan<- *prometheus.De
 func (p *pluginCollector) Collect(ctx context.Context, ch chan<- prometheus.Metric, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx).WithName("plugin_metrics_collect")
 
-	if len(cluster.GetInstanceEnabledPluginNames()) == 0 {
+	if len(p.getEnabledPluginNames(cluster)) == 0 {
 		contextLogger.Trace("No plugins enabled for metrics collection")
 		return nil
 	}
@@ -651,6 +652,20 @@ func (p *pluginCollector) getClient(ctx context.Context, cluster *apiv1.Cluster)
 	return pluginClient.WithPlugins(
 		pluginLoadingContext,
 		p.pluginRepository,
-		cluster.GetInstanceEnabledPluginNames()...,
+		p.getEnabledPluginNames(cluster)...,
 	)
+}
+
+func (p *pluginCollector) getEnabledPluginNames(cluster *apiv1.Cluster) []string {
+	enabledPluginNames := cluster.GetInstanceEnabledPluginNames()
+
+	// for backward compatibility, we also add the WAL archive plugin that initially didn't require
+	// INSTANCE_SIDECAR_INJECTION
+	if pluginWAL := cluster.GetEnabledWALArchivePluginName(); pluginWAL != "" {
+		if !slices.Contains(enabledPluginNames, pluginWAL) {
+			enabledPluginNames = append(enabledPluginNames, pluginWAL)
+		}
+	}
+
+	return enabledPluginNames
 }
