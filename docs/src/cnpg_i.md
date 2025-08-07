@@ -150,7 +150,7 @@ spec:
 
 !!! Note
     While providing self-provisioned certificate bundles is supported, the recommended approach for managing certificates 
-    is by using [CertManager](https://cert-manager.io).
+    is by using [Certmanager](https://cert-manager.io).
 
 ## How to use a plugin
 Plugins are enabled on a `Cluster` resource by configuring the `.spec.plugins` stanza. Refer to the CloudNativePG 
