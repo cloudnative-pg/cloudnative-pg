@@ -17,7 +17,9 @@ operations throughout a Cluster's lifecycle. This includes critical functions li
 reconciliation, enabling seamless customization and extending CloudNativePG's capabilities without disrupting the
 core project.
 
-## How to register a plugin
+CNPG-I can extend the operator and/or the instance manager capabilities.
+
+## How to register a plugin for the operator
 
 The implementation of CNPG-I is heavily inspired by the Kubernetes
 [Container Storage Interface](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)
