@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -127,6 +128,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 		// We archive every WAL that have not been archived from the latest postmaster invocation.
 		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {
+			var missingPluginError archiver.ErrMissingWALArchiverPlugin
+			if errors.As(err, &missingPluginError) {
+				// The instance initialization resulted in a fatal error.
+				// We need the Pod to be rolled out to install the archiving plugin.
+				r.systemInitialization.BroadcastError(err)
+			}
 			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
