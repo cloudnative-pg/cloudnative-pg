@@ -4,21 +4,19 @@
 !!! Info
     This section covers **physical backups** in PostgreSQL.
     While PostgreSQL also supports logical backups using the `pg_dump` utility,
-    these are **not suitable for business continuity** and are **not managed** by
-    CloudNativePG. If you still wish to use `pg_dump`, refer to the
+logical backups are **not suitable for business continuity** and are **not managed** by
+CloudNativePG. If you still wish to use `pg_dump`, refer to the
     [*Troubleshooting / Emergency backup* section](troubleshooting.md#emergency-backup)
     for guidance.
 
 !!! Important
-    Starting with version 1.26, native backup and recovery capabilities are
-    being **progressively phased out** of the core operator and moved to official
-    CNPG-I plugins. This transition aligns with CloudNativePG's shift towards a
+    Starting with version 1.26, the CloudNativePG team is **progressively phasing out** native backup and recovery capabilities from the core operator and moving them to official CNPG-I plugins. This transition aligns with CloudNativePG's shift towards a
     **backup-agnostic architecture**, enabled by its extensible
     interface—**CNPG-I**—which standardizes the management of **WAL archiving**,
     **physical base backups**, and corresponding **recovery processes**.
 
 CloudNativePG currently supports **physical backups of PostgreSQL clusters** in
-two main ways:
+several ways:
 
 - **Via [CNPG-I](https://github.com/cloudnative-pg/cnpg-i/) plugins**: the
   CloudNativePG Community officially supports the [**Barman Cloud Plugin**](https://cloudnative-pg.io/plugin-barman-cloud/)
@@ -32,7 +30,7 @@ two main ways:
       supported by the underlying storage class
 
 Before selecting a backup strategy with CloudNativePG, it's important to
-familiarize yourself with the foundational concepts covered in the ["Main Concepts"](#main-concepts)
+familiarize yourself with the foundational concepts covered in the [Main Concepts](#main-concepts)
 section. These include WAL archiving, hot and cold backups, performing backups
 from a standby, and more.
 
@@ -68,8 +66,8 @@ is fundamental for the following reasons:
   time from the first available base backup in your system
 
 !!! Warning
-    WAL archive alone is useless. Without a physical base backup, you cannot
-    restore a PostgreSQL cluster.
+    WAL archive alone is insufficient for recovery. Without a physical base backup, you cannot
+restore a PostgreSQL cluster.
 
 In general, the presence of a WAL archive enhances the resilience of a
 PostgreSQL cluster, allowing each instance to fetch any required WAL file from
@@ -146,7 +144,7 @@ Native volume snapshots:
 - Support both hot and cold backups
 - Do not support retention policies
 
-### Choosing Between the Two
+### Choosing between the two
 
 The best approach depends on your environment and operational requirements.
 Consider the following factors:
@@ -164,7 +162,7 @@ Consider the following factors:
 - **Operational familiarity**: Choose the method that aligns best with your
   team's experience and confidence in managing storage.
 
-### Comparison Summary
+### Comparison summary
 
 | Feature                           | Object Store |   Volume Snapshots   |
 |-----------------------------------|:------------:|:--------------------:|
