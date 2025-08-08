@@ -46,6 +46,14 @@ var _ = Describe("Database validation", func() {
 		}
 	}
 
+	createFDWSpec := func(name string) apiv1.FDWSpec {
+		return apiv1.FDWSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   name,
+				Ensure: apiv1.EnsurePresent,
+			},
+		}
+	}
 	BeforeEach(func() {
 		v = &DatabaseCustomValidator{}
 	})
@@ -103,6 +111,112 @@ var _ = Describe("Database validation", func() {
 				},
 			},
 			1,
+		),
+
+		Entry(
+			"doesn't complain with distinct FDWs and usage names",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "fdw1",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage1"},
+								{Name: "usage2"},
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "option1"},
+								{Name: "option2"},
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "fdw2",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage3"},
+								{Name: "usage4"},
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "option3"},
+								{Name: "option4"},
+							},
+						},
+					},
+				},
+			},
+			0,
+		),
+
+		Entry(
+			"complain if there are duplicate FDWs",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						createFDWSpec("postgres_fdw"),
+						createFDWSpec("mysql_fdw"),
+						createFDWSpec("postgres_fdw"),
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"complain if there are duplicate usage names within an FDW",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "postgre_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "usage1"},
+								{Name: "usage2"},
+								{Name: "usage1"},
+							},
+						},
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"complains for duplicate FDW and duplicate usage names",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					FDWs: []apiv1.FDWSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "duplicate_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "dup_usage"},
+								{Name: "dup_usage"},
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "dup_option"},
+								{Name: "dup_option"},
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "duplicate_fdw",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			3,
 		),
 	)
 })
