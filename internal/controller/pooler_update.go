@@ -150,12 +150,12 @@ func (r *PoolerReconciler) reconcileService(
 	}
 
 	patchedService := resources.Service.DeepCopy()
-	
+
 	// only update specific fields in the spec to avoid overwriting
 	// fields that might be automatically managed by the cloud environment
 	// e.g., externalIPs for LoadBalancer services
 	var shouldUpdate bool
-	
+
 	// update the selector if it is different
 	if !reflect.DeepEqual(expectedService.Spec.Selector, patchedService.Spec.Selector) {
 		patchedService.Spec.Selector = expectedService.Spec.Selector
@@ -185,7 +185,7 @@ func (r *PoolerReconciler) reconcileService(
 		patchedService.Spec.SessionAffinityConfig = expectedService.Spec.SessionAffinityConfig
 		shouldUpdate = true
 	}
-	
+
 	// merge metadata
 	originalLabels := make(map[string]string)
 	for k, v := range patchedService.GetLabels() {
@@ -195,9 +195,9 @@ func (r *PoolerReconciler) reconcileService(
 	for k, v := range patchedService.GetAnnotations() {
 		originalAnnotations[k] = v
 	}
-	
+
 	utils.MergeObjectsMetadata(patchedService, expectedService)
-	
+
 	// check if metadata actually changed
 	if !reflect.DeepEqual(originalLabels, patchedService.GetLabels()) ||
 		!reflect.DeepEqual(originalAnnotations, patchedService.GetAnnotations()) {
