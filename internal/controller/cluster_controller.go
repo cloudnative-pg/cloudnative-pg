@@ -1004,6 +1004,11 @@ func (r *ClusterReconciler) reconcilePods(
 	}
 
 	// Are there nodes to be removed? Remove one of them
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
+	}
+
+	// Should we scale down the cluster?
 	if cluster.Status.Instances > cluster.Spec.Instances {
 		if err := r.scaleDownCluster(ctx, cluster, resources); err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)
