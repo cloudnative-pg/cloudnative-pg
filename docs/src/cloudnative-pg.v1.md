@@ -3348,20 +3348,58 @@ database right after is imported - to be used with extreme care
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_dump</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_dump</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 <tr><td><code>pgRestoreExtraOptions</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_restore</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_restore</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePredataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>pre-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestoreDataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>pre-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePostdataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>post-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 </tbody>
