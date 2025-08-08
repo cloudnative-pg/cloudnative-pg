@@ -117,6 +117,10 @@ const (
 	// to indicate that it started successfully, but the configured WAL
 	// archiving plugin is not available.
 	MissingWALArchivePlugin = 5
+
+	// MissingPlugin is the exit code the instance manager
+	// will use to signal that a required plugin is missing
+	MissingPlugin = 5
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
