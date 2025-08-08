@@ -743,8 +743,8 @@ func (r *InstanceReconciler) reconcilePoolers(
 	}()
 
 	var existsRole bool
-	row := tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		apiv1.PGBouncerPoolerUserName)
+	row := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = %s",
+		pq.QuoteLiteral(apiv1.PGBouncerPoolerUserName)))
 	err = row.Scan(&existsRole)
 	if err != nil {
 		return err
@@ -763,9 +763,9 @@ func (r *InstanceReconciler) reconcilePoolers(
 	}
 
 	var existsFunction bool
-	row = tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname = $1 AND prosrc = $2",
-		userSearchFunctionName,
-		userSearchFunction)
+	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname = %s AND prosrc = %s",
+		pq.QuoteLiteral(userSearchFunctionName),
+		pq.QuoteLiteral(userSearchFunction)))
 	err = row.Scan(&existsFunction)
 	if err != nil {
 		return err
