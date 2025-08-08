@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -29,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
@@ -167,8 +167,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		importedClusterName = "cluster-pgdump-different-db-version"
 
 		// Gather the current image
-		postgresImage := os.Getenv("POSTGRES_IMG")
-		Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env should not be empty")
+		postgresImage := utils.GetPostgresImageForTest()
+		Expect(postgresImage).ShouldNot(BeEmpty(), "postgresImage could not be empty")
 
 		// this test case is only applicable if we are not already on the latest major
 		if postgres.IsLatestMajor(postgresImage) {

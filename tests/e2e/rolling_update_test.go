@@ -113,7 +113,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 900
 
 		// Update to the latest minor
-		updatedImageName := os.Getenv("POSTGRES_IMG")
+		updatedImageName := testsUtils.GetPostgresImageForTest()
 		if updatedImageName == "" {
 			updatedImageName = configuration.Current.PostgresImageName
 		}
@@ -531,7 +531,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		BeforeEach(func() {
 			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-			updatedImageName = os.Getenv("POSTGRES_IMG")
+			updatedImageName = testsUtils.GetPostgresImageForTest()
 			if updatedImageName == "" {
 				updatedImageName = configuration.Current.PostgresImageName
 			}

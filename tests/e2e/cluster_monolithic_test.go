@@ -22,12 +22,12 @@ package e2e
 import (
 	"database/sql"
 	"fmt"
-	"os"
 
 	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -138,8 +138,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("creating target cluster", func() {
-			postgresImage := os.Getenv("POSTGRES_IMG")
-			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env should not be empty")
+			postgresImage := utils.GetPostgresImageForTest()
+			Expect(postgresImage).ShouldNot(BeEmpty(), "postgresImage could not be empty")
 			expectedImageName, err := postgres.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")

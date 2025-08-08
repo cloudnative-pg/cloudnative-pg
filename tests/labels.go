@@ -25,6 +25,9 @@ package tests
 const (
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
+	
+	// LabelBarmanCloud is a label for tests that require Barman Cloud tools (deprecated)
+	LabelBarmanCloud = "barman-cloud"
 
 	// LabelBasic is a label for selecting basic tests
 	LabelBasic = "basic"
