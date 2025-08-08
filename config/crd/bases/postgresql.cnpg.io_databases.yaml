@@ -383,6 +383,35 @@ spec:
                     name:
                       description: Name of the extension/schema
                       type: string
+                    options:
+                      description: Options specifies options for the server(key is
+                        option name, value is option value)
+                      items:
+                        description: OptionSpec holds the name, value and the ensure
+                          field for an option
+                        properties:
+                          ensure:
+                            default: present
+                            description: |-
+                              Specifies whether an option should be present or absent in
+                              the database. If set to `present`, the option will be
+                              created if it does not exist. If set to `absent`, the
+                              option will be removed if it exists.
+                            enum:
+                            - present
+                            - absent
+                            type: string
+                          name:
+                            description: Name of the option
+                            type: string
+                          value:
+                            description: Value of the option
+                            type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      type: array
                   required:
                   - fdw
                   - name

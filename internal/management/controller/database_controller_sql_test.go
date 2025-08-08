@@ -540,10 +540,12 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 			Validator: "testvalidator",
 			Options: []apiv1.OptionSpec{
 				{
-					Name: "testoption",
-					OptionSpecValue: apiv1.OptionSpecValue{
-						Value: "testvalue",
-					},
+					Name:  "testoption",
+					Value: "testvalue",
+				},
+				{
+					Name:  "testoption2",
+					Value: "testvalue2",
 				},
 			},
 			Owner: "owner",
@@ -589,7 +591,7 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 
 	Context("createDatabaseFDW", func() {
 		createFDWSQL := "CREATE FOREIGN DATA WRAPPER \"testfdw\" HANDLER \"testhandler\" " +
-			"VALIDATOR \"testvalidator\" OPTIONS (\"testoption\" 'testvalue')"
+			"VALIDATOR \"testvalidator\" OPTIONS (\"testoption\" 'testvalue', \"testoption2\" 'testvalue2')"
 
 		It("returns success when the fdw has been created", func(ctx SpecContext) {
 			dbMock.
@@ -697,11 +699,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		It("add new fdw options", func(ctx SpecContext) {
 			fdw.Options = []apiv1.OptionSpec{
 				{
-					Name: "add_option",
-					OptionSpecValue: apiv1.OptionSpecValue{
-						Value:  "value",
-						Ensure: apiv1.EnsurePresent,
-					},
+					Name:   "add_option",
+					Value:  "value",
+					Ensure: apiv1.EnsurePresent,
 				},
 			}
 			info := &fdwInfo{
@@ -724,11 +724,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		It("modify the fdw options", func(ctx SpecContext) {
 			fdw.Options = []apiv1.OptionSpec{
 				{
-					Name: "modify_option",
-					OptionSpecValue: apiv1.OptionSpecValue{
-						Value:  "new_value",
-						Ensure: apiv1.EnsurePresent,
-					},
+					Name:   "modify_option",
+					Value:  "new_value",
+					Ensure: apiv1.EnsurePresent,
 				},
 			}
 			info := &fdwInfo{
@@ -751,11 +749,9 @@ var _ = Describe("Managed Foreign Data Wrapper SQL", func() {
 		It("remove new fdw options", func(ctx SpecContext) {
 			fdw.Options = []apiv1.OptionSpec{
 				{
-					Name: "remove_option",
-					OptionSpecValue: apiv1.OptionSpecValue{
-						Value:  "value",
-						Ensure: apiv1.EnsureAbsent,
-					},
+					Name:   "remove_option",
+					Value:  "value",
+					Ensure: apiv1.EnsureAbsent,
 				},
 			}
 			info := &fdwInfo{
@@ -849,6 +845,10 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 				Ensure: "present",
 			},
 			FdwName: "testfdw",
+			Options: []apiv1.OptionSpec{
+				{Name: "host", Value: "localhost"},
+				{Name: "port", Value: "5432"},
+			},
 		}
 
 		testError = fmt.Errorf("test error")
@@ -888,7 +888,8 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 	})
 
 	Context("createDatabaseForeignServer", func() {
-		createForeignServerSQL := "CREATE SERVER \"testserver\" FOREIGN DATA WRAPPER \"testfdw\""
+		createForeignServerSQL := "CREATE SERVER \"testserver\" FOREIGN DATA WRAPPER \"testfdw\"" +
+			" OPTIONS (\"host\" 'localhost', \"port\" '5432')"
 
 		It("returns success when the foreign server has been created", func(ctx SpecContext) {
 			dbMock.
@@ -902,6 +903,84 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 				ExpectExec(createForeignServerSQL).
 				WillReturnError(testError)
 			Expect(createDatabaseForeignServer(ctx, db, server)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("updateDatabaseForeignServer", func() {
+		It("does nothing when the foreign server does not exist", func(ctx SpecContext) {
+			Expect(updateDatabaseForeignServer(ctx, db, server, &serverInfo{
+				Name:    server.Name,
+				FDWName: server.FdwName,
+			})).Error().NotTo(HaveOccurred())
+		})
+
+		It("add new foreign server options", func(ctx SpecContext) {
+			server.Options = []apiv1.OptionSpec{
+				{
+					Name:   "add_option",
+					Value:  "value",
+					Ensure: apiv1.EnsurePresent,
+				},
+			}
+			info := &serverInfo{
+				Name:    server.Name,
+				FDWName: server.FdwName,
+				Options: map[OptionName]OptionValue{
+					"modify_option": "old_value",
+					"remove_option": "value",
+				},
+			}
+
+			expectedSQL := "ALTER SERVER \"testserver\" OPTIONS (ADD \"add_option\" 'value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseForeignServer(ctx, db, server, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("modify the foreign server options", func(ctx SpecContext) {
+			server.Options = []apiv1.OptionSpec{
+				{
+					Name:   "modify_option",
+					Value:  "new_value",
+					Ensure: apiv1.EnsurePresent,
+				},
+			}
+			info := &serverInfo{
+				Name:    server.Name,
+				FDWName: server.FdwName,
+				Options: map[OptionName]OptionValue{
+					"modify_option": "old_value",
+					"remove_option": "value",
+				},
+			}
+
+			expectedSQL := "ALTER SERVER \"testserver\" OPTIONS (SET \"modify_option\" 'new_value')"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseForeignServer(ctx, db, server, info)).Error().NotTo(HaveOccurred())
+		})
+
+		It("remove foreign server options", func(ctx SpecContext) {
+			server.Options = []apiv1.OptionSpec{
+				{
+					Name:   "remove_option",
+					Value:  "value",
+					Ensure: apiv1.EnsureAbsent,
+				},
+			}
+			info := &serverInfo{
+				Name:    server.Name,
+				FDWName: server.FdwName,
+				Options: map[OptionName]OptionValue{
+					"modify_option": "old_value",
+					"remove_option": "value",
+				},
+			}
+
+			expectedSQL := "ALTER SERVER \"testserver\" OPTIONS (DROP \"remove_option\")"
+			dbMock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseForeignServer(ctx, db, server, info)).Error().NotTo(HaveOccurred())
 		})
 	})
 
