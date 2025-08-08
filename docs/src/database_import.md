@@ -413,13 +413,15 @@ bootstrap:
 
 ### Stage-Specific `pg_restore` Options
 
-For more fine-grained control during import, CloudNativePG also supports **stage-specific `pg_restore` options** for the following phases:
+For more granular control over the import process, CloudNativePG supports
+stage-specific `pg_restore` options for the following phases:
 
-* **Predata**: e.g., schema definitions
-* **Data**: e.g., table contents
-* **Postdata**: e.g., indexes, constraints, and triggers
+- `pre-data` – e.g., schema definitions
+- `data` – e.g., table contents
+- `post-data` – e.g., indexes, constraints, and triggers
 
-This allows you to apply different parallelism or flags tailored to the characteristics of each stage.
+By specifying options for each phase, you can optimize parallelism and apply
+flags tailored to the nature of the objects being restored.
 
 ```yaml
 bootstrap:
@@ -441,20 +443,29 @@ bootstrap:
 
 In the example above:
 
-* `--jobs=1` is used for predata to ensure ordering of schema creation
-* `--jobs=4` increases parallelism for large data imports
-* `--jobs=2` balances parallelism and dependency handling for postdata steps
+- `--jobs=1` is applied to the `pre-data` stage to preserve the ordering of
+  schema creation.
+- `--jobs=4` increases parallelism during the `data` stage, speeding up large
+  data imports.
+- `--jobs=2` balances performance and dependency handling in the `post-data`
+  stage.
 
-These options are particularly useful when dealing with large databases or resource-sensitive environments.
+These stage-specific settings are particularly valuable for large databases or
+resource-sensitive environments where tuning concurrency can significantly
+improve performance.
 
-> **Note:** These stage-specific options take precedence over the general `pgRestoreExtraOptions` when provided.
+!!! Note
+    When provided, stage-specific options take precedence over the general
+    `pgRestoreExtraOptions`.
 
 !!! Warning
-    Use the `pgDumpExtraOptions` and `pgRestoreExtraOptions` fields with
-    caution and at your own risk. These options are not validated or verified by
-    the operator, and some configurations may conflict with its intended
-    functionality or behavior. Always test thoroughly in a safe and controlled
-    environment before applying them in production.
+    The `pgDumpExtraOptions`, `pgRestoreExtraOptions`, and all stage-specific
+    restore options (`pgRestorePredataOptions`, `pgRestoreDataOptions`,
+    `pgRestorePostdataOptions`) are passed directly to the underlying PostgreSQL
+    tools without validation by the operator.  Certain flags may conflict with the
+    operator’s intended functionality or design.  Use these options with caution,
+    and always test them thoroughly in a safe, controlled environment before
+    applying them in production.
 
 ## Online Import and Upgrades
 
