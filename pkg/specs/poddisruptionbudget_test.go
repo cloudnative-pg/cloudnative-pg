@@ -50,7 +50,7 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 			utils.AppLabelName:       utils.AppName,
 			utils.InstanceLabelName:  cluster.Name,
 			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: "database",
+			utils.ComponentLabelName: utils.DatabaseComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(result.Namespace).To(Equal(cluster.Namespace))

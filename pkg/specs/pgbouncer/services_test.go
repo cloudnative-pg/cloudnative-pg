@@ -83,7 +83,7 @@ var _ = Describe("Pooler Service", func() {
 				utils.PodRoleLabelName:   string(utils.PodRolePooler),
 				utils.AppLabelName:       utils.AppName,
 				utils.InstanceLabelName:  cluster.Name,
-				utils.ComponentLabelName: "pooler",
+				utils.ComponentLabelName: utils.PoolerComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))

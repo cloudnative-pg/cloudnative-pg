@@ -81,7 +81,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 				utils.PodRoleLabelName:   string(utils.PodRolePooler),
 				utils.AppLabelName:       utils.AppName,
 				utils.InstanceLabelName:  pooler.Name,
-				utils.ComponentLabelName: "pooler",
+				utils.ComponentLabelName: utils.PoolerComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 

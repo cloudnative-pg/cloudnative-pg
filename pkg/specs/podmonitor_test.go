@@ -70,7 +70,7 @@ var _ = Describe("PodMonitor test", func() {
 				utils.AppLabelName:       utils.AppName,
 				utils.InstanceLabelName:  cluster.Name,
 				utils.VersionLabelName:   "17",
-				utils.ComponentLabelName: "database",
+				utils.ComponentLabelName: utils.DatabaseComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(monitor.Spec.Selector.MatchLabels).To(BeEquivalentTo(map[string]string{

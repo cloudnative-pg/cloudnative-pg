@@ -53,7 +53,7 @@ var _ = Describe("Services specification", func() {
 			utils.AppLabelName:       utils.AppName,
 			utils.InstanceLabelName:  "clustername",
 			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: "database",
+			utils.ComponentLabelName: utils.DatabaseComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
@@ -71,7 +71,7 @@ var _ = Describe("Services specification", func() {
 			utils.AppLabelName:       utils.AppName,
 			utils.InstanceLabelName:  "clustername",
 			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: "database",
+			utils.ComponentLabelName: utils.DatabaseComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
@@ -89,7 +89,7 @@ var _ = Describe("Services specification", func() {
 			utils.AppLabelName:       utils.AppName,
 			utils.InstanceLabelName:  "clustername",
 			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: "database",
+			utils.ComponentLabelName: utils.DatabaseComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
@@ -107,7 +107,7 @@ var _ = Describe("Services specification", func() {
 			utils.AppLabelName:       utils.AppName,
 			utils.InstanceLabelName:  "clustername",
 			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: "database",
+			utils.ComponentLabelName: utils.DatabaseComponentName,
 			utils.ManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())

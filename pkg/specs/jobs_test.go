@@ -230,7 +230,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.AppLabelName:          utils.AppName,
 			utils.InstanceLabelName:     cluster.Name,
 			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    "database",
+			utils.ComponentLabelName:    utils.DatabaseComponentName,
 			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 		Expect(job.Spec.Template.Labels).To(BeEquivalentTo(map[string]string{
@@ -240,7 +240,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.AppLabelName:          utils.AppName,
 			utils.InstanceLabelName:     cluster.Name,
 			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    "database",
+			utils.ComponentLabelName:    utils.DatabaseComponentName,
 			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 	})
