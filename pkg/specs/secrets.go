@@ -69,8 +69,9 @@ func CreateSecret(
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				utils.UserTypeLabelName: string(usertype),
-				utils.WatchedLabelName:  "true",
+				utils.UserTypeLabelName:  string(usertype),
+				utils.WatchedLabelName:   "true",
+				utils.ManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Type: corev1.SecretTypeBasicAuth,
