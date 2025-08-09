@@ -147,7 +147,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 				utils.PodRoleLabelName:   string(utils.PodRolePooler),
 				utils.AppLabelName:       utils.AppName,
 				utils.InstanceLabelName:  cluster.Name,
-				utils.ComponentLabelName: "database",
+				utils.ComponentLabelName: utils.DatabaseComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{

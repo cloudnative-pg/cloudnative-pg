@@ -950,7 +950,7 @@ var _ = Describe("NewInstance", func() {
 			utils.AppLabelName:          utils.AppName,
 			utils.InstanceLabelName:     "test-cluster",
 			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    "database",
+			utils.ComponentLabelName:    utils.DatabaseComponentName,
 			utils.ManagedByLabelName:    utils.ManagerName,
 		}))
 	})
