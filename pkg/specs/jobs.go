@@ -349,7 +349,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 						utils.AppLabelName:          utils.AppName,
 						utils.InstanceLabelName:     cluster.Name,
 						utils.VersionLabelName:      fmt.Sprint(version),
-						utils.ComponentLabelName:    "database",
+						utils.ComponentLabelName:    utils.DatabaseComponentName,
 						utils.ManagedByLabelName:    utils.ManagerName,
 					},
 				},

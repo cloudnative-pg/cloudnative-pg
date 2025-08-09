@@ -88,7 +88,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 				utils.AppLabelName:       utils.AppName,
 				utils.InstanceLabelName:  cluster.Name,
 				utils.VersionLabelName:   fmt.Sprint(version),
-				utils.ComponentLabelName: "database",
+				utils.ComponentLabelName: utils.DatabaseComponentName,
 				utils.ManagedByLabelName: utils.ManagerName,
 			},
 		},
