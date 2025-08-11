@@ -169,7 +169,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return res, err
 	}
 
-
 	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
 	// from the ones managed directly by the operator (VolumeSnapshot)
 
@@ -182,12 +181,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, err
 		}
 	case apiv1.BackupMethodVolumeSnapshot:
-		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-				errors.New("no volumeSnapshot section defined on the target cluster"))
-			return ctrl.Result{}, nil
-		}
-
 		res, err := r.reconcileSnapshotBackup(ctx, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -308,36 +301,47 @@ func (r *BackupReconciler) checkPrerequisites(
 ) *ctrl.Result {
 	contextLogger := log.FromContext(ctx)
 
-	if backup.Spec.Method == apiv1.BackupMethodPlugin && len(cluster.Spec.Plugins) == 0 {
-		message := "cannot proceed with the backup as the cluster has no plugin configured"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}
+	if backup.Spec.Method == apiv1.BackupMethodPlugin {
+		if len(cluster.Spec.Plugins) == 0 {
+			message := "cannot proceed with the backup as the cluster has no plugin configured"
+			contextLogger.Warning(message)
+			r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+			return &ctrl.Result{}
+		}
+
+		if cluster.Spec.Backup == nil {
+			message := "cannot proceed with the backup as the cluster has no backup section"
+			contextLogger.Warning(message)
+			r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+			return &ctrl.Result{}
+		}
 	}
 
-	if backup.Spec.Method != apiv1.BackupMethodPlugin && cluster.Spec.Backup == nil {
-		message := "cannot proceed with the backup as the cluster has no backup section"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}
+	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot {
+		// This check is still needed for when the backup resource creation is forced through the webhook
+		if !utils.HaveVolumeSnapshot() {
+			message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
+			contextLogger.Warning(message)
+			r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+			return &ctrl.Result{}
+		}
+
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+				errors.New("no volumeSnapshot section defined on the target cluster"))
+			return &ctrl.Result{}
+		}
 	}
 
-	// This check is still needed for when the backup resource creation is forced through the webhook
-	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
-		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}
-	}
-
-	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore &&
-		(cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil) {
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-			errors.New("no barmanObjectStore section defined on the target cluster"))
-		return &ctrl.Result{}
+	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+				errors.New("no barmanObjectStore section defined on the target cluster"))
+			return &ctrl.Result{}
+		}
 	}
 
 	return nil
