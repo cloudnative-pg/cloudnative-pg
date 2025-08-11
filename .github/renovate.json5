@@ -295,7 +295,7 @@
     {
       groupName: 'cnpg',
       matchPackageNames: [
-        'github.com/cloudnative-pg/',
+        'github.com/cloudnative-pg{/,}**',
       ],
       separateMajorMinor: false,
       pinDigests: false,
