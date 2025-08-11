@@ -165,32 +165,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	isRunning, err := r.isValidBackupRunning(ctx, &backup, &cluster)
-	if err != nil {
-		contextLogger.Error(err, "while running isValidBackupRunning")
-		return ctrl.Result{}, err
-	}
-
-	if isRunning && backup.GetOnlineOrDefault(&cluster) {
-		if err := r.ensureTargetPodHealthy(ctx, r.Client, &backup, &cluster); err != nil {
-			contextLogger.Error(err, "while ensuring target pod is healthy")
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
-				fmt.Errorf("while ensuring target pod is healthy: %w", err))
-			r.Recorder.Eventf(&backup, "Warning", "TargetPodNotHealthy",
-				"Error ensuring target pod is healthy: %s", err.Error())
-			// this ensures that we will retry in case of errors
-			// if everything was flagged correctly we will not come back again in this state
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-		}
-	}
-
-	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore || backup.Spec.Method == apiv1.BackupMethodPlugin {
-		if isRunning {
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-		}
-
-		r.Recorder.Eventf(&backup, "Normal", "Starting",
-			"Starting backup for cluster %v", cluster.Name)
+	if res, err := r.checkIfBackupIsRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
+		return res, err
 	}
 
 	origBackup := backup.DeepCopy()
@@ -266,6 +242,44 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
 	return hookResult.Result, hookResult.Err
+}
+
+func (r *BackupReconciler) checkIfBackupIsRunning(
+	ctx context.Context,
+	backup apiv1.Backup,
+	cluster apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	isRunning, err := r.isValidBackupRunning(ctx, &backup, &cluster)
+	if err != nil {
+		contextLogger.Error(err, "while running isValidBackupRunning")
+		return ctrl.Result{}, err
+	}
+
+	if isRunning && backup.GetOnlineOrDefault(&cluster) {
+		if err := r.ensureTargetPodHealthy(ctx, r.Client, &backup, &cluster); err != nil {
+			contextLogger.Error(err, "while ensuring target pod is healthy")
+			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
+				fmt.Errorf("while ensuring target pod is healthy: %w", err))
+			r.Recorder.Eventf(&backup, "Warning", "TargetPodNotHealthy",
+				"Error ensuring target pod is healthy: %s", err.Error())
+			// this ensures that we will retry in case of errors
+			// if everything was flagged correctly we will not come back again in this state
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+	}
+
+	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore || backup.Spec.Method == apiv1.BackupMethodPlugin {
+		if isRunning {
+			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+		}
+
+		r.Recorder.Eventf(&backup, "Normal", "Starting",
+			"Starting backup for cluster %v", cluster.Name)
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *BackupReconciler) checkPrerequisites(
