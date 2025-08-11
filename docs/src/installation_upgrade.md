@@ -271,6 +271,10 @@ only the operator itself.
     1.27.0, or at least to the latest stable version of your current minor release
     (e.g., 1.26.1).
 
+!!! Warning
+    Upgrading to 1.27.0 will trigger a rollout of your clusters, even if you
+    have configured *online upgrades* in CloudNativePG.
+
 Version 1.27 introduces a change in the default behavior of the
 [liveness probe](instance_manager.md#liveness-probe): it now enforces the
 [shutdown of an isolated primary](instance_manager.md#primary-isolation)
