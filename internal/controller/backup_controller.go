@@ -301,19 +301,19 @@ func (r *BackupReconciler) checkPrerequisites(
 ) *ctrl.Result {
 	contextLogger := log.FromContext(ctx)
 
+	if cluster.Spec.Backup == nil {
+		message := "cannot proceed with the backup as the cluster has no backup section"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}
+	}
+
 	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if len(cluster.Spec.Plugins) == 0 {
 			message := "cannot proceed with the backup as the cluster has no plugin configured"
 			contextLogger.Warning(message)
 			r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-			return &ctrl.Result{}
-		}
-
-		if cluster.Spec.Backup == nil {
-			message := "cannot proceed with the backup as the cluster has no backup section"
-			contextLogger.Warning(message)
-			r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 			return &ctrl.Result{}
 		}
@@ -329,7 +329,7 @@ func (r *BackupReconciler) checkPrerequisites(
 			return &ctrl.Result{}
 		}
 
-		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		if cluster.Spec.Backup.VolumeSnapshot == nil {
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 				errors.New("no volumeSnapshot section defined on the target cluster"))
 			return &ctrl.Result{}
@@ -337,7 +337,7 @@ func (r *BackupReconciler) checkPrerequisites(
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
-		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		if cluster.Spec.Backup.BarmanObjectStore == nil {
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 				errors.New("no barmanObjectStore section defined on the target cluster"))
 			return &ctrl.Result{}
