@@ -182,7 +182,7 @@ spec:
     Each plugin may support a unique set of parameters. Always consult the plugin's specific documentation to understand 
     the available parameters and their proper usage.
 
-The `name` field in the plugins stanza should be populated based on how the plugin is configured:
+The `name` field in the `spec.plugins` items must be populated based on how the plugin is configured:
 
 - If the plugin is a [Sidecar Container](#sidecar-container), use the Unix socket file name.
 - If the plugin is a [Deployment](#deployment), use the value of the Service's
@@ -203,9 +203,10 @@ to performs Backup, Restore and WAL Archiving operations using
 [Barman Cloud](https://docs.pgbarman.org/release/3.12.1/user_guide/barman_cloud.html).
 
 Historically, CloudNativePG integrated Barman Cloud directly (**in-tree**), meaning the Barman utilities had to be installed
-and bundled within the CloudNativePG Operator's container image. This approach presented significant challenges for both
-extensibility and maintainability. It made it difficult to update Barman Cloud independently of the Operator and limited
-the ability to add support of other backup and restore tools.
+and bundled within the [CloudNativePG Postgres container images](https://github.com/cloudnative-pg/postgres-containers).
+This approach presented significant challenges for both extensibility and maintainability. It made it difficult to
+update Barman Cloud independently of the Postgres containers and limited the ability to add support of other backup
+and restore tools.
 
 !!! Important
     The in-tree support for Barman Cloud is **deprecated** as of CloudNativePG version 1.26 and will be **removed in a
