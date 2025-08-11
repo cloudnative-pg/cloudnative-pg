@@ -271,8 +271,11 @@ func (r *BackupReconciler) runningBackupChecks(
 		contextLogger.Error(err, "while running isValidBackupRunning")
 		return ctrl.Result{}, err
 	}
+	if !isRunning {
+		return ctrl.Result{}, nil
+	}
 
-	if isRunning && backup.GetOnlineOrDefault(&cluster) {
+	if backup.GetOnlineOrDefault(&cluster) {
 		if err := r.ensureTargetPodHealthy(ctx, r.Client, &backup, &cluster); err != nil {
 			contextLogger.Error(err, "while ensuring target pod is healthy")
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
@@ -285,13 +288,16 @@ func (r *BackupReconciler) runningBackupChecks(
 		}
 	}
 
-	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore || backup.Spec.Method == apiv1.BackupMethodPlugin {
-		if isRunning {
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-		}
+	switch backup.Spec.Method {
+	case apiv1.BackupMethodVolumeSnapshot:
+		// If the backup is a snapshot backup, we proceed with the reconciliation loop
+		return ctrl.Result{}, nil
+	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
+		// the instance manager is working we have to wait for it to finish
+		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	default:
+		return ctrl.Result{}, fmt.Errorf("unknown backup method %s", backup.Spec.Method)
 	}
-
-	return ctrl.Result{}, nil
 }
 
 func (r *BackupReconciler) checkPrerequisites(
