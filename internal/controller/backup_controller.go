@@ -66,16 +66,6 @@ const backupPhase = ".status.phase"
 // where the name of the cluster is written
 const clusterNameField = ".spec.cluster.name"
 
-// getIsRunningResult gets the result that is returned to periodically
-// check for running backups.
-// This is particularly important when the target Pod is destroyed
-// or stops responding.
-//
-// This result should be used almost always when a backup is running
-func getIsRunningResult() ctrl.Result {
-	return ctrl.Result{RequeueAfter: 10 * time.Minute}
-}
-
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -194,18 +184,9 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
+	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore || backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if isRunning {
-			return getIsRunningResult(), nil
-		}
-
-		r.Recorder.Eventf(&backup, "Normal", "Starting",
-			"Starting backup for cluster %v", cluster.Name)
-	}
-
-	if backup.Spec.Method == apiv1.BackupMethodPlugin {
-		if isRunning {
-			return getIsRunningResult(), nil
+			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 		}
 
 		r.Recorder.Eventf(&backup, "Normal", "Starting",
