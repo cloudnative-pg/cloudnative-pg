@@ -258,17 +258,18 @@ Each schema entry supports the following properties:
 
 ## Managing Foreign Data Wrappers (FDWs) In a Database
 
-!!! Info 
-    Foreign Data Wrappers (FDWs) are database-scoped objects that typically require
-    superuser privileges to create or modify. CloudNativePG provides a declarative API
-    for managing FDWs, enabling users to define and maintain them in a controlled, 
-    Kubernetes-native way without directly executing SQL commands or escalating privileges.
+!!! Info
+    Foreign Data Wrappers (FDWs) are database-scoped objects that typically
+    require superuser privileges to create or modify. CloudNativePG provides a
+    declarative API for managing FDWs, enabling users to define and maintain them
+    in a controlled, Kubernetes-native way without directly executing SQL commands
+    or escalating privileges.
 
-CloudNativePG enables seamless and automated management of PostgreSQL foreign data wrappers
-in the target database using declarative configuration.
+CloudNativePG enables seamless and automated management of PostgreSQL foreign
+data wrappers in the target database using declarative configuration.
 
-To enable this feature, define the `spec.fdws` field 
-with a list of FDW specifications, as shown in the following example:
+To enable this feature, define the `spec.fdws` field with a list of FDW
+specifications, as shown in the following example:
 
 ```yaml
 # ...
