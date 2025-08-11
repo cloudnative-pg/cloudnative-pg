@@ -164,15 +164,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return hookResult.Result, hookResult.Err
 	}
 
-	// This check is still needed for when the backup resource creation is forced through the webhook
-	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
-		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return ctrl.Result{}, nil
-	}
-
 	contextLogger.Debug("Found cluster for backup", "cluster", cluster.Name)
 
 	// Store in the context the TLS configuration required communicating with the Pods
@@ -322,6 +313,15 @@ func (r *BackupReconciler) checkPrerequisites(
 		message := "cannot proceed with the backup as the cluster has no backup section"
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}
+	}
+
+	// This check is still needed for when the backup resource creation is forced through the webhook
+	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return &ctrl.Result{}
 	}
