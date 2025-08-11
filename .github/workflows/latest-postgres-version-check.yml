@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install packaging
+          pip install packaging==25.0
 
       - name: Generate PostgreSQL JSON files
         run: |
