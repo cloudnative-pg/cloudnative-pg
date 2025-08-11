@@ -262,12 +262,14 @@ only the operator itself.
     1.28.0, or at least to the latest stable version of your current minor release
     (e.g., 1.27.x).
 
-### Upgrading to 1.27.0 or 1.26.2
+-->
+
+### Upgrading to 1.27.0 or 1.26.1
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
     1.27.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.26.2).
+    (e.g., 1.26.1).
 
 Version 1.27 introduces a change in the default behavior of the
 [liveness probe](instance_manager.md#liveness-probe): it now enforces the
@@ -284,7 +286,6 @@ spec:
       isolationCheck:
         enabled: false
 ```
--->
 
 ### Upgrading to 1.26 from a previous minor version
 
