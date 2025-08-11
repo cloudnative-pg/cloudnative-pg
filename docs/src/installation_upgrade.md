@@ -272,8 +272,12 @@ only the operator itself.
     (e.g., 1.26.1).
 
 !!! Warning
-    Upgrading to 1.27.0 will trigger a rollout of your clusters, even if you
-    have configured *online upgrades* in CloudNativePG.
+    <!-- TODO: PLEASE VERIFY -->
+    Due to changes in the liveness probe for the manager component
+    ([#7845](https://github.com/cloudnative-pg/cloudnative-pg/pull/7845)),
+    upgrading the operator will trigger a restart of your PostgreSQL clusters,
+    even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
+    Your applications will need to reconnect to PostgreSQL after the upgrade.
 
 Version 1.27 introduces a change in the default behavior of the
 [liveness probe](instance_manager.md#liveness-probe): it now enforces the
