@@ -165,7 +165,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.checkIfBackupIsRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
+	if res, err := r.runningBackupChecks(ctx, backup, cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -246,6 +246,9 @@ func (r *BackupReconciler) startBarmanOrPlugin(
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
+	r.Recorder.Eventf(&backup, "Normal", "Starting",
+		"Starting backup for cluster %v", cluster.Name)
+
 	// This backup can be started
 	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
@@ -256,7 +259,7 @@ func (r *BackupReconciler) startBarmanOrPlugin(
 	return nil, nil
 }
 
-func (r *BackupReconciler) checkIfBackupIsRunning(
+func (r *BackupReconciler) runningBackupChecks(
 	ctx context.Context,
 	backup apiv1.Backup,
 	cluster apiv1.Cluster,
@@ -286,9 +289,6 @@ func (r *BackupReconciler) checkIfBackupIsRunning(
 		if isRunning {
 			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 		}
-
-		r.Recorder.Eventf(&backup, "Normal", "Starting",
-			"Starting backup for cluster %v", cluster.Name)
 	}
 
 	return ctrl.Result{}, nil
