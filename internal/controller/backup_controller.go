@@ -142,7 +142,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *res, nil
 	}
 
-
 	// Load the required plugins
 	pluginClient, err := cnpgiClient.WithPlugins(
 		ctx,
@@ -196,12 +195,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
-		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-				errors.New("no barmanObjectStore section defined on the target cluster"))
-			return ctrl.Result{}, nil
-		}
-
 		if isRunning {
 			return getIsRunningResult(), nil
 		}
@@ -323,6 +316,13 @@ func (r *BackupReconciler) checkPrerequisites(
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}
+	}
+
+	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore &&
+		(cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil) {
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+			errors.New("no barmanObjectStore section defined on the target cluster"))
 		return &ctrl.Result{}
 	}
 
