@@ -64,7 +64,7 @@ const backupPhase = ".status.phase"
 
 // clusterName indicates the path inside the Backup kind
 // where the name of the cluster is written
-const clusterName = ".spec.cluster.name"
+const clusterNameField = ".spec.cluster.name"
 
 // getIsRunningResult gets the result that is returned to periodically
 // check for running backups.
@@ -131,40 +131,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	clusterName := backup.Spec.Cluster.Name
 	var cluster apiv1.Cluster
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      clusterName,
-	}, &cluster); err != nil {
-		if apierrs.IsNotFound(err) {
-			r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
-				"Unknown cluster %v, will retry in 30 seconds", clusterName)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-		}
-
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
-			fmt.Errorf("while getting cluster %s: %w", clusterName, err))
-		r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
-			"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
-		return ctrl.Result{}, nil
+	if res := r.getCluster(ctx, &backup, &cluster); res != nil {
+		return *res, nil
 	}
 
-	if backup.Spec.Method == apiv1.BackupMethodPlugin && len(cluster.Spec.Plugins) == 0 {
-		message := "cannot proceed with the backup as the cluster has no plugin configured"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return ctrl.Result{}, nil
+	ctx = cluster.SetInContext(ctx)
+
+	if res := r.checkPrerequisites(ctx, backup, cluster); res != nil {
+		return *res, nil
 	}
 
-	if backup.Spec.Method != apiv1.BackupMethodPlugin && cluster.Spec.Backup == nil {
-		message := "cannot proceed with the backup as the cluster has no backup section"
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return ctrl.Result{}, nil
-	}
 
 	// Load the required plugins
 	pluginClient, err := cnpgiClient.WithPlugins(
@@ -181,7 +158,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}()
 
 	ctx = cnpgiClient.SetPluginClientInContext(ctx, pluginClient)
-	ctx = cluster.SetInContext(ctx)
 
 	// Plugin pre-hooks
 	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
@@ -197,7 +173,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
+	contextLogger.Debug("Found cluster for backup", "cluster", cluster.Name)
 
 	// Store in the context the TLS configuration required communicating with the Pods
 	ctx, err = certs.NewTLSConfigForContext(
@@ -327,6 +303,60 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return hookResult.Result, hookResult.Err
 }
 
+func (r *BackupReconciler) checkPrerequisites(
+	ctx context.Context,
+	backup apiv1.Backup,
+	cluster apiv1.Cluster,
+) *ctrl.Result {
+	contextLogger := log.FromContext(ctx)
+
+	if backup.Spec.Method == apiv1.BackupMethodPlugin && len(cluster.Spec.Plugins) == 0 {
+		message := "cannot proceed with the backup as the cluster has no plugin configured"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}
+	}
+
+	if backup.Spec.Method != apiv1.BackupMethodPlugin && cluster.Spec.Backup == nil {
+		message := "cannot proceed with the backup as the cluster has no backup section"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}
+	}
+
+	return nil
+}
+
+func (r *BackupReconciler) getCluster(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) *ctrl.Result {
+	clusterName := backup.Spec.Cluster.Name
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      clusterName,
+	}, cluster)
+	if err == nil {
+		return nil
+	}
+
+	if apierrs.IsNotFound(err) {
+		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
+			"Unknown cluster %v, will retry in 30 seconds", clusterName)
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}
+	}
+
+	_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, nil,
+		fmt.Errorf("while getting cluster %s: %w", clusterName, err))
+	r.Recorder.Eventf(backup, "Warning", "FindingCluster",
+		"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
+
+	return &ctrl.Result{}
+}
+
 func (r *BackupReconciler) isValidBackupRunning(
 	ctx context.Context,
 	backup *apiv1.Backup,
@@ -444,7 +474,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		ctx,
 		&clusterBackups,
 		client.InNamespace(backup.GetNamespace()),
-		client.MatchingFields{clusterName: cluster.Name},
+		client.MatchingFields{clusterNameField: cluster.Name},
 	); err != nil {
 		return nil, err
 	}
@@ -707,7 +737,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&apiv1.Backup{},
-		clusterName, func(rawObj client.Object) []string {
+		clusterNameField, func(rawObj client.Object) []string {
 			return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
 		}); err != nil {
 		return err
