@@ -169,55 +169,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return res, err
 	}
 
-	origBackup := backup.DeepCopy()
 
 	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
 	// from the ones managed directly by the operator (VolumeSnapshot)
 
 	switch backup.Spec.Method {
 	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
-		// If no good running backups are found we elect a pod for the backup
-		pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-		if apierrs.IsNotFound(err) {
-			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
-				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
-			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
-				cluster.Status.TargetPrimary)
-			backup.Status.Phase = apiv1.BackupPhasePending
-			if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
-				return ctrl.Result{}, err
+		if res, err := r.startBarmanOrPlugin(ctx, cluster, backup); err != nil || res != nil {
+			if res != nil {
+				return *res, err
 			}
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-		}
-		if err != nil {
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
-			r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
-				cluster.Status.TargetPrimary)
-			return ctrl.Result{}, nil
-		}
-		contextLogger.Debug("Found pod for backup", "pod", pod.Name)
-
-		if !utils.IsPodReady(*pod) {
-			contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
-			backup.Status.Phase = apiv1.BackupPhasePending
-			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
-				cluster.Status.TargetPrimary)
-			if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-		}
-
-		contextLogger.Info("Starting backup",
-			"cluster", cluster.Name,
-			"pod", pod.Name)
-
-		// This backup can be started
-		if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
-			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-				fmt.Errorf("encountered an error while taking the backup: %w", err))
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 	case apiv1.BackupMethodVolumeSnapshot:
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
@@ -242,6 +204,63 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
 	return hookResult.Result, hookResult.Err
+}
+
+func (r *BackupReconciler) startBarmanOrPlugin(
+	ctx context.Context,
+	cluster apiv1.Cluster,
+	backup apiv1.Backup,
+) (*ctrl.Result, error) {
+	contextLogger, ctx := log.SetupLogger(ctx)
+
+	origBackup := backup.DeepCopy()
+
+	// If no good running backups are found we elect a pod for the backup
+	pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
+	if apierrs.IsNotFound(err) {
+		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
+			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
+		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
+			cluster.Status.TargetPrimary)
+		backup.Status.Phase = apiv1.BackupPhasePending
+		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+			return nil, err
+		}
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if err != nil {
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
+		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
+			cluster.Status.TargetPrimary)
+		return &ctrl.Result{}, nil
+	}
+
+	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
+
+	if !utils.IsPodReady(*pod) {
+		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
+		backup.Status.Phase = apiv1.BackupPhasePending
+		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
+			cluster.Status.TargetPrimary)
+		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
+			return nil, err
+		}
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	contextLogger.Info("Starting backup",
+		"cluster", cluster.Name,
+		"pod", pod.Name)
+
+	// This backup can be started
+	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
+		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
+			fmt.Errorf("encountered an error while taking the backup: %w", err))
+		return &ctrl.Result{}, nil
+	}
+	return nil, nil
 }
 
 func (r *BackupReconciler) checkIfBackupIsRunning(
