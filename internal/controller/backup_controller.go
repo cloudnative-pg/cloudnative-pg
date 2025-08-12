@@ -164,7 +164,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.runningBackupChecks(ctx, backup, cluster); err != nil || !res.IsZero() {
+	if res, err := r.areOtherBackupsRunning(ctx, &backup, &cluster); err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	if res, err := r.isCurrentBackupRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -258,7 +262,7 @@ func (r *BackupReconciler) startBarmanOrPlugin(
 	return nil, nil
 }
 
-func (r *BackupReconciler) runningBackupChecks(
+func (r *BackupReconciler) isCurrentBackupRunning(
 	ctx context.Context,
 	backup apiv1.Backup,
 	cluster apiv1.Cluster,
@@ -496,25 +500,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPodName", targetPod.Name))
-
-	// Validate we don't have other running backups
-	var clusterBackups apiv1.BackupList
-	if err := r.List(
-		ctx,
-		&clusterBackups,
-		client.InNamespace(backup.GetNamespace()),
-		client.MatchingFields{clusterNameField: cluster.Name},
-	); err != nil {
-		return nil, err
-	}
-
-	if !clusterBackups.CanExecuteBackup(backup.Name) {
-		contextLogger.Info(
-			"A backup is already in progress or waiting to be started, retrying",
-			"targetBackup", backup.Name,
-		)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	}
 
 	if !utils.PodHasContainerStatuses(*targetPod) {
 		return nil, fmt.Errorf("target pod lacks container statuses")
@@ -835,4 +820,33 @@ func (r *BackupReconciler) ensureTargetPodHealthy(
 		"backupName", backup.Name,
 	)
 	return nil
+}
+
+func (r *BackupReconciler) areOtherBackupsRunning(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Validate we don't have other running backups
+	var clusterBackups apiv1.BackupList
+	if err := r.List(
+		ctx,
+		&clusterBackups,
+		client.InNamespace(backup.GetNamespace()),
+		client.MatchingFields{clusterNameField: cluster.Name},
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !clusterBackups.CanExecuteBackup(backup.Name) {
+		contextLogger.Info(
+			"A backup is already in progress or waiting to be started, retrying",
+			"targetBackup", backup.Name,
+		)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }
