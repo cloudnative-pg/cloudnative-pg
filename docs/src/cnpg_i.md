@@ -28,32 +28,29 @@ CNPG-I can extend:
 - The operator, and/or
 - The instance manager running inside PostgreSQL pods.
 
-## How to register a plugin for the operator
+## Registering a plugin
 
-The implementation of CNPG-I is heavily inspired by the Kubernetes
-[Container Storage Interface](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/)
-(CSI). 
-The Operator issues gRPC calls directly to the registered plugins,  adhering to the interface
-defined by the [CNPG-I protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
+CNPG-I is inspired by the Kubernetes
+[Container Storage Interface (CSI)](https://kubernetes.io/blog/2019/01/15/container-storage-interface-ga/).
+The operator communicates with registered plugins using **gRPC**, following the
+[CNPG-I protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
 
-CloudNativePG discovers available plugins during its startup process. Plugins can be registered in one of two ways:
+CloudNativePG discovers plugins **at startup**. You can register them in one of two ways:
 
-- **Sidecar Container**: Configure the plugin as a 
-[Sidecar Container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) within the CloudNativePG's
-Deployment.
+- Sidecar container – run the plugin inside the operator’s Deployment
+- Standalone Deployment – run the plugin as a separate workload in the same
+  namespace
 
-- **Deployment**: Deploy the plugin as an independent 
-[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) in the same namespace as the CloudNativePG.
-
-In both cases, the plugin must be packaged as a container image to be deployed as a Kubernetes workload.
+In both cases, the plugin must be packaged as a container image.
 
 ### Sidecar Container
 
-When configuring a plugin as a Sidecar Container within the CloudNativePG's Deployment, the plugin must register its gRPC 
-server as a **Unix domain socket**. The directory where this socket is created must be shared with the Operator's container 
-and mounted to the path specified by the `PLUGIN_SOCKET_DIR` environment variable (which defaults to `/plugin`).
+When running as a sidecar, the plugin must expose its gRPC server via a **Unix
+domain socket**. This socket must be placed in a directory shared with the
+operator container, mounted at the path set in `PLUGIN_SOCKET_DIR` (default:
+`/plugin`).
 
-Example of a Plugin as a Sidecar Container:
+Example:
 
 ```yaml
 apiVersion: apps/v1
@@ -81,22 +78,17 @@ spec:
         emptyDir: {}
 ```
 
-### Deployment
+### Standalone Deployment (recommended)
 
-Deploying a plugin as a Deployment is the recommended approach. This method offers several advantages,
-including decoupling the plugin's lifecycle from the CloudNativePG Operator's and allowing for independent scaling of
-the plugin.
-
-In this setup, the container must expose the gRPC server implementing the CNPG-I protocol to the network via a `TCP` 
-port and a Service. Communication between CloudNativePG and the plugin is secured using **mTLS over gRPC**. 
-For detailed information on configuring TLS certificates, refer to the
-[Configuring TLS Certificates](#configuring-tls-certificates) section below.
+Running a plugin as its own Deployment decouples its lifecycle from the
+operator’s and allows independent scaling. In this setup, the plugin exposes a
+TCP gRPC endpoint behind a Service, with **mTLS** for secure communication.
 
 !!! Warning
-    CloudNativePG does not automatically discover newly deployed plugins after startup.
-    To detect and utilize new plugins, you must restart the Operator's Deployment.
+    CloudNativePG does **not** discover plugins dynamically. If you deploy a new
+    plugin, you must **restart the operator** to detect it.
 
-Example of a Plugin as a `Deployment`:
+Example Deployment:
 
 ```yaml
 apiVersion: apps/v1
@@ -114,10 +106,15 @@ spec:
         - containerPort: 9090
           protocol: TCP
 ```
+
 The related Service for the plugin must include:
 
-- The label `cnpg.io/plugin: <plugin-name>`, which is essential for CloudNativePG to discover the plugin.
-- The annotation `cnpg.io/pluginPort: <port>`, specifying the port on which the plugin's gRPC server is exposed.
+- The label `cnpg.io/plugin: <plugin-name>` — required for CloudNativePG to
+  discover the plugin
+- The annotation `cnpg.io/pluginPort: <port>` — specifies the port where the
+  plugin’s gRPC server is exposed
+
+Example Service:
 
 ```yaml
 apiVersion: v1
@@ -139,11 +136,13 @@ spec:
 
 ### Configuring TLS Certificates
 
-When a plugin is deployed as a Deployment, communication with CloudNativePG happens over the network. To
-ensure security, **mTLS is enforced**, requiring TLS certificates for both sides of the connection.
-These certificates must be stored as
-[Kubernetes TLS Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) and referenced in the 
-plugin's Service using the annotations `cnpg.io/pluginClientSecret` and `cnpg.io/pluginServerSecret`:
+When a plugin runs as a `Deployment`, communication with CloudNativePG happens
+over the network. To secure it, **mTLS is enforced**, requiring TLS
+certificates for both sides.
+
+Certificates must be stored as [Kubernetes TLS Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets)
+and referenced in the plugin’s Service annotations
+(`cnpg.io/pluginClientSecret` and `cnpg.io/pluginServerSecret`):
 
 ```yaml
 apiVersion: v1
@@ -160,16 +159,17 @@ spec:
 ```
 
 !!! Note
-    While providing self-provisioned certificate bundles is supported, the recommended approach for managing certificates 
-    is by using [Certmanager](https://cert-manager.io).
+    You can provide your own certificate bundles, but the recommended method is
+    to use [Cert-manager](https://cert-manager.io).
 
-## How to use a plugin
-Plugins are enabled on a `Cluster` resource by configuring the `.spec.plugins` stanza. Refer to the CloudNativePG 
-API Reference for the full 
+## Using a plugin
+
+To enable a plugin, configure the `.spec.plugins` section in your `Cluster`
+resource. Refer to the CloudNativePG API Reference for the full
 [PluginConfiguration](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
 specification.
 
-Here's an example of how to enable a plugin on a `Cluster` resource:
+Example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -187,42 +187,20 @@ spec:
       key1: value1
       key2: value2
 ```
-!!! Note
-    Each plugin may support a unique set of parameters. Always consult the plugin's specific documentation to understand 
-    the available parameters and their proper usage.
 
-The `name` field in the `spec.plugins` items must be populated based on how the plugin is configured:
+Each plugin may have its own parameters—check the plugin’s documentation for
+details. The `name` field in `spec.plugins` depends on how the plugin is
+deployed:
 
-- If the plugin is a [Sidecar Container](#sidecar-container), use the Unix socket file name.
-- If the plugin is a [Deployment](#deployment), use the value of the Service's
-`cnpg.io/pluginName` label.
-
+- Sidecar container: use the Unix socket file name
+- Deployment: use the value from the Service’s `cnpg.io/pluginName` label
 
 ## Community plugins
 
-The CNPG-I protocol has established as a solid pattern for extending CloudNativePG's functionality
-and to improve its maintainability long-term. As a result, the Community itself has used it to address a set
-of challenges that have emerged over the years, guiding the development of some plugins and providing them with
-direct support.
+The CNPG-I protocol has quickly become a proven and reliable pattern for
+extending CloudNativePG while keeping the core project maintainable.
+Over time, the community has built and shared plugins that address real-world
+needs and serve as examples for developers.
 
-### Barman Cloud
-
-The [Barman Cloud Plugin](https://github.com/cloudnative-pg/plugin-barman-cloud) implements CNPG-I
-to performs Backup, Restore and WAL Archiving operations using
-[Barman Cloud](https://docs.pgbarman.org/release/3.12.1/user_guide/barman_cloud.html).
-
-Historically, CloudNativePG integrated Barman Cloud directly (**in-tree**), meaning the Barman utilities had to be installed
-and bundled within the [CloudNativePG Postgres container images](https://github.com/cloudnative-pg/postgres-containers).
-This approach presented significant challenges for both extensibility and maintainability. It made it difficult to
-update Barman Cloud independently of the Postgres containers and limited the ability to add support of other backup
-and restore tools.
-
-!!! Important
-    The in-tree support for Barman Cloud is **deprecated** as of CloudNativePG version 1.26 and will be **removed in a
-    future release**.
-
-### Hello World
-
-The [Hello World Plugin](https://github.com/cloudnative-pg/cnpg-i-hello-world) is a project that serves as a
-starting point for developers looking to create their own CNPG-I plugins. It provides a simple implementation
-of some of the protocol APIs, allowing users to understand how to create a plugin and how to interact with it.
+For a complete and up-to-date list of plugins built with CNPG-I, please refer to the
+[CNPG-I GitHub page](https://github.com/cloudnative-pg/cnpg-i?tab=readme-ov-file#projects-built-with-cnpg-i).
