@@ -495,6 +495,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 			"target",
 			cluster.Status.TargetPrimary,
 		)
+		// TODO: shouldn't this be a failed backup?
 		origBackup := backup.DeepCopy()
 		backup.Status.Phase = apiv1.BackupPhasePending
 		if err := r.Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
