@@ -147,7 +147,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = cnpgiClient.SetPluginClientInContext(ctx, pluginClient)
 
-	// Plugin pre-hooks
 	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
 		return hookResult.Result, hookResult.Err
 	}
@@ -164,17 +163,18 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	// preflight checks that AREN'T formal.
+	// We ask questions like: "are there other backups running?", "is the current backup running?",
+	// "is the target instance healthy?"
 	if res, err := r.areOtherBackupsRunning(ctx, &backup, &cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
-
 	if res, err := r.isCurrentBackupRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
 
 	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
 	// from the ones managed directly by the operator (VolumeSnapshot)
-
 	switch backup.Spec.Method {
 	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
 		if res, err := r.startBarmanOrPlugin(ctx, cluster, backup); err != nil || res != nil {
@@ -303,6 +303,9 @@ func (r *BackupReconciler) isCurrentBackupRunning(
 	}
 }
 
+// checkPrerequisites checks that the backup and cluster spec are FORMALLY valid and the kubernetes cluster supports
+// the chosen backup method.
+// These checks cannot be executed in the webhook given that we cannot fetch the cluster.
 func (r *BackupReconciler) checkPrerequisites(
 	ctx context.Context,
 	backup apiv1.Backup,
