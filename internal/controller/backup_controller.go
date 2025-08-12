@@ -121,8 +121,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	var cluster apiv1.Cluster
-	if res := r.getCluster(ctx, &backup, &cluster); res != nil {
-		return *res, nil
+	if res, err := r.getCluster(ctx, &backup, &cluster); err != nil || res != nil {
+		if res != nil {
+			return *res, nil
+		}
+		return ctrl.Result{}, err
 	}
 
 	ctx = cluster.SetInContext(ctx)
@@ -362,28 +365,36 @@ func (r *BackupReconciler) getCluster(
 	ctx context.Context,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
-) *ctrl.Result {
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
 	clusterName := backup.Spec.Cluster.Name
 	err := r.Get(ctx, client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      clusterName,
 	}, cluster)
 	if err == nil {
-		return nil
+		return nil, nil
 	}
 
 	if apierrs.IsNotFound(err) {
 		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 			"Unknown cluster %v, will retry in 30 seconds", clusterName)
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, nil,
-		fmt.Errorf("while getting cluster %s: %w", clusterName, err))
+	contextLogger.Error(err, "error getting cluster, proceeding to flag backup as failed.")
+
+	if flagErr := resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, nil,
+		fmt.Errorf("while getting cluster %s: %w", clusterName, err)); flagErr != nil {
+		contextLogger.Error(flagErr, "while flagging backup as failed, retrying...")
+		return nil, flagErr
+	}
+
 	r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 		"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 
-	return &ctrl.Result{}
+	return &ctrl.Result{}, nil
 }
 
 func (r *BackupReconciler) isValidBackupRunning(
