@@ -504,7 +504,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	if err != nil {
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, fmt.Errorf("while getting pod: %w", err))
+		messageErr := fmt.Errorf("while getting pod: %w", err)
+		if flagErr := resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, messageErr); flagErr != nil {
+			return nil, fmt.Errorf("while flagging backup as failed: %w", flagErr)
+		}
 		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
 		return &ctrl.Result{}, nil
