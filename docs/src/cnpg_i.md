@@ -1,23 +1,32 @@
 # CNPG-I
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-The CloudNativePG Interface (**CNPG-I**) provides a powerful standard for extending and customizing CloudNativePG's default 
-functionality without altering its core codebase.
+The **CloudNativePG Interface** ([CNPG-I](https://github.com/cloudnative-pg/cnpg-i))
+is a standard way to extend and customize CloudNativePG without modifying its
+core codebase.
 
 ## Why CNPG-I?
 
-While CloudNativePG effectively handles a wide range of use cases, there are scenarios where its default capabilities 
-may not suffice, or where community support for specific features isn't feasible. Prior to the introduction of CNPG-I, 
-users often had to fork the project to implement custom behaviors or attempt to integrate their changes directly with 
-the upstream codebase. Both approaches posed significant challenges, leading to maintenance overhead and potential 
-delays in meeting business requirements.
+CloudNativePG supports a wide range of use cases, but sometimes its built-in
+functionality isn’t enough, or adding certain features directly to the main
+project isn’t practical.
 
-CNPG-I was developed to address these issues by offering a standardized way to integrate with key CloudNativePG 
-operations throughout a Cluster's lifecycle. This includes critical functions like backups, restores, and sub-resource
-reconciliation, enabling seamless customization and extending CloudNativePG's capabilities without disrupting the
+Before CNPG-I, users had two main options:
+
+- Fork the project to add custom behavior, or
+- Extend the upstream codebase by writing custom components on top of it.
+
+Both approaches created maintenance overhead, slowed upgrades, and delayed delivery of critical features.
+
+CNPG-I solves these problems by providing a stable, gRPC-based integration
+point for extending CloudNativePG at key points in a cluster’s lifecycle —such
+as backups, recovery, and sub-resource reconciliation— without disrupting the
 core project.
 
-CNPG-I can extend the operator and/or the instance manager capabilities.
+CNPG-I can extend:
+
+- The operator, and/or
+- The instance manager running inside PostgreSQL pods.
 
 ## How to register a plugin for the operator
 
