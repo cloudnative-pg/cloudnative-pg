@@ -669,6 +669,7 @@ cmd
 cn
 cnp
 cnpg
+codebase
 codeready
 collationVersion
 columnValue
@@ -843,6 +844,7 @@ googleCredentials
 goroutines
 gosec
 govulncheck
+gRPC
 grafana
 gzip
 hashicorp
@@ -1000,6 +1002,7 @@ monitoringconfiguration
 mountPath
 msg
 mspan
+mTLS
 multinamespace
 mutatingwebhookconfigurations
 mutex
