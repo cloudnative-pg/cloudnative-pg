@@ -668,6 +668,10 @@ func (r *ClusterReconciler) handleSwitchover(
 		return &ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
+		// If we selected a new primary, pause poolers to reduce perceived downtime
+		if err := r.pausePoolersDuringSwitchover(ctx, cluster); err != nil {
+			contextLogger.Error(err, "Failed to pause poolers during switchover, continuing anyway")
+		}
 		// If we selected a new primary, stop the reconciliation loop here
 		contextLogger.Info("Waiting for the new primary to notice the promotion request",
 			"newPrimary", selectedPrimary)
@@ -675,6 +679,11 @@ func (r *ClusterReconciler) handleSwitchover(
 	}
 
 	// Primary is healthy, No switchover in progress.
+	// Resume poolers if they were paused during switchover
+	if err := r.resumePoolersAfterSwitchover(ctx, cluster); err != nil {
+		contextLogger.Error(err, "Failed to resume poolers after switchover, continuing anyway")
+	}
+
 	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
@@ -1557,6 +1566,112 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+// pausePoolersDuringSwitchover pauses all poolers associated with the cluster during a switchover operation
+// to reduce the perceived downtime by client applications
+func (r *ClusterReconciler) pausePoolersDuringSwitchover(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	var poolers apiv1.PoolerList
+	if err := r.List(ctx, &poolers,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{poolerClusterKey: cluster.Name}); err != nil {
+		return fmt.Errorf("while getting poolers for cluster %s: %w", cluster.Name, err)
+	}
+
+	if len(poolers.Items) == 0 {
+		contextLogger.Debug("No poolers found for cluster, skipping pause operation")
+		return nil
+	}
+
+	contextLogger.Info("Pausing poolers during switchover", "poolerCount", len(poolers.Items))
+
+	for i := range poolers.Items {
+		pooler := &poolers.Items[i]
+
+		// Only pause poolers that are not already paused and have auto-integration enabled
+		if pooler.Spec.PgBouncer != nil && pooler.Spec.PgBouncer.IsPaused() {
+			contextLogger.Debug("Pooler is already paused, skipping", "pooler", pooler.Name)
+			continue
+		}
+
+		// Only pause poolers with automated integration (no manual auth configuration)
+		if !pooler.IsAutomatedIntegration() {
+			contextLogger.Debug("Pooler has manual auth configuration, skipping pause", "pooler", pooler.Name)
+			continue
+		}
+
+		poolerCopy := pooler.DeepCopy()
+		if poolerCopy.Spec.PgBouncer == nil {
+			poolerCopy.Spec.PgBouncer = &apiv1.PgBouncerSpec{}
+		}
+
+		poolerCopy.Spec.PgBouncer.Paused = &[]bool{true}[0]
+		if poolerCopy.Annotations == nil {
+			poolerCopy.Annotations = make(map[string]string)
+		}
+		poolerCopy.Annotations["cnpg.io/pausedDuringSwitchover"] = "true"
+
+		if err := r.Update(ctx, poolerCopy); err != nil {
+			contextLogger.Error(err, "Failed to pause pooler during switchover", "pooler", pooler.Name)
+			continue
+		}
+
+		contextLogger.Info("Paused pooler during switchover", "pooler", pooler.Name)
+	}
+
+	return nil
+}
+
+// resumePoolersAfterSwitchover resumes poolers that were paused during switchover
+func (r *ClusterReconciler) resumePoolersAfterSwitchover(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	var poolers apiv1.PoolerList
+	if err := r.List(ctx, &poolers,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{poolerClusterKey: cluster.Name}); err != nil {
+		return fmt.Errorf("while getting poolers for cluster %s: %w", cluster.Name, err)
+	}
+
+	if len(poolers.Items) == 0 {
+		contextLogger.Debug("No poolers found for cluster, skipping resume operation")
+		return nil
+	}
+
+	contextsResumed := 0
+	for i := range poolers.Items {
+		pooler := &poolers.Items[i]
+
+		// Only resume poolers that were paused during switchover
+		if pooler.Annotations == nil || pooler.Annotations["cnpg.io/pausedDuringSwitchover"] != "true" {
+			continue
+		}
+
+		poolerCopy := pooler.DeepCopy()
+		if poolerCopy.Spec.PgBouncer == nil {
+			continue 
+		}
+
+		// Resume the pooler and remove switchover annotation
+		poolerCopy.Spec.PgBouncer.Paused = &[]bool{false}[0]
+		delete(poolerCopy.Annotations, "cnpg.io/pausedDuringSwitchover")
+
+		if err := r.Update(ctx, poolerCopy); err != nil {
+			contextLogger.Error(err, "Failed to resume pooler after switchover", "pooler", pooler.Name)
+			continue
+		}
+
+		contextsResumed++
+		contextLogger.Info("Resumed pooler after switchover", "pooler", pooler.Name)
+	}
+
+	if contextsResumed > 0 {
+		contextLogger.Info("Resumed poolers after switchover", "poolerCount", contextsResumed)
 	}
 
 	return nil
