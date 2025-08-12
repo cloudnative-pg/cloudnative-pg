@@ -127,8 +127,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = cluster.SetInContext(ctx)
 
-	if res := r.checkPrerequisites(ctx, backup, cluster); res != nil {
-		return *res, nil
+	if res, err := r.checkPrerequisites(ctx, backup, cluster); err != nil || res != nil {
+		if res != nil {
+			return *res, err
+		}
+		return ctrl.Result{}, err
 	}
 
 	// Load the required plugins
@@ -310,24 +313,25 @@ func (r *BackupReconciler) checkPrerequisites(
 	ctx context.Context,
 	backup apiv1.Backup,
 	cluster apiv1.Cluster,
-) *ctrl.Result {
+) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Spec.Backup == nil {
-		message := "cannot proceed with the backup as the cluster has no backup section"
+	flagMissingPrerequisite := func(message string, reason string) (*ctrl.Result, error) {
 		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
-		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}
+		r.Recorder.Event(&backup, "Warning", reason, message)
+		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return &ctrl.Result{}, err
+	}
+
+	if cluster.Spec.Backup == nil {
+		const message = "cannot proceed with the backup as the cluster has no backup section"
+		return flagMissingPrerequisite(message, "ClusterHasBackupConfigured")
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if len(cluster.Spec.Plugins) == 0 {
 			const message = "cannot proceed with the backup as the cluster has no plugin configured"
-			contextLogger.Warning(message)
-			r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-			return &ctrl.Result{}
+			return flagMissingPrerequisite(message, "ClusterHasNoBackupExecutorPlugin")
 		}
 	}
 
@@ -335,34 +339,23 @@ func (r *BackupReconciler) checkPrerequisites(
 		// This check is still needed for when the backup resource creation is forced through the webhook
 		if !utils.HaveVolumeSnapshot() {
 			const message = "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
-			contextLogger.Warning(message)
-			r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-			return &ctrl.Result{}
+			return flagMissingPrerequisite(message, "ClusterHasNoVolumeSnapshotCRD")
 		}
 
 		if cluster.Spec.Backup.VolumeSnapshot == nil {
 			const message = "no volumeSnapshot section defined on the target cluster"
-			contextLogger.Warning(message)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-				errors.New(message))
-			r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotSection", message)
-			return &ctrl.Result{}
+			return flagMissingPrerequisite(message, "ClusterHasNoVolumeSnapshotSection")
 		}
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
 		if cluster.Spec.Backup.BarmanObjectStore == nil {
-			message := "no barmanObjectStore section defined on the target cluster"
-			contextLogger.Warning(message)
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
-				errors.New(message))
-			r.Recorder.Event(&backup, "Warning", "ClusterHasNoBarmanSection", message)
-			return &ctrl.Result{}
+			const message = "no barmanObjectStore section defined on the target cluster"
+			return flagMissingPrerequisite(message, "ClusterHasNoBarmanSection")
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (r *BackupReconciler) getCluster(
