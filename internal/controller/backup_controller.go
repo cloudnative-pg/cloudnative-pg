@@ -287,13 +287,17 @@ func (r *BackupReconciler) isCurrentBackupRunning(
 	if backup.GetOnlineOrDefault(&cluster) {
 		if err := r.ensureTargetPodHealthy(ctx, r.Client, &backup, &cluster); err != nil {
 			contextLogger.Error(err, "while ensuring target pod is healthy")
-			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
-				fmt.Errorf("while ensuring target pod is healthy: %w", err))
+
+			if flagErr := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
+				fmt.Errorf("while ensuring target pod is healthy: %w", err)); flagErr != nil {
+				contextLogger.Error(flagErr, "while flagging backup as failed, retrying...")
+				return ctrl.Result{}, flagErr
+			}
+
 			r.Recorder.Eventf(&backup, "Warning", "TargetPodNotHealthy",
 				"Error ensuring target pod is healthy: %s", err.Error())
-			// this ensures that we will retry in case of errors
-			// if everything was flagged correctly we will not come back again in this state
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+
+			return ctrl.Result{}, nil
 		}
 	}
 
