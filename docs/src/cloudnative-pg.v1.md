@@ -3086,18 +3086,18 @@ of WAL archiving and backups for this external cluster</p>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;)
-It would be empty if no handler is specified, in which case
-the default handler is registrated when creating the fdw extensions</p>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;).
+This will be empty if no handler is specified. In that case,
+the default handler is registered when the FDW extension is created.</p>
 </td>
 </tr>
 <tr><td><code>validator</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;)
-It would be empty if no validator is specified, in which case
-the default validator is registrated when creating the fdw extensions</p>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;).
+This will be empty if no validator is specified. In that case,
+the default validator is registered when the FDW extension is created.</p>
 </td>
 </tr>
 <tr><td><code>owner</code><br/>
@@ -3105,21 +3105,22 @@ the default validator is registrated when creating the fdw extensions</p>
 </td>
 <td>
    <p>Owner specifies the database role that will own the Foreign Data Wrapper.
-The specified role must have superuser privileges in the target database.</p>
+The role must have superuser privileges in the target database.</p>
 </td>
 </tr>
 <tr><td><code>options</code><br/>
 <a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
 </td>
 <td>
-   <p>Options specifies options for the FDW(key is option name, value is option value)</p>
+   <p>Options specifies the configuration options for the FDW
+(key is the option name, value is the option value).</p>
 </td>
 </tr>
 <tr><td><code>usage</code><br/>
 <a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
 </td>
 <td>
-   <p>Usages specifies usages for the FDW</p>
+   <p>List of roles for which <code>USAGE</code> privileges on the FDW are granted or revoked.</p>
 </td>
 </tr>
 </tbody>
