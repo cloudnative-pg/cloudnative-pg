@@ -19,7 +19,7 @@ jobs:
   # we backport everything, except those PR that are created or contain `do not backport` explicitly.
   label-source-pr:
     name: Add labels to PR
-    if: | 
+    if: |
         github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
@@ -39,6 +39,7 @@ jobs:
             release-1.22
             release-1.25
             release-1.26
+            release-1.27
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
@@ -63,6 +64,7 @@ jobs:
             release-1.22
             release-1.25
             release-1.26
+            release-1.27
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -78,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.25, release-1.26]
+        branch: [release-1.22, release-1.25, release-1.26, release-1.27]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
