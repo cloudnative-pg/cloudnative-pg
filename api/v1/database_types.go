@@ -229,28 +229,29 @@ type FDWSpec struct {
 	// Common fields
 	DatabaseObjectSpec `json:",inline"`
 
-	// Name of the handler function (e.g., "postgres_fdw_handler")
-	// It would be empty if no handler is specified, in which case
-	// the default handler is registrated when creating the fdw extensions
+	// Name of the handler function (e.g., "postgres_fdw_handler").
+	// This will be empty if no handler is specified. In that case,
+	// the default handler is registered when the FDW extension is created.
 	// +optional
 	Handler string `json:"handler,omitempty"`
 
-	// Name of the validator function (e.g., "postgres_fdw_validator")
-	// It would be empty if no validator is specified, in which case
-	// the default validator is registrated when creating the fdw extensions
+	// Name of the validator function (e.g., "postgres_fdw_validator").
+	// This will be empty if no validator is specified. In that case,
+	// the default validator is registered when the FDW extension is created.
 	// +optional
 	Validator string `json:"validator,omitempty"`
 
 	// Owner specifies the database role that will own the Foreign Data Wrapper.
-	// The specified role must have superuser privileges in the target database.
+	// The role must have superuser privileges in the target database.
 	// +optional
 	Owner string `json:"owner,omitempty"`
 
-	// Options specifies options for the FDW(key is option name, value is option value)
+	// Options specifies the configuration options for the FDW
+	// (key is the option name, value is the option value).
 	// +optional
 	Options []OptionSpec `json:"options,omitempty"`
 
-	// Usages specifies usages for the FDW
+	// List of roles for which `USAGE` privileges on the FDW are granted or revoked.
 	// +optional
 	Usages []UsageSpec `json:"usage,omitempty"`
 }
