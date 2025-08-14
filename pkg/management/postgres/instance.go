@@ -215,6 +215,9 @@ type Instance struct {
 	MetricsPortTLS bool
 
 	serverCertificateHandler serverCertificateHandler
+
+	// Cluster is the cluster this instance belongs to
+	Cluster *apiv1.Cluster
 }
 
 type serverCertificateHandler struct {

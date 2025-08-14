@@ -21,6 +21,8 @@ package concurrency
 
 import (
 	"sync"
+
+	"go.uber.org/multierr"
 )
 
 // Executed can be used to wait for something to be executed,
@@ -30,6 +32,7 @@ import (
 type Executed struct {
 	cond sync.Cond
 	done bool
+	err  error
 }
 
 // MultipleExecuted can be used to wrap multiple Executed conditions that
@@ -41,6 +44,16 @@ func (m MultipleExecuted) Wait() {
 	for _, cond := range m {
 		cond.Wait()
 	}
+}
+
+// Err returns a composition of the errors raised by the individual
+// execution components or nil if there is no error.
+func (m MultipleExecuted) Err() error {
+	var err error
+	for _, cond := range m {
+		err = multierr.Append(err, cond.Err())
+	}
+	return err
 }
 
 // NewExecuted creates a new Executed
@@ -62,10 +75,26 @@ func (i *Executed) Wait() {
 
 // Broadcast broadcasts execution to waiting goroutines
 func (i *Executed) Broadcast() {
+	i.BroadcastError(nil)
+}
+
+// BroadcastError broadcasts execution to waiting goroutines
+// recording the passed error status
+func (i *Executed) BroadcastError(err error) {
 	i.cond.L.Lock()
 	defer i.cond.L.Unlock()
 	if !i.done {
+		i.err = err
 		i.done = true
 		i.cond.Broadcast()
 	}
+}
+
+// Err returns the error passed to BroadcastError if it was
+// executed or nil.
+func (i *Executed) Err() error {
+	if !i.done {
+		return nil
+	}
+	return i.err
 }
