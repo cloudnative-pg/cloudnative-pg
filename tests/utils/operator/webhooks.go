@@ -34,6 +34,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
@@ -84,7 +85,7 @@ func getCNPGsValidatingWebhookConf(
 	*admissionregistrationv1.ValidatingWebhookConfiguration, error,
 ) {
 	validatingWebhookConf := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-	err := crudClient.Get(ctx, types.NamespacedName{Name: controller.ValidatingWebhookConfigurationName},
+	err := crudClient.Get(ctx, types.NamespacedName{Name: configuration.DefaultValidatingWebhookConfigurationName},
 		validatingWebhookConf)
 	return validatingWebhookConf, err
 }
@@ -155,7 +156,7 @@ func checkWebhookSetup(
 	for _, webhook := range mutatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
 			return fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
-				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
+				configuration.DefaultMutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
 		}
 	}
 
@@ -167,7 +168,7 @@ func checkWebhookSetup(
 	for _, webhook := range validatingWebhookConfig.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
 			return fmt.Errorf("secret not match with ca bundle in %v",
-				controller.ValidatingWebhookConfigurationName)
+				configuration.DefaultValidatingWebhookConfigurationName)
 		}
 	}
 
@@ -182,7 +183,7 @@ func getCNPGsMutatingWebhookConf(
 	*admissionregistrationv1.MutatingWebhookConfiguration, error,
 ) {
 	mutatingWebhookConfiguration := &admissionregistrationv1.MutatingWebhookConfiguration{}
-	err := crudClient.Get(ctx, types.NamespacedName{Name: controller.MutatingWebhookConfigurationName},
+	err := crudClient.Get(ctx, types.NamespacedName{Name: configuration.DefaultMutatingWebhookConfigurationName},
 		mutatingWebhookConfiguration)
 	return mutatingWebhookConfiguration, err
 }

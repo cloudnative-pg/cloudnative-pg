@@ -47,6 +47,16 @@ const (
 	// DefaultKubernetesClusterDomain is the default value used as
 	// Kubernetes cluster domain.
 	DefaultKubernetesClusterDomain = "cluster.local"
+
+	// DefaultwebhookServiceName is the default name of the service where the webhook server
+	// is reachable
+	DefaultWebhookServiceName = "cnpg-webhook-service" // #nosec
+
+	// DefaultMutatingWebhookConfigurationName is the default name of the mutating webhook configuration
+	DefaultMutatingWebhookConfigurationName = "cnpg-mutating-webhook-configuration"
+
+	// DefaultValidatingWebhookConfigurationName is the default name of the validating webhook configuration
+	DefaultValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 )
 
 // DefaultDrainTaints is the default list of taints the operator will watch and treat
@@ -165,6 +175,16 @@ type Data struct {
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// WebhookServiceName is the name of the service where the webhook server
+	// is reachable
+	WebhookServiceName string `json:"webhookServiceName" env:"WEBHOOK_SERVICE_NAME"`
+
+	// MutatingWebhookConfigurationName is the name of the mutating webhook configuration
+	MutatingWebhookConfigurationName string `json:"mutatingWebhookConfigurationName" env:"MUTATING_WEBHOOK_CONFIGURATION_NAME"`
+
+	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
+	ValidatingWebhookConfigurationName string `json:"validatingWebhookConfigurationName" env:"VALIDATING_WEBHOOK_CONFIGURATION_NAME"`
 }
 
 // Current is the configuration used by the operator
@@ -173,16 +193,19 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName:  DefaultOperatorPullSecretName,
-		OperatorImageName:       versions.DefaultOperatorImageName,
-		PostgresImageName:       versions.DefaultImageName,
-		PluginSocketDir:         DefaultPluginSocketDir,
-		CreateAnyService:        false,
-		CertificateDuration:     CertificateDuration,
-		ExpiringCheckThreshold:  ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:   0,
-		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
-		DrainTaints:             DefaultDrainTaints,
+		OperatorPullSecretName:             DefaultOperatorPullSecretName,
+		OperatorImageName:                  versions.DefaultOperatorImageName,
+		PostgresImageName:                  versions.DefaultImageName,
+		PluginSocketDir:                    DefaultPluginSocketDir,
+		CreateAnyService:                   false,
+		CertificateDuration:                CertificateDuration,
+		ExpiringCheckThreshold:             ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:              0,
+		KubernetesClusterDomain:            DefaultKubernetesClusterDomain,
+		DrainTaints:                        DefaultDrainTaints,
+		WebhookServiceName:                 DefaultWebhookServiceName,
+		MutatingWebhookConfigurationName:   DefaultMutatingWebhookConfigurationName,
+		ValidatingWebhookConfigurationName: DefaultValidatingWebhookConfigurationName,
 	}
 }
 
