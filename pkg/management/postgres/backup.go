@@ -51,6 +51,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+const (
+	barmanKeepVirtualTargetNoKeep = "nokeep"
+)
+
 // We wait up to 10 minutes to have a WAL archived correctly
 var retryUntilWalArchiveWorking = wait.Backoff{
 	Duration: 60 * time.Second,
@@ -161,6 +165,12 @@ func (b *BackupCommand) run(ctx context.Context) {
 		_ = status.FlagBackupAsFailed(ctx, b.Client, b.Backup, b.Cluster, err)
 	}
 
+	if err := b.keepBackup(ctx); err != nil {
+		b.Log.Error(err, "Can't mark backup as keep")
+		// We do not terminate here because we still want to do the maintenance
+		// activity on the backups and to set the condition on the cluster.
+	}
+
 	b.backupMaintenance(ctx)
 }
 
@@ -219,6 +229,36 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		return status.PatchConditionsWithOptimisticLock(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
 	}); err != nil {
 		b.Log.Error(err, "Can't update the cluster with the completed backup data")
+	}
+
+	return nil
+}
+
+func (b *BackupCommand) keepBackup(ctx context.Context) error {
+	keep := false
+	target := ""
+	if b.Backup.Spec.Keep != nil && *b.Backup.Spec.Keep != barmanKeepVirtualTargetNoKeep {
+		keep = true
+		target = *b.Backup.Spec.Keep
+	}
+
+	if err := barmanCommand.KeepBackup(
+		ctx,
+		b.Cluster.Spec.Backup.BarmanObjectStore,
+		b.Backup.Status.BackupName,
+		b.Backup.Status.ServerName,
+		keep,
+		target,
+		b.Env); err != nil {
+		b.Recorder.Event(b.Backup, "Warning", "KeepFailed", "Failed to configure keep for backup")
+		b.Backup.Status.SetAsFailed(err)
+		return err
+	} else {
+		b.Backup.Status.SetKeep(keep, target)
+	}
+
+	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't set backup keep flag in status", "keep", keep, "target", target)
 	}
 
 	return nil
