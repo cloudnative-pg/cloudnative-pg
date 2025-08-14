@@ -165,6 +165,9 @@ ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
 FailoverQuorum
@@ -306,6 +309,8 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpec
+OptionSpecValue
 OwnNamespace
 PDB
 PDBs
@@ -524,6 +529,7 @@ UTF
 Uncomment
 Unrealizable
 UpdateStrategy
+UsageSpec
 VLDB
 VLDBs
 VM
@@ -841,6 +847,8 @@ faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -854,6 +862,7 @@ firstRecoverabilityPointByMethod
 fqdn
 freddie
 fuzzystrmatch
+gRPC
 gapped
 gc
 gcc
@@ -873,7 +882,6 @@ googleCredentials
 goroutines
 gosec
 govulncheck
-gRPC
 grafana
 gzip
 hashicorp
@@ -1000,6 +1008,7 @@ lookups
 lsn
 lt
 lz
+mTLS
 macOS
 majorVersion
 majorVersionUpgradeFromImage
@@ -1038,7 +1047,6 @@ monitoringconfiguration
 mountPath
 msg
 mspan
-mTLS
 multinamespace
 mutatingwebhookconfigurations
 mutex
@@ -1443,6 +1451,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized

@@ -256,6 +256,76 @@ Each schema entry supports the following properties:
     [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
     [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
 
+## Managing Foreign Data Wrappers (FDWs) In a Database
+
+!!! Info
+    Foreign Data Wrappers (FDWs) are database-scoped objects that typically
+    require superuser privileges to create or modify. CloudNativePG provides a
+    declarative API for managing FDWs, enabling users to define and maintain them
+    in a controlled, Kubernetes-native way without directly executing SQL commands
+    or escalating privileges.
+
+CloudNativePG enables seamless and automated management of PostgreSQL foreign
+data wrappers in the target database using declarative configuration.
+
+To enable this feature, define the `spec.fdws` field with a list of FDW
+specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  fdws:
+  - name: postgres_fdw
+    usage:
+      - name: app
+      - type: grant
+# ...
+```
+
+Each FDW entry supports the following properties:
+
+- `name`: The name of the foreign data wrapper **(mandatory)**.
+- `ensure`: Indicates whether the FDW should be `present` or `absent` in the
+  database (default is `present`).
+- `handler`: The name of the handler function used by the FDW. If not
+  specified, the default handler defined by the FDW extension (if any) will be
+  used.
+- `validator`: The name of the validator function used by the FDW. If not
+  specified, the default validator defined by the FDW extension (if any) will
+  be used.
+- `owner`: The owner of the FDW **(must be a superuser)**.
+- `usage`: The list of `USAGE` permissions of the FDW, with the following fields:
+    - `name` : The name of the role to which the usage permission should be
+      granted or from which it should be revoked.
+    - `type` : The type of the usage permission. Supports `grant` and `revoke`.
+- `options`: A map of FDW-specific options to manage, where each key is the
+  name of an option. Each option supports the following fields:
+    - `value`: The string value of the option.
+    - `ensure`: Indicates whether the option should be `present` or `absent`.
+
+!!! Info
+    Both `handler` and `validator` are optional, and if not specified, the
+    default handler and validator defined by the FDW extension (if any) will be
+    used. Setting `handler` or `validator` to `"-"` will remove the handler or
+    validator from the FDW respectively. This follows the PostgreSQL convention,
+    where "-" denotes the absence of a handler or validator.
+
+!!! Warning
+    PostgreSQL restricts ownership of foreign data wrappers to **roles with
+    superuser privileges only**. Attempting to assign ownership to a non-superuser
+    (e.g., an app role) will be ignored or rejected, as PostgreSQL does not allow
+    non-superuser ownership of foreign data wrappers.
+
+The operator reconciles only the FDWs explicitly listed in `spec.fdws`. Any
+existing FDWs not declared in this list are left untouched.
+
+!!! Info
+     CloudNativePG manages FDWs using PostgreSQL's native SQL commands:
+     [`CREATE FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-createforeigndatawrapper.html),
+     [`ALTER FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-alterforeigndatawrapper.html),
+     and [`DROP FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-dropforeigndatawrapper.html).
+     The `ALTER` command supports option updates.
+
 ## Limitations and Caveats
 
 ### Renaming a database
