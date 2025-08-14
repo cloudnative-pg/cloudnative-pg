@@ -13,26 +13,26 @@ deploying PostgreSQL in Kubernetes. These considerations include:
 
 - **[Deployments in _stretched_](#multi-availability-zone-kubernetes-clusters)
   vs. [_non-stretched_ clusters](#single-availability-zone-kubernetes-clusters)**:
-  Evaluating the differences between deploying in stretched clusters (across 3
+  This section covers evaluating the differences between deploying in stretched clusters (across 3
   or more availability zones) versus non-stretched clusters (within a single
   availability zone).
-- [**Reservation of `postgres` worker nodes**](#reserving-nodes-for-postgresql-workloads): Isolating PostgreSQL workloads by
+- [**Reservation of `postgres` worker nodes**](#reserving-nodes-for-postgresql-workloads): This section discusses isolating PostgreSQL workloads by
   dedicating specific worker nodes to `postgres` tasks, ensuring optimal
   performance and minimizing interference from other workloads.
 - [**PostgreSQL architectures within a single Kubernetes cluster**](#postgresql-architecture):
-  Designing effective PostgreSQL deployments within a single Kubernetes cluster
+  This section covers designing effective PostgreSQL deployments within a single Kubernetes cluster
   to meet high availability and performance requirements.
 - [**PostgreSQL architectures across Kubernetes clusters for disaster recovery**](#deployments-across-kubernetes-clusters):
-  Planning and implementing PostgreSQL architectures that span multiple
+  This section covers planning and implementing PostgreSQL architectures that span multiple
   Kubernetes clusters to provide comprehensive disaster recovery capabilities.
 
 ## Synchronizing the state
 
-PostgreSQL is a database management system and, as such, it needs to be treated
+PostgreSQL is a database management system and, as such it needs to be treated
 as a **stateful workload** in Kubernetes. While stateless applications
 mainly use traffic redirection to achieve High Availability (HA) and
 Disaster Recovery (DR), in the case of a database, state must be replicated in
-multiple locations, preferably in a continuous and instantaneous way, by
+multiple locations, preferably in a continuous and near real-time way, by
 adopting either of the following two strategies:
 
 - *storage-level replication*, normally persistent volumes
@@ -65,8 +65,8 @@ locations - also known as data centers, failure zones, or more frequently
 private network connectivity.
 
 Being a distributed system, the recommended minimum number of availability
-zones for a Kubernetes cluster is three (3), in order to make the control
-plane resilient to the failure of a single zone.
+zones for a Kubernetes cluster is three (3), as this ensures the control
+plane can tolerate the failure of a single zone while maintaining quorum.
 For details, please refer to
 ["Running in multiple zones"](https://kubernetes.io/docs/setup/best-practices/multiple-zones/).
 This means that **each data center is active at any time** and can run workloads
