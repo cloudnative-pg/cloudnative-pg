@@ -1214,6 +1214,7 @@ recoverytarget
 recv
 redefinitions
 redhat
+refreshInterval
 rehydrate
 rehydrated
 rehydration
