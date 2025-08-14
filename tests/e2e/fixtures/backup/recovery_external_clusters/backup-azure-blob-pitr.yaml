@@ -4,4 +4,4 @@ metadata:
   name: cluster-backup-pitr
 spec:
   cluster:
-    name: external-cluster-azure
+    name: source-cluster-azure

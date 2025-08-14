@@ -306,7 +306,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 					clusterName,
 					sourceBackupFileAzurePITR,
 					AzureConfiguration,
-					1,
+					2,
 					currentTimestamp,
 				)
 
@@ -413,7 +413,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 					clusterName,
 					sourceBackupFileAzurePITRSAS,
 					AzureConfiguration,
-					1,
+					2,
 					currentTimestamp,
 				)
 
