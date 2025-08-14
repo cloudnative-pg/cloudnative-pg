@@ -62,7 +62,7 @@ every PostgreSQL cluster it deploys:
 * `[cluster name]-superuser` (if `.spec.enableSuperuserAccess` is set to `true`
   and you have not specified a different secret using `.spec.superuserSecret`)
 
-Each secret contain the following:
+Each secret contains the following:
 
 * username
 * password
