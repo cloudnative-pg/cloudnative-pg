@@ -244,14 +244,15 @@ CloudNativePG manages the following predefined annotations:
     how long the operator should retry recoverable errors before considering the
     volume snapshot backup failed. In minutes, defaulting to 10.
 
-`alpha.cnpg.io/unrecoverable`
-:   Applied to a `Pod` that runs a PostgreSQL instance, instructs the operator
-    to delete all the PVCs and the Pod. The instance will be recreated with
-    the configured join strategy. This will only work on instance that are not the current primary or 
-    the target primary.
-
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
+
+`alpha.cnpg.io/unrecoverable`
+:   Experimental annotation applied to a `Pod` running a PostgreSQL instance.
+    It instructs the operator to delete the `Pod` and all its associated PVCs.
+    The instance will then be recreated according to the configured join
+    strategy. This annotation can only be used on instances that are neither the
+    current primary nor the designated target primary.
 
 ## Prerequisites
 
