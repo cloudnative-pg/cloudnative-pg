@@ -36,7 +36,6 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.22
             release-1.25
             release-1.26
             release-1.27
@@ -61,7 +60,6 @@ jobs:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.22
             release-1.25
             release-1.26
             release-1.27
@@ -80,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.25, release-1.26, release-1.27]
+        branch: [release-1.25, release-1.26, release-1.27]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:

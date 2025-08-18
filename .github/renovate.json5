@@ -10,7 +10,6 @@
   prConcurrentLimit: 5,
   baseBranches: [
     'main',
-    'release-1.22',
     'release-1.25',
     'release-1.26',
     'release-1.27',
