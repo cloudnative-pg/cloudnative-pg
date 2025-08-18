@@ -838,6 +838,7 @@ firstRecoverabilityPointByMethod
 fqdn
 freddie
 fuzzystrmatch
+gRPC
 gapped
 gc
 gcc
@@ -857,7 +858,6 @@ googleCredentials
 goroutines
 gosec
 govulncheck
-gRPC
 grafana
 gzip
 hashicorp
@@ -981,6 +981,7 @@ lookups
 lsn
 lt
 lz
+mTLS
 macOS
 majorVersion
 majorVersionUpgradeFromImage
@@ -1019,7 +1020,6 @@ monitoringconfiguration
 mountPath
 msg
 mspan
-mTLS
 multinamespace
 mutatingwebhookconfigurations
 mutex
