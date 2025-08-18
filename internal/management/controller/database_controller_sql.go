@@ -33,11 +33,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// Now we have only string values for options, this could be changed for high compatibility
-// to other types if needed
-type OptionName = string
-type OptionValue = string
-
 type extInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -50,17 +45,17 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string                     `json:"name"`
-	Handler   string                     `json:"handler"`
-	Validator string                     `json:"validator"`
-	Owner     string                     `json:"owner"`
-	Options   map[OptionName]OptionValue `json:"options"`
+	Name      string            `json:"name"`
+	Handler   string            `json:"handler"`
+	Validator string            `json:"validator"`
+	Owner     string            `json:"owner"`
+	Options   map[string]string `json:"options"`
 }
 
 type serverInfo struct {
-	Name    string                     `json:"name"`
-	FDWName string                     `json:"fdwName"`
-	Options map[OptionName]OptionValue `json:"options"`
+	Name    string            `json:"name"`
+	FDWName string            `json:"fdwName"`
+	Options map[string]string `json:"options"`
 }
 
 func detectDatabase(
@@ -438,14 +433,11 @@ func extractOptionsClauses(options []apiv1.OptionSpec) []string {
 			optionSpec.Value))
 	}
 
-	if len(opts) == 0 {
-		return nil
-	}
 	return opts
 }
 
 // findUpdateableOptions finds the diffs between current options from info of database objects and desired options
-func findUpdateableOptions(desiredOptions []apiv1.OptionSpec, currentOptions map[string]OptionValue) []string {
+func findUpdateableOptions(desiredOptions []apiv1.OptionSpec, currentOptions map[string]string) []string {
 	var clauses []string
 	for _, desiredOptSpec := range desiredOptions {
 		curOptValue, exists := currentOptions[desiredOptSpec.Name]
@@ -455,20 +447,14 @@ func findUpdateableOptions(desiredOptions []apiv1.OptionSpec, currentOptions map
 			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
 				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 
-		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
-			if desiredOptSpec.Value != curOptValue {
-				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
-					pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
-			}
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists && desiredOptSpec.Value != curOptValue:
+			clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
 
 		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
 			clauses = append(clauses, fmt.Sprintf("DROP %s",
 				pgx.Identifier{desiredOptSpec.Name}.Sanitize()))
 		}
-	}
-
-	if len(clauses) == 0 {
-		return nil
 	}
 
 	return clauses
@@ -484,21 +470,15 @@ WHERE fdwname = $1
 `
 
 func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
-	contextLogger := log.FromContext(ctx)
-
-	row := db.QueryRowContext(
-		ctx, detectDatabaseFDWSQL,
-		fdw.Name)
-	if row.Err() != nil {
-		return nil, fmt.Errorf("while checking if FDW %q exists: %w", fdw.Name, row.Err())
-	}
-
 	var (
 		result     fdwInfo
 		optionsRaw pq.StringArray
 	)
 
-	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
+	if err := db.QueryRowContext(
+		ctx, detectDatabaseFDWSQL,
+		fdw.Name).
+		Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -512,10 +492,10 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 		if len(parts) == 2 {
 			opts[parts[0]] = parts[1]
 		} else {
-			contextLogger.Info(
-				"skipping unparsable option, expected \"keyword=value\"",
-				"optionsRaw", optionsRaw,
-				"fdwName", fdw.Name)
+			return nil, fmt.Errorf(
+				"unparsable option for foreign data wrapper %q: expected \"keyword=value\", got %v",
+				fdw.Name, optionsRaw,
+			)
 		}
 	}
 	result.Options = opts
@@ -531,7 +511,7 @@ func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec)
 
 	for _, usageSpec := range fdw.Usages {
 		switch usageSpec.Type {
-		case "grant":
+		case apiv1.GrantUsageSpecType:
 			changeUsageSQL := fmt.Sprintf(
 				"GRANT USAGE ON FOREIGN DATA WRAPPER %s TO %s",
 				pgx.Identifier{fdw.Name}.Sanitize(),
@@ -541,7 +521,7 @@ func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec)
 			}
 			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
 
-		case "revoke":
+		case apiv1.RevokeUsageSpecType:
 			changeUsageSQL := fmt.Sprintf(
 				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
 				pgx.Identifier{fdw.Name}.Sanitize(),
@@ -587,7 +567,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		}
 	}
 
-	if opts := extractOptionsClauses(fdw.Options); opts != nil {
+	if opts := extractOptionsClauses(fdw.Options); len(opts) > 0 {
 		sqlCreateFDW.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
 	}
 
@@ -681,7 +661,7 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 		contextLogger.Info("altered foreign data wrapper owner", "name", fdw.Name, "owner", fdw.Owner)
 	}
 
-	if toUpdateOpts := findUpdateableOptions(fdw.Options, info.Options); toUpdateOpts != nil {
+	if toUpdateOpts := findUpdateableOptions(fdw.Options, info.Options); len(toUpdateOpts) > 0 {
 		changeOptionSQL := fmt.Sprintf(
 			"ALTER FOREIGN DATA WRAPPER %s OPTIONS (%s)", pgx.Identifier{fdw.Name}.Sanitize(),
 			strings.Join(toUpdateOpts, ", "),
@@ -726,21 +706,14 @@ WHERE srvname = $1
 `
 
 func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) (*serverInfo, error) {
-	contextLogger := log.FromContext(ctx)
-
-	row := db.QueryRowContext(
-		ctx, detectDatabaseForeignServerSQL,
-		server.Name)
-	if row.Err() != nil {
-		return nil, fmt.Errorf("while checking if foreign server %q exists: %w", server.Name, row.Err())
-	}
-
 	var (
 		result     serverInfo
 		optionsRaw pq.StringArray
 	)
 
-	if err := row.Scan(&result.Name, &result.FDWName, &optionsRaw); err != nil {
+	if err := db.QueryRowContext(
+		ctx, detectDatabaseForeignServerSQL,
+		server.Name).Scan(&result.Name, &result.FDWName, &optionsRaw); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -753,10 +726,10 @@ func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.
 		if len(parts) == 2 {
 			opts[parts[0]] = parts[1]
 		} else {
-			contextLogger.Info(
-				"skipping unparsable option, expected \"keyword=value\"",
-				"optionsRaw", optionsRaw,
-				"foreignServerName", server.Name)
+			return nil, fmt.Errorf(
+				"unparsable option for foreign server %q: expected \"keyword=value\", got %v",
+				server.Name, optionsRaw,
+			)
 		}
 	}
 	result.Options = opts
@@ -773,7 +746,7 @@ func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 		pgx.Identifier{server.Name}.Sanitize(),
 		pgx.Identifier{server.FdwName}.Sanitize()))
 
-	if opts := extractOptionsClauses(server.Options); opts != nil {
+	if opts := extractOptionsClauses(server.Options); len(opts) > 0 {
 		sqlCreateServer.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
 	}
 
@@ -792,7 +765,7 @@ func updateDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 	contextLogger := log.FromContext(ctx)
 
 	// Alter Options
-	if toUpdateOpts := findUpdateableOptions(server.Options, info.Options); toUpdateOpts != nil {
+	if toUpdateOpts := findUpdateableOptions(server.Options, info.Options); len(toUpdateOpts) > 0 {
 		changeOptionSQL := fmt.Sprintf(
 			"ALTER SERVER %s OPTIONS (%s)", pgx.Identifier{server.Name}.Sanitize(),
 			strings.Join(toUpdateOpts, ", "),

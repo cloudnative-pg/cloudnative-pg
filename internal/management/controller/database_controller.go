@@ -277,8 +277,7 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	ctx context.Context,
 	obj *apiv1.Database,
 ) error {
-	objectCount := 0
-	objectCount += len(obj.Spec.Schemas)
+	objectCount := len(obj.Spec.Schemas)
 	objectCount += len(obj.Spec.Extensions)
 	objectCount += len(obj.Spec.FDWs)
 

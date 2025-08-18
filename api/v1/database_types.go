@@ -38,6 +38,20 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
+// UsageSpecType decribes the type of usage specified in the `usage` field of the
+// `Database` object.
+// +enum
+type UsageSpecType string
+
+const (
+	// GrantUsageSpecType indicates a grant usage permission.
+	// The default usage permission is grant.
+	GrantUsageSpecType UsageSpecType = "grant"
+
+	// RevokeUsageSpecType indicates a revoke usage permission.
+	RevokeUsageSpecType UsageSpecType = "revoke"
+)
+
 // DatabaseSpec is the specification of a Postgresql Database, built around the
 // `CREATE DATABASE`, `ALTER DATABASE`, and `DROP DATABASE` SQL commands of
 // PostgreSQL.
@@ -304,7 +318,7 @@ type UsageSpec struct {
 	// +kubebuilder:default:="grant"
 	// +kubebuilder:validation:Enum=grant;revoke
 	// +optional
-	Type string `json:"type,omitempty"`
+	Type UsageSpecType `json:"type,omitempty"`
 }
 
 // OptionRefSpec holds the name and key of an option that should be referenced from Secret/ConfigMap
