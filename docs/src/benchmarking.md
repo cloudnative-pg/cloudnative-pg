@@ -196,4 +196,4 @@ After all testing is done, fio deployment and resources can be deleted by:
 ```shell
 kubectl cnpg fio <fio-job-name> --dry-run | kubectl delete -f -
 ```
-make sure use the same name which was used to create the fio deployment and add namespace if applicable.
+Make sure to use the same name which was used to create the fio deployment and add namespace if applicable.
