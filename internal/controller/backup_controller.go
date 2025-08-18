@@ -179,17 +179,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return res, err
 	}
 
-	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
-	// from the ones managed directly by the operator (VolumeSnapshot)
-	switch backup.Spec.Method {
-	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
-		if res, err := r.startBarmanOrPlugin(ctx, cluster, backup); err != nil || res != nil {
+	switch {
+	case backup.Spec.Method.IsManagedByInstance():
+		if res, err := r.startBackupManagedByInstance(ctx, cluster, backup); err != nil || res != nil {
 			if res != nil {
 				return *res, err
 			}
 			return ctrl.Result{}, err
 		}
-	case apiv1.BackupMethodVolumeSnapshot:
+	case backup.Spec.Method.IsManagedByOperator():
 		res, err := r.reconcileSnapshotBackup(ctx, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -208,7 +206,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return hookResult.Result, hookResult.Err
 }
 
-func (r *BackupReconciler) startBarmanOrPlugin(
+func (r *BackupReconciler) startBackupManagedByInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	backup apiv1.Backup,
@@ -301,11 +299,11 @@ func (r *BackupReconciler) isCurrentBackupRunning(
 		}
 	}
 
-	switch backup.Spec.Method {
-	case apiv1.BackupMethodVolumeSnapshot:
+	switch {
+	case backup.Spec.Method.IsManagedByOperator():
 		// If the backup is a snapshot backup, we proceed with the reconciliation loop
 		return ctrl.Result{}, nil
-	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
+	case backup.Spec.Method.IsManagedByInstance():
 		// the instance manager is working we have to wait for it to finish
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	default:

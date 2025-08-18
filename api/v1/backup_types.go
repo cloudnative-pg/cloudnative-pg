@@ -118,6 +118,16 @@ const (
 	BackupMethodPlugin BackupMethod = "plugin"
 )
 
+// IsManagedByInstance returns true if the backup is managed by the instance manager
+func (b BackupMethod) IsManagedByInstance() bool {
+	return b == BackupMethodPlugin || b == BackupMethodBarmanObjectStore
+}
+
+// IsManagedByOperator returns true if the backup is managed by the operator
+func (b BackupMethod) IsManagedByOperator() bool {
+	return b == BackupMethodVolumeSnapshot
+}
+
 // BackupSpec defines the desired state of Backup
 // +kubebuilder:validation:XValidation:rule="oldSelf == self",message="BackupSpec is immutable once set"
 type BackupSpec struct {
