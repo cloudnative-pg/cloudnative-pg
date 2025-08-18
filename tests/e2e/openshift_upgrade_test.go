@@ -166,7 +166,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		assertClusterIsAligned(namespace, clusterName)
 	}
 
-	It("stable-v1 to alpha, currently version 1.22", func() {
+	It("stable-v1 to alpha", func() {
 		if ocpVersion.GT(ocp412) {
 			Skip("This test runs only on OCP 4.12 or lower")
 		}
