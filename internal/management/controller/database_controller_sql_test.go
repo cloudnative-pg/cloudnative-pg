@@ -925,7 +925,7 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 			info := &serverInfo{
 				Name:    server.Name,
 				FDWName: server.FdwName,
-				Options: map[OptionName]OptionValue{
+				Options: map[string]string{
 					"modify_option": "old_value",
 					"remove_option": "value",
 				},
@@ -948,7 +948,7 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 			info := &serverInfo{
 				Name:    server.Name,
 				FDWName: server.FdwName,
-				Options: map[OptionName]OptionValue{
+				Options: map[string]string{
 					"modify_option": "old_value",
 					"remove_option": "value",
 				},
@@ -971,7 +971,7 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 			info := &serverInfo{
 				Name:    server.Name,
 				FDWName: server.FdwName,
-				Options: map[OptionName]OptionValue{
+				Options: map[string]string{
 					"modify_option": "old_value",
 					"remove_option": "value",
 				},
