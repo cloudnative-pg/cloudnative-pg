@@ -491,7 +491,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
 
       - name: Run GoReleaser to build kubectl plugin
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         if: |
           github.event_name == 'schedule' ||
           (
@@ -531,7 +531,7 @@ jobs:
           SLACK_MESSAGE: Building kubernetes plugin failed!
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
           version: v2
@@ -605,7 +605,7 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@7e76a00337235faa7b795d0c300768e54c9b0923 # master
+        uses: snyk/actions/docker@86b1cee1b8e110a78d528b3e1328a80e218111d2 # master
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
@@ -617,7 +617,7 @@ jobs:
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@df559355d593797519d70b90fc8edd5db049e7a2 # v3
+        uses: github/codeql-action/upload-sarif@96f518a34f7a870018057716cc4d7a5c014bd61c # v3
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
