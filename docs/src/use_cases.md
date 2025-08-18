@@ -18,7 +18,7 @@ namespace inside a Kubernetes cluster.
 ![Application and Database inside Kubernetes](./images/apps-in-k8s.png)
 
 The application, normally stateless, is managed as a standard `Deployment`,
-with multiple replicas spread over different Kubernetes node, and internally
+with multiple replicas spread over different Kubernetes nodes, and internally
 exposed through a `ClusterIP` service.
 
 The service is exposed externally to the end user through an `Ingress` and the
