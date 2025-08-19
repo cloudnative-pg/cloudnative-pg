@@ -6654,5 +6654,13 @@ online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)</p>
    <p>Configuration parameters to control the online/hot backup with volume snapshots</p>
 </td>
 </tr>
+<tr><td><code>groupSnapshot</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>GroupSnapshot makes the operator use a VolumeGroupSnapshot resource
+instead of individual snapshots</p>
+</td>
+</tr>
 </tbody>
 </table>
