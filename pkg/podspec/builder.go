@@ -386,28 +386,6 @@ func (builder *Builder) WithInitContainerSecurityContext(
 	return builder
 }
 
-// WithInitContainerResources ensures that, if in the current status there is
-// an init container with the passed name and the resources are empty, the resources will be
-// set to the ones passed.
-// If `overwrite` is true the resources are overwritten even when they're not empty
-func (builder *Builder) WithInitContainerResources(
-	name string,
-	resources corev1.ResourceRequirements,
-	overwrite bool,
-) *Builder {
-	builder.WithInitContainer(name)
-
-	for idx, value := range builder.status.Spec.InitContainers {
-		if value.Name == name {
-			if overwrite || value.Resources.Limits == nil && value.Resources.Requests == nil {
-				builder.status.Spec.InitContainers[idx].Resources = resources
-			}
-		}
-	}
-
-	return builder
-}
-
 // Build gets the final Pod template
 func (builder *Builder) Build() *apiv1.PodTemplateSpec {
 	return &builder.status

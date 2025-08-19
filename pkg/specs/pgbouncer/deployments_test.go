@@ -21,6 +21,8 @@ package pgbouncer
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -158,5 +160,40 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds).To(Equal(int32(5)))
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TCPSocket.Port).
 			To(Equal(intstr.FromInt32(pgBouncerConfig.PgBouncerPort)))
+	})
+
+	FIt("retains user-defined bootstrap-controller resources", func() {
+		pooler.Spec.Template = &apiv1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name: specs.BootstrapControllerContainerName,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2m"),
+							corev1.ResourceMemory: resource.MustParse("30Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				}},
+			},
+		}
+
+		deployment, err := Deployment(pooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+		var found *corev1.Container
+		for i := range deployment.Spec.Template.Spec.InitContainers {
+			if deployment.Spec.Template.Spec.InitContainers[i].Name == specs.BootstrapControllerContainerName {
+				found = &deployment.Spec.Template.Spec.InitContainers[i]
+				break
+			}
+		}
+		Expect(found).ToNot(BeNil())
+		Expect(found.Resources.Requests.Cpu().String()).To(Equal("2m"))
+		Expect(found.Resources.Requests.Memory().String()).To(Equal("30Mi"))
+		Expect(found.Resources.Limits.Cpu().String()).To(Equal("1"))
+		Expect(found.Resources.Limits.Memory().String()).To(Equal("100Mi"))
 	})
 })
