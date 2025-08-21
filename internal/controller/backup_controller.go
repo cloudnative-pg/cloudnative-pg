@@ -157,10 +157,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = cnpgiClient.SetPluginClientInContext(ctx, pluginClient)
 
-	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
-		return hookResult.Result, hookResult.Err
-	}
-
 	contextLogger.Debug("Found cluster for backup", "cluster", cluster.Name)
 
 	// Store in the context the TLS configuration required communicating with the Pods
@@ -181,6 +177,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	if res, err := r.isCurrentBackupRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
 		return res, err
+	}
+
+	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
 	}
 
 	switch {
