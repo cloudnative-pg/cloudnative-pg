@@ -1,26 +1,26 @@
 {
   "18": [
-    "18beta2",
-    "18beta2-4"
+    "18beta3-minimal-bookworm",
+    "18beta3-202508191410-minimal-bookworm"
   ],
   "17": [
-    "17.5",
-    "17.4"
+    "17.6-minimal-bookworm",
+    "17.5-minimal-bookworm"
   ],
   "16": [
-    "16.9",
-    "16.8"
+    "16.10-minimal-bookworm",
+    "16.9-minimal-bookworm"
   ],
   "15": [
-    "15.13",
-    "15.12"
+    "15.14-minimal-bookworm",
+    "15.13-minimal-bookworm"
   ],
   "14": [
-    "14.18",
-    "14.17"
+    "14.19-minimal-bookworm",
+    "14.18-minimal-bookworm"
   ],
   "13": [
-    "13.21",
-    "13.20"
+    "13.22-minimal-bookworm",
+    "13.21-minimal-bookworm"
   ]
 }

@@ -27,9 +27,11 @@ from subprocess import check_output
 min_supported_major = 13
 
 pg_repo_name = "cloudnative-pg/postgresql"
-pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?$")
 pg_versions_file = ".github/pg_versions.json"
-
+suffix = "-minimal-bookworm"
+regexp = r"(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d{12})?"
+pg_version_re = re.compile(rf"^{regexp}{re.escape(suffix)}$")
+semantic_re = re.compile(rf"^{regexp}$")
 
 def get_json(repo_name):
     data = check_output([
@@ -54,13 +56,16 @@ def write_json(repo_url, version_re, output_file):
     # Filter out all the tags which do not match the version regexp
     tags = [item for item in tags if version_re.search(item)]
 
+    # Strip the suffix to get a valid semantic version
+    tags = [item.replace(suffix, "") for item in tags]
+
     # Sort the tags according to semantic versioning
     tags.sort(key=version.Version, reverse=True)
 
     results = {}
     extra_results = {}
     for item in tags:
-        match = version_re.search(item)
+        match = semantic_re.search(item)
         if not match:
             continue
 
@@ -70,19 +75,19 @@ def write_json(repo_url, version_re, output_file):
         if int(major) < min_supported_major:
             continue
 
-        # We normally want to handle only versions without the '-' inside
+        # We normally want to handle only versions without the timestamp inside
         extra = match.group(2)
         if not extra:
             if major not in results:
                 results[major] = [item]
             elif len(results[major]) < 2:
                 results[major].append(item)
-        # But we keep the highest version with the '-' in case we have not enough other versions
+        # But we keep the highest version with the timestamp in case we have not enough other versions
         else:
             if major not in extra_results:
                 extra_results[major] = item
 
-    # If there are not enough version without '-` inside we add the one we kept
+    # If there are not enough version without the timestamp inside, we add the one we kept
     for major in results:
         if len(results[major]) < 2:
             results[major].append(extra_results[major])
@@ -90,6 +95,9 @@ def write_json(repo_url, version_re, output_file):
         # make sure to update between two different names of the most recent version (it might be a release)
         elif is_pre_release(results[major][0]) or is_pre_release(results[major][1]):
             results[major] = [results[major][0], extra_results[major]]
+
+    # Add back the suffix
+    results = {major: [f"{v}{suffix}" for v in values] for major, values in results.items()}
 
     with open(output_file, "w") as json_file:
         json.dump(results, json_file, indent=2)
