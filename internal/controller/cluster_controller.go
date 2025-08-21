@@ -437,6 +437,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
+	if res, err := r.requireWALArchivingPluginOrDelete(ctx, instancesStatus); err != nil || !res.IsZero() {
+		return res, err
+	}
+
 	if res, err := replicaclusterswitch.Reconcile(
 		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
@@ -567,6 +571,30 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
+	ctx context.Context,
+	instances postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("require_wal_archiving_plugin_delete")
+
+	for _, state := range instances.Items {
+		if !isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
+			contextLogger.Warning(
+				"Detected instance manager initialization procedure that failed "+
+					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
+				"targetPod", state.Pod.Name)
+			if err := r.Delete(ctx, state.Pod); err != nil {
+				contextLogger.Error(err, "Cannot delete the pod", "pod", state.Pod.Name)
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(
