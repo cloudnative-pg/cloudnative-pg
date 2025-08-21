@@ -76,6 +76,7 @@ type BackupReconciler struct {
 	Plugins  repository.Interface
 
 	instanceStatusClient remote.InstanceClient
+	vsr                  *volumesnapshot.Reconciler
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
@@ -84,13 +85,16 @@ func NewBackupReconciler(
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
 ) *BackupReconciler {
+	cli := mgr.GetClient()
+	recorder := mgr.GetEventRecorderFor("cloudnative-pg-backup")
 	return &BackupReconciler{
-		Client:               mgr.GetClient(),
+		Client:               cli,
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
-		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
+		Recorder:             recorder,
 		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
+		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
 	}
 }
 
@@ -547,11 +551,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return nil, fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
-	reconciler := volumesnapshot.
-		NewReconcilerBuilder(r.Client, r.Recorder).
-		Build()
-
-	res, err := reconciler.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+	res, err := r.vsr.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 	if err != nil {
 		// Volume Snapshot errors are not retryable, we need to set this backup as failed
 		// and un-fence the Pod
