@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: db-declarative-with-foreign-server
+spec:
+  name: declarative-with-foreign-server
+  owner: app
+  localeCType: C
+  localeCollate: C
+  encoding: SQL_ASCII
+  template: template0
+  cluster:
+    name: cluster-with-declarative-databases
+  extensions:
+  - name: bloom
+    ensure: present
+  - name: postgres_fdw
+    ensure: present
+  schemas:
+  - name: test_schema
+    ensure: present
+  fdws:
+    - name: postgres_fdw
+      ensure: present
+      usage:
+      - name: app
+        type: grant
+    - name: mywrapper
+      options:
+        - name: debug
+          value: 'true'
+          ensure: present
+      ensure: present
+  servers:
+  - name: server1
+    fdw: postgres_fdw
+    options:
+
+    ensure: present
