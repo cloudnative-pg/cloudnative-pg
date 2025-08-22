@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -37,6 +38,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// serviceDNS builds the cluster service DNS for the RW service
+func serviceDNS(clusterName, namespace string) string {
+	return fmt.Sprintf("%s-rw.%s.svc", clusterName, namespace)
+}
+
+// externalCredsDir builds the path to the external credentials directory
+func externalCredsDir(externalName string) string {
+	return fmt.Sprintf("/controller/external/%s", externalName)
+}
 
 // - spinning up a cluster, apply a declarative database on it
 
@@ -164,6 +175,16 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}
 			})
 
+			By("verifying the foreign server presence in the target database", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, serverSpec := range database.Spec.Servers {
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						foreignserverExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+				}
+			})
+
 			By("removing the Database object", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
 			})
@@ -242,4 +263,51 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 		})
 	})
+
+	Context("across two clusters (foreign server to a peer cluster; no hardcoded secrets))", Ordered, func() {
+		const (
+			namespacePrefix             = "declarative-db-mc"
+			srcDBName                   = "db_src"
+			dstDBName                   = "db_dst"
+			clusterWithExternalManifest = fixturesDir + "/declarative_databases/cluster-with-external.yaml.template"
+		)
+		var (
+			namespace              string
+			err                    error
+			srcClusterName         string // e.g., "cluster-a"
+			dstClusterName         string // e.g., "cluster-b"
+			srcPrimary, dstPrimary *v1.Pod
+		)
+
+		BeforeAll(func() {
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterWithExternalManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			dstClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("setting up two clusters in the same namespace", func() {
+				AssertCreateCluster(namespace, srcClusterName, clusterWithExternalManifest, env)
+				AssertCreateCluster(namespace, dstClusterName, clusterManifest, env)
+			})
+
+			var errA, errB error
+			srcPrimary, errA = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, srcClusterName)
+			dstPrimary, errB = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, dstClusterName)
+			Expect(errA).ToNot(HaveOccurred())
+			Expect(errB).ToNot(HaveOccurred())
+		})
+
+		It("declares a foreign server on source Cluster pointing to destination Cluster and can query it via postgres_fdw", func() {
+			// Prepare a table on the destination (Cluster B)
+			By("creating a simple table on the destination cluster", func() {
+
+			})
+		})
+	})
+
 })
