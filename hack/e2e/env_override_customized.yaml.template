@@ -12,6 +12,9 @@ spec:
         envFrom:
         - configMapRef:
             name: controller-manager-env
+        env:
+        - name: STANDBY_TCP_USER_TIMEOUT
+          value: "5000"
         args:
         - controller
         - --leader-elect=${LEADER_ELECTION}
