@@ -100,6 +100,8 @@ CloudNativePG manages the following predefined labels:
 `cnpg.io/instanceRole`
 : Whether the instance running in a pod is a `primary` or a `replica`.
 
+`app.kubernetes.io/managed-by`
+: common label across all cnpg managed resources, will always be `cloudnative-pg`
 
 ## Predefined annotations
 
