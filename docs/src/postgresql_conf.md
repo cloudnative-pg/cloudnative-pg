@@ -180,8 +180,8 @@ network disruptions. For more details, refer to the
 
 The operator requires PostgreSQL to output its log in CSV format, and the
 instance manager automatically parses it and outputs it in JSON format.
-For this reason, all log settings in PostgreSQL are fixed and cannot be
-changed.
+For this reason, some log settings in PostgreSQL, as shown in 
+[this section](#fixed-parameters), are fixed and cannot be changed.
 
 For further information, please refer to the ["Logging" section](logging.md).
 
