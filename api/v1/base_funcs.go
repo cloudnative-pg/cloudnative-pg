@@ -75,13 +75,3 @@ func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
 
 	return podsNames
 }
-
-// IsManagedByInstance returns true if the backup is managed by the instance manager
-func (b BackupMethod) IsManagedByInstance() bool {
-	return b == BackupMethodPlugin || b == BackupMethodBarmanObjectStore
-}
-
-// IsManagedByOperator returns true if the backup is managed by the operator
-func (b BackupMethod) IsManagedByOperator() bool {
-	return b == BackupMethodVolumeSnapshot
-}
