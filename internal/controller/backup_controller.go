@@ -127,7 +127,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var cluster apiv1.Cluster
 	if res, err := r.getCluster(ctx, &backup, &cluster); err != nil || res != nil {
 		if res != nil {
-			return *res, nil
+			return *res, err
 		}
 		return ctrl.Result{}, err
 	}
@@ -185,19 +185,20 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	switch {
 	case backup.Spec.Method.IsManagedByInstance():
-		if res, err := r.startBackupManagedByInstance(ctx, cluster, backup); err != nil || res != nil {
-			if res != nil {
-				return *res, err
-			}
+		res, err := r.startBackupManagedByInstance(ctx, cluster, backup)
+		if res != nil {
+			return *res, err
+		}
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 	case backup.Spec.Method.IsManagedByOperator():
 		res, err := r.reconcileSnapshotBackup(ctx, &cluster, &backup)
+		if res != nil {
+			return *res, err
+		}
 		if err != nil {
 			return ctrl.Result{}, err
-		}
-		if res != nil {
-			return *res, nil
 		}
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
