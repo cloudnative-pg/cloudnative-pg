@@ -152,6 +152,34 @@ spec:
         [...]
 ```
 
+Recent changes to the [boto3 implementation](https://github.com/boto/boto3/issues/4392)
+of [Amazon S3 Data Integrity Protections](https://docs.aws.amazon.com/sdkref/latest/guide/feature-dataintegrity.html)
+may lead to the `x-amz-content-sha256` error when using the Barman Cloud
+Plugin.
+
+If you encounter this issue (see [GitHub issue #8427](https://github.com/cloudnative-pg/cloudnative-pg/issues/8427)),
+you can apply the following workaround by setting specific environment
+variables in the `Cluster` resource:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  [...]
+  env:
+  - name: AWS_REQUEST_CHECKSUM_CALCULATION
+    value: when_required
+  - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+    value: when_required    
+  [...]
+```
+
+These settings ensure that checksum calculations and validations are only
+applied when explicitly required, avoiding compatibility issues with certain
+S3-compatible storage providers.
+
 ### Using Object Storage with a private CA
 
 Suppose you configure an Object Storage provider which uses a certificate
