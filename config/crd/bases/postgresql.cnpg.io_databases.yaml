@@ -412,6 +412,27 @@ spec:
                         - value
                         type: object
                       type: array
+                    usage:
+                      description: List of roles for which `USAGE` privileges on the
+                        server are granted or revoked.
+                      items:
+                        description: UsageSpec configures a usage for a foreign data
+                          wrapper
+                        properties:
+                          name:
+                            description: Name of the usage
+                            type: string
+                          type:
+                            default: grant
+                            description: The type of usage
+                            enum:
+                            - grant
+                            - revoke
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                   required:
                   - fdw
                   - name
