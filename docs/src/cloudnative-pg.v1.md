@@ -2430,6 +2430,8 @@ PostgreSQL cluster from an existing storage</p>
 
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>DatabaseObjectSpec contains the fields which are common to every
 database object</p>
@@ -2733,6 +2735,13 @@ tablespace used for objects created in this database.</p>
    <p>The list of foreign data wrappers to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServerSpec"><i>[]ServerSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign servers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2793,6 +2802,13 @@ desired state that was synchronized</p>
    <p>FDWs is the status of the managed FDWs</p>
 </td>
 </tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>Servers is the status of the managed servers</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2835,7 +2851,7 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
-- [OptionSpecValue](#postgresql-cnpg-io-v1-OptionSpecValue)
+- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -4022,6 +4038,8 @@ possible. <code>false</code> by default.</p>
 
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>OptionSpec holds the name, value and the ensure field for an option</p>
 
@@ -4036,30 +4054,6 @@ possible. <code>false</code> by default.</p>
    <p>Name of the option</p>
 </td>
 </tr>
-<tr><td><code>OptionSpecValue</code><br/>
-<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>OptionSpecValue</i></a>
-</td>
-<td>(Members of <code>OptionSpecValue</code> are embedded into this type.)
-   <p>Value and ensure field of the option</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
-
-
-**Appears in:**
-
-- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
-
-
-<p>OptionSpecValue holds the value and the ensure field for an option</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
 <tr><td><code>value</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -5909,6 +5903,51 @@ Map keys are the secret names, map values are the versions</p>
 </tbody>
 </table>
 
+## ServerSpec     {#postgresql-cnpg-io-v1-ServerSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>ServerSpec configures a server of a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>fdw</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>fdw name</p>
+</td>
+</tr>
+<tr><td><code>options</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
+</td>
+<td>
+   <p>Options specifies options for the server(key is option name, value is option value)</p>
+</td>
+</tr>
+<tr><td><code>usage</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>List of roles for which <code>USAGE</code> privileges on the server are granted or revoked.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ServiceAccountTemplate     {#postgresql-cnpg-io-v1-ServiceAccountTemplate}
 
 
@@ -6557,6 +6596,8 @@ in synchronous replica election in case of failures</p>
 
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>UsageSpec configures a usage for a foreign data wrapper</p>
 
@@ -6572,7 +6613,7 @@ in synchronous replica election in case of failures</p>
 </td>
 </tr>
 <tr><td><code>type</code><br/>
-<i>string</i>
+<a href="#postgresql-cnpg-io-v1-UsageSpecType"><i>UsageSpecType</i></a>
 </td>
 <td>
    <p>The type of usage</p>
@@ -6580,6 +6621,21 @@ in synchronous replica election in case of failures</p>
 </tr>
 </tbody>
 </table>
+
+## UsageSpecType     {#postgresql-cnpg-io-v1-UsageSpecType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [UsageSpec](#postgresql-cnpg-io-v1-UsageSpec)
+
+
+<p>UsageSpecType describes the type of usage specified in the <code>usage</code> field of the
+<code>Database</code> object.</p>
+
+
+
 
 ## VolumeSnapshotConfiguration     {#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration}
 
