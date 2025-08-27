@@ -38,7 +38,7 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
-// UsageSpecType decribes the type of usage specified in the `usage` field of the
+// UsageSpecType describes the type of usage specified in the `usage` field of the
 // `Database` object.
 // +enum
 type UsageSpecType string
@@ -289,10 +289,6 @@ type ServerSpec struct {
 	// List of roles for which `USAGE` privileges on the server are granted or revoked.
 	// +optional
 	Usages []UsageSpec `json:"usage,omitempty"`
-
-	// OptionsRef specfies options refered from Secret/ConfigMap
-	// +optional
-	OptionsRef []OptionRefSpec `json:"optionsRef,omitempty"`
 }
 
 // OptionSpec holds the name, value and the ensure field for an option
@@ -323,15 +319,6 @@ type UsageSpec struct {
 	// +kubebuilder:validation:Enum=grant;revoke
 	// +optional
 	Type UsageSpecType `json:"type,omitempty"`
-}
-
-// OptionRefSpec holds the name and key of an option that should be referenced from Secret/ConfigMap
-type OptionRefSpec struct {
-	// Name of the option
-	Name string `json:"name"`
-
-	// Key of the option
-	Key string `json:"key"`
 }
 
 // DatabaseStatus defines the observed state of Database
