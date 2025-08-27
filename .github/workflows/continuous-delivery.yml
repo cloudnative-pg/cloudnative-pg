@@ -40,7 +40,7 @@ env:
   GOLANG_VERSION: "1.25.0"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
-  KIND_VERSION: "v0.29.0"
+  KIND_VERSION: "v0.30.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
   ROOK_VERSION: "v1.17.7"
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.3.0"
@@ -1665,7 +1665,7 @@ jobs:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
       -
         name: Set up Cloud SDK and kubectl
-        uses: google-github-actions/setup-gcloud@6189d56e4096ee891640bb02ac264be376592d6a # v2
+        uses: google-github-actions/setup-gcloud@cb1e50a9932213ecece00a606661ae9ca44f3397 # v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'kubectl,gke-gcloud-auth-plugin'
