@@ -737,6 +737,43 @@ func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.
 	return &result, nil
 }
 
+// updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
+// It supports granting or revoking usage permissions for specified users.
+func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, usageSpec := range server.Usages {
+		switch usageSpec.Type {
+		case apiv1.GrantUsageSpecType:
+			changeUsageSQL := fmt.Sprintf(
+				"GRANT USAGE ON FOREIGN SERVER %s TO %s",
+				pgx.Identifier{server.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("granting usage of foreign server %w", err)
+			}
+			contextLogger.Info("granted usage of foreign server", "name", server.Name, "user", usageSpec.Name)
+
+		case apiv1.RevokeUsageSpecType:
+			changeUsageSQL := fmt.Sprintf(
+				"REVOKE USAGE ON FOREIGN SERVER %s FROM %s", // #nosec G201
+				pgx.Identifier{server.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("revoking usage of foreign server %w", err)
+			}
+			contextLogger.Info("revoked usage of foreign server", "name", server.Name, "user", usageSpec.Name)
+
+		default:
+			contextLogger.Warning(
+				"unknown usage type for foreign server",
+				"type", usageSpec.Type, "fdwName", server.Name)
+		}
+	}
+
+	return nil
+}
+
 // createDatabaseForeignServer creates a foreign server in the database.
 func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) error {
 	contextLogger := log.FromContext(ctx)
@@ -757,6 +794,12 @@ func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 	}
 	contextLogger.Info("created foreign server", "name", server.Name)
 
+	if len(server.Usages) > 0 {
+		if err := updateDatabaseForeignServerUsage(ctx, db, &server); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -775,6 +818,12 @@ func updateDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 			return fmt.Errorf("altering options of foreign server %w", err)
 		}
 		contextLogger.Info("altered foreign server options", "name", server.Name, "options", server.Options)
+	}
+
+	if len(server.Usages) > 0 {
+		if err := updateDatabaseForeignServerUsage(ctx, db, &server); err != nil {
+			return err
+		}
 	}
 
 	return nil

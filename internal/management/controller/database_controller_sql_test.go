@@ -960,6 +960,19 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 			Expect(updateDatabaseForeignServer(ctx, db, server, info)).Error().NotTo(HaveOccurred())
 		})
 
+		It("updates the usages permissions of the foreign server", func(ctx SpecContext) {
+			dbMock.ExpectExec(
+				"GRANT USAGE ON FOREIGN SERVER \"testserver\" TO \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			server.Usages = []apiv1.UsageSpec{
+				{
+					Name: "owner",
+					Type: "grant",
+				},
+			}
+			Expect(updateDatabaseForeignServerUsage(ctx, db, &server)).Error().NotTo(HaveOccurred())
+		})
+
 		It("remove foreign server options", func(ctx SpecContext) {
 			server.Options = []apiv1.OptionSpec{
 				{
