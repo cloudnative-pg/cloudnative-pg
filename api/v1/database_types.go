@@ -286,9 +286,13 @@ type ServerSpec struct {
 	// +optional
 	Options []OptionSpec `json:"options,omitempty"`
 
-	//// OptionsRef specfies options refered from Secret/ConfigMap
-	//// +optional
-	//OptionsRef []OptionRefSpec `json:"optionsRef,omitempty"`
+	// List of roles for which `USAGE` privileges on the server are granted or revoked.
+	// +optional
+	Usages []UsageSpec `json:"usage,omitempty"`
+
+	// OptionsRef specfies options refered from Secret/ConfigMap
+	// +optional
+	OptionsRef []OptionRefSpec `json:"optionsRef,omitempty"`
 }
 
 // OptionSpec holds the name, value and the ensure field for an option

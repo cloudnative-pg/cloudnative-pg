@@ -31,6 +31,9 @@ import (
 	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type extInfo struct {
@@ -418,6 +421,38 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 	}
 	contextLogger.Info("dropped schema", "name", schema.Name)
 	return nil
+}
+
+// extractServerOptionsFromRef returns a list of server options from the referenced secrets
+func extractServerOptionsFromRef(
+	ctx context.Context,
+	kubeClient client.Client,
+	namespace string,
+	optionsRef []apiv1.OptionRefSpec) ([]apiv1.OptionSpec, error) {
+	options := make([]apiv1.OptionSpec, 0, len(optionsRef))
+	for _, ref := range optionsRef {
+		var secret corev1.Secret
+		key := types.NamespacedName{
+			Namespace: namespace,
+			Name:      ref.Name,
+		}
+
+		if err := kubeClient.Get(ctx, key, &secret); err != nil {
+			return nil, fmt.Errorf("failed to get Secret %s: %w", ref.Name, err)
+		}
+
+		valBytes, found := secret.Data[ref.Key]
+		if !found {
+			return nil, fmt.Errorf("key %q not found in Secret %s", ref.Key, ref.Name)
+		}
+
+		options = append(options, apiv1.OptionSpec{
+			Name:  ref.Key,
+			Value: string(valBytes),
+		})
+	}
+
+	return options, nil
 }
 
 // extractOptionsClauses takes a list of apiv1.OptionSpec and returns the present options as clauses

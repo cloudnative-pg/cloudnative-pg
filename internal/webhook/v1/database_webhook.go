@@ -289,6 +289,38 @@ func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) fiel
 			)
 		}
 
+		optionNames := stringset.New()
+		for k, option := range server.Options {
+			optionName := option.Name
+			if optionNames.Has(optionName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "servers").Index(i).Child("options").Index(k).Child("name"),
+						optionName,
+					),
+				)
+			}
+
+			optionNames.Put(optionName)
+		}
+
+		usageNames := stringset.New()
+		for j, usage := range server.Usages {
+			usageName := usage.Name
+			if usageNames.Has(usageName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "servers").Index(i).Child("usages").Index(j).Child("name"),
+						usageName,
+					),
+				)
+			}
+
+			usageNames.Put(usageName)
+		}
+		
 		serverNames.Put(serverName)
 	}
 
