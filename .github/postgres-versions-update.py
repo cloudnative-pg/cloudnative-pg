@@ -25,9 +25,8 @@ from packaging import version
 from subprocess import check_output
 
 min_supported_major = 13
-
 pg_repo_name = "cloudnative-pg/postgresql"
-pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?$")
+pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?-bookworm$")
 pg_versions_file = ".github/pg_versions.json"
 
 
@@ -38,14 +37,15 @@ def get_json(repo_name):
         "--rm",
         "quay.io/skopeo/stable",
         "list-tags",
-        "docker://ghcr.io/{}".format(pg_repo_name)])
+        "docker://ghcr.io/{}".format(repo_name)])
     repo_json = json.loads(data.decode("utf-8"))
     return repo_json
 
+def parse_version(v):
+    return version.Version(v.removesuffix("-bookworm"))
 
 def is_pre_release(v):
-    return version.Version(v).is_prerelease
-
+    return parse_version(v).is_prerelease
 
 def write_json(repo_url, version_re, output_file):
     repo_json = get_json(repo_url)
@@ -55,7 +55,7 @@ def write_json(repo_url, version_re, output_file):
     tags = [item for item in tags if version_re.search(item)]
 
     # Sort the tags according to semantic versioning
-    tags.sort(key=version.Version, reverse=True)
+    tags.sort(key=parse_version, reverse=True)
 
     results = {}
     extra_results = {}
