@@ -280,6 +280,7 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	objectCount := len(obj.Spec.Schemas)
 	objectCount += len(obj.Spec.Extensions)
 	objectCount += len(obj.Spec.FDWs)
+	objectCount += len(obj.Spec.Servers)
 
 	if objectCount == 0 {
 		return nil
