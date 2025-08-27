@@ -320,7 +320,7 @@ func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) fiel
 
 			usageNames.Put(usageName)
 		}
-		
+
 		serverNames.Put(serverName)
 	}
 

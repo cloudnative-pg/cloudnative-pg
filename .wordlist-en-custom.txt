@@ -462,6 +462,7 @@ SecurityProfiles
 Seealso
 SelectorType
 ServerCASecret
+ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
@@ -530,6 +531,7 @@ Uncomment
 Unrealizable
 UpdateStrategy
 UsageSpec
+UsageSpecType
 VLDB
 VLDBs
 VM
