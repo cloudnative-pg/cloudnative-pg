@@ -175,12 +175,26 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if res, err := r.areOtherBackupsRunning(ctx, &backup, &cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
-	if res, err := r.isCurrentBackupRunning(ctx, backup, cluster); err != nil || !res.IsZero() {
-		return res, err
+	isRunning, err := r.isCurrentBackupRunning(ctx, backup, cluster)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
 		return hookResult.Result, hookResult.Err
+	}
+
+	if isRunning {
+		switch {
+		case backup.Spec.Method.IsManagedByOperator():
+			// If the backup is a snapshot backup, we proceed with the reconciliation loop
+			return ctrl.Result{}, nil
+		case backup.Spec.Method.IsManagedByInstance():
+			// the instance manager is working we have to wait for it to finish
+			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+		default:
+			return ctrl.Result{}, fmt.Errorf("unknown backup method %s", backup.Spec.Method)
+		}
 	}
 
 	switch {
@@ -275,16 +289,16 @@ func (r *BackupReconciler) isCurrentBackupRunning(
 	ctx context.Context,
 	backup apiv1.Backup,
 	cluster apiv1.Cluster,
-) (ctrl.Result, error) {
+) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
 	isRunning, err := r.isValidBackupRunning(ctx, &backup, &cluster)
 	if err != nil {
 		contextLogger.Error(err, "while running isValidBackupRunning")
-		return ctrl.Result{}, err
+		return false, err
 	}
 	if !isRunning {
-		return ctrl.Result{}, nil
+		return false, nil
 	}
 
 	if backup.GetOnlineOrDefault(&cluster) {
@@ -294,26 +308,17 @@ func (r *BackupReconciler) isCurrentBackupRunning(
 			if flagErr := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, nil,
 				fmt.Errorf("while ensuring target pod is healthy: %w", err)); flagErr != nil {
 				contextLogger.Error(flagErr, "while flagging backup as failed, retrying...")
-				return ctrl.Result{}, flagErr
+				return false, flagErr
 			}
 
 			r.Recorder.Eventf(&backup, "Warning", "TargetPodNotHealthy",
 				"Error ensuring target pod is healthy: %s", err.Error())
 
-			return ctrl.Result{}, nil
+			return false, fmt.Errorf("interrupting backup as target pod is not healthy: %w", err)
 		}
 	}
 
-	switch {
-	case backup.Spec.Method.IsManagedByOperator():
-		// If the backup is a snapshot backup, we proceed with the reconciliation loop
-		return ctrl.Result{}, nil
-	case backup.Spec.Method.IsManagedByInstance():
-		// the instance manager is working we have to wait for it to finish
-		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-	default:
-		return ctrl.Result{}, fmt.Errorf("unknown backup method %s", backup.Spec.Method)
-	}
+	return true, nil
 }
 
 // checkPrerequisites checks that the backup and cluster spec are FORMALLY valid and the kubernetes cluster supports
