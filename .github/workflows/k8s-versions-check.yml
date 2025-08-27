@@ -67,7 +67,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
         name: Set up Cloud SDK for GKE
-        uses: google-github-actions/setup-gcloud@6189d56e4096ee891640bb02ac264be376592d6a # v2
+        uses: google-github-actions/setup-gcloud@cb1e50a9932213ecece00a606661ae9ca44f3397 # v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
