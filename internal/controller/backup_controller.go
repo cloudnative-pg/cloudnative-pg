@@ -172,7 +172,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// preflight checks that AREN'T formal.
 	// We ask questions like: "are there other backups running?", "is the current backup running?",
 	// "is the target instance healthy?"
-	if res, err := r.areOtherBackupsRunning(ctx, &backup, &cluster); err != nil || !res.IsZero() {
+	if res, err := r.waitIfOtherBackupsRunning(ctx, &backup, &cluster); err != nil || !res.IsZero() {
 		return res, err
 	}
 	isRunning, err := r.isCurrentBackupRunning(ctx, backup, cluster)
@@ -184,35 +184,27 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return hookResult.Result, hookResult.Err
 	}
 
-	if isRunning {
-		switch {
-		case backup.Spec.Method.IsManagedByOperator():
-			// If the backup is a snapshot backup, we proceed with the reconciliation loop
-			return ctrl.Result{}, nil
-		case backup.Spec.Method.IsManagedByInstance():
-			// the instance manager is working we have to wait for it to finish
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-		default:
-			return ctrl.Result{}, fmt.Errorf("unknown backup method %s", backup.Spec.Method)
-		}
+	// When the instance manager is working we have to wait for it to finish
+	if isRunning && backup.Spec.Method.IsManagedByInstance() {
+		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 
 	switch {
 	case backup.Spec.Method.IsManagedByInstance():
 		res, err := r.startBackupManagedByInstance(ctx, cluster, backup)
-		if res != nil {
-			return *res, err
-		}
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if res != nil {
+			return *res, nil
 		}
 	case backup.Spec.Method.IsManagedByOperator():
 		res, err := r.reconcileSnapshotBackup(ctx, &cluster, &backup)
-		if res != nil {
-			return *res, err
-		}
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if res != nil {
+			return *res, nil
 		}
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
@@ -841,7 +833,7 @@ func (r *BackupReconciler) ensureTargetPodHealthy(
 	return nil
 }
 
-func (r *BackupReconciler) areOtherBackupsRunning(
+func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	ctx context.Context,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
