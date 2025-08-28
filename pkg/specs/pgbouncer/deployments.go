@@ -59,10 +59,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
-		WithLabel(utils.AppLabelName, utils.AppName).
-		WithLabel(utils.InstanceLabelName, cluster.Name).
-		WithLabel(utils.ComponentLabelName, utils.PoolerComponentName).
-		WithLabel(utils.ManagedByLabelName, utils.ManagerName).
+		WithLabel(utils.KubernetesAppLabelName, utils.AppName).
+		WithLabel(utils.KubernetesAppInstanceLabelName, cluster.Name).
+		WithLabel(utils.KubernetesAppComponentLabelName, utils.PoolerComponentName).
+		WithLabel(utils.KubernetesAppManagedByLabelName, utils.ManagerName).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -142,13 +142,13 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Labels: map[string]string{
-				utils.ClusterLabelName:   cluster.Name,
-				utils.PgbouncerNameLabel: pooler.Name,
-				utils.PodRoleLabelName:   string(utils.PodRolePooler),
-				utils.AppLabelName:       utils.AppName,
-				utils.InstanceLabelName:  cluster.Name,
-				utils.ComponentLabelName: utils.DatabaseComponentName,
-				utils.ManagedByLabelName: utils.ManagerName,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.PgbouncerNameLabel:              pooler.Name,
+				utils.PodRoleLabelName:                string(utils.PodRolePooler),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.PoolerSpecHashAnnotationName: poolerHash,
