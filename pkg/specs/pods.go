@@ -522,14 +522,14 @@ func buildInstance(
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				utils.ClusterLabelName:      cluster.Name,
-				utils.InstanceNameLabelName: podName,
-				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
-				utils.AppLabelName:          utils.AppName,
-				utils.InstanceLabelName:     cluster.Name,
-				utils.VersionLabelName:      fmt.Sprint(version),
-				utils.ComponentLabelName:    utils.DatabaseComponentName,
-				utils.ManagedByLabelName:    utils.ManagerName,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.InstanceNameLabelName:           podName,
+				utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

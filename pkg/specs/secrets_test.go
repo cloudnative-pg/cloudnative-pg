@@ -33,9 +33,9 @@ var _ = Describe("Secret creation", func() {
 		Expect(secret.Name).To(Equal("name"))
 		Expect(secret.Namespace).To(Equal("namespace"))
 		Expect(secret.Labels).To(BeEquivalentTo(map[string]string{
-			utils.WatchedLabelName:   "true",
-			utils.ManagedByLabelName: utils.ManagerName,
-			utils.UserTypeLabelName:  string(utils.UserTypeApp),
+			utils.WatchedLabelName:                "true",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.UserTypeLabelName:               string(utils.UserTypeApp),
 		}))
 		Expect(secret.StringData["username"]).To(Equal("thisuser"))
 		Expect(secret.StringData["user"]).To(Equal("thisuser"))

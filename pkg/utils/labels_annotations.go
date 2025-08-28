@@ -38,17 +38,39 @@ const AlphaMetadataNamespace = "alpha.cnpg.io"
 // MetadataNamespace is the annotation and label namespace used by the operator
 const MetadataNamespace = "cnpg.io"
 
-// ManagerName is the name of the manager for cnpg controlled objects
-const ManagerName = "cloudnative-pg"
+// KubernetesAppNamespaceDomain is the domain used for the official kubernetes app labels
+const KubernetesAppNamespaceDomain = "app.kubernetes.io"
 
-// AppName is the name of the application
-const AppName = "postgresql"
+const (
+	// ManagerName is the name of the manager for cnpg controlled objects
+	ManagerName = "cloudnative-pg"
 
-// DatabaseComponentName is the name of the component for the database.
-const DatabaseComponentName = "database"
+	// AppName is the name of the application
+	AppName = "postgresql"
 
-// PoolerComponentName is the name of the component for the pooler.
-const PoolerComponentName = "pooler"
+	// DatabaseComponentName is the name of the component for the database.
+	DatabaseComponentName = "database"
+
+	// PoolerComponentName is the name of the component for the pooler.
+	PoolerComponentName = "pooler"
+)
+
+const (
+	// KubernetesAppManagedByLabelName is the name of the label applied to all managed objects
+	KubernetesAppManagedByLabelName = KubernetesAppNamespaceDomain + "/managed-by"
+
+	// KubernetesAppLabelName is the name of the label used to indicate the name of the application
+	KubernetesAppLabelName = KubernetesAppNamespaceDomain + "/name"
+
+	// KubernetesAppInstanceLabelName is the name of the label used to indicate the unique instance of this application
+	KubernetesAppInstanceLabelName = KubernetesAppNamespaceDomain + "/instance"
+
+	// KubernetesAppVersionLabelName is the name of the label used to indicate the version postgres
+	KubernetesAppVersionLabelName = KubernetesAppNamespaceDomain + "/version"
+
+	// KubernetesAppComponentLabelName is the name of the label used to indicate the component within the architecture
+	KubernetesAppComponentLabelName = KubernetesAppNamespaceDomain + "/component"
+)
 
 // When you add a new label or annotation, please make sure that you also update the
 // publicly visible documentation, namely the `docs/src/labels_annotations.md` file
@@ -129,21 +151,6 @@ const (
 
 	// LivenessPingerAnnotationName is the name of the pinger configuration
 	LivenessPingerAnnotationName = AlphaMetadataNamespace + "/livenessPinger"
-
-	// ManagedByLabelName is the name of the label applied to all managed objects
-	ManagedByLabelName = "app.kubernetes.io/managed-by"
-
-	// AppLabelName is the name of the label used to indicate the name of the application
-	AppLabelName = "app.kubernetes.io/name"
-
-	// InstanceLabelName is the name of the label used to indicate the unique instance of this application
-	InstanceLabelName = "app.kubernetes.io/instance"
-
-	// VersionLabelName is the name of the label used to indicate the version postgres
-	VersionLabelName = "app.kubernetes.io/version"
-
-	// ComponentLabelName is the name of the label used to indicate the component within the architecture
-	ComponentLabelName = "app.kubernetes.io/component"
 )
 
 const (

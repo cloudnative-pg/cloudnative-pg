@@ -944,14 +944,14 @@ var _ = Describe("NewInstance", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:      "test-cluster",
-			utils.InstanceNameLabelName: "test-cluster-1",
-			utils.PodRoleLabelName:      string(utils.PodRoleInstance),
-			utils.AppLabelName:          utils.AppName,
-			utils.InstanceLabelName:     "test-cluster",
-			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    utils.DatabaseComponentName,
-			utils.ManagedByLabelName:    utils.ManagerName,
+			utils.ClusterLabelName:                "test-cluster",
+			utils.InstanceNameLabelName:           "test-cluster-1",
+			utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "test-cluster",
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 	})
 

@@ -50,11 +50,11 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
 		Labels: map[string]string{
-			utils.ManagedByLabelName: utils.ManagerName,
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  c.cluster.Name,
-			utils.VersionLabelName:   fmt.Sprint(version),
-			utils.ComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  c.cluster.Name,
+			utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 		},
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)

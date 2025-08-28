@@ -46,12 +46,12 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 		result := BuildReplicasPodDisruptionBudget(cluster)
 		Expect(result.Name).To(Equal(cluster.Name))
 		Expect(result.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:   cluster.Name,
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  cluster.Name,
-			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: utils.DatabaseComponentName,
-			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:                cluster.Name,
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(result.Namespace).To(Equal(cluster.Namespace))
 	})

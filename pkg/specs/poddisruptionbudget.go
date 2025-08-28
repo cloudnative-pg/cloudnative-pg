@@ -47,11 +47,11 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.AppLabelName:       utils.AppName,
-				utils.InstanceLabelName:  cluster.Name,
-				utils.VersionLabelName:   fmt.Sprint(version),
-				utils.ComponentLabelName: utils.DatabaseComponentName,
-				utils.ManagedByLabelName: utils.ManagerName,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
@@ -85,11 +85,11 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.AppLabelName:       utils.AppName,
-				utils.InstanceLabelName:  cluster.Name,
-				utils.VersionLabelName:   fmt.Sprint(version),
-				utils.ComponentLabelName: utils.DatabaseComponentName,
-				utils.ManagedByLabelName: utils.ManagerName,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{

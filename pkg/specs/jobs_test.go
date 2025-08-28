@@ -224,24 +224,24 @@ var _ = Describe("Job created via InitDB", func() {
 		}
 		job := CreatePrimaryJobViaInitdb(cluster, 0)
 		Expect(job.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:      cluster.Name,
-			utils.JobRoleLabelName:      "initdb",
-			utils.InstanceNameLabelName: "cluster-0",
-			utils.AppLabelName:          utils.AppName,
-			utils.InstanceLabelName:     cluster.Name,
-			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    utils.DatabaseComponentName,
-			utils.ManagedByLabelName:    utils.ManagerName,
+			utils.ClusterLabelName:                cluster.Name,
+			utils.JobRoleLabelName:                "initdb",
+			utils.InstanceNameLabelName:           "cluster-0",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(job.Spec.Template.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:      cluster.Name,
-			utils.JobRoleLabelName:      "initdb",
-			utils.InstanceNameLabelName: "cluster-0",
-			utils.AppLabelName:          utils.AppName,
-			utils.InstanceLabelName:     cluster.Name,
-			utils.VersionLabelName:      "17",
-			utils.ComponentLabelName:    utils.DatabaseComponentName,
-			utils.ManagedByLabelName:    utils.ManagerName,
+			utils.ClusterLabelName:                cluster.Name,
+			utils.JobRoleLabelName:                "initdb",
+			utils.InstanceNameLabelName:           "cluster-0",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 	})
 })
