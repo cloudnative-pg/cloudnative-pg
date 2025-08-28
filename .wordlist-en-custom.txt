@@ -281,6 +281,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicies
 NetworkPolicy
 Niccolò
 NodeAffinity
