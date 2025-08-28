@@ -155,7 +155,11 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofHTTPServer bool) error { //nolint:gocognit,gocyclo
+func runSubCommand(
+	ctx context.Context,
+	instance *postgres.Instance,
+	pprofHTTPServer bool,
+) error { //nolint:gocognit,gocyclo
 	var err error
 
 	contextLogger := log.FromContext(ctx)
