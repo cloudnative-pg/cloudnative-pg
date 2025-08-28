@@ -45,76 +45,50 @@ var _ = Describe("Services specification", func() {
 		Port:       postgres.ServerPort,
 	}
 
-	It("create a configured -any service", func() {
-		service := CreateClusterAnyService(postgresql)
-		Expect(service.Name).To(Equal("clustername-any"))
-		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:                "clustername",
-			utils.KubernetesAppLabelName:          utils.AppName,
-			utils.KubernetesAppInstanceLabelName:  "clustername",
-			utils.KubernetesAppVersionLabelName:   "17",
-			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
-			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-		}))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
+	// shared expected labels
+	expectedLabels := map[string]string{
+		utils.ClusterLabelName:                "clustername",
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppInstanceLabelName:  "clustername",
+		utils.KubernetesAppVersionLabelName:   "17",
+		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+	}
+
+	// helper to assert common service properties
+	assertService := func(
+		service *corev1.Service,
+		expectedName string,
+		publishNotReady bool,
+		selectorKey, selectorValue string,
+	) {
+		Expect(service.Name).To(Equal(expectedName))
+		Expect(service.Labels).To(BeEquivalentTo(expectedLabels))
+		Expect(service.Spec.PublishNotReadyAddresses).To(Equal(publishNotReady))
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
+		Expect(service.Spec.Selector[selectorKey]).To(Equal(selectorValue))
 		Expect(service.Spec.Ports).To(HaveLen(1))
 		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+	}
+
+	It("create a configured -any service", func() {
+		service := CreateClusterAnyService(postgresql)
+		assertService(service, "clustername-any", true, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -r service", func() {
 		service := CreateClusterReadService(postgresql)
-		Expect(service.Name).To(Equal("clustername-r"))
-		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:                "clustername",
-			utils.KubernetesAppLabelName:          utils.AppName,
-			utils.KubernetesAppInstanceLabelName:  "clustername",
-			utils.KubernetesAppVersionLabelName:   "17",
-			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
-			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-		}))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		assertService(service, "clustername-r", false, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -ro service", func() {
 		service := CreateClusterReadOnlyService(postgresql)
-		Expect(service.Name).To(Equal("clustername-ro"))
-		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:                "clustername",
-			utils.KubernetesAppLabelName:          utils.AppName,
-			utils.KubernetesAppInstanceLabelName:  "clustername",
-			utils.KubernetesAppVersionLabelName:   "17",
-			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
-			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-		}))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		assertService(service, "clustername-ro", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelReplica)
 	})
 
 	It("create a configured -rw service", func() {
 		service := CreateClusterReadWriteService(postgresql)
-		Expect(service.Name).To(Equal("clustername-rw"))
-		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:                "clustername",
-			utils.KubernetesAppLabelName:          utils.AppName,
-			utils.KubernetesAppInstanceLabelName:  "clustername",
-			utils.KubernetesAppVersionLabelName:   "17",
-			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
-			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-		}))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		assertService(service, "clustername-rw", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelPrimary)
 	})
 })
 
