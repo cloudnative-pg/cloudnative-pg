@@ -49,12 +49,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterAnyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-any"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:   "clustername",
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  "clustername",
-			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: utils.DatabaseComponentName,
-			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:                "clustername",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "clustername",
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -67,12 +67,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadService(postgresql)
 		Expect(service.Name).To(Equal("clustername-r"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:   "clustername",
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  "clustername",
-			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: utils.DatabaseComponentName,
-			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:                "clustername",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "clustername",
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -85,12 +85,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadOnlyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-ro"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:   "clustername",
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  "clustername",
-			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: utils.DatabaseComponentName,
-			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:                "clustername",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "clustername",
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -103,12 +103,12 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Labels).To(BeEquivalentTo(map[string]string{
-			utils.ClusterLabelName:   "clustername",
-			utils.AppLabelName:       utils.AppName,
-			utils.InstanceLabelName:  "clustername",
-			utils.VersionLabelName:   "17",
-			utils.ComponentLabelName: utils.DatabaseComponentName,
-			utils.ManagedByLabelName: utils.ManagerName,
+			utils.ClusterLabelName:                "clustername",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "clustername",
+			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
@@ -184,7 +184,7 @@ var _ = Describe("BuildManagedServices", func() {
 			Expect(services).NotTo(BeNil())
 			Expect(services).To(HaveLen(1))
 			Expect(services[0].ObjectMeta.Name).To(Equal("test-service"))
-			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.ManagedByLabelName, utils.ManagerName))
+			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.IsManagedLabelName, "true"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue("test-label", "test-value"))
 			Expect(services[0].ObjectMeta.Annotations).To(HaveKeyWithValue("test-annotation", "test-value"))
