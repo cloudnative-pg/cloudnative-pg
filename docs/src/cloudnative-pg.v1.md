@@ -792,6 +792,14 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
    <p>The potential credentials for each cloud provider</p>
 </td>
 </tr>
+<tr><td><code>majorVersion</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The major version of PostgreSQL of the cluster where the backup
+has been taken from.</p>
+</td>
+</tr>
 <tr><td><code>endpointCA</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
