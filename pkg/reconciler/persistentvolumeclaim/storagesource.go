@@ -21,11 +21,12 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -95,7 +96,7 @@ func GetCandidateStorageSourceForReplica(
 
 	if result := getCandidateSourceFromBackupList(
 		ctx,
-		cluster.CreationTimestamp,
+		cluster,
 		backupList,
 	); result != nil {
 		return result
@@ -117,10 +118,33 @@ func GetCandidateStorageSourceForReplica(
 // given a backup list
 func getCandidateSourceFromBackupList(
 	ctx context.Context,
-	clusterCreationTime metav1.Time,
+	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
 	contextLogger := log.FromContext(ctx)
+
+	isCorrectMajorVersion := func(backup *apiv1.Backup) bool {
+		if cluster.Status.PGDataImageInfo == nil {
+			return true
+		}
+
+		backupMajorVersion := backup.Status.MajorVersion
+		if backup.Status.MajorVersion == 0 && backup.Annotations[utils.BackupMajorVersionAnnotationName] != "" {
+			backupMajorVersion, _ = strconv.Atoi(backup.Annotations[utils.BackupMajorVersionAnnotationName])
+		}
+
+		if backupMajorVersion == 0 {
+			contextLogger.Warning(
+				fmt.Sprintf("majorVersion on backup status is not populated, cannot use it as a recovery source"+
+					"the drop in annotations %s can be used to communicate the backup version manually", utils.BackupMajorVersionAnnotationName),
+			)
+			return false
+		}
+
+		majorVersion, _ := cluster.GetPostgresqlMajorVersion()
+
+		return majorVersion == backupMajorVersion
+	}
 
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
@@ -132,10 +156,17 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		if backup.CreationTimestamp.Before(&clusterCreationTime) {
+		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
 			contextLogger.Info(
 				"skipping backup as a potential recovery storage source candidate " +
 					"because if was created before the Cluster object")
+			continue
+		}
+
+		if !isCorrectMajorVersion(backup) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because of major version mismatch")
 			continue
 		}
 
