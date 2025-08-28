@@ -51,6 +51,7 @@ export CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 export DOCKER_REGISTRY_MIRROR=${DOCKER_REGISTRY_MIRROR:-}
 export TEST_CLOUD_VENDOR="local"
 
+# shellcheck disable=SC2329
 cleanup() {
   if [ "${PRESERVE_CLUSTER}" = false ]; then
     "${HACK_DIR}/setup-cluster.sh" destroy || true
