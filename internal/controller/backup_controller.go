@@ -190,6 +190,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 
+	// The backup is ready to start, and before starting it we store
+	// the major version inside the Backup resource.
 	if err := r.reconcileMajorVersion(ctx, &backup, &cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error setting major version for backup: %w", err)
 	}
