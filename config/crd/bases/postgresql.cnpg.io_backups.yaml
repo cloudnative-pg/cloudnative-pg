@@ -314,8 +314,8 @@ spec:
                 type: object
               majorVersion:
                 description: |-
-                  The major version of PostgreSQL of the cluster where the backup
-                  has been taken from.
+                  The PostgreSQL major version that was running when the
+                  backup was taken.
                 type: integer
               method:
                 description: The backup method being used
