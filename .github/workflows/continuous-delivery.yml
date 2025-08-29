@@ -1660,12 +1660,12 @@ jobs:
       -
         name: Authenticate to Google Cloud
         id: 'auth'
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
       -
         name: Set up Cloud SDK and kubectl
-        uses: google-github-actions/setup-gcloud@cb1e50a9932213ecece00a606661ae9ca44f3397 # v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'kubectl,gke-gcloud-auth-plugin'
