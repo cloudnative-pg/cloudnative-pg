@@ -136,7 +136,8 @@ func getCandidateSourceFromBackupList(
 		if backupMajorVersion == 0 {
 			contextLogger.Warning(
 				fmt.Sprintf("majorVersion on backup status is not populated, cannot use it as a recovery source"+
-					"the drop in annotations %s can be used to communicate the backup version manually", utils.BackupMajorVersionAnnotationName),
+					"the drop in annotations %s can be used to communicate the backup version manually",
+					utils.BackupMajorVersionAnnotationName),
 			)
 			return false
 		}
