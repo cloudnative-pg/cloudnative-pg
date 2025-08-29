@@ -117,7 +117,7 @@ func (v *BackupCustomValidator) ValidateUpdate(
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "backup.cnpg.io", Kind: "Backup"},
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
 		backup.Name, allErrs)
 }
 
