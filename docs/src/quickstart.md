@@ -1,10 +1,7 @@
 # Quickstart
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-This section guides you through testing a PostgreSQL cluster on your local machine by
-deploying CloudNativePG on a local Kubernetes cluster
-using either [Kind](https://kind.sigs.k8s.io/) or
-[Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
+This section guides you through testing a PostgreSQL cluster on your local machine. You'll deploy CloudNativePG on a local Kubernetes cluster using either [Kind](https://kind.sigs.k8s.io/) or [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
 !!! Warning
     The instructions contained in this section are for demonstration,

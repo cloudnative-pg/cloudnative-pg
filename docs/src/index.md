@@ -5,7 +5,7 @@ CloudNativePG (CNPG) is an open-source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed to manage [PostgreSQL](https://www.postgresql.org/) workloads on any
 supported [Kubernetes](https://kubernetes.io) cluster.
-It fosters cloud-neutrality through seamless deployment in private, public,
+It fosters cloud neutrality through seamless deployment in private, public,
 hybrid, and multi-cloud environments via its
 [distributed topology](replica_cluster.md#distributed-topology) feature.
 
@@ -20,7 +20,7 @@ At its core, CloudNativePG introduces a custom Kubernetes resource called
 - Optional replicas for High Availability and read scaling.
 
 These instances reside within a Kubernetes namespace, allowing applications to
-connect seamlessly using operator-managed services. Failovers and switchovers
+connect seamlessly using the operator-managed services. Failovers and switchovers
 occur transparently, eliminating the need for manual intervention.
 
 For applications inside the Kubernetes cluster, CNPG provides a microservice
@@ -62,7 +62,7 @@ in three different flavors:
 - Debian 12 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
 
-Red Hat UBI images are primarily intended for OLM consumption.
+Red Hat UBI images are primarily intended for OLM (Operator Lifecycle Manager) consumption.
 
 All container images are signed and include SBOM and provenance attestations,
 provided separately for each architecture.
@@ -76,7 +76,7 @@ across multiple architectures, directly from the
 
 The [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
 and [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
-container images are signed and include SBOM and provenance attestations,
+container images are signed and include SBOM (Software Bill of Materials) and provenance attestations,
 provided separately for each architecture.
 
 Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
@@ -123,12 +123,12 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - WAL archiving to object stores with support for full/PITR recovery.
     - Retention policies based on configurable recovery windows.
     - Supported as a CNPG-I plugin (recommended approach).
-- Native Backup Methods:
+- Native backup methods:
     - Continuous backup and full/PITR recovery via volume snapshots (if
       supported by the storage class).
     - Native integration with Barman Cloud for object store backups via
       `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
-- Offline in-place major upgrades of PostgreSQL
+- Offline in-place major upgrades of PostgreSQL clusters
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.
     - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.

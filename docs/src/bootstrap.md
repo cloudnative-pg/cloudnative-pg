@@ -3,14 +3,14 @@
 
 This section describes the options available to create a new
 PostgreSQL cluster and the design rationale behind them.
-There are primarily two ways to bootstrap a new cluster:
+There are two main ways to bootstrap a new cluster:
 
 - from scratch (`initdb`)
 - from an existing PostgreSQL cluster, either directly (`pg_basebackup`)
   or indirectly through a physical base backup (`recovery`)
 
 The `initdb` bootstrap also provides the option to import one or more
-databases from an existing PostgreSQL cluster, even if it's outside
+databases from an existing PostgreSQL cluster, even if the cluster is outside
 Kubernetes or running a different major version of PostgreSQL.
 For more detailed information about this feature, please refer to the
 ["Importing Postgres databases"](database_import.md) section.
@@ -63,7 +63,7 @@ used to spin up replica clusters. They both rely on the definition of external
 clusters.
 Refer to the [replica cluster section](replica_cluster.md) for more information.
 
-Given the amount of possible backup methods and combinations of backup
+Given the number of possible backup methods and combinations of backup
 storage that the CloudNativePG operator provides for `recovery`, please refer to
 the dedicated ["Recovery" section](recovery.md) for guidance on each method.
 
