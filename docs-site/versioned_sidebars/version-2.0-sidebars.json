@@ -1,0 +1,12 @@
+{
+  "tutorialSidebar": [
+    {
+      "type": "category",
+      "label": "Getting Started",
+      "items": [
+        "quickstart",
+        "recovery"
+      ]
+    }
+  ]
+}
