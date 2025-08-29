@@ -195,8 +195,8 @@ type BackupStatus struct {
 	// The potential credentials for each cloud provider
 	BarmanCredentials `json:",inline"`
 
-	// The major version of PostgreSQL of the cluster where the backup
-	// has been taken from.
+	// The PostgreSQL major version that was running when the
+	// backup was taken.
 	MajorVersion int `json:"majorVersion,omitempty"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
