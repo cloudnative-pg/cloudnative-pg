@@ -329,17 +329,18 @@ func (r *BackupReconciler) checkPrerequisites(
 		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return &ctrl.Result{}, err
 	}
-
-	if cluster.Spec.Backup == nil {
-		const message = "cannot proceed with the backup as the cluster has no backup section"
-		return flagMissingPrerequisite(message, "ClusterHasBackupConfigured")
-	}
-
 	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if len(cluster.Spec.Plugins) == 0 {
 			const message = "cannot proceed with the backup as the cluster has no plugin configured"
 			return flagMissingPrerequisite(message, "ClusterHasNoBackupExecutorPlugin")
 		}
+
+		return nil, nil
+	}
+
+	if cluster.Spec.Backup == nil {
+		const message = "cannot proceed with the backup as the cluster has no backup section"
+		return flagMissingPrerequisite(message, "ClusterHasBackupConfigured")
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot {
