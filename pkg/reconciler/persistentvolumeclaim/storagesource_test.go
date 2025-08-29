@@ -346,7 +346,6 @@ var _ = Describe("candidate backups", func() {
 	})
 })
 
-
 var _ = Describe("major version filtering in candidate backup selection", func() {
 	makeCompletedSnapshotBackup := func(name string) apiv1.Backup {
 		return apiv1.Backup{
