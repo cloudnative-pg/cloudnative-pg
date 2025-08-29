@@ -124,25 +124,45 @@ func getCandidateSourceFromBackupList(
 	contextLogger := log.FromContext(ctx)
 
 	isCorrectMajorVersion := func(backup *apiv1.Backup) bool {
+		// If we don't have image info, we can't determine cluster version reliably; skip enforcement
 		if cluster.Status.PGDataImageInfo == nil {
 			return true
 		}
 
 		backupMajorVersion := backup.Status.MajorVersion
 		if backup.Status.MajorVersion == 0 && backup.Annotations[utils.BackupMajorVersionAnnotationName] != "" {
-			backupMajorVersion, _ = strconv.Atoi(backup.Annotations[utils.BackupMajorVersionAnnotationName])
+			if v, err := strconv.Atoi(backup.Annotations[utils.BackupMajorVersionAnnotationName]); err == nil {
+				backupMajorVersion = v
+			} else {
+				contextLogger.Warning(
+					"invalid backup major version annotation; skipping this backup as a recovery source",
+					"annotation", utils.BackupMajorVersionAnnotationName,
+					"value", backup.Annotations[utils.BackupMajorVersionAnnotationName],
+					"error", err.Error(),
+				)
+				return false
+			}
 		}
 
 		if backupMajorVersion == 0 {
 			contextLogger.Warning(
-				fmt.Sprintf("majorVersion on backup status is not populated, cannot use it as a recovery source"+
-					"the drop in annotations %s can be used to communicate the backup version manually",
-					utils.BackupMajorVersionAnnotationName),
+				fmt.Sprintf(
+					"majorVersion on backup status is not populated, cannot use it as a recovery source. "+
+						"The annotation %s can be used to communicate the backup version manually",
+					utils.BackupMajorVersionAnnotationName,
+				),
 			)
 			return false
 		}
 
-		majorVersion, _ := cluster.GetPostgresqlMajorVersion()
+		majorVersion, err := cluster.GetPostgresqlMajorVersion()
+		if err != nil {
+			contextLogger.Warning(
+				"unable to determine cluster major version; skipping backup as a recovery source",
+				"error", err.Error(),
+			)
+			return false
+		}
 
 		return majorVersion == backupMajorVersion
 	}
@@ -150,7 +170,6 @@ func getCandidateSourceFromBackupList(
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
-		contextLogger := contextLogger.WithValues()
 
 		if !backup.IsCompletedVolumeSnapshot() {
 			contextLogger.Trace("skipping backup, not a valid storage source candidate")
@@ -159,15 +178,15 @@ func getCandidateSourceFromBackupList(
 
 		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
 			contextLogger.Info(
-				"skipping backup as a potential recovery storage source candidate " +
-					"because if was created before the Cluster object")
+				"skipping backup as a potential recovery storage source candidate because it was created before the Cluster object",
+			)
 			continue
 		}
 
 		if !isCorrectMajorVersion(backup) {
 			contextLogger.Info(
-				"skipping backup as a potential recovery storage source candidate " +
-					"because of major version mismatch")
+				"skipping backup as a potential recovery storage source candidate because of major version mismatch",
+			)
 			continue
 		}
 
