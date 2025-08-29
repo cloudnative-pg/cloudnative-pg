@@ -292,3 +292,13 @@ func (backup *Backup) EnsureGVKIsPresent() {
 func (configuration *BackupPluginConfiguration) IsEmpty() bool {
 	return configuration == nil || len(configuration.Name) == 0
 }
+
+// IsManagedByInstance returns true if the backup is managed by the instance manager
+func (b BackupMethod) IsManagedByInstance() bool {
+	return b == BackupMethodPlugin || b == BackupMethodBarmanObjectStore
+}
+
+// IsManagedByOperator returns true if the backup is managed by the operator
+func (b BackupMethod) IsManagedByOperator() bool {
+	return b == BackupMethodVolumeSnapshot
+}

@@ -1237,7 +1237,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	var backupList apiv1.BackupList
 	if err := r.List(ctx, &backupList,
-		client.MatchingFields{clusterName: cluster.Name},
+		client.MatchingFields{clusterNameField: cluster.Name},
 		client.InNamespace(cluster.Namespace),
 	); err != nil {
 		contextLogger.Error(err, "Error while getting backup list, when bootstrapping a new replica")
