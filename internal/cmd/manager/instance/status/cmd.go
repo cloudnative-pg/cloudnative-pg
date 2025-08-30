@@ -101,7 +101,7 @@ func statusSubCommand(ctx context.Context) error {
 		return err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		contextLogger.Info(
 			"Error while extracting status",
 			"statusCode", resp.StatusCode,
