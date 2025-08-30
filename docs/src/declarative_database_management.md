@@ -326,6 +326,73 @@ existing FDWs not declared in this list are left untouched.
      and [`DROP FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-dropforeigndatawrapper.html).
      The `ALTER` command supports option updates.
 
+The operator reconciles only the FDWs explicitly listed in `spec.fdws`. Any existing FDWs not declared in this list are left untouched.
+
+!!! Warning
+    PostgreSQL restricts ownership of foreign data wrappers to **superuser roles only**. As a result, the `owner` field
+    in the FDW spec is **informational**: it can only be set to the superuser that the CloudNativePG operator uses
+    internally (typically `postgres`). Attempting to assign ownership to a non-superuser (e.g., an app role) will be ignored or rejected, as PostgreSQL does
+    not allow non-superuser ownership of foreign data wrappers.
+
+### Managing Foreign Servers In a Database
+
+!!! Info
+    Foreign servers are database-scoped objects that define the connection parameters
+    for accessing external data sources through a Foreign Data Wrapper (FDW). CloudNativePG
+    provides a declarative API for managing foreign servers, enabling users to configure
+    and maintain them in a Kubernetes-native way without directly executing SQL commands
+    or requiring superuser intervention.
+
+CloudNativePG enables seamless and automated management of PostgreSQL foreign servers
+in the target database using declarative configuration.
+
+To enable this feature, define the `spec.servers` field
+with a list of foreign server specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  servers:
+  - name: pg-a
+    fdw: postgres_fdw
+    ensure: present
+    options:
+    - name: host
+      value: foo
+    - name: dbname
+      value: app
+# ...
+```
+
+Each foreign server entry supports the following properties:
+
+- `name` *(mandatory)*: The name of the foreign server.
+- `fdw` *(mandatory)*: The name of the foreign data wrapper the server belongs to.
+- `ensure`: Indicates whether the foreign server should be `present` or `absent` in the database (default is `present`).
+- `options`: The list of server-level options. Each option supports the following fields:
+   - `name`: The name of the option.
+   - `value`: The string value of the option.
+
+!!! Important
+    The `fdw` field must refer to an existing foreign data wrapper already declared
+    in the database. If the referenced FDW does not exist, the foreign server will not
+    be created.
+
+!!! Info
+ CloudNativePG manages foreign servers using PostgreSQL’s native SQL commands:
+ [`CREATE SERVER`](https://www.postgresql.org/docs/current/sql-createserver.html),
+ [`ALTER SERVER`](https://www.postgresql.org/docs/current/sql-alterserver.html),
+ and [`DROP SERVER`](https://www.postgresql.org/docs/current/sql-dropserver.html).
+ The `ALTER` command supports updating server options.
+
+The operator reconciles only the foreign servers explicitly listed in `spec.servers`. Any existing servers not declared in this list are left untouched.
+
+!!! Warning
+    PostgreSQL restricts ownership of foreign servers to **superuser roles only**. As a result, the `owner` field
+    in the server spec is **informational**: it can only be set to the superuser that the CloudNativePG operator uses
+    internally (typically `postgres`). Attempting to assign ownership to a non-superuser role will be ignored or rejected,
+    as PostgreSQL does not allow non-superuser ownership of foreign servers.
+
 ## Limitations and Caveats
 
 ### Renaming a database

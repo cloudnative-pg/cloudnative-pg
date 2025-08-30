@@ -218,5 +218,124 @@ var _ = Describe("Database validation", func() {
 			},
 			3,
 		),
+
+		Entry(
+			"doesn't complain with distinct foreign servers",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server2",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			0,
+		),
+
+		Entry(
+			"complains for duplicate foreign servers",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "dup_server",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "dup_server",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"complains for duplicate options within a single foreign server",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "duplicate_option"},
+								{Name: "duplicate_option"},
+							},
+						},
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"complains for duplicate usages within a single foreign server",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "duplicate_usage"},
+								{Name: "duplicate_usage"},
+							},
+						},
+					},
+				},
+			},
+			1,
+		),
+
+		Entry(
+			"complains for a combination of duplicate servers, options, and usages",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Servers: []apiv1.ServerSpec{
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+							Options: []apiv1.OptionSpec{
+								{Name: "dup_option"},
+								{Name: "dup_option"},
+							},
+							Usages: []apiv1.UsageSpec{
+								{Name: "dup_usage"},
+								{Name: "dup_usage"},
+							},
+						},
+						{
+							DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+								Name:   "server1",
+								Ensure: apiv1.EnsurePresent,
+							},
+						},
+					},
+				},
+			},
+			3,
+		),
 	)
 })
