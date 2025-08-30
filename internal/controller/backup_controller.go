@@ -107,6 +107,7 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
+// nolint: gocognito
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
@@ -187,6 +188,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// When the instance manager is working we have to wait for it to finish
 	if isRunning && backup.Spec.Method.IsManagedByInstance() {
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+	}
+
+	// The backup is ready to start, and before starting it we store
+	// the major version inside the Backup resource.
+	if err := r.reconcileMajorVersion(ctx, &backup, &cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error setting major version for backup: %w", err)
 	}
 
 	switch {
@@ -657,6 +664,30 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	backup *apiv1.Backup,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
+
+	podHasLatestMajorImage := func(pod *corev1.Pod) bool {
+		if cluster.Status.PGDataImageInfo == nil {
+			return true
+		}
+
+		// we are not undergoing major upgrade
+		if cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
+			return true
+		}
+
+		if len(pod.Spec.Containers) == 0 {
+			contextLogger.Warning("Instance has no containers, discarded as target for backup")
+			return false
+		}
+
+		if pod.Spec.Containers[0].Image != cluster.Status.Image {
+			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
+			return false
+		}
+
+		return true
+	}
+
 	pods, err := GetManagedInstances(ctx, cluster, r.Client)
 	if err != nil {
 		return nil, err
@@ -675,6 +706,11 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 				"pod", item.Pod.Name)
 			continue
 		}
+
+		if !podHasLatestMajorImage(item.Pod) {
+			continue
+		}
+
 		switch backupTarget {
 		case apiv1.BackupTargetPrimary:
 			if item.IsPrimary {
@@ -698,6 +734,10 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 		Namespace: cluster.Namespace,
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
+
+	if podHasLatestMajorImage(&pod) {
+		return nil, fmt.Errorf("primary instance not having expected image, cannot run backup")
+	}
 
 	return &pod, err
 }
@@ -860,4 +900,22 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *BackupReconciler) reconcileMajorVersion(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) error {
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return fmt.Errorf("cannot get major version from cluster: %w", err)
+	}
+
+	if backup.Status.MajorVersion == majorVersion {
+		return nil
+	}
+
+	backup.Status.MajorVersion = majorVersion
+	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
