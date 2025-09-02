@@ -60,7 +60,7 @@ func (c *backupClientImpl) StatusWithErrors(
 ) (*webserver.Response[webserver.BackupResultData], error) {
 	scheme := GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (c *backupClientImpl) Start(
 		return nil, fmt.Errorf("failed to marshal start payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", httpURL, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (c *backupClientImpl) Stop(
 		return nil, fmt.Errorf("failed to marshal stop payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "PUT", httpURL, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
