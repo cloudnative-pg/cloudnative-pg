@@ -64,7 +64,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			if resp.StatusCode != 200 {
+			if resp.StatusCode != http.StatusOK {
 				contextLogger.Info(
 					"Error while requesting backup",
 					"backupURL", backupURL,
