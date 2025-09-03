@@ -667,13 +667,10 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	contextLogger := log.FromContext(ctx)
 
 	podHasLatestMajorImage := func(pod *corev1.Pod) bool {
-		if cluster.Status.PGDataImageInfo == nil {
-			return true
-		}
-
-		// we are not undergoing major upgrade
-		if cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
-			return true
+		// No backup should run during a major version upgrade
+		if cluster.Status.PGDataImageInfo != nil &&
+			cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
+			return false
 		}
 
 		if len(pod.Spec.Containers) == 0 {
