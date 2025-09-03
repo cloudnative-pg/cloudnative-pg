@@ -34,6 +34,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -844,6 +845,18 @@ var _ = Describe("Verify Volume Snapshot",
 				By("checking the cluster is working", func() {
 					// Setting up a cluster with three pods is slow, usually 200-600s
 					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady], env)
+				})
+
+				By("checking the new replicas have been created using the snapshot", func() {
+					pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					for _, pvc := range pvcList.Items {
+						if pvc.Labels[utils.ClusterInstanceRoleLabelName] == specs.ClusterRoleLabelReplica &&
+							pvc.Labels[utils.ClusterLabelName] == clusterToSnapshotName {
+							Expect(pvc.Spec.DataSource.Kind).To(Equal(apiv1.VolumeSnapshotKind))
+							Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(apiv1.VolumeSnapshotKind))
+						}
+					}
 				})
 
 				// we need to verify the streaming replica continue works
