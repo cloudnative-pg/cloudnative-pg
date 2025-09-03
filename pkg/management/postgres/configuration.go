@@ -424,7 +424,7 @@ func createPostgresqlConfiguration(
 	sort.Strings(info.TemporaryTablespaces)
 
 	// Set additional extensions
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	for _, extension := range cluster.Status.Extensions {
 		info.AdditionalExtensions = append(
 			info.AdditionalExtensions,
 			postgres.AdditionalExtensionConfiguration{
