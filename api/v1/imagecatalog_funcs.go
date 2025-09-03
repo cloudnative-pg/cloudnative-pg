@@ -34,3 +34,14 @@ func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
 
 	return "", false
 }
+
+// FindExtensionsForMajor finds the extensions for the selected major version
+func (spec *ImageCatalogSpec) FindExtensionsForMajor(major int) ([]ExtensionConfiguration, bool) {
+	for _, entry := range spec.Images {
+		if entry.Major == major {
+			return entry.Extensions, true
+		}
+	}
+
+	return nil, false
+}
