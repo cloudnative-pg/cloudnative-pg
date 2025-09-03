@@ -445,6 +445,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | The image reference | True |  |  |
 | `major` _integer_ | The PostgreSQL major version of the image. Must be unique within the catalog. | True |  | Minimum: 10 <br /> |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
 
 
 #### CertificatesConfiguration
@@ -680,6 +681,7 @@ _Appears in:_
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
 | `systemID` _string_ | SystemID is the latest detected PostgreSQL SystemID |  |  |  |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | Extensions rules hue hue hue! | True |  |  |
 
 
 
@@ -980,6 +982,8 @@ PostgreSQL extensions to the Cluster.
 
 _Appears in:_
 
+- [CatalogImage](#catalogimage)
+- [ClusterStatus](#clusterstatus)
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |

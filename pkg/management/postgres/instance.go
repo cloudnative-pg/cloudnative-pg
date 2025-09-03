@@ -747,7 +747,7 @@ func (instance *Instance) buildPostgresEnv() []string {
 
 	// If there are no additional library paths, we use the environment variables
 	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Spec.PostgresConfiguration.Extensions)
+	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Status.Extensions)
 	if len(additionalLibraryPaths) == 0 {
 		return envMap.StringSlice()
 	}

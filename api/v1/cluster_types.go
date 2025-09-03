@@ -1030,6 +1030,9 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// Extensions rules hue hue hue!
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
