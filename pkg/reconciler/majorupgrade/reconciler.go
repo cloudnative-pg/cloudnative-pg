@@ -247,6 +247,7 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
+			// TODO: are extensions relevant here??
 		}),
 		status.SetTimelineID(1),
 	); err != nil {
