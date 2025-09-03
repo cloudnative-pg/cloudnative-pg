@@ -66,6 +66,9 @@ const backupPhase = ".status.phase"
 // where the name of the cluster is written
 const clusterNameField = ".spec.cluster.name"
 
+// ErrPrimaryImageNeedsUpdate is returned when the primary instance is not running with the latest image
+var ErrPrimaryImageNeedsUpdate = fmt.Errorf("primary instance not having expected image, cannot run backup")
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -235,7 +238,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	// If no good running backups are found we elect a pod for the backup
 	pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-	if apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
@@ -490,7 +493,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	contextLogger := log.FromContext(ctx)
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
-	if apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		r.Recorder.Eventf(
 			backup,
 			"Warning",
@@ -728,16 +731,18 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
 
 	var pod corev1.Pod
-	err = r.Get(ctx, client.ObjectKey{
+	if err = r.Get(ctx, client.ObjectKey{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Status.TargetPrimary,
-	}, &pod)
-
-	if !podHasLatestMajorImage(&pod) {
-		return nil, fmt.Errorf("primary instance not having expected image, cannot run backup")
+	}, &pod); err != nil {
+		return nil, err
 	}
 
-	return &pod, err
+	if !podHasLatestMajorImage(&pod) {
+		return nil, ErrPrimaryImageNeedsUpdate
+	}
+
+	return &pod, nil
 }
 
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
