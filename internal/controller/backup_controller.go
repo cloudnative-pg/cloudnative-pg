@@ -733,7 +733,7 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
 
-	if podHasLatestMajorImage(&pod) {
+	if !podHasLatestMajorImage(&pod) {
 		return nil, fmt.Errorf("primary instance not having expected image, cannot run backup")
 	}
 
