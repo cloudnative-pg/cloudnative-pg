@@ -796,8 +796,8 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <i>int</i>
 </td>
 <td>
-   <p>The major version of PostgreSQL of the cluster where the backup
-has been taken from.</p>
+   <p>The PostgreSQL major version that was running when the
+backup was taken.</p>
 </td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
