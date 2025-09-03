@@ -170,7 +170,7 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 	}
 
 	return warns, apierrors.NewInvalid(
-		schema.GroupKind{Group: "pooler.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
