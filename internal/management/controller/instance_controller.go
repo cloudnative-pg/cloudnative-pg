@@ -427,9 +427,14 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
 	contextLogger := log.FromContext(ctx)
 
+	if cluster.Status.PGDataImageInfo == nil {
+		contextLogger.Info("Waiting for the Cluster's ImageInfo Status to be populated")
+		return false
+	}
+
 	latestImages := stringset.New()
-	latestImages.Put(cluster.Spec.ImageName)
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	latestImages.Put(cluster.Status.PGDataImageInfo.Image)
+	for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
 		latestImages.Put(extension.ImageVolumeSource.Reference)
 	}
 

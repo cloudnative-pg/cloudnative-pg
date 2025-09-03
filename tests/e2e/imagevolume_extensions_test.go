@@ -21,12 +21,14 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/blang/semver"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -164,7 +166,54 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 		Expect(dotProduct).To(BeEquivalentTo("32"))
 	}
 
-	It("can use ImageVolume extensions", func() {
+	addExtensionToCluster := func(
+		namespace,
+		clusterName,
+		databaseName string,
+		extensionConfig apiv1.ExtensionConfiguration,
+		extensionSqlName string,
+		additionalGucParams map[string]string,
+	) {
+		database := &apiv1.Database{}
+		databaseNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      databaseName,
+		}
+		Eventually(func(g Gomega) {
+			// Updating the Cluster
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).NotTo(HaveOccurred())
+			cluster.Spec.PostgresConfiguration.Extensions = append(
+				cluster.Spec.PostgresConfiguration.Extensions, extensionConfig)
+			for key, value := range additionalGucParams {
+				cluster.Spec.PostgresConfiguration.Parameters[key] = value
+			}
+			g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+
+			// Updating the Database
+			err = env.Client.Get(env.Ctx, databaseNamespacedName, database)
+			g.Expect(err).ToNot(HaveOccurred())
+			database.Spec.Extensions = append(database.Spec.Extensions, apiv1.ExtensionSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   extensionSqlName,
+					Ensure: apiv1.EnsurePresent,
+				},
+			})
+			g.Expect(env.Client.Update(env.Ctx, database)).To(Succeed())
+		}, 60, 5).Should(Succeed())
+
+		AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 300)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		assertVolumeMounts(podList, extensionConfig.Name)
+		assertVolumes(podList, extensionConfig.Name)
+		assertExtensions(namespace, databaseName)
+	}
+
+	It("via Cluster Spec", func() {
 		By("creating the cluster", func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -188,48 +237,158 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 		})
 
 		By("adding a new extension to an existing Cluster", func() {
-			database := &apiv1.Database{}
-			databaseNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      databaseName,
+			extensionConfig := apiv1.ExtensionConfiguration{
+				Name: "pgvector",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+				},
 			}
+			additionalGucParams := map[string]string{
+				"hnsw.iterative_scan":    "on",
+				"ivfflat.iterative_scan": "on",
+			}
+			addExtensionToCluster(namespace, clusterName, databaseName, extensionConfig,
+				"vector", additionalGucParams)
+		})
 
-			Eventually(func(g Gomega) {
-				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-				g.Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.PostgresConfiguration.Extensions = append(cluster.Spec.PostgresConfiguration.Extensions,
-					apiv1.ExtensionConfiguration{
-						Name: "pgvector",
-						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+		By("verifying GUCS have been updated", func() {
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
+			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
+		})
+
+		By("verifying the extension's usage ", func() {
+			assertPostgis(namespace, clusterName)
+			assertVector(namespace, clusterName)
+		})
+	})
+
+	It("via ImageCatalog", func() {
+		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		clusterName = "postgresql-with-extensions"
+		catalogName := "catalog-with-extensions"
+
+		By("creating Catalog, Cluster and Database", func() {
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			databaseName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
+			Expect(err).NotTo(HaveOccurred())
+
+			postgresImage := fmt.Sprintf("%s:%s", env.PostgresImageName, env.PostgresImageTag)
+			catalog := &apiv1.ImageCatalog{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      catalogName,
+				},
+				Spec: apiv1.ImageCatalogSpec{
+					Images: []apiv1.CatalogImage{
+						{
+							Image: postgresImage,
+							Major: int(env.PostgresVersion),
+							Extensions: []apiv1.ExtensionConfiguration{
+								{
+									Name: "postgis",
+									ImageVolumeSource: corev1.ImageVolumeSource{
+										Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/postgis-extension:3.6.1-%d-trixie", env.PostgresVersion),
+									},
+									LdLibraryPath: []string{"/system"},
+								},
+							},
 						},
-					})
-				// Setting some pgvector GUCs
-				cluster.Spec.PostgresConfiguration.Parameters["hnsw.iterative_scan"] = "on"
-				cluster.Spec.PostgresConfiguration.Parameters["ivfflat.iterative_scan"] = "on"
-				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
-
-				// Updating the Database
-				err = env.Client.Get(env.Ctx, databaseNamespacedName, database)
-				g.Expect(err).ToNot(HaveOccurred())
-				database.Spec.Extensions = append(database.Spec.Extensions, apiv1.ExtensionSpec{
-					DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
-						Name:   "vector",
-						Ensure: apiv1.EnsurePresent,
 					},
-				})
-				g.Expect(env.Client.Update(env.Ctx, database)).To(Succeed())
-			}, 60, 5).Should(Succeed())
+				},
+			}
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      clusterName,
+				},
+				Spec: apiv1.ClusterSpec{
+					Instances: 3,
+					ImageCatalogRef: &apiv1.ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							APIGroup: &apiv1.SchemeGroupVersion.Group,
+							Name:     catalogName,
+							Kind:     "ImageCatalog",
+						},
+						Major: int(env.PostgresVersion),
+					},
+					PostgresConfiguration: apiv1.PostgresConfiguration{
+						Extensions: []apiv1.ExtensionConfiguration{
+							{
+								Name: "postgis",
+							},
+						},
+						Parameters: map[string]string{
+							"log_checkpoints":             "on",
+							"log_lock_waits":              "on",
+							"log_min_duration_statement":  "1000",
+							"log_statement":               "ddl",
+							"log_temp_files":              "1024",
+							"log_autovacuum_min_duration": "1s",
+							"log_replication_commands":    "on",
+						},
+					},
+					Bootstrap: &apiv1.BootstrapConfiguration{InitDB: &apiv1.BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+					}},
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size:         "1Gi",
+						StorageClass: &storageClass,
+					},
+					WalStorage: &apiv1.StorageConfiguration{
+						Size:         "1Gi",
+						StorageClass: &storageClass,
+					},
+				},
+			}
+			err := env.Client.Create(env.Ctx, catalog)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.Client.Create(env.Ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			CreateResourceFromFile(namespace, databaseManifest)
+		})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
-				[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
-
+		By("checking volumes and volumeMounts", func() {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			assertVolumeMounts(podList, "pgvector")
-			assertVolumes(podList, "pgvector")
+			assertVolumeMounts(podList, "postgis")
+			assertVolumes(podList, "postgis")
+		})
+
+		By("checking extensions have been created", func() {
 			assertExtensions(namespace, databaseName)
+		})
+
+		By("adding a new extension by updating the ImageCatalog", func() {
+			// Add a new extension to the catalog
+			catalog := &apiv1.ImageCatalog{}
+			catalogNamespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      catalogName,
+			}
+			err := env.Client.Get(env.Ctx, catalogNamespacedName, catalog)
+			Expect(err).ToNot(HaveOccurred())
+			catalog.Spec.Images[0].Extensions = append(catalog.Spec.Images[0].Extensions, apiv1.ExtensionConfiguration{
+				Name: "pgvector",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
+				},
+			})
+			err = env.Client.Update(env.Ctx, catalog)
+			Expect(err).ToNot(HaveOccurred())
+
+			extensionConfig := apiv1.ExtensionConfiguration{Name: "pgvector"}
+			additionalGucParams := map[string]string{
+				"hnsw.iterative_scan":    "on",
+				"ivfflat.iterative_scan": "on",
+			}
+			addExtensionToCluster(namespace, clusterName, databaseName, extensionConfig,
+				"vector", additionalGucParams)
 		})
 
 		By("verifying GUCS have been updated", func() {
