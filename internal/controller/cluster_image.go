@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -63,39 +64,44 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		)
 	}
 
-	// Case 2: there's a running image. The code checks if the user selected
-	// an image of the same major version or if a change in the major
-	// version has been requested.
-	if requestedImageInfo.Image == cluster.Status.PGDataImageInfo.Image {
-		// The requested image is the same as the current one, no action needed
-		return nil, nil
-	}
+	extensionsChanged := !reflect.DeepEqual(cluster.Status.PGDataImageInfo.Extensions, requestedImageInfo.Extensions)
+	imageChanged := requestedImageInfo.Image != cluster.Status.PGDataImageInfo.Image
 
 	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
 	requestedMajorVersion := requestedImageInfo.MajorVersion
 
-	if currentMajorVersion > requestedMajorVersion {
-		// Major version downgrade requested. This is not allowed.
-		contextLogger.Info(
-			"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
-			"currentImage", cluster.Status.PGDataImageInfo.Image,
-			"requestedImage", requestedImageInfo)
-		return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
-			currentMajorVersion, requestedMajorVersion)
+	// Case 2: nothing to be done.
+	if !imageChanged && !extensionsChanged {
+		return nil, nil
 	}
 
-	if currentMajorVersion < requestedMajorVersion {
-		// Major version upgrade requested
-		return nil, status.PatchWithOptimisticLock(
-			ctx,
-			r.Client,
-			cluster,
-			status.SetImage(requestedImageInfo.Image),
-		)
+	// Case 3: there's a running image. The code checks if the user selected
+	// an image of the same major version or if a change in the major
+	// version has been requested.
+	if imageChanged {
+		if currentMajorVersion > requestedMajorVersion {
+			// Major version downgrade requested. This is not allowed.
+			contextLogger.Info(
+				"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
+				"currentImage", cluster.Status.PGDataImageInfo.Image,
+				"requestedImage", requestedImageInfo)
+			return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
+				currentMajorVersion, requestedMajorVersion)
+		}
+
+		if currentMajorVersion < requestedMajorVersion {
+			// Major version upgrade requested
+			return nil, status.PatchWithOptimisticLock(
+				ctx,
+				r.Client,
+				cluster,
+				status.SetImage(requestedImageInfo.Image),
+			)
+		}
 	}
 
-	// The major versions are the same, but the images are different.
-	// This is a minor version upgrade/downgrade.
+	// Case 4: This is either a minor version upgrade/downgrade or a
+	// change to the extension images.
 	return nil, status.PatchWithOptimisticLock(
 		ctx,
 		r.Client,
@@ -104,16 +110,18 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
-func getImageInfoFromImage(image string) (apiv1.ImageInfo, error) {
+func getImageInfoFromImage(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 	// Parse the version from the tag
-	imageVersion, err := version.FromTag(reference.New(image).Tag)
+	imageVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
 	if err != nil {
-		return apiv1.ImageInfo{}, fmt.Errorf("cannot parse version from image %s: %w", image, err)
+		return apiv1.ImageInfo{},
+			fmt.Errorf("cannot parse version from image %s: %w", cluster.Spec.ImageName, err)
 	}
 
 	return apiv1.ImageInfo{
-		Image:        image,
+		Image:        cluster.Spec.ImageName,
 		MajorVersion: int(imageVersion.Major()), //nolint:gosec
+		Extensions:   cluster.Spec.PostgresConfiguration.Extensions,
 	}, nil
 }
 
@@ -124,7 +132,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	if cluster.Spec.ImageCatalogRef == nil {
 		if cluster.Spec.ImageName != "" {
-			return getImageInfoFromImage(cluster.Spec.ImageName)
+			return getImageInfoFromImage(cluster)
 		}
 
 		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
@@ -185,7 +193,16 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
 	}
 
-	return apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}, nil
+	extensions, err := getExtensionsFromCatalog(cluster, catalog, requestedMajorVersion)
+	if err != nil {
+		return apiv1.ImageInfo{}, fmt.Errorf("cannot retrieve extensions for image %s: %w", catalogImage, err)
+	}
+
+	return apiv1.ImageInfo{
+		Image:        catalogImage,
+		MajorVersion: requestedMajorVersion,
+		Extensions:   extensions,
+	}, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
@@ -278,4 +295,86 @@ func (r *ClusterReconciler) mapImageCatalogsToClusters() handler.MapFunc {
 		}
 		return requests
 	}
+}
+
+// getExtensionsFromCatalog returns a list of requested Extensions from a Catalog for a given
+// Postgres major version.
+// If present, extension entries present in the catalog are always used as a starting base.
+// If additional configuration is passed via `cluster.Spec.PostgresConfiguration.Extensions`
+// for an extension that's already defined in the catalog, the values defined in the Cluster
+// take precedence.
+func getExtensionsFromCatalog(
+	cluster *apiv1.Cluster,
+	catalog apiv1.GenericImageCatalog,
+	requestedMajorVersion int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	requestedExtensions := cluster.Spec.PostgresConfiguration.Extensions
+	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(requestedExtensions))
+
+	// Build a map of extensions coming from the catalog
+	catalogExtensionsMap := make(map[string]apiv1.ExtensionConfiguration)
+	if extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion); ok {
+		for _, extension := range extensions {
+			catalogExtensionsMap[extension.Name] = extension
+		}
+	}
+
+	// Resolve extensions
+	for _, extension := range requestedExtensions {
+		catalogExtension, found := catalogExtensionsMap[extension.Name]
+
+		// Validate that the ImageVolumeSource.Reference is properly defined.
+		// We want to allow overriding each field of an extension defined in a catalog,
+		// meaning that even the ImageVolumeSource.Reference is defined as an optional field,
+		// although it must be defined either in the catalog or in the Cluster Spec.
+
+		// Case 1. This case is also covered by the validateExtensions cluster webhook, but it doesn't
+		// hurt to have it here as well.
+		if !found && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q found in the Cluster Spec but no ImageVolumeSource.Reference is defined", extension.Name)
+		}
+
+		// Case 2. This case must be handled here because we don't have a validation webhook for the catalog,
+		// but it could be moved there if we decide to add one.
+		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
+					"in both the image catalog and the Cluster Spec",
+				extension.Name, catalog.GetNamespace(), catalog.GetName(),
+			)
+		}
+
+		var resultExtension apiv1.ExtensionConfiguration
+		if found {
+			// Found the extension in the catalog, so let's use the catalog entry as a base
+			// and eventually override it with Cluster Spec values
+			resultExtension = catalogExtension
+		} else {
+			// No catalog entry, rely fully on the Cluster Spec
+			resolvedExtensions = append(resolvedExtensions, extension)
+			continue
+		}
+
+		// Apply the Cluster Spec overrides
+		if extension.ImageVolumeSource.Reference != "" {
+			resultExtension.ImageVolumeSource.Reference = extension.ImageVolumeSource.Reference
+		}
+		if extension.ImageVolumeSource.PullPolicy != "" {
+			resultExtension.ImageVolumeSource.PullPolicy = extension.ImageVolumeSource.PullPolicy
+		}
+		if len(extension.ExtensionControlPath) > 0 {
+			resultExtension.ExtensionControlPath = extension.ExtensionControlPath
+		}
+		if len(extension.DynamicLibraryPath) > 0 {
+			resultExtension.DynamicLibraryPath = extension.DynamicLibraryPath
+		}
+		if len(extension.LdLibraryPath) > 0 {
+			resultExtension.LdLibraryPath = extension.LdLibraryPath
+		}
+
+		resolvedExtensions = append(resolvedExtensions, resultExtension)
+	}
+
+	return resolvedExtensions, nil
 }

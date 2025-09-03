@@ -328,8 +328,12 @@ func SanitizeExtensionNameForVolume(extensionName string) string {
 }
 
 func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
-	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil
+	}
+
+	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Status.PGDataImageInfo.Extensions))
+	for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
 				Name: SanitizeExtensionNameForVolume(extension.Name),
@@ -344,8 +348,12 @@ func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
 }
 
 func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
-	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil
+	}
+
+	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(cluster.Status.PGDataImageInfo.Extensions))
+	for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
 				Name:      SanitizeExtensionNameForVolume(extension.Name),
