@@ -322,8 +322,8 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 }
 
 func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
-	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Status.Extensions))
+	for _, extension := range cluster.Status.Extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
 				Name: extension.Name,
@@ -338,8 +338,8 @@ func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
 }
 
 func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
-	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(cluster.Status.Extensions))
+	for _, extension := range cluster.Status.Extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
 				Name:      extension.Name,
