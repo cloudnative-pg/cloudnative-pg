@@ -74,7 +74,7 @@ const (
 
 	pgBouncerIniTemplateString = `
 [databases]
-* = host={{.Pooler.Spec.Cluster.Name}}-{{.Pooler.Spec.Type}}
+* = host={{ .ServiceName }}
 
 [pgbouncer]
 pool_mode = {{ .Pooler.Spec.PgBouncer.PoolMode }}
@@ -192,6 +192,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQueryPassword string
 		Parameters        string
 		PgHba             []string
+		ServiceName       string
 	}{
 		Pooler:            pooler,
 		AuthQuery:         pooler.GetAuthQuery(),
@@ -204,8 +205,9 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		//
 		// Also, we want the list of parameters inside the PgBouncer configuration
 		// to be stable.
-		Parameters: stringifyPgBouncerParameters(parameters),
-		PgHba:      pooler.Spec.PgBouncer.PgHBA,
+		Parameters:  stringifyPgBouncerParameters(parameters),
+		PgHba:       pooler.Spec.PgBouncer.PgHBA,
+		ServiceName: getServiceName(pooler),
 	}
 
 	err = pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
@@ -235,4 +237,12 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	files[clientTLSKeyPath] = secrets.Client.Data[certs.TLSPrivateKeyKey]
 
 	return files, nil
+}
+
+func getServiceName(pooler *apiv1.Pooler) string {
+	if pooler.Spec.CustomServiceName != "" {
+		return pooler.Spec.CustomServiceName
+	}
+
+	return fmt.Sprintf("%s-%s", pooler.Spec.Cluster.Name, string(pooler.Spec.Type))
 }
