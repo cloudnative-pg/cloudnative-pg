@@ -5085,6 +5085,95 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
+              resourceResizePolicy:
+                description: ResourceResizePolicy defines how resource changes should
+                  be handled
+                properties:
+                  autoStrategyThresholds:
+                    description: Thresholds for automatic strategy selection
+                    properties:
+                      cpuIncreaseThreshold:
+                        default: 100
+                        description: CPU increase threshold (percentage) above which
+                          rolling update is preferred
+                        format: int32
+                        type: integer
+                      memoryDecreaseThreshold:
+                        default: 25
+                        description: Memory decrease threshold (percentage) above
+                          which rolling update is preferred
+                        format: int32
+                        type: integer
+                      memoryIncreaseThreshold:
+                        default: 50
+                        description: Memory increase threshold (percentage) above
+                          which rolling update is preferred
+                        format: int32
+                        type: integer
+                    type: object
+                  cpu:
+                    description: CPU resize policy for PostgreSQL containers
+                    properties:
+                      maxDecreasePct:
+                        description: MaxDecreasePct defines the maximum percentage
+                          decrease allowed for in-place resize
+                        format: int32
+                        maximum: 100
+                        minimum: 0
+                        type: integer
+                      maxIncreasePct:
+                        description: |-
+                          MaxIncreasePct defines the maximum percentage increase allowed for in-place resize
+                          Changes exceeding this threshold will trigger rolling update
+                        format: int32
+                        maximum: 1000
+                        minimum: 0
+                        type: integer
+                      restartPolicy:
+                        default: NotRequired
+                        description: RestartPolicy defines whether the container should
+                          restart during resize
+                        enum:
+                        - NotRequired
+                        - RestartContainer
+                        type: string
+                    type: object
+                  memory:
+                    description: Memory resize policy for PostgreSQL containers
+                    properties:
+                      maxDecreasePct:
+                        description: MaxDecreasePct defines the maximum percentage
+                          decrease allowed for in-place resize
+                        format: int32
+                        maximum: 100
+                        minimum: 0
+                        type: integer
+                      maxIncreasePct:
+                        description: |-
+                          MaxIncreasePct defines the maximum percentage increase allowed for in-place resize
+                          Changes exceeding this threshold will trigger rolling update
+                        format: int32
+                        maximum: 1000
+                        minimum: 0
+                        type: integer
+                      restartPolicy:
+                        default: NotRequired
+                        description: RestartPolicy defines whether the container should
+                          restart during resize
+                        enum:
+                        - NotRequired
+                        - RestartContainer
+                        type: string
+                    type: object
+                  strategy:
+                    default: Auto
+                    description: Strategy determines how resource changes are applied
+                    enum:
+                    - InPlace
+                    - RollingUpdate
+                    - Auto
+                    type: string
+                type: object
               resources:
                 description: |-
                   Resources requirements of every generated Pod. Please refer to
@@ -6550,6 +6639,56 @@ spec:
                 description: The total number of ready instances in the cluster. It
                   is equal to the number of ready instance pods.
                 type: integer
+              resizeStatus:
+                description: ResizeStatus tracks ongoing resize operations
+                properties:
+                  completedAt:
+                    description: CompletedAt indicates when the resize operation completed
+                    format: date-time
+                    type: string
+                  instancesStatus:
+                    description: InstancesStatus tracks resize status for each instance
+                    items:
+                      description: InstanceResizeStatus tracks resize status for a
+                        single instance
+                      properties:
+                        message:
+                          description: Message with additional details
+                          type: string
+                        name:
+                          description: Name of the PostgreSQL instance
+                          type: string
+                        phase:
+                          description: Phase of resize for this instance
+                          type: string
+                        strategy:
+                          description: Strategy used for this instance
+                          type: string
+                      required:
+                      - name
+                      - phase
+                      - strategy
+                      type: object
+                    type: array
+                  message:
+                    description: Message provides additional details about the resize
+                      operation
+                    type: string
+                  phase:
+                    description: Phase indicates the current phase of the resize operation
+                    type: string
+                  startedAt:
+                    description: StartedAt indicates when the resize operation started
+                    format: date-time
+                    type: string
+                  strategy:
+                    description: Strategy indicates which resize strategy is being
+                      used
+                    type: string
+                required:
+                - phase
+                - strategy
+                type: object
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.
                 items:

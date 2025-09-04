@@ -385,6 +385,10 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// ResourceResizePolicy defines how resource changes should be handled
+	// +optional
+	ResourceResizePolicy *ResourceResizePolicy `json:"resourceResizePolicy,omitempty"`
+
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
 	// +optional
@@ -822,6 +826,10 @@ type ClusterStatus struct {
 	// TablespacesStatus reports the state of the declarative tablespaces in the cluster
 	// +optional
 	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
+
+	// ResizeStatus tracks ongoing resize operations
+	// +optional
+	ResizeStatus *ResizeStatus `json:"resizeStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
@@ -2544,6 +2552,136 @@ type ConfigMapResourceVersion struct {
 	// Map keys are the config map names, map values are the versions
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// ResizeStatus tracks the status of resize operations
+type ResizeStatus struct {
+	// Strategy indicates which resize strategy is being used
+	Strategy ResourceResizeStrategy `json:"strategy"`
+
+	// Phase indicates the current phase of the resize operation
+	Phase ResizePhase `json:"phase"`
+
+	// StartedAt indicates when the resize operation started
+	StartedAt *metav1.Time `json:"startedAt,omitempty"`
+
+	// CompletedAt indicates when the resize operation completed
+	CompletedAt *metav1.Time `json:"completedAt,omitempty"`
+
+	// InstancesStatus tracks resize status for each instance
+	InstancesStatus []InstanceResizeStatus `json:"instancesStatus,omitempty"`
+
+	// Message provides additional details about the resize operation
+	Message string `json:"message,omitempty"`
+}
+
+// ResizePhase represents the phase of a resize operation
+type ResizePhase string
+
+const (
+	// ResizePhaseInProgress indicates resize is in progress
+	ResizePhaseInProgress ResizePhase = "InProgress"
+	// ResizePhasePending indicates resize is pending
+	ResizePhasePending ResizePhase = "Pending"
+	// ResizePhaseCompleted indicates resize is completed
+	ResizePhaseCompleted ResizePhase = "Completed"
+	// ResizePhaseFailed indicates resize has failed
+	ResizePhaseFailed ResizePhase = "Failed"
+)
+
+// InstanceResizeStatus tracks resize status for a single instance
+type InstanceResizeStatus struct {
+	// Name of the PostgreSQL instance
+	Name string `json:"name"`
+
+	// Phase of resize for this instance
+	Phase ResizePhase `json:"phase"`
+
+	// Strategy used for this instance
+	Strategy ResourceResizeStrategy `json:"strategy"`
+
+	// Message with additional details
+	Message string `json:"message,omitempty"`
+}
+
+// ResourceResizePolicy defines policies for in-place resource resizing
+type ResourceResizePolicy struct {
+	// Strategy determines how resource changes are applied
+	// +kubebuilder:validation:Enum=InPlace;RollingUpdate;Auto
+	// +kubebuilder:default:=Auto
+	Strategy ResourceResizeStrategy `json:"strategy,omitempty"`
+
+	// CPU resize policy for PostgreSQL containers
+	// +optional
+	CPU *ContainerResizePolicy `json:"cpu,omitempty"`
+
+	// Memory resize policy for PostgreSQL containers
+	// +optional
+	Memory *ContainerResizePolicy `json:"memory,omitempty"`
+
+	// Thresholds for automatic strategy selection
+	// +optional
+	AutoStrategyThresholds *AutoStrategyThresholds `json:"autoStrategyThresholds,omitempty"`
+}
+
+// ResourceResizeStrategy defines the strategy for resource resizing
+type ResourceResizeStrategy string
+
+const (
+	// ResourceResizeStrategyInPlace attempts to resize pods in-place when possible
+	ResourceResizeStrategyInPlace ResourceResizeStrategy = "InPlace"
+
+	// ResourceResizeStrategyRollingUpdate always uses traditional rolling update approach
+	ResourceResizeStrategyRollingUpdate ResourceResizeStrategy = "RollingUpdate"
+
+	// ResourceResizeStrategyAuto selects the best strategy based on the change magnitude and type
+	ResourceResizeStrategyAuto ResourceResizeStrategy = "Auto"
+)
+
+// ContainerResizePolicy defines resize policy for a specific resource type
+type ContainerResizePolicy struct {
+	// RestartPolicy defines whether the container should restart during resize
+	// +kubebuilder:validation:Enum=NotRequired;RestartContainer
+	// +kubebuilder:default:=NotRequired
+	RestartPolicy ContainerRestartPolicy `json:"restartPolicy,omitempty"`
+
+	// MaxIncreasePct defines the maximum percentage increase allowed for in-place resize
+	// Changes exceeding this threshold will trigger rolling update
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1000
+	// +optional
+	MaxIncreasePct *int32 `json:"maxIncreasePct,omitempty"`
+
+	// MaxDecreasePct defines the maximum percentage decrease allowed for in-place resize
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	MaxDecreasePct *int32 `json:"maxDecreasePct,omitempty"`
+}
+
+// ContainerRestartPolicy defines whether containers should restart during resize
+type ContainerRestartPolicy string
+
+const (
+	// ContainerRestartPolicyNotRequired indicates container restart is not required
+	ContainerRestartPolicyNotRequired ContainerRestartPolicy = "NotRequired"
+	// ContainerRestartPolicyRestartContainer indicates container should restart
+	ContainerRestartPolicyRestartContainer ContainerRestartPolicy = "RestartContainer"
+)
+
+// AutoStrategyThresholds defines thresholds for automatic strategy selection
+type AutoStrategyThresholds struct {
+	// CPU increase threshold (percentage) above which rolling update is preferred
+	// +kubebuilder:default:=100
+	CPUIncreaseThreshold int32 `json:"cpuIncreaseThreshold,omitempty"`
+
+	// Memory increase threshold (percentage) above which rolling update is preferred
+	// +kubebuilder:default:=50
+	MemoryIncreaseThreshold int32 `json:"memoryIncreaseThreshold,omitempty"`
+
+	// Memory decrease threshold (percentage) above which rolling update is preferred
+	// +kubebuilder:default:=25
+	MemoryDecreaseThreshold int32 `json:"memoryDecreaseThreshold,omitempty"`
 }
 
 func init() {
