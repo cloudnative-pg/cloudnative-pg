@@ -266,6 +266,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.instances.Items,
 	)
 
+	hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, hibernation.HibernationConditionType)
+	if hibernationCondition != nil && hibernationCondition.Status == metav1.ConditionTrue {
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHibernated, "Instances have been removed"); err != nil {
+			return err
+		}
+	}
+
 	// Count jobs
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
