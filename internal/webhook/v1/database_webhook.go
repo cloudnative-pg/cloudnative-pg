@@ -155,6 +155,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 		v.validateExtensions,
 		v.validateSchemas,
 		v.validateFDWs,
+		v.validateForeignServers,
 	}
 
 	for _, validate := range validations {
@@ -267,6 +268,60 @@ func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorLis
 		}
 
 		fdwNames.Put(name)
+	}
+
+	return result
+}
+
+func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+
+	serverNames := stringset.New()
+	for i, server := range d.Spec.Servers {
+		serverName := server.Name
+		if serverNames.Has(serverName) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "servers").Index(i).Child("name"),
+					serverName,
+				),
+			)
+		}
+
+		optionNames := stringset.New()
+		for k, option := range server.Options {
+			optionName := option.Name
+			if optionNames.Has(optionName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "servers").Index(i).Child("options").Index(k).Child("name"),
+						optionName,
+					),
+				)
+			}
+
+			optionNames.Put(optionName)
+		}
+
+		usageNames := stringset.New()
+		for j, usage := range server.Usages {
+			usageName := usage.Name
+			if usageNames.Has(usageName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "servers").Index(i).Child("usages").Index(j).Child("name"),
+						usageName,
+					),
+				)
+			}
+
+			usageNames.Put(usageName)
+		}
+
+		serverNames.Put(serverName)
 	}
 
 	return result
