@@ -98,10 +98,10 @@ func ShouldEnableResizePolicy(cluster *apiv1.Cluster) bool {
 	return cluster.Spec.ResourceResizePolicy != nil
 }
 
-// GetDefaultResizePolicy returns a default resize policy for Auto strategy
+// GetDefaultResizePolicy returns a default resize policy
 func GetDefaultResizePolicy() *apiv1.ResourceResizePolicy {
 	return &apiv1.ResourceResizePolicy{
-		Strategy: apiv1.ResourceResizeStrategyAuto,
+		Strategy: apiv1.ResourceResizeStrategyInPlace,
 		CPU: &apiv1.ContainerResizePolicy{
 			RestartPolicy:  apiv1.ContainerRestartPolicyNotRequired,
 			MaxIncreasePct: int32Ptr(100),
@@ -111,11 +111,6 @@ func GetDefaultResizePolicy() *apiv1.ResourceResizePolicy {
 			RestartPolicy:  apiv1.ContainerRestartPolicyRestartContainer,
 			MaxIncreasePct: int32Ptr(50),
 			MaxDecreasePct: int32Ptr(25),
-		},
-		AutoStrategyThresholds: &apiv1.AutoStrategyThresholds{
-			CPUIncreaseThreshold:    100,
-			MemoryIncreaseThreshold: 50,
-			MemoryDecreaseThreshold: 25,
 		},
 	}
 }

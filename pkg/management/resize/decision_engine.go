@@ -21,8 +21,6 @@ SPDX-License-Identifier: Apache-2.0
 package resize
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -60,14 +58,10 @@ func (r *DecisionEngine) DetermineStrategy() (apiv1.ResourceResizeStrategy, erro
 		if r.canResizeInPlace() {
 			return apiv1.ResourceResizeStrategyInPlace, nil
 		}
-		return apiv1.ResourceResizeStrategyRollingUpdate,
-			fmt.Errorf("in-place resize not feasible, falling back to rolling update")
+		return apiv1.ResourceResizeStrategyRollingUpdate, nil
 
 	case apiv1.ResourceResizeStrategyRollingUpdate:
 		return apiv1.ResourceResizeStrategyRollingUpdate, nil
-
-	case apiv1.ResourceResizeStrategyAuto:
-		return r.selectAutoStrategy(), nil
 
 	default:
 		return apiv1.ResourceResizeStrategyRollingUpdate, nil
@@ -89,34 +83,6 @@ func (r *DecisionEngine) canResizeInPlace() bool {
 
 	// For Phase 1, only support CPU changes
 	return r.isCPUOnlyChange()
-}
-
-// selectAutoStrategy selects the best strategy automatically
-func (r *DecisionEngine) selectAutoStrategy() apiv1.ResourceResizeStrategy {
-	thresholds := r.cluster.Spec.ResourceResizePolicy.AutoStrategyThresholds
-	if thresholds == nil {
-		thresholds = &apiv1.AutoStrategyThresholds{
-			CPUIncreaseThreshold:    100,
-			MemoryIncreaseThreshold: 50,
-			MemoryDecreaseThreshold: 25,
-		}
-	}
-
-	cpuChange := r.calculateResourceChange(corev1.ResourceCPU)
-	memoryChange := r.calculateResourceChange(corev1.ResourceMemory)
-
-	// Use rolling update for large changes or memory decreases
-	if cpuChange > float64(thresholds.CPUIncreaseThreshold) ||
-		memoryChange > float64(thresholds.MemoryIncreaseThreshold) ||
-		(memoryChange < 0 && -memoryChange > float64(thresholds.MemoryDecreaseThreshold)) {
-		return apiv1.ResourceResizeStrategyRollingUpdate
-	}
-
-	if r.canResizeInPlace() {
-		return apiv1.ResourceResizeStrategyInPlace
-	}
-
-	return apiv1.ResourceResizeStrategyRollingUpdate
 }
 
 // isInPlaceResizeSupported checks if the Kubernetes cluster supports in-place resize
@@ -212,25 +178,4 @@ func (r *DecisionEngine) getResourceQuantity(
 	}
 
 	return resource.Quantity{}
-}
-
-// GetResizeReason provides a human-readable reason for the resize decision
-func (r *DecisionEngine) GetResizeReason(strategy apiv1.ResourceResizeStrategy) string {
-	switch strategy {
-	case apiv1.ResourceResizeStrategyInPlace:
-		return "Resource changes are within thresholds and suitable for in-place resize"
-	case apiv1.ResourceResizeStrategyRollingUpdate:
-		if !r.isInPlaceResizeSupported() {
-			return "Kubernetes cluster does not support in-place pod resizing"
-		}
-		if !r.isCPUOnlyChange() {
-			return "Memory changes not supported in Phase 1, using rolling update"
-		}
-		if !r.isWithinThresholds() {
-			return "Resource changes exceed configured thresholds"
-		}
-		return "Rolling update selected for safety"
-	default:
-		return "Unknown resize strategy"
-	}
 }

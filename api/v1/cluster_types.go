@@ -2607,8 +2607,8 @@ type InstanceResizeStatus struct {
 // ResourceResizePolicy defines policies for in-place resource resizing
 type ResourceResizePolicy struct {
 	// Strategy determines how resource changes are applied
-	// +kubebuilder:validation:Enum=InPlace;RollingUpdate;Auto
-	// +kubebuilder:default:=Auto
+	// +kubebuilder:validation:Enum=InPlace;RollingUpdate
+	// +kubebuilder:default:=InPlace
 	Strategy ResourceResizeStrategy `json:"strategy,omitempty"`
 
 	// CPU resize policy for PostgreSQL containers
@@ -2618,10 +2618,6 @@ type ResourceResizePolicy struct {
 	// Memory resize policy for PostgreSQL containers
 	// +optional
 	Memory *ContainerResizePolicy `json:"memory,omitempty"`
-
-	// Thresholds for automatic strategy selection
-	// +optional
-	AutoStrategyThresholds *AutoStrategyThresholds `json:"autoStrategyThresholds,omitempty"`
 }
 
 // ResourceResizeStrategy defines the strategy for resource resizing
@@ -2633,9 +2629,6 @@ const (
 
 	// ResourceResizeStrategyRollingUpdate always uses traditional rolling update approach
 	ResourceResizeStrategyRollingUpdate ResourceResizeStrategy = "RollingUpdate"
-
-	// ResourceResizeStrategyAuto selects the best strategy based on the change magnitude and type
-	ResourceResizeStrategyAuto ResourceResizeStrategy = "Auto"
 )
 
 // ContainerResizePolicy defines resize policy for a specific resource type
@@ -2668,21 +2661,6 @@ const (
 	// ContainerRestartPolicyRestartContainer indicates container should restart
 	ContainerRestartPolicyRestartContainer ContainerRestartPolicy = "RestartContainer"
 )
-
-// AutoStrategyThresholds defines thresholds for automatic strategy selection
-type AutoStrategyThresholds struct {
-	// CPU increase threshold (percentage) above which rolling update is preferred
-	// +kubebuilder:default:=100
-	CPUIncreaseThreshold int32 `json:"cpuIncreaseThreshold,omitempty"`
-
-	// Memory increase threshold (percentage) above which rolling update is preferred
-	// +kubebuilder:default:=50
-	MemoryIncreaseThreshold int32 `json:"memoryIncreaseThreshold,omitempty"`
-
-	// Memory decrease threshold (percentage) above which rolling update is preferred
-	// +kubebuilder:default:=25
-	MemoryDecreaseThreshold int32 `json:"memoryDecreaseThreshold,omitempty"`
-}
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})

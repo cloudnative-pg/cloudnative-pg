@@ -69,7 +69,7 @@ var _ = Describe("PodSpec resize configuration", Label("resizing"), func() {
 		Context("when resize policy is configured", func() {
 			BeforeEach(func() {
 				cluster.Spec.ResourceResizePolicy = &apiv1.ResourceResizePolicy{
-					Strategy: apiv1.ResourceResizeStrategyAuto,
+					Strategy: apiv1.ResourceResizeStrategyInPlace,
 					CPU: &apiv1.ContainerResizePolicy{
 						RestartPolicy:  apiv1.ContainerRestartPolicyNotRequired,
 						MaxIncreasePct: &maxInc100,
@@ -213,7 +213,7 @@ var _ = Describe("PodSpec resize configuration", Label("resizing"), func() {
 
 		It("should return true when resize policy is configured", func() {
 			cluster.Spec.ResourceResizePolicy = &apiv1.ResourceResizePolicy{
-				Strategy: apiv1.ResourceResizeStrategyAuto,
+				Strategy: apiv1.ResourceResizeStrategyInPlace,
 			}
 
 			result := ShouldEnableResizePolicy(cluster)
@@ -226,10 +226,9 @@ var _ = Describe("PodSpec resize configuration", Label("resizing"), func() {
 			policy := GetDefaultResizePolicy()
 
 			Expect(policy).NotTo(BeNil())
-			Expect(policy.Strategy).To(Equal(apiv1.ResourceResizeStrategyAuto))
+			Expect(policy.Strategy).To(Equal(apiv1.ResourceResizeStrategyInPlace))
 			Expect(policy.CPU).NotTo(BeNil())
 			Expect(policy.Memory).NotTo(BeNil())
-			Expect(policy.AutoStrategyThresholds).NotTo(BeNil())
 
 			// Check CPU defaults
 			Expect(policy.CPU.RestartPolicy).To(Equal(apiv1.ContainerRestartPolicyNotRequired))
@@ -244,11 +243,6 @@ var _ = Describe("PodSpec resize configuration", Label("resizing"), func() {
 			Expect(*policy.Memory.MaxIncreasePct).To(Equal(int32(50)))
 			Expect(policy.Memory.MaxDecreasePct).NotTo(BeNil())
 			Expect(*policy.Memory.MaxDecreasePct).To(Equal(int32(25)))
-
-			// Check thresholds
-			Expect(policy.AutoStrategyThresholds.CPUIncreaseThreshold).To(Equal(int32(100)))
-			Expect(policy.AutoStrategyThresholds.MemoryIncreaseThreshold).To(Equal(int32(50)))
-			Expect(policy.AutoStrategyThresholds.MemoryDecreaseThreshold).To(Equal(int32(25)))
 		})
 	})
 })

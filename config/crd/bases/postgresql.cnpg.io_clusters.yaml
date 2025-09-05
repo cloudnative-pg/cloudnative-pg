@@ -5089,28 +5089,6 @@ spec:
                 description: ResourceResizePolicy defines how resource changes should
                   be handled
                 properties:
-                  autoStrategyThresholds:
-                    description: Thresholds for automatic strategy selection
-                    properties:
-                      cpuIncreaseThreshold:
-                        default: 100
-                        description: CPU increase threshold (percentage) above which
-                          rolling update is preferred
-                        format: int32
-                        type: integer
-                      memoryDecreaseThreshold:
-                        default: 25
-                        description: Memory decrease threshold (percentage) above
-                          which rolling update is preferred
-                        format: int32
-                        type: integer
-                      memoryIncreaseThreshold:
-                        default: 50
-                        description: Memory increase threshold (percentage) above
-                          which rolling update is preferred
-                        format: int32
-                        type: integer
-                    type: object
                   cpu:
                     description: CPU resize policy for PostgreSQL containers
                     properties:
@@ -5166,12 +5144,11 @@ spec:
                         type: string
                     type: object
                   strategy:
-                    default: Auto
+                    default: InPlace
                     description: Strategy determines how resource changes are applied
                     enum:
                     - InPlace
                     - RollingUpdate
-                    - Auto
                     type: string
                 type: object
               resources:

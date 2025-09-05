@@ -47,7 +47,7 @@ var _ = Describe("Cluster resize API types", Label("resizing"), func() {
 			maxDec := int32(50)
 
 			cluster.Spec.ResourceResizePolicy = &ResourceResizePolicy{
-				Strategy: ResourceResizeStrategyAuto,
+				Strategy: ResourceResizeStrategyInPlace,
 				CPU: &ContainerResizePolicy{
 					RestartPolicy:  ContainerRestartPolicyNotRequired,
 					MaxIncreasePct: &maxInc,
@@ -58,18 +58,12 @@ var _ = Describe("Cluster resize API types", Label("resizing"), func() {
 					MaxIncreasePct: &maxInc,
 					MaxDecreasePct: &maxDec,
 				},
-				AutoStrategyThresholds: &AutoStrategyThresholds{
-					CPUIncreaseThreshold:    100,
-					MemoryIncreaseThreshold: 50,
-					MemoryDecreaseThreshold: 25,
-				},
 			}
 
 			Expect(cluster.Spec.ResourceResizePolicy).NotTo(BeNil())
-			Expect(cluster.Spec.ResourceResizePolicy.Strategy).To(Equal(ResourceResizeStrategyAuto))
+			Expect(cluster.Spec.ResourceResizePolicy.Strategy).To(Equal(ResourceResizeStrategyInPlace))
 			Expect(cluster.Spec.ResourceResizePolicy.CPU).NotTo(BeNil())
 			Expect(cluster.Spec.ResourceResizePolicy.Memory).NotTo(BeNil())
-			Expect(cluster.Spec.ResourceResizePolicy.AutoStrategyThresholds).NotTo(BeNil())
 		})
 
 		It("should handle minimal configuration", func() {
@@ -80,7 +74,6 @@ var _ = Describe("Cluster resize API types", Label("resizing"), func() {
 			Expect(cluster.Spec.ResourceResizePolicy.Strategy).To(Equal(ResourceResizeStrategyInPlace))
 			Expect(cluster.Spec.ResourceResizePolicy.CPU).To(BeNil())
 			Expect(cluster.Spec.ResourceResizePolicy.Memory).To(BeNil())
-			Expect(cluster.Spec.ResourceResizePolicy.AutoStrategyThresholds).To(BeNil())
 		})
 	})
 
@@ -153,7 +146,6 @@ var _ = Describe("Cluster resize API types", Label("resizing"), func() {
 		It("should have correct string values", func() {
 			Expect(string(ResourceResizeStrategyInPlace)).To(Equal("InPlace"))
 			Expect(string(ResourceResizeStrategyRollingUpdate)).To(Equal("RollingUpdate"))
-			Expect(string(ResourceResizeStrategyAuto)).To(Equal("Auto"))
 		})
 	})
 
@@ -197,32 +189,6 @@ var _ = Describe("Cluster resize API types", Label("resizing"), func() {
 
 			Expect(policy.MaxIncreasePct).To(BeNil())
 			Expect(policy.MaxDecreasePct).To(BeNil())
-		})
-	})
-
-	Describe("AutoStrategyThresholds", func() {
-		It("should allow setting threshold values", func() {
-			thresholds := &AutoStrategyThresholds{
-				CPUIncreaseThreshold:    75,
-				MemoryIncreaseThreshold: 40,
-				MemoryDecreaseThreshold: 20,
-			}
-
-			Expect(thresholds.CPUIncreaseThreshold).To(Equal(int32(75)))
-			Expect(thresholds.MemoryIncreaseThreshold).To(Equal(int32(40)))
-			Expect(thresholds.MemoryDecreaseThreshold).To(Equal(int32(20)))
-		})
-
-		It("should work with zero values", func() {
-			thresholds := &AutoStrategyThresholds{
-				CPUIncreaseThreshold:    0,
-				MemoryIncreaseThreshold: 0,
-				MemoryDecreaseThreshold: 0,
-			}
-
-			Expect(thresholds.CPUIncreaseThreshold).To(Equal(int32(0)))
-			Expect(thresholds.MemoryIncreaseThreshold).To(Equal(int32(0)))
-			Expect(thresholds.MemoryDecreaseThreshold).To(Equal(int32(0)))
 		})
 	})
 

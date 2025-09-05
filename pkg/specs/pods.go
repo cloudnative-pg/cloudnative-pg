@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/resize"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -507,6 +508,9 @@ func buildInstance(
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
 	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
+
+	// Configure resize policies if specified
+	resize.UpdatePodSpecForResize(&podSpec, &cluster)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

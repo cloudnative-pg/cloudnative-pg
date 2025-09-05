@@ -43,8 +43,8 @@ type ClusterSpec struct {
 // ResourceResizePolicy defines policies for in-place resource resizing
 type ResourceResizePolicy struct {
     // Strategy determines how resource changes are applied
-    // +kubebuilder:validation:Enum=InPlace;RollingUpdate;Auto
-    // +kubebuilder:default:=Auto
+    // +kubebuilder:validation:Enum=InPlace;RollingUpdate
+    // +kubebuilder:default:=InPlace
     Strategy ResourceResizeStrategy `json:"strategy,omitempty"`
     
     // CPU resize policy for PostgreSQL containers
@@ -55,9 +55,6 @@ type ResourceResizePolicy struct {
     // +optional
     Memory *ContainerResizePolicy `json:"memory,omitempty"`
     
-    // Thresholds for automatic strategy selection
-    // +optional
-    AutoStrategyThresholds *AutoStrategyThresholds `json:"autoStrategyThresholds,omitempty"`
 }
 
 type ResourceResizeStrategy string
@@ -69,8 +66,6 @@ const (
     // RollingUpdate always uses traditional rolling update approach
     ResourceResizeStrategyRollingUpdate ResourceResizeStrategy = "RollingUpdate"
     
-    // Auto selects the best strategy based on the change magnitude and type
-    ResourceResizeStrategyAuto ResourceResizeStrategy = "Auto"
 )
 
 type ContainerResizePolicy struct {
@@ -100,19 +95,6 @@ const (
     ContainerRestartPolicyRestartContainer ContainerRestartPolicy = "RestartContainer"
 )
 
-type AutoStrategyThresholds struct {
-    // CPU increase threshold (percentage) above which rolling update is preferred
-    // +kubebuilder:default:=100
-    CPUIncreaseThreshold int32 `json:"cpuIncreaseThreshold,omitempty"`
-    
-    // Memory increase threshold (percentage) above which rolling update is preferred  
-    // +kubebuilder:default:=50
-    MemoryIncreaseThreshold int32 `json:"memoryIncreaseThreshold,omitempty"`
-    
-    // Memory decrease threshold (percentage) above which rolling update is preferred
-    // +kubebuilder:default:=25
-    MemoryDecreaseThreshold int32 `json:"memoryDecreaseThreshold,omitempty"`
-}
 ```
 
 #### Status Extensions
@@ -199,10 +181,6 @@ func (r *ResizeDecisionEngine) DetermineStrategy() (ResourceResizeStrategy, erro
         
     case ResourceResizeStrategyRollingUpdate:
         return ResourceResizeStrategyRollingUpdate, nil
-        
-    case ResourceResizeStrategyAuto:
-        return r.selectAutoStrategy(), nil
-        
     default:
         return ResourceResizeStrategyRollingUpdate, nil
     }
@@ -223,32 +201,6 @@ func (r *ResizeDecisionEngine) canResizeInPlace() bool {
     return r.isPostgreSQLCompatible()
 }
 
-func (r *ResizeDecisionEngine) selectAutoStrategy() ResourceResizeStrategy {
-    thresholds := r.cluster.Spec.ResourceResizePolicy.AutoStrategyThresholds
-    if thresholds == nil {
-        thresholds = &AutoStrategyThresholds{
-            CPUIncreaseThreshold:    100,
-            MemoryIncreaseThreshold: 50,
-            MemoryDecreaseThreshold: 25,
-        }
-    }
-    
-    cpuChange := r.calculateResourceChange("cpu")
-    memoryChange := r.calculateResourceChange("memory")
-    
-    // Use rolling update for large changes or memory decreases
-    if cpuChange > float64(thresholds.CPUIncreaseThreshold) ||
-       memoryChange > float64(thresholds.MemoryIncreaseThreshold) ||
-       (memoryChange < 0 && -memoryChange > float64(thresholds.MemoryDecreaseThreshold)) {
-        return ResourceResizeStrategyRollingUpdate
-    }
-    
-    if r.canResizeInPlace() {
-        return ResourceResizeStrategyInPlace
-    }
-    
-    return ResourceResizeStrategyRollingUpdate
-}
 ```
 
 #### Pod Specification Updates
@@ -510,10 +462,6 @@ spec:
       restartPolicy: RestartContainer
       maxIncreasePct: 50
       maxDecreasePct: 25
-    autoStrategyThresholds:
-      cpuIncreaseThreshold: 100
-      memoryIncreaseThreshold: 50
-      memoryDecreaseThreshold: 25
 ```
 
 ### Conservative Configuration (Always Rolling Update)

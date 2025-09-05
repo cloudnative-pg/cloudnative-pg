@@ -77,9 +77,6 @@ if err != nil {
     // Handle error
 }
 
-// Get human-readable reason
-reason := engine.GetResizeReason(strategy)
-
 // Configure pod spec with resize policies
 resize.UpdatePodSpecForResize(podSpec, cluster)
 ```
@@ -97,12 +94,6 @@ resize.UpdatePodSpecForResize(podSpec, cluster)
 - Used when in-place resize is not feasible
 - Provides maximum safety and consistency
 - Required for memory changes in Phase 1
-
-### Auto
-- Automatically selects the best strategy
-- Uses configurable thresholds to make decisions
-- Balances performance and safety
-
 ## Limitations (Phase 1)
 
 1. **CPU-only changes**: Memory modifications trigger rolling updates
