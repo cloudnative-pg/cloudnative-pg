@@ -1099,7 +1099,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return ctrl.Result{}, err
 		}
 
-		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); err != nil || !res.IsZero() {
 			return res, err
 		}
 

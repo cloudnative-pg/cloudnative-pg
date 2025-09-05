@@ -512,13 +512,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// ensuring the primary to be healthy. The hibernation starts from the
 	// primary Pod to ensure the replicas are in sync and doing it here avoids
 	// any unwanted switchover.
-	if result, err := hibernation.Reconcile(
-		ctx,
-		r.Client,
-		cluster,
-		resources.instances.Items,
-	); result != nil || err != nil {
-		return *result, err
+	result, err := hibernation.Reconcile(ctx, r.Client, cluster, resources.instances.Items)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if result != nil {
+		return *result, nil
 	}
 
 	// We have already updated the status in updateResourceStatus call,
@@ -539,7 +538,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
-	result, err := r.handleSwitchover(ctx, cluster, resources, instancesStatus)
+	result, err = r.handleSwitchover(ctx, cluster, resources, instancesStatus)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -809,7 +808,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Reconcile Pods
-	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -961,7 +960,7 @@ func (r *ClusterReconciler) reconcilePods(
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 

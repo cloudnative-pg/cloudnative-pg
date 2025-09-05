@@ -121,9 +121,8 @@ func (o *onlineExecutor) prepare(
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	status := statusBody.Data
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	if status != nil && (backup.Name != status.BackupName || status.Phase == "") {
+	if statusBody.Data != nil && (backup.Name != statusBody.Data.BackupName || statusBody.Data.Phase == "") {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
@@ -152,13 +151,13 @@ func (o *onlineExecutor) prepare(
 		return nil, err
 	}
 
-	switch status.Phase {
+	switch statusBody.Data.Phase {
 	case webserver.Starting:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case webserver.Started:
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("found the instance is an unexpected phase while preparing the snapshot: %s",
-			status.Phase)
+			statusBody.Data.Phase)
 	}
 }

@@ -54,10 +54,10 @@ func IsWalStorageEnabled(
 	namespace, clusterName string,
 ) (bool, error) {
 	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
-	if cluster.Spec.WalStorage == nil {
+	if err != nil || cluster.Spec.WalStorage == nil {
 		return false, err
 	}
-	return true, err
+	return true, nil
 }
 
 // PvcHasLabels returns true if a PVC contains a given map of labels
