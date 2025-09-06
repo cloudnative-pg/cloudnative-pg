@@ -655,7 +655,7 @@ var _ = Describe("Set cluster metadata of service account", func() {
 
 		cluster := &apiv1.Cluster{}
 
-		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
+		cluster.Spec.ServiceAccount.MergeMetadata(sa)
 		Expect(sa.Annotations).To(BeEmpty())
 		Expect(sa.Labels).To(BeEmpty())
 	})
@@ -671,18 +671,16 @@ var _ = Describe("Set cluster metadata of service account", func() {
 		}
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
-					Metadata: apiv1.Metadata{
-						Labels:      labels,
-						Annotations: annotations,
-					},
+				ServiceAccount: &apiv1.ServiceAccount{
+					Labels:      labels,
+					Annotations: annotations,
 				},
 			},
 		}
 
-		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
-		Expect(sa.Annotations).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Annotations))
-		Expect(sa.Labels).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Labels))
+		cluster.Spec.ServiceAccount.MergeMetadata(sa)
+		Expect(sa.Annotations).To(BeEquivalentTo(cluster.Spec.ServiceAccount.Annotations))
+		Expect(sa.Labels).To(BeEquivalentTo(cluster.Spec.ServiceAccount.Labels))
 	})
 })
 
