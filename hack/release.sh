@@ -103,6 +103,24 @@ release_manifest="releases/cnpg-${release_version}.yaml"
 # shellcheck disable=SC2001
 release_branch="release-$(sed -e 's/^\([0-9]\+\.[0-9]\+\)\..*$/\1/' <<< "$release_version" )"
 
+# Find the previous version
+previous_version=$(ls releases/cnpg-*.yaml 2>/dev/null | sed -E 's/releases\/cnpg-([0-9]+\.[0-9]+\.[0-9]+).*\.yaml/\1/' | sort -V | tail -1)
+
+echo "Previous version: $previous_version"
+echo "New version: $release_version"
+
+# If a previous version exists, check if it's in the manifest
+if [[ -n "$previous_version" && -f "$release_manifest" ]]; then
+    if grep -q "$previous_version" "$release_manifest"; then
+        echo "Updating $previous_version → $release_version in $release_manifest"
+        sed -i "s/$previous_version/$release_version/g" "$release_manifest"
+    else
+        echo "No matching version found in $release_manifest, skipping replacement."
+    fi
+else
+    echo "No previous version found or $release_manifest does not exist"
+fi
+
 # Perform automated substitutions of the version string in the source code
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
