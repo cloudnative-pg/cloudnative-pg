@@ -84,8 +84,13 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
 	}
 
-	if r.Spec.Backup != nil && r.Spec.Backup.Target == "" {
-		r.Spec.Backup.Target = DefaultBackupTarget
+	if r.Spec.Backup != nil {
+		if r.Spec.Backup.Target == "" {
+			r.Spec.Backup.Target = DefaultBackupTarget
+		}
+		if r.Spec.Backup.ReplicaMethodPreference == "" {
+			r.Spec.Backup.ReplicaMethodPreference = ReplicaBackupMethodPreferenceVolumeSnapshot
+		}
 	}
 
 	psqlVersion, err := r.GetPostgresqlMajorVersion()
