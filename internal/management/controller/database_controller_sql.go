@@ -65,10 +65,6 @@ func detectDatabase(
 	    WHERE datname = $1
 		`,
 		obj.Spec.Name)
-	if row.Err() != nil {
-		return false, fmt.Errorf("while checking if database %q exists: %w", obj.Spec.Name, row.Err())
-	}
-
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return false, fmt.Errorf("while scanning if database %q exists: %w", obj.Spec.Name, err)
@@ -251,10 +247,6 @@ func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext apiv1.Extensi
 	row := db.QueryRowContext(
 		ctx, detectDatabaseExtensionSQL,
 		ext.Name)
-	if row.Err() != nil {
-		return nil, fmt.Errorf("while checking if extension %q exists: %w", ext.Name, row.Err())
-	}
-
 	var result extInfo
 	if err := row.Scan(&result.Name, &result.Version, &result.Schema); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -347,10 +339,6 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 	row := db.QueryRowContext(
 		ctx, detectDatabaseSchemaSQL,
 		schema.Name)
-	if row.Err() != nil {
-		return nil, fmt.Errorf("while checking if schema %q exists: %w", schema.Name, row.Err())
-	}
-
 	var result schemaInfo
 	if err := row.Scan(&result.Name, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
