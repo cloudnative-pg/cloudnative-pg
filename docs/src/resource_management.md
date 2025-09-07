@@ -104,6 +104,63 @@ enabling our containers to work as expected.
 For more details, please refer to the ["Resource Consumption"](https://www.postgresql.org/docs/current/runtime-config-resource.html)
 section in the PostgreSQL documentation.
 
+## In-place Resource Updates
+
+CloudNativePG supports in-place resource updates for CPU and memory changes when the container resize policy allows it. This feature enables you to scale your PostgreSQL cluster resources without recreating pods, improving cluster availability during scaling operations.
+
+### Container Resize Policy
+
+To enable in-place resource updates, you need to configure the `containerResizePolicy` in your cluster specification. This policy defines how resource changes should be handled for each container.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-resize
+spec:
+  instances: 3
+  
+  containerResizePolicy:
+    - name: postgres
+      resizePolicy: NotRequired
+    - name: barman-cloud-backup
+      resizePolicy: RestartContainer
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+```
+
+### Resize Policy Options
+
+- `NotRequired`: The container can be resized in-place without restarting
+- `RestartContainer`: The container will be restarted when resources are changed
+
+### How It Works
+
+1. When you update the `resources` section in your cluster specification, CloudNativePG checks if the change can be applied in-place
+2. For CPU and memory changes with `NotRequired` resize policy, the operator applies the resource update using Kubernetes' resize subresource
+3. The pod's resource allocation is updated without recreating the container
+4. The operator updates the pod's spec annotation to reflect the new desired state
+
+### Benefits
+
+- **Zero downtime**: Resource scaling without pod recreation
+- **Improved availability**: No interruption to database connections
+- **Faster scaling**: Immediate resource allocation without waiting for pod recreation
+- **Better user experience**: Seamless resource adjustments
+
+### Limitations
+
+- Only CPU and memory resources can be updated in-place
+- Requires Kubernetes 1.27+ for full support
+- Container resize policy must be set to `NotRequired` for in-place updates
+- Some resource changes may still require pod recreation (e.g., storage, security contexts)
+
 !!! Seealso "Managing Compute Resources for Containers"
     For more details on resource management, please refer to the
     ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
