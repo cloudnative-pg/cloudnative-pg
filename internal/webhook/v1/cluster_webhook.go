@@ -222,6 +222,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
 		v.validateExtensions,
+		v.validateContainerResizePolicy,
 	}
 
 	for _, validate := range validations {
@@ -919,6 +920,66 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 				field.NewPath("spec", "resources", "requests", "storage"),
 				ephemeralStorageRequest.String(),
 				"Ephemeral storage request is greater than the limit",
+			))
+		}
+	}
+
+	return result
+}
+
+// validateContainerResizePolicy validates the container resize policy configuration
+func (v *ClusterCustomValidator) validateContainerResizePolicy(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	// If no resize policy is specified, no validation needed
+	if len(r.Spec.ContainerResizePolicy) == 0 {
+		return result
+	}
+
+	// Track resource names to ensure no duplicates
+	resourceNames := make(map[corev1.ResourceName]bool)
+
+	for i, policy := range r.Spec.ContainerResizePolicy {
+		fieldPath := field.NewPath("spec", "containerResizePolicy").Index(i)
+
+		// Validate resource name
+		if policy.ResourceName == "" {
+			result = append(result, field.Required(
+				fieldPath.Child("resourceName"),
+				"resourceName must be specified",
+			))
+			continue
+		}
+
+		// Check for supported resource names (CPU and memory)
+		if policy.ResourceName != corev1.ResourceCPU && policy.ResourceName != corev1.ResourceMemory {
+			result = append(result, field.NotSupported(
+				fieldPath.Child("resourceName"),
+				policy.ResourceName,
+				[]string{string(corev1.ResourceCPU), string(corev1.ResourceMemory)},
+			))
+		}
+
+		// Check for duplicate resource names
+		if resourceNames[policy.ResourceName] {
+			result = append(result, field.Duplicate(
+				fieldPath.Child("resourceName"),
+				policy.ResourceName,
+			))
+		}
+		resourceNames[policy.ResourceName] = true
+
+		// Validate restart policy
+		if policy.RestartPolicy == "" {
+			result = append(result, field.Required(
+				fieldPath.Child("restartPolicy"),
+				"restartPolicy must be specified",
+			))
+		} else if policy.RestartPolicy != corev1.NotRequired && policy.RestartPolicy != corev1.RestartContainer {
+			result = append(result, field.NotSupported(
+				fieldPath.Child("restartPolicy"),
+				policy.RestartPolicy,
+				[]string{string(corev1.NotRequired), string(corev1.RestartContainer)},
 			))
 		}
 	}
