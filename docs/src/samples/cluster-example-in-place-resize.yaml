@@ -23,9 +23,9 @@ spec:
   # Container resize policy configuration
   # This enables in-place resource updates for the postgres container
   containerResizePolicy:
-    - name: postgres
+    - resourceName: cpu
       resizePolicy: NotRequired  # Allows in-place CPU/memory updates
-    - name: barman-cloud-backup
+    - resourceName: memory
       resizePolicy: RestartContainer  # Requires restart for resource changes
 
   # Initial resource configuration
