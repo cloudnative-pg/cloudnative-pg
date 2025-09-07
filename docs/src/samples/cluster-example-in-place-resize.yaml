@@ -1,0 +1,93 @@
+# Example: CloudNativePG Cluster with In-place Resource Updates
+# This example demonstrates how to configure a PostgreSQL cluster to support
+# in-place resource updates using container resize policies.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-resize-example
+  namespace: default
+spec:
+  # Number of instances in the cluster
+  instances: 3
+
+  # PostgreSQL version
+  postgresql:
+    parameters:
+      # Configure shared_buffers to be 25% of container memory
+      shared_buffers: "256MB"
+      # Enable logging for monitoring
+      log_statement: "all"
+      log_min_duration_statement: "1000"
+
+  # Container resize policy configuration
+  # This enables in-place resource updates for the postgres container
+  containerResizePolicy:
+    - name: postgres
+      resizePolicy: NotRequired  # Allows in-place CPU/memory updates
+    - name: barman-cloud-backup
+      resizePolicy: RestartContainer  # Requires restart for resource changes
+
+  # Initial resource configuration
+  # These can be updated in-place when resizePolicy is NotRequired
+  resources:
+    requests:
+      memory: "1Gi"    # Initial memory request
+      cpu: "500m"      # Initial CPU request (0.5 cores)
+    limits:
+      memory: "2Gi"    # Maximum memory limit
+      cpu: "1000m"     # Maximum CPU limit (1 core)
+
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: "fast-ssd"
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: postgresql-resize-example-credentials
+
+  # Monitoring configuration
+  monitoring:
+    customQueriesConfigMap:
+      - name: postgres-exporter
+        key: queries.yaml
+
+---
+# Secret for database credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-resize-example-credentials
+  namespace: default
+type: kubernetes.io/basic-auth
+stringData:
+  username: app
+  password: "super-secret-password"
+
+---
+# Example: How to update resources in-place
+# To scale up resources, simply update the resources section:
+#
+# kubectl patch cluster postgresql-resize-example --type='merge' -p='
+# {
+#   "spec": {
+#     "resources": {
+#       "requests": {
+#         "memory": "2Gi",
+#         "cpu": "1000m"
+#       },
+#       "limits": {
+#         "memory": "4Gi", 
+#         "cpu": "2000m"
+#       }
+#     }
+#   }
+# }'
+#
+# This will trigger an in-place resource update without recreating pods,
+# provided the containerResizePolicy is set to NotRequired for the postgres container.

@@ -2136,6 +2136,30 @@ spec:
                       created using the provided CA.
                     type: string
                 type: object
+              containerResizePolicy:
+                description: |-
+                  ContainerResizePolicy defines the resize policy for the PostgreSQL container
+                  in instance pods (primary and replica). This allows fine-grained control
+                  over how resource changes are applied to running containers.
+                items:
+                  description: ContainerResizePolicy represents resource resize policy
+                    for the container.
+                  properties:
+                    resourceName:
+                      description: |-
+                        Name of the resource to which this resource resize policy applies.
+                        Supported values: cpu, memory.
+                      type: string
+                    restartPolicy:
+                      description: |-
+                        Restart policy to apply when specified resource is resized.
+                        If not specified, it defaults to NotRequired.
+                      type: string
+                  required:
+                  - resourceName
+                  - restartPolicy
+                  type: object
+                type: array
               description:
                 description: Description of this PostgreSQL cluster
                 type: string

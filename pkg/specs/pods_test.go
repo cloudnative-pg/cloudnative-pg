@@ -1064,4 +1064,96 @@ var _ = Describe("NewInstance", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
+
+	It("applies container resize policy to PostgreSQL container", func(ctx SpecContext) {
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: v1.ClusterSpec{
+				Instances: 1,
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.NotRequired,
+					},
+					{
+						ResourceName:  corev1.ResourceMemory,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				},
+			},
+			Status: v1.ClusterStatus{
+				Image: "postgres:13.11",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+
+		// Find the PostgreSQL container
+		var postgresContainer *corev1.Container
+		for i, container := range pod.Spec.Containers {
+			if container.Name == PostgresContainerName {
+				postgresContainer = &pod.Spec.Containers[i]
+				break
+			}
+		}
+		Expect(postgresContainer).NotTo(BeNil())
+
+		// Verify resize policies are applied correctly
+		Expect(postgresContainer.ResizePolicy).To(HaveLen(2))
+
+		cpuPolicy := findResizePolicy(postgresContainer.ResizePolicy, corev1.ResourceCPU)
+		Expect(cpuPolicy).NotTo(BeNil())
+		Expect(cpuPolicy.RestartPolicy).To(Equal(corev1.NotRequired))
+
+		memoryPolicy := findResizePolicy(postgresContainer.ResizePolicy, corev1.ResourceMemory)
+		Expect(memoryPolicy).NotTo(BeNil())
+		Expect(memoryPolicy.RestartPolicy).To(Equal(corev1.RestartContainer))
+	})
+
+	It("works without container resize policy", func(ctx SpecContext) {
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: v1.ClusterSpec{
+				Instances: 1,
+			},
+			Status: v1.ClusterStatus{
+				Image: "postgres:13.11",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+
+		// Find the PostgreSQL container
+		var postgresContainer *corev1.Container
+		for i, container := range pod.Spec.Containers {
+			if container.Name == PostgresContainerName {
+				postgresContainer = &pod.Spec.Containers[i]
+				break
+			}
+		}
+		Expect(postgresContainer).NotTo(BeNil())
+
+		// Verify no resize policies are applied when not specified
+		Expect(postgresContainer.ResizePolicy).To(BeEmpty())
+	})
 })
+
+// Helper function to find a resize policy by resource name
+func findResizePolicy(policies []corev1.ContainerResizePolicy, resourceName corev1.ResourceName) *corev1.ContainerResizePolicy {
+	for i, policy := range policies {
+		if policy.ResourceName == resourceName {
+			return &policies[i]
+		}
+	}
+	return nil
+}

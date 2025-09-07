@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -79,6 +80,17 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
+		// Check if this is a resource-only change that can be applied in-place
+		if podRollout.canUseResourceInPlaceUpdate {
+			err := r.updatePodResources(ctx, cluster, postgresqlStatus.Pod)
+			if err == nil {
+				continue
+			}
+			log.FromContext(ctx).Info("In-place resource update failed, falling back to pod recreation",
+				"pod", postgresqlStatus.Pod.Name,
+				"error", err.Error())
+		}
+
 		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
 		if !managerResult.RolloutAllowed {
 			r.Recorder.Eventf(
@@ -119,6 +131,12 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, nil
 	}
 
+	log.FromContext(ctx).Info("Primary pod rollout required",
+		"pod", primaryPostgresqlStatus.Pod.Name,
+		"reason", podRollout.reason,
+		"canUseResourceInPlaceUpdate", podRollout.canUseResourceInPlaceUpdate,
+		"canBeInPlace", podRollout.canBeInPlace)
+
 	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
@@ -141,7 +159,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		podRollout.canBeInPlace, podRollout.primaryForceRecreate, podRollout.reason)
+		podRollout.canBeInPlace, podRollout.primaryForceRecreate, podRollout.reason, podRollout.canUseResourceInPlaceUpdate)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -152,6 +170,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	inPlacePossible bool,
 	forceRecreate bool,
 	reason rolloutReason,
+	canUseResourceInPlaceUpdate bool,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -166,6 +185,17 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		}
 
 		return true, nil
+	}
+
+	// Check if this is a resource-only change that can be applied in-place for the primary
+	if canUseResourceInPlaceUpdate {
+		// Try to apply the resource update in-place
+		err := r.updatePodResources(ctx, cluster, &primaryPod)
+		if err != nil {
+			return false, err
+		}
+		log.FromContext(ctx).Info("In-place resource update successful for primary pod",
+			"pod", primaryPod.Name)
 	}
 
 	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {
@@ -275,6 +305,9 @@ type rollout struct {
 	needsChangeOperatorImage bool
 	needsChangeOperandImage  bool
 
+	// Used for in-place resource updates
+	canUseResourceInPlaceUpdate bool
+
 	reason string
 }
 
@@ -304,6 +337,7 @@ func isInstanceNeedingRollout(
 		}
 	}
 
+	// Check if the pod needs a rollout (including resource-only changes that might be applied in-place)
 	if podRollout := isPodNeedingRollout(ctx, status.Pod, cluster); podRollout.required {
 		return podRollout
 	}
@@ -356,6 +390,7 @@ func isPodNeedingRollout(
 	}
 
 	checkers := map[string]rolloutChecker{
+		"resource requirements changed":            checkResourceOnlyChanges,
 		"pod has missing PVCs":                     checkHasMissingPVCs,
 		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
 		"pod image is outdated":                    checkPodImageIsOutdated,
@@ -394,6 +429,130 @@ func isPodNeedingRollout(
 	}
 
 	return rollout{}
+}
+
+// checkResourceOnlyChanges checks if there are only resource requirement changes
+// that can be applied in-place according to the container resize policy
+func checkResourceOnlyChanges(
+	ctx context.Context,
+	pod *corev1.Pod,
+	cluster *apiv1.Cluster,
+) (rollout, error) {
+	// Find the PostgreSQL container in the current pod
+	var currentPostgresContainer *corev1.Container
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
+			currentPostgresContainer = &pod.Spec.Containers[i]
+			break
+		}
+	}
+
+	if currentPostgresContainer == nil {
+		return rollout{}, nil
+	}
+
+	// Get the desired resources from the cluster spec
+	desiredResources := cluster.Spec.Resources
+
+	// Check if resources are actually different
+	if equality.Semantic.DeepEqual(currentPostgresContainer.Resources, desiredResources) {
+		// Resources are identical, no changes needed
+		return rollout{}, nil
+	}
+
+	// Track which resources have changed
+	cpuChanged := false
+	memoryChanged := false
+
+	// Check CPU requests
+	currentCPURequest := currentPostgresContainer.Resources.Requests.Cpu()
+	desiredCPURequest := desiredResources.Requests.Cpu()
+	if !currentCPURequest.Equal(*desiredCPURequest) {
+		cpuChanged = true
+	}
+
+	// Check CPU limits
+	currentCPULimit := currentPostgresContainer.Resources.Limits.Cpu()
+	desiredCPULimit := desiredResources.Limits.Cpu()
+	if !currentCPULimit.Equal(*desiredCPULimit) {
+		cpuChanged = true
+	}
+
+	// Check Memory requests
+	currentMemoryRequest := currentPostgresContainer.Resources.Requests.Memory()
+	desiredMemoryRequest := desiredResources.Requests.Memory()
+	if !currentMemoryRequest.Equal(*desiredMemoryRequest) {
+		memoryChanged = true
+	}
+
+	// Check Memory limits
+	currentMemoryLimit := currentPostgresContainer.Resources.Limits.Memory()
+	desiredMemoryLimit := desiredResources.Limits.Memory()
+	if !currentMemoryLimit.Equal(*desiredMemoryLimit) {
+		memoryChanged = true
+	}
+
+	// If nothing changed, no rollout needed
+	if !cpuChanged && !memoryChanged {
+		return rollout{}, nil
+	}
+
+	// Check resize policies to see if we can apply changes in-place
+	policies := cluster.Spec.ContainerResizePolicy
+
+	// If no policies are defined, we need to recreate the pod (standard rollout)
+	if len(policies) == 0 {
+		return rollout{
+			required:                    true,
+			canUseResourceInPlaceUpdate: false,
+			reason:                      "resource requirements changed, pod recreation required (no resize policies defined)",
+		}, nil
+	}
+
+	// Check if CPU changes require restart
+	if cpuChanged {
+		cpuPolicy := findResizePolicyForResource(policies, corev1.ResourceCPU)
+		if cpuPolicy == nil {
+			return rollout{
+				required:                    true,
+				canUseResourceInPlaceUpdate: false,
+				reason:                      "CPU resource changed but no resize policy found for CPU",
+			}, nil
+		}
+		if cpuPolicy.RestartPolicy == corev1.RestartContainer {
+			return rollout{
+				required:                    true,
+				canUseResourceInPlaceUpdate: false,
+				reason:                      "CPU resource changed but resize policy requires container restart",
+			}, nil
+		}
+	}
+
+	// Check if Memory changes require restart
+	if memoryChanged {
+		memoryPolicy := findResizePolicyForResource(policies, corev1.ResourceMemory)
+		if memoryPolicy == nil {
+			return rollout{
+				required:                    true,
+				canUseResourceInPlaceUpdate: false,
+				reason:                      "Memory resource changed but no resize policy found for memory",
+			}, nil
+		}
+		if memoryPolicy.RestartPolicy == corev1.RestartContainer {
+			return rollout{
+				required:                    true,
+				canUseResourceInPlaceUpdate: false,
+				reason:                      "Memory resource changed but resize policy requires container restart",
+			}, nil
+		}
+	}
+
+	// All changed resources can be updated in-place
+	return rollout{
+		required:                    true,
+		canUseResourceInPlaceUpdate: true,
+		reason:                      "resource requirements changed, can be updated in-place",
+	}, nil
 }
 
 // check if the pod has a valid podSpec
@@ -646,6 +805,9 @@ func checkPodSpecIsOutdated(
 
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if !match {
+		// Note: Resource-only changes that can be applied in-place are now handled by
+		// checkResourceOnlyChanges, which is called earlier in the process
+
 		return rollout{
 			required: true,
 			reason:   "original and target PodSpec differ in " + diff,
@@ -678,6 +840,119 @@ func (r *ClusterReconciler) upgradePod(
 		if !apierrs.IsNotFound(err) {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// findResizePolicyForResource finds the resize policy for a specific resource
+func findResizePolicyForResource(policies []corev1.ContainerResizePolicy, resourceName corev1.ResourceName) *corev1.ContainerResizePolicy {
+	for i, policy := range policies {
+		if policy.ResourceName == resourceName {
+			return &policies[i]
+		}
+	}
+	return nil
+}
+
+// updatePodResources applies in-place resource updates to a Pod when the resize policy allows
+// it, avoiding the need to delete and recreate the pod. This is used specifically for resource
+// changes (CPU/memory) when the container resize policy permits in-place updates.
+func (r *ClusterReconciler) updatePodResources(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pod *corev1.Pod,
+) error {
+
+	// Create a patch to update only the container resources
+	patchedPod := pod.DeepCopy()
+
+	// Update resources for the PostgreSQL container with the desired resources from cluster spec
+	for i, container := range patchedPod.Spec.Containers {
+		if container.Name == specs.PostgresContainerName {
+			patchedPod.Spec.Containers[i].Resources = cluster.Spec.Resources
+			break
+		}
+	}
+
+	// Use the resize subresource to patch pod resources, similar to:
+	// kubectl patch pod <name> --subresource resize --patch '{"spec":{"containers":[{"name":"<name>", "resources":{"requests":{"cpu":"800m"}}}]}}'
+	err := r.SubResource("resize").Patch(ctx, patchedPod, client.MergeFrom(pod))
+	if err != nil {
+		return err
+	}
+
+	// IMPORTANT: After a successful in-place resource update, we need to update the pod's
+	// PodSpec annotation to reflect the new resources. This prevents the next reconciliation
+	// cycle from detecting a mismatch and triggering pod recreation.
+
+	// Update the pod's PodSpec annotation to reflect the new resources
+	if err := r.updatePodSpecAnnotationAfterResourceUpdate(ctx, pod, cluster); err != nil {
+		// Don't return error here as the resource update was successful
+		// The annotation update failure will be handled in the next reconciliation cycle
+	}
+
+	return nil
+}
+
+// updatePodSpecAnnotationAfterResourceUpdate updates the pod's PodSpec annotation to reflect
+// the new resources after a successful in-place resource update. This prevents the next
+// reconciliation cycle from detecting a mismatch and triggering pod recreation.
+func (r *ClusterReconciler) updatePodSpecAnnotationAfterResourceUpdate(
+	ctx context.Context,
+	pod *corev1.Pod,
+	cluster *apiv1.Cluster,
+) error {
+
+	// Get the current pod to ensure we have the latest version
+	var currentPod corev1.Pod
+	if err := r.Get(ctx, client.ObjectKeyFromObject(pod), &currentPod); err != nil {
+		return fmt.Errorf("failed to get current pod: %w", err)
+	}
+
+	// Check if the pod has a PodSpec annotation
+	podSpecAnnotation, hasAnnotation := currentPod.Annotations[utils.PodSpecAnnotationName]
+	if !hasAnnotation {
+		return nil
+	}
+
+	// Parse the current PodSpec annotation
+	var currentPodSpec corev1.PodSpec
+	if err := json.Unmarshal([]byte(podSpecAnnotation), &currentPodSpec); err != nil {
+		return fmt.Errorf("failed to unmarshal current pod spec annotation: %w", err)
+	}
+
+	// Update the resources in the PodSpec for the PostgreSQL container
+	updated := false
+	for i, container := range currentPodSpec.Containers {
+		if container.Name == specs.PostgresContainerName {
+			// Update the resources to match the cluster spec
+			currentPodSpec.Containers[i].Resources = cluster.Spec.Resources
+			updated = true
+			break
+		}
+	}
+
+	if !updated {
+		return nil
+	}
+
+	// Marshal the updated PodSpec back to JSON
+	updatedPodSpecJSON, err := json.Marshal(currentPodSpec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated pod spec: %w", err)
+	}
+
+	// Update the pod's annotation
+	originalPod := currentPod.DeepCopy()
+	if currentPod.Annotations == nil {
+		currentPod.Annotations = make(map[string]string)
+	}
+	currentPod.Annotations[utils.PodSpecAnnotationName] = string(updatedPodSpecJSON)
+
+	// Apply the annotation update
+	if err := r.Patch(ctx, &currentPod, client.MergeFrom(originalPod)); err != nil {
+		return fmt.Errorf("failed to update pod spec annotation: %w", err)
 	}
 
 	return nil

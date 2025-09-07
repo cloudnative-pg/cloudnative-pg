@@ -255,7 +255,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				"instance",
 				"run",
 			},
-			Resources: cluster.Spec.Resources,
+			Resources:    cluster.Spec.Resources,
+			ResizePolicy: cluster.Spec.ContainerResizePolicy,
 			Ports: []corev1.ContainerPort{
 				{
 					Name:          "postgresql",
