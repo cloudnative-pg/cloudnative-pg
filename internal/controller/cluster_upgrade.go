@@ -131,12 +131,6 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, nil
 	}
 
-	log.FromContext(ctx).Info("Primary pod rollout required",
-		"pod", primaryPostgresqlStatus.Pod.Name,
-		"reason", podRollout.reason,
-		"canUseResourceInPlaceUpdate", podRollout.canUseResourceInPlaceUpdate,
-		"canBeInPlace", podRollout.canBeInPlace)
-
 	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
@@ -805,9 +799,6 @@ func checkPodSpecIsOutdated(
 
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if !match {
-		// Note: Resource-only changes that can be applied in-place are now handled by
-		// checkResourceOnlyChanges, which is called earlier in the process
-
 		return rollout{
 			required: true,
 			reason:   "original and target PodSpec differ in " + diff,
