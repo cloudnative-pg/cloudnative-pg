@@ -96,6 +96,20 @@ var _ = Describe("Storage source", func() {
 		},
 	}
 
+	clusterWithPluginOnly := &apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			StorageConfiguration: apiv1.StorageConfiguration{},
+			WalStorage:           &apiv1.StorageConfiguration{},
+			Backup:               nil,
+			Plugins: []apiv1.PluginConfiguration{
+				{
+					Name:          "test-wal-archiver",
+					IsWALArchiver: ptr.To(true),
+				},
+			},
+		},
+	}
+
 	backupList := apiv1.BackupList{
 		Items: []apiv1.Backup{
 			{
@@ -187,6 +201,17 @@ var _ = Describe("Storage source", func() {
 			source, err := NewPgDataCalculator().GetSource(GetCandidateStorageSourceForReplica(
 				ctx,
 				clusterWithBackupSection,
+				backupList,
+			))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(source).ToNot(BeNil())
+			Expect(source.Name).To(Equal("completed-backup"))
+		})
+
+		It("should return the backup as storage source when WAL archiving is via plugin only", func(ctx context.Context) {
+			source, err := NewPgDataCalculator().GetSource(GetCandidateStorageSourceForReplica(
+				ctx,
+				clusterWithPluginOnly,
 				backupList,
 			))
 			Expect(err).ToNot(HaveOccurred())

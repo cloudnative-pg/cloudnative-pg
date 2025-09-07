@@ -85,8 +85,11 @@ func GetCandidateStorageSourceForReplica(
 	//    the cluster itself. Other backups are fine because the required
 	//    WALs have been archived in the cluster object store.
 
-	// Unless WAL archiving is active, we can't recover a replica from a backup
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+	// Unless WAL archiving is active (via BarmanObjectStore or a WAL-archiver plugin),
+	// we can't recover a replica from a backup
+	walArchivingActive := (cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil) ||
+		cluster.GetEnabledWALArchivePluginName() != ""
+	if !walArchivingActive {
 		return nil
 	}
 
