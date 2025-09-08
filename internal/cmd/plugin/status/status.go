@@ -178,6 +178,7 @@ func extractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *Postgr
 	// Get the list of Pods created by this Cluster
 	instancesStatus, errList := resources.ExtractInstancesStatus(
 		ctx,
+		&cluster,
 		plugin.Config,
 		managedPods,
 	)
@@ -520,7 +521,7 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		return
 	}
 	status := tabby.New()
-	FPoR := cluster.Status.FirstRecoverabilityPoint
+	FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
 	if FPoR == "" {
 		FPoR = "Not Available"
 	}
@@ -756,7 +757,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		if instance.Error != nil {
 			status.AddLine(
 				instance.Pod.Name,
-				"-",
 				"-",
 				"-",
 				apierrs.ReasonForError(instance.Error),

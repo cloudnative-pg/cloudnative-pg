@@ -71,7 +71,7 @@ var _ = Describe("FlagBackupAsFailed", func() {
 		Expect(backup.Status.Error).To(BeEquivalentTo("my sample error"))
 
 		// Cluster status assertions
-		Expect(cluster.Status.LastFailedBackup).ToNot(BeEmpty())
+		Expect(cluster.Status.LastFailedBackup).ToNot(BeEmpty()) //nolint:staticcheck
 		for _, condition := range cluster.Status.Conditions {
 			if condition.Type == string(apiv1.ConditionBackup) {
 				Expect(condition.Status).To(BeEquivalentTo(metav1.ConditionFalse))

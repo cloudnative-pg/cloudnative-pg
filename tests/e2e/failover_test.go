@@ -222,7 +222,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				}, timeout).Should(Not(Equal("")))
 			}
 
-			By("making sure that the the targetPrimary has switched away from current primary")
+			By("making sure that the targetPrimary has switched away from current primary")
 			// The operator should eventually set the cluster target primary to
 			// the instance we expect to take that role (-3).
 			Eventually(func() (string, error) {

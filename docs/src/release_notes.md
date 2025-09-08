@@ -3,7 +3,8 @@
 
 History of user-visible changes for CloudNativePG, classified for each minor release.
 
-<!-- - [CloudNativePG 1.27 - Release Candidate](release_notes/v1.27.md) -->
+<!-- - [CloudNativePG 1.28 - Release Candidate](release_notes/v1.28.md) -->
+- [CloudNativePG 1.27](release_notes/v1.27.md)
 - [CloudNativePG 1.26](release_notes/v1.26.md)
 - [CloudNativePG 1.25](release_notes/v1.25.md)
 

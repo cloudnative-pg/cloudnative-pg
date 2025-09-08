@@ -263,6 +263,36 @@ the following parameters:
     instances, you can add a label with the key `cnpg.io/reload` to it. Otherwise,
     you must reload the instances using the `kubectl cnpg reload` subcommand.
 
+#### Customizing the `streaming_replica` client certificate
+
+In some environments, it may not be possible to generate a certificate with the
+common name `streaming_replica` due to company policies or other security
+concerns, such as a CA shared across multiple clusters. In such cases, the user
+mapping feature can be used to allow authentication as the `streaming_replica`
+user with certificates containing different common names.
+
+To configure this setup, add a `pg_ident.conf` entry for the predefined map
+named `cnpg_streaming_replica`.
+
+For example, to enable `streaming_replica` authentication using a certificate
+with the common name `streaming-replica.cnpg.svc.cluster.local`, add the
+following to your cluster definition:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  postgresql:
+    pg_ident:
+    - cnpg_streaming_replica streaming-replica.cnpg.svc.cluster.local streaming_replica
+```
+
+For further details on how `pg_ident.conf` is managed by the operator, see the
+["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_ident-section) in
+the documentation.
+
 #### Cert-manager example
 
 This simple example shows how to use [cert-manager](https://cert-manager.io/)

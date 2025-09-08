@@ -50,9 +50,9 @@ import (
 
 const (
 	// minioImage is the image used to run a MinIO server
-	minioImage = "minio/minio:RELEASE.2025-06-13T11-33-47Z"
+	minioImage = "minio/minio:RELEASE.2025-07-23T15-54-02Z"
 	// minioClientImage is the image used to run a MinIO client
-	minioClientImage = "minio/mc:RELEASE.2025-05-21T01-59-54Z"
+	minioClientImage = "minio/mc:RELEASE.2025-07-21T05-28-08Z"
 )
 
 // Env contains all the information related or required by MinIO deployment and
@@ -519,7 +519,7 @@ func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string)
 	}, nil
 }
 
-// CreateCaSecret creates the certificates required to authenticate against the the MinIO service
+// CreateCaSecret creates the certificates required to authenticate against the MinIO service
 func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace string) error {
 	caSecret, err := m.getCaSecret(env, namespace)
 	if err != nil {
@@ -529,7 +529,7 @@ func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace stri
 	return err
 }
 
-// CountFiles uses the minioClient in the given `namespace` to count  the
+// CountFiles uses the minioClient in the given `namespace` to count the
 // amount of files matching the given `path`
 func CountFiles(minioEnv *Env, path string) (value int, err error) {
 	var stdout string

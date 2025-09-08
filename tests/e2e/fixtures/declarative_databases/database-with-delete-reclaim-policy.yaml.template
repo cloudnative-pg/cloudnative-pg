@@ -14,6 +14,20 @@ spec:
   extensions:
   - name: bloom
     ensure: present
+  - name: postgres_fdw
+    ensure: present
   schemas:
   - name: test_schema
     ensure: present
+  fdws:
+    - name: postgres_fdw
+      ensure: present
+      usage:
+      - name: app
+        type: grant
+    - name: mywrapper
+      options:
+        - name: debug
+          value: 'true'
+          ensure: present
+      ensure: present

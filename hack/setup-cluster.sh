@@ -27,7 +27,7 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-KIND_NODE_DEFAULT_VERSION=v1.33.1
+KIND_NODE_DEFAULT_VERSION=v1.34.0
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
 EXTERNAL_SNAPSHOTTER_VERSION=v8.3.0
 EXTERNAL_PROVISIONER_VERSION=v5.3.0
@@ -64,9 +64,9 @@ case $ARCH in
   aarch64) ARCH="arm64" ;;
 esac
 
-# If arm64 and user did not set it explicitly
-if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
-  DOCKER_DEFAULT_PLATFORM=linux/arm64
+# If user did not set it explicitly
+if [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
+  DOCKER_DEFAULT_PLATFORM="linux/${ARCH}"
 fi
 export DOCKER_DEFAULT_PLATFORM
 
@@ -172,6 +172,15 @@ EOF
     for ((i = 0; i < NODES; i++)); do
       echo '- role: worker' >>"${config_file}"
     done
+  fi
+
+  # Enable ImageVolume support from kindest/node v1.33.1
+  if [[ "$(printf '%s\n' "1.33.1" "${k8s_version#v}" | sort -V | head -n1)" == "1.33.1" ]]; then
+    cat >>"${config_file}" <<-EOF
+
+featureGates:
+  ImageVolume: true
+EOF
   fi
 
   # Add containerdConfigPatches section
@@ -397,7 +406,7 @@ load_image_registry() {
 
   local image_local_name=${image/${registry_name}/127.0.0.1}
   docker tag "${image}" "${image_local_name}"
-  docker push -q "${image_local_name}"
+  docker push --platform "${DOCKER_DEFAULT_PLATFORM}" -q "${image_local_name}"
 }
 
 load_image() {

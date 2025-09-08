@@ -17,23 +17,22 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package client
+package v1
 
 import (
-	"context"
-
-	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// PostgresConfigurationCapabilities is the interface that defines the
-// capabilities of interacting with PostgreSQL.
-type PostgresConfigurationCapabilities interface {
-	// EnrichConfiguration is the method that enriches the PostgreSQL configuration
-	EnrichConfiguration(
-		ctx context.Context,
-		cluster client.Object,
-		config map[string]string,
-		operationType postgres.OperationType_Type,
-	) (map[string]string, error)
-}
+type testStruct struct{ Val int }
+
+var _ = Describe("toSliceWithPointers", func() {
+	It("should return pointers to the original slice elements", func() {
+		items := []testStruct{{1}, {2}, {3}}
+		pointers := toSliceWithPointers(items)
+		Expect(pointers).To(HaveLen(len(items)))
+		for i := range items {
+			Expect(pointers[i]).To(BeIdenticalTo(&items[i]))
+		}
+	})
+})

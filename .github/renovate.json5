@@ -10,9 +10,9 @@
   prConcurrentLimit: 5,
   baseBranches: [
     'main',
-    'release-1.22',
     'release-1.25',
     'release-1.26',
+    'release-1.27',
   ],
   ignorePaths: [
     'docs/**',
@@ -295,10 +295,18 @@
     {
       groupName: 'cnpg',
       matchPackageNames: [
-        'github.com/cloudnative-pg/',
+        'github.com/cloudnative-pg{/,}**',
       ],
       separateMajorMinor: false,
       pinDigests: false,
+    },
+    {
+      groupName: 'container distroless digests',
+      matchPackageNames: [
+        'gcr.io/distroless{/,}**',
+      ],
+      pinDigests: true,
+      separateMajorMinor: false,
     },
   ],
 }

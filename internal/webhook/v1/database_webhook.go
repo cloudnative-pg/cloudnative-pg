@@ -154,6 +154,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 	validations := []validationFunc{
 		v.validateExtensions,
 		v.validateSchemas,
+		v.validateFDWs,
 	}
 
 	for _, validate := range validations {
@@ -208,6 +209,64 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 		}
 
 		schemaNames.Put(name)
+	}
+
+	return result
+}
+
+// validateFDWs validates the database Foreign Data Wrappers
+// FDWs must be unique in .spec.fdws
+func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+
+	fdwNames := stringset.New()
+	for i, fdw := range d.Spec.FDWs {
+		name := fdw.Name
+		if fdwNames.Has(name) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "fdws").Index(i).Child("name"),
+					name,
+				),
+			)
+		}
+
+		// Validate the options of the FDW
+		optionNames := stringset.New()
+		for k, option := range fdw.Options {
+			optionName := option.Name
+			if optionNames.Has(optionName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "fdws").Index(i).Child("options").Index(k).Child("name"),
+						optionName,
+					),
+				)
+			}
+
+			optionNames.Put(optionName)
+		}
+
+		// Validate the usage of the FDW
+		usageNames := stringset.New()
+		for j, usage := range fdw.Usages {
+			usageName := usage.Name
+			if usageNames.Has(usageName) {
+				result = append(
+					result,
+					field.Duplicate(
+						field.NewPath("spec", "fdws").Index(i).Child("usages").Index(j).Child("name"),
+						usageName,
+					),
+				)
+			}
+
+			usageNames.Put(usageName)
+		}
+
+		fdwNames.Put(name)
 	}
 
 	return result

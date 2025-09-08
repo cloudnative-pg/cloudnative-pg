@@ -83,11 +83,12 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.26.x          | Yes                  | May 23, 2025 | ~ Nov 2025      | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
+| 1.27.x          | Yes                  | 12 Aug 2025  | ~  Feb 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 17                     |
+| 1.26.x          | Yes                  | May 23, 2025 | 12 Nov 2025     | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
 | 1.25.x          | Yes                  | Dec 23, 2024 | 22 Aug 2025     | 1.29, 1.30, 1.31, 1.32        | 1.33                      | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
 
-<!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
+<sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -122,9 +123,9 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.27.0  | ~ Aug, 2025  | ~ Feb, 2026 |
 | 1.28.0  | ~ Nov, 2025  | ~ May, 2026 |
-| 1.29.0  | ~ Feb, 2025  | ~ Aug, 2026 |
+| 1.29.0  | ~ Feb, 2026  | ~ Aug, 2026 |
+| 1.30.0  | ~ May, 2026  | ~ Nov, 2026 |
 
 !!! Note
     Feature freeze occurs 1-2 weeks before the release, at which point a
@@ -154,29 +155,29 @@ version of PostgreSQL, we might not be able to help you.
 
 ## What we mean by support
 
-Our support window is roughly five months for each release branch (latest
+Our support window is roughly five/six months for each release branch (latest
 minor release, plus 3 additional months), given that we produce a new final
-release every two months.
+release every two/three months.
 
-In the following diagram, `release-1.23` is an example of a release branch.
+In the following diagram, `release-1.27` is an example of a release branch.
 
-For example, if the latest release is `v1.23.0`, you can expect a supplementary
-3-month support period for the preceding release, `v1.22.x`.
+For example, if the latest release is `v1.27.0`, you can expect a supplementary
+3-month support period for the preceding release, `v1.26.x`.
 
-Only the last patch release of each branch is supported.
+**Only the last patch release of each branch is supported.**
 
 ```diagram
 ------+---------------------------------------------> main (trunk development)
        \             \
         \             \
-         \             \             v1.23.0
-          \             \            Apr 24, 2024                   ^
-           \             \----------+---------------> release-1.23  |
+         \             \             v1.27.0
+          \             \            Aug 12, 2025                   ^
+           \             \----------+---------------> release-1.27  |
             \                                                       | SUPPORTED
              \                                                      | RELEASES
-              \   v1.22.0                                           | = last minor
-               \  Dec 21, 2023                                      |   release +
-                +-------------------+---------------> release-1.22  |   3 months
+              \   v1.26.0                                           | = last minor
+               \  May 23, 2025                                      |   release +
+                +-------------------+---------------> release-1.26  |   3 months
                                                                     v
 ```
 

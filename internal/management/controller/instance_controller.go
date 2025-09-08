@@ -151,7 +151,7 @@ func (r *InstanceReconciler) Reconcile(
 	requeueOnMissingPermissions := r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
-	r.reconcileMetrics(cluster)
+	r.reconcileMetrics(ctx, cluster)
 	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Verify that the promotion token is usable before changing the archive mode and triggering restarts
@@ -252,12 +252,28 @@ func (r *InstanceReconciler) Reconcile(
 
 	if reloadNeeded && !restarted {
 		contextLogger.Info("reloading the instance")
+
+		// IMPORTANT
+		//
+		// We are unsure of the state of the PostgreSQL configuration
+		// meanwhile a new configuration is applied.
+		//
+		// For this reason, before applying a new configuration we
+		// reset the FailoverQuorum object - de facto preventing any failover -
+		// and we update it after.
+		if err = r.resetFailoverQuorumObject(ctx, cluster); err != nil {
+			return reconcile.Result{}, err
+		}
 		if err = r.instance.Reload(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
+	}
+
+	if err = r.updateFailoverQuorumObject(ctx, cluster); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	// IMPORTANT
@@ -807,6 +823,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 
 // reconcileMetrics updates any required metrics
 func (r *InstanceReconciler) reconcileMetrics(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) {
 	exporter := r.metricsServerExporter
@@ -823,7 +840,7 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 
-	syncReplicas := replication.GetExpectedSyncReplicasNumber(cluster)
+	syncReplicas := replication.GetExpectedSyncReplicasNumber(ctx, cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
 
 	if cluster.IsReplica() {
@@ -942,6 +959,7 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
+	r.instance.Cluster = cluster
 }
 
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`

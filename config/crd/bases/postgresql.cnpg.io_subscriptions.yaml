@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: subscriptions.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -93,8 +93,11 @@ spec:
                 additionalProperties:
                   type: string
                 description: |-
-                  Subscription parameters part of the `WITH` clause as expected by
-                  PostgreSQL `CREATE SUBSCRIPTION` command
+                  Subscription parameters included in the `WITH` clause of the PostgreSQL
+                  `CREATE SUBSCRIPTION` command. Most parameters cannot be changed
+                  after the subscription is created and will be ignored if modified
+                  later, except for a limited set documented at:
+                  https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET
                 type: object
               publicationDBName:
                 description: |-

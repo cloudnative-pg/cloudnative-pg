@@ -77,10 +77,14 @@ func GetInstancePods(ctx context.Context, clusterName string) ([]corev1.Pod, cor
 // ExtractInstancesStatus extracts the instance status from the given pod list
 func ExtractInstancesStatus(
 	ctx context.Context,
+	cluster *apiv1.Cluster,
 	config *rest.Config,
 	filteredPods []corev1.Pod,
 ) (postgres.PostgresqlStatusList, []error) {
-	var result postgres.PostgresqlStatusList
+	result := postgres.PostgresqlStatusList{
+		IsReplicaCluster: cluster.IsReplica(),
+		CurrentPrimary:   cluster.Status.CurrentPrimary,
+	}
 	var errs []error
 
 	for idx := range filteredPods {

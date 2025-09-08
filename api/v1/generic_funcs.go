@@ -60,8 +60,8 @@ func ensureManagedResourceExclusivity[T managedResourceComparer](t1 T, list []T)
 // toSliceWithPointers converts a slice of items to a slice of pointers to the items
 func toSliceWithPointers[T any](items []T) []*T {
 	result := make([]*T, len(items))
-	for i, item := range items {
-		result[i] = &item
+	for i := range items {
+		result[i] = &items[i]
 	}
 	return result
 }

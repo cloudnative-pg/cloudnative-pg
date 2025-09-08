@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
@@ -55,6 +56,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -65,9 +67,13 @@ import (
 var (
 	scheme = runtime.NewScheme()
 
-	// errNoFreeWALSpace is raised when there's not enough disk space
-	// to store two WAL files
+	// errNoFreeWALSpace is returned when there isn't enough disk space
+	// available to store at least two WAL files.
 	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
+
+	// errWALArchivePluginNotAvailable is returned when the configured
+	// WAL archiving plugin is not available or cannot be found.
+	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
 )
 
 func init() {
@@ -113,6 +119,9 @@ func NewCmd() *cobra.Command {
 			if errors.Is(err, errNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
 			}
+			if errors.Is(err, errWALArchivePluginNotAvailable) {
+				os.Exit(apiv1.MissingWALArchivePlugin)
+			}
 
 			return err
 		},
@@ -139,7 +148,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
+func runSubCommand(ctx context.Context, instance *postgres.Instance) error { //nolint:gocognit,gocyclo
 	var err error
 
 	contextLogger := log.FromContext(ctx)
@@ -193,6 +202,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 					// we don't have the permissions to cache backups, as the ServiceAccount
 					// doesn't have watch permission on the backup status
 					&apiv1.Backup{},
+					// we don't have the permissions to cache FailoverQuorum objects, we can
+					// only access the object having the same name as the cluster
+					&apiv1.FailoverQuorum{},
 				},
 			},
 		},
@@ -212,13 +224,16 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
+	var loadedPluginNames []string
 	pluginRepository := repository.New()
-	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	if loadedPluginNames, err = pluginRepository.RegisterUnixSocketPluginsInPath(
+		configuration.Current.PluginSocketDir,
+	); err != nil {
 		contextLogger.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
 	defer pluginRepository.Close()
 
-	metricsExporter := metricserver.NewExporter(instance)
+	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
@@ -368,7 +383,18 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
-		return errNoFreeWALSpace
+		return makeUnretryableError(errNoFreeWALSpace)
+	}
+
+	if instance.Cluster != nil {
+		enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
+		if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
+			contextLogger.Info(
+				"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
+				"enabledArchiverPluginName", enabledArchiverPluginName,
+				"loadedPluginNames", loadedPluginNames)
+			return makeUnretryableError(errWALArchivePluginNotAvailable)
+		}
 	}
 
 	return nil

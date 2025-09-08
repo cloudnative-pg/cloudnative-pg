@@ -20,7 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package metrics
 
 import (
+	"github.com/cloudnative-pg/cnpg-i/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -148,5 +151,128 @@ var _ = Describe("QueryCollector tests", func() {
 				Expect(labels).To(BeZero())
 			})
 		})
+	})
+})
+
+var _ = Describe("sendPluginMetrics tests", func() {
+	It("should successfully send metrics when definitions and metrics match", func() {
+		ch := make(chan prometheus.Metric, 10)
+		desc := prometheus.NewDesc("test_metric", "test description", []string{"label1"}, nil)
+		definitions := pluginClient.PluginMetricDefinitions{
+			pluginClient.PluginMetricDefinition{
+				FqName:    "test_metric",
+				Desc:      desc,
+				ValueType: prometheus.CounterValue,
+			},
+		}
+
+		testMetrics := []*metrics.CollectMetric{
+			{
+				FqName:         "test_metric",
+				Value:          42.0,
+				VariableLabels: []string{"value1"},
+			},
+		}
+
+		err := sendPluginMetrics(definitions, testMetrics, ch)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ch).To(HaveLen(1))
+
+		// Verify the metric was sent
+		metric := <-ch
+		Expect(metric.Desc()).To(Equal(desc))
+	})
+
+	It("should return error when metric definition is not found", func() {
+		ch := make(chan prometheus.Metric, 10)
+		definitions := pluginClient.PluginMetricDefinitions{}
+		testMetrics := []*metrics.CollectMetric{
+			{
+				FqName:         "missing_metric",
+				Value:          42.0,
+				VariableLabels: []string{"value1"},
+			},
+		}
+
+		err := sendPluginMetrics(definitions, testMetrics, ch)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("metric definition not found for fqName: missing_metric"))
+		Expect(ch).To(BeEmpty())
+	})
+
+	It("should return error when prometheus metric creation fails", func() {
+		ch := make(chan prometheus.Metric, 10)
+		desc := prometheus.NewDesc("test_metric", "test description", []string{"label1", "label2"}, nil)
+		definitions := pluginClient.PluginMetricDefinitions{
+			pluginClient.PluginMetricDefinition{
+				FqName:    "test_metric",
+				Desc:      desc,
+				ValueType: prometheus.CounterValue,
+			},
+		}
+
+		// Create metric with wrong number of labels (should cause NewConstMetric to fail)
+		testMetrics := []*metrics.CollectMetric{
+			{
+				FqName:         "test_metric",
+				Value:          42.0,
+				VariableLabels: []string{"value1"}, // Only one label, but desc expects two
+			},
+		}
+
+		err := sendPluginMetrics(definitions, testMetrics, ch)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to create metric test_metric"))
+		Expect(ch).To(BeEmpty())
+	})
+
+	It("should handle multiple metrics successfully", func() {
+		ch := make(chan prometheus.Metric, 10)
+		desc1 := prometheus.NewDesc("metric_one", "first metric", []string{"label1"}, nil)
+		desc2 := prometheus.NewDesc("metric_two", "second metric", []string{"label2"}, nil)
+		definitions := pluginClient.PluginMetricDefinitions{
+			pluginClient.PluginMetricDefinition{
+				FqName:    "metric_one",
+				Desc:      desc1,
+				ValueType: prometheus.CounterValue,
+			},
+			pluginClient.PluginMetricDefinition{
+				FqName:    "metric_two",
+				Desc:      desc2,
+				ValueType: prometheus.GaugeValue,
+			},
+		}
+
+		testMetrics := []*metrics.CollectMetric{
+			{
+				FqName:         "metric_one",
+				Value:          10.0,
+				VariableLabels: []string{"value1"},
+			},
+			{
+				FqName:         "metric_two",
+				Value:          20.0,
+				VariableLabels: []string{"value2"},
+			},
+		}
+
+		err := sendPluginMetrics(definitions, testMetrics, ch)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ch).To(HaveLen(2))
+	})
+
+	It("should handle empty metrics slice", func() {
+		ch := make(chan prometheus.Metric, 10)
+		definitions := pluginClient.PluginMetricDefinitions{}
+		var testMetrics []*metrics.CollectMetric
+
+		err := sendPluginMetrics(definitions, testMetrics, ch)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ch).To(BeEmpty())
 	})
 })

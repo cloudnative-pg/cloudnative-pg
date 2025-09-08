@@ -112,6 +112,11 @@ const (
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
+
+	// MissingWALArchivePlugin is the exit code used by the instance manager
+	// to indicate that it started successfully, but the configured WAL
+	// archiving plugin is not available.
+	MissingWALArchivePlugin = 5
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -640,6 +645,9 @@ const (
 	// loaded still
 	PhaseUnknownPlugin = "Cluster cannot proceed to reconciliation due to an unknown plugin being required"
 
+	// PhaseFailurePlugin is triggered when the cluster cannot proceed to reconciliation due to an interaction failure
+	PhaseFailurePlugin = "Cluster cannot proceed to reconciliation due to an error while interacting with plugins"
+
 	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
 	// apply because of an invalid or incomplete catalog
 	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
@@ -905,24 +913,34 @@ type ClusterStatus struct {
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 
 	// The first recoverability point, stored as a date in RFC3339 format.
-	// This field is calculated from the content of FirstRecoverabilityPointByMethod
+	// This field is calculated from the content of FirstRecoverabilityPointByMethod.
+	//
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
-	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
+	// The first recoverability point, stored as a date in RFC3339 format, per backup method type.
+	//
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
-	// Last successful backup, stored as a date in RFC3339 format
-	// This field is calculated from the content of LastSuccessfulBackupByMethod
+	// Last successful backup, stored as a date in RFC3339 format.
+	// This field is calculated from the content of LastSuccessfulBackupByMethod.
+	//
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
-	// Last successful backup, stored as a date in RFC3339 format, per backup method type
+	// Last successful backup, stored as a date in RFC3339 format, per backup method type.
+	//
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
-	// Stored as a date in RFC3339 format
+	// Last failed backup, stored as a date in RFC3339 format.
+	//
+	// Deprecated: the field is not set for backup plugins.
 	// +optional
 	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
 
@@ -1210,6 +1228,16 @@ type ReplicationSlotsHAConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[0-9a-z_]*$
 	// +optional
 	SlotPrefix string `json:"slotPrefix,omitempty"`
+
+	// When enabled, the operator automatically manages synchronization of logical
+	// decoding (replication) slots across high-availability clusters.
+	//
+	// Requires one of the following conditions:
+	// - PostgreSQL version 17 or later
+	// - PostgreSQL version < 17 with pg_failover_slots extension enabled
+	//
+	// +optional
+	SynchronizeLogicalDecoding bool `json:"synchronizeLogicalDecoding,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -1406,6 +1434,37 @@ type PostgresConfiguration struct {
 	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
+
+	// The configuration of the extensions to be added
+	// +optional
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
+}
+
+// ExtensionConfiguration is the configuration used to add
+// PostgreSQL extensions to the Cluster.
+type ExtensionConfiguration struct {
+	// The name of the extension, required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// The image containing the extension, required
+	// +kubebuilder:validation:XValidation:rule="has(self.reference)",message="An image reference is required"
+	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
+
+	// The list of directories inside the image which should be added to extension_control_path.
+	// If not defined, defaults to "/share".
+	// +optional
+	ExtensionControlPath []string `json:"extension_control_path,omitempty"`
+
+	// The list of directories inside the image which should be added to dynamic_library_path.
+	// If not defined, defaults to "/lib".
+	// +optional
+	DynamicLibraryPath []string `json:"dynamic_library_path,omitempty"`
+
+	// The list of directories inside the image which should be added to ld_library_path.
+	// +optional
+	LdLibraryPath []string `json:"ld_library_path,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

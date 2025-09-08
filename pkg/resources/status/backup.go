@@ -113,7 +113,7 @@ func FlagBackupAsFailed(
 		cli,
 		cluster,
 		func(cluster *apiv1.Cluster) {
-			cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
+			cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339) //nolint:staticcheck
 		},
 	); err != nil {
 		contextLogger.Error(err, "while patching cluster status with last failed backup")

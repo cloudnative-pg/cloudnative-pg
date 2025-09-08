@@ -29,7 +29,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// PostgresConfigurationCapabilities is the interface that defines the
+// capabilities of interacting with PostgreSQL.
+type PostgresConfigurationCapabilities interface {
+	// EnrichConfiguration is the method that enriches the PostgreSQL configuration
+	EnrichConfiguration(
+		ctx context.Context,
+		cluster client.Object,
+		config map[string]string,
+		operationType postgresClient.OperationType_Type,
+	) (map[string]string, error)
+}
+
 func (data *data) EnrichConfiguration(
+	ctx context.Context,
+	cluster client.Object,
+	config map[string]string,
+	operationType postgresClient.OperationType_Type,
+) (map[string]string, error) {
+	m, err := data.innerEnrichConfiguration(ctx, cluster, config, operationType)
+	return m, wrapAsPluginErrorIfNeeded(err)
+}
+
+func (data *data) innerEnrichConfiguration(
 	ctx context.Context,
 	cluster client.Object,
 	config map[string]string,

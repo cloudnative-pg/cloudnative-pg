@@ -78,10 +78,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	}
 
 	postgresConfiguration, sha256, err := createPostgresqlConfiguration(
-		ctx,
-		cluster,
-		preserveUserSettings,
-		pgMajor,
+		ctx, cluster, preserveUserSettings, pgMajor,
 		operationType,
 	)
 	if err != nil {
@@ -406,7 +403,7 @@ func createPostgresqlConfiguration(
 		IsReplicaCluster:                 cluster.IsReplica(),
 		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
 		IsAlterSystemEnabled:             cluster.Spec.PostgresConfiguration.EnableAlterSystem,
-		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(cluster),
+		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(ctx, cluster),
 	}
 
 	if preserveUserSettings {
@@ -426,9 +423,32 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
+	// Set additional extensions
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		info.AdditionalExtensions = append(
+			info.AdditionalExtensions,
+			postgres.AdditionalExtensionConfiguration{
+				Name:                 extension.Name,
+				ExtensionControlPath: extension.ExtensionControlPath,
+				DynamicLibraryPath:   extension.DynamicLibraryPath,
+			},
+		)
+	}
+
 	// Setup minimum replay delay if we're on a replica cluster
 	if cluster.IsReplica() && cluster.Spec.ReplicaCluster.MinApplyDelay != nil {
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
+	}
+
+	if isSynchronizeLogicalDecodingEnabled(cluster) {
+		slots := make([]string, 0, len(cluster.Status.InstanceNames)-1)
+		for _, instanceName := range cluster.Status.InstanceNames {
+			if instanceName == cluster.Status.CurrentPrimary {
+				continue
+			}
+			slots = append(slots, cluster.GetSlotNameFromInstanceName(instanceName))
+		}
+		info.SynchronizedStandbySlots = slots
 	}
 
 	config, err := plugin.CreatePostgresqlConfigurationWithPlugins(ctx, info, operationType)
@@ -438,6 +458,13 @@ func createPostgresqlConfiguration(
 
 	file, sha := postgres.CreatePostgresqlConfFile(config)
 	return file, sha, nil
+}
+
+func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
+	return cluster.Spec.ReplicationSlots != nil &&
+		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
+		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
+		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import

@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  annotations:
+    alpha.cnpg.io/failoverQuorum: "true"
+spec:
+  instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+
+  storage:
+    size: 1G

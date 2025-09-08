@@ -373,9 +373,9 @@ Fixed rules:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 ```
 
 Default rules:
@@ -397,8 +397,9 @@ The resulting `pg_hba.conf` will look like this:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 
 <user defined rules>
 <user defined LDAP>

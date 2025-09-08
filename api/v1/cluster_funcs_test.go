@@ -1749,3 +1749,33 @@ var _ = Describe("Probes configuration", func() {
 			"configured probe should not be modified with zero values")
 	})
 })
+
+var _ = Describe("Failover quorum annotation", func() {
+	clusterWithAnnotation := func(v string) *Cluster {
+		return &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: v,
+				},
+			},
+		}
+	}
+
+	DescribeTable(
+		"annotation parsing",
+		func(cluster *Cluster, valueIsCorrect, expected bool) {
+			actual, err := cluster.IsFailoverQuorumActive()
+			if valueIsCorrect {
+				Expect(err).ToNot(HaveOccurred())
+			} else {
+				Expect(err).To(HaveOccurred())
+			}
+			Expect(actual).To(Equal(expected))
+		},
+		Entry("with no annotation", &Cluster{}, true, false),
+		Entry("with empty annotation", clusterWithAnnotation(""), true, false),
+		Entry("with true annotation", clusterWithAnnotation("t"), true, true),
+		Entry("with false annotation", clusterWithAnnotation("f"), true, false),
+		Entry("with invalid annotation", clusterWithAnnotation("xxx"), false, false),
+	)
+})

@@ -63,6 +63,8 @@ nav:
   - postgis.md
   - e2e.md
   - container_images.md
+  - imagevolume_extensions.md
+  - cnpg_i.md
   - operator_capability_levels.md
   - controller.md
   - samples.md
@@ -75,6 +77,7 @@ nav:
   - release_notes.md
   - CNCF Projects Integrations:
     - cncf-projects/external-secrets.md
+    - cncf-projects/cilium.md
   - Appendixes:
     - appendixes/backup_volumesnapshot.md
     - appendixes/backup_barmanobjectstore.md

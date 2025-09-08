@@ -11,6 +11,7 @@
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 - [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
 - [Database](#postgresql-cnpg-io-v1-Database)
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
 - [Publication](#postgresql-cnpg-io-v1-Publication)
@@ -155,6 +156,40 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>Most recently observed status of the Database. This data may not be up to
 date. Populated by the system. Read-only.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FailoverQuorum     {#postgresql-cnpg-io-v1-FailoverQuorum}
+
+
+**Appears in:**
+
+
+
+<p>FailoverQuorum contains the information about the current failover
+quorum status of a PG cluster. It is updated by the instance manager
+of the primary node and reset to zero by the operator to trigger
+an update.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>FailoverQuorum</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>status</code><br/>
+<a href="#postgresql-cnpg-io-v1-FailoverQuorumStatus"><i>FailoverQuorumStatus</i></a>
+</td>
+<td>
+   <p>Most recently observed status of the failover quorum.</p>
 </td>
 </tr>
 </tbody>
@@ -2148,36 +2183,41 @@ configmap data</p>
 </td>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format.
-This field is calculated from the content of FirstRecoverabilityPointByMethod</p>
+This field is calculated from the content of FirstRecoverabilityPointByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>firstRecoverabilityPointByMethod</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type</p>
+   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Last successful backup, stored as a date in RFC3339 format
-This field is calculated from the content of LastSuccessfulBackupByMethod</p>
+   <p>Last successful backup, stored as a date in RFC3339 format.
+This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackupByMethod</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type</p>
+   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastFailedBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Stored as a date in RFC3339 format</p>
+   <p>Last failed backup, stored as a date in RFC3339 format.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>cloudNativePGCommitHash</code><br/>
@@ -2385,6 +2425,8 @@ PostgreSQL cluster from an existing storage</p>
 **Appears in:**
 
 - [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
@@ -2684,6 +2726,13 @@ tablespace used for objects created in this database.</p>
    <p>The list of extensions to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-FDWSpec"><i>[]FDWSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign data wrappers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2737,6 +2786,13 @@ desired state that was synchronized</p>
    <p>Extensions is the status of the managed extensions</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>FDWs is the status of the managed FDWs</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2779,6 +2835,8 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
+- [OptionSpecValue](#postgresql-cnpg-io-v1-OptionSpecValue)
+
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
 
@@ -2815,6 +2873,61 @@ storage</p>
 </td>
 <td>
    <p>TemporaryData is the size limit of the temporary data volume</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ExtensionConfiguration     {#postgresql-cnpg-io-v1-ExtensionConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>ExtensionConfiguration is the configuration used to add
+PostgreSQL extensions to the Cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the extension, required</p>
+</td>
+</tr>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#imagevolumesource-v1-core"><i>core/v1.ImageVolumeSource</i></a>
+</td>
+<td>
+   <p>The image containing the extension, required</p>
+</td>
+</tr>
+<tr><td><code>extension_control_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to extension_control_path.
+If not defined, defaults to &quot;/share&quot;.</p>
+</td>
+</tr>
+<tr><td><code>dynamic_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to dynamic_library_path.
+If not defined, defaults to &quot;/lib&quot;.</p>
+</td>
+</tr>
+<tr><td><code>ld_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to ld_library_path.</p>
 </td>
 </tr>
 </tbody>
@@ -2943,6 +3056,120 @@ secure and efficient password management for external clusters.</p>
 <td>
    <p>The configuration of the plugin that is taking care
 of WAL archiving and backups for this external cluster</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FDWSpec     {#postgresql-cnpg-io-v1-FDWSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>FDWSpec configures an Foreign Data Wrapper in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>handler</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;).
+This will be empty if no handler is specified. In that case,
+the default handler is registered when the FDW extension is created.</p>
+</td>
+</tr>
+<tr><td><code>validator</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;).
+This will be empty if no validator is specified. In that case,
+the default validator is registered when the FDW extension is created.</p>
+</td>
+</tr>
+<tr><td><code>owner</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner specifies the database role that will own the Foreign Data Wrapper.
+The role must have superuser privileges in the target database.</p>
+</td>
+</tr>
+<tr><td><code>options</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
+</td>
+<td>
+   <p>Options specifies the configuration options for the FDW
+(key is the option name, value is the option value).</p>
+</td>
+</tr>
+<tr><td><code>usage</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>List of roles for which <code>USAGE</code> privileges on the FDW are granted or revoked.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FailoverQuorumStatus     {#postgresql-cnpg-io-v1-FailoverQuorumStatus}
+
+
+**Appears in:**
+
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
+
+
+<p>FailoverQuorumStatus is the latest observed status of the failover
+quorum of the PG cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Contains the latest reported Method value.</p>
+</td>
+</tr>
+<tr><td><code>standbyNames</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>StandbyNames is the list of potentially synchronous
+instance names.</p>
+</td>
+</tr>
+<tr><td><code>standbyNumber</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>StandbyNumber is the number of synchronous standbys that transactions
+need to wait for replies from.</p>
+</td>
+</tr>
+<tr><td><code>primary</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary is the name of the primary instance that updated
+this object the latest time.</p>
 </td>
 </tr>
 </tbody>
@@ -3788,6 +4015,71 @@ possible. <code>false</code> by default.</p>
 </tbody>
 </table>
 
+## OptionSpec     {#postgresql-cnpg-io-v1-OptionSpec}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
+<p>OptionSpec holds the name, value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the option</p>
+</td>
+</tr>
+<tr><td><code>OptionSpecValue</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>OptionSpecValue</i></a>
+</td>
+<td>(Members of <code>OptionSpecValue</code> are embedded into this type.)
+   <p>Value and ensure field of the option</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
+
+
+**Appears in:**
+
+- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
+
+
+<p>OptionSpecValue holds the value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>value</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Value of the option</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Specifies whether an option should be present or absent in
+the database. If set to <code>present</code>, the option will be
+created if it does not exist. If set to <code>absent</code>, the
+option will be removed if it exists.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## PasswordState     {#postgresql-cnpg-io-v1-PasswordState}
 
 
@@ -4448,6 +4740,13 @@ This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
 </td>
 </tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionConfiguration"><i>[]ExtensionConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the extensions to be added</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -5106,6 +5405,19 @@ from the designated primary to its cascading replicas.</p>
    <p>Prefix for replication slots managed by the operator for HA.
 It may only contain lower case letters, numbers, and the underscore character.
 This can only be set at creation time. By default set to <code>_cnpg_</code>.</p>
+</td>
+</tr>
+<tr><td><code>synchronizeLogicalDecoding</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>When enabled, the operator automatically manages synchronization of logical
+decoding (replication) slots across high-availability clusters.</p>
+<p>Requires one of the following conditions:</p>
+<ul>
+<li>PostgreSQL version 17 or later</li>
+<li>PostgreSQL version &lt; 17 with pg_failover_slots extension enabled</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -5825,8 +6137,11 @@ the &quot;subscriber&quot; cluster</p>
 <i>map[string]string</i>
 </td>
 <td>
-   <p>Subscription parameters part of the <code>WITH</code> clause as expected by
-PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
+   <p>Subscription parameters included in the <code>WITH</code> clause of the PostgreSQL
+<code>CREATE SUBSCRIPTION</code> command. Most parameters cannot be changed
+after the subscription is created and will be ignored if modified
+later, except for a limited set documented at:
+https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET</p>
 </td>
 </tr>
 <tr><td><code>publicationName</code> <B>[Required]</B><br/>
@@ -6230,6 +6545,37 @@ shared nothing architecture on the compute side.</p>
 <td>
    <p>SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
 in synchronous replica election in case of failures</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## UsageSpec     {#postgresql-cnpg-io-v1-UsageSpec}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+
+<p>UsageSpec configures a usage for a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the usage</p>
+</td>
+</tr>
+<tr><td><code>type</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The type of usage</p>
 </td>
 </tr>
 </tbody>

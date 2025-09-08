@@ -1008,3 +1008,12 @@ spec:
       - path: message
         displayName: Message
         description: Message is the reconciliation output message
+    - kind: FailoverQuorum
+      name: failoverquorums.postgresql.cnpg.io
+      displayName: Failover Quorum
+      description: FailoverQuorum contains the information about the current failover quorum status of a PG cluster
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1

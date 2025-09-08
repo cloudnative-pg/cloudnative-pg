@@ -391,3 +391,105 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(config.GetConfig(ParameterRecoveryMinApplyDelay)).To(Equal("3600s"))
 	})
 })
+
+var _ = Describe("PostgreSQL Extensions", func() {
+	Context("configuring extension_control_path and dynamic_library_path", func() {
+		const (
+			share1 = ExtensionsBaseDirectory + "/postgis/share"
+			share2 = ExtensionsBaseDirectory + "/pgvector/share"
+			lib1   = ExtensionsBaseDirectory + "/postgis/lib"
+			lib2   = ExtensionsBaseDirectory + "/pgvector/lib"
+		)
+		sharePaths := strings.Join([]string{share1, share2}, ":")
+		libPaths := strings.Join([]string{lib1, lib2}, ":")
+
+		It("both empty when there are no Extensions defined", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(BeEmpty())
+			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEmpty())
+		})
+
+		It("configures them when an Extension is defined", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
+					{
+						Name: "postgis",
+					},
+					{
+						Name: "pgvector",
+					},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths))
+		})
+
+		It("correctly merges the configuration with UserSettings", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				UserSettings: map[string]string{
+					ExtensionControlPath: "/my/extension/path",
+					DynamicLibraryPath:   "/my/library/path",
+				},
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
+					{
+						Name: "postgis",
+					},
+					{
+						Name: "pgvector",
+					},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths + ":/my/extension/path"))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths + ":/my/library/path"))
+		})
+
+		It("when custom paths are provided (multi-extension)", func() {
+			const (
+				geoShare1     = ExtensionsBaseDirectory + "/geo/postgis/share"
+				geoShare2     = ExtensionsBaseDirectory + "/geo/pgrouting/share"
+				geoLib1       = ExtensionsBaseDirectory + "/geo/postgis/lib"
+				geoLib2       = ExtensionsBaseDirectory + "/geo/pgrouting/lib"
+				utilityShare1 = ExtensionsBaseDirectory + "/utility/pgaudit/share"
+				utilityShare2 = ExtensionsBaseDirectory + "/utility/pg-failover-slots/share"
+				utilityLib1   = ExtensionsBaseDirectory + "/utility/pgaudit/lib"
+				utilityLib2   = ExtensionsBaseDirectory + "/utility/pg-failover-slots/lib"
+			)
+			sharePaths = strings.Join([]string{geoShare1, geoShare2, utilityShare1, utilityShare2}, ":")
+			libPaths = strings.Join([]string{geoLib1, geoLib2, utilityLib1, utilityLib2}, ":")
+
+			info := ConfigurationInfo{
+				Settings:           CnpgConfigurationSettings,
+				MajorVersion:       18,
+				IncludingMandatory: true,
+				AdditionalExtensions: []AdditionalExtensionConfiguration{
+					{
+						Name:                 "geo",
+						ExtensionControlPath: []string{"postgis/share", "./pgrouting/share"},
+						DynamicLibraryPath:   []string{"postgis/lib/", "/pgrouting/lib/"},
+					},
+					{
+						Name:                 "utility",
+						ExtensionControlPath: []string{"pgaudit/share", "./pg-failover-slots/share"},
+						DynamicLibraryPath:   []string{"pgaudit/lib/", "/pg-failover-slots/lib/"},
+					},
+				},
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig(ExtensionControlPath)).To(BeEquivalentTo("$system:" + sharePaths))
+			Expect(config.GetConfig(DynamicLibraryPath)).To(BeEquivalentTo("$libdir:" + libPaths))
+		})
+	})
+})
