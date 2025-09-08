@@ -162,7 +162,7 @@ var _ = Describe("Deployment", func() {
 			To(Equal(intstr.FromInt32(pgBouncerConfig.PgBouncerPort)))
 	})
 
-	FIt("retains user-defined bootstrap-controller resources", func() {
+	It("retains user-defined bootstrap-controller resources", func() {
 		pooler.Spec.Template = &apiv1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				InitContainers: []corev1.Container{{
