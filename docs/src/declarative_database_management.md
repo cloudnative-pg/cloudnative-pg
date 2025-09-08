@@ -356,6 +356,9 @@ spec:
   - name: pg-a
     fdw: postgres_fdw
     ensure: present
+    usage:
+      - name: app
+        type: grant
     options:
     - name: host
       value: foo
@@ -369,6 +372,9 @@ Each foreign server entry supports the following properties:
 - `name` *(mandatory)*: The name of the foreign server.
 - `fdw` *(mandatory)*: The name of the foreign data wrapper the server belongs to.
 - `ensure`: Indicates whether the foreign server should be `present` or `absent` in the database (default is `present`).
+- `usage`: The list of `USAGE` permissions of the foreign server, with the following fields:
+   - `name`: The name of the role to which the usage permission should be granted or from which it should be revoked.
+   - `type`: The type of the usage permission. Supports `grant` and `revoke`.
 - `options`: The list of server-level options. Each option supports the following fields:
    - `name`: The name of the option.
    - `value`: The string value of the option.
