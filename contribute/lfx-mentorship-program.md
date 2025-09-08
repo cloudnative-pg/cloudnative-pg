@@ -27,7 +27,6 @@ the areas outlined below.
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | 2025 | 3 (Sep–Nov) | [Chaos Testing](https://mentorship.lfx.linuxfoundation.org/project/0858ce07-0c90-47fa-a1a0-95c6762f00ff) | [Yash Agarwal](https://github.com/xploy04) |
 | 2025 | 3 (Sep–Nov) | [Rebuild documentation for multi-version support with Docusaurus](https://mentorship.lfx.linuxfoundation.org/project/86a647c1-88c7-474f-b093-6abb58197083) | [Anushka Saxena](https://www.linkedin.com/in/-anushka-saxena/) |
-| 2025 | 3 (Sep–Nov) | [Refresh cnpg-i-hello-world to align with current CNPG-I](https://mentorship.lfx.linuxfoundation.org/project/cabc7391-4956-42b2-b91c-d261816b7289) | *Postponed* |
 
 ---
 
