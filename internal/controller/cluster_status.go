@@ -266,12 +266,6 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.instances.Items,
 	)
 
-	if meta.IsStatusConditionTrue(cluster.Status.Conditions, hibernation.HibernationConditionType) {
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHibernated, "Instance Pods have been removed"); err != nil {
-			return err
-		}
-	}
-
 	// Count jobs
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
