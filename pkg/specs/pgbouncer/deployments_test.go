@@ -162,6 +162,37 @@ var _ = Describe("Deployment", func() {
 			To(Equal(intstr.FromInt32(pgBouncerConfig.PgBouncerPort)))
 	})
 
+	It("should correctly set pod resources to the bootstrap init container", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				Template: &apiv1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Resources: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dep, err := Deployment(pooler, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		// check that the init container has the correct resources
+		Expect(dep.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+		initResources := dep.Spec.Template.Spec.InitContainers[0].Resources
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("200m")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("256Mi")))
+	})
+
 	It("retains user-defined bootstrap-controller resources", func() {
 		pooler.Spec.Template = &apiv1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
