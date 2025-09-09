@@ -117,7 +117,13 @@ func (r *PluginReconciler) reconcile(
 	service *corev1.Service,
 	pluginName string,
 ) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx).WithValues("pluginName", pluginName)
+	contextLogger := log.FromContext(ctx).WithValues(
+		"pluginName", pluginName,
+		"service", client.ObjectKeyFromObject(service))
+	contextLogger.Debug("Plugin reconciliation loop start")
+	defer func() {
+		contextLogger.Debug("Plugin reconciliation loop end")
+	}()
 
 	pluginServerSecret := service.Annotations[utils.PluginServerSecretAnnotationName]
 	if len(pluginServerSecret) == 0 {
