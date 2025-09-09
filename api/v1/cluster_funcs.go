@@ -1293,6 +1293,88 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	}
 }
 
+// GetPodSecurityContext return the proper PodSecurityContext set in the cluster for Pods
+func (cluster *Cluster) GetPodSecurityContext() *corev1.PodSecurityContext {
+	uid := cluster.GetPostgresUID()
+	gid := cluster.GetPostgresGID()
+	trueValue := true
+	defaultContext := &corev1.PodSecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
+		RunAsUser:      &uid,
+		RunAsGroup:     &gid,
+		RunAsNonRoot:   &trueValue,
+		FSGroup:        &gid,
+	}
+	if cluster.Spec.PodSecurityContext != nil {
+		definedContext := cluster.Spec.PodSecurityContext
+		if definedContext.RunAsUser == nil {
+			definedContext.RunAsUser = defaultContext.RunAsUser
+		}
+		if definedContext.RunAsGroup == nil {
+			definedContext.RunAsGroup = defaultContext.RunAsGroup
+		}
+		if definedContext.SeccompProfile == nil {
+			definedContext.SeccompProfile = defaultContext.SeccompProfile
+		}
+		return definedContext
+	}
+
+	return defaultContext
+}
+
+// GetSecurityContext return the proper SecurityContext in the cluster for Containers in Pods
+func (cluster *Cluster) GetSecurityContext() *corev1.SecurityContext {
+	trueValue := true
+	falseValue := false
+
+	uid := cluster.GetPostgresUID()
+	gid := cluster.GetPostgresGID()
+
+	defaultContext := &corev1.SecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
+		RunAsUser:      &uid,
+		RunAsGroup:     &gid,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{
+				"ALL",
+			},
+		},
+		Privileged:               &falseValue,
+		RunAsNonRoot:             &trueValue,
+		ReadOnlyRootFilesystem:   &trueValue,
+		AllowPrivilegeEscalation: &falseValue,
+	}
+	if cluster.Spec.SecurityContext != nil {
+		definedContext := cluster.Spec.SecurityContext
+		if definedContext.RunAsUser == nil {
+			definedContext.RunAsUser = defaultContext.RunAsUser
+		}
+		if definedContext.RunAsGroup == nil {
+			definedContext.RunAsGroup = defaultContext.RunAsGroup
+		}
+		if definedContext.SeccompProfile == nil {
+			definedContext.SeccompProfile = defaultContext.SeccompProfile
+		}
+		if definedContext.Capabilities == nil {
+			definedContext.Capabilities = defaultContext.Capabilities
+		}
+		if definedContext.Privileged == nil {
+			definedContext.Privileged = defaultContext.Privileged
+		}
+		if definedContext.RunAsNonRoot == nil {
+			definedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+		}
+		if definedContext.ReadOnlyRootFilesystem == nil {
+			definedContext.ReadOnlyRootFilesystem = defaultContext.ReadOnlyRootFilesystem
+		}
+		if definedContext.AllowPrivilegeEscalation == nil {
+			definedContext.AllowPrivilegeEscalation = defaultContext.AllowPrivilegeEscalation
+		}
+		return definedContext
+	}
+	return defaultContext
+}
+
 // GetCoredumpFilter get the coredump filter value from the cluster annotation
 func (cluster *Cluster) GetCoredumpFilter() string {
 	value, ok := cluster.Annotations[utils.CoredumpFilter]
