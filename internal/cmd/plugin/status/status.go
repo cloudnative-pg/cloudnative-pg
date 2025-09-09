@@ -1350,7 +1350,7 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 
 	uptime := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
-		"%s (uptime %s)",
+		"%s (%s)",
 		primaryInstanceTimestamp.Round(time.Second),
 		uptime.Round(time.Second),
 	)
