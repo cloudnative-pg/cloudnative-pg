@@ -129,16 +129,6 @@ CloudNativePG manages the following predefined annotations:
 : The WAL at the start of a backup.
   This annotation is available only on `VolumeSnapshot` resources.
 
-`cnpg.io/backupMajorVersion`
-:   Applied to `Backup` resources.
-    Integer PostgreSQL major version of the backup's data directory (for example, `16`).
-    This annotation is available only on `VolumeSnapshot` resources.
-    Used only when selecting a storage source to create replicas from `VolumeSnapshot` backups,
-    to ensure major-version compatibility when `status.majorVersion` is missing.
-    Primarily for older snapshot backups that were created before `status.majorVersion` field; newer backups already
-    carry that field and don’t require this annotation.
-    Must be an integer; invalid values are rejected by the validation webhook.
-
 `cnpg.io/coredumpFilter`
 :   Filter to control the coredump of Postgres processes, expressed with a
     bitmask. By default it's set to `0x31` to exclude shared memory

@@ -115,14 +115,6 @@ defined in your PostgreSQL cluster.
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
 
-!!! Note
-    When creating replicas from VolumeSnapshot backups, CloudNativePG enforces
-    PostgreSQL major version compatibility. Newer backups include the
-    `status.majorVersion` field; for older snapshot backups that don’t, set the
-    `cnpg.io/backupMajorVersion` annotation (integer) on the `Backup` so the operator
-    can select a compatible snapshot. See [Labels and annotations](../labels_annotations.md)
-    for details about `cnpg.io/backupMajorVersion`.
-
 ## Hot and cold backups
 
 !!! Warning

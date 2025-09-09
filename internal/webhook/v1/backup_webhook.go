@@ -183,16 +183,5 @@ func (v *BackupCustomValidator) validate(r *apiv1.Backup) field.ErrorList {
 		}
 	}
 
-	if value := r.Annotations[utils.BackupMajorVersionAnnotationName]; value != "" {
-		_, err := strconv.Atoi(value)
-		if err != nil {
-			result = append(result, field.Invalid(
-				field.NewPath("metadata", "annotations", utils.BackupMajorVersionAnnotationName),
-				value,
-				"must be an integer",
-			))
-		}
-	}
-
 	return result
 }

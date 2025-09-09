@@ -21,8 +21,6 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -123,43 +121,25 @@ func getCandidateSourceFromBackupList(
 ) *StorageSource {
 	contextLogger := log.FromContext(ctx)
 
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Warning(
+			"unable to determine cluster major version; skipping backup as a recovery source",
+			"error", err.Error(),
+		)
+		return nil
+	}
+
 	isCorrectMajorVersion := func(backup *apiv1.Backup) bool {
-		// If we don't have image info, we can't determine cluster version reliably; skip enforcement
+		// If we don't have image info, we can't determine the cluster version reliably; skip enforcement
 		if cluster.Status.PGDataImageInfo == nil {
 			return true
 		}
 
 		backupMajorVersion := backup.Status.MajorVersion
-		if backup.Status.MajorVersion == 0 && backup.Annotations[utils.BackupMajorVersionAnnotationName] != "" {
-			if v, err := strconv.Atoi(backup.Annotations[utils.BackupMajorVersionAnnotationName]); err == nil {
-				backupMajorVersion = v
-			} else {
-				contextLogger.Warning(
-					"invalid backup major version annotation; skipping this backup as a recovery source",
-					"annotation", utils.BackupMajorVersionAnnotationName,
-					"value", backup.Annotations[utils.BackupMajorVersionAnnotationName],
-					"error", err.Error(),
-				)
-				return false
-			}
-		}
-
 		if backupMajorVersion == 0 {
 			contextLogger.Warning(
-				fmt.Sprintf(
-					"majorVersion on backup status is not populated, cannot use it as a recovery source. "+
-						"The annotation %s can be used to communicate the backup version manually",
-					utils.BackupMajorVersionAnnotationName,
-				),
-			)
-			return false
-		}
-
-		majorVersion, err := cluster.GetPostgresqlMajorVersion()
-		if err != nil {
-			contextLogger.Warning(
-				"unable to determine cluster major version; skipping backup as a recovery source",
-				"error", err.Error(),
+				"majorVersion on backup status is not populated, cannot use it as a recovery source.",
 			)
 			return false
 		}
