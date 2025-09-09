@@ -465,7 +465,7 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
+	// TODO: remove tlsEnabled when we drop the support for instances created without TLS
 	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")

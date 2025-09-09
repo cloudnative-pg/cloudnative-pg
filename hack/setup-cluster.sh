@@ -401,7 +401,7 @@ data:
    INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
 EOF
  configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
- kubectl -n cnpg-system patch configmap ${configMapName} --patch-file "${configMaps}"
+ kubectl -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 }
 
 deploy_prometheus_crds() {
