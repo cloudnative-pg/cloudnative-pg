@@ -501,36 +501,55 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 
 // updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper
 // based on the provided FDW specification.
-// It supports granting or revoking usage permissions for specified users.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
+	const objectTypeForeignDataWrapper = "FOREIGN DATA WRAPPER"
+	return applyUsagePermissions(ctx, db, objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
+}
+
+// updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
+// It supports granting or revoking usage permissions for specified users.
+func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
+	const objectTypeForeignServer = "FOREIGN SERVER"
+	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
+}
+
+// applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
+// for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
+func applyUsagePermissions(
+	ctx context.Context,
+	db *sql.DB,
+	objectType string,
+	objectName string,
+	usages []apiv1.UsageSpec,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	for _, usageSpec := range fdw.Usages {
+	if len(usages) == 0 {
+		return nil
+	}
+
+	for _, usageSpec := range usages {
+		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
+		sanitizedUser := pgx.Identifier{usageSpec.Name}.Sanitize()
+
 		switch usageSpec.Type {
 		case apiv1.GrantUsageSpecType:
-			changeUsageSQL := fmt.Sprintf(
-				"GRANT USAGE ON FOREIGN DATA WRAPPER %s TO %s",
-				pgx.Identifier{fdw.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("granting usage of foreign data wrapper %w", err)
+			mutation := fmt.Sprintf("GRANT USAGE ON %s %s TO %s", objectType, sanitizedObject, sanitizedUser)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("granting usage of %s: %w", objectType, err)
 			}
-			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		case apiv1.RevokeUsageSpecType:
-			changeUsageSQL := fmt.Sprintf(
-				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
-				pgx.Identifier{fdw.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("revoking usage of foreign data wrapper %w", err)
+			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) // nolint:gosec
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
 			}
-			contextLogger.Info("revoked usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+			contextLogger.Info("revoked usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		default:
 			contextLogger.Warning(
-				"unknown usage type",
-				"type", usageSpec.Type, "fdwName", fdw.Name)
+				"unknown usage type", "type", usageSpec.Type, "objectType", objectType, "name", objectName)
 		}
 	}
 
@@ -723,43 +742,6 @@ func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.
 	result.Options = opts
 
 	return &result, nil
-}
-
-// updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
-// It supports granting or revoking usage permissions for specified users.
-func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
-	contextLogger := log.FromContext(ctx)
-
-	for _, usageSpec := range server.Usages {
-		switch usageSpec.Type {
-		case apiv1.GrantUsageSpecType:
-			changeUsageSQL := fmt.Sprintf(
-				"GRANT USAGE ON FOREIGN SERVER %s TO %s",
-				pgx.Identifier{server.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("granting usage of foreign server %w", err)
-			}
-			contextLogger.Info("granted usage of foreign server", "name", server.Name, "user", usageSpec.Name)
-
-		case apiv1.RevokeUsageSpecType:
-			changeUsageSQL := fmt.Sprintf(
-				"REVOKE USAGE ON FOREIGN SERVER %s FROM %s", // #nosec G201
-				pgx.Identifier{server.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("revoking usage of foreign server %w", err)
-			}
-			contextLogger.Info("revoked usage of foreign server", "name", server.Name, "user", usageSpec.Name)
-
-		default:
-			contextLogger.Warning(
-				"unknown usage type for foreign server",
-				"type", usageSpec.Type, "fdwName", server.Name)
-		}
-	}
-
-	return nil
 }
 
 // createDatabaseForeignServer creates a foreign server in the database.
