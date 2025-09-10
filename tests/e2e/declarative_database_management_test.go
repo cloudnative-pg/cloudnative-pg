@@ -170,7 +170,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 
 				for _, serverSpec := range database.Spec.Servers {
 					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
-						foreignserverExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+						foreignServerExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})
 
