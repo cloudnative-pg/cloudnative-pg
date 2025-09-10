@@ -197,8 +197,8 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 	var result field.ErrorList
 
 	schemaNames := stringset.New()
-	for i, schema := range d.Spec.Schemas {
-		name := schema.Name
+	for i, schemaSpec := range d.Spec.Schemas {
+		name := schemaSpec.Name
 		if schemaNames.Has(name) {
 			result = append(
 				result,
@@ -219,110 +219,59 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 // FDWs must be unique in .spec.fdws
 func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
 	var result field.ErrorList
-
-	fdwNames := stringset.New()
+	nameSet := stringset.New()
+	basePath := field.NewPath("spec", "fdws")
 	for i, fdw := range d.Spec.FDWs {
-		name := fdw.Name
-		if fdwNames.Has(name) {
-			result = append(
-				result,
-				field.Duplicate(
-					field.NewPath("spec", "fdws").Index(i).Child("name"),
-					name,
-				),
-			)
-		}
-
-		// Validate the options of the FDW
-		optionNames := stringset.New()
-		for k, option := range fdw.Options {
-			optionName := option.Name
-			if optionNames.Has(optionName) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "fdws").Index(i).Child("options").Index(k).Child("name"),
-						optionName,
-					),
-				)
-			}
-
-			optionNames.Put(optionName)
-		}
-
-		// Validate the usage of the FDW
-		usageNames := stringset.New()
-		for j, usage := range fdw.Usages {
-			usageName := usage.Name
-			if usageNames.Has(usageName) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "fdws").Index(i).Child("usages").Index(j).Child("name"),
-						usageName,
-					),
-				)
-			}
-
-			usageNames.Put(usageName)
-		}
-
-		fdwNames.Put(name)
+		itemPath := basePath.Index(i)
+		errs := validateNameOptionsUsages(itemPath, fdw.Name, fdw.Options, fdw.Usages, nameSet)
+		result = append(result, errs...)
 	}
-
 	return result
 }
 
+// validateForeignServers validates the database Foreign Servers
 func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) field.ErrorList {
 	var result field.ErrorList
-
-	serverNames := stringset.New()
+	nameSet := stringset.New()
+	basePath := field.NewPath("spec", "servers")
 	for i, server := range d.Spec.Servers {
-		serverName := server.Name
-		if serverNames.Has(serverName) {
-			result = append(
-				result,
-				field.Duplicate(
-					field.NewPath("spec", "servers").Index(i).Child("name"),
-					serverName,
-				),
-			)
+		itemPath := basePath.Index(i)
+		errs := validateNameOptionsUsages(itemPath, server.Name, server.Options, server.Usages, nameSet)
+		result = append(result, errs...)
+	}
+	return result
+}
+
+// validateNameOptionsUsages validates a single named object with options and usages, tracking duplicates.
+func validateNameOptionsUsages(
+	itemPath *field.Path,
+	name string,
+	options []apiv1.OptionSpec,
+	usages []apiv1.UsageSpec,
+	existingNames *stringset.Data,
+) field.ErrorList {
+	var errs field.ErrorList
+
+	if existingNames.Has(name) {
+		errs = append(errs, field.Duplicate(itemPath.Child("name"), name))
+	}
+	existingNames.Put(name)
+
+	optionNames := stringset.New()
+	for i, option := range options {
+		if optionNames.Has(option.Name) {
+			errs = append(errs, field.Duplicate(itemPath.Child("options").Index(i).Child("name"), option.Name))
 		}
-
-		optionNames := stringset.New()
-		for k, option := range server.Options {
-			optionName := option.Name
-			if optionNames.Has(optionName) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "servers").Index(i).Child("options").Index(k).Child("name"),
-						optionName,
-					),
-				)
-			}
-
-			optionNames.Put(optionName)
-		}
-
-		usageNames := stringset.New()
-		for j, usage := range server.Usages {
-			usageName := usage.Name
-			if usageNames.Has(usageName) {
-				result = append(
-					result,
-					field.Duplicate(
-						field.NewPath("spec", "servers").Index(i).Child("usages").Index(j).Child("name"),
-						usageName,
-					),
-				)
-			}
-
-			usageNames.Put(usageName)
-		}
-
-		serverNames.Put(serverName)
+		optionNames.Put(option.Name)
 	}
 
-	return result
+	usageNames := stringset.New()
+	for i, usage := range usages {
+		if usageNames.Has(usage.Name) {
+			errs = append(errs, field.Duplicate(itemPath.Child("usages").Index(i).Child("name"), usage.Name))
+		}
+		usageNames.Put(usage.Name)
+	}
+
+	return errs
 }
