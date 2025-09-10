@@ -557,7 +557,7 @@ func fdwExistsQuery(fdwName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_data_wrapper WHERE fdwname='%v')", fdwName)
 }
 
-func foreignserverExistsQuery(serverName string) string {
+func foreignServerExistsQuery(serverName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_server WHERE srvname='%v')", serverName)
 }
 
