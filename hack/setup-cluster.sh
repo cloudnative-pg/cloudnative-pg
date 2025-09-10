@@ -366,18 +366,16 @@ EOF
 apiVersion: v1
 kind: Service
 metadata:
-  name: cnpg-pprof
+  name: cnpg-controller-manager-pprof
 spec:
   ports:
   - targetPort: 6060
     port: 6060
-  selector:
-    app: cnpg-pprof
   type: ClusterIP
   selector:
     app.kubernetes.io/name: cloudnative-pg
 EOF
-  kubectl -n pyroscope apply -f "${service_file}"
+  kubectl -n cnpg-system apply -f "${service_file}"
 
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
@@ -444,7 +442,7 @@ Commands:
     export-logs           Export the logs from the cluster inside the directory
                           ${LOG_DIR}
     destroy               Destroy the cluster
-    pyroscope             Deploy Pyroscope inside operator namespace
+    pyroscope             Deploy Pyroscope and enable pprof for the operator
 
 Options:
     -k|--k8s-version
