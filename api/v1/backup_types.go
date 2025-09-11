@@ -155,6 +155,13 @@ type BackupSpec struct {
 	// Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
 	// +optional
 	OnlineConfiguration *OnlineConfiguration `json:"onlineConfiguration,omitempty"`
+
+	// The policy to decide whether this backup should be kept from removing by retention policy handler.
+	// Value is passed to --target argument of barman-cloud-backup-keep if present.
+	// Value 'nokeep' is treated like the property wasn't set at all, thus backup won't be kept.
+	// +kubebuilder:validation:Enum=nokeep;standalone;full
+	// +optional
+	Keep *string `json:"keep,omitempty"`
 }
 
 // BackupPluginConfiguration contains the backup configuration used by
@@ -292,6 +299,14 @@ type BackupStatus struct {
 	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
 	// +optional
 	Online *bool `json:"online,omitempty"`
+
+	// Backup keep target (like in barman-cloud-backup-keep --status):
+	// "standalone" (keep this point in time only)
+	// or "full" (keep all WALs after this backup).
+	// Absence of the value means that keep target is not set (aka "nokeep").
+	// Check Barman documentation for more information on different targets.
+	// +optional
+	Keep *string `json:"keep,omitempty"`
 
 	// A map containing the plugin metadata
 	// +optional
