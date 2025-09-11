@@ -60,7 +60,7 @@ requested for a cluster.
     `bullseye` image, you cannot upgrade to a `bookworm` image.
 
 !!! Warning
-    There is a bug in PostgreSQL 17.0 through 17.6 that prevents successful upgrades
+    There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
     if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
     The upgrade process will fail with an error related to replication slot configuration.
     This issue has been [fixed in PostgreSQL 17.6 and 18beta2 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
