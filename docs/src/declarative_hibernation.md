@@ -59,7 +59,7 @@ $ kubectl cnpg status <cluster-name>
 Cluster Summary
 Name:              cluster-example
 Namespace:         default
-PostgreSQL Image:  ghcr.io/cloudnative-pg/postgresql:17.5
+PostgreSQL Image:  ghcr.io/cloudnative-pg/postgresql:17.5-system-trixie
 Primary instance:  cluster-example-2
 Status:            Cluster in healthy state 
 Instances:         3
