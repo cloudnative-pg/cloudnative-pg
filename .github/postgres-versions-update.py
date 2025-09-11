@@ -25,8 +25,11 @@ from packaging import version
 from subprocess import check_output
 
 min_supported_major = 13
+os_name = "trixie"
+image_type = "system"
+
 pg_repo_name = "cloudnative-pg/postgresql"
-pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?-bookworm$")
+pg_version_re = r"(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d{12})?"
 pg_versions_file = ".github/pg_versions.json"
 
 
@@ -41,15 +44,20 @@ def get_json(repo_name):
     repo_json = json.loads(data.decode("utf-8"))
     return repo_json
 
+
 def parse_version(v):
-    return version.Version(v.removesuffix("-bookworm"))
+    return version.Version(v.removesuffix(f"-{image_type}-{os_name}"))
+
 
 def is_pre_release(v):
     return parse_version(v).is_prerelease
 
+
 def write_json(repo_url, version_re, output_file):
     repo_json = get_json(repo_url)
     tags = repo_json["Tags"]
+
+    version_re = re.compile(rf"^{version_re}-{image_type}-{os_name}$")
 
     # Filter out all the tags which do not match the version regexp
     tags = [item for item in tags if version_re.search(item)]
@@ -70,19 +78,19 @@ def write_json(repo_url, version_re, output_file):
         if int(major) < min_supported_major:
             continue
 
-        # We normally want to handle only versions without the '-' inside
+        # We normally want to handle only versions without the timestamp inside
         extra = match.group(2)
         if not extra:
             if major not in results:
                 results[major] = [item]
             elif len(results[major]) < 2:
                 results[major].append(item)
-        # But we keep the highest version with the '-' in case we have not enough other versions
+        # But we keep the highest version with the timestamp in case we have not enough other versions
         else:
             if major not in extra_results:
                 extra_results[major] = item
 
-    # If there are not enough version without '-` inside we add the one we kept
+    # If there are not enough version without the timestamp inside, we add the one we kept
     for major in results:
         if len(results[major]) < 2:
             results[major].append(extra_results[major])
