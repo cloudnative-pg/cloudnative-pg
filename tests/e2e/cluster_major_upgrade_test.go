@@ -112,7 +112,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	generatePostgreSQLCluster := func(namespace string, storageClass string, tagVersion string) *v1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-bookworm", tagVersion)
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-trixie", tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitSQL = []string{
 			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
 			"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
@@ -122,7 +122,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	}
 	generatePostgreSQLMinimalCluster := func(namespace string, storageClass string, tagVersion string) *v1.Cluster {
 		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion)
-		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-bookworm", tagVersion)
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-trixie", tagVersion)
 		return cluster
 	}
 
@@ -209,14 +209,14 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		// Default target Images
 		targetImages := map[string]string{
 			postgisEntry:           fmt.Sprintf("%v:%v", PostgisImageRepository, targetTag),
-			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", ImageRepository, targetTag),
-			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", ImageRepository, targetTag),
+			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-trixie", ImageRepository, targetTag),
+			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-trixie", ImageRepository, targetTag),
 		}
 		// Set custom targets when detecting a given env variable
 		if envValue := os.Getenv(customImageRegistryEnvVar); envValue != "" {
-			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetTag)
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetTag)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetTag)
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-trixie", envValue, targetTag)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-trixie", envValue, targetTag)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-trixie", envValue, targetTag)
 		}
 
 		return targetImages
@@ -337,7 +337,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		// Avoid running Postgis major upgrade tests when a custom registry is being specified, because our
 		// PostGIS images are still based on Debian bullseye which uses OpenSSL 1.1, thus making them incompatible
 		// with any other image that uses OpenSSL 3.0 or greater.
-		// TODO: remove once we have PostGIS bookworm images
+		// TODO: remove once we have PostGIS trixie images
 		if scenarioName == postgisEntry && os.Getenv(customImageRegistryEnvVar) != "" {
 			Skip("Skipping PostGIS major upgrades when a custom registry is specified")
 		}
