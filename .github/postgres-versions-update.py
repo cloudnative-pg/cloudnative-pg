@@ -93,7 +93,7 @@ def write_json(repo_url, version_re, output_file):
             if major not in extra_results:
                 extra_results[major] = item
 
-    # If there are not enough version without the timestamp inside, we add the one we kept
+    # If there are not enough versions without the timestamp inside, we add the one we kept
     for major in results:
         if len(results[major]) < 2:
             results[major].append(extra_results[major])
