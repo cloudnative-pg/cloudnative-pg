@@ -60,10 +60,7 @@ and accepting up to 1000 connections each. The default pool size is 10
 user/database pairs toward PostgreSQL.
 
 !!! Important
-    The `Pooler` resource sets only the `*` fallback database in PgBouncer. This setting means that
-    that all parameters in the connection strings passed from the client are
-    relayed to the PostgreSQL server. For details, see ["Section [databases]"
-    in the PgBouncer documentation](https://www.pgbouncer.org/config.html#section-databases).
+    The `Pooler` resource sets only the `*` fallback database in PgBouncer. This setting means that all parameters in the connection strings passed from the client are relayed to the PostgreSQL server. For details, see ["Section [databases]" in the PgBouncer documentation](https://www.pgbouncer.org/config.html#section-databases).
 
 CloudNativePG also creates a secret with the same name as the pooler containing
 the configuration files used with PgBouncer.
