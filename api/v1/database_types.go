@@ -200,13 +200,13 @@ type DatabaseSpec struct {
 // DatabaseObjectSpec contains the fields which are common to every
 // database object
 type DatabaseObjectSpec struct {
-	// Name of the extension/schema
+	// Name of the object (extension, schema, FDW, server)
 	Name string `json:"name"`
 
-	// Specifies whether an extension/schema should be present or absent in
-	// the database. If set to `present`, the extension/schema will be
-	// created if it does not exist. If set to `absent`, the
-	// extension/schema will be removed if it exists.
+	// Specifies whether an object (e.g schema) should be present or absent
+	// in the database. If set to `present`, the object will be created if
+	// it does not exist. If set to `absent`, the extension/schema will be
+	// removed if it exists.
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
@@ -279,10 +279,11 @@ type ServerSpec struct {
 	// Common fields
 	DatabaseObjectSpec `json:",inline"`
 
-	// fdw name
+	// The name of the Foreign Data Wrapper (FDW)
 	FdwName string `json:"fdw"`
 
-	// Options specifies options for the server(key is option name, value is option value)
+	// Options specifies the configuration options for the server
+	// (key is the option name, value is the option value).
 	// +optional
 	Options []OptionSpec `json:"options,omitempty"`
 

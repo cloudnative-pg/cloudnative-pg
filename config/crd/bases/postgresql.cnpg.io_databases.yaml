@@ -132,16 +132,16 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     schema:
                       description: |-
@@ -170,10 +170,10 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
@@ -185,7 +185,7 @@ spec:
                         the default handler is registered when the FDW extension is created.
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     options:
                       description: |-
@@ -343,16 +343,16 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     owner:
                       description: |-
@@ -372,23 +372,24 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
                       type: string
                     fdw:
-                      description: fdw name
+                      description: The name of the Foreign Data Wrapper (FDW)
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     options:
-                      description: Options specifies options for the server(key is
-                        option name, value is option value)
+                      description: |-
+                        Options specifies the configuration options for the server
+                        (key is the option name, value is the option value).
                       items:
                         description: OptionSpec holds the name, value and the ensure
                           field for an option
