@@ -2452,17 +2452,17 @@ database object</p>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the extension/schema</p>
+   <p>Name of the object (extension, schema, FDW, server)</p>
 </td>
 </tr>
 <tr><td><code>ensure</code><br/>
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
 </td>
 <td>
-   <p>Specifies whether an extension/schema should be present or absent in
-the database. If set to <code>present</code>, the extension/schema will be
-created if it does not exist. If set to <code>absent</code>, the
-extension/schema will be removed if it exists.</p>
+   <p>Specifies whether an object (e.g schema) should be present or absent
+in the database. If set to <code>present</code>, the object will be created if
+it does not exist. If set to <code>absent</code>, the extension/schema will be
+removed if it exists.</p>
 </td>
 </tr>
 </tbody>
@@ -5936,14 +5936,15 @@ Map keys are the secret names, map values are the versions</p>
 <i>string</i>
 </td>
 <td>
-   <p>fdw name</p>
+   <p>The name of the Foreign Data Wrapper (FDW)</p>
 </td>
 </tr>
 <tr><td><code>options</code><br/>
 <a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
 </td>
 <td>
-   <p>Options specifies options for the server(key is option name, value is option value)</p>
+   <p>Options specifies the configuration options for the server
+(key is the option name, value is the option value).</p>
 </td>
 </tr>
 <tr><td><code>usage</code><br/>
