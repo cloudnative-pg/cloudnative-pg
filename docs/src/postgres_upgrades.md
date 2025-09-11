@@ -17,7 +17,7 @@ version 17.1:
 Minor releases are fully compatible with earlier and later minor releases of
 the same major version. They include bug fixes and security updates but do not
 introduce changes to the internal storage format.
-For example, PostgreSQL 17.1 is compatible with 17.0 and 17.5.
+For example, PostgreSQL 17.1 is compatible with 17.0 and 17.6.
 
 ### Upgrading a Minor Version in CloudNativePG
 
@@ -60,11 +60,11 @@ requested for a cluster.
     `bullseye` image, you cannot upgrade to a `bookworm` image.
 
 !!! Warning
-    There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
+    There is a bug in PostgreSQL 17.0 through 17.6 that prevents successful upgrades
     if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
     The upgrade process will fail with an error related to replication slot configuration.
     This issue has been [fixed in PostgreSQL 17.6 and 18beta2 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
-    If you are using PostgreSQL 17.0 through 17.5, ensure that you upgrade to at least
+    If you are using PostgreSQL 17.0 through 17.6, ensure that you upgrade to at least
     PostgreSQL 17.6 before attempting a major upgrade, or make sure to temporarily set
     the `max_slot_wal_keep_size` parameter to `-1` in your cluster configuration.
 
