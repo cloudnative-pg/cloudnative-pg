@@ -44,7 +44,6 @@ import (
 var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		level           = tests.Lowest
-		sampleFile      = fixturesDir + "/self-fencing/cluster-self-fencing.yaml.template"
 		namespacePrefix = "self-fencing"
 	)
 
@@ -57,7 +56,38 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		}
 	})
 
-	It("will terminate an isolated primary", func() {
+	verifyIsolatedPrimary := func(namespace, isolatedPod, isolatedNode string, livenessPingerEnabled bool) {
+		By("verifying the isolatedPod behaviour", func() {
+			defaultCommand := fmt.Sprintf(
+				"docker exec %v crictl ps -a -q "+
+					"--label io.kubernetes.pod.namespace=%s,io.kubernetes.pod.name=%s "+
+					"--name postgres", isolatedNode, namespace, isolatedPod)
+
+			if livenessPingerEnabled {
+				Eventually(func(g Gomega) {
+					out, _, err := run.Unchecked(fmt.Sprintf("%s -s Exited", defaultCommand))
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(out).ToNot(BeEmpty())
+					if out != "" {
+						GinkgoWriter.Printf("Container %s (%s) has been terminated\n",
+							isolatedPod, strings.TrimSpace(out))
+					}
+				}, 120).Should(Succeed())
+			} else {
+				Consistently(func(g Gomega) {
+					out, _, err := run.Unchecked(fmt.Sprintf("%s -s Running", defaultCommand))
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(out).ToNot(BeEmpty())
+					if out != "" {
+						GinkgoWriter.Printf("Container %s (%s) is still running\n",
+							isolatedPod, strings.TrimSpace(out))
+					}
+				}, 20, 5).Should(Succeed())
+			}
+		})
+	}
+
+	assertLivenessPinger := func(clusterManifest string, livenessPingerEnabled bool) {
 		var namespace, clusterName, isolatedNode string
 		var err error
 		var oldPrimaryPod *corev1.Pod
@@ -70,11 +100,11 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 		})
 
 		By("creating a Cluster", func() {
-			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 		})
 
 		By("setting up the environment", func() {
@@ -107,21 +137,7 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		})
 
-		By("verifying that oldPrimary will self isolate", func() {
-			// Assert that the oldPrimary is eventually terminated
-			Eventually(func(g Gomega) {
-				out, _, err := run.Unchecked(fmt.Sprintf(
-					"docker exec %v crictl ps -a "+
-						"--label io.kubernetes.pod.namespace=%s,io.kubernetes.pod.name=%s "+
-						"--name postgres -s Exited -q", isolatedNode, namespace, oldPrimaryPod.Name))
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(out).ToNot(BeEmpty())
-				if out != "" {
-					GinkgoWriter.Printf("Container %s (%s) has been terminated\n",
-						oldPrimaryPod.Name, strings.TrimSpace(out))
-				}
-			}, 120).Should(Succeed())
-		})
+		verifyIsolatedPrimary(namespace, oldPrimaryPod.Name, isolatedNode, livenessPingerEnabled)
 
 		By("reconnecting the isolated Node", func() {
 			_, _, err = run.Unchecked(fmt.Sprintf("docker network connect kind %v", isolatedNode))
@@ -142,6 +158,20 @@ var _ = Describe("Self-fencing with liveness probe", Serial, Label(tests.LabelDi
 				g.Expect(specs.IsPodStandby(pod)).To(BeTrue())
 				g.Expect(nodes.IsNodeReachable(env.Ctx, env.Client, isolatedNode)).To(BeTrue())
 			}, timeout).Should(Succeed())
+		})
+	}
+
+	When("livenessPinger is enabled", func() {
+		const sampleFile = fixturesDir + "/self-fencing/cluster-liveness-pinger-enabled.yaml.template"
+		It("will terminate an isolated primary", func() {
+			assertLivenessPinger(sampleFile, true)
+		})
+	})
+
+	When("livenessPinger is disabled", func() {
+		const sampleFile = fixturesDir + "/self-fencing/cluster-liveness-pinger-disabled.yaml.template"
+		It("will not restart an isolated primary", func() {
+			assertLivenessPinger(sampleFile, false)
 		})
 	})
 })

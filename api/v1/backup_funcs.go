@@ -236,6 +236,30 @@ func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client
 	return &previouslyElectedPod, nil
 }
 
+// GetOnlineOrDefault returns the online value for the backup.
+func (backup *Backup) GetOnlineOrDefault(cluster *Cluster) bool {
+	// Offline backups are supported only with the
+	// volume snapshot backup method.
+	if backup.Spec.Method != BackupMethodVolumeSnapshot {
+		return true
+	}
+
+	if backup.Spec.Online != nil {
+		return *backup.Spec.Online
+	}
+
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return true
+	}
+
+	config := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+	if config.Online != nil {
+		return *config.Online
+	}
+
+	return true
+}
+
 // GetVolumeSnapshotConfiguration overrides the  configuration value with the ones specified
 // in the backup, if present.
 func (backup *Backup) GetVolumeSnapshotConfiguration(
@@ -267,4 +291,14 @@ func (backup *Backup) EnsureGVKIsPresent() {
 // IsEmpty checks if the plugin configuration is empty or not
 func (configuration *BackupPluginConfiguration) IsEmpty() bool {
 	return configuration == nil || len(configuration.Name) == 0
+}
+
+// IsManagedByInstance returns true if the backup is managed by the instance manager
+func (b BackupMethod) IsManagedByInstance() bool {
+	return b == BackupMethodPlugin || b == BackupMethodBarmanObjectStore
+}
+
+// IsManagedByOperator returns true if the backup is managed by the operator
+func (b BackupMethod) IsManagedByOperator() bool {
+	return b == BackupMethodVolumeSnapshot
 }

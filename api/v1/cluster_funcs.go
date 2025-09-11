@@ -24,9 +24,11 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
@@ -83,6 +85,50 @@ func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) 
 		}
 	}
 	return pluginNames
+}
+
+// GetInstanceEnabledPluginNames gets the name of the plugins that are available to the instance container
+func (cluster *Cluster) GetInstanceEnabledPluginNames() (result []string) {
+	var instance []string
+	for _, pluginStatus := range cluster.Status.PluginStatus {
+		if slices.Contains(pluginStatus.Capabilities,
+			identity.PluginCapability_Service_TYPE_INSTANCE_SIDECAR_INJECTION.String()) {
+			instance = append(instance, pluginStatus.Name)
+		}
+	}
+
+	enabled := GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+
+	var instanceEnabled []string
+	for _, pluginName := range instance {
+		if slices.Contains(enabled, pluginName) {
+			instanceEnabled = append(instanceEnabled, pluginName)
+		}
+	}
+
+	return instanceEnabled
+}
+
+// GetJobEnabledPluginNames gets the name of the plugins that are available to the job container
+func (cluster *Cluster) GetJobEnabledPluginNames() (result []string) {
+	var instance []string
+	for _, pluginStatus := range cluster.Status.PluginStatus {
+		if slices.Contains(pluginStatus.Capabilities,
+			identity.PluginCapability_Service_TYPE_INSTANCE_JOB_SIDECAR_INJECTION.String()) {
+			instance = append(instance, pluginStatus.Name)
+		}
+	}
+
+	enabled := GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+
+	var instanceEnabled []string
+	for _, pluginName := range instance {
+		if slices.Contains(enabled, pluginName) {
+			instanceEnabled = append(instanceEnabled, pluginName)
+		}
+	}
+
+	return instanceEnabled
 }
 
 // GetExternalClustersEnabledPluginNames gets the name of the plugins that are
@@ -1514,4 +1560,20 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	}
 
 	return ""
+}
+
+// IsFailoverQuorumActive check if we should enable the
+// quorum failover protection alpha-feature.
+func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
+	failoverQuorumAnnotation, ok := cluster.GetAnnotations()[utils.FailoverQuorumAnnotationName]
+	if !ok || failoverQuorumAnnotation == "" {
+		return false, nil
+	}
+
+	v, err := strconv.ParseBool(failoverQuorumAnnotation)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse failover quorum annotation '%v': %v", failoverQuorumAnnotation, err)
+	}
+
+	return v, nil
 }

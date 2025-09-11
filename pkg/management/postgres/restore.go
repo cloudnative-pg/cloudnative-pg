@@ -40,6 +40,7 @@ import (
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -107,10 +108,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	// We're creating a new replica of an existing cluster, and the PVCs
 	// have been initialized by a set of VolumeSnapshots.
 	if immediate {
-		// If the instance will start as a primary, we will enter in the
+		// If the instance starts as a primary, we will enter in the
 		// same logic attaching an old primary back after a failover.
 		// We don't need that as this instance has never diverged.
-		if err := info.GetInstance().Demote(ctx, cluster); err != nil {
+		if err := info.GetInstance(nil).Demote(ctx, cluster); err != nil {
 			return fmt.Errorf("error while demoting the instance: %w", err)
 		}
 		return nil
@@ -182,7 +183,7 @@ func (info InitInfo) concludeRestore(
 	// we recover from a base which has postgresql.auto.conf
 	// the override.conf and include statement is present, what we need to do is to
 	// migrate the content
-	if _, err := info.GetInstance().migratePostgresAutoConfFile(ctx); err != nil {
+	if _, err := info.GetInstance(cluster).migratePostgresAutoConfFile(ctx); err != nil {
 		return err
 	}
 	if cluster.IsReplica() {
@@ -817,6 +818,15 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		}
 	}()
 
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	defer pluginCli.Close(ctx)
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
+
 	temporaryInitInfo := InitInfo{
 		PgData:    tempDataDir,
 		Temporary: true,
@@ -826,7 +836,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}
 
-	temporaryInstance := temporaryInitInfo.GetInstance().
+	temporaryInstance := temporaryInitInfo.GetInstance(cluster).
 		WithNamespace(info.Namespace).
 		WithClusterName(info.ClusterName)
 
@@ -838,7 +848,12 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 	if err != nil {
 		return fmt.Errorf("while generating pg_ident.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(ctx, cluster, false)
+	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		cluster,
+		false,
+		postgres.OperationType_TYPE_RESTORE,
+	)
 	if err != nil {
 		return fmt.Errorf("while generating Postgres configuration: %w", err)
 	}
@@ -888,7 +903,7 @@ func (info InitInfo) WriteRestoreHbaConf(ctx context.Context) error {
 	}
 
 	// Create only the local map referred in the HBA configuration
-	_, err = info.GetInstance().RefreshPGIdent(ctx, nil)
+	_, err = info.GetInstance(nil).RefreshPGIdent(ctx, nil)
 	return err
 }
 
@@ -899,7 +914,7 @@ func (info InitInfo) WriteRestoreHbaConf(ctx context.Context) error {
 func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster *apiv1.Cluster, env []string) error {
 	contextLogger := log.FromContext(ctx)
 
-	instance := info.GetInstance()
+	instance := info.GetInstance(cluster)
 	instance.Env = env
 
 	if err := instance.VerifyPgDataCoherence(ctx); err != nil {

@@ -34,12 +34,12 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       -
         # There is no command to get EKS k8s versions, we have to parse the documentation
         name: Get updated EKS versions
         run: |
-          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/mainline/latest/ug/clusters/kubernetes-versions-standard.adoc"
+          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/mainline/latest/ug/versioning/kubernetes-versions-standard.adoc"
           curl --silent "${DOC_URL}" | sed -e 's/.*Kubernetes \([0-9].[0-9][0-9]\).*/\1/;/^[0-9]\./!d' | uniq | \
             awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
             jq -Rn '[inputs]' | tee .github/eks_versions.json
@@ -61,13 +61,13 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
         name: 'Auth GKE'
-        uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
+        uses: 'google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093' # v3
         with:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
         name: Set up Cloud SDK for GKE
-        uses: google-github-actions/setup-gcloud@6189d56e4096ee891640bb02ac264be376592d6a # v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'

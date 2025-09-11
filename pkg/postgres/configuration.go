@@ -22,12 +22,18 @@ package postgres
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"iter"
 	"math"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
@@ -46,8 +52,14 @@ const (
 	// ParameterWalLogHints the configuration key containing the wal_log_hints value
 	ParameterWalLogHints = "wal_log_hints"
 
-	// ParameterRecoveyMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
-	ParameterRecoveyMinApplyDelay = "recovery_min_apply_delay"
+	// ParameterRecoveryMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
+	ParameterRecoveryMinApplyDelay = "recovery_min_apply_delay"
+
+	// ParameterSyncReplicationSlots the configuration key containing the sync_replication_slots value
+	ParameterSyncReplicationSlots = "sync_replication_slots"
+
+	// ParameterHotStandbyFeedback the configuration key containing the hot_standby_feedback value
+	ParameterHotStandbyFeedback = "hot_standby_feedback"
 )
 
 // An acceptable wal_level value
@@ -90,9 +102,9 @@ const (
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
@@ -124,6 +136,12 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 # Grant local access ('local' user map)
 local {{.Username}} postgres
+
+# Grant streaming_replica access ('cnpg_streaming_replica' user map)
+cnpg_streaming_replica streaming_replica streaming_replica
+
+# Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
+cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 #
 # USER-DEFINED RULES
@@ -234,11 +252,26 @@ local {{.Username}} postgres
 	// config in the custom.conf file
 	CNPGConfigSha256 = "cnpg.config_sha256"
 
+	// CNPGSynchronousStandbyNamesMetadata is used to inject inside PG the parameters
+	// that were used to calculate synchronous_standby_names. With this data we're
+	// able to know the actual settings without parsing back the
+	// synchronous_standby_names GUC
+	CNPGSynchronousStandbyNamesMetadata = "cnpg.synchronous_standby_names_metadata"
+
 	// SharedPreloadLibraries shared preload libraries key in the config
 	SharedPreloadLibraries = "shared_preload_libraries"
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// ExtensionControlPath is the postgresql parameter key for extension_control_path
+	ExtensionControlPath = "extension_control_path"
+
+	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
+	DynamicLibraryPath = "dynamic_library_path"
+
+	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
+	ExtensionsBaseDirectory = "/extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -279,6 +312,21 @@ type ConfigurationSettings struct {
 	PgAuditSettings SettingsCollection
 }
 
+// SynchronousStandbyNamesConfig is the parameters that are needed
+// to create the synchronous_standby_names GUC
+type SynchronousStandbyNamesConfig struct {
+	// Method accepts 'any' (quorum-based synchronous replication)
+	// or 'first' (priority-based synchronous replication) as values.
+	Method string `json:"method"`
+
+	// NumSync is the number of synchronous standbys that transactions
+	// need to wait for replies from
+	NumSync int `json:"number"`
+
+	// StandbyNames is the list of standby servers
+	StandbyNames []string `json:"standbyNames"`
+}
+
 // ConfigurationInfo contains the required information to create a PostgreSQL
 // configuration
 type ConfigurationInfo struct {
@@ -295,7 +343,10 @@ type ConfigurationInfo struct {
 	UserSettings map[string]string
 
 	// The synchronous_standby_names configuration to be applied
-	SynchronousStandbyNames string
+	SynchronousStandbyNames SynchronousStandbyNamesConfig
+
+	// The synchronized_standby_slots configuration to be applied
+	SynchronizedStandbySlots []string
 
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
@@ -328,6 +379,9 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
+
+	// The list of additional extensions to be loaded into the PostgreSQL configuration
+	AdditionalExtensions []AdditionalExtensionConfiguration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -354,8 +408,8 @@ type ManagedExtension struct {
 	SkipCreateExtension bool
 }
 
-// IsUsed checks whether a configuration namespace in the namespaces list
-// is used in the user provided configuration
+// IsUsed checks whether a configuration namespace in the extension namespaces list
+// is used in the user-provided configuration
 func (e ManagedExtension) IsUsed(userConfigs map[string]string) bool {
 	for k := range userConfigs {
 		for _, namespace := range e.Namespaces {
@@ -365,6 +419,23 @@ func (e ManagedExtension) IsUsed(userConfigs map[string]string) bool {
 		}
 	}
 	return false
+}
+
+// IsManagedExtensionUsed checks whether a configuration namespace in the named extension namespaces list
+// is used in the user-provided configuration
+func IsManagedExtensionUsed(name string, userConfigs map[string]string) bool {
+	var extension *ManagedExtension
+	for _, ext := range ManagedExtensions {
+		if ext.Name == name {
+			extension = &ext
+			break
+		}
+	}
+	if extension == nil {
+		return false
+	}
+
+	return extension.IsUsed(userConfigs)
 }
 
 var (
@@ -443,6 +514,7 @@ var (
 		"log_rotation_size":                      blockedConfigurationParameter,
 		"log_truncate_on_rotation":               blockedConfigurationParameter,
 		"pg_failover_slots.primary_dsn":          fixedConfigurationParameter,
+		"pg_failover_slots.standby_slot_names":   fixedConfigurationParameter,
 		"promote_trigger_file":                   blockedConfigurationParameter,
 		"recovery_end_command":                   blockedConfigurationParameter,
 		"recovery_min_apply_delay":               blockedConfigurationParameter,
@@ -459,6 +531,7 @@ var (
 		"ssl_prefer_server_ciphers":              fixedConfigurationParameter,
 		"stats_temp_directory":                   blockedConfigurationParameter,
 		"synchronous_standby_names":              fixedConfigurationParameter,
+		"synchronized_standby_slots":             fixedConfigurationParameter,
 		"syslog_facility":                        blockedConfigurationParameter,
 		"syslog_ident":                           blockedConfigurationParameter,
 		"syslog_sequence_numbers":                blockedConfigurationParameter,
@@ -567,6 +640,11 @@ func (p *PgConfiguration) GetConfigurationParameters() map[string]string {
 	return p.configs
 }
 
+// SetConfigurationParameters sets the configuration parameters
+func (p *PgConfiguration) SetConfigurationParameters(configs map[string]string) {
+	p.configs = configs
+}
+
 // OverwriteConfig overwrites a configuration in the map, given the key/value pair.
 // If the map is nil, it is created and the pair is added
 func (p *PgConfiguration) OverwriteConfig(key, value string) {
@@ -619,7 +697,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	ignoreFixedSettingsFromUser := info.IncludingMandatory || !info.PreserveFixedSettingsFromUser
 
 	// Set all the default settings
-	setDefaultConfigurations(info, configuration)
+	configuration.setDefaultConfigurations(info)
 
 	// Apply all the values from the user, overriding defaults,
 	// ignoring those which are fixed if ignoreFixedSettingsFromUser is true
@@ -655,9 +733,30 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Apply the synchronous replication settings
-	syncStandbyNames := info.SynchronousStandbyNames
+	syncStandbyNames := info.SynchronousStandbyNames.String()
 	if len(syncStandbyNames) > 0 {
 		configuration.OverwriteConfig(SynchronousStandbyNames, syncStandbyNames)
+
+		if metadata, err := json.Marshal(info.SynchronousStandbyNames); err != nil {
+			log.Error(err,
+				"Error while serializing streaming configuration parameters",
+				"synchronousStandbyNames", info.SynchronousStandbyNames)
+		} else {
+			configuration.OverwriteConfig(CNPGSynchronousStandbyNamesMetadata, string(metadata))
+		}
+	}
+
+	if len(info.SynchronizedStandbySlots) > 0 {
+		synchronizedStandbySlots := strings.Join(info.SynchronizedStandbySlots, ",")
+		if IsManagedExtensionUsed("pg_failover_slots", info.UserSettings) {
+			configuration.OverwriteConfig("pg_failover_slots.standby_slot_names", synchronizedStandbySlots)
+		}
+
+		if info.MajorVersion >= 17 {
+			if isEnabled, _ := ParsePostgresConfigBoolean(info.UserSettings["sync_replication_slots"]); isEnabled {
+				configuration.OverwriteConfig("synchronized_standby_slots", synchronizedStandbySlots)
+			}
+		}
 	}
 
 	if info.ClusterName != "" {
@@ -676,16 +775,16 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		// primary and on the replicas, setting it on both
 		// is a safe approach.
 		configuration.OverwriteConfig(
-			ParameterRecoveyMinApplyDelay,
+			ParameterRecoveryMinApplyDelay,
 			fmt.Sprintf("%vs", math.Floor(info.RecoveryMinApplyDelay.Seconds())))
 	}
 
 	if info.IncludingSharedPreloadLibraries {
 		// Set all managed shared preload libraries
-		setManagedSharedPreloadLibraries(info, configuration)
+		configuration.setManagedSharedPreloadLibraries(info)
 
 		// Set all user provided shared preload libraries
-		setUserSharedPreloadLibraries(info, configuration)
+		configuration.setUserSharedPreloadLibraries(info)
 	}
 
 	// Apply the list of temporary tablespaces
@@ -693,33 +792,39 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
+	// Setup additional extensions
+	if len(info.AdditionalExtensions) > 0 {
+		configuration.setExtensionControlPath(info)
+		configuration.setDynamicLibraryPath(info)
+	}
+
 	return configuration
 }
 
 // setDefaultConfigurations sets all default configurations into the configuration map
 // from the provided info
-func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setDefaultConfigurations(info ConfigurationInfo) {
 	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
-		configuration.OverwriteConfig(key, value)
+		p.OverwriteConfig(key, value)
 	}
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range info.Settings.DefaultSettings {
 		if constraints.Min <= info.MajorVersion && info.MajorVersion < constraints.Max {
 			for key, value := range settings {
-				configuration.OverwriteConfig(key, value)
+				p.OverwriteConfig(key, value)
 			}
 		}
 	}
 }
 
 // setManagedSharedPreloadLibraries sets all additional preloaded libraries
-func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+func (p *PgConfiguration) setManagedSharedPreloadLibraries(info ConfigurationInfo) {
 	for _, extension := range ManagedExtensions {
 		if extension.IsUsed(info.UserSettings) {
 			for _, library := range extension.SharedPreloadLibraries {
-				configuration.AddSharedPreloadLibrary(library)
+				p.AddSharedPreloadLibrary(library)
 			}
 		}
 	}
@@ -729,8 +834,8 @@ func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgC
 // The resulting list will have all the user provided libraries, followed by all the ones managed
 // by the operator, removing any duplicate and keeping the first occurrence in case of duplicates.
 // Therefore the user provided order is preserved, if an overlap (with the ones already present) happens
-func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
-	oldLibraries := strings.Split(configuration.GetConfig(SharedPreloadLibraries), ",")
+func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) {
+	oldLibraries := strings.Split(p.GetConfig(SharedPreloadLibraries), ",")
 	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
 	var libraries []string
 	for _, library := range append(info.AdditionalSharedPreloadLibraries, oldLibraries...) {
@@ -744,7 +849,7 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 		}
 	}
 	if len(libraries) > 0 {
-		configuration.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
+		p.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
 	}
 }
 
@@ -774,4 +879,128 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
+type AdditionalExtensionConfiguration struct {
+	// The name of the Extension
+	Name string
+
+	// The list of directories that should be added to ExtensionControlPath.
+	ExtensionControlPath []string
+
+	// The list of directories that should be added to DynamicLibraryPath.
+	DynamicLibraryPath []string
+}
+
+// absolutizePaths returns an iterator over the passed paths, absolutized
+// using the name of the extension
+func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, path := range paths {
+			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
+				break
+			}
+		}
+	}
+}
+
+// getRuntimeExtensionControlPath collects the absolute directories to be put
+// into the `extension_control_path` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getRuntimeExtensionControlPath() iter.Seq[string] {
+	paths := []string{"share"}
+	if len(ext.ExtensionControlPath) > 0 {
+		paths = ext.ExtensionControlPath
+	}
+
+	return ext.absolutizePaths(paths)
+}
+
+// getDynamicLibraryPath collects the absolute directories to be put
+// into the `dynamic_library_path` GUC to support this additional extension
+func (ext *AdditionalExtensionConfiguration) getDynamicLibraryPath() iter.Seq[string] {
+	paths := []string{"lib"}
+	if len(ext.DynamicLibraryPath) > 0 {
+		paths = ext.DynamicLibraryPath
+	}
+
+	return ext.absolutizePaths(paths)
+}
+
+// setExtensionControlPath manages the `extension_control_path` GUC, merging
+// the paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func (p *PgConfiguration) setExtensionControlPath(info ConfigurationInfo) {
+	extensionControlPath := []string{"$system"}
+
+	for _, extension := range info.AdditionalExtensions {
+		extensionControlPath = slices.AppendSeq(
+			extensionControlPath,
+			extension.getRuntimeExtensionControlPath(),
+		)
+	}
+
+	extensionControlPath = slices.AppendSeq(
+		extensionControlPath,
+		strings.SplitSeq(p.GetConfig(ExtensionControlPath), ":"),
+	)
+
+	extensionControlPath = slices.DeleteFunc(
+		extensionControlPath,
+		func(s string) bool { return s == "" },
+	)
+
+	p.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+}
+
+// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
+// paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func (p *PgConfiguration) setDynamicLibraryPath(info ConfigurationInfo) {
+	dynamicLibraryPath := []string{"$libdir"}
+
+	for _, extension := range info.AdditionalExtensions {
+		dynamicLibraryPath = slices.AppendSeq(
+			dynamicLibraryPath,
+			extension.getDynamicLibraryPath())
+	}
+
+	dynamicLibraryPath = slices.AppendSeq(
+		dynamicLibraryPath,
+		strings.SplitSeq(p.GetConfig(DynamicLibraryPath), ":"))
+
+	dynamicLibraryPath = slices.DeleteFunc(
+		dynamicLibraryPath,
+		func(s string) bool { return s == "" },
+	)
+
+	p.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
+}
+
+// String creates the synchronous_standby_names PostgreSQL GUC
+// with the passed members
+func (s *SynchronousStandbyNamesConfig) String() string {
+	if s.IsZero() {
+		return ""
+	}
+
+	escapePostgresConfLiteral := func(value string) string {
+		return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
+	}
+
+	escapedReplicas := make([]string, len(s.StandbyNames))
+	for idx, name := range s.StandbyNames {
+		escapedReplicas[idx] = escapePostgresConfLiteral(name)
+	}
+
+	return fmt.Sprintf(
+		"%s %v (%v)",
+		s.Method,
+		s.NumSync,
+		strings.Join(escapedReplicas, ","))
+}
+
+// IsZero is true when synchronour replication is disabled
+func (s SynchronousStandbyNamesConfig) IsZero() bool {
+	return len(s.StandbyNames) == 0
 }

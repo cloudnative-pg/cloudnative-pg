@@ -51,6 +51,7 @@ BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
 ByStatus
+CAs
 CIS
 CKA
 CN
@@ -75,6 +76,7 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertsCASecret
@@ -159,11 +161,18 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
+FailoverQuorum
+FailoverQuorumSpec
+FailoverQuorumStatus
 Fei
 Filesystem
 Fluentd
@@ -179,6 +188,7 @@ GUC
 GUCs
 Gabriele
 GaugeVec
+GeoSpatial
 Gi
 GitOps
 GoArch
@@ -203,11 +213,15 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolume
+ImageVolumeSource
 ImportSource
 InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
+IsolationCheckConfiguration
+Isovalent
 Istio
 Istio's
 JSON
@@ -267,6 +281,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicy
 Niccolò
 NodeAffinity
 NodeMaintenanceWindow
@@ -294,6 +309,8 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpec
+OptionSpecValue
 OwnNamespace
 PDB
 PDBs
@@ -363,6 +380,7 @@ ProbeTerminationGracePeriod
 ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
+Promotable
 PublicationReclaimPolicy
 PublicationSpec
 PublicationStatus
@@ -375,6 +393,7 @@ PushSecret
 QoS
 Quaresima
 QuickStart
+QuorumFailoverProtection
 RBAC
 README
 RHSA
@@ -462,6 +481,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StandbyNames
+StandbyNumber
 StartupProbe
 StartupStrategyType
 StatefulSets
@@ -479,7 +500,9 @@ SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
 SynchronousReplicaConfigurationMethod
+SynchronousStandbyNamesList
 Synopsys
+SystemID
 TCP
 TLS
 TLSv
@@ -506,6 +529,7 @@ UTF
 Uncomment
 Unrealizable
 UpdateStrategy
+UsageSpec
 VLDB
 VLDBs
 VM
@@ -676,6 +700,7 @@ cmd
 cn
 cnp
 cnpg
+codebase
 codeready
 collationVersion
 columnValue
@@ -697,6 +722,7 @@ conn
 connectionLimit
 connectionParameters
 connectionString
+connectionTimeout
 conninfo
 containerImage
 containerPort
@@ -765,6 +791,7 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+discoverable
 displayName
 displayName
 distro
@@ -780,6 +807,7 @@ downtimes
 dvcmQ
 dwm
 dx
+eBPF
 ecdsa
 edb
 eks
@@ -812,12 +840,15 @@ externalclusters
 facto
 failover
 failoverDelay
+failoverquorums
 failovers
 failureThreshold
 faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -828,8 +859,10 @@ fio
 fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
+fqdn
 freddie
 fuzzystrmatch
+gRPC
 gapped
 gc
 gcc
@@ -877,6 +910,7 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imageVolume
 imagecatalogs
 img
 immediateCheckpoint
@@ -909,6 +943,7 @@ ips
 isPrimary
 isTemplate
 isWALArchiver
+isolationCheck
 issuecomment
 italy
 jdbc
@@ -942,6 +977,7 @@ lastSuccessfulBackupByMethod
 latestGeneratedNode
 latn
 lc
+ld
 ldap
 ldapBindPassword
 ldaps
@@ -972,6 +1008,7 @@ lookups
 lsn
 lt
 lz
+mTLS
 macOS
 majorVersion
 majorVersionUpgradeFromImage
@@ -1012,6 +1049,7 @@ msg
 mspan
 multinamespace
 mutatingwebhookconfigurations
+mutex
 myAKSCluster
 myResourceGroup
 namespace
@@ -1084,6 +1122,7 @@ pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
 pgRestoreExtraOptions
+pgRouting
 pgSQL
 pgadmin
 pgaudit
@@ -1096,6 +1135,7 @@ pgpass
 pgstatstatements
 phaseReason
 pid
+pinger
 pitr
 plpgsql
 pluggable
@@ -1149,6 +1189,7 @@ programmatically
 proj
 projectedVolumeTemplate
 prometheus
+promotable
 promotionTimeout
 promotionToken
 provisioner
@@ -1164,6 +1205,7 @@ pvcTemplate
 quantile
 queryable
 quickstart
+quorumFailoverProtection
 rbac
 rc
 readService
@@ -1192,6 +1234,7 @@ repmgr
 reportNonRedacted
 reportRedacted
 req
+requestTimeout
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1289,8 +1332,10 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNames
 standbyNamesPost
 standbyNamesPre
+standbyNumber
 startDelay
 startedAt
 stateful
@@ -1327,10 +1372,12 @@ switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeLogicalDecoding
 synchronizeReplicas
 synchronizeReplicasCache
 sys
 syslog
+systemID
 systemd
 sysv
 tAc
@@ -1404,6 +1451,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized

@@ -20,12 +20,11 @@ SPDX-License-Identifier: Apache-2.0
 package replication
 
 import (
-	"fmt"
 	"slices"
 	"sort"
-	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // placeholderInstanceNameSuffix is the name of the suffix to be added to the
@@ -33,7 +32,7 @@ import (
 // `synchronous_stanby_names` when the replica list would be empty.
 const placeholderInstanceNameSuffix = "-placeholder"
 
-func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
+func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
 	switch cluster.Spec.PostgresConfiguration.Synchronous.DataDurability {
 	case apiv1.DataDurabilityLevelPreferred:
 		return explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster)
@@ -43,7 +42,9 @@ func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 	}
 }
 
-func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluster) string {
+func explicitSynchronousStandbyNamesDataDurabilityRequired(
+	cluster *apiv1.Cluster,
+) postgres.SynchronousStandbyNamesConfig {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
 	// Create the list of pod names
@@ -71,20 +72,16 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluste
 		}
 	}
 
-	// Escape the pod list
-	escapedReplicas := make([]string, len(instancesList))
-	for idx, name := range instancesList {
-		escapedReplicas[idx] = escapePostgresConfLiteral(name)
+	return postgres.SynchronousStandbyNamesConfig{
+		Method:       config.Method.ToPostgreSQLConfigurationKeyword(),
+		NumSync:      config.Number,
+		StandbyNames: instancesList,
 	}
-
-	return fmt.Sprintf(
-		"%s %v (%v)",
-		config.Method.ToPostgreSQLConfigurationKeyword(),
-		config.Number,
-		strings.Join(escapedReplicas, ","))
 }
 
-func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Cluster) string {
+func explicitSynchronousStandbyNamesDataDurabilityPreferred(
+	cluster *apiv1.Cluster,
+) postgres.SynchronousStandbyNamesConfig {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
 	// Create the list of healthy replicas
@@ -93,12 +90,6 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Clust
 	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(instancesList) > *config.MaxStandbyNamesFromCluster {
 		instancesList = instancesList[:*config.MaxStandbyNamesFromCluster]
-	}
-
-	// Escape the pod list
-	escapedReplicas := make([]string, len(instancesList))
-	for idx, name := range instancesList {
-		escapedReplicas[idx] = escapePostgresConfLiteral(name)
 	}
 
 	// If data durability is not enforced, we cap the number of synchronous
@@ -110,14 +101,18 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Clust
 
 	// An empty instances list is not allowed in synchronous_standby_names
 	if len(instancesList) == 0 {
-		return ""
+		return postgres.SynchronousStandbyNamesConfig{
+			Method:       "",
+			NumSync:      0,
+			StandbyNames: []string{},
+		}
 	}
 
-	return fmt.Sprintf(
-		"%s %v (%v)",
-		config.Method.ToPostgreSQLConfigurationKeyword(),
-		syncReplicaNumber,
-		strings.Join(escapedReplicas, ","))
+	return postgres.SynchronousStandbyNamesConfig{
+		Method:       config.Method.ToPostgreSQLConfigurationKeyword(),
+		NumSync:      syncReplicaNumber,
+		StandbyNames: instancesList,
+	}
 }
 
 // getSortedInstanceNames gets a list of all the known PostgreSQL instances in a

@@ -50,6 +50,8 @@ const subscriptionDetectionQuery = `SELECT count(*)
 		WHERE subname = $1`
 
 var _ = Describe("Managed subscription controller tests", func() {
+	const defaultPostgresMajorVersion = 17
+
 	var (
 		dbMock       sqlmock.Sqlmock
 		db           *sql.DB
@@ -122,6 +124,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 			instance: pgInstance,
 			getDB: func(_ string) (*sql.DB, error) {
 				return db, nil
+			},
+			getPostgresMajorVersion: func() (int, error) {
+				return defaultPostgresMajorVersion, nil
 			},
 		}
 		r.finalizerReconciler = newFinalizerReconciler(

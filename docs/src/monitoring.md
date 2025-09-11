@@ -220,15 +220,15 @@ cnpg_collector_up{cluster="cluster-example"} 1
 # TYPE cnpg_collector_postgres_version gauge
 cnpg_collector_postgres_version{cluster="cluster-example",full="17.5"} 17.5
 
-# HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp
+# HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge
 cnpg_collector_last_failed_backup_timestamp 0
 
-# HELP cnpg_collector_last_available_backup_timestamp The last available backup as a unix timestamp
+# HELP cnpg_collector_last_available_backup_timestamp The last available backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_available_backup_timestamp gauge
 cnpg_collector_last_available_backup_timestamp 1.63238406e+09
 
-# HELP cnpg_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp
+# HELP cnpg_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_first_recoverability_point gauge
 cnpg_collector_first_recoverability_point 1.63238406e+09
 
@@ -398,9 +398,16 @@ go_threads 18
     `Major.Minor.Patch` can be found inside one of its label field
     named `full`.
 
-!!! Note
-    `cnpg_collector_first_recoverability_point` and `cnpg_collector_last_available_backup_timestamp`
-    will be zero until your first backup to the object store. This is separate from the WAL archival.
+!!! Warning
+    The metrics `cnpg_collector_last_failed_backup_timestamp`,
+    `cnpg_collector_last_available_backup_timestamp`, and
+    `cnpg_collector_first_recoverability_point` have been deprecated starting
+    from version 1.26. These metrics will continue to function with native backup
+    solutions such as in-core Barman Cloud (deprecated) and volume snapshots. Note
+    that for these cases, `cnpg_collector_first_recoverability_point` and
+    `cnpg_collector_last_available_backup_timestamp` will remain zero until the
+    first backup is completed to the object store. This is separate from WAL
+    archiving.
 
 ### User defined metrics
 

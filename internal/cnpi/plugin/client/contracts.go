@@ -41,6 +41,8 @@ type Client interface {
 	WalCapabilities
 	BackupCapabilities
 	RestoreJobHooksCapabilities
+	PostgresConfigurationCapabilities
+	MetricsCapabilities
 }
 
 // SetPluginClientInContext records the plugin client in the given context

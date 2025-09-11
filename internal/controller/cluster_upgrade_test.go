@@ -860,6 +860,7 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 		pluginCli := fakePluginClientRollout{
 			returnedPod: podModifiedByPlugins,
 		}
+
 		ctx := pluginClient.SetPluginClientInContext(context.TODO(), pluginCli)
 
 		rollout, err := checkPodSpecIsOutdated(ctx, pod, &cluster)

@@ -8,12 +8,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.26/releases/cnpg-1.26.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.26/releases/cnpg-1.26.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
 ```
 
 You can verify that with:
@@ -74,7 +74,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.26/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.27/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -254,18 +254,100 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-### Upgrading to 1.26.0 or 1.25.2
+<!--
+### Upgrading to 1.28.0 or 1.27.x
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.26.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.25.x).
+    1.28.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.27.x).
+
+-->
+
+### Upgrading to 1.27.0 or 1.26.1
+
+!!! Important
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.27.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.26.1).
+
+Version 1.27 introduces a change in the default behavior of the
+[liveness probe](instance_manager.md#liveness-probe): it now enforces the
+[shutdown of an isolated primary](instance_manager.md#primary-isolation)
+within the `livenessProbeTimeout` (30 seconds).
+
+If this behavior is not suitable for your environment, you can disable the
+*isolation check* in the liveness probe with the following configuration:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: false
+```
+
+### Upgrading to 1.26 from a previous minor version
+
+!!! Important
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.26.1, or at a minimum, to the latest stable version of your current minor
+    release (for example, 1.25.x).
+
+!!! Warning
+    Due to changes in the startup probe for the manager component
+    ([#6623](https://github.com/cloudnative-pg/cloudnative-pg/pull/6623)),
+    upgrading the operator will trigger a restart of your PostgreSQL clusters,
+    even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
+    Your applications will need to reconnect to PostgreSQL after the upgrade.
+
+#### Deprecation of backup metrics and fields in the `Cluster` `.status`
+
+With the transition to a backup and recovery agnostic approach based on CNPG-I
+plugins in CloudNativePG, which began with version 1.26.0 for Barman Cloud, we
+are starting the deprecation period for the following fields in the `.status`
+section of the `Cluster` resource:
+
+- `firstRecoverabilityPoint`
+- `firstRecoverabilityPointByMethod`
+- `lastSuccessfulBackup`
+- `lastSuccessfulBackupByMethod`
+- `lastFailedBackup`
+
+The following Prometheus metrics are also deprecated:
+
+- `cnpg_collector_first_recoverability_point`
+- `cnpg_collector_last_failed_backup_timestamp`
+- `cnpg_collector_last_available_backup_timestamp`
+
+!!! Warning
+    If you have migrated to a plugin-based backup and recovery solution such as
+    Barman Cloud, these fields and metrics are no longer synchronized and will
+    not be updated. Users still relying on the in-core support for Barman Cloud
+    and volume snapshots can continue to use these fields for the time being.
+
+Under the new plugin-based approach, multiple backup methods can operate
+simultaneously, each with its own timeline for backup and recovery. For
+example, some plugins may provide snapshots without WAL archiving, while others
+support continuous archiving.
+
+Because of this flexibility, maintaining centralized status fields in the
+`Cluster` resource could be misleading or confusing, as they would not
+accurately represent the state across all configured backup methods.
+For this reason, these fields are being deprecated.
+
+Instead, each plugin is responsible for exposing its own backup status
+information and providing metrics back to the instance manager for monitoring
+and operational awareness.
+
+#### Declarative Hibernation in the `cnpg` plugin
 
 In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
-to a declarative approach for cluster hibernation. The `hibernate on` and
-`hibernate off` commands are now convenient shortcuts that apply declarative
-changes to enable or disable hibernation. The `hibernate status` command has
-been removed, as its purpose is now fulfilled by the standard `status` command.
+to a [declarative approach for cluster hibernation](declarative_hibernation.md).
+The `hibernate on` and `hibernate off` commands are now convenient shortcuts
+that apply declarative changes to enable or disable hibernation.
+The `hibernate status` command has been removed, as its purpose is now
+fulfilled by the standard `status` command.
 
 ### Upgrading to 1.25 from a previous minor version
 

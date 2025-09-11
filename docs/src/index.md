@@ -74,7 +74,9 @@ The PostgreSQL operand container images are available for all
 across multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-All container images are signed and include SBOM and provenance attestations,
+The [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
+and [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
+container images are signed and include SBOM and provenance attestations,
 provided separately for each architecture.
 
 Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
@@ -93,7 +95,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
 - Declarative management of key PostgreSQL configurations, including:
     - PostgreSQL settings.
     - Roles, users, and groups.
-    - Databases, extensions, and schemas.
+    - Databases, extensions, schemas, and foreign data wrappers (FDW).
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
@@ -131,7 +133,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - *Offline Import*: Direct restore from existing databases.
     - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
 - High Availability physical replication slots, including synchronization of
-  user-defined replication slots.
+  user-defined replication slots and logical decoding failover.
 - Parallel WAL archiving and restore, ensuring high-performance data
   synchronization in high-write environments.
 - TLS support, including:

@@ -84,3 +84,12 @@ resources:
   kind: Subscription
   path: github.com/cloudnative-pg/cloudnative-pg/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cnpg.io
+  group: postgresql
+  kind: FailoverQuorum
+  path: github.com/cloudnative-pg/cloudnative-pg/api/v1
+  version: v1

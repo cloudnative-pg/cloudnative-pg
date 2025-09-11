@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -41,6 +42,14 @@ type extInfo struct {
 type schemaInfo struct {
 	Name  string `json:"name"`
 	Owner string `json:"owner"`
+}
+
+type fdwInfo struct {
+	Name      string                           `json:"name"`
+	Handler   string                           `json:"handler"`
+	Validator string                           `json:"validator"`
+	Owner     string                           `json:"owner"`
+	Options   map[string]apiv1.OptionSpecValue `json:"options"`
 }
 
 func detectDatabase(
@@ -402,5 +411,294 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 		return err
 	}
 	contextLogger.Info("dropped schema", "name", schema.Name)
+	return nil
+}
+
+const detectDatabaseFDWSQL = `
+SELECT
+ fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
+ a.rolname AS owner
+FROM pg_foreign_data_wrapper f
+JOIN pg_authid a ON f.fdwowner = a.oid
+WHERE fdwname = $1
+`
+
+func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
+	contextLogger := log.FromContext(ctx)
+
+	row := db.QueryRowContext(
+		ctx, detectDatabaseFDWSQL,
+		fdw.Name)
+	if row.Err() != nil {
+		return nil, fmt.Errorf("while checking if FDW %q exists: %w", fdw.Name, row.Err())
+	}
+
+	var (
+		result     fdwInfo
+		optionsRaw pq.StringArray
+	)
+
+	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if FDW %q exists: %w", fdw.Name, err)
+	}
+
+	// Extract options from SQL raw format(e.g. -{host=localhost,port=5432}) to type OptSpec
+	opts := make(map[string]apiv1.OptionSpecValue, len(optionsRaw))
+	for _, opt := range optionsRaw {
+		parts := strings.SplitN(opt, "=", 2)
+		if len(parts) == 2 {
+			opts[parts[0]] = apiv1.OptionSpecValue{
+				Value: parts[1],
+			}
+		} else {
+			contextLogger.Info(
+				"skipping unparsable option, expected \"keyword=value\"",
+				"optionsRaw", optionsRaw,
+				"fdwName", fdw.Name)
+		}
+	}
+	result.Options = opts
+
+	return &result, nil
+}
+
+// updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper
+// based on the provided FDW specification.
+// It supports granting or revoking usage permissions for specified users.
+func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, usageSpec := range fdw.Usages {
+		switch usageSpec.Type {
+		case "grant":
+			changeUsageSQL := fmt.Sprintf(
+				"GRANT USAGE ON FOREIGN DATA WRAPPER %s TO %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("granting usage of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+
+		case "revoke":
+			changeUsageSQL := fmt.Sprintf(
+				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{usageSpec.Name}.Sanitize())
+			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
+				return fmt.Errorf("revoking usage of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("revoked usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+
+		default:
+			contextLogger.Warning(
+				"unknown usage type",
+				"type", usageSpec.Type, "fdwName", fdw.Name)
+		}
+	}
+
+	return nil
+}
+
+func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateFDW strings.Builder
+	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+
+	// Create Handler
+	if len(fdw.Handler) > 0 {
+		switch fdw.Handler {
+		case "-":
+			sqlCreateFDW.WriteString("NO HANDLER ")
+		default:
+			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+		}
+	}
+
+	// Create Validator
+	if len(fdw.Validator) > 0 {
+		switch fdw.Validator {
+		case "-":
+			sqlCreateFDW.WriteString("NO VALIDATOR ")
+		default:
+			sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+		}
+	}
+
+	// Extract options
+	opts := make([]string, 0, len(fdw.Options))
+	for _, optionSpec := range fdw.Options {
+		if optionSpec.Ensure == apiv1.EnsureAbsent {
+			continue
+		}
+		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{optionSpec.Name}.Sanitize(),
+			optionSpec.Value))
+	}
+	if len(opts) > 0 {
+		sqlCreateFDW.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
+	}
+
+	_, err := db.ExecContext(ctx, sqlCreateFDW.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating foreign data wrapper", "query", sqlCreateFDW.String())
+		return err
+	}
+	contextLogger.Info("created foreign data wrapper", "name", fdw.Name)
+
+	// Update usage permissions
+	if len(fdw.Usages) > 0 {
+		if err := updateDatabaseFDWUsage(ctx, db, &fdw); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info *fdwInfo) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Collect individual ALTER-clauses
+	var clauses []string
+	for _, desiredOptSpec := range fdw.Options {
+		curOptSpec, exists := info.Options[desiredOptSpec.Name]
+
+		switch {
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
+			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
+
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
+			if desiredOptSpec.Value != curOptSpec.Value {
+				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
+					pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
+			}
+
+		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
+			clauses = append(clauses, fmt.Sprintf("DROP %s", pgx.Identifier{desiredOptSpec.Name}.Sanitize()))
+		}
+	}
+
+	if len(clauses) == 0 {
+		return nil
+	}
+
+	// Build SQL
+	changeOptionSQL := fmt.Sprintf(
+		"ALTER FOREIGN DATA WRAPPER %s OPTIONS (%s)", pgx.Identifier{fdw.Name}.Sanitize(),
+		strings.Join(clauses, ", "),
+	)
+
+	if _, err := db.ExecContext(ctx, changeOptionSQL); err != nil {
+		return fmt.Errorf("altering options of foreign data wrapper %w", err)
+	}
+	contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
+
+	return nil
+}
+
+func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info *fdwInfo) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Alter Handler
+	if len(fdw.Handler) > 0 && fdw.Handler != info.Handler {
+		switch fdw.Handler {
+		case "-":
+			changeHandlerSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s NO HANDLER",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+			)
+			if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
+				return fmt.Errorf("removing handler of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("removed foreign data wrapper handler", "name", fdw.Name)
+
+		default:
+			changeHandlerSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s HANDLER %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{fdw.Handler}.Sanitize(),
+			)
+			if _, err := db.ExecContext(ctx, changeHandlerSQL); err != nil {
+				return fmt.Errorf("altering handler of foreign data wrapper %w", err)
+			}
+			contextLogger.Info("altered foreign data wrapper handler", "name", fdw.Name, "handler", fdw.Handler)
+		}
+	}
+
+	// Alter Validator
+	if len(fdw.Validator) > 0 && fdw.Validator != info.Validator {
+		switch fdw.Validator {
+		case "-":
+			changeValidatorSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s NO VALIDATOR",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+			)
+
+			if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
+				return fmt.Errorf("removing validator of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("removed foreign data wrapper validator", "name", fdw.Name)
+
+		default:
+			changeValidatorSQL := fmt.Sprintf(
+				"ALTER FOREIGN DATA WRAPPER %s VALIDATOR %s",
+				pgx.Identifier{fdw.Name}.Sanitize(),
+				pgx.Identifier{fdw.Validator}.Sanitize(),
+			)
+			if _, err := db.ExecContext(ctx, changeValidatorSQL); err != nil {
+				return fmt.Errorf("altering validator of foreign data wrapper %w", err)
+			}
+
+			contextLogger.Info("altered foreign data wrapper validator", "name", fdw.Name, "validator", fdw.Validator)
+		}
+	}
+
+	// Alter the owner
+	if len(fdw.Owner) > 0 && fdw.Owner != info.Owner {
+		changeOwnerSQL := fmt.Sprintf(
+			"ALTER FOREIGN DATA WRAPPER %s OWNER TO %v",
+			pgx.Identifier{fdw.Name}.Sanitize(),
+			pgx.Identifier{fdw.Owner}.Sanitize(),
+		)
+
+		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
+			return fmt.Errorf("altering owner of foreign data wrapper %w", err)
+		}
+
+		contextLogger.Info("altered foreign data wrapper owner", "name", fdw.Name, "owner", fdw.Owner)
+	}
+
+	// Alter Options
+	if err := updateFDWOptions(ctx, db, &fdw, info); err != nil {
+		return err
+	}
+
+	// Update usage permissions
+	if len(fdw.Usages) > 0 {
+		if err := updateDatabaseFDWUsage(ctx, db, &fdw); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
+	contextLogger := log.FromContext(ctx)
+	query := fmt.Sprintf("DROP FOREIGN DATA WRAPPER IF EXISTS %s", pgx.Identifier{fdw.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	if err != nil {
+		contextLogger.Error(err, "while dropping foreign data wrapper", "query", query)
+		return err
+	}
+	contextLogger.Info("dropped foreign data wrapper", "name", fdw.Name)
 	return nil
 }

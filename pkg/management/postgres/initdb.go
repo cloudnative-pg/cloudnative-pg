@@ -34,14 +34,17 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -50,6 +53,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
+
+type connectionProvider interface {
+	// GetSuperUserDB returns the superuser database connection
+	GetSuperUserDB() (*sql.DB, error)
+	// GetTemplateDB returns the template database connection
+	GetTemplateDB() (*sql.DB, error)
+	// ConnectionPool returns the connection pool for this instance
+	ConnectionPool() pool.Pooler
+}
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
@@ -157,7 +169,7 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 		return nil
 	}
 
-	out, err := info.GetInstance().GetPgControldata()
+	out, err := info.GetInstance(nil).GetPgControldata()
 	if err == nil {
 		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
 		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
@@ -293,16 +305,17 @@ func (info InitInfo) CreateDataDirectory(reuseDirectory bool) error {
 }
 
 // GetInstance gets the PostgreSQL instance which correspond to these init information
-func (info InitInfo) GetInstance() *Instance {
+func (info InitInfo) GetInstance(cluster *apiv1.Cluster) *Instance {
 	postgresInstance := NewInstance()
 	postgresInstance.PgData = info.PgData
 	postgresInstance.StartupOptions = []string{"listen_addresses='127.0.0.1'"}
+	postgresInstance.Cluster = cluster
 	return postgresInstance
 }
 
 // ConfigureNewInstance creates the expected users and databases in a new
 // PostgreSQL instance. If any error occurs, we return it
-func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
+func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 	log.Info("Configuring new PostgreSQL instance")
 
 	dbSuperUser, err := instance.GetSuperUserDB()
@@ -310,20 +323,20 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
-	var existsRole bool
-	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		info.ApplicationUser)
-	err = userRow.Scan(&existsRole)
-	if err != nil {
-		return err
-	}
-
-	if !existsRole {
-		_, err = dbSuperUser.Exec(fmt.Sprintf(
-			"CREATE ROLE %v LOGIN",
-			pgx.Identifier{info.ApplicationUser}.Sanitize()))
-		if err != nil {
+	if info.ApplicationUser != "" {
+		var existsRole bool
+		userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+			info.ApplicationUser)
+		if err = userRow.Scan(&existsRole); err != nil {
 			return err
+		}
+
+		if !existsRole {
+			if _, err = dbSuperUser.Exec(fmt.Sprintf(
+				"CREATE ROLE %v LOGIN",
+				pgx.Identifier{info.ApplicationUser}.Sanitize())); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -348,16 +361,22 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err = info.executeSQLRefs(dbTemplate, info.PostInitTemplateSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
-	if info.ApplicationDatabase == "" {
+
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
+	}
+
+	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {
 		return nil
 	}
 
 	var existsDB bool
-	dbRow := dbSuperUser.QueryRow(
-		"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
+	dbRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
 		info.ApplicationDatabase)
-	err = dbRow.Scan(&existsDB)
-	if err != nil {
+	if err = dbRow.Scan(&existsDB); err != nil {
 		return err
 	}
 
@@ -382,13 +401,6 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 
 	if err = info.executeSQLRefs(appDB, info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
-	}
-
-	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
-	// We create the check empty wal archive file to tell that we should check if the
-	// destination path it is empty
-	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
-		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil
@@ -457,6 +469,15 @@ func (info InitInfo) Bootstrap(ctx context.Context, reuseDirectory bool) error {
 		return err
 	}
 
+	enabledPluginNamesSet := stringset.From(cluster.GetJobEnabledPluginNames())
+	pluginCli, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
+	if err != nil {
+		return fmt.Errorf("error while creating the plugin client: %w", err)
+	}
+	defer pluginCli.Close(ctx)
+	ctx = pluginClient.SetPluginClientInContext(ctx, pluginCli)
+	ctx = cluster.SetInContext(ctx)
+
 	coredumpFilter := cluster.GetCoredumpFilter()
 	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
@@ -467,14 +488,19 @@ func (info InitInfo) Bootstrap(ctx context.Context, reuseDirectory bool) error {
 		return err
 	}
 
-	instance := info.GetInstance()
+	instance := info.GetInstance(cluster)
 
 	// Detect an initdb bootstrap with import
 	isImportBootstrap := cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Import != nil
 
-	if applied, err := instance.RefreshConfigurationFilesFromCluster(ctx, cluster, true); err != nil {
+	if applied, err := instance.RefreshConfigurationFilesFromCluster(
+		ctx,
+		cluster,
+		true,
+		postgres.OperationType_TYPE_INIT,
+	); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")

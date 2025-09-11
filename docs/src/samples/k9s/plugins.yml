@@ -6,6 +6,7 @@
 #   h         View hibernate status
 #   Shift-H   Hibernate cluster (this retains the data, but deletes everything else - including the cluster)
 #   l         View cluster logs
+#   Shift-L   View cluster logs pretty
 #   p         Connect to the cluster via psql
 #   r         Reload the cluster
 #   Shift-R   Restart the cluster
@@ -68,7 +69,17 @@ plugins:
     background: false
     args:
       - -c
-      - "kubectl cnpg logs cluster $NAME -f -n $NAMESPACE --context $CONTEXT"
+      - "kubectl cnpg logs cluster $NAME -f -n $NAMESPACE --context $CONTEXT"      
+  cnpg-logs-pretty:
+    shortCut: Shift-L
+    description: Logs pretty
+    scopes:
+      - cluster
+    command: bash
+    background: false
+    args:
+      - -c
+      - "kubectl cnpg logs cluster $NAME -f -n $NAMESPACE --context $CONTEXT | kubectl cnpg logs pretty"
   cnpg-psql:
     shortCut: p
     description: PSQL shell

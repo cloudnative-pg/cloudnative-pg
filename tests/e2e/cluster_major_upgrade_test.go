@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
@@ -103,16 +104,15 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 						"log_temp_files":              "1024",
 						"log_autovacuum_min_duration": "1000",
 						"log_replication_commands":    "on",
-						"max_slot_wal_keep_size":      "1GB",
 					},
 				},
 			},
 		}
 	}
 
-	generatePostgreSQLCluster := func(namespace string, storageClass string, majorVersion int) *v1.Cluster {
+	generatePostgreSQLCluster := func(namespace string, storageClass string, tagVersion string) *v1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%d-standard-bookworm", majorVersion)
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-bookworm", tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitSQL = []string{
 			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
 			"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
@@ -120,15 +120,15 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		cluster.Spec.PostgresConfiguration.Parameters["pg_stat_statements.track"] = "top"
 		return cluster
 	}
-	generatePostgreSQLMinimalCluster := func(namespace string, storageClass string, majorVersion int) *v1.Cluster {
-		cluster := generatePostgreSQLCluster(namespace, storageClass, majorVersion)
-		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%d-minimal-bookworm", majorVersion)
+	generatePostgreSQLMinimalCluster := func(namespace string, storageClass string, tagVersion string) *v1.Cluster {
+		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion)
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-bookworm", tagVersion)
 		return cluster
 	}
 
-	generatePostGISCluster := func(namespace string, storageClass string, majorVersion int) *v1.Cluster {
+	generatePostGISCluster := func(namespace string, storageClass string, tagVersion string) *v1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = "ghcr.io/cloudnative-pg/postgis:" + strconv.Itoa(majorVersion)
+		cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgis:%s", tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
 			"CREATE EXTENSION postgis",
 			"CREATE EXTENSION postgis_raster",
@@ -149,17 +149,26 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		return cluster
 	}
 
-	determineVersionsForTesting := func() (uint64, uint64) {
+	type versionInfo struct {
+		currentMajor uint64
+		currentTag   string
+		targetMajor  uint64
+		targetTag    string
+	}
+
+	determineVersionsForTesting := func() versionInfo {
 		currentImage := os.Getenv("POSTGRES_IMG")
 		Expect(currentImage).ToNot(BeEmpty())
 
 		currentVersion, err := version.FromTag(reference.New(currentImage).Tag)
 		Expect(err).NotTo(HaveOccurred())
 		currentMajor := currentVersion.Major()
+		currentTag := strconv.FormatUint(currentMajor, 10)
 
 		targetVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 		Expect(err).ToNot(HaveOccurred())
 		targetMajor := targetVersion.Major()
+		targetTag := strconv.FormatUint(targetMajor, 10)
 
 		// If same version, choose a previous one for testing
 		if currentMajor == targetMajor {
@@ -167,12 +176,28 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			GinkgoWriter.Printf("Using %v as the current major version instead.\n", currentMajor)
 		}
 
-		return currentMajor, targetMajor
+		// This means we are on a beta version, so we can just invert the versions
+		if currentMajor > targetMajor {
+			currentMajor, targetMajor = targetMajor, currentMajor
+			currentTag = targetTag
+			// Beta images don't have a major version only tag yet, and
+			// are most likely in the following format: "18beta1", "18rc2"
+			// So, we split at the first `-` and use that prefix to build the target image.
+			targetTag = strings.Split(reference.New(currentImage).Tag, "-")[0]
+			GinkgoWriter.Printf("Using %v as the current major and upgrading to %v.\n", currentMajor, targetMajor)
+		}
+
+		return versionInfo{
+			currentMajor: currentMajor,
+			currentTag:   currentTag,
+			targetMajor:  targetMajor,
+			targetTag:    targetTag,
+		}
 	}
 
 	// generateTargetImages, given a targetMajor, generates a target image for each buildScenario.
 	// MAJOR_UPGRADE_IMAGE_REPO env allows to customize the target image repository.
-	generateTargetImages := func(targetMajor uint64) map[string]string {
+	generateTargetImages := func(targetTag string) map[string]string {
 		const (
 			// ImageRepository is the default repository for Postgres container images
 			ImageRepository = "ghcr.io/cloudnative-pg/postgresql"
@@ -183,43 +208,45 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 		// Default target Images
 		targetImages := map[string]string{
-			postgisEntry:           fmt.Sprintf("%v:%v", PostgisImageRepository, targetMajor),
-			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", ImageRepository, targetMajor),
-			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", ImageRepository, targetMajor),
+			postgisEntry:           fmt.Sprintf("%v:%v", PostgisImageRepository, targetTag),
+			postgresqlEntry:        fmt.Sprintf("%v:%v-standard-bookworm", ImageRepository, targetTag),
+			postgresqlMinimalEntry: fmt.Sprintf("%v:%v-minimal-bookworm", ImageRepository, targetTag),
 		}
 		// Set custom targets when detecting a given env variable
 		if envValue := os.Getenv(customImageRegistryEnvVar); envValue != "" {
-			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetMajor)
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetMajor)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetMajor)
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-bookworm", envValue, targetTag)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-standard-bookworm", envValue, targetTag)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-minimal-bookworm", envValue, targetTag)
 		}
 
 		return targetImages
 	}
 
 	buildScenarios := func(
-		namespace string, storageClass string, currentMajor, targetMajor uint64,
+		namespace string, storageClass string, info versionInfo,
 	) map[string]*scenario {
-		targetImages := generateTargetImages(targetMajor)
+		targetImages := generateTargetImages(info.targetTag)
 
 		return map[string]*scenario{
 			postgisEntry: {
-				startingCluster: generatePostGISCluster(namespace, storageClass, int(currentMajor)),
-				startingMajor:   int(currentMajor),
+				startingCluster: generatePostGISCluster(namespace, storageClass, strconv.FormatUint(info.currentMajor, 10)),
+				startingMajor:   int(info.currentMajor),
 				targetImage:     targetImages[postgisEntry],
-				targetMajor:     int(targetMajor),
+				targetMajor:     int(info.targetMajor),
 			},
 			postgresqlEntry: {
-				startingCluster: generatePostgreSQLCluster(namespace, storageClass, int(currentMajor)),
-				startingMajor:   int(currentMajor),
-				targetImage:     targetImages[postgresqlEntry],
-				targetMajor:     int(targetMajor),
+				startingCluster: generatePostgreSQLCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10)),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlEntry],
+				targetMajor:   int(info.targetMajor),
 			},
 			postgresqlMinimalEntry: {
-				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass, int(currentMajor)),
-				startingMajor:   int(currentMajor),
-				targetImage:     targetImages[postgresqlMinimalEntry],
-				targetMajor:     int(targetMajor),
+				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10)),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlMinimalEntry],
+				targetMajor:   int(info.targetMajor),
 			},
 		}
 	}
@@ -291,7 +318,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		currentMajor, targetMajor := determineVersionsForTesting()
+		versionInfo := determineVersionsForTesting()
 		var err error
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
@@ -302,7 +329,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		// We cannot use generated entries in the DescribeTable, so we use the scenario key as a constant, but
 		// define the actual content here.
 		// See https://onsi.github.io/ginkgo/#mental-model-table-specs-are-just-syntactic-sugar
-		scenarios = buildScenarios(namespace, storageClass, currentMajor, targetMajor)
+		scenarios = buildScenarios(namespace, storageClass, versionInfo)
 	})
 
 	DescribeTable("can upgrade a Cluster to a newer major version", func(scenarioName string) {
@@ -316,6 +343,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		}
 
 		scenario := scenarios[scenarioName]
+
+		if scenarioName == postgisEntry && scenario.targetMajor > 17 {
+			// PostGIS images are not available for Postgres versions greater than 17
+			Skip("Skipping major upgrades on PostGIS images for Postgres versions greater than 17")
+		}
+
 		cluster := scenario.startingCluster
 		err := env.Client.Create(env.Ctx, cluster)
 		Expect(err).NotTo(HaveOccurred())

@@ -81,8 +81,8 @@ following excerpt taken from `pg_hba.conf`:
 
 ```
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
 ```
 
 !!! Seealso "Certificates"
@@ -120,6 +120,11 @@ CloudNativePG supports both
     than strict data durability in your setup, this setting can be adjusted. For
     details on managing this behavior, refer to the [Data Durability and Synchronous Replication](#data-durability-and-synchronous-replication)
     section.
+
+!!! Important
+    The [*failover quorum* feature](failover.md#failover-quorum-quorum-based-failover) (experimental)
+    can be used alongside synchronous replication to improve data durability
+    and safety during failover events.
 
 Direct configuration of the `synchronous_standby_names` option is not
 permitted. However, CloudNativePG automatically populates this option with the
@@ -733,6 +738,78 @@ spec:
   storage:
     size: 1Gi
 ```
+
+### Logical Decoding Slot Synchronization
+
+CloudNativePG can synchronize logical decoding (replication) slots across all
+nodes in a high-availability cluster, ensuring seamless continuation of logical
+replication after a failover or switchover. This feature is disabled by
+default, and enabling it requires two steps.
+
+The first step is to enable logical decoding slot synchronization:
+
+```yaml
+  # ...
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+```
+
+The second step involves configuring PostgreSQL parameters: the required
+configuration depends on your PostgreSQL version, as explained below.
+
+When enabled, the operator automatically manages logical decoding slot states
+during failover and switchover, preventing slot invalidation and avoiding data
+loss for logical replication clients.
+
+#### Behavior on PostgreSQL 17 and later
+
+For PostgreSQL 17 and newer, CloudNativePG transparently manages the
+[`synchronized_standby_slots` parameter](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-SYNCHRONIZED-STANDBY-SLOTS).
+
+You must enable both `sync_replication_slots` and `hot_standby_feedback` in
+your PostgreSQL configuration:
+
+```yaml
+# ...
+postgresql:
+  parameters:
+    # ...
+    hot_standby_feedback: 'on'
+    sync_replication_slots: 'on'
+```
+
+Additionally, you must create the logical replication `Subscription` with the
+`failover` option enabled, for example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+# ...
+spec:
+# ...
+  parameters:
+    failover: 'true'
+# ...
+```
+
+When configured, logical WAL sender processes send decoded changes to plugins
+only after the specified replication slots confirm receiving and flushing the
+relevant WAL, ensuring that:
+
+- logical replication slots do not consume changes until they are safely
+  received by the replicas of the publisher, and
+- logical replication clients can seamlessly reconnect to a promoted standby
+  without missing data after failover.
+
+For more details on logical replication slot synchronization, see the
+PostgreSQL documentation on [Logical Replication Failover](https://www.postgresql.org/docs/current/logical-replication-failover.html).
+
+#### Behavior on PostgreSQL 16 and earlier
+
+For PostgreSQL 16 and older versions, CloudNativePG uses the
+[`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots)
+to maintain synchronization of logical replication slots across failovers.
 
 ### Capping the WAL size retained for replication slots
 

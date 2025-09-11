@@ -213,6 +213,39 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"failoverquorums",
+			},
+			Verbs: []string{
+				"get",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{
+				cluster.Name,
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"failoverquorums/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+				"watch",
+			},
+			ResourceNames: []string{
+				cluster.Name,
+			},
+		},
 	}
 
 	return rbacv1.Role{
