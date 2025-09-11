@@ -349,7 +349,7 @@ resource with a list of foreign server specifications, for example:
 # ...
 spec:
   servers:
-  - name: pg-a
+  - name: angus
     fdw: postgres_fdw
     ensure: present
     usage:
@@ -357,7 +357,7 @@ spec:
         type: grant
     options:
     - name: host
-      value: pg-a-rw
+      value: angus-rw
     - name: dbname
       value: app
 # ...
