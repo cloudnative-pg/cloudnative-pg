@@ -383,6 +383,9 @@ spec:
                     fdw:
                       description: The name of the Foreign Data Wrapper (FDW)
                       type: string
+                      x-kubernetes-validations:
+                      - message: fdw is required
+                        rule: self != ''
                     name:
                       description: Name of the object (extension, schema, FDW, server)
                       type: string

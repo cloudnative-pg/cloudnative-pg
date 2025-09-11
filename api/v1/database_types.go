@@ -280,6 +280,7 @@ type ServerSpec struct {
 	DatabaseObjectSpec `json:",inline"`
 
 	// The name of the Foreign Data Wrapper (FDW)
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="fdw is required"
 	FdwName string `json:"fdw"`
 
 	// Options specifies the configuration options for the server
