@@ -312,6 +312,7 @@ type OptionSpec struct {
 // UsageSpec configures a usage for a foreign data wrapper
 type UsageSpec struct {
 	// Name of the usage
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="name is required"
 	Name string `json:"name"`
 
 	// The type of usage
