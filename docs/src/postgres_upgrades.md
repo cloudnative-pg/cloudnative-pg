@@ -17,7 +17,6 @@ version 17.1:
 Minor releases are fully compatible with earlier and later minor releases of
 the same major version. They include bug fixes and security updates but do not
 introduce changes to the internal storage format.
-For example, PostgreSQL 17.1 is compatible with 17.0 and 17.6.
 
 ### Upgrading a Minor Version in CloudNativePG
 
