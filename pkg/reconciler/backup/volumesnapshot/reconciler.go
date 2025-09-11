@@ -76,7 +76,7 @@ func (e *ExecutorBuilder) Build() *Reconciler {
 
 func (se *Reconciler) enrichSnapshot(
 	ctx context.Context,
-	vs *storagesnapshotv1.VolumeSnapshot,
+	vs *metav1.ObjectMeta,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 	targetPod *corev1.Pod,
@@ -84,46 +84,49 @@ func (se *Reconciler) enrichSnapshot(
 	contextLogger := log.FromContext(ctx)
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
-	vs.Labels[utils.BackupNameLabelName] = backup.Name
+	labels := vs.GetLabels()
+	annotations := vs.GetAnnotations()
+
+	labels[utils.BackupNameLabelName] = backup.Name
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
-		cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(vs)
 	case apiv1.SnapshotOwnerReferenceBackup:
-		utils.SetAsOwnedBy(&vs.ObjectMeta, backup.ObjectMeta, backup.TypeMeta)
+		utils.SetAsOwnedBy(vs, backup.ObjectMeta, backup.TypeMeta)
 	default:
 		break
 	}
 
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
-		vs.Annotations[utils.PgControldataAnnotationName] = data
+		annotations[utils.PgControldataAnnotationName] = data
 		pgControlData := utils.ParsePgControldataOutput(data)
 		timelineID, ok := pgControlData.TryGetLatestCheckpointTimelineID()
 		if ok {
-			vs.Labels[utils.BackupTimelineLabelName] = timelineID
+			labels[utils.BackupTimelineLabelName] = timelineID
 		}
 		startWal, ok := pgControlData.TryGetREDOWALFile()
 		if ok {
-			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
+			annotations[utils.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change
-			vs.Annotations[utils.BackupEndWALAnnotationName] = startWal
+			annotations[utils.BackupEndWALAnnotationName] = startWal
 		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
 
-	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
-	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
-	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
-	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
+	labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
+	labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
+	labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
 		return err
 	}
 
-	vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
+	annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
 
 	return nil
 }
@@ -390,6 +393,11 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+	if volumeSnapshotConfig.GroupSnapshot {
+		return se.createVolumeGroupSnapshot(ctx, cluster, backup, targetPod, pvcs)
+	}
+
 	for i := range pvcs {
 		se.recorder.Eventf(backup, "Normal", "CreateSnapshot",
 			"Creating VolumeSnapshot for PVC %v", pvcs[i].Name)
@@ -484,7 +492,7 @@ func (se *Reconciler) createSnapshot(
 		snapshot.Annotations = map[string]string{}
 	}
 
-	if err := se.enrichSnapshot(ctx, &snapshot, backup, cluster, targetPod); err != nil {
+	if err := se.enrichSnapshot(ctx, &snapshot.ObjectMeta, backup, cluster, targetPod); err != nil {
 		return err
 	}
 
