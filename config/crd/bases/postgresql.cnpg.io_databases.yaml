@@ -232,6 +232,9 @@ spec:
                           name:
                             description: Name of the usage
                             type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
                           type:
                             default: grant
                             description: The type of usage
@@ -422,6 +425,9 @@ spec:
                           name:
                             description: Name of the usage
                             type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
                           type:
                             default: grant
                             description: The type of usage
