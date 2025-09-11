@@ -34,13 +34,16 @@ pg_versions_file = ".github/pg_versions.json"
 
 
 def get_json(repo_name):
-    data = check_output([
-        "docker",
-        "run",
-        "--rm",
-        "quay.io/skopeo/stable",
-        "list-tags",
-        "docker://ghcr.io/{}".format(repo_name)])
+    data = check_output(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "quay.io/skopeo/stable",
+            "list-tags",
+            "docker://ghcr.io/{}".format(repo_name),
+        ]
+    )
     repo_json = json.loads(data.decode("utf-8"))
     return repo_json
 
