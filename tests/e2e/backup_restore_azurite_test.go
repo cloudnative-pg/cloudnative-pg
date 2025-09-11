@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore, tests.LabelBarmanCloud), func() {
 	const (
 		tableName             = "to_restore"
 		azuriteBlobSampleFile = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
@@ -158,7 +158,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 	})
 })
 
-var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.LabelBackupRestore, tests.LabelBarmanCloud), func() {
 	const (
 		fixturesBackupDir          = fixturesDir + "/backup/recovery_external_clusters/"
 		azuriteBlobSampleFile      = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"

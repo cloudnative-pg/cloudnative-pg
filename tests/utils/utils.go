@@ -23,6 +23,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/cheynewallace/tabby"
@@ -170,4 +172,49 @@ func TestDirectoryEmpty(namespace, podName, directoryPath string) bool {
 		testDirectoryEmptyCommand))
 
 	return err == nil
+}
+
+// ShouldUseMinimalImages checks if tests should use minimal PostgreSQL images
+// This is determined by checking if the POSTGRES_IMG environment variable contains "-minimal"
+// or if USE_MINIMAL_IMAGES is explicitly set to "true"
+func ShouldUseMinimalImages() bool {
+	if useMinimal := os.Getenv("USE_MINIMAL_IMAGES"); useMinimal == "true" {
+		return true
+	}
+
+	postgresImg := os.Getenv("POSTGRES_IMG")
+	return strings.Contains(postgresImg, "-minimal")
+}
+
+// GetPostgresImageForTest returns the appropriate PostgreSQL image to use in tests
+// If minimal images should be used, it converts the standard image to minimal variant
+func GetPostgresImageForTest() string {
+	postgresImg := os.Getenv("POSTGRES_IMG")
+	if postgresImg == "" {
+		postgresImg = "ghcr.io/cloudnative-pg/postgresql:17.5"
+	}
+
+	if ShouldUseMinimalImages() {
+		return transformToMinimalImage(postgresImg)
+	}
+
+	return postgresImg
+}
+
+// transformToMinimalImage converts a standard PostgreSQL image to its minimal variant
+func transformToMinimalImage(image string) string {
+	// Transform standard images to minimal variants
+	// Examples:
+	// ghcr.io/cloudnative-pg/postgresql:17.5 -> ghcr.io/cloudnative-pg/postgresql:17.5-minimal-bookworm
+	// ghcr.io/cloudnative-pg/postgresql:16.4-bookworm -> ghcr.io/cloudnative-pg/postgresql:16.4-minimal-bookworm
+
+	if strings.Contains(image, "-minimal-") {
+		return image
+	}
+
+	if strings.HasSuffix(image, "-bookworm") {
+		return strings.Replace(image, "-bookworm", "-minimal-bookworm", 1)
+	}
+
+	return image + "-minimal-bookworm"
 }
