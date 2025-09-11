@@ -65,7 +65,9 @@ jobs:
           sed -i '/DefaultImageName *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
 
           # Update docs directory (only .md and .yaml filename extensions)
-          find docs -type f \( -name '*.md' -o -name '*.yaml' \) \! -path '*release_notes*' -exec sed -i "/[ :]${CURRENT_POSTGRES_VERSION//./\\.}/s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
+          CURRENT_POSTGRES_VERSION_MM=${CURRENT_POSTGRES_VERSION%%-*}
+          LATEST_POSTGRES_VERSION_MM=${LATEST_POSTGRES_VERSION%%-*}
+          find docs -type f \( -name '*.md' -o -name '*.yaml' \) \! -path '*release_notes*' -exec sed -i "/[ :]${CURRENT_POSTGRES_VERSION_MM//./\\.}/s/${CURRENT_POSTGRES_VERSION_MM//./\\.}/${LATEST_POSTGRES_VERSION_MM}/g" {} +
 
       - name: Diff
         run: |
