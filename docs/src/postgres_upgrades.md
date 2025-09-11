@@ -150,7 +150,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-bookworm
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
   instances: 3
   storage:
     size: 1Gi
@@ -177,7 +177,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-bookworm
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
   instances: 3
   storage:
     size: 1Gi
