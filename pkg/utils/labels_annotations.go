@@ -62,6 +62,9 @@ const (
 	// BackupNameLabelName is the name of the label containing the backup id, available on backup resources
 	BackupNameLabelName = MetadataNamespace + "/backupName"
 
+	// MajorVersionLabelName is the Postgres major version contained in a snapshot backup
+	MajorVersionLabelName = MetadataNamespace + "/majorVersion"
+
 	// PgbouncerNameLabel is the name of the label of containing the pooler name
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 

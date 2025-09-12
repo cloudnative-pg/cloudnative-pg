@@ -85,6 +85,7 @@ func (se *Reconciler) enrichSnapshot(
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	vs.Labels[utils.BackupNameLabelName] = backup.Name
+	vs.Labels[utils.MajorVersionLabelName] = strconv.Itoa(backup.Status.MajorVersion)
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
