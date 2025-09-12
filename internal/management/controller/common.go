@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -172,4 +173,19 @@ func detectConflictingManagers[T postgresResourceManager, TL managedResourceExcl
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func parseOptions(raw []string) (map[string]string, error) {
+	opts := make(map[string]string, len(raw))
+	for _, opt := range raw {
+		parts := strings.SplitN(opt, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf(
+				"unparsable option: expected \"keyword=value\", got %v",
+				raw,
+			)
+		}
+		opts[parts[0]] = parts[1]
+	}
+	return opts, nil
 }
