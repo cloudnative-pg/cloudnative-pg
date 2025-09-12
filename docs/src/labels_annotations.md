@@ -51,10 +51,6 @@ CloudNativePG manages the following predefined labels:
 : The year a backup was taken.
   This label is available only on `VolumeSnapshot` resources.
 
-`cnpg.io/majorVersion`
-: Integer PostgreSQL major version of the backup's data directory (for example, `16`).
-This label is available only on `VolumeSnapshot` resources.
-
 `cnpg.io/cluster`
 : Name of the cluster.
 
@@ -68,6 +64,10 @@ This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/jobRole`
 : Role of the job (that is, `import`, `initdb`, `join`, ...)
+
+`cnpg.io/majorVersion`
+: Integer PostgreSQL major version of the backup's data directory (for example, `17`).
+This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/onlineBackup`
 : Whether the backup is online (hot) or taken when Postgres is down (cold).
