@@ -79,7 +79,7 @@ Images are published for all [Debian supported releases](https://www.debian.org/
 [PostgreSQL versions supported by PGDG](https://www.postgresql.org/).
 They are distributed via the [`postgres-containers` GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Three image flavours are available, each extending the previous one:
+Three image flavors are available, each extending the previous one:
 
 - [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
 - [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
