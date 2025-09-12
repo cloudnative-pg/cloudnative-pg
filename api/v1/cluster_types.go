@@ -2129,6 +2129,16 @@ type BackupConfiguration struct {
 	// +kubebuilder:default:=prefer-standby
 	// +optional
 	Target BackupTarget `json:"target,omitempty"`
+
+	// The preferred backup method to use when creating replicas:
+	// `volumeSnapshot` or `barmanObjectStore`. This setting only affects
+	// replica creation and does not influence the backup method used for
+	// regular backups. If the preferred method is unavailable, it will fall
+	// back to the other available option.
+	// +kubebuilder:validation:Enum=volumeSnapshot;barmanObjectStore
+	// +kubebuilder:default:=volumeSnapshot
+	// +optional
+	ReplicaMethodPreference ReplicaBackupMethodPreference `json:"replicaMethodPreference,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring

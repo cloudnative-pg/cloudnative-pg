@@ -93,11 +93,27 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	if result := getCandidateSourceFromBackupList(
-		ctx,
-		cluster.CreationTimestamp,
-		backupList,
-	); result != nil {
+	// Get the backup method preference from cluster configuration
+	preference := getReplicaBackupMethodPreference(cluster)
+
+	var result *StorageSource
+
+	switch preference {
+	case apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore:
+		// Try barman backups first, then volume snapshots
+		result = getCandidateSourceFromBarmanBackups(ctx, cluster.CreationTimestamp, backupList)
+		if result == nil {
+			result = getCandidateSourceFromVolumeSnapshotBackups(ctx, cluster.CreationTimestamp, backupList)
+		}
+	default: // volumeSnapshot or unknown preference
+		// Try volume snapshots first, then barman backups
+		result = getCandidateSourceFromVolumeSnapshotBackups(ctx, cluster.CreationTimestamp, backupList)
+		if result == nil {
+			result = getCandidateSourceFromBarmanBackups(ctx, cluster.CreationTimestamp, backupList)
+		}
+	}
+
+	if result != nil {
 		return result
 	}
 
@@ -111,40 +127,6 @@ func GetCandidateStorageSourceForReplica(
 
 	// Try using the backup the Cluster has been bootstrapped from
 	return getCandidateSourceFromClusterDefinition(cluster)
-}
-
-// getCandidateSourceFromBackupList gets a candidate storage source
-// given a backup list
-func getCandidateSourceFromBackupList(
-	ctx context.Context,
-	clusterCreationTime metav1.Time,
-	backupList apiv1.BackupList,
-) *StorageSource {
-	contextLogger := log.FromContext(ctx)
-
-	backupList.SortByReverseCreationTime()
-	for idx := range backupList.Items {
-		backup := &backupList.Items[idx]
-		contextLogger := contextLogger.WithValues()
-
-		if !backup.IsCompletedVolumeSnapshot() {
-			contextLogger.Trace("skipping backup, not a valid storage source candidate")
-			continue
-		}
-
-		if backup.CreationTimestamp.Before(&clusterCreationTime) {
-			contextLogger.Info(
-				"skipping backup as a potential recovery storage source candidate " +
-					"because if was created before the Cluster object")
-			continue
-		}
-
-		contextLogger.Debug("found a backup that is a valid storage source candidate")
-
-		return getCandidateSourceFromBackup(backup)
-	}
-
-	return nil
 }
 
 func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
@@ -187,4 +169,93 @@ func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSou
 		WALSource:        volumeSnapshots.WalStorage,
 		TablespaceSource: volumeSnapshots.TablespaceStorage,
 	}
+}
+
+// getReplicaBackupMethodPreference gets the replica backup method preference
+// from the cluster configuration, defaulting to volumeSnapshot if not specified
+func getReplicaBackupMethodPreference(cluster *apiv1.Cluster) apiv1.ReplicaBackupMethodPreference {
+	if cluster.Spec.Backup == nil {
+		return apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+	}
+
+	if cluster.Spec.Backup.ReplicaMethodPreference == "" {
+		return apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+	}
+
+	return cluster.Spec.Backup.ReplicaMethodPreference
+}
+
+// getCandidateSourceFromVolumeSnapshotBackups gets a candidate storage source
+// from volume snapshot backups only
+func getCandidateSourceFromVolumeSnapshotBackups(
+	ctx context.Context,
+	clusterCreationTime metav1.Time,
+	backupList apiv1.BackupList,
+) *StorageSource {
+	contextLogger := log.FromContext(ctx)
+
+	backupList.SortByReverseCreationTime()
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues("backupName", backup.Name, "backupMethod", backup.Spec.Method)
+
+		if !backup.IsCompletedVolumeSnapshot() {
+			contextLogger.Trace("skipping backup, not a completed volume snapshot")
+			continue
+		}
+
+		if backup.CreationTimestamp.Before(&clusterCreationTime) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because it was created before the Cluster object")
+			continue
+		}
+
+		contextLogger.Debug("found a volume snapshot backup that is a valid storage source candidate")
+		return getCandidateSourceFromBackup(backup)
+	}
+
+	return nil
+}
+
+// getCandidateSourceFromBarmanBackups checks if there are any valid barman backups
+// and returns a special marker to indicate barman backup should be used
+func getCandidateSourceFromBarmanBackups(
+	ctx context.Context,
+	clusterCreationTime metav1.Time,
+	backupList apiv1.BackupList,
+) *StorageSource {
+	contextLogger := log.FromContext(ctx)
+
+	backupList.SortByReverseCreationTime()
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues("backupName", backup.Name, "backupMethod", backup.Spec.Method)
+
+		// Skip if not a completed barman backup
+		if backup.Spec.Method != apiv1.BackupMethodBarmanObjectStore ||
+			backup.Status.Phase != apiv1.BackupPhaseCompleted {
+			contextLogger.Trace("skipping backup, not a completed barman object store backup")
+			continue
+		}
+
+		if backup.CreationTimestamp.Before(&clusterCreationTime) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because it was created before the Cluster object")
+			continue
+		}
+
+		contextLogger.Debug("found a barman backup that is a valid storage source candidate")
+		// For barman backups, we return a special marker to indicate that barman backup
+		// should be used. The actual backup selection is handled elsewhere in the bootstrap process.
+		return &StorageSource{
+			DataSource: corev1.TypedLocalObjectReference{
+				Kind: "BarmanBackup",
+				Name: backup.Name,
+			},
+		}
+	}
+
+	return nil
 }
