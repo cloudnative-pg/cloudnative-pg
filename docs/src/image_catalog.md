@@ -102,3 +102,10 @@ container images on Debian `trixie`, run:
 kubectl apply -f \
   https://raw.githubusercontent.com/cloudnative-pg/artifacts/refs/heads/main/image-catalogs/catalog-minimal-trixie.yaml
 ```
+
+You can install all the available catalogs by using the `kustomization` file
+present in the `image-catalogs` directory:
+
+```shell
+kubectl apply -k https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main
+```
