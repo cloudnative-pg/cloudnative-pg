@@ -76,6 +76,9 @@ func getIsRunningResult() ctrl.Result {
 	return ctrl.Result{RequeueAfter: 10 * time.Minute}
 }
 
+// ErrPrimaryImageNeedsUpdate is returned when the primary instance is not running with the latest image
+var ErrPrimaryImageNeedsUpdate = fmt.Errorf("primary instance not having expected image, cannot run backup")
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -228,6 +231,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// The backup is ready to start, and before starting it we store
+	// the major version inside the Backup resource.
+	if err := r.reconcileMajorVersion(ctx, &backup, &cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error setting major version for backup: %w", err)
+	}
+
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 			_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
@@ -261,7 +270,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
 		// If no good running backups are found we elect a pod for the backup
 		pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-		if apierrs.IsNotFound(err) {
+		if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
@@ -408,7 +417,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	contextLogger := log.FromContext(ctx)
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
-	if apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		r.Recorder.Eventf(
 			backup,
 			"Warning",
@@ -602,6 +611,27 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	backup *apiv1.Backup,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
+
+	podHasLatestMajorImage := func(pod *corev1.Pod) bool {
+		// No backup should run during a major version upgrade
+		if cluster.Status.PGDataImageInfo != nil &&
+			cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
+			return false
+		}
+
+		if len(pod.Spec.Containers) == 0 {
+			contextLogger.Warning("Instance has no containers, discarded as target for backup")
+			return false
+		}
+
+		if pod.Spec.Containers[0].Image != cluster.Status.Image {
+			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
+			return false
+		}
+
+		return true
+	}
+
 	pods, err := GetManagedInstances(ctx, cluster, r.Client)
 	if err != nil {
 		return nil, err
@@ -620,6 +650,11 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 				"pod", item.Pod.Name)
 			continue
 		}
+
+		if !podHasLatestMajorImage(item.Pod) {
+			continue
+		}
+
 		switch backupTarget {
 		case apiv1.BackupTargetPrimary:
 			if item.IsPrimary {
@@ -639,12 +674,18 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
 
 	var pod corev1.Pod
-	err = r.Get(ctx, client.ObjectKey{
+	if err = r.Get(ctx, client.ObjectKey{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Status.TargetPrimary,
-	}, &pod)
+	}, &pod); err != nil {
+		return nil, err
+	}
 
-	return &pod, err
+	if !podHasLatestMajorImage(&pod) {
+		return nil, ErrPrimaryImageNeedsUpdate
+	}
+
+	return &pod, nil
 }
 
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
@@ -776,4 +817,22 @@ func (r *BackupReconciler) ensureTargetPodHealthy(
 		"backupName", backup.Name,
 	)
 	return nil
+}
+
+func (r *BackupReconciler) reconcileMajorVersion(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) error {
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return fmt.Errorf("cannot get major version from cluster: %w", err)
+	}
+
+	if backup.Status.MajorVersion == majorVersion {
+		return nil
+	}
+
+	backup.Status.MajorVersion = majorVersion
+	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }

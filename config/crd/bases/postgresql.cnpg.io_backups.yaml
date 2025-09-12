@@ -309,6 +309,11 @@ spec:
                     description: The pod name
                     type: string
                 type: object
+              majorVersion:
+                description: |-
+                  The PostgreSQL major version that was running when the
+                  backup was taken.
+                type: integer
               method:
                 description: The backup method being used
                 type: string
