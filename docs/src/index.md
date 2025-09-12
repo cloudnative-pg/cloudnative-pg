@@ -96,7 +96,7 @@ By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgr
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
 
-For details and support, see the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers).
+For details and support, see the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#cnpg-postgresql-container-images).
 
 ## Main features
 
