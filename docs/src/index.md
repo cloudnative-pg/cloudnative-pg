@@ -61,20 +61,34 @@ Red Hat UBI images are primarily intended for OLM consumption.
 
 ### Operands
 
-The PostgreSQL operand container images are available for all
-[PGDG supported versions of PostgreSQL](https://www.postgresql.org/),
-across multiple architectures, directly from the
-[`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
+The CloudNativePG project provides and maintains PostgreSQL operand container
+images, built on top of the official [Debian `slim` base image](https://hub.docker.com/_/debian),
+for both `linux/amd64` and `linux/arm64` architectures.
 
-The [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
-and [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
-container images are signed and include SBOM and provenance attestations,
-provided separately for each architecture.
+Images are published for all [Debian supported releases](https://www.debian.org/releases/)
+([`stable`](https://www.debian.org/releases/stable/),
+[`oldstable`](https://www.debian.org/releases/oldstable/)) and for
+[PostgreSQL versions supported by PGDG](https://www.postgresql.org/).
+They are distributed via the [`postgres-containers` GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
-promptly addressed.
+Three image flavors are available, each extending the previous one:
 
-Additionally, the community provides images for the [PostGIS extension](postgis.md).
+- [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
+- [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
+- [`system`](https://github.com/cloudnative-pg/postgres-containers#system-images) *(deprecated)*
+
+!!! Important
+    The `system` images are deprecated and will be removed once in-core
+    Barman Cloud support is phased out. They remain usable for now, but you may
+    want to plan a future migration to `minimal` or `standard` images with the
+    Barman Cloud plugin, or another supported backup solution.
+
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie`.
+
+All images are signed and shipped with SBOM and provenance attestations.
+Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
+
+For details and support, see the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#cnpg-postgresql-container-images).
 
 ## Main features
 
