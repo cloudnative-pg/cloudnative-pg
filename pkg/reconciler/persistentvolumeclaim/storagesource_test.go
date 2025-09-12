@@ -315,7 +315,12 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(-1*time.Hour)), backupList)
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+			},
+		}
+		source := getCandidateSourceFromBackupList(ctx, cluster, backupList)
 		Expect(source).ToNot(BeNil())
 		Expect(source.DataSource.Name).To(Equal("completed-backup"))
 	})
@@ -331,7 +336,111 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(1*time.Hour)), backupList)
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(1 * time.Hour)),
+			},
+		}
+		source := getCandidateSourceFromBackupList(ctx, cluster, backupList)
+		Expect(source).To(BeNil())
+	})
+})
+
+var _ = Describe("major version filtering in candidate backup selection", func() {
+	makeCompletedSnapshotBackup := func(name string) apiv1.Backup {
+		return apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now()),
+				Name:              name,
+			},
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
+			},
+			Status: apiv1.BackupStatus{
+				Phase: apiv1.BackupPhaseCompleted,
+				BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+					Elements: []apiv1.BackupSnapshotElementStatus{
+						{
+							Name: "completed-backup",
+							Type: string(utils.PVCRolePgData),
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("does not filter by major version when PGDataImageInfo is nil", func(ctx context.Context) {
+		backup := makeCompletedSnapshotBackup("no-major-version")
+		// Explicitly leave MajorVersion=0 and no annotation to simulate missing version
+		backupList := apiv1.BackupList{Items: []apiv1.Backup{backup}}
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://test",
+					},
+				},
+			},
+			// Status.PGDataImageInfo is nil here on purpose
+		}
+
+		source := getCandidateSourceFromBackupList(ctx, cluster, backupList)
+		Expect(source).ToNot(BeNil())
+		Expect(source.DataSource.Name).To(Equal("completed-backup"))
+	})
+
+	It("skips backup when PGDataImageInfo is set and backup major version is missing", func(ctx context.Context) {
+		backup := makeCompletedSnapshotBackup("missing-major-version")
+		// MajorVersion=0 and no annotation, will be rejected when PGDataImageInfo != nil
+		backupList := apiv1.BackupList{Items: []apiv1.Backup{backup}}
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://test",
+					},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{},
+			},
+		}
+
+		source := getCandidateSourceFromBackupList(ctx, cluster, backupList)
+		Expect(source).To(BeNil())
+	})
+
+	It("skips backup when PGDataImageInfo is set and major version mismatches", func(ctx context.Context) {
+		backup := makeCompletedSnapshotBackup("mismatching-major-version")
+		backup.Status.MajorVersion = 99 // intentionally mismatching
+		backupList := apiv1.BackupList{Items: []apiv1.Backup{backup}}
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://test",
+					},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{},
+			},
+		}
+
+		source := getCandidateSourceFromBackupList(ctx, cluster, backupList)
 		Expect(source).To(BeNil())
 	})
 })
