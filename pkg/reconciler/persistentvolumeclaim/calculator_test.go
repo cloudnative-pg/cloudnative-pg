@@ -34,8 +34,9 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
-			utils.InstanceNameLabelName: instanceName,
+			utils.PvcRoleLabelName:                string(utils.PVCRolePgData),
+			utils.InstanceNameLabelName:           instanceName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -71,8 +72,9 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
-			utils.InstanceNameLabelName: instanceName,
+			utils.PvcRoleLabelName:                string(utils.PVCRolePgWal),
+			utils.InstanceNameLabelName:           instanceName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -110,9 +112,10 @@ var _ = Describe("pvc role test", func() {
 		backupName := "backup1"
 		tbsName := "tbs1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
-			utils.InstanceNameLabelName:   instanceName,
-			utils.TablespaceNameLabelName: tbsName,
+			utils.PvcRoleLabelName:                string(utils.PVCRolePgTablespace),
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.InstanceNameLabelName:           instanceName,
+			utils.TablespaceNameLabelName:         tbsName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
