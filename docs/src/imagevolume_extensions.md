@@ -312,10 +312,10 @@ system libraries at runtime.
 A standard extension container image for CloudNativePG includes two
 required directories at its root:
 
-- `share`: contains the extension control file (e.g., `<EXTENSION>.control`)
-  and any SQL files.
-- `lib`: contains the extension's shared library (e.g., `<EXTENSION>.so`) and
-  any additional required libraries.
+- `/share/`: contains an `extension` subdirectory with the extension control
+  file (e.g. `<EXTENSION>.control`) and the corresponding SQL files.
+- `/lib/`: contains the extension’s shared library (e.g. `<EXTENSION>.so`) as
+  well as any other required libraries.
 
 Following this structure ensures that the extension will be automatically
 discoverable and usable by PostgreSQL within CloudNativePG without requiring
