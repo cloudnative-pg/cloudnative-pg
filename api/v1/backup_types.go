@@ -118,6 +118,22 @@ const (
 	BackupMethodPlugin BackupMethod = "plugin"
 )
 
+// ReplicaBackupMethodPreference defines the preferred backup method for
+// creating replicas
+type ReplicaBackupMethodPreference string
+
+const (
+	// ReplicaBackupMethodPreferenceVolumeSnapshot prefers volume snapshots for
+	// replica creation, falling back to barman if no volume snapshots are
+	// available
+	ReplicaBackupMethodPreferenceVolumeSnapshot ReplicaBackupMethodPreference = "volumeSnapshot"
+
+	// ReplicaBackupMethodPreferenceBarmanObjectStore prefers barman object
+	// store for replica creation, falling back to volume snapshots if no barman
+	// backups are available
+	ReplicaBackupMethodPreferenceBarmanObjectStore ReplicaBackupMethodPreference = "barmanObjectStore"
+)
+
 // BackupSpec defines the desired state of Backup
 // +kubebuilder:validation:XValidation:rule="oldSelf == self",message="BackupSpec is immutable once set"
 type BackupSpec struct {

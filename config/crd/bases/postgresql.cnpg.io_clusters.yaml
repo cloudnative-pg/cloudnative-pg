@@ -1387,6 +1387,18 @@ spec:
                     required:
                     - destinationPath
                     type: object
+                  replicaMethodPreference:
+                    default: volumeSnapshot
+                    description: |-
+                      The preferred backup method to use when creating replicas:
+                      `volumeSnapshot` or `barmanObjectStore`. This setting only affects
+                      replica creation and does not influence the backup method used for
+                      regular backups. If the preferred method is unavailable, it will fall
+                      back to the other available option.
+                    enum:
+                    - volumeSnapshot
+                    - barmanObjectStore
+                    type: string
                   retentionPolicy:
                     description: |-
                       RetentionPolicy is the retention policy to be used for backups
