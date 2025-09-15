@@ -310,11 +310,9 @@ system libraries at runtime.
 ## Image Specifications
 
 A standard extension container image for CloudNativePG includes two
-required directories at its root. As mentioned in the 
-[PostgreSQL documentation](https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-EXTENSION-CONTROL-PATH),
-a subdirectory `extension` must exist in `share` folder in order to have :
+required directories at its root:
 
-- `/share/extension`: contains the extension control file (e.g., `<EXTENSION>.control`)
+- `/share/`: contains an `extension` subdirectory which includes the extension control file (e.g., `<EXTENSION>.control`)
   and any SQL files.
 - `/lib/`: contains the extension's shared library (e.g., `<EXTENSION>.so`) and
   any additional required libraries.
