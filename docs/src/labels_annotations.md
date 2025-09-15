@@ -247,6 +247,13 @@ CloudNativePG manages the following predefined annotations:
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
 
+`alpha.cnpg.io/unrecoverable`
+:   Experimental annotation applied to a `Pod` running a PostgreSQL instance.
+    It instructs the operator to delete the `Pod` and all its associated PVCs.
+    The instance will then be recreated according to the configured join
+    strategy. This annotation can only be used on instances that are neither the
+    current primary nor the designated target primary.
+
 ## Prerequisites
 
 By default, no label or annotation defined in the cluster's metadata is
