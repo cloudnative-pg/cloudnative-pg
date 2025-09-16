@@ -94,7 +94,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		WithInitContainerCommand(specs.BootstrapControllerContainerName,
 			[]string{"/manager", "bootstrap", "/controller/manager"},
 			true).
-		WithInitContainerResources(specs.BootstrapControllerContainerName, pooler.GetResourcesRequirements(), true).
+		WithInitContainerResources(specs.BootstrapControllerContainerName, pooler.GetResourcesRequirements(), false).
 		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
 			specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 			true).
