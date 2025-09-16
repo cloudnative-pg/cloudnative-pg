@@ -348,26 +348,7 @@ deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
-
-  service_file="${TEMP_DIR}/pyroscope_service.yaml"
-
-  cat >"${service_file}" <<-EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: cnpg-pprof
-spec:
-  ports:
-  - targetPort: 6060
-    port: 6060
-  selector:
-    app: cnpg-pprof
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: cloudnative-pg
-EOF
-  kubectl -n cnpg-system apply -f "${service_file}"
+  helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
@@ -384,6 +365,14 @@ spec:
 EOF
 
   kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+
+  configMaps="${TEMP_DIR}/cnpg_configmap_config.yaml"
+  cat >"${configMaps}" <<-EOF
+data:
+   INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
+EOF
+  configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+  kubectl -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 }
 
 deploy_prometheus_crds() {
@@ -426,7 +415,7 @@ Commands:
     export-logs           Export the logs from the cluster inside the directory
                           ${LOG_DIR}
     destroy               Destroy the cluster
-    pyroscope             Deploy Pyroscope inside operator namespace
+    pyroscope             Deploy Pyroscope and enable pprof for the operator
 
 Options:
     -k|--k8s-version

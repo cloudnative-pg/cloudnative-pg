@@ -270,6 +270,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicies
 NetworkPolicy
 Niccolò
 NodeAffinity
@@ -791,6 +792,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enableInstancePprof
 enableMetricsTLS
 enablePDB
 enablePodAntiAffinity

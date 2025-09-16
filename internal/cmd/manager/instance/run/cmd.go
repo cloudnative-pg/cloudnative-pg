@@ -79,6 +79,7 @@ func NewCmd() *cobra.Command {
 	var podName string
 	var clusterName string
 	var namespace string
+	var pprofHTTPServer bool
 	var statusPortTLS bool
 	var metricsPortTLS bool
 
@@ -105,7 +106,7 @@ func NewCmd() *cobra.Command {
 			instance.MetricsPortTLS = metricsPortTLS
 
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
-				return runSubCommand(ctx, instance)
+				return runSubCommand(ctx, instance, pprofHTTPServer)
 			})
 
 			if errors.Is(err, errNoFreeWALSpace) {
@@ -130,6 +131,12 @@ func NewCmd() *cobra.Command {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
+	cmd.Flags().BoolVar(
+		&pprofHTTPServer,
+		"pprof-server",
+		false,
+		"If true it will start a pprof debug http server on localhost:6060. Defaults to false.",
+	)
 	cmd.Flags().BoolVar(&statusPortTLS, "status-port-tls", false,
 		"Enable TLS for communicating with the operator")
 	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
@@ -137,7 +144,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
+func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer bool) error {
 	var err error
 
 	contextLogger := log.FromContext(ctx)
@@ -200,7 +207,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		BaseContext: func() context.Context {
 			return ctx
 		},
-		Logger: contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
+		Logger:           contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
+		PprofBindAddress: getPprofServerAddress(pprofServer),
 	})
 	if err != nil {
 		contextLogger.Error(err, "unable to set up overall controller manager")
@@ -364,4 +372,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	}
 
 	return nil
+}
+
+func getPprofServerAddress(enabled bool) string {
+	if enabled {
+		return "0.0.0.0:6060"
+	}
+
+	return ""
 }
