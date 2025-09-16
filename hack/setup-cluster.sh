@@ -360,23 +360,6 @@ EOF
   kubectl create ns pyroscope
   helm -n pyroscope install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
-  service_file="${TEMP_DIR}/pyroscope_service.yaml"
-
-  cat >"${service_file}" <<-EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: cnpg-controller-manager-pprof
-spec:
-  ports:
-  - targetPort: 6060
-    port: 6060
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: cloudnative-pg
-EOF
-  kubectl -n cnpg-system apply -f "${service_file}"
-
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
 spec:
