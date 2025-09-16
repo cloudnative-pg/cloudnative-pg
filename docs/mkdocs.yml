@@ -74,7 +74,6 @@ nav:
   - cloudnative-pg.v1.md
   - supported_releases.md
   - preview_version.md
-  - experimental_features.md
   - release_notes.md
   - CNCF Projects Integrations:
     - cncf-projects/external-secrets.md
