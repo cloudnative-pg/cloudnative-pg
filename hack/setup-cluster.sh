@@ -357,8 +357,7 @@ deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  kubectl create ns pyroscope
-  helm -n pyroscope install pyroscope pyroscope-io/pyroscope -f "${values_file}"
+  helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
@@ -381,8 +380,8 @@ EOF
 data:
    INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
 EOF
- configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
- kubectl -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
+  configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+  kubectl -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 }
 
 deploy_prometheus_crds() {
