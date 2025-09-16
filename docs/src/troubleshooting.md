@@ -674,6 +674,8 @@ curl -sS http://localhost:6060/debug/pprof/
 go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
 ```
 
+You can also access pprof using the browser at [http://localhost:6060/debug/pprof/](http://localhost:6060/debug/pprof/).
+
 ### Troubleshooting
 
 First, verify that the cluster has the `alpha.cnpg.io/enableInstancePprof:
