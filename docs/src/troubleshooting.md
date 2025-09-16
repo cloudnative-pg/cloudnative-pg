@@ -621,7 +621,7 @@ CloudNativePG integrates with [pprof](https://github.com/google/pprof) to
 collect and analyze profiling data at two levels:
 
 - **Operator level** – enable by adding the `--pprof-server=true` option to the
-  operator deployment (see [Operator configuration](operator_conf.md)).
+  operator deployment (see [Operator configuration](operator_conf.md#profiling-tools)).
 - **Postgres cluster level** – enable by adding the
   `alpha.cnpg.io/enableInstancePprof` annotation to a `Cluster` resource
   (described below).
@@ -633,13 +633,6 @@ manager.
 - The server listens on `0.0.0.0:6060` inside the pod.
 - A container port named `pprof` (`6060/TCP`) is automatically added to the pod
   spec.
-
-The following endpoints are available under `/debug/pprof` (note that the root
-path `/` is not served):
-
-- `/debug/pprof/` (index)
-- `/debug/pprof/heap`
-- `/debug/pprof/profile?seconds=30`
 
 You can disable pprof at any time by either removing the annotation or setting
 it to `"false"`. The operator will roll out changes automatically to remove the
@@ -676,8 +669,8 @@ the corresponding flag) and triggers a rolling update.
 Use port-forwarding to access the pprof endpoints:
 
 ```bash
-kubectl port-forward pod/<instance-pod> 6060
-curl -sS http://localhost:6060/debug/pprof/ | head
+kubectl port-forward -n <namespace> pod/<instance-pod> 6060
+curl -sS http://localhost:6060/debug/pprof/
 go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
 ```
 

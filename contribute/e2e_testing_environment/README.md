@@ -126,8 +126,8 @@ kubectl port-forward -n pyroscope svc/pyroscope 4040
 
 Then open [http://localhost:4040](http://localhost:4040).
 
-See [operator config](../../docs/src/operator_conf.md#pprof-http-server)
-and [instance-pprof](../../docs/src/experimental_features.md#instance-pprof)
+See [operator config](../../docs/src/operator_conf.md#profiling-tools)
+and [instance-pprof](../../docs/src/troubleshooting.md#visualizing-and-analyzing-profiling-data)
 for details.
 
 If issues arise, verify that teh Pyroscope annotations are on the pods
