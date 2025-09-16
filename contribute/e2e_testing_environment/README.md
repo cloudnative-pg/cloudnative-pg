@@ -29,26 +29,26 @@ development and testing purposes.
 
 You can create a new Kubernetes cluster with:
 
-```console
+``` shell
 hack/setup-cluster.sh <OPTIONAL_FLAGS> create
 ```
 
 You can also build the operator image and load it in the local Kubernetes
 cluster. For example, to load the operator image you can run:
 
-```console
+``` shell
 hack/setup-cluster.sh load
 ```
 
 To deploy the operator:
 
-```console
+``` shell
 hack/setup-cluster.sh deploy
 ```
 
 To cleanup everything:
 
-```console
+``` shell
 hack/setup-cluster.sh destroy
 ```
 
@@ -71,45 +71,67 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 
 ## Profiling tools
 
-In addition to deploying and destroying the operator, `hack/setup-cluster.sh`
-can also load two powerful profiling / debugging tools: *pprof* and *pyroscope*.
+In addition to deploying the operator, `hack/setup-cluster.sh`
+can enable two powerful profiling tools: *pprof* and *pyroscope*.
 
-Issuing the following command once the operator is deployed:
+After deploying the operator, run:
 
-``` console
+``` shell
 hack/setup-cluster.sh pyroscope
 ```
 
-will create a deployment, and add two services on ports 6060 and 4040
-respectively, in the same namespace as the operator:
+This creates a Pyroscope deployment and service on port 4040 in the
+`pyroscope` namespace:
 
-``` console
-kubectl get svc -n cnpg-system
+``` shell
+kubectl get svc -n pyroscope pyroscope
 
-NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-cnpg-pprof             ClusterIP   10.96.17.58    <none>        6060/TCP   9m41s
-cnpg-webhook-service   ClusterIP   10.96.64.74    <none>        443/TCP    10m
-pyroscope              ClusterIP   10.96.187.86   <none>        4040/TCP   9m41s
+NAME        TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
+pyroscope   ClusterIP   10.96.29.42   <none>        4040/TCP   59m
 ```
 
-You can find more information on the various endpoints that come included with
-the `pprof` server in the
-[operator conf document](../../docs/src/operator_conf.md#pprof-http-server).
+It also enables the pprof server (`--pprof-server` flag), adds Pyroscope
+scraping annotation to the operator, and allows "profiles.grafana.com/*"
+to be inherited by PostgreSQL instances.
 
-[Pyroscope](https://pyroscope.io/) offers a very functional web app out of the
-box.
-To use it, you will need first to do port-forwarding for the `pyroscope`
-service:
+To enable pprof and Pyroscope scraping on PostgreSQL instances, add these
+annotations to your Cluster:
 
-```console
-kubectl port-forward -n cnpg-system svc/pyroscope 4040
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  annotations:
+    # Enable pproof server
+    alpha.cnpg.io/enableInstancePprof: "true"
+
+    # Pyroscope configuration
+    profiles.grafana.com/memory.scrape: "true"
+    profiles.grafana.com/memory.port: "6060"
+    profiles.grafana.com/cpu.scrape: "true"
+    profiles.grafana.com/cpu.port: "6060"
+    profiles.grafana.com/goroutine.scrape: "true"
+    profiles.grafana.com/goroutine.port: "6060"
+spec:
+  instances: 3
+  ...
 ```
 
-Then you can open the local pyroscope page at [localhost:4040](http://localhost:4040), and you should see a display like so:
+To access the Pyroscope web UI, port-forward:
 
-![pyroscope](pyroscope.png)
+``` shell
+kubectl port-forward -n pyroscope svc/pyroscope 4040
+```
 
-It is a great tool to interactively monitor memory and CPU usage.
+Then open [http://localhost:4040](http://localhost:4040).
+
+See [operator config](../../docs/src/operator_conf.md#pprof-http-server)
+and [instance-pprof](../../docs/src/experimental_features.md#instance-pprof)
+for details.
+
+If issues arise, verify that teh Pyroscope annotations are on the pods
+and the `--pprof-server` flag is present in the pod command arguments.
 
 ## E2E tests suite
 
