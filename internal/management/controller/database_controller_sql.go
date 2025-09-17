@@ -714,9 +714,9 @@ func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 
 const detectDatabaseForeignServerSQL = `
 SELECT
-	srvname, s.srvfdw::regproc::text, srvoptions
-FROM pg_foreign_server s
-JOIN pg_authid a ON s.srvowner = a.oid
+	srvname, fdwname, srvoptions
+FROM pg_foreign_server fs
+JOIN pg_foreign_data_wrapper fdw ON fs.srvfdw = fdw.oid
 WHERE srvname = $1
 `
 
