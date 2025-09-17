@@ -188,9 +188,8 @@ spec:
                       description: Name of the object (extension, schema, FDW, server)
                       type: string
                     options:
-                      description: |-
-                        Options specifies the configuration options for the FDW
-                        (key is the option name, value is the option value).
+                      description: Options specifies the configuration options for
+                        the FDW.
                       items:
                         description: OptionSpec holds the name, value and the ensure
                           field for an option

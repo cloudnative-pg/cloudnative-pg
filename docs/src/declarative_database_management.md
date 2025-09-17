@@ -375,8 +375,9 @@ Each foreign server entry supports the following properties:
     - `name` : The name of the role to which the usage permission should be
       granted or from which it should be revoked **(mandatory)**.
     - `type` : The type of the usage permission. Supports `grant` and `revoke`.
-- `options`: A map of FDW-specific options to manage for the server, where each
-  key is the name of an option. Each option supports the following fields:
+- `options`: A list of FDW-specific option specifications.
+  Each entry in the list supports the following keys:
+    - `name`: The name of the option **(mandatory)**.
     - `value`: The string value of the option.
     - `ensure`: Indicates whether the option should be `present` or `absent`.
 

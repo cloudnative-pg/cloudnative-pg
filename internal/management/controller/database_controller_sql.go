@@ -421,7 +421,7 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 }
 
 // extractOptionsClauses takes a list of apiv1.OptionSpec and returns the present options as clauses
-// If no options are present, nil is returned
+// suitable to be joined with ", " inside a CREATE ... OPTIONS (...) statement.
 func extractOptionsClauses(options []apiv1.OptionSpec) []string {
 	opts := make([]string, 0, len(options))
 	for _, optionSpec := range options {

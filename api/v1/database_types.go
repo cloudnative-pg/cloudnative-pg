@@ -264,8 +264,7 @@ type FDWSpec struct {
 	// +optional
 	Owner string `json:"owner,omitempty"`
 
-	// Options specifies the configuration options for the FDW
-	// (key is the option name, value is the option value).
+	// Options specifies the configuration options for the FDW.
 	// +optional
 	Options []OptionSpec `json:"options,omitempty"`
 

@@ -3136,8 +3136,7 @@ The role must have superuser privileges in the target database.</p>
 <a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
 </td>
 <td>
-   <p>Options specifies the configuration options for the FDW
-(key is the option name, value is the option value).</p>
+   <p>Options specifies the configuration options for the FDW.</p>
 </td>
 </tr>
 <tr><td><code>usage</code><br/>
