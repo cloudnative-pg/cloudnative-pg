@@ -134,14 +134,7 @@ func (r *ClusterReconciler) evaluateQuorumCheckWithStatus(
 }
 
 func (r *ClusterReconciler) reconcileFailoverQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx).WithValues("tag", "quorumCheck")
-
-	syncConfig := cluster.Spec.PostgresConfiguration.Synchronous
-	failoverQuorumActive, err := cluster.IsFailoverQuorumActive()
-	if err != nil {
-		contextLogger.Error(err, "Failed to determine if failover quorum is active")
-	}
-	if syncConfig != nil && failoverQuorumActive {
+	if cluster.IsFailoverQuorumActive() {
 		return r.ensureFailoverQuorumObjectExists(ctx, cluster)
 	}
 
