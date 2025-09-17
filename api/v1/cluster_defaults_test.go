@@ -515,3 +515,56 @@ var _ = Describe("probe defaults", func() {
 		Expect(cluster.Spec.Probes.Liveness.IsolationCheck.ConnectionTimeout).To(Equal(600))
 	})
 })
+
+var _ = Describe("failover quorum defaults", func() {
+	clusterWithFailoverQuorumAnnotation := func(value string) *Cluster {
+		return &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: value,
+				},
+			},
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{},
+				},
+			},
+		}
+	}
+
+	It("should convert the annotation if present and set to true", func() {
+		cluster := clusterWithFailoverQuorumAnnotation("t")
+		cluster.Default()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
+	})
+
+	It("should not convert the annotation if the value is wrong", func() {
+		cluster := clusterWithFailoverQuorumAnnotation("toast")
+		cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = true
+		cluster.Default()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
+	})
+
+	It("should not convert the annotation if the synchronous replication stanza has not been set", func() {
+		cluster := clusterWithFailoverQuorumAnnotation("t")
+		cluster.Spec.PostgresConfiguration.Synchronous = nil
+
+		// This would panic if the code tried to convert the annotation
+		cluster.Default()
+	})
+
+	It("should not override the existing setting if the annotation has not been set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						FailoverQuorum: true,
+					},
+				},
+			},
+		}
+
+		cluster.Default()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
+	})
+})

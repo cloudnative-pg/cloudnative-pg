@@ -207,6 +207,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
 		v.validateSynchronousReplicaConfiguration,
+		v.validateFailoverQuorumAlphaAnnotation,
 		v.validateFailoverQuorum,
 		v.validateLDAP,
 		v.validateReplicationSlots,
@@ -993,20 +994,44 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 	return result
 }
 
+func (v *ClusterCustomValidator) validateFailoverQuorumAlphaAnnotation(r *apiv1.Cluster) field.ErrorList {
+	annotationValue, ok := r.Annotations[utils.FailoverQuorumAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	failoverQuorumActive, err := strconv.ParseBool(annotationValue)
+	if err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
+				r.Annotations[utils.FailoverQuorumAnnotationName],
+				"Invalid failoverQuorum annotation value, expected boolean.",
+			),
+		}
+	}
+
+	if !failoverQuorumActive {
+		return nil
+	}
+
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return field.ErrorList{
+			field.Required(
+				field.NewPath("spec", "postgresql", "synchronous"),
+				"Invalid failoverQuorum configuration: synchronous replication configuration "+
+					"is required.",
+			),
+		}
+	}
+
+	return nil
+}
+
 func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	failoverQuorumActive, err := r.IsFailoverQuorumActive()
-	if err != nil {
-		err := field.Invalid(
-			field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
-			r.Annotations[utils.FailoverQuorumAnnotationName],
-			"Invalid failoverQuorum annotation value, expected boolean.",
-		)
-		result = append(result, err)
-		return result
-	}
-	if !failoverQuorumActive {
+	if !r.IsFailoverQuorumActive() {
 		return nil
 	}
 

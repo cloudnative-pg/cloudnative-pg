@@ -133,13 +133,27 @@ the instance to promote, and it does not occur otherwise.
 This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
-Failover quorum can be enabled by setting the annotation
-`alpha.cnpg.io/failoverQuorum="true"` in the `Cluster` resource.
+Failover quorum can be enabled by setting the
+`.spec.postgresql.synchronous.failoverQuorum` field to `true`, like in the
+following example:
 
-!!! info
-    When this feature is out of the experimental phase, the annotation
-    `alpha.cnpg.io/failoverQuorum` will be replaced by a configuration option in
-    the `Cluster` resource.
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      failoverQuorum: true
+
+  storage:
+    size: 1G
+```
 
 ### How it works
 

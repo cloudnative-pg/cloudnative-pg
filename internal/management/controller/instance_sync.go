@@ -22,7 +22,6 @@ package controller
 import (
 	"context"
 
-	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +32,7 @@ import (
 // resetFailoverQuorumObject resets the content of the sync quorum object
 // to prevent unsafe failovers when we are changing the configuration
 func (r *InstanceReconciler) resetFailoverQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !r.shouldManageFailoverQuorumObject(ctx, cluster) {
+	if !r.shouldManageFailoverQuorumObject(cluster) {
 		return nil
 	}
 
@@ -53,7 +52,7 @@ func (r *InstanceReconciler) resetFailoverQuorumObject(ctx context.Context, clus
 // updateFailoverQuorumObject updates the sync quorum object reading the
 // current synchronous replica metadata from the PG instance
 func (r *InstanceReconciler) updateFailoverQuorumObject(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !r.shouldManageFailoverQuorumObject(ctx, cluster) {
+	if !r.shouldManageFailoverQuorumObject(cluster) {
 		return nil
 	}
 
@@ -96,9 +95,7 @@ func (r *InstanceReconciler) updateFailoverQuorumObject(ctx context.Context, clu
 	})
 }
 
-func (r *InstanceReconciler) shouldManageFailoverQuorumObject(ctx context.Context, cluster *apiv1.Cluster) bool {
-	contextLogger := log.FromContext(ctx)
-
+func (r *InstanceReconciler) shouldManageFailoverQuorumObject(cluster *apiv1.Cluster) bool {
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() {
 		return false
 	}
@@ -109,15 +106,5 @@ func (r *InstanceReconciler) shouldManageFailoverQuorumObject(ctx context.Contex
 		return false
 	}
 
-	failoverQuorumActive, err := cluster.IsFailoverQuorumActive()
-	if err != nil {
-		contextLogger.Error(err, "Failed to determine if sync quorum is active")
-		failoverQuorumActive = false
-	}
-
-	if !failoverQuorumActive {
-		return false
-	}
-
-	return true
+	return cluster.IsFailoverQuorumActive()
 }
