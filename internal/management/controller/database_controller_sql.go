@@ -428,8 +428,8 @@ func extractOptionsClauses(options []apiv1.OptionSpec) []string {
 		if optionSpec.Ensure == apiv1.EnsureAbsent {
 			continue
 		}
-		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{optionSpec.Name}.Sanitize(),
-			optionSpec.Value))
+		opts = append(opts, fmt.Sprintf("%s %s", pgx.Identifier{optionSpec.Name}.Sanitize(),
+			pq.QuoteLiteral(optionSpec.Value)))
 	}
 
 	return opts
@@ -448,12 +448,12 @@ func calculateAlterOptionsClauses(desiredOptions []apiv1.OptionSpec, currentOpti
 
 		switch {
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
-			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
-				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
+			clauses = append(clauses, fmt.Sprintf("ADD %s %s",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), pq.QuoteLiteral(desiredOptSpec.Value)))
 
 		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists && desiredOptSpec.Value != curOptValue:
-			clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
-				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
+			clauses = append(clauses, fmt.Sprintf("SET %s %s",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), pq.QuoteLiteral(desiredOptSpec.Value)))
 
 		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
 			clauses = append(clauses, fmt.Sprintf("DROP %s",
