@@ -110,16 +110,17 @@ wait_for sa openshift-operators cnpg-manager 10 60
 oc create secret docker-registry -n openshift-operators --docker-server="${REGISTRY}" --docker-username="${REGISTRY_USER}" --docker-password="${REGISTRY_PASSWORD}" cnpg-pull-secret || true
 retry 5 oc secrets link -n openshift-operators cnpg-manager cnpg-pull-secret --for=pull
 
-# We wait 30 seconds for the operator deployment to be created
-echo "Waiting 30s for the operator deployment to be ready"
+# We wait 60 seconds for the operator deployment to be created
+echo "Waiting 60s for the operator deployment to be ready"
 sleep 60
 
 # We wait later for the deployment to be available, but if it doesn't exist if fails. Let's wait again.
-DEPLOYMENT_NAME=$(oc get csv -n openshift-operators -o yaml | awk '/deploymentName/{print $2; exit}')
+CSV_NAME=$(oc get csv -n openshift-operators -l 'operators.coreos.com/cloudnative-pg.openshift-operators=' -o jsonpath='{.items[0].metadata.name}')
+DEPLOYMENT_NAME=$(oc get csv -n openshift-operators "$CSV_NAME" -o jsonpath='{.spec.install.spec.deployments[0].name}')
 wait_for deployment openshift-operators "$DEPLOYMENT_NAME" 5 60
 
 # Force a default postgresql image in the running operator
-oc patch -n openshift-operators "$(oc get csv -n openshift-operators -o name)" --type='json' -p \
+oc patch -n openshift-operators csv "$CSV_NAME" --type='json' -p \
 "[
   {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"POSTGRES_IMAGE_NAME\", \"value\": \"${POSTGRES_IMG}\"}}
 ]"
@@ -137,18 +138,18 @@ while true; do
     exit 1
   fi
   # There should be only one pod
-  pod_count=$(oc get -n openshift-operators pods -o name | wc -l)
+  pod_count=$(oc get -n openshift-operators pods -o name -l app.kubernetes.io/name=cloudnative-pg | wc -l)
   if [[ $pod_count -ne 1 ]]; then
     echo "[$ITER] Expected pod count to be 1, got $pod_count instead"
     continue
   fi
   # The pod should be ready
-  if ! oc wait --for=condition=Ready -n openshift-operators "$(oc get -n openshift-operators pods -o name)" --timeout=0; then
+  if ! oc wait --for=condition=Ready -n openshift-operators pods -l app.kubernetes.io/name=cloudnative-pg --timeout=0; then
     echo "[$ITER] Waiting pod to be ready"
     continue
   fi
   # Check the pod env is correct
-  pod_postgres_img=$(oc get -n openshift-operators "$(oc get -n openshift-operators pods -o name)" -o jsonpath="{.spec.containers[0].env[?(@.name=='POSTGRES_IMAGE_NAME')].value}" || true)
+  pod_postgres_img=$(oc get -n openshift-operators pods -l app.kubernetes.io/name=cloudnative-pg -o jsonpath="{.items[0].spec.containers[0].env[?(@.name=='POSTGRES_IMAGE_NAME')].value}" || true)
   if [[ "${pod_postgres_img}" != "${POSTGRES_IMG}" ]]; then
     echo "[$ITER] Expected POSTGRES_IMG to be $POSTGRES_IMG, got $pod_postgres_img instead"
     continue
