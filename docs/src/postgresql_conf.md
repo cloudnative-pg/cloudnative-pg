@@ -169,8 +169,8 @@ recovery_target_timeline = 'latest'
 
 The operator requires PostgreSQL to output its log in CSV format, and the
 instance manager automatically parses it and outputs it in JSON format.
-For this reason, all log settings in PostgreSQL are fixed and cannot be
-changed.
+As a result, certain PostgreSQL log settings, listed in [this section](#fixed-parameters),
+are fixed and cannot be modified.
 
 For further information, please refer to the ["Logging" section](logging.md).
 
