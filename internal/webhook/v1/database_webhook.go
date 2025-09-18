@@ -259,7 +259,7 @@ func (v *DatabaseCustomValidator) validateServerFDWReference(
 	server apiv1.ServerSpec,
 	itemPath *field.Path,
 ) field.ErrorList {
-	if fdwNames.Has(server.FdwName) {
+	if server.GetEnsure() == apiv1.EnsureAbsent || fdwNames.Has(server.FdwName) {
 		return nil
 	}
 
