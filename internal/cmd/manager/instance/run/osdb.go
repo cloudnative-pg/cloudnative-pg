@@ -23,35 +23,35 @@ import "time"
 
 // OSEntry represents an OS version.
 //
-// Between the release date and SupportedUntil, the OS Version
+// Between the release date and DeprecatedFrom, the OS Version
 // is **supported** and **not deprecated**.
 //
-// Between SupportedUntil and DeprectatedFrom, the OS Version
+// Between DeprecatedFrom and SupportedUntil, the OS Version
 // is **supported** and **deprecated**.
 //
-// After DeprectatedFrom, the OS Version
+// After SupportedUntil, the OS Version
 // is **not supported** and **deprecated**.
 type OSEntry struct {
 	// Version identifies the operating system version. This is the same
 	// as the "VERSION" field in the "/etc/osrelease" file.
 	Version string `json:"version"`
 
-	// SupportedUntil is the end-of-life date of this OS version
-	SupportedUntil time.Time `json:"supportedUntil"`
+	// DeprecatedFrom is the end-of-life date of this OS version
+	DeprecatedFrom time.Time `json:"supportedUntil"`
 
-	// DeprectatedFrom is the end of the OS version long-term-support period,
+	// SupportedUntil is the end of the OS version long-term-support period,
 	// as defined.
-	DeprectatedFrom time.Time `json:"deprecatedFrom"`
+	SupportedUntil time.Time `json:"deprecatedFrom"`
 }
 
 // IsSupported checks if the release is supported.
 func (e *OSEntry) IsSupported(now time.Time) bool {
-	return now.Before(e.DeprectatedFrom)
+	return now.Before(e.SupportedUntil)
 }
 
 // IsDeprecated checks if the release is deprecated.
 func (e *OSEntry) IsDeprecated(now time.Time) bool {
-	return now.After(e.SupportedUntil)
+	return now.After(e.DeprecatedFrom)
 }
 
 // OSDB is a set of known OS releases
@@ -79,22 +79,22 @@ func init() {
 	// Known Debian releases
 	defaultOSDB.Register(OSEntry{
 		Version:         "10 (buster)",
-		SupportedUntil:  time.Date(2022, time.September, 10, 0, 0, 0, 0, time.UTC),
-		DeprectatedFrom: time.Date(2024, time.June, 30, 0, 0, 0, 0, time.UTC),
+		DeprecatedFrom:  time.Date(2022, time.September, 10, 0, 0, 0, 0, time.UTC),
+		SupportedUntil: time.Date(2024, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
 		Version:         "11 (bullseye)",
-		SupportedUntil:  time.Date(2024, time.August, 14, 0, 0, 0, 0, time.UTC),
-		DeprectatedFrom: time.Date(2026, time.August, 31, 0, 0, 0, 0, time.UTC),
+		DeprecatedFrom:  time.Date(2024, time.August, 14, 0, 0, 0, 0, time.UTC),
+		SupportedUntil: time.Date(2026, time.August, 31, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
 		Version:         "12 (bookworm)",
-		SupportedUntil:  time.Date(2026, time.June, 10, 0, 0, 0, 0, time.UTC),
-		DeprectatedFrom: time.Date(2028, time.June, 30, 0, 0, 0, 0, time.UTC),
+		DeprecatedFrom:  time.Date(2026, time.June, 10, 0, 0, 0, 0, time.UTC),
+		SupportedUntil: time.Date(2028, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
 		Version:         "13 (trixie)",
-		SupportedUntil:  time.Date(2028, time.August, 9, 0, 0, 0, 0, time.UTC),
-		DeprectatedFrom: time.Date(2030, time.June, 30, 0, 0, 0, 0, time.UTC),
+		DeprecatedFrom:  time.Date(2028, time.August, 9, 0, 0, 0, 0, time.UTC),
+		SupportedUntil: time.Date(2030, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 }
