@@ -210,7 +210,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:17.5-3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -278,7 +278,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    ghcr.io/cloudnative-pg/postgresql:17.5-3
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
 ```
 
 !!! Note
@@ -614,6 +614,84 @@ kubectl cp POD:/var/lib/postgresql/data/pgdata/core.14177 core.14177
 
 You now have the file. Make sure you free the space on the server by
 removing the core dumps.
+
+## Visualizing and Analyzing Profiling Data
+
+CloudNativePG integrates with [pprof](https://github.com/google/pprof) to
+collect and analyze profiling data at two levels:
+
+- **Operator level** – enable by adding the `--pprof-server=true` option to the
+  operator deployment (see [Operator configuration](operator_conf.md#profiling-tools)).
+- **Postgres cluster level** – enable by adding the
+  `alpha.cnpg.io/enableInstancePprof` annotation to a `Cluster` resource
+  (described below).
+
+When the `alpha.cnpg.io/enableInstancePprof` annotation is set to `"true"`,
+each instance pod exposes a Go pprof HTTP server provided by the instance
+manager.
+
+- The server listens on `0.0.0.0:6060` inside the pod.
+- A container port named `pprof` (`6060/TCP`) is automatically added to the pod
+  spec.
+
+You can disable pprof at any time by either removing the annotation or setting
+it to `"false"`. The operator will roll out changes automatically to remove the
+pprof port and flag.
+
+!!! Important
+    The pprof server only serves plain HTTP on port `6060`.
+
+### Example
+
+Enable pprof on a cluster by adding the annotation:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  annotations:
+    alpha.cnpg.io/enableInstancePprof: "true"
+spec:
+  instances: 3
+  # ...
+```
+
+Changing this annotation updates the instance pod spec (adds port `6060` and
+the corresponding flag) and triggers a rolling update.
+
+!!! Warning
+    The example below uses `kubectl port-forward` for local testing only.
+    This is **not** the intended way to expose the feature in production.
+    Treat pprof as a sensitive debugging interface and never expose it publicly.
+    If you must access it remotely, secure it with proper network policies and access controls.
+
+Use port-forwarding to access the pprof endpoints:
+
+```bash
+kubectl port-forward -n <namespace> pod/<instance-pod> 6060
+curl -sS http://localhost:6060/debug/pprof/
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+```
+
+You can also access pprof using the browser at [http://localhost:6060/debug/pprof/](http://localhost:6060/debug/pprof/).
+
+### Troubleshooting
+
+First, verify that the cluster has the `alpha.cnpg.io/enableInstancePprof:
+"true"` annotation set.
+
+Next, check that the instance manager command includes the `--pprof-server`
+flag and that port `6060/TCP` is exposed. You can do this by running:
+
+```bash
+kubectl -n <namespace> describe pod <instance-pod>
+```
+
+Then review the **Command** and **Ports** sections in the output.
+
+Finally, if you are not using port-forwarding, make sure that your
+NetworkPolicies allow access to port `6060/TCP`.
 
 ## Some known issues
 

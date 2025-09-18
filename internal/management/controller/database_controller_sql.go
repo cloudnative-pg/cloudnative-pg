@@ -45,11 +45,17 @@ type schemaInfo struct {
 }
 
 type fdwInfo struct {
-	Name      string                           `json:"name"`
-	Handler   string                           `json:"handler"`
-	Validator string                           `json:"validator"`
-	Owner     string                           `json:"owner"`
-	Options   map[string]apiv1.OptionSpecValue `json:"options"`
+	Name      string            `json:"name"`
+	Handler   string            `json:"handler"`
+	Validator string            `json:"validator"`
+	Owner     string            `json:"owner"`
+	Options   map[string]string `json:"options"`
+}
+
+type serverInfo struct {
+	Name    string            `json:"name"`
+	FDWName string            `json:"fdwName"`
+	Options map[string]string `json:"options"`
 }
 
 func detectDatabase(
@@ -414,6 +420,50 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 	return nil
 }
 
+// extractOptionsClauses takes a list of apiv1.OptionSpec and returns the present options as clauses
+// suitable to be joined with ", " inside a CREATE ... OPTIONS (...) statement.
+func extractOptionsClauses(options []apiv1.OptionSpec) []string {
+	opts := make([]string, 0, len(options))
+	for _, optionSpec := range options {
+		if optionSpec.Ensure == apiv1.EnsureAbsent {
+			continue
+		}
+		opts = append(opts, fmt.Sprintf("%s %s", pgx.Identifier{optionSpec.Name}.Sanitize(),
+			pq.QuoteLiteral(optionSpec.Value)))
+	}
+
+	return opts
+}
+
+// calculateAlterOptionsClauses returns the list of option alteration clauses (ADD / SET / DROP)
+// needed to reconcile the currentOptions of a database object with the desiredOptions.
+//
+// The returned slice is suitable to be joined with ", " inside an ALTER ... OPTIONS (...)
+// statement. Order of emitted clauses follows the order of desiredOptions, enabling
+// predictable application.
+func calculateAlterOptionsClauses(desiredOptions []apiv1.OptionSpec, currentOptions map[string]string) []string {
+	var clauses []string
+	for _, desiredOptSpec := range desiredOptions {
+		curOptValue, exists := currentOptions[desiredOptSpec.Name]
+
+		switch {
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
+			clauses = append(clauses, fmt.Sprintf("ADD %s %s",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), pq.QuoteLiteral(desiredOptSpec.Value)))
+
+		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists && desiredOptSpec.Value != curOptValue:
+			clauses = append(clauses, fmt.Sprintf("SET %s %s",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), pq.QuoteLiteral(desiredOptSpec.Value)))
+
+		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
+			clauses = append(clauses, fmt.Sprintf("DROP %s",
+				pgx.Identifier{desiredOptSpec.Name}.Sanitize()))
+		}
+	}
+
+	return clauses
+}
+
 const detectDatabaseFDWSQL = `
 SELECT
  fdwname, fdwhandler::regproc::text, fdwvalidator::regproc::text, fdwoptions,
@@ -424,21 +474,15 @@ WHERE fdwname = $1
 `
 
 func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fdwInfo, error) {
-	contextLogger := log.FromContext(ctx)
-
-	row := db.QueryRowContext(
-		ctx, detectDatabaseFDWSQL,
-		fdw.Name)
-	if row.Err() != nil {
-		return nil, fmt.Errorf("while checking if FDW %q exists: %w", fdw.Name, row.Err())
-	}
-
 	var (
 		result     fdwInfo
 		optionsRaw pq.StringArray
 	)
 
-	if err := row.Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
+	if err := db.QueryRowContext(
+		ctx, detectDatabaseFDWSQL,
+		fdw.Name).
+		Scan(&result.Name, &result.Handler, &result.Validator, &optionsRaw, &result.Owner); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -446,19 +490,9 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 	}
 
 	// Extract options from SQL raw format(e.g. -{host=localhost,port=5432}) to type OptSpec
-	opts := make(map[string]apiv1.OptionSpecValue, len(optionsRaw))
-	for _, opt := range optionsRaw {
-		parts := strings.SplitN(opt, "=", 2)
-		if len(parts) == 2 {
-			opts[parts[0]] = apiv1.OptionSpecValue{
-				Value: parts[1],
-			}
-		} else {
-			contextLogger.Info(
-				"skipping unparsable option, expected \"keyword=value\"",
-				"optionsRaw", optionsRaw,
-				"fdwName", fdw.Name)
-		}
+	opts, err := parseOptions(optionsRaw)
+	if err != nil {
+		return nil, fmt.Errorf("while parsing options of foreign data wrapper %q: %w", fdw.Name, err)
 	}
 	result.Options = opts
 
@@ -467,36 +501,55 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 
 // updateDatabaseFDWUsage updates the usage permissions for a foreign data wrapper
 // based on the provided FDW specification.
-// It supports granting or revoking usage permissions for specified users.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
+	const objectTypeForeignDataWrapper = "FOREIGN DATA WRAPPER"
+	return applyUsagePermissions(ctx, db, objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
+}
+
+// updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
+// It supports granting or revoking usage permissions for specified users.
+func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
+	const objectTypeForeignServer = "FOREIGN SERVER"
+	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
+}
+
+// applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
+// for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
+func applyUsagePermissions(
+	ctx context.Context,
+	db *sql.DB,
+	objectType string,
+	objectName string,
+	usages []apiv1.UsageSpec,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	for _, usageSpec := range fdw.Usages {
-		switch usageSpec.Type {
-		case "grant":
-			changeUsageSQL := fmt.Sprintf(
-				"GRANT USAGE ON FOREIGN DATA WRAPPER %s TO %s",
-				pgx.Identifier{fdw.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("granting usage of foreign data wrapper %w", err)
-			}
-			contextLogger.Info("granted usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+	if len(usages) == 0 {
+		return nil
+	}
 
-		case "revoke":
-			changeUsageSQL := fmt.Sprintf(
-				"REVOKE USAGE ON FOREIGN DATA WRAPPER %s FROM %s", // #nosec G201
-				pgx.Identifier{fdw.Name}.Sanitize(),
-				pgx.Identifier{usageSpec.Name}.Sanitize())
-			if _, err := db.ExecContext(ctx, changeUsageSQL); err != nil {
-				return fmt.Errorf("revoking usage of foreign data wrapper %w", err)
+	for _, usageSpec := range usages {
+		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
+		sanitizedUser := pgx.Identifier{usageSpec.Name}.Sanitize()
+
+		switch usageSpec.Type {
+		case apiv1.GrantUsageSpecType:
+			mutation := fmt.Sprintf("GRANT USAGE ON %s %s TO %s", objectType, sanitizedObject, sanitizedUser)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("granting usage of %s: %w", objectType, err)
 			}
-			contextLogger.Info("revoked usage of foreign data wrapper", "name", fdw.Name, "user", usageSpec.Name)
+			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
+
+		case apiv1.RevokeUsageSpecType:
+			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) // nolint:gosec
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
+			}
+			contextLogger.Info("revoked usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		default:
 			contextLogger.Warning(
-				"unknown usage type",
-				"type", usageSpec.Type, "fdwName", fdw.Name)
+				"unknown usage type", "type", usageSpec.Type, "objectType", objectType, "name", objectName)
 		}
 	}
 
@@ -529,16 +582,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		}
 	}
 
-	// Extract options
-	opts := make([]string, 0, len(fdw.Options))
-	for _, optionSpec := range fdw.Options {
-		if optionSpec.Ensure == apiv1.EnsureAbsent {
-			continue
-		}
-		opts = append(opts, fmt.Sprintf("%s '%s'", pgx.Identifier{optionSpec.Name}.Sanitize(),
-			optionSpec.Value))
-	}
-	if len(opts) > 0 {
+	if opts := extractOptionsClauses(fdw.Options); len(opts) > 0 {
 		sqlCreateFDW.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
 	}
 
@@ -555,48 +599,6 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 			return err
 		}
 	}
-
-	return nil
-}
-
-func updateFDWOptions(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec, info *fdwInfo) error {
-	contextLogger := log.FromContext(ctx)
-
-	// Collect individual ALTER-clauses
-	var clauses []string
-	for _, desiredOptSpec := range fdw.Options {
-		curOptSpec, exists := info.Options[desiredOptSpec.Name]
-
-		switch {
-		case desiredOptSpec.Ensure == apiv1.EnsurePresent && !exists:
-			clauses = append(clauses, fmt.Sprintf("ADD %s '%s'",
-				pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
-
-		case desiredOptSpec.Ensure == apiv1.EnsurePresent && exists:
-			if desiredOptSpec.Value != curOptSpec.Value {
-				clauses = append(clauses, fmt.Sprintf("SET %s '%s'",
-					pgx.Identifier{desiredOptSpec.Name}.Sanitize(), desiredOptSpec.Value))
-			}
-
-		case desiredOptSpec.Ensure == apiv1.EnsureAbsent && exists:
-			clauses = append(clauses, fmt.Sprintf("DROP %s", pgx.Identifier{desiredOptSpec.Name}.Sanitize()))
-		}
-	}
-
-	if len(clauses) == 0 {
-		return nil
-	}
-
-	// Build SQL
-	changeOptionSQL := fmt.Sprintf(
-		"ALTER FOREIGN DATA WRAPPER %s OPTIONS (%s)", pgx.Identifier{fdw.Name}.Sanitize(),
-		strings.Join(clauses, ", "),
-	)
-
-	if _, err := db.ExecContext(ctx, changeOptionSQL); err != nil {
-		return fmt.Errorf("altering options of foreign data wrapper %w", err)
-	}
-	contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
 
 	return nil
 }
@@ -674,9 +676,16 @@ func updateDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec, info 
 		contextLogger.Info("altered foreign data wrapper owner", "name", fdw.Name, "owner", fdw.Owner)
 	}
 
-	// Alter Options
-	if err := updateFDWOptions(ctx, db, &fdw, info); err != nil {
-		return err
+	if toUpdateOpts := calculateAlterOptionsClauses(fdw.Options, info.Options); len(toUpdateOpts) > 0 {
+		changeOptionSQL := fmt.Sprintf(
+			"ALTER FOREIGN DATA WRAPPER %s OPTIONS (%s)", pgx.Identifier{fdw.Name}.Sanitize(),
+			strings.Join(toUpdateOpts, ", "),
+		)
+
+		if _, err := db.ExecContext(ctx, changeOptionSQL); err != nil {
+			return fmt.Errorf("altering options of foreign data wrapper %w", err)
+		}
+		contextLogger.Info("altered foreign data wrapper options", "name", fdw.Name, "options", fdw.Options)
 	}
 
 	// Update usage permissions
@@ -700,5 +709,107 @@ func dropDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
 		return err
 	}
 	contextLogger.Info("dropped foreign data wrapper", "name", fdw.Name)
+	return nil
+}
+
+const detectDatabaseForeignServerSQL = `
+SELECT
+	srvname, fdwname, srvoptions
+FROM pg_foreign_server fs
+JOIN pg_foreign_data_wrapper fdw ON fs.srvfdw = fdw.oid
+WHERE srvname = $1
+`
+
+func getDatabaseForeignServerInfo(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) (*serverInfo, error) {
+	var (
+		result     serverInfo
+		optionsRaw pq.StringArray
+	)
+
+	if err := db.QueryRowContext(
+		ctx, detectDatabaseForeignServerSQL,
+		server.Name).Scan(&result.Name, &result.FDWName, &optionsRaw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if foreign server %q exists: %w", server.Name, err)
+	}
+
+	opts, err := parseOptions(optionsRaw)
+	if err != nil {
+		return nil, fmt.Errorf("while parsing options of foreign server %q: %w", server.Name, err)
+	}
+	result.Options = opts
+
+	return &result, nil
+}
+
+// createDatabaseForeignServer creates a foreign server in the database.
+func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateServer strings.Builder
+	sqlCreateServer.WriteString(fmt.Sprintf("CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
+		pgx.Identifier{server.Name}.Sanitize(),
+		pgx.Identifier{server.FdwName}.Sanitize()))
+
+	if opts := extractOptionsClauses(server.Options); len(opts) > 0 {
+		sqlCreateServer.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")
+	}
+
+	_, err := db.ExecContext(ctx, sqlCreateServer.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating foreign server", "query", sqlCreateServer.String())
+		return err
+	}
+	contextLogger.Info("created foreign server", "name", server.Name)
+
+	if len(server.Usages) > 0 {
+		if err := updateDatabaseForeignServerUsage(ctx, db, &server); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// updateDatabaseForeignServer updates the configuration of a foreign server in the database.
+func updateDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec, info *serverInfo) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Alter Options
+	if toUpdateOpts := calculateAlterOptionsClauses(server.Options, info.Options); len(toUpdateOpts) > 0 {
+		changeOptionSQL := fmt.Sprintf(
+			"ALTER SERVER %s OPTIONS (%s)", pgx.Identifier{server.Name}.Sanitize(),
+			strings.Join(toUpdateOpts, ", "),
+		)
+
+		if _, err := db.ExecContext(ctx, changeOptionSQL); err != nil {
+			return fmt.Errorf("altering options of foreign server %w", err)
+		}
+		contextLogger.Info("altered foreign server options", "name", server.Name, "options", server.Options)
+	}
+
+	if len(server.Usages) > 0 {
+		if err := updateDatabaseForeignServerUsage(ctx, db, &server); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// dropDatabaseForeignServer drops a foreign server from the database.
+func dropDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.ServerSpec) error {
+	contextLogger := log.FromContext(ctx)
+	query := fmt.Sprintf("DROP SERVER IF EXISTS %s", pgx.Identifier{server.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	if err != nil {
+		contextLogger.Error(err, "while dropping foreign server", "query", query)
+		return err
+	}
+	contextLogger.Info("dropped foreign server", "name", server.Name)
 	return nil
 }
