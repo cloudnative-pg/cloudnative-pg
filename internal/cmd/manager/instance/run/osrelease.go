@@ -29,19 +29,21 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
+// checkCurrentOSRelease inspects the host's OS release information
+// and logs warnings if the distribution is unknown, unsupported, or deprecated.
+// If the OS release file is missing, the check is skipped silently.
 func checkCurrentOSRelease(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
 
 	data, err := osrelease.Read()
 	if errors.Is(err, fs.ErrNotExist) {
-		// There is no need to complain if we don't
-		// find the os-release file. Some distributions
-		// don't have it.
+		// Some Linux distributions do not include an os-release file.
+		// Skipping the OS distribution check in such cases.
 		return
 	}
 	if err != nil {
 		contextLogger.Warning(
-			"Can't parse the os-release file, distribution check skipped",
+			"Failed to read or parse the os-release file; skipping distribution check",
 			"err", err)
 		return
 	}
@@ -49,7 +51,7 @@ func checkCurrentOSRelease(ctx context.Context) {
 	version := data["VERSION"]
 	if version == "" {
 		contextLogger.Warning(
-			"The os-release file doesn't contain the VERSION field, distribution check skipped",
+			"os-release file is missing the VERSION field; skipping distribution check",
 			"data", data)
 		return
 	}
@@ -57,7 +59,7 @@ func checkCurrentOSRelease(ctx context.Context) {
 	entry, ok := defaultOSDB.Get(version)
 	if !ok {
 		contextLogger.Warning(
-			"Unknown distribution version, check skipped",
+			"Encountered unknown OS distribution version; skipping check",
 			"version", version)
 		return
 	}
@@ -66,17 +68,17 @@ func checkCurrentOSRelease(ctx context.Context) {
 	switch {
 	case !entry.IsSupported(now):
 		contextLogger.Warning(
-			"Base distribution is not supported",
+			"OS distribution is not supported",
 			"entry", entry)
 
 	case entry.IsDeprecated(now):
 		contextLogger.Warning(
-			"Base distribution is deprecated",
+			"OS distribution is deprecated; consider upgrading",
 			"entry", entry)
 
 	default:
-		contextLogger.Warning(
-			"Base distribution is supported",
+		contextLogger.Info(
+			"OS distribution is supported",
 			"entry", entry)
 	}
 }
