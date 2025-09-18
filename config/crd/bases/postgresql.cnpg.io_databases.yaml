@@ -132,16 +132,16 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     schema:
                       description: |-
@@ -170,10 +170,10 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
@@ -185,12 +185,11 @@ spec:
                         the default handler is registered when the FDW extension is created.
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     options:
-                      description: |-
-                        Options specifies the configuration options for the FDW
-                        (key is the option name, value is the option value).
+                      description: Options specifies the configuration options for
+                        the FDW.
                       items:
                         description: OptionSpec holds the name, value and the ensure
                           field for an option
@@ -232,6 +231,9 @@ spec:
                           name:
                             description: Name of the usage
                             type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
                           type:
                             default: grant
                             description: The type of usage
@@ -340,16 +342,16 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Specifies whether an extension/schema should be present or absent in
-                        the database. If set to `present`, the extension/schema will be
-                        created if it does not exist. If set to `absent`, the
-                        extension/schema will be removed if it exists.
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
                       enum:
                       - present
                       - absent
                       type: string
                     name:
-                      description: Name of the extension/schema
+                      description: Name of the object (extension, schema, FDW, server)
                       type: string
                     owner:
                       description: |-
@@ -358,6 +360,90 @@ spec:
                         `OWNER TO` command of `ALTER SCHEMA`.
                       type: string
                   required:
+                  - name
+                  type: object
+                type: array
+              servers:
+                description: The list of foreign servers to be managed in the database
+                items:
+                  description: ServerSpec configures a server of a foreign data wrapper
+                  properties:
+                    ensure:
+                      default: present
+                      description: |-
+                        Specifies whether an object (e.g schema) should be present or absent
+                        in the database. If set to `present`, the object will be created if
+                        it does not exist. If set to `absent`, the extension/schema will be
+                        removed if it exists.
+                      enum:
+                      - present
+                      - absent
+                      type: string
+                    fdw:
+                      description: The name of the Foreign Data Wrapper (FDW)
+                      type: string
+                      x-kubernetes-validations:
+                      - message: fdw is required
+                        rule: self != ''
+                    name:
+                      description: Name of the object (extension, schema, FDW, server)
+                      type: string
+                    options:
+                      description: |-
+                        Options specifies the configuration options for the server
+                        (key is the option name, value is the option value).
+                      items:
+                        description: OptionSpec holds the name, value and the ensure
+                          field for an option
+                        properties:
+                          ensure:
+                            default: present
+                            description: |-
+                              Specifies whether an option should be present or absent in
+                              the database. If set to `present`, the option will be
+                              created if it does not exist. If set to `absent`, the
+                              option will be removed if it exists.
+                            enum:
+                            - present
+                            - absent
+                            type: string
+                          name:
+                            description: Name of the option
+                            type: string
+                          value:
+                            description: Value of the option
+                            type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      type: array
+                    usage:
+                      description: List of roles for which `USAGE` privileges on the
+                        server are granted or revoked.
+                      items:
+                        description: UsageSpec configures a usage for a foreign data
+                          wrapper
+                        properties:
+                          name:
+                            description: Name of the usage
+                            type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
+                          type:
+                            default: grant
+                            description: The type of usage
+                            enum:
+                            - grant
+                            - revoke
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                  required:
+                  - fdw
                   - name
                   type: object
                 type: array
@@ -455,6 +541,28 @@ spec:
                 type: integer
               schemas:
                 description: Schemas is the status of the managed schemas
+                items:
+                  description: DatabaseObjectStatus is the status of the managed database
+                    objects
+                  properties:
+                    applied:
+                      description: |-
+                        True of the object has been installed successfully in
+                        the database
+                      type: boolean
+                    message:
+                      description: Message is the object reconciliation message
+                      type: string
+                    name:
+                      description: The name of the object
+                      type: string
+                  required:
+                  - applied
+                  - name
+                  type: object
+                type: array
+              servers:
+                description: Servers is the status of the managed servers
                 items:
                   description: DatabaseObjectStatus is the status of the managed database
                     objects
