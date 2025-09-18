@@ -48,6 +48,7 @@ var _ = Describe("OS database", func() {
 				"expected %s support status to be %t instead of %t", distro, supported, actualSupported)
 		},
 		Entry("trixie", "13 (trixie)", false, true),
+		Entry("bookworm", "12 (bookworm)", false, true),
 		Entry("bullseye", "11 (bullseye)", true, true),
 		Entry("buster", "10 (buster)", true, false),
 	)
