@@ -25,6 +25,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -92,11 +93,27 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	if result := getCandidateSourceFromBackupList(
-		ctx,
-		cluster,
-		backupList,
-	); result != nil {
+	// Get the backup method preference from cluster configuration
+	preference := getReplicaBackupMethodPreference(cluster)
+
+	var result *StorageSource
+
+	switch preference {
+	case apiv1.ReplicaBackupMethodPreferenceBarmanObjectStore:
+		// Try barman backups first, then volume snapshots
+		result = getCandidateSourceFromBarmanBackups(ctx, cluster, backupList)
+		if result == nil {
+			result = getCandidateSourceFromVolumeSnapshotBackups(ctx, cluster, backupList)
+		}
+	default: // volumeSnapshot or unknown preference
+		// Try volume snapshots first, then barman backups
+		result = getCandidateSourceFromVolumeSnapshotBackups(ctx, cluster, backupList)
+		if result == nil {
+			result = getCandidateSourceFromBarmanBackups(ctx, cluster, backupList)
+		}
+	}
+
+	if result != nil {
 		return result
 	}
 
@@ -112,9 +129,66 @@ func GetCandidateStorageSourceForReplica(
 	return getCandidateSourceFromClusterDefinition(cluster)
 }
 
-// getCandidateSourceFromBackupList gets a candidate storage source
-// given a backup list
-func getCandidateSourceFromBackupList(
+func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
+	var result StorageSource
+	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
+		reference := corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To(volumesnapshot.GroupName),
+			Kind:     apiv1.VolumeSnapshotKind,
+			Name:     element.Name,
+		}
+		switch utils.PVCRole(element.Type) {
+		case utils.PVCRolePgData:
+			result.DataSource = reference
+		case utils.PVCRolePgWal:
+			result.WALSource = &reference
+		case utils.PVCRolePgTablespace:
+			if result.TablespaceSource == nil {
+				result.TablespaceSource = map[string]corev1.TypedLocalObjectReference{}
+			}
+			result.TablespaceSource[element.TablespaceName] = reference
+		}
+	}
+
+	return &result
+}
+
+
+// getCandidateSourceFromClusterDefinition gets a candidate storage source
+// from a Cluster definition, taking into consideration the backup that the
+// cluster has been bootstrapped from
+func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+	return &StorageSource{
+		DataSource:       volumeSnapshots.Storage,
+		WALSource:        volumeSnapshots.WalStorage,
+		TablespaceSource: volumeSnapshots.TablespaceStorage,
+	}
+}
+
+// getReplicaBackupMethodPreference gets the replica backup method preference
+// from the cluster configuration, defaulting to volumeSnapshot if not specified
+func getReplicaBackupMethodPreference(cluster *apiv1.Cluster) apiv1.ReplicaBackupMethodPreference {
+	if cluster.Spec.Backup == nil {
+		return apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+	}
+
+	if cluster.Spec.Backup.ReplicaMethodPreference == "" {
+		return apiv1.ReplicaBackupMethodPreferenceVolumeSnapshot
+	}
+
+	return cluster.Spec.Backup.ReplicaMethodPreference
+}
+
+// getCandidateSourceFromVolumeSnapshotBackups gets a candidate storage source
+// from volume snapshot backups only
+func getCandidateSourceFromVolumeSnapshotBackups(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
@@ -150,16 +224,17 @@ func getCandidateSourceFromBackupList(
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues("backupName", backup.Name, "backupMethod", backup.Spec.Method)
 
 		if !backup.IsCompletedVolumeSnapshot() {
-			contextLogger.Trace("skipping backup, not a valid storage source candidate")
+			contextLogger.Trace("skipping backup, not a completed volume snapshot")
 			continue
 		}
 
 		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
 			contextLogger.Info(
-				"skipping backup as a potential recovery storage source candidate because it was created before the Cluster object",
-			)
+				"skipping backup as a potential recovery storage source candidate " +
+					"because it was created before the Cluster object")
 			continue
 		}
 
@@ -170,52 +245,84 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		contextLogger.Debug("found a backup that is a valid storage source candidate")
-
+		contextLogger.Debug("found a volume snapshot backup that is a valid storage source candidate")
 		return getCandidateSourceFromBackup(backup)
 	}
 
 	return nil
 }
 
-func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
-	var result StorageSource
-	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
-		reference := corev1.TypedLocalObjectReference{
-			APIGroup: ptr.To(volumesnapshot.GroupName),
-			Kind:     apiv1.VolumeSnapshotKind,
-			Name:     element.Name,
-		}
-		switch utils.PVCRole(element.Type) {
-		case utils.PVCRolePgData:
-			result.DataSource = reference
-		case utils.PVCRolePgWal:
-			result.WALSource = &reference
-		case utils.PVCRolePgTablespace:
-			if result.TablespaceSource == nil {
-				result.TablespaceSource = map[string]corev1.TypedLocalObjectReference{}
-			}
-			result.TablespaceSource[element.TablespaceName] = reference
-		}
-	}
+// getCandidateSourceFromBarmanBackups checks if there are any valid barman backups
+// and returns a special marker to indicate barman backup should be used
+func getCandidateSourceFromBarmanBackups(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backupList apiv1.BackupList,
+) *StorageSource {
+	contextLogger := log.FromContext(ctx)
 
-	return &result
-}
-
-// getCandidateSourceFromClusterDefinition gets a candidate storage source
-// from a Cluster definition, taking into consideration the backup that the
-// cluster has been bootstrapped from
-func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
-	if cluster.Spec.Bootstrap == nil ||
-		cluster.Spec.Bootstrap.Recovery == nil ||
-		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Warning(
+			"unable to determine cluster major version; skipping backup as a recovery source",
+			"error", err.Error(),
+		)
 		return nil
 	}
 
-	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-	return &StorageSource{
-		DataSource:       volumeSnapshots.Storage,
-		WALSource:        volumeSnapshots.WalStorage,
-		TablespaceSource: volumeSnapshots.TablespaceStorage,
+	isCorrectMajorVersion := func(backup *apiv1.Backup) bool {
+		// If we don't have image info, we can't determine the cluster version reliably; skip enforcement
+		if cluster.Status.PGDataImageInfo == nil {
+			return true
+		}
+
+		backupMajorVersion := backup.Status.MajorVersion
+		if backupMajorVersion == 0 {
+			contextLogger.Warning(
+				"majorVersion on backup status is not populated, cannot use it as a recovery source.",
+			)
+			return false
+		}
+
+		return majorVersion == backupMajorVersion
 	}
+
+	backupList.SortByReverseCreationTime()
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues("backupName", backup.Name, "backupMethod", backup.Spec.Method)
+
+		// Skip if not a completed barman backup
+		if backup.Spec.Method != apiv1.BackupMethodBarmanObjectStore ||
+			backup.Status.Phase != apiv1.BackupPhaseCompleted {
+			contextLogger.Trace("skipping backup, not a completed barman object store backup")
+			continue
+		}
+
+		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because it was created before the Cluster object")
+			continue
+		}
+
+		if !isCorrectMajorVersion(backup) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate because of major version mismatch",
+			)
+			continue
+		}
+
+		contextLogger.Debug("found a barman backup that is a valid storage source candidate")
+		// For barman backups, we return a special marker to indicate that barman backup
+		// should be used. The actual backup selection is handled elsewhere in the bootstrap process.
+		return &StorageSource{
+			DataSource: corev1.TypedLocalObjectReference{
+				Kind: "BarmanBackup",
+				Name: backup.Name,
+			},
+		}
+	}
+
+	return nil
 }
