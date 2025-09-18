@@ -78,23 +78,23 @@ func (db *OSDB) Get(version string) (OSEntry, bool) {
 func init() {
 	// Known Debian releases
 	defaultOSDB.Register(OSEntry{
-		Version:         "10 (buster)",
-		DeprecatedFrom:  time.Date(2022, time.September, 10, 0, 0, 0, 0, time.UTC),
+		Version:        "10 (buster)",
+		DeprecatedFrom: time.Date(2022, time.September, 10, 0, 0, 0, 0, time.UTC),
 		SupportedUntil: time.Date(2024, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
-		Version:         "11 (bullseye)",
-		DeprecatedFrom:  time.Date(2024, time.August, 14, 0, 0, 0, 0, time.UTC),
+		Version:        "11 (bullseye)",
+		DeprecatedFrom: time.Date(2024, time.August, 14, 0, 0, 0, 0, time.UTC),
 		SupportedUntil: time.Date(2026, time.August, 31, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
-		Version:         "12 (bookworm)",
-		DeprecatedFrom:  time.Date(2026, time.June, 10, 0, 0, 0, 0, time.UTC),
+		Version:        "12 (bookworm)",
+		DeprecatedFrom: time.Date(2026, time.June, 10, 0, 0, 0, 0, time.UTC),
 		SupportedUntil: time.Date(2028, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 	defaultOSDB.Register(OSEntry{
-		Version:         "13 (trixie)",
-		DeprecatedFrom:  time.Date(2028, time.August, 9, 0, 0, 0, 0, time.UTC),
+		Version:        "13 (trixie)",
+		DeprecatedFrom: time.Date(2028, time.August, 9, 0, 0, 0, 0, time.UTC),
 		SupportedUntil: time.Date(2030, time.June, 30, 0, 0, 0, 0, time.UTC),
 	})
 }
