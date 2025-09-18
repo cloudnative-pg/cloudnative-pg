@@ -42,13 +42,13 @@ var _ = Describe("OS database", func() {
 			actualDeprecated := entry.IsDeprecated(today)
 			Expect(actualDeprecated).To(
 				Equal(deprecated),
-				"expected %s depracation status to be %t instead of %t", distro, deprecated, actualDeprecated)
+				"expected %s deprecation status to be %t instead of %t", distro, deprecated, actualDeprecated)
 			Expect(actualSupported).To(
 				Equal(supported),
 				"expected %s support status to be %t instead of %t", distro, supported, actualSupported)
 		},
 		Entry("trixie", "13 (trixie)", false, true),
 		Entry("bullseye", "11 (bullseye)", true, true),
-		Entry("bullseye", "10 (buster)", true, false),
+		Entry("buster", "10 (buster)", true, false),
 	)
 })
