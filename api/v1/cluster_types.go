@@ -317,7 +317,7 @@ type ClusterSpec struct {
 
 	// Configure the generation of the service account
 	// +optional
-	ServiceAccountTemplate *ServiceAccountTemplate `json:"serviceAccountTemplate,omitempty"`
+	ServiceAccount *ServiceAccount `json:"serviceAccount,omitempty"`
 
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	// +optional
@@ -687,11 +687,25 @@ type EphemeralVolumesSizeLimitConfiguration struct {
 	TemporaryData *resource.Quantity `json:"temporaryData,omitempty"`
 }
 
-// ServiceAccountTemplate contains the template needed to generate the service accounts
-type ServiceAccountTemplate struct {
-	// Metadata are the metadata to be used for the generated
-	// service account
-	Metadata Metadata `json:"metadata"`
+// ServiceAccount contains the configuration of the service account
+type ServiceAccount struct {
+	// Create indicates whether the service account should be created or not.
+	Create bool `json:"create,omitempty"`
+
+	// Name is the name of the service account to be used.
+	// If not specified, the name of the cluster will be used.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Annotations are the annotations to be used for the generated
+	// service account. If not specified, no annotations will be added.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Labels are the labels to be used for the generated
+	// service account. If not specified, no labels will be added.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
