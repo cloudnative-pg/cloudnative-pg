@@ -281,7 +281,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		// Avoid printing the start time when hibernated or fenced
 		primaryStartTime := getPrimaryStartTime(cluster)
 		if len(primaryStartTime) > 0 {
-			summary.AddLine("Primary start time:", primaryStartTime)
+			summary.AddLine("Primary since:", primaryStartTime)
 		}
 		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
@@ -1262,7 +1262,7 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 
 	uptime := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
-		"%s (uptime %s)",
+		"%s (%s)",
 		primaryInstanceTimestamp.Round(time.Second),
 		uptime.Round(time.Second),
 	)
