@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -512,13 +513,24 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// ensuring the primary to be healthy. The hibernation starts from the
 	// primary Pod to ensure the replicas are in sync and doing it here avoids
 	// any unwanted switchover.
-	if result, err := hibernation.Reconcile(
+	result, err := hibernation.Reconcile(
 		ctx,
 		r.Client,
 		cluster,
 		resources.instances.Items,
-	); result != nil || err != nil {
-		return *result, err
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if meta.IsStatusConditionTrue(cluster.Status.Conditions, hibernation.HibernationConditionType) {
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHibernated, "Instance Pods have been removed"); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
+	}
+	if result != nil {
+		return *result, nil
 	}
 
 	// We have already updated the status in updateResourceStatus call,
@@ -539,7 +551,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
-	result, err := r.handleSwitchover(ctx, cluster, resources, instancesStatus)
+	result, err = r.handleSwitchover(ctx, cluster, resources, instancesStatus)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
