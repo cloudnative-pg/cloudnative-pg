@@ -40,8 +40,8 @@ spec:
   cluster:
     name: cluster-example
   extensions:
-  - name: bloom
-    ensure: present
+    - name: bloom
+      ensure: present
 ```
 
 When applied, this manifest creates a `Database` object called
@@ -181,8 +181,8 @@ with a list of extension specifications, as shown in the following example:
 # ...
 spec:
   extensions:
-  - name: bloom
-    ensure: present
+    - name: bloom
+      ensure: present
 # ...
 ```
 
@@ -236,8 +236,8 @@ with a list of schema specifications, as shown in the following example:
 # ...
 spec:
   schemas:
-  - name: app
-    owner: app
+    - name: app
+      owner: app
 # ...
 ```
 
@@ -275,10 +275,10 @@ specifications, as shown in the following example:
 # ...
 spec:
   fdws:
-  - name: postgres_fdw
-    usage:
-      - name: app
-      - type: grant
+    - name: postgres_fdw
+      usage:
+        - name: app
+          type: grant
 # ...
 ```
 
@@ -349,17 +349,17 @@ resource with a list of foreign server specifications, for example:
 # ...
 spec:
   servers:
-  - name: angus
-    fdw: postgres_fdw
-    ensure: present
-    usage:
-      - name: app
-        type: grant
-    options:
-    - name: host
-      value: angus-rw
-    - name: dbname
-      value: app
+    - name: angus
+      fdw: postgres_fdw
+      ensure: present
+      usage:
+        - name: app
+          type: grant
+      options:
+        - name: host
+          value: angus-rw
+        - name: dbname
+          value: app
 # ...
 ```
 
