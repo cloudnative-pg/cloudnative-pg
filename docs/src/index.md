@@ -109,7 +109,8 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Declarative management of key PostgreSQL configurations, including:
     - PostgreSQL settings.
     - Roles, users, and groups.
-    - Databases, extensions, schemas, and foreign data wrappers (FDW).
+    - Databases, extensions, schemas, foreign data wrappers (FDW), and foreign
+      servers.
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
