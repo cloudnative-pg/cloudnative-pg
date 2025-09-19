@@ -27,7 +27,7 @@ import (
 
 	"github.com/blang/semver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -112,7 +112,7 @@ func GetOpenshiftVersion(ctx context.Context, restConfig *rest.Config) (semver.V
 		Group:    "operator.openshift.io",
 		Version:  "v1",
 		Resource: "openshiftcontrollermanagers",
-	}).Get(ctx, "cluster", v1.GetOptions{})
+	}).Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
 		return semver.Version{}, err
 	}

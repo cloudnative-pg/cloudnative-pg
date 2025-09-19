@@ -22,8 +22,8 @@ package controller
 import (
 	"context"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -528,7 +528,7 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 					Recovery: &apiv1.BootstrapRecovery{
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(volumesnapshot.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     apiv1.VolumeSnapshotKind,
 								Name:     "pgdata",
 							},
@@ -540,8 +540,8 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 	})
 
 	It("should not requeue if bootstrapping from a valid volume snapshot", func(ctx SpecContext) {
-		snapshots := volumesnapshot.VolumeSnapshotList{
-			Items: []volumesnapshot.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pgdata",
@@ -576,8 +576,8 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 
 	// nolint: dupl
 	It("should requeue if bootstrapping from an invalid volume snapshot", func(ctx SpecContext) {
-		snapshots := volumesnapshot.VolumeSnapshotList{
-			Items: []volumesnapshot.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pgdata",
@@ -613,8 +613,8 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 
 	// nolint: dupl
 	It("should requeue if bootstrapping from a snapshot that isn't there", func(ctx SpecContext) {
-		snapshots := volumesnapshot.VolumeSnapshotList{
-			Items: []volumesnapshot.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "foobar",
@@ -688,14 +688,14 @@ var _ = Describe("Set cluster metadata of service account", func() {
 
 type mockPodMonitorManager struct {
 	isEnabled  bool
-	podMonitor *v1.PodMonitor
+	podMonitor *monitoringv1.PodMonitor
 }
 
 func (m *mockPodMonitorManager) IsPodMonitorEnabled() bool {
 	return m.isEnabled
 }
 
-func (m *mockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
+func (m *mockPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	return m.podMonitor
 }
 
@@ -711,7 +711,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		ctx = context.Background()
 		manager = &mockPodMonitorManager{}
 		manager.isEnabled = true
-		manager.podMonitor = &v1.PodMonitor{
+		manager.podMonitor = &monitoringv1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
@@ -742,7 +742,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		err := createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{
@@ -772,7 +772,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// Ensure the PodMonitor doesn't exist anymore
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{
@@ -803,7 +803,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{

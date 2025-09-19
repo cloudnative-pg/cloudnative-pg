@@ -25,7 +25,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -78,10 +78,10 @@ var _ = Describe("PostgresManager", func() {
 	Context("List", func() {
 		const expectedSQL = "^SELECT (.+) FROM pg_catalog.pg_replication_slots"
 
-		var config *v1.ReplicationSlotsConfiguration
+		var config *apiv1.ReplicationSlotsConfiguration
 		BeforeEach(func() {
-			config = &v1.ReplicationSlotsConfiguration{
-				HighAvailability: &v1.ReplicationSlotsHAConfiguration{
+			config = &apiv1.ReplicationSlotsConfiguration{
+				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
 					Enabled:    new(bool),
 					SlotPrefix: "_cnpg_",
 				},
