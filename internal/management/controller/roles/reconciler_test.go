@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,7 +32,7 @@ import (
 
 var _ = Describe("Role reconciler test", func() {
 	It("reconcile an empty cluster", func(ctx SpecContext) {
-		cluster := &v1.Cluster{}
+		cluster := &apiv1.Cluster{}
 		instance := &postgres.Instance{}
 		mockClient := fake.NewClientBuilder().Build()
 
@@ -44,10 +44,10 @@ var _ = Describe("Role reconciler test", func() {
 	It("reconcile fails with no database connection", func(ctx SpecContext) {
 		instance := &postgres.Instance{}
 		mockClient := fake.NewClientBuilder().Build()
-		cluster := &v1.Cluster{
-			Spec: v1.ClusterSpec{
-				Managed: &v1.ManagedConfiguration{
-					Roles: []v1.RoleConfiguration{
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Managed: &apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{
 						{
 							Name:    "dante",
 							Comment: "divine comedy",

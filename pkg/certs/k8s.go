@@ -31,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/robfig/cron"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,7 +88,7 @@ type PublicKeyInfrastructure struct {
 // RenewLeafCertificate renew a secret containing a server
 // certificate given the secret containing the CA that will sign it.
 // Returns true if the certificate has been renewed
-func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret, altDNSNames []string) (bool, error) {
+func RenewLeafCertificate(caSecret *corev1.Secret, secret *corev1.Secret, altDNSNames []string) (bool, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseServerSecret(secret)
 	if err != nil {
@@ -161,8 +161,8 @@ func (pki *PublicKeyInfrastructure) Setup(
 func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 	ctx context.Context,
 	kubeClient client.Client,
-) (*v1.Secret, error) {
-	secret := &v1.Secret{}
+) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
 	// Checking if the root CA already exist
 	err := kubeClient.Get(ctx, types.NamespacedName{Namespace: pki.OperatorNamespace, Name: pki.CaSecretName}, secret)
 	if err == nil {
@@ -198,7 +198,7 @@ func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 
 // renewCACertificate renews a CA certificate if needed, returning the updated
 // secret if the secret has been renewed
-func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *v1.Secret) (*v1.Secret, error) {
+func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *corev1.Secret) (*corev1.Secret, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseCASecret(secret)
 	if err != nil {
@@ -264,8 +264,8 @@ func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	ctx context.Context,
 	kubeClient client.Client,
-	caSecret *v1.Secret,
-) (*v1.Secret, error) {
+	caSecret *corev1.Secret,
+) (*corev1.Secret, error) {
 	if err := fileutils.EnsureDirectoryExists(pki.CertDir); err != nil {
 		return nil, err
 	}
@@ -319,13 +319,13 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 
 // ensureCertificate will ensure that a webhook certificate exists and is usable
 func (pki PublicKeyInfrastructure) ensureCertificate(
-	ctx context.Context, kubeClient client.Client, caSecret *v1.Secret,
-) (*v1.Secret, error) {
+	ctx context.Context, kubeClient client.Client, caSecret *corev1.Secret,
+) (*corev1.Secret, error) {
 	webhookHostname := fmt.Sprintf(
 		"%v.%v.svc",
 		pki.ServiceName,
 		pki.OperatorNamespace)
-	secret := &v1.Secret{}
+	secret := &corev1.Secret{}
 	// Checking if the secret already exist
 	if err := kubeClient.Get(
 		ctx,
@@ -370,8 +370,8 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret, altDNSNames []string,
-) (*v1.Secret, error) {
+	ctx context.Context, kubeClient client.Client, caSecret corev1.Secret, secret *corev1.Secret, altDNSNames []string,
+) (*corev1.Secret, error) {
 	origSecret := secret.DeepCopy()
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret, altDNSNames)
 	if err != nil {
@@ -390,7 +390,7 @@ func renewServerCertificate(
 
 // ensureMountedSecretsAreInSync returns errSecretsMountNotRefreshed if secrets are not yet refreshed by the kubelet
 // or any other error encountered while reading the file
-func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
+func ensureMountedSecretsAreInSync(secret *corev1.Secret, certDir string) error {
 	for name, content := range secret.Data {
 		fileName := path.Join(certDir, name)
 		mountedVersion, err := fileutils.ReadFile(fileName)
@@ -407,7 +407,7 @@ func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
 // injectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
-	ctx context.Context, kubeClient client.Client, tlsSecret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, tlsSecret *corev1.Secret,
 ) error {
 	config := &admissionregistrationv1.MutatingWebhookConfiguration{}
 	if err := kubeClient.Get(ctx, types.NamespacedName{Name: pki.MutatingWebhookConfigurationName}, config); err != nil {
@@ -433,7 +433,7 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 // injectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
-	ctx context.Context, kubeClient client.Client, tlsSecret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, tlsSecret *corev1.Secret,
 ) error {
 	config := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 	if err := kubeClient.Get(ctx, types.NamespacedName{Name: pki.ValidatingWebhookConfigurationName}, config); err != nil {

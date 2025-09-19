@@ -36,7 +36,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -232,8 +232,8 @@ func (pair KeyPair) createAndSignPairWithValidity(
 }
 
 // GenerateCASecret create a k8s CA secret from a key pair
-func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
-	return &v1.Secret{
+func (pair KeyPair) GenerateCASecret(namespace, name string) *corev1.Secret {
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -242,13 +242,13 @@ func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
 			CAPrivateKeyKey: pair.Private,
 			CACertKey:       pair.Certificate,
 		},
-		Type: v1.SecretTypeOpaque,
+		Type: corev1.SecretTypeOpaque,
 	}
 }
 
 // GenerateCertificateSecret creates a k8s server secret from a key pair
-func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *v1.Secret {
-	return &v1.Secret{
+func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *corev1.Secret {
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -257,7 +257,7 @@ func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *v1.Secret
 			TLSPrivateKeyKey: pair.Private,
 			TLSCertKey:       pair.Certificate,
 		},
-		Type: v1.SecretTypeTLS,
+		Type: corev1.SecretTypeTLS,
 	}
 }
 
@@ -375,7 +375,7 @@ func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error
 }
 
 // ParseCASecret parse a CA secret to a key pair
-func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
+func ParseCASecret(secret *corev1.Secret) (*KeyPair, error) {
 	privateKey, ok := secret.Data[CAPrivateKeyKey]
 	if !ok {
 		return nil, fmt.Errorf("missing %s secret data", CAPrivateKeyKey)
@@ -399,7 +399,7 @@ func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
 }
 
 // ParseServerSecret parse a secret for a server to a key pair
-func ParseServerSecret(secret *v1.Secret) (*KeyPair, error) {
+func ParseServerSecret(secret *corev1.Secret) (*KeyPair, error) {
 	privateKey, ok := secret.Data[TLSPrivateKeyKey]
 	if !ok {
 		return nil, fmt.Errorf("missing %v secret data", TLSPrivateKeyKey)

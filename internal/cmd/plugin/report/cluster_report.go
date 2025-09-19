@@ -31,14 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // clusterReport contains the data to be printed by the `report cluster` plugin
 type clusterReport struct {
-	cluster     cnpgv1.Cluster
+	cluster     apiv1.Cluster
 	clusterPods corev1.PodList
 	clusterJobs batchv1.JobList
 	clusterPVCs corev1.PersistentVolumeClaimList
@@ -91,7 +91,7 @@ func cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 		return fmt.Errorf("could not get events: %w", err)
 	}
 
-	var cluster cnpgv1.Cluster
+	var cluster apiv1.Cluster
 	err = plugin.Client.Get(ctx,
 		types.NamespacedName{Namespace: namespace, Name: clusterName},
 		&cluster)

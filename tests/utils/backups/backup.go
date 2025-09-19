@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"os"
 
-	v1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	v2 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,12 +74,12 @@ func GetVolumeSnapshot(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace, name string,
-) (*v1.VolumeSnapshot, error) {
+) (*volumesnapshotv1.VolumeSnapshot, error) {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}
-	volumeSnapshot := &v1.VolumeSnapshot{}
+	volumeSnapshot := &volumesnapshotv1.VolumeSnapshot{}
 	err := objects.Get(ctx, crudClient, namespacedName, volumeSnapshot)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func GetConditionsInClusterStatus(
 	namespace,
 	clusterName string,
 	conditionType apiv1.ClusterConditionType,
-) (*v2.Condition, error) {
+) (*metav1.Condition, error) {
 	var cluster *apiv1.Cluster
 	var err error
 
@@ -242,7 +242,7 @@ func CreateClusterFromBackupUsingPITR(
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v2.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
 		},
@@ -304,7 +304,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v2.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
@@ -394,7 +394,7 @@ func CreateOnDemand(
 	method apiv1.BackupMethod,
 ) (*apiv1.Backup, error) {
 	targetBackup := &apiv1.Backup{
-		ObjectMeta: v2.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupName,
 			Namespace: namespace,
 		},

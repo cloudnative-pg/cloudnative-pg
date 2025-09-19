@@ -26,7 +26,7 @@ import (
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -59,7 +59,7 @@ func ImportDatabaseMicroservice(
 	}
 	appUserSecretName := sourceClusterName + apiv1.ApplicationUserSecretSuffix
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      importedClusterName,
 			Namespace: namespace,
 		},
@@ -141,7 +141,7 @@ func ImportDatabasesMonolith(
 	}
 	superUserSecretName := sourceClusterName + apiv1.SuperUserSecretSuffix
 	targetCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      importedClusterName,
 			Namespace: namespace,
 		},

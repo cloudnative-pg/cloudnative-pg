@@ -25,7 +25,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -71,12 +71,12 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 }
 
 // ensureClientCASecret ensure that the cluster CA really exist and is valid
-func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *apiv1.Cluster) (*v1.Secret, error) {
+func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *apiv1.Cluster) (*corev1.Secret, error) {
 	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ClientCASecret == "" {
 		return r.ensureCASecret(ctx, cluster, cluster.GetClientCASecretName())
 	}
 
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetClientCASecretName()},
 		&secret)
 	// If specified and error, bubble up
@@ -106,14 +106,14 @@ func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *a
 }
 
 // ensureServerCASecret ensure that the cluster CA really exist and is valid
-func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *apiv1.Cluster) (*v1.Secret, error) {
+func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *apiv1.Cluster) (*corev1.Secret, error) {
 	// If not specified, use default amd renew/generate
 	certificates := cluster.Spec.Certificates
 	if certificates == nil || certificates.ServerCASecret == "" {
 		return r.ensureCASecret(ctx, cluster, cluster.GetServerCASecretName())
 	}
 
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerCASecretName()},
 		&secret)
 	// If specified and error, bubble up
@@ -142,7 +142,7 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 	return &secret, nil
 }
 
-func (r *ClusterReconciler) verifyCAValidity(ctx context.Context, secret v1.Secret, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) verifyCAValidity(ctx context.Context, secret corev1.Secret, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Verify validity of the CA and expiration (only ca.crt)
@@ -169,8 +169,8 @@ func (r *ClusterReconciler) verifyCAValidity(ctx context.Context, secret v1.Secr
 
 func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *apiv1.Cluster,
 	secretName string,
-) (*v1.Secret, error) {
-	var secret v1.Secret
+) (*corev1.Secret, error) {
+	var secret corev1.Secret
 	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: secretName}, &secret)
 	if err == nil {
 		// Verify the validity of this CA and renew it if needed
@@ -197,7 +197,7 @@ func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *apiv1.C
 }
 
 // renewCASecret check if this CA secret is valid and renew it if needed
-func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret) error {
+func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *corev1.Secret) error {
 	pair, err := certs.ParseCASecret(secret)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 func (r *ClusterReconciler) ensureServerLeafCertificate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	caSecret *v1.Secret,
+	caSecret *corev1.Secret,
 ) error {
 	// This is the certificate for the server
 	secretName := client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerTLSSecretName()}
@@ -248,7 +248,7 @@ func (r *ClusterReconciler) ensureServerLeafCertificate(
 		)
 	}
 
-	var serverSecret v1.Secret
+	var serverSecret corev1.Secret
 	if err := r.Get(ctx, secretName, &serverSecret); apierrors.IsNotFound(err) {
 		return fmt.Errorf("missing specified server TLS secret %s: %w",
 			cluster.Status.Certificates.ServerTLSSecret, err)
@@ -265,7 +265,7 @@ func (r *ClusterReconciler) ensureServerLeafCertificate(
 func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	caSecret *v1.Secret,
+	caSecret *corev1.Secret,
 ) error {
 	// Generating postgres client certificate
 	replicationSecretObjectKey := client.ObjectKey{
@@ -287,7 +287,7 @@ func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 		)
 	}
 
-	var replicationClientSecret v1.Secret
+	var replicationClientSecret corev1.Secret
 	if err := r.Get(ctx, replicationSecretObjectKey, &replicationClientSecret); apierrors.IsNotFound(err) {
 		return fmt.Errorf("missing specified replication TLS secret %s: %w",
 			replicationSecretObjectKey.Name, err)
@@ -299,7 +299,7 @@ func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 	return validateLeafCertificate(caSecret, &replicationClientSecret, opts)
 }
 
-func validateLeafCertificate(caSecret *v1.Secret, serverSecret *v1.Secret, opts *x509.VerifyOptions) error {
+func validateLeafCertificate(caSecret *corev1.Secret, serverSecret *corev1.Secret, opts *x509.VerifyOptions) error {
 	publicKey, ok := caSecret.Data[certs.CACertKey]
 	if !ok {
 		return fmt.Errorf("missing %s secret data", certs.CACertKey)
@@ -321,12 +321,12 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	cluster *apiv1.Cluster,
 	secretName client.ObjectKey,
 	commonName string,
-	caSecret *v1.Secret,
+	caSecret *corev1.Secret,
 	usage certs.CertType,
 	altDNSNames []string,
 	additionalLabels map[string]string,
 ) error {
-	var secret v1.Secret
+	var secret corev1.Secret
 	err := r.Get(ctx, secretName, &secret)
 	switch {
 	case err == nil:
@@ -352,12 +352,12 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 
 // generateCertificateFromCA create a certificate secret using the provided CA secret
 func generateCertificateFromCA(
-	caSecret *v1.Secret,
+	caSecret *corev1.Secret,
 	commonName string,
 	usage certs.CertType,
 	altDNSNames []string,
 	secretName client.ObjectKey,
-) (*v1.Secret, error) {
+) (*corev1.Secret, error) {
 	caPair, err := certs.ParseCASecret(caSecret)
 	if err != nil {
 		return nil, err
@@ -376,8 +376,8 @@ func generateCertificateFromCA(
 // the secret
 func (r *ClusterReconciler) renewAndUpdateCertificate(
 	ctx context.Context,
-	caSecret *v1.Secret,
-	secret *v1.Secret,
+	caSecret *corev1.Secret,
+	secret *corev1.Secret,
 	altDNSNames []string,
 ) error {
 	origSecret := secret.DeepCopy()
