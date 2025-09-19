@@ -37,7 +37,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	v1 "k8s.io/api/events/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -376,8 +376,8 @@ func GetEventList(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace string,
-) (*v1.EventList, error) {
-	eventList := &v1.EventList{}
+) (*eventsv1.EventList, error) {
+	eventList := &eventsv1.EventList{}
 	err := crudClient.List(
 		ctx, eventList, client.InNamespace(namespace),
 	)

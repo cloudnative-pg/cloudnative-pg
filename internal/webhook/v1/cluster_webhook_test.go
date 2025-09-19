@@ -29,7 +29,7 @@ import (
 	"github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4243,12 +4243,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &apiv1.BootstrapRecovery{
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
@@ -4267,12 +4267,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &apiv1.BootstrapRecovery{
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
@@ -4289,12 +4289,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgwal",
 				},
@@ -4307,7 +4307,7 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
@@ -4323,12 +4323,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 				VolumeSnapshots: &apiv1.DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},
@@ -4343,12 +4343,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 				VolumeSnapshots: &apiv1.DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},

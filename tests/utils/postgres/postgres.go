@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -95,7 +95,7 @@ func GetCurrentTimestamp(
 		namespace,
 		clusterName,
 		AppDBName,
-		v1.ApplicationUserSecretSuffix,
+		apiv1.ApplicationUserSecretSuffix,
 		"select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');",
 	)
 	if err != nil {

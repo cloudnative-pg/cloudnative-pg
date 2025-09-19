@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +116,7 @@ func createClient(cfg *rest.Config) error {
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = apiv1.AddToScheme(scheme)
-	_ = storagesnapshotv1.AddToScheme(scheme)
+	_ = volumesnapshotv1.AddToScheme(scheme)
 
 	cfg.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
 

@@ -30,7 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -588,7 +588,7 @@ var _ = DescribeTable("role secrets test",
 	) {
 		// define various secrets as test cases to show failure modes
 		secret := corev1.Secret{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: namespace,
 			},
@@ -598,7 +598,7 @@ var _ = DescribeTable("role secrets test",
 			},
 		}
 		secretNoUser := corev1.Secret{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretNameNoUser,
 				Namespace: namespace,
 			},
@@ -607,7 +607,7 @@ var _ = DescribeTable("role secrets test",
 			},
 		}
 		secretNoPass := corev1.Secret{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretNameNoPass,
 				Namespace: namespace,
 			},

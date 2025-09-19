@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,7 +177,7 @@ func VerifyDataSourceCoherence(
 }
 
 type metadataSource struct {
-	snapshot *storagesnapshotv1.VolumeSnapshot
+	snapshot *volumesnapshotv1.VolumeSnapshot
 	pvc      *corev1.PersistentVolumeClaim
 }
 
@@ -187,8 +187,8 @@ func newMetadataSource(source corev1.TypedLocalObjectReference) (*metadataSource
 	if source.APIGroup != nil {
 		apiGroup = *source.APIGroup
 	}
-	if apiGroup == storagesnapshotv1.GroupName && source.Kind == "VolumeSnapshot" {
-		objRef.snapshot = &storagesnapshotv1.VolumeSnapshot{}
+	if apiGroup == volumesnapshotv1.GroupName && source.Kind == "VolumeSnapshot" {
+		objRef.snapshot = &volumesnapshotv1.VolumeSnapshot{}
 		return objRef, nil
 	}
 	if apiGroup == corev1.GroupName && source.Kind == "PersistentVolumeClaim" {
