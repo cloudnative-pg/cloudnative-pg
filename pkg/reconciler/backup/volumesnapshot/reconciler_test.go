@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"time"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	v1 "k8s.io/api/core/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -63,8 +63,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	)
 	var (
 		cluster   *apiv1.Cluster
-		targetPod *v1.Pod
-		pvcs      []v1.PersistentVolumeClaim
+		targetPod *corev1.Pod
+		pvcs      []corev1.PersistentVolumeClaim
 		backup    *apiv1.Backup
 	)
 
@@ -85,13 +85,13 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				},
 			},
 		}
-		targetPod = &v1.Pod{
+		targetPod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterName + "-2",
 			},
 		}
-		pvcs = []v1.PersistentVolumeClaim{
+		pvcs = []corev1.PersistentVolumeClaim{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2",
@@ -150,15 +150,15 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(data.Len()).To(Equal(1))
 		Expect(data.Has(targetPod.Name)).To(BeTrue())
 
-		var snapshotList storagesnapshotv1.VolumeSnapshotList
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		err = mockClient.List(ctx, &snapshotList)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(snapshotList.Items).NotTo(BeEmpty())
 	})
 
 	It("should not fence the target pod when there are existing volumesnapshots", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:   namespace,
@@ -209,8 +209,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
@@ -222,7 +222,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						ReadyToUse:                     ptr.To(false),
 						Error:                          nil,
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
@@ -240,7 +240,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						ReadyToUse:                     ptr.To(false),
 						Error:                          nil,
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
@@ -285,8 +285,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
@@ -298,7 +298,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
 						ReadyToUse:                     ptr.To(true),
 						Error:                          nil,
@@ -316,7 +316,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
 						ReadyToUse:                     ptr.To(true),
 						Error:                          nil,
@@ -422,14 +422,14 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 var _ = Describe("annotateSnapshotsWithBackupData", func() {
 	var (
 		fakeClient   k8client.Client
-		snapshots    storagesnapshotv1.VolumeSnapshotList
+		snapshots    volumesnapshotv1.VolumeSnapshotList
 		backupStatus *apiv1.BackupStatus
 		startedAt    metav1.Time
 		stoppedAt    metav1.Time
 	)
 
 	BeforeEach(func() {
-		snapshots = storagesnapshotv1.VolumeSnapshotList{
+		snapshots = volumesnapshotv1.VolumeSnapshotList{
 			Items: slice{
 				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Annotations: map[string]string{"avoid": "nil"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-2", Annotations: map[string]string{"avoid": "nil"}}},

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,7 +65,7 @@ var (
 
 var _ = Describe("The PostgreSQL security context with", func() {
 	It("default RuntimeDefault profile", func() {
-		cluster := v1.Cluster{}
+		cluster := apiv1.Cluster{}
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -78,7 +78,7 @@ var _ = Describe("The PostgreSQL security context with", func() {
 			Type:             corev1.SeccompProfileTypeLocalhost,
 			LocalhostProfile: &profilePath,
 		}
-		cluster := v1.Cluster{Spec: v1.ClusterSpec{SeccompProfile: localhostProfile}}
+		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{SeccompProfile: localhostProfile}}
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -91,7 +91,7 @@ var _ = Describe("Create affinity section", func() {
 	clusterName := "cluster-test"
 
 	It("enable preferred pod affinity everything default", func() {
-		config := v1.AffinityConfiguration{
+		config := apiv1.AffinityConfiguration{
 			PodAntiAffinityType: "preferred",
 		}
 		affinity := CreateAffinitySection(clusterName, config)
@@ -100,7 +100,7 @@ var _ = Describe("Create affinity section", func() {
 	})
 
 	It("can not set pod affinity if pod anti-affinity is disabled", func() {
-		config := v1.AffinityConfiguration{
+		config := apiv1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(false),
 		}
 		affinity := CreateAffinitySection(clusterName, config)
@@ -108,7 +108,7 @@ var _ = Describe("Create affinity section", func() {
 	})
 
 	It("can set pod anti affinity with 'preferred' pod anti-affinity type", func() {
-		config := v1.AffinityConfiguration{
+		config := apiv1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(true),
 			PodAntiAffinityType:   "preferred",
 		}
@@ -118,7 +118,7 @@ var _ = Describe("Create affinity section", func() {
 	})
 
 	It("can set pod anti-affinity with 'required' pod anti-affinity type", func() {
-		config := v1.AffinityConfiguration{
+		config := apiv1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(true),
 			PodAntiAffinityType:   "required",
 		}
@@ -128,7 +128,7 @@ var _ = Describe("Create affinity section", func() {
 		Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(BeNil())
 	})
 	It("does not set pod anti-affinity if provided an invalid type", func() {
-		config := v1.AffinityConfiguration{
+		config := apiv1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(true),
 			PodAntiAffinityType:   "not-a-type",
 		}
@@ -142,7 +142,7 @@ var _ = Describe("Create affinity section", func() {
 	When("given additional affinity terms", func() {
 		When("generated pod anti-affinity is enabled", func() {
 			It("sets both pod affinity and anti-affinity correctly if passed and set to required", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(true),
 					PodAntiAffinityType:   "required",
 					AdditionalPodAffinity: &corev1.PodAffinity{
@@ -168,7 +168,7 @@ var _ = Describe("Create affinity section", func() {
 					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
 			})
 			It("sets pod both affinity and anti-affinity correctly if passed and set to preferred", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(true),
 					PodAntiAffinityType:   "preferred",
 					AdditionalPodAffinity: &corev1.PodAffinity{
@@ -196,7 +196,7 @@ var _ = Describe("Create affinity section", func() {
 		})
 		When("generated pod anti-affinity is disabled", func() {
 			It("sets pod required anti-affinity correctly if passed", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(false),
 					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{testAffinityTerm},
@@ -210,7 +210,7 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAffinity).To(BeNil())
 			})
 			It("sets pod preferred anti-affinity correctly if passed", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(false),
 					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
@@ -224,7 +224,7 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAffinity).To(BeNil())
 			})
 			It("sets pod preferred affinity correctly if passed", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(false),
 					AdditionalPodAffinity: &corev1.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
@@ -238,7 +238,7 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAntiAffinity).To(BeNil())
 			})
 			It("sets pod required affinity correctly if passed", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(false),
 					AdditionalPodAffinity: &corev1.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{testAffinityTerm},
@@ -252,7 +252,7 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAntiAffinity).To(BeNil())
 			})
 			It("sets pod both affinity and anti-affinity correctly if passed", func() {
-				config := v1.AffinityConfiguration{
+				config := apiv1.AffinityConfiguration{
 					EnablePodAntiAffinity: pointerToBool(false),
 					AdditionalPodAffinity: &corev1.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
@@ -281,7 +281,7 @@ var _ = Describe("Create affinity section", func() {
 
 	When("given node affinity config", func() {
 		It("sets node affinity", func() {
-			config := v1.AffinityConfiguration{
+			config := apiv1.AffinityConfiguration{
 				NodeAffinity: &corev1.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
 						NodeSelectorTerms: []corev1.NodeSelectorTerm{testNodeSelectorTerm},
@@ -301,12 +301,12 @@ var _ = Describe("Create affinity section", func() {
 var _ = Describe("EnvConfig", func() {
 	Context("IsEnvEqual function", func() {
 		It("returns true if the Env are equal", func() {
-			cluster := v1.Cluster{
+			cluster := apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: "test-ns",
 				},
-				Spec: v1.ClusterSpec{
+				Spec: apiv1.ClusterSpec{
 					Env: []corev1.EnvVar{
 						{
 							Name:  "TEST_ENV",
@@ -362,7 +362,7 @@ var _ = Describe("EnvConfig", func() {
 		})
 
 		It("returns false if the Env are different", func() {
-			cluster := v1.Cluster{
+			cluster := apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: "test-ns",
@@ -411,12 +411,12 @@ var _ = Describe("EnvConfig", func() {
 		})
 
 		It("returns true if the EnvFrom are equal", func() {
-			cluster := v1.Cluster{
+			cluster := apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: "test-ns",
 				},
-				Spec: v1.ClusterSpec{
+				Spec: apiv1.ClusterSpec{
 					EnvFrom: []corev1.EnvFromSource{
 						{
 							ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -447,12 +447,12 @@ var _ = Describe("EnvConfig", func() {
 		})
 
 		It("returns false if the EnvFrom are different", func() {
-			cluster := v1.Cluster{
+			cluster := apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: "test-ns",
 				},
-				Spec: v1.ClusterSpec{
+				Spec: apiv1.ClusterSpec{
 					EnvFrom: []corev1.EnvFromSource{
 						{
 							SecretRef: &corev1.SecretEnvSource{

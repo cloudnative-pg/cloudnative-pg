@@ -33,7 +33,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -777,7 +777,7 @@ func validateVolumeSnapshotSource(
 	}
 
 	switch {
-	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
+	case apiGroup == volumesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
 	case apiGroup == corev1.GroupName && value.Kind == "PersistentVolumeClaim":
 	default:
 		return field.ErrorList{

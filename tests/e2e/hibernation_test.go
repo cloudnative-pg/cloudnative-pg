@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -185,26 +185,26 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				})
 
 				By(fmt.Sprintf("verifying cluster %v role is removed", clusterName), func() {
-					Eventually(func() (bool, v1.Role) {
-						role := v1.Role{}
+					Eventually(func() (bool, rbacv1.Role) {
+						role := rbacv1.Role{}
 						err = env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 							&role)
 						if err != nil {
-							return true, v1.Role{}
+							return true, rbacv1.Role{}
 						}
 						return false, role
 					}, timeout).Should(BeTrue())
 				})
 
 				By(fmt.Sprintf("verifying cluster %v rolebinding is removed", clusterName), func() {
-					Eventually(func() (bool, v1.RoleBinding) {
-						roleBinding := v1.RoleBinding{}
+					Eventually(func() (bool, rbacv1.RoleBinding) {
+						roleBinding := rbacv1.RoleBinding{}
 						err = env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 							&roleBinding)
 						if err != nil {
-							return true, v1.RoleBinding{}
+							return true, rbacv1.RoleBinding{}
 						}
 						return false, roleBinding
 					}, timeout).Should(BeTrue())

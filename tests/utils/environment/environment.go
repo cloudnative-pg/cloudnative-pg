@@ -30,7 +30,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/go-logr/logr"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
@@ -102,7 +102,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
 
-	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
+	if err := volumesnapshotv1.AddToScheme(env.Scheme); err != nil {
 		return nil, err
 	}
 

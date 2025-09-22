@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -53,7 +53,7 @@ type volumeSnapshotInfo struct {
 type volumeSnapshotError struct {
 	// InternalError is a representation of the error given
 	// by the CSI driver
-	InternalError storagesnapshotv1.VolumeSnapshotError
+	InternalError volumesnapshotv1.VolumeSnapshotError
 
 	// Name is the name of the VolumeSnapshot object
 	Name string
@@ -84,8 +84,8 @@ func (err volumeSnapshotError) isRetryable() bool {
 	return isCSIErrorMessageRetriable(*err.InternalError.Message)
 }
 
-// slice represents a slice of []storagesnapshotv1.VolumeSnapshot
-type slice []storagesnapshotv1.VolumeSnapshot
+// slice represents a slice of []volumesnapshotv1.VolumeSnapshot
+type slice []volumesnapshotv1.VolumeSnapshot
 
 // getControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
 func (s slice) getControldata() (string, error) {
@@ -107,7 +107,7 @@ func getBackupVolumeSnapshots(
 	namespace string,
 	backupName string,
 ) (slice, error) {
-	var list storagesnapshotv1.VolumeSnapshotList
+	var list volumesnapshotv1.VolumeSnapshotList
 
 	if err := cli.List(
 		ctx,
@@ -122,7 +122,7 @@ func getBackupVolumeSnapshots(
 }
 
 // parseVolumeSnapshotInfo extracts information from a volume snapshot resource
-func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeSnapshotInfo {
+func parseVolumeSnapshotInfo(snapshot *volumesnapshotv1.VolumeSnapshot) volumeSnapshotInfo {
 	if snapshot.Status == nil {
 		return volumeSnapshotInfo{
 			error:       nil,

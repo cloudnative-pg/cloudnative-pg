@@ -31,7 +31,7 @@ import (
 	"time"
 
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1251,8 +1251,8 @@ func getSnapshots(
 	backupName string,
 	clusterName string,
 	namespace string,
-) (volumesnapshot.VolumeSnapshotList, error) {
-	var snapshotList volumesnapshot.VolumeSnapshotList
+) (volumesnapshotv1.VolumeSnapshotList, error) {
+	var snapshotList volumesnapshotv1.VolumeSnapshotList
 	err := env.Client.List(env.Ctx, &snapshotList, client.InNamespace(namespace),
 		client.MatchingLabels{
 			utils.ClusterLabelName:    clusterName,

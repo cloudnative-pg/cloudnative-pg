@@ -26,11 +26,11 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // List the available replication slots
-func List(ctx context.Context, db *sql.DB, config *v1.ReplicationSlotsConfiguration) (ReplicationSlotList, error) {
+func List(ctx context.Context, db *sql.DB, config *apiv1.ReplicationSlotsConfiguration) (ReplicationSlotList, error) {
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
