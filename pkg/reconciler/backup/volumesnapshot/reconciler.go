@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -458,9 +459,9 @@ func (se *Reconciler) createSnapshot(
 		pvc.Labels = map[string]string{}
 	}
 
-	labels := pvc.Labels
+	labels := maps.Clone(pvc.Labels)
 	utils.MergeMap(labels, snapshotConfig.Labels)
-	annotations := pvc.Annotations
+	annotations := maps.Clone(pvc.Annotations)
 	utils.MergeMap(annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
 
