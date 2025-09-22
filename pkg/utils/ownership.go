@@ -19,14 +19,14 @@ SPDX-License-Identifier: Apache-2.0
 
 package utils
 
-import v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // SetAsOwnedBy sets the controlled object as owned by a certain other
 // controller object with his type information
-func SetAsOwnedBy(controlled *v1.ObjectMeta, controller v1.ObjectMeta, typeMeta v1.TypeMeta) {
+func SetAsOwnedBy(controlled *metav1.ObjectMeta, controller metav1.ObjectMeta, typeMeta metav1.TypeMeta) {
 	isController := true
 
-	controlled.SetOwnerReferences([]v1.OwnerReference{
+	controlled.SetOwnerReferences([]metav1.OwnerReference{
 		{
 			APIVersion: typeMeta.APIVersion,
 			Kind:       typeMeta.Kind,

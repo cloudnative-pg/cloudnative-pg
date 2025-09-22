@@ -27,14 +27,14 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -82,7 +82,7 @@ func NewControllerRuntimeClient() (client.WithWatch, error) {
 		// custom resources
 		&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &apiv1.ImageCatalog{}, &apiv1.ClusterImageCatalog{},
 		// k8s resources needed for the typedClient to work properly
-		&v1.ConfigMap{}, &v1.Secret{},
+		&corev1.ConfigMap{}, &corev1.Secret{},
 	}
 
 	// we register the resources
@@ -121,12 +121,12 @@ func NewEventRecorder() (record.EventRecorder, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(
-		&typedcorev1.EventSinkImpl{
+		&corev1client.EventSinkImpl{
 			Interface: kubeClient.CoreV1().Events(""),
 		})
 	recorder := eventBroadcaster.NewRecorder(
 		Scheme,
-		v1.EventSource{Component: "instance-manager"},
+		corev1.EventSource{Component: "instance-manager"},
 	)
 
 	return recorder, nil

@@ -52,6 +52,40 @@ linters:
         - '-QF1007'
     lll:
       line-length: 120
+    importas:
+      alias:
+        - pkg: github.com/cloudnative-pg/cloudnative-pg/api/v1
+          alias: apiv1
+        - pkg: github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1
+          alias: webhookv1
+        - pkg: github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1
+          alias: volumesnapshotv1
+        - pkg: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
+          alias: monitoringv1
+        - pkg: k8s.io/api/admissionregistration/v1
+          alias: admissionregistrationv1
+        - pkg: k8s.io/api/apps/v1
+          alias: appsv1
+        - pkg: k8s.io/api/batch/v1
+          alias: batchv1
+        - pkg: k8s.io/api/core/v1
+          alias: corev1
+        - pkg: k8s.io/api/discovery/v1
+          alias: discoveryv1
+        - pkg: k8s.io/api/events/v1
+          alias: eventsv1
+        - pkg: k8s.io/api/policy/v1
+          alias: policyv1
+        - pkg: k8s.io/api/rbac/v1
+          alias: rbacv1
+        - pkg: k8s.io/api/storage/v1
+          alias: storagev1
+        - pkg: k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
+          alias: apiextensionsv1
+        - pkg: k8s.io/apimachinery/pkg/apis/meta/v1
+          alias: metav1
+        - pkg: k8s.io/client-go/kubernetes/typed/core/v1
+          alias: corev1client
   exclusions:
     generated: lax
     rules:

@@ -22,7 +22,7 @@ package persistentvolumeclaim
 import (
 	"fmt"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -176,7 +176,7 @@ func (r pgDataCalculator) GetSourceFromBackup(backup *apiv1.Backup) *corev1.Type
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		if element.Type == string(utils.PVCRolePgData) {
 			return &corev1.TypedLocalObjectReference{
-				APIGroup: ptr.To(volumesnapshot.GroupName),
+				APIGroup: ptr.To(volumesnapshotv1.GroupName),
 				Kind:     apiv1.VolumeSnapshotKind,
 				Name:     element.Name,
 			}

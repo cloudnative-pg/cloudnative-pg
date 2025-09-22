@@ -25,7 +25,7 @@ import (
 	"fmt"
 
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -52,7 +52,7 @@ func Promote(ctx context.Context, cli client.Client,
 	}
 
 	// Check if the Pod exist
-	var pod v1.Pod
+	var pod corev1.Pod
 	err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serverName}, &pod)
 	if err != nil {
 		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, namespace, err)
