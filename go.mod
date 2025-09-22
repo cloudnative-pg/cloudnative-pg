@@ -2,6 +2,8 @@ module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.24.1
 
+toolchain go1.25.1
+
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.4.0
