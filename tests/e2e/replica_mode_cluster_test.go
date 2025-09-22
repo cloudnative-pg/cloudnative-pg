@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -462,7 +462,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("fetching the volume snapshots", func() {
-				snapshotList := volumesnapshot.VolumeSnapshotList{}
+				snapshotList := volumesnapshotv1.VolumeSnapshotList{}
 				err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
 					utils.ClusterLabelName: clusterName,
 				})
