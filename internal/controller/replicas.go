@@ -112,7 +112,6 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// If quorum check is active, ensure we don't failover in unsafe scenarios.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary &&
-		cluster.Spec.PostgresConfiguration.Synchronous != nil &&
 		cluster.IsFailoverQuorumActive() {
 		if status, err := r.evaluateQuorumCheck(ctx, cluster, status); err != nil {
 			return "", err

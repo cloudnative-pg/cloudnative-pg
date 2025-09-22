@@ -155,6 +155,13 @@ spec:
     size: 1G
 ```
 
+!!! Note
+    For backward compatibility, the legacy annotation `alpha.cnpg.io/failoverQuorum` is still
+    accepted by the admission webhook. When the annotation evaluates to "true"
+    and a synchronous replication stanza is present, the webhook will set the
+    `.spec.postgresql.synchronous.failoverQuorum` to true.
+    When the annotation evaluates to "false", it is ignored.
+
 ### How it works
 
 Before promoting a replica to primary, the operator performs a quorum check,

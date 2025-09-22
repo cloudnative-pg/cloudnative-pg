@@ -1050,7 +1050,7 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			cfg,
-			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
+			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must be greater than "+
 				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
 				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
 		)
