@@ -223,7 +223,7 @@ func cleanNamespaceList(namespaces string) (result []string) {
 		}
 	}
 
-	return
+	return result
 }
 
 func evaluateGlobPatterns(patterns []string, value string) (result bool) {
@@ -238,9 +238,9 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 		}
 
 		if result {
-			return
+			return result
 		}
 	}
 
-	return
+	return result
 }
