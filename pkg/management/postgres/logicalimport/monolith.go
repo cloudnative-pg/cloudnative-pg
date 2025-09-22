@@ -70,10 +70,7 @@ func Monolith(
 		ctx,
 		destination,
 		databases,
-		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions,
-		cluster.Spec.Bootstrap.InitDB.Import.PgRestorePredataOptions,
-		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreDataOptions,
-		cluster.Spec.Bootstrap.InitDB.Import.PgRestorePostdataOptions,
+		pgRestoreOptionsForImport(cluster.Spec.Bootstrap.InitDB.Import),
 	); err != nil {
 		return err
 	}
