@@ -1539,7 +1539,7 @@ spec:
                               IMPORTANT: Use with caution. The operator does not validate these options,
                               and certain flags may interfere with its intended functionality or design.
                               You are responsible for ensuring that the provided options are compatible
-                              with your environment and desired behaviour.
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
@@ -1551,7 +1551,7 @@ spec:
                               IMPORTANT: Use with caution. The operator does not validate these options,
                               and certain flags may interfere with its intended functionality or design.
                               You are responsible for ensuring that the provided options are compatible
-                              with your environment and desired behaviour.
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
@@ -1562,7 +1562,7 @@ spec:
                               IMPORTANT: Use with caution. The operator does not validate these options,
                               and certain flags may interfere with its intended functionality or design.
                               You are responsible for ensuring that the provided options are compatible
-                              with your environment and desired behaviour.
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
@@ -1574,7 +1574,7 @@ spec:
                               IMPORTANT: Use with caution. The operator does not validate these options,
                               and certain flags may interfere with its intended functionality or design.
                               You are responsible for ensuring that the provided options are compatible
-                              with your environment and desired behaviour.
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
@@ -1586,7 +1586,7 @@ spec:
                               IMPORTANT: Use with caution. The operator does not validate these options,
                               and certain flags may interfere with its intended functionality or design.
                               You are responsible for ensuring that the provided options are compatible
-                              with your environment and desired behaviour.
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
