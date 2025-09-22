@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
@@ -459,9 +460,9 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	labels := pvc.Labels
-	utils.MergeMap(labels, snapshotConfig.Labels)
+	maps.Copy(labels, snapshotConfig.Labels)
 	annotations := pvc.Annotations
-	utils.MergeMap(annotations, snapshotConfig.Annotations)
+	maps.Copy(annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{
