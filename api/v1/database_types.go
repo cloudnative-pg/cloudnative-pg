@@ -38,6 +38,20 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
+// UsageSpecType describes the type of usage specified in the `usage` field of the
+// `Database` object.
+// +enum
+type UsageSpecType string
+
+const (
+	// GrantUsageSpecType indicates a grant usage permission.
+	// The default usage permission is grant.
+	GrantUsageSpecType UsageSpecType = "grant"
+
+	// RevokeUsageSpecType indicates a revoke usage permission.
+	RevokeUsageSpecType UsageSpecType = "revoke"
+)
+
 // DatabaseSpec is the specification of a Postgresql Database, built around the
 // `CREATE DATABASE`, `ALTER DATABASE`, and `DROP DATABASE` SQL commands of
 // PostgreSQL.
@@ -177,18 +191,22 @@ type DatabaseSpec struct {
 	// The list of foreign data wrappers to be managed in the database
 	// +optional
 	FDWs []FDWSpec `json:"fdws,omitempty"`
+
+	// The list of foreign servers to be managed in the database
+	// +optional
+	Servers []ServerSpec `json:"servers,omitempty"`
 }
 
 // DatabaseObjectSpec contains the fields which are common to every
 // database object
 type DatabaseObjectSpec struct {
-	// Name of the extension/schema
+	// Name of the object (extension, schema, FDW, server)
 	Name string `json:"name"`
 
-	// Specifies whether an extension/schema should be present or absent in
-	// the database. If set to `present`, the extension/schema will be
-	// created if it does not exist. If set to `absent`, the
-	// extension/schema will be removed if it exists.
+	// Specifies whether an object (e.g schema) should be present or absent
+	// in the database. If set to `present`, the object will be created if
+	// it does not exist. If set to `absent`, the extension/schema will be
+	// removed if it exists.
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
@@ -246,12 +264,30 @@ type FDWSpec struct {
 	// +optional
 	Owner string `json:"owner,omitempty"`
 
-	// Options specifies the configuration options for the FDW
-	// (key is the option name, value is the option value).
+	// Options specifies the configuration options for the FDW.
 	// +optional
 	Options []OptionSpec `json:"options,omitempty"`
 
 	// List of roles for which `USAGE` privileges on the FDW are granted or revoked.
+	// +optional
+	Usages []UsageSpec `json:"usage,omitempty"`
+}
+
+// ServerSpec configures a server of a foreign data wrapper
+type ServerSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// The name of the Foreign Data Wrapper (FDW)
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="fdw is required"
+	FdwName string `json:"fdw"`
+
+	// Options specifies the configuration options for the server
+	// (key is the option name, value is the option value).
+	// +optional
+	Options []OptionSpec `json:"options,omitempty"`
+
+	// List of roles for which `USAGE` privileges on the server are granted or revoked.
 	// +optional
 	Usages []UsageSpec `json:"usage,omitempty"`
 }
@@ -261,12 +297,6 @@ type OptionSpec struct {
 	// Name of the option
 	Name string `json:"name"`
 
-	// Value and ensure field of the option
-	OptionSpecValue `json:",inline"`
-}
-
-// OptionSpecValue holds the value and the ensure field for an option
-type OptionSpecValue struct {
 	// Value of the option
 	Value string `json:"value"`
 
@@ -283,13 +313,14 @@ type OptionSpecValue struct {
 // UsageSpec configures a usage for a foreign data wrapper
 type UsageSpec struct {
 	// Name of the usage
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="name is required"
 	Name string `json:"name"`
 
 	// The type of usage
 	// +kubebuilder:default:="grant"
 	// +kubebuilder:validation:Enum=grant;revoke
 	// +optional
-	Type string `json:"type,omitempty"`
+	Type UsageSpecType `json:"type,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database
@@ -318,6 +349,10 @@ type DatabaseStatus struct {
 	// FDWs is the status of the managed FDWs
 	// +optional
 	FDWs []DatabaseObjectStatus `json:"fdws,omitempty"`
+
+	// Servers is the status of the managed servers
+	// +optional
+	Servers []DatabaseObjectStatus `json:"servers,omitempty"`
 }
 
 // DatabaseObjectStatus is the status of the managed database objects

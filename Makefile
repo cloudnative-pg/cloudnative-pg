@@ -397,11 +397,7 @@ ifneq ($(shell $(PREFLIGHT) --version 2>/dev/null | awk '{print $$3}'), $(PREFLI
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	if [ "$${OS}" != "linux" ] ; then \
-		echo "Unsupported OS: $${OS}" ;\
-	else \
-		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
-		chmod +x $(LOCALBIN)/preflight ;\
-	fi \
+	curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
+	chmod +x $(LOCALBIN)/preflight ;\
 	}
 endif
