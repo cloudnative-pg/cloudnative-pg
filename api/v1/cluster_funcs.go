@@ -22,6 +22,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -129,8 +130,8 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 		sa.Annotations = map[string]string{}
 	}
 
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+	maps.Copy(sa.Labels, st.Metadata.Labels)
+	maps.Copy(sa.Annotations, st.Metadata.Annotations)
 }
 
 // MatchesTopology checks if the two topologies have
@@ -622,7 +623,7 @@ func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
 		return meta.Annotations
 	}
 
-	utils.MergeMap(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
+	maps.Copy(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
 
 	return meta.Annotations
 }

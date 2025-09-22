@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"time"
@@ -432,12 +433,12 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	// we preserve existing labels/annotation that could be added by third parties
 	if !utils.IsMapSubset(livingService.Labels, proposed.Labels) {
-		utils.MergeMap(livingService.Labels, proposed.Labels)
+		maps.Copy(livingService.Labels, proposed.Labels)
 		shouldUpdate = true
 	}
 
 	if !utils.IsMapSubset(livingService.Annotations, proposed.Annotations) {
-		utils.MergeMap(livingService.Annotations, proposed.Annotations)
+		maps.Copy(livingService.Annotations, proposed.Annotations)
 		shouldUpdate = true
 	}
 
