@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -182,7 +182,7 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 	var result StorageSource
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		reference := corev1.TypedLocalObjectReference{
-			APIGroup: ptr.To(volumesnapshot.GroupName),
+			APIGroup: ptr.To(volumesnapshotv1.GroupName),
 			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     element.Name,
 		}

@@ -23,7 +23,7 @@ import (
 	"context"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -265,7 +265,7 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 var _ = Describe("update snapshot backup metadata", func() {
 	var (
 		env           *testingEnvironment
-		snapshots     volumesnapshot.VolumeSnapshotList
+		snapshots     volumesnapshotv1.VolumeSnapshotList
 		cluster       *apiv1.Cluster
 		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
 		oneHourAgo    = metav1.NewTime(now.Add(-1 * time.Hour))
@@ -285,8 +285,8 @@ var _ = Describe("update snapshot backup metadata", func() {
 				TargetPrimary: "cluster-example-2",
 			},
 		}
-		snapshots = volumesnapshot.VolumeSnapshotList{
-			Items: []volumesnapshot.VolumeSnapshot{
+		snapshots = volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{ObjectMeta: metav1.ObjectMeta{
 					Name:      "snapshot-0",
 					Namespace: namespace,

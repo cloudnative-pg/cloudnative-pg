@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -164,7 +164,7 @@ func Command(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	restConfig *rest.Config,
-	pod v1.Pod,
+	pod corev1.Pod,
 	containerName string,
 	timeout *time.Duration,
 	command ...string,

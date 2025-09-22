@@ -26,7 +26,7 @@ import (
 	"errors"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -102,7 +102,7 @@ IRh7fVEH8WBfMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIwBdrw
 -----END CERTIFICATE-----
 `),
 			}
-			ca := &v1.Secret{
+			ca := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      caSecret.Name,
 					Namespace: caSecret.Namespace,
@@ -287,7 +287,7 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 
 	Context("when the ca.crt entry is missing in the secret", func() {
 		BeforeEach(func() {
-			secret := &v1.Secret{
+			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      caSecret.Name,
 					Namespace: caSecret.Namespace,

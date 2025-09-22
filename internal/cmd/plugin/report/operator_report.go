@@ -28,7 +28,7 @@ import (
 	"path/filepath"
 	"time"
 
-	v12 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,8 +45,8 @@ type operatorReport struct {
 	configs                 []namedObject
 	events                  corev1.EventList
 	webhookService          corev1.Service
-	mutatingWebhookConfig   *v12.MutatingWebhookConfigurationList
-	validatingWebhookConfig *v12.ValidatingWebhookConfigurationList
+	mutatingWebhookConfig   *admissionregistrationv1.MutatingWebhookConfigurationList
+	validatingWebhookConfig *admissionregistrationv1.ValidatingWebhookConfigurationList
 }
 
 // writeToZip makes a new section in the ZIP file, and adds in it various
