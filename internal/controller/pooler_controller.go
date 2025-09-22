@@ -240,7 +240,7 @@ func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
 			result[idx] = reconcile.Request{NamespacedName: value}
 		}
 
-		return
+		return result
 	}
 }
 

@@ -236,7 +236,7 @@ func DetectAvailableArchitectures() error {
 func DetectOLM(client discovery.DiscoveryInterface) (err error) {
 	olmPlatform = false
 	olmPlatform, err = resourceExist(client, "operators.coreos.com/v1", "operators")
-	return
+	return err
 }
 
 // RunningOnOLM returns if we're running over a Kubernetes cluster with OLM support
