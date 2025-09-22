@@ -21,6 +21,7 @@ package utils
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"strconv"
 	"strings"
@@ -488,19 +489,6 @@ func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[SkipWalArchiving] == string(annotationStatusEnabled)
 }
 
-func mergeMap(receiver, giver map[string]string) map[string]string {
-	for key, value := range giver {
-		receiver[key] = value
-	}
-	return receiver
-}
-
-// MergeMap transfers the content of a giver map to a receiver
-// ensure the receiver is not nil before call this method
-func MergeMap(receiver, giver map[string]string) {
-	_ = mergeMap(receiver, giver)
-}
-
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
 func GetInstanceRole(labels map[string]string) (string, bool) {
 	if value := labels[ClusterRoleLabelName]; value != "" {
@@ -531,8 +519,8 @@ func MergeObjectsMetadata(receiver client.Object, giver client.Object) {
 		receiver.SetAnnotations(map[string]string{})
 	}
 
-	receiver.SetLabels(mergeMap(receiver.GetLabels(), giver.GetLabels()))
-	receiver.SetAnnotations(mergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
+	maps.Copy(receiver.GetLabels(), giver.GetLabels())
+	maps.Copy(receiver.GetAnnotations(), giver.GetAnnotations())
 }
 
 // GetClusterSerialValue returns the `nodeSerial` value from the given annotation map or return an error
