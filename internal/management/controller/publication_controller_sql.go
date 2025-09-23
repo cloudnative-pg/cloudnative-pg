@@ -44,10 +44,6 @@ func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1
 	        WHERE pubname = $1
 		`,
 		obj.Spec.Name)
-	if row.Err() != nil {
-		return fmt.Errorf("while getting publication status: %w", row.Err())
-	}
-
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return fmt.Errorf("while getting publication status (scan): %w", err)
