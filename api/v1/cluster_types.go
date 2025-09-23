@@ -1813,7 +1813,7 @@ type Import struct {
 	// +optional
 	PgRestorePredataOptions []string `json:"pgRestorePredataOptions,omitempty"`
 
-	// Custom options to pass to the `pg_restore` command during the `pre-data`
+	// Custom options to pass to the `pg_restore` command during the `data`
 	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
 	//
 	// IMPORTANT: Use with caution. The operator does not validate these options,

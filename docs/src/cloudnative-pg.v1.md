@@ -3382,7 +3382,7 @@ with your environment and desired behavior.</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>pre-data</code>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>data</code>
 section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
 <p>IMPORTANT: Use with caution. The operator does not validate these options,
 and certain flags may interfere with its intended functionality or design.
