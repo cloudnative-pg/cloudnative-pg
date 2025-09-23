@@ -39,30 +39,30 @@ var _ = Describe("pg_restore options management", func() {
 	})
 
 	It("creates the options from the import bootstrap method", func() {
-		options := pgRestoreOptionsForImport(importBootstrap)
+		options := buildPgRestoreSectionOptions(importBootstrap)
 		Expect(options).NotTo(BeNil())
-		Expect(options.ForSection(PgRestoreSectionPreData)).To(ConsistOf("--predata-options"))
-		Expect(options.ForSection(PgRestoreSectionData)).To(ConsistOf("--data-options"))
-		Expect(options.ForSection(PgRestoreSectionPostData)).To(ConsistOf("--postdata-options"))
+		Expect(options.forSection(sectionPreData)).To(ConsistOf("--predata-options"))
+		Expect(options.forSection(sectionData)).To(ConsistOf("--data-options"))
+		Expect(options.forSection(sectionPostData)).To(ConsistOf("--postdata-options"))
 	})
 
 	It("defaults a section to the common options, when the specific options are empty", func() {
 		importBootstrap.PgRestoreDataOptions = nil
-		options := pgRestoreOptionsForImport(importBootstrap)
+		options := buildPgRestoreSectionOptions(importBootstrap)
 		Expect(options).NotTo(BeNil())
-		Expect(options.ForSection(PgRestoreSectionPreData)).To(ConsistOf("--predata-options"))
-		Expect(options.ForSection(PgRestoreSectionData)).To(ConsistOf("--extra-options"))
-		Expect(options.ForSection(PgRestoreSectionPostData)).To(ConsistOf("--postdata-options"))
+		Expect(options.forSection(sectionPreData)).To(ConsistOf("--predata-options"))
+		Expect(options.forSection(sectionData)).To(ConsistOf("--extra-options"))
+		Expect(options.forSection(sectionPostData)).To(ConsistOf("--postdata-options"))
 	})
 
 	It("defaults every section to the common options when needed", func() {
 		importBootstrap = &apiv1.Import{
 			PgRestoreExtraOptions: []string{"--extra-options"},
 		}
-		options := pgRestoreOptionsForImport(importBootstrap)
+		options := buildPgRestoreSectionOptions(importBootstrap)
 		Expect(options).NotTo(BeNil())
-		Expect(options.ForSection(PgRestoreSectionPreData)).To(ConsistOf("--extra-options"))
-		Expect(options.ForSection(PgRestoreSectionData)).To(ConsistOf("--extra-options"))
-		Expect(options.ForSection(PgRestoreSectionPostData)).To(ConsistOf("--extra-options"))
+		Expect(options.forSection(sectionPreData)).To(ConsistOf("--extra-options"))
+		Expect(options.forSection(sectionData)).To(ConsistOf("--extra-options"))
+		Expect(options.forSection(sectionPostData)).To(ConsistOf("--extra-options"))
 	})
 })

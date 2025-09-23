@@ -128,17 +128,17 @@ func (ds *databaseSnapshotter) importDatabases(
 	ctx context.Context,
 	target pool.Pooler,
 	databases []string,
-	flags pgRestoreSectionOptions,
+	flags sectionOptions,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
 	for _, database := range databases {
-		for _, section := range ds.getSectionsToExecute() {
+		for _, sec := range ds.getSectionsToExecute() {
 			targetDatabase := target.GetDsn(database)
 			contextLogger.Info(
 				"executing database importing section",
 				"databaseName", database,
-				"section", section,
+				"section", sec,
 			)
 
 			exists, err := ds.databaseExists(target, database)
@@ -158,11 +158,11 @@ func (ds *databaseSnapshotter) importDatabases(
 			alwaysPresentOptions := []string{
 				"-U", "postgres",
 				"-d", targetDatabase,
-				"--section", string(section),
+				"--section", string(sec),
 				generateFileNameForDatabase(database),
 			}
 
-			options = append(options, flags.ForSection(section)...)
+			options = append(options, flags.forSection(sec)...)
 			options = append(options, alwaysPresentOptions...)
 
 			contextLogger.Info("Running pg_restore",
@@ -172,7 +172,7 @@ func (ds *databaseSnapshotter) importDatabases(
 			pgRestoreCommand := exec.Command(pgRestore, options...) // #nosec
 			err = execlog.RunStreaming(pgRestoreCommand, pgRestore)
 			if err != nil {
-				return fmt.Errorf("error while executing pg_restore, section:%s, %w", section, err)
+				return fmt.Errorf("error while executing pg_restore, section:%s, %w", sec, err)
 			}
 		}
 	}
@@ -186,7 +186,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 	database string,
 	targetDatabase string,
 	owner string,
-	flags pgRestoreSectionOptions,
+	flags sectionOptions,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -224,7 +224,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			generateFileNameForDatabase(database),
 		}
 
-		options = append(options, flags.ForSection(section)...)
+		options = append(options, flags.forSection(section)...)
 		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
@@ -364,17 +364,17 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 // getSectionsToExecute determines which stages of `pg_restore` and `pg_dump` to execute,
 // based on the configuration of the cluster. It returns a slice of strings representing
 // the sections to execute. These sections are labeled as "pre-data", "data", and "post-data".
-func (ds *databaseSnapshotter) getSectionsToExecute() []PgRestoreSectionName {
+func (ds *databaseSnapshotter) getSectionsToExecute() []section {
 	if ds.cluster.Spec.Bootstrap.InitDB.Import.SchemaOnly {
-		return []PgRestoreSectionName{
-			PgRestoreSectionPreData,
-			PgRestoreSectionPostData,
+		return []section{
+			sectionPreData,
+			sectionPostData,
 		}
 	}
 
-	return []PgRestoreSectionName{
-		PgRestoreSectionPreData,
-		PgRestoreSectionData,
-		PgRestoreSectionPostData,
+	return []section{
+		sectionPreData,
+		sectionData,
+		sectionPostData,
 	}
 }
