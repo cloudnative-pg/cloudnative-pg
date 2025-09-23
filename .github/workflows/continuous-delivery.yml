@@ -1327,7 +1327,7 @@ jobs:
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
           VELERO_VERSION: "v1.17.0"
           # renovate: datasource=docker depName=velero/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.12.2"
+          VELERO_AWS_PLUGIN_VERSION: "v1.13.0"
         with:
           timeout_minutes: 10
           max_attempts: 3
