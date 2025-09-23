@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete '-testing' operator images in ${{ env.IMAGE_NAME }}
-        uses: snok/container-retention-policy@1dc2fbd0781d6af814f0f1947189b54846743298 # v3.0.1
+        uses: snok/container-retention-policy@3b0972b2276b171b212f8c4efbca59ebba26eceb # v3.0.1
         with:
           image-names: ${{ env.IMAGE_NAME }}
           cut-off: 5d
@@ -30,7 +30,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete '-testing' operand images
-        uses: snok/container-retention-policy@1dc2fbd0781d6af814f0f1947189b54846743298 # v3.0.1
+        uses: snok/container-retention-policy@3b0972b2276b171b212f8c4efbca59ebba26eceb # v3.0.1
         if: ${{ github.repository_owner == 'cloudnative-pg' }}
         with:
           image-names: ${{ env.CONTAINER_IMAGE_NAMES }}
