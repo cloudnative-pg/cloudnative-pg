@@ -222,6 +222,19 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: scheduledBackup.Namespace,
+		Name:      scheduledBackup.Spec.Cluster.Name,
+	}, &cluster); err != nil {
+		// if cluster is hibernated, don't create new scheduled backup
+		clusterHibernationAnnotation, ok := cluster.GetAnnotations()[utils.HibernationAnnotationName]
+		if !ok || clusterHibernationAnnotation == "" {
+			contextLogger.Info("Skipping scheduled backup of a hibernated cluster", "next", nextTime)
+			return ctrl.Result{RequeueAfter: 24 * time.Hour}, nil
+		}
+	}
+
 	return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false)
 }
 
