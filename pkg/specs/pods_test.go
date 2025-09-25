@@ -933,7 +933,7 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 
 var _ = Describe("NewInstance", func() {
 	It("applies correct labels", func(ctx SpecContext) {
-		cluster := v1.Cluster{
+		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
 				Namespace: "default",
