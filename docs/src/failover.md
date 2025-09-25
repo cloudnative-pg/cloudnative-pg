@@ -134,8 +134,7 @@ This feature allows users to choose their preferred trade-off between data
 durability and data availability.
 
 Failover quorum can be enabled by setting the
-`.spec.postgresql.synchronous.failoverQuorum` field to `true`, like in the
-following example:
+`.spec.postgresql.synchronous.failoverQuorum` field to `true`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -155,12 +154,21 @@ spec:
     size: 1G
 ```
 
-!!! Note
-    For backward compatibility, the legacy annotation `alpha.cnpg.io/failoverQuorum` is still
-    accepted by the admission webhook. When the annotation evaluates to "true"
-    and a synchronous replication stanza is present, the webhook will set the
-    `.spec.postgresql.synchronous.failoverQuorum` to true.
-    When the annotation evaluates to "false", it is ignored.
+For backward compatibility, the legacy annotation
+`alpha.cnpg.io/failoverQuorum` is still supported by the admission webhook and
+takes precedence over the `Cluster` spec option:
+
+- If the annotation evaluates to `"true"` and a synchronous replication stanza
+  is present, the webhook automatically sets
+  `.spec.postgresql.synchronous.failoverQuorum` to `true`.
+- If the annotation evaluates to `"false"`, the feature is always disabled.
+
+!!! Important
+    Because the annotation overrides the spec, we recommend that users of this
+    experimental feature migrate to the native
+    `.spec.postgresql.synchronous.failoverQuorum` option and remove the annotation
+    from their manifests. The annotation is **deprecated** and will be removed in a
+    future release.
 
 ### How it works
 
