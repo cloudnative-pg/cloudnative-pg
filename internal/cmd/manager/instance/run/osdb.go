@@ -37,11 +37,11 @@ type OSEntry struct {
 	Version string `json:"version"`
 
 	// DeprecatedFrom is the end-of-life date of this OS version
-	DeprecatedFrom time.Time `json:"supportedUntil"`
+	DeprecatedFrom time.Time `json:"deprecatedFrom"`
 
 	// SupportedUntil is the end of the OS version long-term-support period,
 	// as defined.
-	SupportedUntil time.Time `json:"deprecatedFrom"`
+	SupportedUntil time.Time `json:"supportedUntil"`
 }
 
 // IsSupported checks if the release is supported.
