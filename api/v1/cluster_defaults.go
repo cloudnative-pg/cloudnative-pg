@@ -347,12 +347,7 @@ func (r *Cluster) tryConvertAlphaFailoverQuorum() {
 		return
 	}
 
-	// There's nothing to do if failover quorum is disabled
-	if !v {
-		return
-	}
-
-	// Again, the webhook prevents the user from enabling
+	// The webhook prevents the user from enabling
 	// failover quorum without synchronous replication.
 	if r.Spec.PostgresConfiguration.Synchronous == nil {
 		return

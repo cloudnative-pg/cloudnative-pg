@@ -538,6 +538,13 @@ var _ = Describe("failover quorum defaults", func() {
 		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeTrue())
 	})
 
+	It("should convert the annotation if present and set to false", func() {
+		cluster := clusterWithFailoverQuorumAnnotation("f")
+		cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = true
+		cluster.Default()
+		Expect(cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum).To(BeFalse())
+	})
+
 	It("should not convert the annotation if the value is wrong", func() {
 		cluster := clusterWithFailoverQuorumAnnotation("toast")
 		cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = true
