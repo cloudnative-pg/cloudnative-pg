@@ -300,6 +300,10 @@ type BackupStatus struct {
 	// A map containing the plugin metadata
 	// +optional
 	PluginMetadata map[string]string `json:"pluginMetadata,omitempty"`
+
+	// Information about the PostgreSQL image that was running when the backup was taken
+	// +optional
+	BackupImageInfo *ImageInfo `json:"backupImageInfo,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance

@@ -218,6 +218,20 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              backupImageInfo:
+                description: Information about the PostgreSQL image that was running
+                  when the backup was taken
+                properties:
+                  image:
+                    description: Image is the image name
+                    type: string
+                  majorVersion:
+                    description: MajorVersion is the major version of the image
+                    type: integer
+                required:
+                - image
+                - majorVersion
+                type: object
               backupLabelFile:
                 description: Backup label file content as returned by Postgres in
                   case of online (hot) backups
