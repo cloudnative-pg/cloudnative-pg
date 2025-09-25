@@ -1153,6 +1153,21 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
 
 	default:
+		appSecretName := cluster.GetApplicationSecretName()
+		if appSecretName != "" && cluster.ShouldInitDBCreateApplicationDatabase() {
+			var appSecret corev1.Secret
+			key := client.ObjectKey{Namespace: cluster.Namespace, Name: appSecretName}
+			if err := r.Get(ctx, key, &appSecret); err != nil {
+				if apierrs.IsNotFound(err) {
+					contextLogger.Warning("Waiting for application secret to be created")
+					r.Recorder.Eventf(cluster, "Warning", "WaitingForSecret",
+						"Waiting for application secret %s to exist before initdb", appSecretName)
+					return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+				}
+				return ctrl.Result{}, fmt.Errorf("cannot get application secret: %w", err)
+			}
+		}
+
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
 	}
