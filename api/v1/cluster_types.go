@@ -1388,8 +1388,8 @@ type SynchronousReplicaConfiguration struct {
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
 
-	// FailoverQuorum enables quorum-based check before failover, enhances data
-	// durability and safety during failover events in CloudNativePG-managed
+	// FailoverQuorum enables a quorum-based check before failover, improving
+	// data durability and safety during failover events in CloudNativePG-managed
 	// PostgreSQL clusters.
 	// +optional
 	FailoverQuorum bool `json:"failoverQuorum"`
