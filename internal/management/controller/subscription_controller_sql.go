@@ -48,10 +48,6 @@ func (r *SubscriptionReconciler) alignSubscription(
 	    WHERE subname = $1
 		`,
 		obj.Spec.Name)
-	if row.Err() != nil {
-		return fmt.Errorf("while getting subscription status: %w", row.Err())
-	}
-
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return fmt.Errorf("while getting subscription status (scan): %w", err)

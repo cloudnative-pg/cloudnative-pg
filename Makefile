@@ -57,15 +57,15 @@ KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.12.0
+GORELEASER_VERSION ?= v2.12.2
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.51.0
+SPELLCHECK_VERSION ?= 0.52.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.41.1
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.57.0
+OPM_VERSION ?= v1.59.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.14.1
 OPENSHIFT_VERSIONS ?= v4.12-v4.19

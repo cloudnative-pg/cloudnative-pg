@@ -110,7 +110,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -262,7 +262,7 @@ jobs:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -427,7 +427,7 @@ jobs:
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts

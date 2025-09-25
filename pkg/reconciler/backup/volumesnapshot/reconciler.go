@@ -24,11 +24,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -76,7 +77,7 @@ func (e *ExecutorBuilder) Build() *Reconciler {
 
 func (se *Reconciler) enrichSnapshot(
 	ctx context.Context,
-	vs *storagesnapshotv1.VolumeSnapshot,
+	vs *volumesnapshotv1.VolumeSnapshot,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 	targetPod *corev1.Pod,
@@ -408,7 +409,7 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 	ctx context.Context,
 	backup *apiv1.Backup,
-	snapshots []storagesnapshotv1.VolumeSnapshot,
+	snapshots []volumesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
 		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, backup, &snapshots[i]); res != nil || err != nil {
@@ -423,7 +424,7 @@ func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 func (se *Reconciler) waitSnapshotToBeReadyStep(
 	ctx context.Context,
 	backup *apiv1.Backup,
-	snapshots []storagesnapshotv1.VolumeSnapshot,
+	snapshots []volumesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
 		if res, err := se.waitSnapshotToBeReady(ctx, backup, &snapshots[i]); res != nil || err != nil {
@@ -459,20 +460,20 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	labels := pvc.Labels
-	utils.MergeMap(labels, snapshotConfig.Labels)
+	maps.Copy(labels, snapshotConfig.Labels)
 	annotations := pvc.Annotations
-	utils.MergeMap(annotations, snapshotConfig.Annotations)
+	maps.Copy(annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
 
-	snapshot := storagesnapshotv1.VolumeSnapshot{
+	snapshot := volumesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        pvcCalculator.GetSnapshotName(backup.Name),
 			Namespace:   pvc.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
 		},
-		Spec: storagesnapshotv1.VolumeSnapshotSpec{
-			Source: storagesnapshotv1.VolumeSnapshotSource{
+		Spec: volumesnapshotv1.VolumeSnapshotSpec{
+			Source: volumesnapshotv1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: &pvc.Name,
 			},
 			VolumeSnapshotClassName: snapshotClassName,
@@ -526,7 +527,7 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	ctx context.Context,
 	backup *apiv1.Backup,
-	snapshot *storagesnapshotv1.VolumeSnapshot,
+	snapshot *volumesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -563,7 +564,7 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 func (se *Reconciler) waitSnapshotToBeReady(
 	ctx context.Context,
 	backup *apiv1.Backup,
-	snapshot *storagesnapshotv1.VolumeSnapshot,
+	snapshot *volumesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 

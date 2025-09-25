@@ -29,7 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -72,7 +72,7 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 		clusterInfo.AddLine("Pod name", pod.Name)
 		clusterInfo.AddLine("Pod phase", pod.Status.Phase)
 		if cluster.Status.InstancesReportedState != nil {
-			if instanceReportState, ok := cluster.Status.InstancesReportedState[v1.PodName(pod.Name)]; ok {
+			if instanceReportState, ok := cluster.Status.InstancesReportedState[apiv1.PodName(pod.Name)]; ok {
 				clusterInfo.AddLine("Is Primary", instanceReportState.IsPrimary)
 				clusterInfo.AddLine("TimeLineID", instanceReportState.TimeLineID)
 				clusterInfo.AddLine("---", "---")
