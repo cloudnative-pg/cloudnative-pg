@@ -176,6 +176,9 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 	// CertificatesDir location to store the certificates
 	CertificatesDir = ScratchDataDirectory + "/certificates/"
 
+	// SecretsVolumeDirectory is the base directory to store Projected secrets
+	SecretsVolumeDirectory = "/secrets"
+
 	// ProjectedVolumeDirectory is the base directory to store ProjectedVolumeSource
 	ProjectedVolumeDirectory = "/projected"
 

@@ -385,6 +385,13 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
 	}
 
+	if cluster.ShouldInitDBCreateApplicationDatabase() && cluster.GetApplicationSecretName() != "" {
+		volume, volumeMount := createAppUserSecretVolumeAndVolumeMount(cluster.GetApplicationSecretName())
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+	}
+
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
 		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
 			postInitApplicationSQLRefsFolder,
