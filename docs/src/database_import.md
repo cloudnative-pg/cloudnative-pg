@@ -247,7 +247,7 @@ There are a few things you need to be aware of when using the `monolith` type:
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
   `roles` arrays to import every object of the kind; When matching databases
-  the wildcard will ignore the `postgres` database, template databases,
+  the wildcard will ignore the `postgres` database, template databases
   and those databases not allowing connections
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
@@ -390,9 +390,11 @@ unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 `shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
 `Cluster` configuration.
 
-## Customizing `pg_dump` and `pg_restore` Behavior
+## Customizing `pg_dump` and `pg_restore` behavior
 
-You can customize the behavior of `pg_dump` and `pg_restore` by specifying additional options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions` parameters. This is especially useful for improving performance or managing import/export complexity.
+You can customize the behavior of `pg_dump` and `pg_restore` by specifying additional
+options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions` parameters.
+This is especially useful for improving performance or managing import/export complexity.
 
 For example, enabling parallel jobs can significantly speed up data transfer:
 
@@ -411,14 +413,14 @@ bootstrap:
       - '--jobs=2'
 ```
 
-### Stage-Specific `pg_restore` Options
+### Stage-Specific `pg_restore` options
 
 For more granular control over the import process, CloudNativePG supports
 stage-specific `pg_restore` options for the following phases:
 
 - `pre-data` – e.g., schema definitions
 - `data` – e.g., table contents
-- `post-data` – e.g., indexes, constraints, and triggers
+- `post-data` – e.g., indexes, constraints and triggers
 
 By specifying options for each phase, you can optimize parallelism and apply
 flags tailored to the nature of the objects being restored.
@@ -462,8 +464,8 @@ improve performance.
     The `pgDumpExtraOptions`, `pgRestoreExtraOptions`, and all stage-specific
     restore options (`pgRestorePredataOptions`, `pgRestoreDataOptions`,
     `pgRestorePostdataOptions`) are passed directly to the underlying PostgreSQL
-    tools without validation by the operator.  Certain flags may conflict with the
-    operator’s intended functionality or design.  Use these options with caution,
+    tools without validation by the operator. Certain flags may conflict with the
+    operator’s intended functionality or design. Use these options with caution
     and always test them thoroughly in a safe, controlled environment before
     applying them in production.
 
