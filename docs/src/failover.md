@@ -161,7 +161,7 @@ takes precedence over the `Cluster` spec option:
 - If the annotation evaluates to `"true"` and a synchronous replication stanza
   is present, the webhook automatically sets
   `.spec.postgresql.synchronous.failoverQuorum` to `true`.
-- If the annotation evaluates to `"false"`, the annotation is ignored.
+- If the annotation evaluates to `"false"`, the feature is always disabled
 
 !!! Important
     Because the annotation overrides the spec, we recommend that users of this
