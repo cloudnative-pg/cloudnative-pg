@@ -17,7 +17,6 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package run implements the "instance run" subcommand of the operator
 package run
 
 import (
@@ -104,6 +103,9 @@ func NewCmd() *cobra.Command {
 				cmd.Context(),
 				log.GetLogger().WithValues("logger", "instance-manager"),
 			)
+
+			checkCurrentOSRelease(ctx)
+
 			instance := postgres.NewInstance().
 				WithPodName(podName).
 				WithClusterName(clusterName).
