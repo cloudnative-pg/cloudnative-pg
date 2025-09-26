@@ -10,6 +10,10 @@ between your applications and a PostgreSQL service, for example, the `rw`
 service. It creates a separate, scalable, configurable, and highly available
 database access layer.
 
+!!! Warning
+    CloudNativePG requires the `auth_dbname` feature in PgBouncer.
+    Make sure to use a PgBouncer container image version **1.19 or higher**.
+
 ## Architecture
 
 The following diagram highlights how introducing a database access layer based
