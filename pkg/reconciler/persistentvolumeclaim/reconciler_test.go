@@ -241,10 +241,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Labels).To(BeEquivalentTo(map[string]string{
-			utils.InstanceNameLabelName: clusterName + "-3-wal",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			utils.InstanceNameLabelName:           clusterName + "-3-wal",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			"label1":                              "value",
+			"label2":                              "value",
 		}))
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
@@ -315,26 +316,29 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		patchedPvc2 := fetchPVC(cl, pvc2)
 
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-2",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			utils.InstanceNameLabelName:           "cluster-pvc-reconciliation-2",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			"label1":                              "value",
+			"label2":                              "value",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
-			utils.PvcRoleLabelName:      "PG_WAL",
-			"label1":                    "value",
-			"label2":                    "value",
+			utils.InstanceNameLabelName:           "cluster-pvc-reconciliation-3",
+			utils.PvcRoleLabelName:                "PG_WAL",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			"label1":                              "value",
+			"label2":                              "value",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			utils.InstanceNameLabelName:           "cluster-pvc-reconciliation-3",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			"label1":                              "value",
+			"label2":                              "value",
 		}))
 	})
 
@@ -386,10 +390,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 
 		patchedPvc := fetchPVC(cl, pvc)
 		Expect(patchedPvc.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-1",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "primary",
-			utils.ClusterInstanceRoleLabelName: "primary",
+			utils.InstanceNameLabelName:           clusterName + "-1",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.ClusterRoleLabelName:            "primary",
+			utils.ClusterInstanceRoleLabelName:    "primary",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
 			utils.ClusterSerialAnnotationName:   "1",
@@ -399,10 +404,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-2",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.InstanceNameLabelName:           clusterName + "-2",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.ClusterRoleLabelName:            "replica",
+			utils.ClusterInstanceRoleLabelName:    "replica",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,
@@ -412,10 +418,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-3",
-			utils.PvcRoleLabelName:             "PG_WAL",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.InstanceNameLabelName:           clusterName + "-3",
+			utils.PvcRoleLabelName:                "PG_WAL",
+			utils.ClusterRoleLabelName:            "replica",
+			utils.ClusterInstanceRoleLabelName:    "replica",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,
@@ -425,10 +432,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-3",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			utils.InstanceNameLabelName:           clusterName + "-3",
+			utils.PvcRoleLabelName:                "PG_DATA",
+			utils.ClusterRoleLabelName:            "replica",
+			utils.ClusterInstanceRoleLabelName:    "replica",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
 			utils.OperatorVersionAnnotationName: versions.Version,

@@ -45,10 +45,20 @@ func buildInstanceServicePorts() []corev1.ServicePort {
 
 // CreateClusterAnyService create a service insisting on all the pods
 func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceAnyName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:                     corev1.ServiceTypeClusterIP,
@@ -64,10 +74,20 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadService create a service insisting on all the ready pods
 func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,
@@ -82,10 +102,20 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadOnlyService create a service insisting on all the ready pods
 func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadOnlyName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,
@@ -100,10 +130,20 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadWriteService create a service insisting on the primary pod
 func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadWriteName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,

@@ -122,8 +122,9 @@ func NewPgTablespaceCalculator(tbsName string) ExpectedObjectCalculator {
 // GetLabels will be used as the label value
 func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName: instanceName,
-		utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		utils.InstanceNameLabelName:           instanceName,
+		utils.PvcRoleLabelName:                string(utils.PVCRolePgData),
 	}
 	return labels
 }
@@ -189,8 +190,9 @@ func (r pgDataCalculator) GetSourceFromBackup(backup *apiv1.Backup) *corev1.Type
 // GetLabels will be used as the label value
 func (r pgWalCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName: instanceName,
-		utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+		utils.InstanceNameLabelName:           instanceName,
+		utils.PvcRoleLabelName:                string(utils.PVCRolePgWal),
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 	}
 	return labels
 }
@@ -248,8 +250,9 @@ func (r pgWalCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnaps
 // GetLabels will be used as the label value
 func (r pgTablespaceCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName: instanceName,
-		utils.PvcRoleLabelName:      string(utils.PVCRolePgTablespace),
+		utils.InstanceNameLabelName:           instanceName,
+		utils.PvcRoleLabelName:                string(utils.PVCRolePgTablespace),
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 	}
 	// we need empty check here as we don't want to impact the label filter with empty value
 	if r.tablespaceName != "" {
