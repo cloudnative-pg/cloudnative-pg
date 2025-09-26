@@ -673,6 +673,9 @@ const (
 
 	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
 	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
+
+	// PhaseHibernated is set when the cluster is hibernated and all pods has been removed
+	PhaseHibernated = "Cluster is hibernated"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
