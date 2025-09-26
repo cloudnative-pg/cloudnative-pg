@@ -25,7 +25,6 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -1565,16 +1564,10 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 
 // IsFailoverQuorumActive check if we should enable the
 // quorum failover protection alpha-feature.
-func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
-	failoverQuorumAnnotation, ok := cluster.GetAnnotations()[utils.FailoverQuorumAnnotationName]
-	if !ok || failoverQuorumAnnotation == "" {
-		return false, nil
+func (cluster *Cluster) IsFailoverQuorumActive() bool {
+	if cluster.Spec.PostgresConfiguration.Synchronous == nil {
+		return false
 	}
 
-	v, err := strconv.ParseBool(failoverQuorumAnnotation)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse failover quorum annotation '%v': %v", failoverQuorumAnnotation, err)
-	}
-
-	return v, nil
+	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }

@@ -844,6 +844,7 @@ externalclusters
 facto
 failover
 failoverDelay
+failoverQuorum
 failoverquorums
 failovers
 failureThreshold

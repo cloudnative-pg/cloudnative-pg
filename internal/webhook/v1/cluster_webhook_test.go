@@ -5796,13 +5796,29 @@ var _ = Describe("getStorageWarnings", func() {
 	})
 })
 
-var _ = Describe("failoverQuorum validation", func() {
+var _ = Describe("failoverQuorum annotation validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	It("fails if it is active but no synchronous replication is configured", func() {
+	It("fails if the annotation value is wrong", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: "toast",
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
+		}
+
+		errList := v.validateFailoverQuorumAlphaAnnotation(cluster)
+		Expect(errList).To(HaveLen(1))
+	})
+
+	It("fails if the annotation is active but no synchronous replication is configured", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -5814,22 +5830,25 @@ var _ = Describe("failoverQuorum validation", func() {
 			},
 		}
 
-		errList := v.validateFailoverQuorum(cluster)
+		errList := v.validateFailoverQuorumAlphaAnnotation(cluster)
 		Expect(errList).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("failoverQuorum validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
 	})
 
 	It("requires at least three instances", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.FailoverQuorumAnnotationName: "t",
-				},
-			},
 			Spec: apiv1.ClusterSpec{
 				Instances: 3,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Synchronous: &apiv1.SynchronousReplicaConfiguration{
-						Number: 1,
+						Number:         1,
+						FailoverQuorum: true,
 					},
 				},
 			},
@@ -5845,11 +5864,6 @@ var _ = Describe("failoverQuorum validation", func() {
 
 	It("check if the number of external synchronous replicas is coherent", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.FailoverQuorumAnnotationName: "t",
-				},
-			},
 			Spec: apiv1.ClusterSpec{
 				Instances: 3,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5863,6 +5877,7 @@ var _ = Describe("failoverQuorum validation", func() {
 							"three",
 							"four",
 						},
+						FailoverQuorum: true,
 					},
 				},
 			},

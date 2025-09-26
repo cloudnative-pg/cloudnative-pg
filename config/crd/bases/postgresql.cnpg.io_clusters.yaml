@@ -4290,6 +4290,12 @@ spec:
                         - required
                         - preferred
                         type: string
+                      failoverQuorum:
+                        description: |-
+                          FailoverQuorum enables a quorum-based check before failover, improving
+                          data durability and safety during failover events in CloudNativePG-managed
+                          PostgreSQL clusters.
+                        type: boolean
                       maxStandbyNamesFromCluster:
                         description: |-
                           Specifies the maximum number of local cluster pods that can be

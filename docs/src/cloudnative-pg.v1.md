@@ -6466,6 +6466,15 @@ to allow for operational continuity. This setting is only applicable if both
 <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
+<tr><td><code>failoverQuorum</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>FailoverQuorum enables a quorum-based check before failover, improving
+data durability and safety during failover events in CloudNativePG-managed
+PostgreSQL clusters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 

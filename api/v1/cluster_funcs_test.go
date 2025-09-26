@@ -1750,32 +1750,41 @@ var _ = Describe("Probes configuration", func() {
 	})
 })
 
-var _ = Describe("Failover quorum annotation", func() {
-	clusterWithAnnotation := func(v string) *Cluster {
-		return &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.FailoverQuorumAnnotationName: v,
+var _ = Describe("Failover quorum", func() {
+	clusterWithoutSynchrousReplication := &Cluster{
+		Spec: ClusterSpec{
+			PostgresConfiguration: PostgresConfiguration{
+				Synchronous: nil,
+			},
+		},
+	}
+	clusterWithFailoverQuorumEnabled := &Cluster{
+		Spec: ClusterSpec{
+			PostgresConfiguration: PostgresConfiguration{
+				Synchronous: &SynchronousReplicaConfiguration{
+					FailoverQuorum: true,
 				},
 			},
-		}
+		},
+	}
+	clusterWithFailoverQuorumDisabled := &Cluster{
+		Spec: ClusterSpec{
+			PostgresConfiguration: PostgresConfiguration{
+				Synchronous: &SynchronousReplicaConfiguration{
+					FailoverQuorum: false,
+				},
+			},
+		},
 	}
 
 	DescribeTable(
-		"annotation parsing",
-		func(cluster *Cluster, valueIsCorrect, expected bool) {
-			actual, err := cluster.IsFailoverQuorumActive()
-			if valueIsCorrect {
-				Expect(err).ToNot(HaveOccurred())
-			} else {
-				Expect(err).To(HaveOccurred())
-			}
+		"failover quorum getter",
+		func(cluster *Cluster, expected bool) {
+			actual := cluster.IsFailoverQuorumActive()
 			Expect(actual).To(Equal(expected))
 		},
-		Entry("with no annotation", &Cluster{}, true, false),
-		Entry("with empty annotation", clusterWithAnnotation(""), true, false),
-		Entry("with true annotation", clusterWithAnnotation("t"), true, true),
-		Entry("with false annotation", clusterWithAnnotation("f"), true, false),
-		Entry("with invalid annotation", clusterWithAnnotation("xxx"), false, false),
+		Entry("with no synchronous replication configuration", clusterWithoutSynchrousReplication, false),
+		Entry("with failover quorum enabled", clusterWithFailoverQuorumEnabled, true),
+		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
 })

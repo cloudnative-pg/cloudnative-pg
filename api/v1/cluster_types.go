@@ -1387,6 +1387,12 @@ type SynchronousReplicaConfiguration struct {
 	// +kubebuilder:validation:Enum=required;preferred
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
+
+	// FailoverQuorum enables a quorum-based check before failover, improving
+	// data durability and safety during failover events in CloudNativePG-managed
+	// PostgreSQL clusters.
+	// +optional
+	FailoverQuorum bool `json:"failoverQuorum"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
