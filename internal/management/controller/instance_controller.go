@@ -317,6 +317,10 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
+	if err := r.reconcilePgbouncerAuthUser(ctx, postgresDB, cluster); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile pgbouncer integration: %w", err)
+	}
+
 	// Reconcile postgresql.auto.conf file permissions (< PG 17)
 	// IMPORTANT: this needs a database connection to determine
 	// the PostgreSQL major version
@@ -634,10 +638,6 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 					fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 			}
 		}
-		if err = r.reconcilePoolers(ctx, db, databaseName, cluster.Status.PoolerIntegrations); err != nil {
-			errors = append(errors,
-				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
-		}
 	}
 	if errors != nil {
 		return fmt.Errorf("got errors while reconciling databases: %v", errors)
@@ -724,13 +724,29 @@ func (r *InstanceReconciler) reconcileExtensions(
 
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
-func (r *InstanceReconciler) reconcilePoolers(
-	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations,
-) (err error) {
-	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
-		return err
+func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
+	ctx context.Context,
+	db *sql.DB,
+	cluster *apiv1.Cluster,
+) error {
+	// This need to be executed only against the primary node
+	ok, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("unable to check if instance is primary: %w", err)
+	}
+	if !ok {
+		return nil
 	}
 
+	// If there is no integrated pgbouncer, we directly skip the
+	// integration.
+	integrations := cluster.Status.PoolerIntegrations
+	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
+		return nil
+	}
+
+	// Otherwise, we need to ensure that both the role and the
+	// auth_query function are present in the superuser database.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -752,7 +768,9 @@ func (r *InstanceReconciler) reconcilePoolers(
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, apiv1.PGBouncerPoolerUserName))
+
+		const authDBName = "postgres"
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", authDBName, apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}
