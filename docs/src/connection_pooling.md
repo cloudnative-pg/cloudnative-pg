@@ -123,7 +123,7 @@ Supported secret formats are:
 2. TLS
 3. Opaque
 
-For Opaque secrets, PgBouncer expects the following keys:
+For Opaque secrets, the `Pooler` resource expects the following keys:
 
 - `tls.crt`
 - `tls.key`
@@ -198,6 +198,14 @@ REVOKE ALL ON FUNCTION public.user_search(text)
 GRANT EXECUTE ON FUNCTION public.user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
+
+### Custom authentication method
+
+Providing your own certificate secrets disables the built-in integration.
+
+This gives you the flexibility — and responsibility — to manage the
+authentication process yourself. You can follow the instructions above to
+replicate similar behavior to the default setup.
 
 ## Pod templates
 
