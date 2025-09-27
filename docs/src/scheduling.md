@@ -41,7 +41,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 
   affinity:
     enablePodAntiAffinity: true # Default value
