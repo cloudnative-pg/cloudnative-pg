@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -153,34 +152,6 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 	result = append(result, createExtensionVolumes(cluster)...)
 
 	return result
-}
-
-func createAppUserSecretVolumeAndVolumeMount(appSecretName string) (corev1.Volume, corev1.VolumeMount) {
-	volume := corev1.Volume{
-		Name: "secrets",
-		VolumeSource: corev1.VolumeSource{
-			Projected: &corev1.ProjectedVolumeSource{
-				Sources: []corev1.VolumeProjection{
-					{
-						Secret: &corev1.SecretProjection{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: appSecretName,
-							},
-							Optional: ptr.To(false),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	volumeMount := corev1.VolumeMount{
-		Name:      "secrets",
-		MountPath: postgres.SecretsVolumeDirectory,
-		ReadOnly:  true,
-	}
-
-	return volume, volumeMount
 }
 
 func createVolumesAndVolumeMountsForSQLRefs(
