@@ -147,18 +147,18 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 
 	// if no user is provided we have to check the secret for a username, and we must be using basic auth
 	// if a user is provided it will overwrite the user in the secret, or we could be using cert auth
-	authQuerySecretType, err := detectSecretType(secrets.AuthQuery)
+	serverTLSSecretType, err := detectSecretType(secrets.ServerTLSSecret)
 	if err != nil {
 		return nil, fmt.Errorf("while detecting auth user secret type: %w", err)
 	}
 
-	switch authQuerySecretType {
+	switch serverTLSSecretType {
 	case corev1.SecretTypeBasicAuth:
-		authQueryUser = string(secrets.AuthQuery.Data["username"])
-		authQueryPassword = strings.ReplaceAll(string(secrets.AuthQuery.Data["password"]), "\"", "\"\"")
+		authQueryUser = string(secrets.ServerTLSSecret.Data["username"])
+		authQueryPassword = strings.ReplaceAll(string(secrets.ServerTLSSecret.Data["password"]), "\"", "\"\"")
 
 	case corev1.SecretTypeTLS:
-		keyPair, err := certs.ParseServerSecret(secrets.AuthQuery)
+		keyPair, err := certs.ParseServerSecret(secrets.ServerTLSSecret)
 		if err != nil {
 			return nil, fmt.Errorf("while parsing TLS secret for auth user: %w", err)
 		}
@@ -170,11 +170,11 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 
 		authQueryUser = certificate.Subject.CommonName
 		isCertAuth = true
-		files[authUserCrtPath] = secrets.AuthQuery.Data[certs.TLSCertKey]
-		files[authUserKeyPath] = secrets.AuthQuery.Data[certs.TLSPrivateKeyKey]
+		files[authUserCrtPath] = secrets.ServerTLSSecret.Data[certs.TLSCertKey]
+		files[authUserKeyPath] = secrets.ServerTLSSecret.Data[certs.TLSPrivateKeyKey]
 
 	default:
-		return nil, fmt.Errorf("unsupported secret type for auth query: %s", secrets.AuthQuery.Type)
+		return nil, fmt.Errorf("unsupported secret type for auth query: %s", secrets.ServerTLSSecret.Type)
 	}
 
 	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)

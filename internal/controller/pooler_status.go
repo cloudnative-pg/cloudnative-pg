@@ -42,10 +42,10 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		updatedStatus.Secrets.PgBouncerSecrets = &apiv1.PgBouncerSecrets{}
 	}
 
-	if resources.AuthUserSecret != nil {
+	if resources.ServerTLSSecret != nil {
 		updatedStatus.Secrets.PgBouncerSecrets.AuthQuery = apiv1.SecretVersion{
-			Name:    resources.AuthUserSecret.Name,
-			Version: resources.AuthUserSecret.ResourceVersion,
+			Name:    resources.ServerTLSSecret.Name,
+			Version: resources.ServerTLSSecret.ResourceVersion,
 		}
 	}
 

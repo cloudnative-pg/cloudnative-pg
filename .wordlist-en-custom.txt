@@ -43,6 +43,7 @@ BackupTarget
 BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
+BasicAuth
 Battiato
 Bok
 BootstrapConfiguration
@@ -1138,6 +1139,7 @@ pgbarman
 pgbasebackup
 pgbench
 pgbouncer
+pgbouncer's
 pgdata
 pgpass
 pgstatstatements

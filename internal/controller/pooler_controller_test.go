@@ -53,7 +53,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 
 		By("creating expected poolers", func() {
 			pooler1 := *newFakePooler(env.client, cluster)
-			expectedAuthSecretName = pooler1.GetAuthQuerySecretName()
+			expectedAuthSecretName = pooler1.GetServerTLSSecretNameOrDefault()
 
 			pooler2 := *newFakePooler(env.client, cluster)
 			pooler3 := *newFakePooler(env.client, cluster)
@@ -127,7 +127,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 		By("creating expected poolers", func() {
 			pooler1 := *newFakePooler(env.client, cluster)
 			pooler2 := *newFakePooler(env.client, cluster)
-			expectedAuthSecretName = pooler1.GetAuthQuerySecretName()
+			expectedAuthSecretName = pooler1.GetServerTLSSecretNameOrDefault()
 
 			for _, expectedPooler := range []apiv1.Pooler{pooler1, pooler2} {
 				request := reconcile.Request{
@@ -142,7 +142,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 
 		By("creating pooler with a different secret that should be skipped", func() {
 			pooler3 := *newFakePooler(env.client, cluster)
-			pooler3.Spec.PgBouncer.AuthQuerySecret = &apiv1.LocalObjectReference{
+			pooler3.Spec.PgBouncer.ServerTLSSecret = &apiv1.LocalObjectReference{
 				Name: "test-one",
 			}
 			pooler3.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1"

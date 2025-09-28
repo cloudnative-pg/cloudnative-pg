@@ -35,8 +35,8 @@ import (
 // synchronized by the Pooler controller
 type poolerManagedResources struct {
 	// This is the secret that is being used to authenticate
-	// the auth_query connection
-	AuthUserSecret *corev1.Secret
+	// connections from pgbouncer to the PostgreSQL Server.
+	ServerTLSSecret *corev1.Secret
 
 	// This is the pgbouncer deployment
 	Deployment *appsv1.Deployment
@@ -62,8 +62,8 @@ func (r *PoolerReconciler) getManagedResources(ctx context.Context,
 	result = &poolerManagedResources{}
 
 	// Get the auth query secret if any
-	result.AuthUserSecret, err = getSecretOrNil(
-		ctx, r.Client, client.ObjectKey{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace})
+	result.ServerTLSSecret, err = getSecretOrNil(
+		ctx, r.Client, client.ObjectKey{Name: pooler.GetServerTLSSecretNameOrDefault(), Namespace: pooler.Namespace})
 	if err != nil {
 		return nil, err
 	}

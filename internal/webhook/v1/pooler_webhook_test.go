@@ -34,11 +34,11 @@ var _ = Describe("Pooler validation", func() {
 		v = &PoolerCustomValidator{}
 	})
 
-	It("doesn't allow specifying authQuerySecret without any authQuery", func() {
+	It("doesn't allow specifying serverTLSSecret without any authQuery", func() {
 		pooler := &apiv1.Pooler{
 			Spec: apiv1.PoolerSpec{
 				PgBouncer: &apiv1.PgBouncerSpec{
-					AuthQuerySecret: &apiv1.LocalObjectReference{
+					ServerTLSSecret: &apiv1.LocalObjectReference{
 						Name: "test",
 					},
 				},
@@ -48,7 +48,7 @@ var _ = Describe("Pooler validation", func() {
 		Expect(v.validatePgBouncer(pooler)).NotTo(BeEmpty())
 	})
 
-	It("doesn't allow specifying authQuery without any authQuerySecret", func() {
+	It("doesn't allow specifying authQuery without any serverTLSSecret", func() {
 		pooler := &apiv1.Pooler{
 			Spec: apiv1.PoolerSpec{
 				PgBouncer: &apiv1.PgBouncerSpec{
@@ -60,12 +60,12 @@ var _ = Describe("Pooler validation", func() {
 		Expect(v.validatePgBouncer(pooler)).NotTo(BeEmpty())
 	})
 
-	It("allows having both authQuery and authQuerySecret", func() {
+	It("allows having both authQuery and serverTLSSecret", func() {
 		pooler := &apiv1.Pooler{
 			Spec: apiv1.PoolerSpec{
 				PgBouncer: &apiv1.PgBouncerSpec{
 					AuthQuery: "test",
-					AuthQuerySecret: &apiv1.LocalObjectReference{
+					ServerTLSSecret: &apiv1.LocalObjectReference{
 						Name: "test",
 					},
 				},

@@ -37,7 +37,7 @@ func ServiceAccount(pooler *apiv1.Pooler) *corev1.ServiceAccount {
 
 // Role creates a role for a given pooler
 func Role(pooler *apiv1.Pooler) *rbacv1.Role {
-	secretNames := []string{pooler.GetAuthQuerySecretName()}
+	secretNames := []string{pooler.GetServerTLSSecretNameOrDefault()}
 	if pooler.Status.Secrets != nil {
 		if pooler.Status.Secrets.ServerCA.Name != "" {
 			secretNames = append(secretNames, pooler.Status.Secrets.ServerCA.Name)

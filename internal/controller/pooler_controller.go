@@ -105,8 +105,10 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	if resources.AuthUserSecret == nil {
-		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds", "secret", pooler.GetAuthQuerySecretName())
+	if resources.ServerTLSSecret == nil {
+		contextLogger.Info(
+			"ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerTLSSecretNameOrDefault())
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -256,7 +258,7 @@ func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (req
 			continue
 		}
 
-		if pooler.Spec.PgBouncer != nil && pooler.GetAuthQuerySecretName() == secret.Name {
+		if pooler.Spec.PgBouncer != nil && pooler.GetServerTLSSecretNameOrDefault() == secret.Name {
 			requests = append(requests,
 				types.NamespacedName{
 					Name:      pooler.Name,

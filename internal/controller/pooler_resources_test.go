@@ -102,7 +102,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
-		objectKey := client.ObjectKey{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace}
+		objectKey := client.ObjectKey{Name: pooler.GetServerTLSSecretNameOrDefault(), Namespace: pooler.Namespace}
 
 		By("making sure that returns nil if the secret doesn't exist", func() {
 			result, err := getSecretOrNil(ctx, env.poolerReconciler.Client, objectKey)
@@ -112,7 +112,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 
 		By("creating the secret", func() {
 			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: pooler.GetServerTLSSecretNameOrDefault(), Namespace: pooler.Namespace},
 			}
 			err := env.poolerReconciler.Create(ctx, secret)
 			Expect(err).ToNot(HaveOccurred())
@@ -122,7 +122,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 			result, err := getSecretOrNil(ctx, env.poolerReconciler.Client, objectKey)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).ToNot(BeNil())
-			Expect(result.Name).To(Equal(pooler.GetAuthQuerySecretName()))
+			Expect(result.Name).To(Equal(pooler.GetServerTLSSecretNameOrDefault()))
 			Expect(result.Namespace).To(Equal(pooler.Namespace))
 		})
 	})

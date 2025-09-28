@@ -68,12 +68,12 @@ var _ = Describe("pooler_status unit tests", func() {
 		pooler := newFakePooler(env.client, cluster)
 		authUserSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            pooler.GetAuthQuerySecretName(),
+				Name:            pooler.GetServerTLSSecretNameOrDefault(),
 				Namespace:       pooler.Namespace,
 				ResourceVersion: "1",
 			},
 		}
-		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster}
+		res := &poolerManagedResources{ServerTLSSecret: authUserSecret, Cluster: cluster}
 
 		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
@@ -103,7 +103,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		poolerQuery := types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}
 		authUserSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            pooler.GetAuthQuerySecretName(),
+				Name:            pooler.GetServerTLSSecretNameOrDefault(),
 				Namespace:       pooler.Namespace,
 				ResourceVersion: "1",
 			},
@@ -111,7 +111,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
 		Expect(err).ToNot(HaveOccurred())
-		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster, Deployment: dep}
+		res := &poolerManagedResources{ServerTLSSecret: authUserSecret, Cluster: cluster, Deployment: dep}
 
 		By("making sure it updates the remote stored status when there are changes", func() {
 			poolerBefore := &apiv1.Pooler{}

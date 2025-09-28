@@ -26,11 +26,27 @@ func (in PgBouncerSpec) IsPaused() bool {
 	return in.Paused != nil && *in.Paused
 }
 
-// GetAuthQuerySecretName returns the specified AuthQuerySecret name for PgBouncer
-// if provided or the default name otherwise.
-func (in *Pooler) GetAuthQuerySecretName() string {
-	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.AuthQuerySecret != nil {
-		return in.Spec.PgBouncer.AuthQuerySecret.Name
+// GetServerTLSSecretName returns the specified server TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerTLSSecretName() string {
+	if in.Spec.PgBouncer != nil {
+		if in.Spec.PgBouncer.ServerTLSSecret != nil {
+			return in.Spec.PgBouncer.ServerTLSSecret.Name
+		}
+
+		if in.Spec.PgBouncer.AuthQuerySecret != nil {
+			return in.Spec.PgBouncer.AuthQuerySecret.Name
+		}
+	}
+
+	return ""
+}
+
+// GetServerTLSSecretNameOrDefault returns the specified server TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerTLSSecretNameOrDefault() string {
+	if name := in.GetServerTLSSecretName(); name != "" {
+		return name
 	}
 
 	return in.Spec.Cluster.Name + DefaultPgBouncerPoolerSecretSuffix
@@ -49,15 +65,31 @@ func (in *Pooler) GetAuthQuery() string {
 // IsAutomatedIntegration returns whether the Pooler integration with the
 // Cluster is automated or not.
 func (in *Pooler) IsAutomatedIntegration() bool {
+	// If pgbouncer is not active, we drop the automatic integration. Important:
+	// the pgbouncer configuration is currently required and enforced by the
+	// admission webhook, so this condition shouldn't happen.
 	if in.Spec.PgBouncer == nil {
-		return true
-	}
-	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
-	// is not going to be handled by the operator.
-	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
-		in.Spec.PgBouncer.AuthQuery != "" {
 		return false
 	}
+
+	// If the user specified an AuthQuery, the integration
+	// is not going to be handled by the operator.
+	if in.Spec.PgBouncer.AuthQuery != "" {
+		return false
+	}
+
+	// If the user specified an ServerTLSSecret, the integration is not going to
+	// be handled by the operator.
+	if in.Spec.PgBouncer.ServerTLSSecret != nil && in.Spec.PgBouncer.ServerTLSSecret.Name != "" {
+		return false
+	}
+
+	// If the user specified an AuthQuerySecret, the integration is not going to
+	// be handled by the operator.
+	if in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "" {
+		return false
+	}
+
 	return true
 }
 

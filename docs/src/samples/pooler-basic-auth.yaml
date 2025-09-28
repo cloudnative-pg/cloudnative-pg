@@ -10,6 +10,6 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
-    authQuerySecret:
+    serverTLSSecret:
       name: cluster-example-superuser
     authQuery: SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1

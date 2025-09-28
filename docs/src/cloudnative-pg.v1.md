@@ -4233,6 +4233,19 @@ by pgbouncer</p>
    <p>The pool mode. Default: <code>session</code>.</p>
 </td>
 </tr>
+<tr><td><code>serverTLSSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+<code>server_tls_key_file</code> and <code>server_tls_cert_file</code>, used when
+authenticating against PostgreSQL. Replaces <code>authQuerySecret</code>, with
+broader scope.</p>
+<p>When pointing to a BasicAuth secret, provides the username and the
+password that will be used to execute the auth_query against the
+PostgreSQL server.</p>
+</td>
+</tr>
 <tr><td><code>authQuerySecret</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
@@ -4241,6 +4254,7 @@ by pgbouncer</p>
 query. In case it is specified, also an AuthQuery
 (e.g. &quot;SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1&quot;)
 has to be specified and no automatic CNPG Cluster integration will be triggered.</p>
+<p>Deprecated: the field has been replaced by ServerTLSSecret.</p>
 </td>
 </tr>
 <tr><td><code>authQuery</code><br/>

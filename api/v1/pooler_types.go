@@ -160,10 +160,25 @@ type PgBouncerSpec struct {
 	// +optional
 	PoolMode PgBouncerPoolMode `json:"poolMode,omitempty"`
 
+	// ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+	// `server_tls_key_file` and `server_tls_cert_file`, used when
+	// authenticating against PostgreSQL. Replaces `authQuerySecret`, with
+	// broader scope.
+	//
+	// When pointing to a BasicAuth secret, provides the username and the
+	// password that will be used to execute the auth_query against the
+	// PostgreSQL server.
+	//
+	// +optional
+	ServerTLSSecret *LocalObjectReference `json:"serverTLSSecret,omitempty"`
+
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
 	// (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
 	// has to be specified and no automatic CNPG Cluster integration will be triggered.
+	//
+	// Deprecated: the field has been replaced by ServerTLSSecret.
+	//
 	// +optional
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 

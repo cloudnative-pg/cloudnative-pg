@@ -35,10 +35,10 @@ import (
 )
 
 const (
-	authQueryName = "authquery"
-	serverCAName  = "serverca"
-	serverTLSName = "servertls"
-	clientCAName  = "clientca"
+	serverTLSSecretName = "authquery"
+	serverCAName        = "serverca"
+	serverTLSName       = "servertls"
+	clientCAName        = "clientca"
 )
 
 func TestController(t *testing.T) {
@@ -47,8 +47,8 @@ func TestController(t *testing.T) {
 }
 
 func buildTestEnv() (client.WithWatch, *apiv1.Pooler) {
-	authQuerySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: authQueryName, Namespace: "default"},
+	serverTLSSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: serverTLSSecretName, Namespace: "default"},
 	}
 	serverCASecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: serverCAName, Namespace: "default"},
@@ -64,7 +64,7 @@ func buildTestEnv() (client.WithWatch, *apiv1.Pooler) {
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pooler", Namespace: "default"},
 		Spec: apiv1.PoolerSpec{
 			PgBouncer: &apiv1.PgBouncerSpec{
-				AuthQuerySecret: &apiv1.LocalObjectReference{Name: authQueryName},
+				ServerTLSSecret: &apiv1.LocalObjectReference{Name: serverTLSSecretName},
 			},
 			Cluster: apiv1.LocalObjectReference{
 				Name: "cluster",
@@ -80,6 +80,6 @@ func buildTestEnv() (client.WithWatch, *apiv1.Pooler) {
 	}
 
 	return fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
-		WithObjects(pooler, authQuerySecret, serverCASecret, serverCertSecret, clientCASecret).
+		WithObjects(pooler, serverTLSSecret, serverCASecret, serverCertSecret, clientCASecret).
 		Build(), pooler
 }

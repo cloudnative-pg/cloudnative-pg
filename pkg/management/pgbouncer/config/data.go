@@ -26,7 +26,7 @@ import (
 // Secrets is the set of data that is needed to compute a PgBouncer configuration
 type Secrets struct {
 	// The secret containing the credentials to be used to execute the auth_query queries.
-	AuthQuery *corev1.Secret
+	ServerTLSSecret *corev1.Secret
 
 	// The TLS secret that will be used for client connections (application-side)
 	Client *corev1.Secret

@@ -455,9 +455,9 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 		// The integrated poolers are the ones whose permissions are directly
 		// managed by the instance manager.
 		//
-		// For this to be done the user needs to avoid setting an authQuery
-		// and an authQuerySecret manually on the pooler: this would mean
-		// that the user intend to manually manage them.
+		// For this to be done the user needs to avoid setting an authQuery and
+		// a serverTLSSecret manually on the pooler: this would mean that the
+		// user intend to manually manage them.
 		//
 		// If this happens, we declare the pooler automatically integrated
 		// in the following two cases:
@@ -467,14 +467,13 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 		// 2. the secret exists and has been created by the operator
 		//    (owned by the Cluster)
 
-		// We skip secrets which were directly setup by the user with
-		// the authQuery and authQuerySecret parameters inside the
-		// pooler
+		// We skip secrets which were directly setup by the user with the
+		// authQuery and serverTLSSecret parameters inside the pooler
 		if !pooler.IsAutomatedIntegration() {
 			continue
 		}
 
-		secretName := pooler.GetAuthQuerySecretName()
+		secretName := pooler.GetServerTLSSecretNameOrDefault()
 		// there is no need to examine further, the potential secret we may add is already present.
 		// This saves us:
 		// - further API calls to the kube-api server,
@@ -484,11 +483,11 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 		}
 
 		// Check the secret existence and ownership
-		authQuerySecret := corev1.Secret{}
+		serverTLSSecret := corev1.Secret{}
 		err := r.Get(
 			ctx,
-			client.ObjectKey{Namespace: cluster.Namespace, Name: pooler.GetAuthQuerySecretName()},
-			&authQuerySecret,
+			client.ObjectKey{Namespace: cluster.Namespace, Name: pooler.GetServerTLSSecretNameOrDefault()},
+			&serverTLSSecret,
 		)
 		if apierrs.IsNotFound(err) {
 			poolersIntegrations.Secrets = append(poolersIntegrations.Secrets, secretName)
@@ -498,7 +497,7 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 		if err != nil {
 			return apiv1.PgBouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
 		}
-		if owner, ok := IsOwnedByCluster(&authQuerySecret); ok && owner == cluster.Name {
+		if owner, ok := IsOwnedByCluster(&serverTLSSecret); ok && owner == cluster.Name {
 			poolersIntegrations.Secrets = append(poolersIntegrations.Secrets, secretName)
 			continue
 		}

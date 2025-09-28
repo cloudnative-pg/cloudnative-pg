@@ -59,7 +59,7 @@ var _ = Describe("getSecrets tests", func() {
 			Expect(res.ClientCA.Name).To(Equal(clientCAName))
 			Expect(res.Client.Name).To(Equal(serverTLSName))
 			Expect(res.ServerCA.Name).To(Equal(serverCAName))
-			Expect(res.AuthQuery.Name).To(Equal(authQueryName))
+			Expect(res.ServerTLSSecret.Name).To(Equal(serverTLSSecretName))
 		})
 	})
 
