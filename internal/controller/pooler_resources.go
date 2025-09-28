@@ -38,6 +38,20 @@ type poolerManagedResources struct {
 	// the auth_query connection
 	AuthUserSecret *corev1.Secret
 
+	// This is the secret that is being used to authenticate
+	// connections from pgbouncer to the PostgreSQL Server.
+	ServerTLSSecret *corev1.Secret
+
+	// This is the root certificate to validate PostgreSQL
+	// server certificates.
+	ServerCASecret *corev1.Secret
+
+	// This is the certificate for PgBouncer to accept client connections.
+	ClientTLSSecret *corev1.Secret
+
+	// This is the root certificate to validate client certificates.
+	ClientCASecret *corev1.Secret
+
 	// This is the pgbouncer deployment
 	Deployment *appsv1.Deployment
 
@@ -56,14 +70,71 @@ type poolerManagedResources struct {
 
 // getManagedResources detects the list of the resources created and manager
 // by this pooler
-func (r *PoolerReconciler) getManagedResources(ctx context.Context,
+func (r *PoolerReconciler) getManagedResources(
+	ctx context.Context,
 	pooler *apiv1.Pooler,
 ) (result *poolerManagedResources, err error) {
 	result = &poolerManagedResources{}
 
+	// Get the referenced cluster
+	result.Cluster, err = getClusterOrNil(
+		ctx, r.Client, client.ObjectKey{Name: pooler.Spec.Cluster.Name, Namespace: pooler.Namespace})
+	if err != nil {
+		return nil, err
+	}
+
 	// Get the auth query secret if any
 	result.AuthUserSecret, err = getSecretOrNil(
 		ctx, r.Client, client.ObjectKey{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the auth query secret if any
+	serverTLSSecretName := pooler.GetServerTLSSecretName()
+	if serverTLSSecretName != "" {
+		result.ServerTLSSecret, err = getSecretOrNil(
+			ctx, r.Client, client.ObjectKey{
+				Name:      serverTLSSecretName,
+				Namespace: pooler.Namespace,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Get the server CA secret
+	result.ServerCASecret, err = getSecretOrNil(
+		ctx,
+		r.Client,
+		client.ObjectKey{
+			Name:      pooler.GetServerCASecretNameOrDefault(result.Cluster),
+			Namespace: pooler.Namespace,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the client CA secret
+	result.ClientCASecret, err = getSecretOrNil(
+		ctx, r.Client, client.ObjectKey{
+			Name:      pooler.GetClientCASecretNameOrDefault(result.Cluster),
+			Namespace: pooler.Namespace,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the client TLS secret
+	result.ClientTLSSecret, err = getSecretOrNil(
+		ctx, r.Client, client.ObjectKey{
+			Name:      pooler.GetClientTLSSecretNameOrDefault(result.Cluster),
+			Namespace: pooler.Namespace,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -78,13 +149,6 @@ func (r *PoolerReconciler) getManagedResources(ctx context.Context,
 	// Get the service deployment
 	result.Service, err = getServiceOrNil(
 		ctx, r.Client, client.ObjectKey{Name: pooler.Name, Namespace: pooler.Namespace})
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the referenced cluster
-	result.Cluster, err = getClusterOrNil(
-		ctx, r.Client, client.ObjectKey{Name: pooler.Spec.Cluster.Name, Namespace: pooler.Namespace})
 	if err != nil {
 		return nil, err
 	}

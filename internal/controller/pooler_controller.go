@@ -110,6 +110,34 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
+	if resources.ClientTLSSecret == nil {
+		contextLogger.Info(
+			"ClientTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetClientTLSSecretNameOrDefault(resources.Cluster))
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if resources.ClientCASecret == nil {
+		contextLogger.Info(
+			"ClientCASecret not found, waiting 30 seconds",
+			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
+		contextLogger.Info(
+			"ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerTLSSecretName())
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if resources.ServerCASecret == nil {
+		contextLogger.Info(
+			"ServerCASecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerCASecretNameOrDefault(resources.Cluster))
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	if res := r.ensureManagedResourcesAreOwned(ctx, pooler, resources); !res.IsZero() {
 		return res, nil
 	}
@@ -257,6 +285,16 @@ func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (req
 		}
 
 		if pooler.Spec.PgBouncer != nil && pooler.GetAuthQuerySecretName() == secret.Name {
+			requests = append(requests,
+				types.NamespacedName{
+					Name:      pooler.Name,
+					Namespace: pooler.Namespace,
+				},
+			)
+			continue
+		}
+
+		if pooler.GetServerTLSSecretName() == secret.Name {
 			requests = append(requests,
 				types.NamespacedName{
 					Name:      pooler.Name,
