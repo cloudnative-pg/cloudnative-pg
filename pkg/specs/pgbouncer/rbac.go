@@ -50,6 +50,10 @@ func Role(pooler *apiv1.Pooler) *rbacv1.Role {
 		if pooler.Status.Secrets.ClientCA.Name != "" {
 			secretNames = append(secretNames, pooler.Status.Secrets.ClientCA.Name)
 		}
+
+		if pooler.Status.Secrets.ClientTLS.Name != "" {
+			secretNames = append(secretNames, pooler.Status.Secrets.ClientTLS.Name)
+		}
 	}
 
 	return &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{

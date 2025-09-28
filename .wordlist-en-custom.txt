@@ -81,6 +81,7 @@ ClassName
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+ClientTLSSecret
 CloudNativePG
 CloudNativePG's
 ClusterBinding
@@ -690,6 +691,8 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientTLS
+clientTLSSecret
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -1145,6 +1148,7 @@ pgbarman
 pgbasebackup
 pgbench
 pgbouncer
+pgbouncer's
 pgdata
 pgpass
 pgstatstatements

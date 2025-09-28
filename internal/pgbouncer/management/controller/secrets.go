@@ -38,11 +38,13 @@ func getSecrets(ctx context.Context, client ctrl.Client, pooler *apiv1.Pooler) (
 		return nil, fmt.Errorf("status not populated yet")
 	}
 
+	result := &config.Secrets{}
+
 	var (
-		authQuerySecret  corev1.Secret
-		serverCASecret   corev1.Secret
-		serverCertSecret corev1.Secret
-		clientCASecret   corev1.Secret
+		authQuerySecret corev1.Secret
+		serverCASecret  corev1.Secret
+		clientTLSSecret corev1.Secret
+		clientCASecret  corev1.Secret
 	)
 
 	authQuerySecretName := pooler.GetAuthQuerySecretName()
@@ -52,7 +54,18 @@ func getSecrets(ctx context.Context, client ctrl.Client, pooler *apiv1.Pooler) (
 			Namespace: pooler.Namespace,
 		},
 		&authQuerySecret); err != nil {
-		return nil, fmt.Errorf("while getting auth query secret %s: %w", authQuerySecretName, err)
+		return nil, fmt.Errorf("while getting auth query secret: %w", err)
+	}
+	result.AuthQuery = &authQuerySecret
+
+	if pooler.Status.Secrets.ServerTLS.Name != "" {
+		var serverTLSSecret corev1.Secret
+		if err := client.Get(ctx,
+			types.NamespacedName{Name: pooler.Status.Secrets.ServerTLS.Name, Namespace: pooler.Namespace},
+			&serverTLSSecret); err != nil {
+			return nil, fmt.Errorf("while getting server TLS secret: %w", err)
+		}
+		result.ServerTLS = &serverTLSSecret
 	}
 
 	if err := client.Get(ctx,
@@ -60,23 +73,21 @@ func getSecrets(ctx context.Context, client ctrl.Client, pooler *apiv1.Pooler) (
 		&serverCASecret); err != nil {
 		return nil, fmt.Errorf("while getting server CA secret: %w", err)
 	}
+	result.ServerCA = &serverCASecret
 
 	if err := client.Get(ctx,
-		types.NamespacedName{Name: pooler.Status.Secrets.ServerTLS.Name, Namespace: pooler.Namespace},
-		&serverCertSecret); err != nil {
-		return nil, fmt.Errorf("while getting server cert secret: %w", err)
+		types.NamespacedName{Name: pooler.Status.Secrets.ClientTLS.Name, Namespace: pooler.Namespace},
+		&clientTLSSecret); err != nil {
+		return nil, fmt.Errorf("while getting client TLS secret: %w", err)
 	}
+	result.ClientTLS = &clientTLSSecret
 
 	if err := client.Get(ctx,
 		types.NamespacedName{Name: pooler.Status.Secrets.ClientCA.Name, Namespace: pooler.Namespace},
 		&clientCASecret); err != nil {
 		return nil, fmt.Errorf("while getting client CA secret: %w", err)
 	}
+	result.ClientCA = &clientCASecret
 
-	return &config.Secrets{
-		AuthQuery: &authQuerySecret,
-		ServerCA:  &serverCASecret,
-		Client:    &serverCertSecret,
-		ClientCA:  &clientCASecret,
-	}, nil
+	return result, nil
 }

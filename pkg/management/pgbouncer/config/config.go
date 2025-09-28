@@ -42,11 +42,19 @@ const (
 
 	// ClientTLSCertPath is the path where the client TLS certificate
 	// is stored
-	clientTLSCertPath = ConfigsDir + "/server-tls/tls.crt"
+	clientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
 
 	// ClientTLSKeyPath is the path where the client TLS private key
 	// is stored
-	clientTLSKeyPath = ConfigsDir + "/server-tls/tls.key"
+	clientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
+
+	// ServerTLSCertPath is the path where the server TLS certificate
+	// is stored
+	serverTLSCertPath = ConfigsDir + "/server-tls/tls.crt"
+
+	// ServerTLSKeyPath is the path where the client TLS private key
+	// is stored
+	serverTLSKeyPath = ConfigsDir + "/server-tls/tls.key"
 
 	// ClientTLSCAPath is the path where the public key of the CA
 	// used to authenticate clients is stored
@@ -186,6 +194,11 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		parameters["auth_file"] = authFilePath
 	}
 
+	if secrets.ServerTLS != nil {
+		parameters["server_tls_cert_file"] = serverTLSCertPath
+		parameters["server_tls_key_file"] = serverTLSKeyPath
+	}
+
 	templateData := struct {
 		Pooler            *apiv1.Pooler
 		AuthQuery         string
@@ -234,8 +247,13 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	// The required crypto-material
 	files[serverTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
 	files[clientTLSCAPath] = secrets.ClientCA.Data[certs.CACertKey]
-	files[clientTLSCertPath] = secrets.Client.Data[certs.TLSCertKey]
-	files[clientTLSKeyPath] = secrets.Client.Data[certs.TLSPrivateKeyKey]
+	files[clientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
+	files[clientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
+
+	if secrets.ServerTLS != nil {
+		files[serverTLSCertPath] = secrets.ServerTLS.Data[certs.TLSCertKey]
+		files[serverTLSKeyPath] = secrets.ServerTLS.Data[certs.TLSPrivateKeyKey]
+	}
 
 	return files, nil
 }
