@@ -18,8 +18,6 @@ Rolling upgrades are triggered when:
 
 - you change the `Cluster` `.spec.resources` values;
 
-- you resize the persistent volume claim on AKS;
-
 - the operator is updated, ensuring Pods run the latest instance manager
   (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
