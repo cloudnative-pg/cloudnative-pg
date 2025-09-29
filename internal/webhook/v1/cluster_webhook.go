@@ -1032,15 +1032,6 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 		result = append(result, err)
 	}
 
-	if r.Spec.Instances <= 2 {
-		err := field.Invalid(
-			field.NewPath("spec", "instances"),
-			r.Spec.Instances,
-			"failoverQuorum requires more than 2 instances.",
-		)
-		result = append(result, err)
-	}
-
 	return result
 }
 

@@ -5818,7 +5818,7 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 
-	It("requires at least three instances", func() {
+	It("accepts two or more instances", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -5826,7 +5826,7 @@ var _ = Describe("failoverQuorum validation", func() {
 				},
 			},
 			Spec: apiv1.ClusterSpec{
-				Instances: 3,
+				Instances: 2,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Synchronous: &apiv1.SynchronousReplicaConfiguration{
 						Number: 1,
@@ -5838,9 +5838,9 @@ var _ = Describe("failoverQuorum validation", func() {
 		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(BeEmpty())
 
-		cluster.Spec.Instances = 2
+		cluster.Spec.Instances = 3
 		errList = v.validateFailoverQuorum(cluster)
-		Expect(errList).To(HaveLen(1))
+		Expect(errList).To(BeEmpty())
 	})
 
 	It("check if the number of external synchronous replicas is coherent", func() {
