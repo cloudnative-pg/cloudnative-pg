@@ -769,8 +769,8 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 			return err
 		}
 
-		const authDBName = "postgres"
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", authDBName, apiv1.PGBouncerPoolerUserName))
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+			apiv1.PoolerAuthDBName, apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}

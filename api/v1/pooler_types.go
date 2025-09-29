@@ -43,6 +43,9 @@ const (
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
 	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
+
+	// PoolerAuthDBName is the database name used to run the auth_query
+	PoolerAuthDBName = "postgres"
 )
 
 // PgBouncerPoolMode is the mode of PgBouncer
