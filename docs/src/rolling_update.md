@@ -21,13 +21,6 @@ Rolling upgrades are triggered when:
 - the operator is updated, ensuring Pods run the latest instance manager
   (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
-!!! Warning
-    Any change to container images (including extensions) takes precedence over
-    all other changes and will trigger a rollout first. For example, if you update
-    both the PostgreSQL configuration and the PostgreSQL version at the same time,
-    the container image change will take priority, and the configuration change
-    will be applied in a subsequent rollout.
-
 During a rolling upgrade, the operator upgrades all replicas one Pod at a time,
 starting from the one with the highest serial.
 
@@ -40,7 +33,7 @@ The upgrade keeps the CloudNativePG identity, without re-cloning the
 data. Pods will be deleted and created again with the same PVCs and a new
 image, if required.
 
-During the rolling update procedure, each service endpoints move to reflect the
+During the rolling update procedure, each service's endpoint moves to reflect the
 cluster's status, so that applications can ignore the node that is being
 updated.
 
