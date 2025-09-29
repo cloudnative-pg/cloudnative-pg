@@ -110,7 +110,10 @@ var (
 
 	// the PgBouncer parameters we want to have a default different from the default one
 	defaultPgBouncerParameters = map[string]string{
-		"log_stats": "0",
+		"log_stats":          "0",
+		"auth_type":          "hba",
+		"client_tls_sslmode": "prefer",
+		"server_tls_sslmode": "verify-ca",
 		// We are going to append these ignore_startup_parameters to the ones provided by the user,
 		// as we need them to be able to connect using libpq.
 		// See: https://github.com/lib/pq/issues/475
@@ -123,11 +126,8 @@ var (
 		"listen_port":          "5432",
 		"listen_addr":          "*",
 		"admin_users":          PgBouncerAdminUser,
-		"auth_type":            "hba",
 		"auth_hba_file":        ConfigsDir + "/pg_hba.conf",
-		"server_tls_sslmode":   "verify-ca",
 		"server_tls_ca_file":   serverTLSCAPath,
-		"client_tls_sslmode":   "prefer",
 		"client_tls_cert_file": clientTLSCertPath,
 		"client_tls_key_file":  clientTLSKeyPath,
 		"client_tls_ca_file":   clientTLSCAPath,
