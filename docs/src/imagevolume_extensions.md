@@ -277,7 +277,7 @@ present in the base PostgreSQL image. To support these requirements, you can
 package the necessary libraries within your extension container image and make
 them available to PostgreSQL using the `ld_library_path` field.
 
-For example, if your extension image includes a `system` directory with the
+For example, if your extension image includes a `syslib` directory with the
 required libraries:
 
 ```yaml
@@ -298,7 +298,7 @@ spec:
 ```
 
 CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
-`/extensions/postgis/system`, allowing PostgreSQL to locate and load these
+`/extensions/postgis/syslib`, allowing PostgreSQL to locate and load these
 system libraries at runtime.
 
 !!! Important
