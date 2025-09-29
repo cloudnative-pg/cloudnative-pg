@@ -1473,6 +1473,10 @@ var _ = Describe("validate image name change", func() {
 			Expect(v.validateImageChange(clusterNew, clusterOld)).To(HaveLen(1))
 		})
 		It("complains going from imageCatalogRef to lower major default imageName", func() {
+			defaultVersion, err := pgversion.FromTag(reference.New(versions.DefaultImageName).Tag)
+			Expect(err).ToNot(HaveOccurred())
+			higherVersion := int(defaultVersion.Major()) + 1
+
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					ImageCatalogRef: &apiv1.ImageCatalogRef{
@@ -1480,14 +1484,14 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 18,
+						Major: higherVersion,
 					},
 				},
 				Status: apiv1.ClusterStatus{
 					Image: "test",
 					PGDataImageInfo: &apiv1.ImageInfo{
 						Image:        "test",
-						MajorVersion: 18,
+						MajorVersion: higherVersion,
 					},
 				},
 			}
