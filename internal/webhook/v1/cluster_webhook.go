@@ -21,6 +21,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -242,6 +243,7 @@ func (v *ClusterCustomValidator) validateClusterChanges(r, old *apiv1.Cluster) (
 	type validationFunc func(*apiv1.Cluster, *apiv1.Cluster) field.ErrorList
 	validations := []validationFunc{
 		v.validateImageChange,
+		v.validateConfigurationChange,
 		v.validateStorageChange,
 		v.validateWalStorageChange,
 		v.validateTablespacesChange,
@@ -1326,6 +1328,31 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 	}
 
 	return resource.ParseQuantity(value)
+}
+
+// validateConfigurationChange determines whether a PostgreSQL configuration
+// change can be applied
+func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if old.Spec.ImageName != r.Spec.ImageName && r.Spec.PrimaryUpdateMethod == apiv1.PrimaryUpdateMethodSwitchover {
+		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
+			r.Spec.PostgresConfiguration.Parameters)
+		if len(diff) > 0 {
+			jsonDiff, _ := json.Marshal(diff)
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "imageName"),
+					r.Spec.ImageName,
+					fmt.Sprintf("Can't change image name and configuration at the same time when "+
+						"`primaryUpdateMethod` is set to `switchover`. "+
+						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
+			return result
+		}
+	}
+
+	return result
 }
 
 func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElectionConstraints) *field.Error {

@@ -1075,6 +1075,26 @@ var _ = Describe("configuration change validation", func() {
 		Expect(v.validateWALLevelChange(cluster, oldCluster)).To(BeEmpty())
 	})
 
+	It("complains when changing image and settings simultaneously if PrimaryUpdateMethodSwitchover", func() {
+		clusterOld := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryUpdateMethod: apiv1.PrimaryUpdateMethodSwitchover,
+				ImageName:           "postgres:10.5",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"shared_buffers": "4G",
+					},
+				},
+			},
+		}
+		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(HaveLen(1))
+	})
+
 	Describe("wal_log_hints", func() {
 		It("should reject wal_log_hints set to an invalid value", func() {
 			cluster := &apiv1.Cluster{
