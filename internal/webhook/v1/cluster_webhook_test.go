@@ -5841,6 +5841,27 @@ var _ = Describe("failoverQuorum validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
+	It("accepts two or more instances", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Synchronous: &apiv1.SynchronousReplicaConfiguration{
+						Number:         1,
+						FailoverQuorum: true,
+					},
+				},
+			},
+		}
+
+		errList := v.validateFailoverQuorum(cluster)
+		Expect(errList).To(BeEmpty())
+
+		cluster.Spec.Instances = 3
+		errList = v.validateFailoverQuorum(cluster)
+		Expect(errList).To(BeEmpty())
+	})
+
 	It("check if the number of external synchronous replicas is coherent", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
