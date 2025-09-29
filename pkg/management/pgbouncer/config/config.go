@@ -80,6 +80,7 @@ const (
 pool_mode = {{ .Pooler.Spec.PgBouncer.PoolMode }}
 auth_user = {{ .AuthQueryUser }}
 auth_query = {{ .AuthQuery }}
+auth_dbname = {{ .AuthDBName }}
 
 {{ .Parameters -}}
 `
@@ -190,6 +191,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQuery         string
 		AuthQueryUser     string
 		AuthQueryPassword string
+		AuthDBName        string
 		Parameters        string
 		PgHba             []string
 	}{
@@ -197,6 +199,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQuery:         pooler.GetAuthQuery(),
 		AuthQueryUser:     authQueryUser,
 		AuthQueryPassword: authQueryPassword,
+		AuthDBName:        apiv1.PoolerAuthDBName,
 		// We are not directly passing the map of parameters inside the template
 		// because the iteration order of the entries inside a map is undefined
 		// and this could lead to the secret being rewritten where isn't really
