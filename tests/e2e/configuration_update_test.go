@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,9 +53,8 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		level       = tests.High
 	)
 	var (
-		namespace    string
-		targetTag    string
-		currentMajor uint64
+		namespace string
+		targetTag string
 	)
 
 	postgresParams := map[string]string{
@@ -206,36 +204,41 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		})
 	}
 
-	assertChangeImageAndGucs := func(namespace string) {
-		if currentMajor > 17 {
-			Skip("Skipping until pgaudit is available for PG18")
-		}
-
-		Eventually(func(g Gomega) {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			g.Expect(err).NotTo(HaveOccurred())
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-bookworm", targetTag)
+	assertChangeImageAndGucs := func(namespace string, primaryUpdateMethod apiv1.PrimaryUpdateMethod) {
+		cluster := &apiv1.Cluster{}
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			var err error
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).NotTo(HaveOccurred())
+			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-trixie", targetTag)
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log"] = "all, -misc"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_catalog"] = "off"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_parameter"] = "on"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_relation"] = "on"
-			g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
-		}, 60, 5).Should(Succeed())
-
-		AssertClusterEventuallyReachesPhase(namespace, clusterName,
-			[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
-
-		By("verify that pgaudit is enabled", func() {
-			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			QueryMatchExpectationPredicate(primary, postgres.PostgresDBName,
-				"SELECT extname FROM pg_extension WHERE extname = 'pgaudit'", "pgaudit")
-			QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
-			QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
-			QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
-			QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
+			return env.Client.Update(env.Ctx, cluster)
 		})
+
+		if primaryUpdateMethod == apiv1.PrimaryUpdateMethodSwitchover {
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+		}
+
+		if primaryUpdateMethod == apiv1.PrimaryUpdateMethodRestart {
+			Expect(err).NotTo(HaveOccurred())
+			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			By("verify that pgaudit is enabled", func() {
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName,
+					"SELECT extname FROM pg_extension WHERE extname = 'pgaudit'", "pgaudit")
+				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
+				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
+				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
+				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
+			})
+		}
 	}
 
 	BeforeEach(func() {
@@ -247,9 +250,6 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		// https://github.com/cloudnative-pg/cloudnative-pg/issues/8123
 		currentImage := os.Getenv("POSTGRES_IMG")
 		Expect(currentImage).ToNot(BeEmpty())
-		currentVersion, err := version.FromTag(reference.New(currentImage).Tag)
-		Expect(err).NotTo(HaveOccurred())
-		currentMajor = currentVersion.Major()
 		targetTag = strings.Split(reference.New(currentImage).Tag, "-")[0]
 	})
 
@@ -261,7 +261,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-bookworm", targetTag)
+			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-trixie", targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
@@ -444,9 +444,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		})
 
 		It("10. performing a rolling update when changing imageName and extension GUC at the same time", func() {
-			oldPrimary := gatherCurrentPrimary(namespace)
-			assertChangeImageAndGucs(namespace)
-			checkSwitchoverOccurred(namespace, oldPrimary)
+			assertChangeImageAndGucs(namespace, apiv1.PrimaryUpdateMethodSwitchover)
 		})
 	})
 
@@ -458,7 +456,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-bookworm", targetTag)
+			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-trixie", targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
@@ -567,7 +565,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("3. performing a rolling update when changing imageName and extension GUC at the same time", func() {
 			oldPrimary := gatherCurrentPrimary(namespace)
-			assertChangeImageAndGucs(namespace)
+			assertChangeImageAndGucs(namespace, apiv1.PrimaryUpdateMethodRestart)
 			checkSwitchoverHaveNotOccurred(namespace, oldPrimary)
 		})
 	})
