@@ -330,11 +330,13 @@ These are the PgBouncer options you can customize, with links to the PgBouncer
 documentation for each parameter. Unless stated otherwise, the default values
 are the ones directly set by PgBouncer.
 
+- [`auth_type`](https://www.pgbouncer.org/config.html#auth_type)
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)
 - [`client_idle_timeout`](https://www.pgbouncer.org/config.html#client_idle_timeout)
 - [`client_login_timeout`](https://www.pgbouncer.org/config.html#client_login_timeout)
+- [`client_tls_sslmode`](https://www.pgbouncer.org/config.html#client_tls_sslmode)
 - [`default_pool_size`](https://www.pgbouncer.org/config.html#default_pool_size)
 - [`disable_pqexec`](https://www.pgbouncer.org/config.html#disable_pqexec)
 - [`dns_max_ttl`](https://www.pgbouncer.org/config.html#dns_max_ttl)
@@ -373,6 +375,7 @@ are the ones directly set by PgBouncer.
 - [`server_round_robin`](https://www.pgbouncer.org/config.html#server_round_robin)
 - [`server_tls_ciphers`](https://www.pgbouncer.org/config.html#server_tls_ciphers)
 - [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
+- [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
 - [`suspend_timeout`](https://www.pgbouncer.org/config.html#suspend_timeout)
 - [`tcp_defer_accept`](https://www.pgbouncer.org/config.html#tcp_defer_accept)

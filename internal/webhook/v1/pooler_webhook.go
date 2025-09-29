@@ -39,10 +39,12 @@ import (
 // AllowedPgbouncerGenericConfigurationParameters is the list of allowed parameters for PgBouncer
 var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"application_name_add_host",
+	"auth_type",
 	"autodb_idle_timeout",
 	"cancel_wait_timeout",
 	"client_idle_timeout",
 	"client_login_timeout",
+	"client_tls_sslmode",
 	"default_pool_size",
 	"disable_pqexec",
 	"dns_max_ttl",
@@ -78,6 +80,7 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"server_round_robin",
 	"server_tls_ciphers",
 	"server_tls_protocols",
+	"server_tls_sslmode",
 	"stats_period",
 	"suspend_timeout",
 	"tcp_defer_accept",
