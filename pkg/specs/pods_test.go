@@ -938,6 +938,9 @@ var _ = Describe("NewInstance", func() {
 				Name:      "test-cluster",
 				Namespace: "default",
 			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+			},
 		}
 
 		pod, err := NewInstance(ctx, cluster, 1, true)
@@ -949,7 +952,7 @@ var _ = Describe("NewInstance", func() {
 			utils.PodRoleLabelName:                string(utils.PodRoleInstance),
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  "test-cluster",
-			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppVersionLabelName:   "18",
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))

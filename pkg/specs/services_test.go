@@ -37,6 +37,9 @@ var _ = Describe("Services specification", func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustername",
 		},
+		Spec: apiv1.ClusterSpec{
+			ImageName: "postgres:18.0",
+		},
 	}
 	expectedPort := corev1.ServicePort{
 		Name:       PostgresContainerName,
@@ -50,7 +53,7 @@ var _ = Describe("Services specification", func() {
 		utils.ClusterLabelName:                "clustername",
 		utils.KubernetesAppLabelName:          utils.AppName,
 		utils.KubernetesAppInstanceLabelName:  "clustername",
-		utils.KubernetesAppVersionLabelName:   "17",
+		utils.KubernetesAppVersionLabelName:   "18",
 		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 	}
