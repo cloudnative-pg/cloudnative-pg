@@ -33,9 +33,9 @@ import (
 )
 
 var _ = Describe("Services specification", func() {
-	postgresql := apiv1.Cluster{
+	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clustername",
+			Name: "clusterName",
 		},
 		Spec: apiv1.ClusterSpec{
 			ImageName: "postgres:18.0",
@@ -50,9 +50,9 @@ var _ = Describe("Services specification", func() {
 
 	// shared expected labels
 	expectedLabels := map[string]string{
-		utils.ClusterLabelName:                "clustername",
+		utils.ClusterLabelName:                cluster.Name,
 		utils.KubernetesAppLabelName:          utils.AppName,
-		utils.KubernetesAppInstanceLabelName:  "clustername",
+		utils.KubernetesAppInstanceLabelName:  cluster.Name,
 		utils.KubernetesAppVersionLabelName:   "18",
 		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
@@ -68,30 +68,30 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Name).To(Equal(expectedName))
 		Expect(service.Labels).To(BeEquivalentTo(expectedLabels))
 		Expect(service.Spec.PublishNotReadyAddresses).To(Equal(publishNotReady))
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal(cluster.Name))
 		Expect(service.Spec.Selector[selectorKey]).To(Equal(selectorValue))
 		Expect(service.Spec.Ports).To(HaveLen(1))
 		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
 	}
 
 	It("create a configured -any service", func() {
-		service := CreateClusterAnyService(postgresql)
-		assertService(service, "clustername-any", true, utils.PodRoleLabelName, string(utils.PodRoleInstance))
+		service := CreateClusterAnyService(cluster)
+		assertService(service, cluster.Name+"-any", true, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -r service", func() {
-		service := CreateClusterReadService(postgresql)
-		assertService(service, "clustername-r", false, utils.PodRoleLabelName, string(utils.PodRoleInstance))
+		service := CreateClusterReadService(cluster)
+		assertService(service, cluster.Name+"-r", false, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -ro service", func() {
-		service := CreateClusterReadOnlyService(postgresql)
-		assertService(service, "clustername-ro", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelReplica)
+		service := CreateClusterReadOnlyService(cluster)
+		assertService(service, cluster.Name+"-ro", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelReplica)
 	})
 
 	It("create a configured -rw service", func() {
-		service := CreateClusterReadWriteService(postgresql)
-		assertService(service, "clustername-rw", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelPrimary)
+		service := CreateClusterReadWriteService(cluster)
+		assertService(service, cluster.Name+"-rw", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelPrimary)
 	})
 })
 
