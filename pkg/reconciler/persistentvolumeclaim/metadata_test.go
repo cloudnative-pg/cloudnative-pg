@@ -66,7 +66,7 @@ var _ = Describe("metadataReconciler", func() {
 				Expect(pvc.Labels).To(HaveKeyWithValue("label1", "value1"))
 				Expect(pvc.Labels).To(HaveKeyWithValue("label2", "value2"))
 				Expect(pvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, string(utils.ManagerName)))
+				Expect(pvc.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 			})
 		})
 
@@ -89,7 +89,7 @@ var _ = Describe("metadataReconciler", func() {
 						Labels: map[string]string{
 							utils.PvcRoleLabelName:                string(utils.PVCRolePgData),
 							utils.InstanceNameLabelName:           "instance1",
-							utils.KubernetesAppManagedByLabelName: string(utils.ManagerName),
+							utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 							"label1":                              "value1",
 							"label2":                              "value2",
 						},
