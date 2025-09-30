@@ -39,7 +39,10 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 			Name:      "thistest",
 			Namespace: "default",
 		},
-		Spec: apiv1.ClusterSpec{Instances: instancesNum},
+		Spec: apiv1.ClusterSpec{
+			ImageName: "postgres:18.0",
+			Instances: instancesNum,
+		},
 	}
 
 	It("have the same name as the PostgreSQL cluster", func() {
@@ -49,7 +52,7 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 			utils.ClusterLabelName:                cluster.Name,
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppVersionLabelName:   "18",
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))

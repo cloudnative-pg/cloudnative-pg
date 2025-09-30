@@ -203,6 +203,7 @@ var _ = Describe("Job created via InitDB", func() {
 				Name: "cluster",
 			},
 			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
 						PostInitSQL:            []string{"testPostInitSql"},
@@ -229,7 +230,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.InstanceNameLabelName:           "cluster-0",
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppVersionLabelName:   "18",
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
@@ -239,7 +240,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.InstanceNameLabelName:           "cluster-0",
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppVersionLabelName:   "17",
+			utils.KubernetesAppVersionLabelName:   "18",
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
