@@ -515,17 +515,22 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
 	fmt.Println(aurora.Green("Continuous Backup status"))
-	if cluster.Spec.Backup == nil {
+	if cluster.Spec.Backup == nil && len(cluster.Status.PluginStatus) == 0 {
 		fmt.Println(aurora.Yellow("Not configured"))
 		fmt.Println()
 		return
 	}
 	status := tabby.New()
-	FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
-	if FPoR == "" {
-		FPoR = "Not Available"
+	// FirstRecoverabilityPoint is deprecated and will be removed together
+	// with native Barman Cloud support. It is only shown when the backup
+	// section is not empty.
+	if cluster.Spec.Backup != nil {
+		FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
+		if FPoR == "" {
+			FPoR = "Not Available"
+		}
+		status.AddLine("First Point of Recoverability:", FPoR)
 	}
-	status.AddLine("First Point of Recoverability:", FPoR)
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
