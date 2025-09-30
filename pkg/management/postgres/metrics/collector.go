@@ -28,6 +28,7 @@ import (
 	"path"
 	"regexp"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/blang/semver"
@@ -58,30 +59,34 @@ type QueriesCollector struct {
 	errorUserQueriesGauge prometheus.Gauge
 
 	computedMetrics []prometheus.Metric
+
+	// metricsMu guards access to computedMetrics and error metrics to avoid
+	// races between Update (writer) and Collect (reader)
+	metricsMu sync.RWMutex
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
-func (q QueriesCollector) Name() string {
+func (q *QueriesCollector) Name() string {
 	return q.collectorName
-}
-
-// GetComputedMetricsCount returns the number of constant Prometheus metrics that
-// are updated and ready for collection
-func (q QueriesCollector) GetComputedMetricsCount() int {
-	return len(q.computedMetrics)
 }
 
 var isPathPattern = regexp.MustCompile(`[][*?]`)
 
 // Update recomputes the metrics from the user queries
 func (q *QueriesCollector) Update() error {
+	// Start a fresh error state for this cycle
+	q.metricsMu.Lock()
+	defer q.metricsMu.Unlock()
+
+	q.errorUserQueriesGauge.Set(0)
+	q.errorUserQueries.Reset()
+
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
+		q.errorUserQueriesGauge.Set(1)
+		q.errorUserQueries.WithLabelValues("isPrimary: " + err.Error()).Inc()
 		return fmt.Errorf("while updating query metrics, could not check for primary: %w", err)
 	}
-
-	// Reset before collecting
-	q.errorUserQueries.Reset()
 
 	q.createMetricsFromUserQueries(isPrimary)
 	return nil
@@ -90,9 +95,13 @@ func (q *QueriesCollector) Update() error {
 // Collect sends the pre-computed metrics to the output channel.
 // These metrics were cached during the last Update() call and are not
 // fetched from the database during collection.
-func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) {
-	q.collectComputedMetrics(ch)
-
+func (q *QueriesCollector) Collect(ch chan<- prometheus.Metric) {
+	// Guard the snapshot read and error metrics collection
+	q.metricsMu.RLock()
+	defer q.metricsMu.RUnlock()
+	for _, m := range q.computedMetrics {
+		ch <- m
+	}
 	// Add errors into errorUserQueriesVec and errorUserQueriesGauge metrics
 	q.errorUserQueriesGauge.Collect(ch)
 	q.errorUserQueries.Collect(ch)
@@ -160,13 +169,7 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 	q.computedMetrics = generatedMetrics
 }
 
-func (q *QueriesCollector) collectComputedMetrics(ch chan<- prometheus.Metric) {
-	for _, m := range q.computedMetrics {
-		ch <- m
-	}
-}
-
-func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger log.Logger) bool {
+func (q *QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger log.Logger) bool {
 	if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
 		queryLogger.Debug("Skipping because runs only on primary")
 		return false
@@ -190,12 +193,12 @@ func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimar
 	return true
 }
 
-func (q QueriesCollector) reportUserQueryErrorMetric(label string) {
+func (q *QueriesCollector) reportUserQueryErrorMetric(label string) {
 	q.errorUserQueries.WithLabelValues(label).Inc()
 	q.errorUserQueriesGauge.Set(1)
 }
 
-func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name string) (bool, error) {
+func (q *QueriesCollector) checkRunOnServerMatches(runOnServer string, name string) (bool, error) {
 	// The instance will only get the PostgreSQL version one time
 	// and then cache the result, so this is not a real query
 	pgVersion, err := q.instance.GetPgVersion()
@@ -214,7 +217,7 @@ func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name strin
 	return isVersionInRange(pgVersion), nil
 }
 
-func (q QueriesCollector) expandTargetDatabases(
+func (q *QueriesCollector) expandTargetDatabases(
 	targetDatabases []string,
 	allAccessibleDatabasesCache []string,
 ) (allTargetDatabases map[string]bool) {
@@ -234,7 +237,7 @@ func (q QueriesCollector) expandTargetDatabases(
 	return allTargetDatabases
 }
 
-func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
+func (q *QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
 	if err != nil {
 		return nil, fmt.Errorf("while connecting to expand target_database *: %w", err)
@@ -256,7 +259,7 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 }
 
 // Describe implements the prometheus.Collector and defines the metrics with return
-func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
+func (q *QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 	for name, userQuery := range q.userQueries {
 		collector := QueryRunner{
 			namespace:     name,

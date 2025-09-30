@@ -446,7 +446,6 @@ func (e *Exporter) updatePgMetrics() {
 			e.Metrics.Error.Set(1)
 		}
 		log.Debug("created metrics from user queries",
-			"count", e.queries.GetComputedMetricsCount(),
 			"duration", time.Since(collectionStart).Seconds())
 		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
 	}
