@@ -97,7 +97,7 @@ var _ = Describe("Deployment", func() {
 			utils.PodRoleLabelName:                string(utils.PodRolePooler),
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 		// Check the DeploymentSpec
