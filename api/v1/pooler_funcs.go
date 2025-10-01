@@ -94,8 +94,9 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 	}
 	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
 	// is not going to be handled by the operator.
-	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
-		in.Spec.PgBouncer.AuthQuery != "" {
+	if in.Spec.PgBouncer.AuthQuery != "" ||
+		(in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(in.Spec.PgBouncer.ServerTLSSecret != nil && in.Spec.PgBouncer.ServerTLSSecret.Name != "") {
 		return false
 	}
 	return true

@@ -203,21 +203,27 @@ func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, obj runtime.Ob
 }
 
 func (v *PoolerCustomValidator) validatePgBouncer(r *apiv1.Pooler) field.ErrorList {
-	var result field.ErrorList
-	switch {
-	case r.Spec.PgBouncer == nil:
-		result = append(result,
+	if r.Spec.PgBouncer == nil {
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer"),
-				"", "required pgbouncer configuration"))
-	case r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" &&
-		r.Spec.PgBouncer.AuthQuery == "":
+				"",
+				"required pgbouncer configuration",
+			),
+		}
+	}
+
+	hasPGAuthentication := (r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(r.Spec.PgBouncer.ServerTLSSecret != nil && r.Spec.PgBouncer.ServerTLSSecret.Name != "")
+
+	var result field.ErrorList
+	switch {
+	case hasPGAuthentication && r.Spec.PgBouncer.AuthQuery == "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuery"),
 				"", "must specify an auth query when providing an auth query secret"))
-	case (r.Spec.PgBouncer.AuthQuerySecret == nil || r.Spec.PgBouncer.AuthQuerySecret.Name == "") &&
-		r.Spec.PgBouncer.AuthQuery != "":
+	case !hasPGAuthentication && r.Spec.PgBouncer.AuthQuery != "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuerySecret", "name"),
