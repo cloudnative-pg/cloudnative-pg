@@ -1,32 +1,30 @@
 # Rolling Updates
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-The operator allows changing the PostgreSQL version used in a cluster while
-applications are running against it.
+The operator allows you to change the PostgreSQL version used in a cluster
+while applications continue running against it.
 
-!!! Important
-    Only upgrades for PostgreSQL minor releases are supported.
+Rolling upgrades are triggered when:
 
-Rolling upgrades are started when:
+- you change the `imageName` attribute in the cluster specification;
 
-- the user changes the `imageName` attribute of the cluster specification;
+- you change the list of extension images in the `.spec.postgresql.extensions`
+  stanza of the cluster specification;
 
-- the [image catalog](image_catalog.md) is updated with a new image for the major used by the cluster;
+- the [image catalog](image_catalog.md) is updated with a new image for the
+  major version used by the cluster;
 
-- a change in the PostgreSQL configuration requires a restart to be
-  applied;
+- a change in the PostgreSQL configuration requires a restart to apply;
 
-- a change on the `Cluster` `.spec.resources` values
+- you change the `Cluster` `.spec.resources` values;
 
-- a change in size of the persistent volume claim on AKS
+- the operator is updated, ensuring Pods run the latest instance manager
+  (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
-- after the operator is updated, to ensure the Pods run the latest instance
-  manager (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
+During a rolling upgrade, the operator upgrades all replicas one Pod at a time,
+starting from the one with the highest serial.
 
-The operator starts upgrading all the replicas, one Pod at a time, and begins
-from the one with the highest serial.
-
-The primary is the last node to be upgraded.
+The primary is always the last node to be upgraded.
 
 Rolling updates are configurable and can be either entirely automated
 (`unsupervised`) or requiring human intervention (`supervised`).
@@ -35,7 +33,7 @@ The upgrade keeps the CloudNativePG identity, without re-cloning the
 data. Pods will be deleted and created again with the same PVCs and a new
 image, if required.
 
-During the rolling update procedure, each service endpoints move to reflect the
+During the rolling update procedure, each service's endpoint moves to reflect the
 cluster's status, so that applications can ignore the node that is being
 updated.
 

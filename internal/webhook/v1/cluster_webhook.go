@@ -1335,7 +1335,7 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	if old.Spec.ImageName != r.Spec.ImageName {
+	if old.Spec.ImageName != r.Spec.ImageName && r.Spec.PrimaryUpdateMethod == apiv1.PrimaryUpdateMethodSwitchover {
 		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
 			r.Spec.PostgresConfiguration.Parameters)
 		if len(diff) > 0 {
@@ -1345,7 +1345,8 @@ func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Clust
 				field.Invalid(
 					field.NewPath("spec", "imageName"),
 					r.Spec.ImageName,
-					fmt.Sprintf("Can't change image name and configuration at the same time. "+
+					fmt.Sprintf("Can't change image name and configuration at the same time when "+
+						"`primaryUpdateMethod` is set to `switchover`. "+
 						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
 			return result
 		}
