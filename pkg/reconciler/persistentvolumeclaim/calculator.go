@@ -122,9 +122,12 @@ func NewPgTablespaceCalculator(tbsName string) ExpectedObjectCalculator {
 // GetLabels will be used as the label value
 func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
+		utils.InstanceNameLabelName: instanceName,
+		utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
+		// Common Labels
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
-		utils.InstanceNameLabelName:           instanceName,
-		utils.PvcRoleLabelName:                string(utils.PVCRolePgData),
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 	}
 	return labels
 }
@@ -190,9 +193,12 @@ func (r pgDataCalculator) GetSourceFromBackup(backup *apiv1.Backup) *corev1.Type
 // GetLabels will be used as the label value
 func (r pgWalCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName:           instanceName,
-		utils.PvcRoleLabelName:                string(utils.PVCRolePgWal),
+		utils.InstanceNameLabelName: instanceName,
+		utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+		// Common Labels
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 	}
 	return labels
 }
@@ -250,9 +256,12 @@ func (r pgWalCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnaps
 // GetLabels will be used as the label value
 func (r pgTablespaceCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName:           instanceName,
-		utils.PvcRoleLabelName:                string(utils.PVCRolePgTablespace),
+		utils.InstanceNameLabelName: instanceName,
+		utils.PvcRoleLabelName:      string(utils.PVCRolePgTablespace),
+		// Common Labels
 		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 	}
 	// we need empty check here as we don't want to impact the label filter with empty value
 	if r.tablespaceName != "" {
