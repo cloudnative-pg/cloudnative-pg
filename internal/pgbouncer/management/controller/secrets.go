@@ -47,16 +47,18 @@ func getSecrets(ctx context.Context, client ctrl.Client, pooler *apiv1.Pooler) (
 		clientCASecret  corev1.Secret
 	)
 
-	authQuerySecretName := pooler.GetAuthQuerySecretName()
-	if err := client.Get(ctx,
-		types.NamespacedName{
-			Name:      authQuerySecretName,
-			Namespace: pooler.Namespace,
-		},
-		&authQuerySecret); err != nil {
-		return nil, fmt.Errorf("while getting auth query secret: %w", err)
+	if pooler.Status.Secrets.ServerTLS.Name == "" {
+		authQuerySecretName := pooler.GetAuthQuerySecretName()
+		if err := client.Get(ctx,
+			types.NamespacedName{
+				Name:      authQuerySecretName,
+				Namespace: pooler.Namespace,
+			},
+			&authQuerySecret); err != nil {
+			return nil, fmt.Errorf("while getting auth query secret: %w", err)
+		}
+		result.AuthQuery = &authQuerySecret
 	}
-	result.AuthQuery = &authQuerySecret
 
 	if pooler.Status.Secrets.ServerTLS.Name != "" {
 		var serverTLSSecret corev1.Secret
