@@ -105,8 +105,9 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	if resources.AuthUserSecret == nil {
-		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds", "secret", pooler.GetAuthQuerySecretName())
+	if resources.AuthUserSecret == nil && resources.ServerTLSSecret == nil {
+		contextLogger.Info("AuthUserSecret and ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetAuthQuerySecretName())
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
