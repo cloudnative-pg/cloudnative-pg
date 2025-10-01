@@ -204,8 +204,16 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			if _, found := pvc.Labels[utils.KubernetesAppManagedByLabelName]; !found {
-				return false
+			// Check common labels
+			commonLabels := []string{
+				utils.KubernetesAppManagedByLabelName,
+				utils.KubernetesAppLabelName,
+				utils.KubernetesAppComponentLabelName,
+			}
+			for _, label := range commonLabels {
+				if _, found := pvc.Labels[label]; !found {
+					return false
+				}
 			}
 
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
@@ -248,7 +256,10 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
+			// Set common labels
 			pvc.Labels[utils.KubernetesAppManagedByLabelName] = utils.ManagerName
+			pvc.Labels[utils.KubernetesAppLabelName] = utils.AppName
+			pvc.Labels[utils.KubernetesAppComponentLabelName] = utils.DatabaseComponentName
 
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
