@@ -100,43 +100,9 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("while getting managed resources: %w", err)
 	}
 
-	if resources.Cluster == nil {
-		contextLogger.Info("Cluster not found, will retry in 30 seconds", "cluster", pooler.Spec.Cluster.Name)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	if resources.AuthUserSecret == nil && resources.ServerTLSSecret == nil {
-		contextLogger.Info("AuthUserSecret and ServerTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetAuthQuerySecretName())
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	if resources.ClientTLSSecret == nil {
-		contextLogger.Info(
-			"ClientTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientTLSSecretNameOrDefault(resources.Cluster))
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	if resources.ClientCASecret == nil {
-		contextLogger.Info(
-			"ClientCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
-		contextLogger.Info(
-			"ServerTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerTLSSecretName())
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	if resources.ServerCASecret == nil {
-		contextLogger.Info(
-			"ServerCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerCASecretNameOrDefault(resources.Cluster))
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	// Early exit if some required prerequisite resources are not yet available
+	if res := r.waitForPrerequisites(ctx, &pooler, resources); res != nil {
+		return *res, nil
 	}
 
 	if res := r.ensureManagedResourcesAreOwned(ctx, pooler, resources); !res.IsZero() {
@@ -240,6 +206,61 @@ func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
 		"found invalid ownership for managed resources, check logs")
 
 	return ctrl.Result{RequeueAfter: 120 * time.Second}
+}
+
+// waitForPrerequisites centralizes the early-return checks for missing dependent resources
+// to keep Reconcile lean. It logs a concise message and instructs the controller to
+// requeue after a short delay when something is missing.
+// Returns a non-nil *ctrl.Result when it requested a requeue; otherwise nil.
+func (r *PoolerReconciler) waitForPrerequisites(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	resources *poolerManagedResources,
+) *ctrl.Result {
+	contextLogger := log.FromContext(ctx)
+	waitResult := &ctrl.Result{RequeueAfter: 30 * time.Second}
+
+	if resources.Cluster == nil {
+		contextLogger.Info("Cluster not found, will retry in 30 seconds",
+			"cluster", pooler.Spec.Cluster.Name)
+		return waitResult
+	}
+
+	if resources.AuthUserSecret == nil && resources.ServerTLSSecret == nil {
+		contextLogger.Info("AuthUserSecret and ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetAuthQuerySecretName())
+		return waitResult
+	}
+
+	if resources.ClientTLSSecret == nil {
+		contextLogger.Info(
+			"ClientTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetClientTLSSecretNameOrDefault(resources.Cluster))
+		return waitResult
+	}
+
+	if resources.ClientCASecret == nil {
+		contextLogger.Info(
+			"ClientCASecret not found, waiting 30 seconds",
+			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
+		return waitResult
+	}
+
+	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
+		contextLogger.Info(
+			"ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerTLSSecretName())
+		return waitResult
+	}
+
+	if resources.ServerCASecret == nil {
+		contextLogger.Info(
+			"ServerCASecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerCASecretNameOrDefault(resources.Cluster))
+		return waitResult
+	}
+
+	return nil
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them
