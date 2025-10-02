@@ -22,6 +22,7 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -203,7 +204,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		return pvc
 	}
 
-	assertCommonLabels := func(pvcLabels map[string]string, clusterName string) {
+	assertCommonLabels := func(pvcLabels map[string]string) {
 		Expect(pvcLabels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 		Expect(pvcLabels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 		Expect(pvcLabels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
@@ -253,7 +254,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(pvcs.Items[2].Labels).To(HaveKeyWithValue("label2", "value"))
 		Expect(pvcs.Items[2].Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
 		Expect(pvcs.Items[2].Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-3-wal"))
-		assertCommonLabels(pvcs.Items[2].Labels, clusterName)
+		assertCommonLabels(pvcs.Items[2].Labels)
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
 		pvcs.Items[1].Annotations = map[string]string{
@@ -321,25 +322,21 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue("label1", "value"))
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue("label2", "value"))
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-2"))
-		assertCommonLabels(patchedPvc2.Labels, clusterName)
-
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue("label1", "value"))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue("label2", "value"))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgWal)))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-3"))
-		assertCommonLabels(patchedPvc3Wal.Labels, clusterName)
-
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue("label1", "value"))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue("label2", "value"))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-3"))
-		assertCommonLabels(patchedPvc3Data.Labels, clusterName)
+
+		for _, pvc := range []corev1.PersistentVolumeClaim{patchedPvc2, patchedPvc3Wal, patchedPvc3Data} {
+			role := string(utils.PVCRolePgData)
+			if strings.Contains(pvc.Name, "-wal") {
+				role = string(utils.PVCRolePgWal)
+			}
+			Expect(pvc.Labels).To(HaveKeyWithValue("label1", "value"))
+			Expect(pvc.Labels).To(HaveKeyWithValue("label2", "value"))
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, role))
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName,
+				fmt.Sprintf("%s-%s", clusterName, pvc.Annotations[utils.ClusterSerialAnnotationName])))
+			assertCommonLabels(pvc.Labels)
+		}
 	})
 
 	It("will reconcile each PVC's instance-relative labels by invoking the instance metadata reconciler", func() {
@@ -389,60 +386,43 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		patchedPvc := fetchPVC(cl, pvc)
-		//nolint:staticcheck
-		Expect(patchedPvc.Labels).To(HaveKeyWithValue(utils.ClusterRoleLabelName, "primary"))
-		Expect(patchedPvc.Labels).To(HaveKeyWithValue(utils.ClusterInstanceRoleLabelName, "primary"))
-		Expect(patchedPvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-		Expect(patchedPvc.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-1"))
-		assertCommonLabels(patchedPvc.Labels, clusterName)
-
-		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
-			utils.ClusterSerialAnnotationName:   "1",
-			utils.PVCStatusAnnotationName:       "ready",
-			utils.OperatorVersionAnnotationName: versions.Version,
-		}))
-
 		patchedPvc2 := fetchPVC(cl, pvc2)
-		//nolint:staticcheck
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.ClusterRoleLabelName, "replica"))  //nolint:staticcheck
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.ClusterInstanceRoleLabelName, "replica"))
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-		Expect(patchedPvc2.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-2"))
-		assertCommonLabels(patchedPvc2.Labels, clusterName)
-
-		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
-			utils.OperatorVersionAnnotationName: versions.Version,
-			utils.ClusterSerialAnnotationName:   "2",
-			utils.PVCStatusAnnotationName:       "ready",
-		}))
-
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
-		//nolint:staticcheck
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.ClusterRoleLabelName, "replica"))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.ClusterInstanceRoleLabelName, "replica"))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgWal)))
-		Expect(patchedPvc3Wal.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-3"))
-		assertCommonLabels(patchedPvc3Wal.Labels, clusterName)
-
-		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
-			utils.OperatorVersionAnnotationName: versions.Version,
-			utils.ClusterSerialAnnotationName:   "3",
-			utils.PVCStatusAnnotationName:       "ready",
-		}))
-
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
-		//nolint:staticcheck
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.ClusterRoleLabelName, "replica"))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.ClusterInstanceRoleLabelName, "replica"))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, string(utils.PVCRolePgData)))
-		Expect(patchedPvc3Data.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName, clusterName+"-3"))
-		assertCommonLabels(patchedPvc3Data.Labels, clusterName)
 
-		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
-			utils.OperatorVersionAnnotationName: versions.Version,
-			utils.ClusterSerialAnnotationName:   "3",
-			utils.PVCStatusAnnotationName:       "ready",
-		}))
+		// Serial annotation
+		Expect(patchedPvc.Annotations).To(HaveKeyWithValue(utils.ClusterSerialAnnotationName, "1"))
+		Expect(patchedPvc2.Annotations).To(HaveKeyWithValue(utils.ClusterSerialAnnotationName, "2"))
+		Expect(patchedPvc3Wal.Annotations).To(HaveKeyWithValue(utils.ClusterSerialAnnotationName, "3"))
+		Expect(patchedPvc3Data.Annotations).To(HaveKeyWithValue(utils.ClusterSerialAnnotationName, "3"))
+
+		patchedPvcs := []corev1.PersistentVolumeClaim{
+			patchedPvc,
+			patchedPvc2,
+			patchedPvc3Wal,
+			patchedPvc3Data,
+		}
+		for _, pvc := range patchedPvcs {
+			role := string(utils.PVCRolePgData)
+			if strings.Contains(pvc.Name, "-wal") {
+				role = string(utils.PVCRolePgWal)
+			}
+			clusterRole := specs.ClusterRoleLabelPrimary
+			if pvc.Annotations[utils.ClusterSerialAnnotationName] != "1" {
+				clusterRole = specs.ClusterRoleLabelReplica
+			}
+			// Labels
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.ClusterRoleLabelName, clusterRole)) //nolint:staticcheck
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.ClusterInstanceRoleLabelName, clusterRole))
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.PvcRoleLabelName, role))
+			Expect(pvc.Labels).To(HaveKeyWithValue(utils.InstanceNameLabelName,
+				fmt.Sprintf("%s-%s", clusterName, pvc.Annotations[utils.ClusterSerialAnnotationName])))
+			assertCommonLabels(pvc.Labels)
+
+			// Annotations
+			Expect(pvc.Annotations).To(HaveKeyWithValue(utils.PVCStatusAnnotationName, "ready"))
+			Expect(pvc.Annotations).To(HaveKeyWithValue(utils.OperatorVersionAnnotationName, versions.Version))
+		}
 	})
 })
 
