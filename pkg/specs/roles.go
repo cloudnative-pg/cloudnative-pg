@@ -30,7 +30,11 @@ import (
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, backupNames []string) rbacv1.Role {
+	if backupOrigin != nil {
+		backupNames = append(backupNames, backupOrigin.Name)
+	}
+
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -89,32 +93,6 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 			},
 			ResourceNames: []string{
 				cluster.Name,
-			},
-		},
-		{
-			APIGroups: []string{
-				"postgresql.cnpg.io",
-			},
-			Resources: []string{
-				"backups",
-			},
-			Verbs: []string{
-				"list",
-				"get",
-				"delete",
-			},
-		},
-		{
-			APIGroups: []string{
-				"postgresql.cnpg.io",
-			},
-			Resources: []string{
-				"backups/status",
-			},
-			Verbs: []string{
-				"get",
-				"patch",
-				"update",
 			},
 		},
 		{
@@ -246,6 +224,40 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				cluster.Name,
 			},
 		},
+	}
+
+	if len(backupNames) > 0 {
+		rules = append(
+			rules,
+			rbacv1.PolicyRule{
+				APIGroups: []string{
+					"postgresql.cnpg.io",
+				},
+				Resources: []string{
+					"backups",
+				},
+				Verbs: []string{
+					"list",
+					"get",
+					"delete",
+				},
+				ResourceNames: backupNames,
+			},
+			rbacv1.PolicyRule{
+				APIGroups: []string{
+					"postgresql.cnpg.io",
+				},
+				Resources: []string{
+					"backups/status",
+				},
+				Verbs: []string{
+					"get",
+					"patch",
+					"update",
+				},
+				ResourceNames: backupNames,
+			},
+		)
 	}
 
 	return rbacv1.Role{
