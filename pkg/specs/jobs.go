@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -393,6 +394,22 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
+	}
+
+	if role == jobRoleInitDB && cluster.ShouldInitDBCreateApplicationDatabase() &&
+		cluster.GetApplicationSecretName() != "" {
+		// The secret is not needed by the initdb job. We do this to ensure that the secret is available
+		// before proceeding with the cluster initialization
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name: "APP_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cluster.GetApplicationSecretName()},
+					Key:                  "username",
+					Optional:             ptr.To(false),
+				},
+			},
+		})
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
