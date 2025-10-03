@@ -1703,6 +1703,10 @@ jobs:
       -
         name: Configure Storage
         run: |
+          # Waiting for volume snapshot CRDs to exist
+          kubectl wait --for=condition=established crd/volumesnapshotclasses.snapshot.storage.k8s.io --timeout=240s
+          kubectl wait --for=condition=established crd/volumesnapshots.snapshot.storage.k8s.io --timeout=240s
+          kubectl wait --for=condition=established crd/volumesnapshotcontents.snapshot.storage.k8s.io --timeout=240s
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
           # Change to use standard-rwo as default storage account
