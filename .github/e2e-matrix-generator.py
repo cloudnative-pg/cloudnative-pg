@@ -177,9 +177,10 @@ class E2EJob(dict):
     def __init__(self, k8s_version, postgres_version_list, flavor):
         postgres_version = postgres_version_list.latest
         postgres_version_pre = postgres_version_list.oldest
+        short_postgres_version = postgres_version.split('-')[0]
 
         if flavor == "pg":
-            name = f"{k8s_version}-PostgreSQL-{postgres_version}"
+            name = f"{k8s_version}-PostgreSQL-{short_postgres_version}"
             repo = POSTGRES_REPO
             kind = "PostgreSQL"
 
