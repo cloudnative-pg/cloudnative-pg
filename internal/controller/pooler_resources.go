@@ -90,7 +90,7 @@ func (r *PoolerReconciler) getManagedResources(
 		return nil, err
 	}
 
-	// Get the auth query secret if any
+	// Get the server TLS secret for manual PostgreSQL authentication if specified
 	serverTLSSecretName := pooler.GetServerTLSSecretName()
 	if serverTLSSecretName != "" {
 		result.ServerTLSSecret, err = getSecretOrNil(
