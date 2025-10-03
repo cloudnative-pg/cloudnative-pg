@@ -52,7 +52,7 @@ const (
 	// is stored
 	serverTLSCertPath = ConfigsDir + "/server-tls/tls.crt"
 
-	// ServerTLSKeyPath is the path where the client TLS private key
+	// ServerTLSKeyPath is the path where the server TLS private key
 	// is stored
 	serverTLSKeyPath = ConfigsDir + "/server-tls/tls.key"
 
