@@ -226,12 +226,21 @@ func (r *PoolerReconciler) waitForPrerequisites(
 		return waitResult
 	}
 
-	if resources.AuthUserSecret == nil && resources.ServerTLSSecret == nil {
-		contextLogger.Info("AuthUserSecret and ServerTLSSecret not found, waiting 30 seconds",
+	// For automated integration, we need AuthUserSecret
+	if pooler.IsAutomatedIntegration() && resources.AuthUserSecret == nil {
+		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds",
 			"secret", pooler.GetAuthQuerySecretName())
 		return waitResult
 	}
 
+	// For manual TLS authentication to PostgreSQL, we need ServerTLSSecret
+	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
+		contextLogger.Info("ServerTLSSecret not found, waiting 30 seconds",
+			"secret", pooler.GetServerTLSSecretName())
+		return waitResult
+	}
+
+	// Always required: TLS certificates for accepting client connections
 	if resources.ClientTLSSecret == nil {
 		contextLogger.Info(
 			"ClientTLSSecret not found, waiting 30 seconds",
@@ -243,13 +252,6 @@ func (r *PoolerReconciler) waitForPrerequisites(
 		contextLogger.Info(
 			"ClientCASecret not found, waiting 30 seconds",
 			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
-		return waitResult
-	}
-
-	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
-		contextLogger.Info(
-			"ServerTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerTLSSecretName())
 		return waitResult
 	}
 
