@@ -231,22 +231,20 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		PgHba:      pooler.Spec.PgBouncer.PgHBA,
 	}
 
-	err := pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
-	if err != nil {
+	if err := pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData); err != nil {
 		return nil, fmt.Errorf("while executing %s template: %w", PgBouncerIniFileName, err)
 	}
 	files[filepath.Join(ConfigsDir, PgBouncerIniFileName)] = pgbouncerIni.Bytes()
 
 	if !isCertAuth {
-		err = pgBouncerUserListTemplate.Execute(&pgbouncerUserList, templateData)
+		err := pgBouncerUserListTemplate.Execute(&pgbouncerUserList, templateData)
 		if err != nil {
 			return nil, fmt.Errorf("while executing %s template: %w", PgBouncerUserListFileName, err)
 		}
 		files[filepath.Join(ConfigsDir, PgBouncerUserListFileName)] = pgbouncerUserList.Bytes()
 	}
 
-	err = pgBouncerHBATemplate.Execute(&pgbouncerHBA, templateData)
-	if err != nil {
+	if err := pgBouncerHBATemplate.Execute(&pgbouncerHBA, templateData); err != nil {
 		return nil, fmt.Errorf("while executing %s template: %w", PgBouncerHBAConfFileName, err)
 	}
 	files[filepath.Join(ConfigsDir, PgBouncerHBAConfFileName)] = pgbouncerHBA.Bytes()
