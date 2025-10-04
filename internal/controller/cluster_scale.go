@@ -77,10 +77,6 @@ func (r *ClusterReconciler) ensureInstanceIsDeleted(
 	cluster *apiv1.Cluster,
 	instanceName string,
 ) error {
-	if err := r.ensureInstancePodIsDeleted(ctx, cluster, instanceName); err != nil {
-		return err
-	}
-
 	if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
 		ctx,
 		r.Client,
@@ -88,6 +84,10 @@ func (r *ClusterReconciler) ensureInstanceIsDeleted(
 		instanceName,
 		cluster.Namespace,
 	); err != nil {
+		return err
+	}
+
+	if err := r.ensureInstancePodIsDeleted(ctx, cluster, instanceName); err != nil {
 		return err
 	}
 
