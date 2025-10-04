@@ -1775,7 +1775,7 @@ gracefully shutdown (default 1800)</p>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>).</p>
+(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>). Default is 180 seconds.</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
