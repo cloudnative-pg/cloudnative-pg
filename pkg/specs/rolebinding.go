@@ -22,6 +22,8 @@ package specs
 import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateRoleBinding is the binding between the permissions that the instance manager can use
@@ -31,6 +33,9 @@ func CreateRoleBinding(objectMeta metav1.ObjectMeta) rbacv1.RoleBinding {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: objectMeta.Namespace,
 			Name:      objectMeta.Name,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Subjects: []rbacv1.Subject{
 			{
