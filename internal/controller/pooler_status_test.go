@@ -41,8 +41,12 @@ var _ = Describe("pooler_status unit tests", func() {
 
 	assertClusterInheritedStatus := func(pooler *apiv1.Pooler, cluster *apiv1.Cluster) {
 		Expect(pooler.Status.Secrets.ServerCA.Name).To(Equal(cluster.GetServerCASecretName()))
-		Expect(pooler.Status.Secrets.ServerTLS.Name).To(Equal(cluster.GetServerTLSSecretName()))
+		Expect(pooler.Status.Secrets.ServerTLS.Name).To(BeEmpty())
 		Expect(pooler.Status.Secrets.ClientCA.Name).To(Equal(cluster.GetClientCASecretName()))
+
+		// Yes, this may be confusing, but pgbouncer calls "client" its listening side, and
+		// we just use the same PostgreSQL certificates for that.
+		Expect(pooler.Status.Secrets.ClientTLS.Name).To(Equal(cluster.GetServerTLSSecretName()))
 	}
 	assertAuthUserStatus := func(pooler *apiv1.Pooler, authUserSecret *corev1.Secret) {
 		Expect(pooler.Status.Secrets.PgBouncerSecrets.AuthQuery.Name).To(Equal(authUserSecret.Name))
@@ -54,7 +58,25 @@ var _ = Describe("pooler_status unit tests", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
-		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
+		res := &poolerManagedResources{
+			Deployment: nil,
+			Cluster:    cluster,
+			ClientCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientCASecretNameOrDefault(cluster),
+				},
+			},
+			ClientTLSSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientTLSSecretNameOrDefault(cluster),
+				},
+			},
+			ServerCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetServerCASecretNameOrDefault(cluster),
+				},
+			},
+		}
 
 		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
@@ -111,7 +133,26 @@ var _ = Describe("pooler_status unit tests", func() {
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
 		Expect(err).ToNot(HaveOccurred())
-		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster, Deployment: dep}
+		res := &poolerManagedResources{
+			AuthUserSecret: authUserSecret,
+			Cluster:        cluster,
+			Deployment:     dep,
+			ClientCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientCASecretNameOrDefault(cluster),
+				},
+			},
+			ClientTLSSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientTLSSecretNameOrDefault(cluster),
+				},
+			},
+			ServerCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetServerCASecretNameOrDefault(cluster),
+				},
+			},
+		}
 
 		By("making sure it updates the remote stored status when there are changes", func() {
 			poolerBefore := &apiv1.Pooler{}
