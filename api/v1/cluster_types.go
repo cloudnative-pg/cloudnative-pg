@@ -338,7 +338,7 @@ type ClusterSpec struct {
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-	// (that is: `stopDelay` - `smartShutdownTimeout`).
+	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
 	// +kubebuilder:default:=180
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
