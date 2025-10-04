@@ -983,6 +983,7 @@ jobs:
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
             kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
