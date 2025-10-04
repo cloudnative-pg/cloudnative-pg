@@ -1656,7 +1656,7 @@ jobs:
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
           SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
@@ -1703,6 +1703,10 @@ jobs:
       -
         name: Configure Storage
         run: |
+          # Waiting for volume snapshot CRDs to exist
+          kubectl wait --for=condition=established crd/volumesnapshotclasses.snapshot.storage.k8s.io --timeout=240s
+          kubectl wait --for=condition=established crd/volumesnapshots.snapshot.storage.k8s.io --timeout=240s
+          kubectl wait --for=condition=established crd/volumesnapshotcontents.snapshot.storage.k8s.io --timeout=240s
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
           # Change to use standard-rwo as default storage account
