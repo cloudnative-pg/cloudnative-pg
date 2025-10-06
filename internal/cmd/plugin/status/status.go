@@ -517,18 +517,26 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	fmt.Println(aurora.Green("Continuous Backup status"))
 
 	// Check if barman-cloud plugin is configured
-	hasBarmanCloudPlugin, barmanObjectName := isBarmanCloudPluginEnabled(cluster)
+	isBarmanPluginEnabled, barmanObjectName := isBarmanCloudPluginEnabled(cluster)
 
-	if cluster.Spec.Backup == nil && !hasBarmanCloudPlugin {
+	if cluster.Spec.Backup == nil && !isBarmanPluginEnabled {
 		fmt.Println(aurora.Yellow("Not configured"))
 		fmt.Println()
 		return
 	}
 
-	// If backup is managed by barman-cloud plugin, inform the user
+	// If backup is managed by barman-cloud plugin, inform the user. We assume that the WALArchiving is also managed
+	// by the barman-cloud plugin
 	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
 	// so we don't need to check both conditions
-	if hasBarmanCloudPlugin {
+	if isBarmanPluginEnabled {
+		if barmanObjectName == "" {
+			fmt.Println(aurora.Red("Backup is managed by the barman-cloud plugin, " +
+				"but 'barmanObjectName' parameter is not configured."))
+			fmt.Println(aurora.Red("Please configure the 'barmanObjectName' parameter in the plugin configuration."))
+			fmt.Println()
+			return
+		}
 		fmt.Println(aurora.Cyan("Backup is managed by the barman-cloud plugin."))
 		arg := fmt.Sprintf("Please check the Barman plugin CRD: '%s' for detailed backup status.", barmanObjectName)
 		fmt.Println(aurora.Cyan(arg))
