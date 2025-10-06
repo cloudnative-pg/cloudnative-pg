@@ -879,8 +879,12 @@ func (r *ClusterReconciler) updatePodResources(
 
 	// Update the pod's PodSpec annotation to reflect the new resources
 	if err := r.updatePodSpecAnnotationAfterResourceUpdate(ctx, pod, cluster); err != nil {
-		// Don't return error here as the resource update was successful
-		// The annotation update failure will be handled in the next reconciliation cycle
+		// Don't return error here as the resource update was successful; log and continue
+		log.FromContext(ctx).Info(
+			"failed to update PodSpec annotation after in-place resource update (will retry on next reconciliation)",
+			"pod", pod.Name,
+			"error", err.Error(),
+		)
 	}
 
 	return nil
