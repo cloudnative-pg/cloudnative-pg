@@ -3967,6 +3967,8 @@ Default: false.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+<p>Deprecated: Will be removed in future releases, create a PodMonitor manually instead,
+if needed.</p>
 </td>
 </tr>
 <tr><td><code>tls</code><br/>
@@ -4510,6 +4512,8 @@ part for now.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+<p>Deprecated: Will be removed in future releases, create a PodMonitor manually instead,
+if needed.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>

@@ -104,6 +104,9 @@ type PoolerSpec struct {
 type PoolerMonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
+	//
+	// Deprecated: Will be removed in future releases, create a PodMonitor manually instead,
+	// if needed.
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
