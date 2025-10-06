@@ -2197,8 +2197,8 @@ type MonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
 	//
-	// Deprecated: Will be removed in future releases, create a PodMonitor manually instead,
-	// if needed.
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
