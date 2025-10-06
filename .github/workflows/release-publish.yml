@@ -11,7 +11,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.0"
+  GOLANG_VERSION: "1.25.1"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -75,7 +75,7 @@ jobs:
             /src/docs/src/${{ env.FILE }}
       -
         name: Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2
         with:
           body_path: release_notes.md
           draft: false
@@ -110,7 +110,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -191,7 +191,7 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         name: Login to ghcr.io
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -262,7 +262,7 @@ jobs:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -271,7 +271,7 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Login to ghcr.io
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -427,7 +427,7 @@ jobs:
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts

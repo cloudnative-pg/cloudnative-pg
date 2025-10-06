@@ -792,6 +792,14 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
    <p>The potential credentials for each cloud provider</p>
 </td>
 </tr>
+<tr><td><code>majorVersion</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The PostgreSQL major version that was running when the
+backup was taken.</p>
+</td>
+</tr>
 <tr><td><code>endpointCA</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
@@ -1767,7 +1775,7 @@ gracefully shutdown (default 1800)</p>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>).</p>
+(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>). Default is 180 seconds.</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
@@ -2430,6 +2438,8 @@ PostgreSQL cluster from an existing storage</p>
 
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>DatabaseObjectSpec contains the fields which are common to every
 database object</p>
@@ -2442,17 +2452,17 @@ database object</p>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the extension/schema</p>
+   <p>Name of the object (extension, schema, FDW, server)</p>
 </td>
 </tr>
 <tr><td><code>ensure</code><br/>
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
 </td>
 <td>
-   <p>Specifies whether an extension/schema should be present or absent in
-the database. If set to <code>present</code>, the extension/schema will be
-created if it does not exist. If set to <code>absent</code>, the
-extension/schema will be removed if it exists.</p>
+   <p>Specifies whether an object (e.g schema) should be present or absent
+in the database. If set to <code>present</code>, the object will be created if
+it does not exist. If set to <code>absent</code>, the extension/schema will be
+removed if it exists.</p>
 </td>
 </tr>
 </tbody>
@@ -2733,6 +2743,13 @@ tablespace used for objects created in this database.</p>
    <p>The list of foreign data wrappers to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServerSpec"><i>[]ServerSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign servers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2793,6 +2810,13 @@ desired state that was synchronized</p>
    <p>FDWs is the status of the managed FDWs</p>
 </td>
 </tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>Servers is the status of the managed servers</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2835,7 +2859,7 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
-- [OptionSpecValue](#postgresql-cnpg-io-v1-OptionSpecValue)
+- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -3112,8 +3136,7 @@ The role must have superuser privileges in the target database.</p>
 <a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
 </td>
 <td>
-   <p>Options specifies the configuration options for the FDW
-(key is the option name, value is the option value).</p>
+   <p>Options specifies the configuration options for the FDW.</p>
 </td>
 </tr>
 <tr><td><code>usage</code><br/>
@@ -3325,20 +3348,58 @@ database right after is imported - to be used with extreme care
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_dump</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_dump</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 <tr><td><code>pgRestoreExtraOptions</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_restore</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_restore</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePredataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>pre-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestoreDataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePostdataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>post-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -4022,6 +4083,8 @@ possible. <code>false</code> by default.</p>
 
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>OptionSpec holds the name, value and the ensure field for an option</p>
 
@@ -4036,30 +4099,6 @@ possible. <code>false</code> by default.</p>
    <p>Name of the option</p>
 </td>
 </tr>
-<tr><td><code>OptionSpecValue</code><br/>
-<a href="#postgresql-cnpg-io-v1-OptionSpecValue"><i>OptionSpecValue</i></a>
-</td>
-<td>(Members of <code>OptionSpecValue</code> are embedded into this type.)
-   <p>Value and ensure field of the option</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## OptionSpecValue     {#postgresql-cnpg-io-v1-OptionSpecValue}
-
-
-**Appears in:**
-
-- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
-
-
-<p>OptionSpecValue holds the value and the ensure field for an option</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
 <tr><td><code>value</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -5909,6 +5948,52 @@ Map keys are the secret names, map values are the versions</p>
 </tbody>
 </table>
 
+## ServerSpec     {#postgresql-cnpg-io-v1-ServerSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>ServerSpec configures a server of a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>fdw</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the Foreign Data Wrapper (FDW)</p>
+</td>
+</tr>
+<tr><td><code>options</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
+</td>
+<td>
+   <p>Options specifies the configuration options for the server
+(key is the option name, value is the option value).</p>
+</td>
+</tr>
+<tr><td><code>usage</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>List of roles for which <code>USAGE</code> privileges on the server are granted or revoked.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ServiceAccountTemplate     {#postgresql-cnpg-io-v1-ServiceAccountTemplate}
 
 
@@ -6381,6 +6466,15 @@ to allow for operational continuity. This setting is only applicable if both
 <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
+<tr><td><code>failoverQuorum</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>FailoverQuorum enables a quorum-based check before failover, improving
+data durability and safety during failover events in CloudNativePG-managed
+PostgreSQL clusters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -6557,6 +6651,8 @@ in synchronous replica election in case of failures</p>
 
 - [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
 
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
 
 <p>UsageSpec configures a usage for a foreign data wrapper</p>
 
@@ -6572,7 +6668,7 @@ in synchronous replica election in case of failures</p>
 </td>
 </tr>
 <tr><td><code>type</code><br/>
-<i>string</i>
+<a href="#postgresql-cnpg-io-v1-UsageSpecType"><i>UsageSpecType</i></a>
 </td>
 <td>
    <p>The type of usage</p>
@@ -6580,6 +6676,21 @@ in synchronous replica election in case of failures</p>
 </tr>
 </tbody>
 </table>
+
+## UsageSpecType     {#postgresql-cnpg-io-v1-UsageSpecType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [UsageSpec](#postgresql-cnpg-io-v1-UsageSpec)
+
+
+<p>UsageSpecType describes the type of usage specified in the <code>usage</code> field of the
+<code>Database</code> object.</p>
+
+
+
 
 ## VolumeSnapshotConfiguration     {#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration}
 

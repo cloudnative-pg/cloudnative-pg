@@ -8,7 +8,7 @@
   ],
   rebaseWhen: 'never',
   prConcurrentLimit: 5,
-  baseBranches: [
+  baseBranchPatterns: [
     'main',
     'release-1.25',
     'release-1.26',

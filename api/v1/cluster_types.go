@@ -343,7 +343,7 @@ type ClusterSpec struct {
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-	// (that is: `stopDelay` - `smartShutdownTimeout`).
+	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
 	// +kubebuilder:default:=180
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
@@ -1387,6 +1387,12 @@ type SynchronousReplicaConfiguration struct {
 	// +kubebuilder:validation:Enum=required;preferred
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
+
+	// FailoverQuorum enables a quorum-based check before failover, improving
+	// data durability and safety during failover events in CloudNativePG-managed
+	// PostgreSQL clusters.
+	// +optional
+	FailoverQuorum bool `json:"failoverQuorum"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -1782,19 +1788,58 @@ type Import struct {
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 
-	// List of custom options to pass to the `pg_dump` command. IMPORTANT:
-	// Use these options with caution and at your own risk, as the operator
-	// does not validate their content. Be aware that certain options may
-	// conflict with the operator's intended functionality or design.
+	// List of custom options to pass to the `pg_dump` command.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
 	// +optional
 	PgDumpExtraOptions []string `json:"pgDumpExtraOptions,omitempty"`
 
-	// List of custom options to pass to the `pg_restore` command. IMPORTANT:
-	// Use these options with caution and at your own risk, as the operator
-	// does not validate their content. Be aware that certain options may
-	// conflict with the operator's intended functionality or design.
+	// List of custom options to pass to the `pg_restore` command.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
 	// +optional
 	PgRestoreExtraOptions []string `json:"pgRestoreExtraOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `pre-data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestorePredataOptions []string `json:"pgRestorePredataOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestoreDataOptions []string `json:"pgRestoreDataOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `post-data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestorePostdataOptions []string `json:"pgRestorePostdataOptions,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot

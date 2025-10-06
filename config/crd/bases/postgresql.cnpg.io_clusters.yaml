@@ -1534,19 +1534,59 @@ spec:
                             type: array
                           pgDumpExtraOptions:
                             description: |-
-                              List of custom options to pass to the `pg_dump` command. IMPORTANT:
-                              Use these options with caution and at your own risk, as the operator
-                              does not validate their content. Be aware that certain options may
-                              conflict with the operator's intended functionality or design.
+                              List of custom options to pass to the `pg_dump` command.
+
+                              IMPORTANT: Use with caution. The operator does not validate these options,
+                              and certain flags may interfere with its intended functionality or design.
+                              You are responsible for ensuring that the provided options are compatible
+                              with your environment and desired behavior.
+                            items:
+                              type: string
+                            type: array
+                          pgRestoreDataOptions:
+                            description: |-
+                              Custom options to pass to the `pg_restore` command during the `data`
+                              section. This setting overrides the generic `pgRestoreExtraOptions` value.
+
+                              IMPORTANT: Use with caution. The operator does not validate these options,
+                              and certain flags may interfere with its intended functionality or design.
+                              You are responsible for ensuring that the provided options are compatible
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
                           pgRestoreExtraOptions:
                             description: |-
-                              List of custom options to pass to the `pg_restore` command. IMPORTANT:
-                              Use these options with caution and at your own risk, as the operator
-                              does not validate their content. Be aware that certain options may
-                              conflict with the operator's intended functionality or design.
+                              List of custom options to pass to the `pg_restore` command.
+
+                              IMPORTANT: Use with caution. The operator does not validate these options,
+                              and certain flags may interfere with its intended functionality or design.
+                              You are responsible for ensuring that the provided options are compatible
+                              with your environment and desired behavior.
+                            items:
+                              type: string
+                            type: array
+                          pgRestorePostdataOptions:
+                            description: |-
+                              Custom options to pass to the `pg_restore` command during the `post-data`
+                              section. This setting overrides the generic `pgRestoreExtraOptions` value.
+
+                              IMPORTANT: Use with caution. The operator does not validate these options,
+                              and certain flags may interfere with its intended functionality or design.
+                              You are responsible for ensuring that the provided options are compatible
+                              with your environment and desired behavior.
+                            items:
+                              type: string
+                            type: array
+                          pgRestorePredataOptions:
+                            description: |-
+                              Custom options to pass to the `pg_restore` command during the `pre-data`
+                              section. This setting overrides the generic `pgRestoreExtraOptions` value.
+
+                              IMPORTANT: Use with caution. The operator does not validate these options,
+                              and certain flags may interfere with its intended functionality or design.
+                              You are responsible for ensuring that the provided options are compatible
+                              with your environment and desired behavior.
                             items:
                               type: string
                             type: array
@@ -4250,6 +4290,12 @@ spec:
                         - required
                         - preferred
                         type: string
+                      failoverQuorum:
+                        description: |-
+                          FailoverQuorum enables a quorum-based check before failover, improving
+                          data durability and safety during failover events in CloudNativePG-managed
+                          PostgreSQL clusters.
+                        type: boolean
                       maxStandbyNamesFromCluster:
                         description: |-
                           Specifies the maximum number of local cluster pods that can be
@@ -5217,7 +5263,7 @@ spec:
                 description: |-
                   The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
                   Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-                  (that is: `stopDelay` - `smartShutdownTimeout`).
+                  (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
                 format: int32
                 type: integer
               startDelay:

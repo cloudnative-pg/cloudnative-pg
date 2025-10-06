@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"go.uber.org/atomic"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,8 +43,9 @@ import (
 // the one of this PostgreSQL instance. Also, the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client   ctrl.Client
-	instance *postgres.Instance
+	client        ctrl.Client
+	instance      *postgres.Instance
+	runningImages *stringset.Data
 
 	secretVersions  map[string]string
 	extensionStatus map[string]bool

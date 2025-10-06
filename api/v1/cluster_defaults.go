@@ -22,6 +22,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
@@ -142,6 +143,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 
 	r.setDefaultPlugins(configuration.Current)
 	r.setProbes()
+	r.tryConvertAlphaFailoverQuorum()
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -330,6 +332,28 @@ func (r *Cluster) tryConvertAlphaLivenessPinger() {
 		RequestTimeout:    v.RequestTimeout,
 		ConnectionTimeout: v.ConnectionTimeout,
 	}
+}
+
+func (r *Cluster) tryConvertAlphaFailoverQuorum() {
+	annotationValue, ok := r.Annotations[utils.FailoverQuorumAnnotationName]
+	if !ok {
+		return
+	}
+
+	v, err := strconv.ParseBool(annotationValue)
+	if err != nil {
+		// The validation webhook will catch this
+		// error and notify the user.
+		return
+	}
+
+	// The webhook prevents the user from enabling
+	// failover quorum without synchronous replication.
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return
+	}
+
+	r.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = v
 }
 
 // NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations

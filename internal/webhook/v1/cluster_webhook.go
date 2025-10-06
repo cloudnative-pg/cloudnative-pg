@@ -34,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -207,6 +207,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
 		v.validateSynchronousReplicaConfiguration,
+		v.validateFailoverQuorumAlphaAnnotation,
 		v.validateFailoverQuorum,
 		v.validateLDAP,
 		v.validateReplicationSlots,
@@ -787,7 +788,7 @@ func validateVolumeSnapshotSource(
 	}
 
 	switch {
-	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
+	case apiGroup == volumesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
 	case apiGroup == corev1.GroupName && value.Kind == "PersistentVolumeClaim":
 	default:
 		return field.ErrorList{
@@ -993,20 +994,44 @@ func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv
 	return result
 }
 
+func (v *ClusterCustomValidator) validateFailoverQuorumAlphaAnnotation(r *apiv1.Cluster) field.ErrorList {
+	annotationValue, ok := r.Annotations[utils.FailoverQuorumAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	failoverQuorumActive, err := strconv.ParseBool(annotationValue)
+	if err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
+				r.Annotations[utils.FailoverQuorumAnnotationName],
+				"Invalid failoverQuorum annotation value, expected boolean.",
+			),
+		}
+	}
+
+	if !failoverQuorumActive {
+		return nil
+	}
+
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return field.ErrorList{
+			field.Required(
+				field.NewPath("spec", "postgresql", "synchronous"),
+				"Invalid failoverQuorum configuration: synchronous replication configuration "+
+					"is required.",
+			),
+		}
+	}
+
+	return nil
+}
+
 func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	failoverQuorumActive, err := r.IsFailoverQuorumActive()
-	if err != nil {
-		err := field.Invalid(
-			field.NewPath("metadata", "annotations", utils.FailoverQuorumAnnotationName),
-			r.Annotations[utils.FailoverQuorumAnnotationName],
-			"Invalid failoverQuorum annotation value, expected boolean.",
-		)
-		result = append(result, err)
-		return result
-	}
-	if !failoverQuorumActive {
+	if !r.IsFailoverQuorumActive() {
 		return nil
 	}
 
@@ -1025,18 +1050,9 @@ func (v *ClusterCustomValidator) validateFailoverQuorum(r *apiv1.Cluster) field.
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			cfg,
-			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must the greater than "+
+			"Invalid failoverQuorum configuration: spec.postgresql.synchronous.number must be greater than "+
 				"the total number of instances in spec.postgresql.synchronous.standbyNamesPre and "+
 				"spec.postgresql.synchronous.standbyNamesPost to allow automatic failover.",
-		)
-		result = append(result, err)
-	}
-
-	if r.Spec.Instances <= 2 {
-		err := field.Invalid(
-			field.NewPath("spec", "instances"),
-			r.Spec.Instances,
-			"failoverQuorum requires more than 2 instances.",
 		)
 		result = append(result, err)
 	}
@@ -1319,7 +1335,7 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	if old.Spec.ImageName != r.Spec.ImageName {
+	if old.Spec.ImageName != r.Spec.ImageName && r.Spec.PrimaryUpdateMethod == apiv1.PrimaryUpdateMethodSwitchover {
 		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
 			r.Spec.PostgresConfiguration.Parameters)
 		if len(diff) > 0 {
@@ -1329,7 +1345,8 @@ func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Clust
 				field.Invalid(
 					field.NewPath("spec", "imageName"),
 					r.Spec.ImageName,
-					fmt.Sprintf("Can't change image name and configuration at the same time. "+
+					fmt.Sprintf("Can't change image name and configuration at the same time when "+
+						"`primaryUpdateMethod` is set to `switchover`. "+
 						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
 			return result
 		}
@@ -2575,7 +2592,7 @@ func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 		result = append(
 			result,
 			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
-				"completely removed in CloudNativePG 1.28.0. Found usage in: %s. "+
+				"completely removed in CloudNativePG 1.29.0. Found usage in: %s. "+
 				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
 				pathsStr),
 		)

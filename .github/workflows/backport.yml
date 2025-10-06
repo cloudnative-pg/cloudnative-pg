@@ -12,7 +12,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.0"
+  GOLANG_VERSION: "1.25.1"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
@@ -41,7 +41,7 @@ jobs:
             release-1.27
       -
         name: Create comment
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -94,7 +94,7 @@ jobs:
           token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
