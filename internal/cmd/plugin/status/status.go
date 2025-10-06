@@ -515,11 +515,27 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
 	fmt.Println(aurora.Green("Continuous Backup status"))
-	if cluster.Spec.Backup == nil && len(cluster.Status.PluginStatus) == 0 {
+
+	// Check if barman-cloud plugin is configured
+	hasBarmanCloudPlugin, barmanObjectName := isBarmanCloudPluginEnabled(cluster)
+
+	if cluster.Spec.Backup == nil && !hasBarmanCloudPlugin {
 		fmt.Println(aurora.Yellow("Not configured"))
 		fmt.Println()
 		return
 	}
+
+	// If backup is managed by barman-cloud plugin, inform the user
+	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
+	// so we don't need to check both conditions
+	if hasBarmanCloudPlugin {
+		fmt.Println(aurora.Cyan("Backup is managed by the barman-cloud plugin."))
+		arg := fmt.Sprintf("Please check the Barman plugin CRD: '%s' for detailed backup status.", barmanObjectName)
+		fmt.Println(aurora.Cyan(arg))
+		fmt.Println()
+		return
+	}
+
 	status := tabby.New()
 	// FirstRecoverabilityPoint is deprecated and will be removed together
 	// with native Barman Cloud support. It is only shown when the backup
@@ -556,6 +572,19 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 
 	status.Print()
 	fmt.Println()
+}
+
+// isBarmanCloudPluginEnabled checks if the barman-cloud plugin is enabled, and the 'barmanObject' object name
+func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, string) {
+	for _, plg := range cluster.Spec.Plugins {
+		if plg.Name == "barman-cloud.cloudnative-pg.io" {
+			if plg.IsEnabled() {
+				return true, plg.Parameters["barmanObjectName"]
+			}
+			return false, ""
+		}
+	}
+	return false, ""
 }
 
 func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
