@@ -9,13 +9,23 @@ spec:
     size: 1Gi
 
   monitoring:
-    enablePodMonitor: true
     customQueriesConfigMap:
       - name: example-monitoring
         key: custom-queries
     customQueriesSecret:
       - name: example-monitoring-secret
         key: pg-database
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-example
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: cluster-example
+  podMetricsEndpoints:
+  - port: metrics
 ---
 apiVersion: v1
 kind: ConfigMap
