@@ -1704,6 +1704,19 @@ jobs:
       -
         name: Configure Storage
         run: |
+          # Even if the cluster is ready, it might take some time before the
+          # volumesnapshot CRDs are available
+          attempt=1
+          max_attempts=10
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+            if kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io >/dev/null 2>&1; then
+              echo "VolumeSnapshot CRDs are available."
+              break
+            fi
+            echo "Waiting for snapshot CRDs..."
+            sleep 20
+            attempt=$((attempt+1))
+          done
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
           # Change to use standard-rwo as default storage account
