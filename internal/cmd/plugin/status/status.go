@@ -21,6 +21,7 @@ package status
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -39,6 +40,8 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -517,7 +520,7 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	fmt.Println(aurora.Green("Continuous Backup status"))
 
 	// Check if Barman Cloud plugin is configured
-	isBarmanPluginEnabled, barmanObjectName := isBarmanCloudPluginEnabled(cluster)
+	isBarmanPluginEnabled, pluginParams := isBarmanCloudPluginEnabled(cluster)
 
 	if cluster.Spec.Backup == nil && !isBarmanPluginEnabled {
 		fmt.Println(aurora.Yellow("Not configured"))
@@ -525,11 +528,11 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		return
 	}
 
-	// If backup is managed by Barman Cloud plugin, inform the user. We assume that the WALArchiving is also managed
-	// by the Barman Cloud plugin
+	// If backup is managed by Barman Cloud plugin, fetch and display the ObjectStore CRD
 	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
 	// so we don't need to check both conditions
 	if isBarmanPluginEnabled {
+		barmanObjectName := pluginParams["barmanObjectName"]
 		if barmanObjectName == "" {
 			fmt.Println(aurora.Red("Backup is managed by the Barman Cloud plugin, " +
 				"but 'barmanObjectName' parameter is not configured."))
@@ -537,9 +540,21 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 			fmt.Println()
 			return
 		}
+
 		fmt.Println(aurora.Cyan("Backup is managed by the Barman Cloud plugin."))
-		arg := fmt.Sprintf("Please check the Barman Cloud plugin CRD: '%s' for detailed backup status.", barmanObjectName)
-		fmt.Println(aurora.Cyan(arg))
+
+		objectStore, err := fullStatus.getBarmanObject(barmanObjectName)
+		if err != nil {
+			fmt.Println(aurora.Red(fmt.Sprintf("Error fetching ObjectStore '%s': %v", barmanObjectName, err)))
+			fmt.Println()
+			return
+		}
+
+		status := tabby.New()
+		status.AddLine(aurora.Green(fmt.Sprintf("ObjectStore Resource: %s", barmanObjectName)))
+		status.Print()
+
+		fullStatus.printBarmanObjectStoreStatus(objectStore, pluginParams)
 		fmt.Println()
 		return
 	}
@@ -556,6 +571,61 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		status.AddLine("First Point of Recoverability:", FPoR)
 	}
 
+	fullStatus.printWALArchivingStatus(status)
+
+	status.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) getBarmanObject(barmanObjectName string) (*ObjectStore, error) {
+	ctx := context.Background()
+	objectStoreGVR := schema.GroupVersionResource{
+		Group:    "barmancloud.cnpg.io",
+		Version:  "v1",
+		Resource: "objectstores",
+	}
+
+	dynamicClient := dynamic.NewForConfigOrDie(plugin.Config)
+	unstructuredObj, err := dynamicClient.Resource(objectStoreGVR).Namespace(plugin.Namespace).Get(
+		ctx, barmanObjectName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert unstructured to typed ObjectStore
+	var objectStore ObjectStore
+	err = convertUnstructured(unstructuredObj, &objectStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ObjectStore: %w", err)
+	}
+
+	return &objectStore, nil
+}
+
+// convertUnstructured converts an unstructured object to a typed object
+func convertUnstructured(from interface{}, to interface{}) error {
+	data, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, to)
+}
+
+// isBarmanCloudPluginEnabled checks if the barman-cloud plugin is enabled, and the parameters map
+func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string) {
+	for _, plg := range cluster.Spec.Plugins {
+		if plg.Name == "barman-cloud.cloudnative-pg.io" {
+			if plg.IsEnabled() {
+				return true, plg.Parameters
+			}
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
+// printWALArchivingStatus prints the WAL archiving status to the provided tabby table
+func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
 		status.AddLine("No Primary instance found")
@@ -577,22 +647,6 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		status.AddLine("Last Failed WAL:", primaryInstanceStatus.LastFailedWAL,
 			" @ ", primaryInstanceStatus.LastFailedWALTime)
 	}
-
-	status.Print()
-	fmt.Println()
-}
-
-// isBarmanCloudPluginEnabled checks if the barman-cloud plugin is enabled, and the 'barmanObject' object name
-func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, string) {
-	for _, plg := range cluster.Spec.Plugins {
-		if plg.Name == "barman-cloud.cloudnative-pg.io" {
-			if plg.IsEnabled() {
-				return true, plg.Parameters["barmanObjectName"]
-			}
-			return false, ""
-		}
-	}
-	return false, ""
 }
 
 func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
@@ -1308,4 +1362,57 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 		primaryInstanceTimestamp.Round(time.Second),
 		uptime.Round(time.Second),
 	)
+}
+
+// printBarmanObjectStoreStatus prints the ObjectStore CRD status in a tree-like format
+func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(objectStore *ObjectStore, params map[string]string) {
+	serverName := params["serverName"]
+	if serverName == "" {
+		serverName = fullStatus.Cluster.Name
+	}
+
+	// Print each server's recovery window information
+	recoveryWindow, ok := objectStore.Status.ServerRecoveryWindow[serverName]
+	if !ok {
+		fmt.Println(aurora.Red(fmt.Sprintf("No recovery window information found for server '%s'", serverName)))
+		return
+	}
+
+	fmt.Println(aurora.Green(fmt.Sprintf("Server: %s", serverName)))
+
+	status := tabby.New()
+
+	// Format and print first recoverability point
+	if recoveryWindow.FirstRecoverabilityPoint != nil {
+		status.AddLine("  First Recoverability Point:",
+			recoveryWindow.FirstRecoverabilityPoint.Format("2006-01-02 15:04:05 MST"))
+	} else {
+		status.AddLine("  First Recoverability Point:", "-")
+	}
+
+	// Format and print last successful backup time
+	if recoveryWindow.LastSuccessfulBackupTime != nil {
+		status.AddLine("  Last Successful Backup:",
+			recoveryWindow.LastSuccessfulBackupTime.Format("2006-01-02 15:04:05 MST"))
+	} else {
+		status.AddLine("  Last Successful Backup:", "-")
+	}
+
+	// Format and print last failed backup time (in red if present)
+	if recoveryWindow.LastFailedBackupTime != nil {
+		status.AddLine("  Last Failed Backup:",
+			aurora.Red(recoveryWindow.LastFailedBackupTime.Format("2006-01-02 15:04:05 MST")))
+	} else {
+		status.AddLine("  Last Failed Backup:", "-")
+	}
+
+	status.Print()
+	fmt.Println()
+
+	// Also display WAL archiving status from primary instance (similar to in-tree)
+	if fullStatus.tryGetPrimaryInstance() != nil {
+		status := tabby.New()
+		fullStatus.printWALArchivingStatus(status)
+		status.Print()
+	}
 }
