@@ -115,9 +115,11 @@ func (se *Reconciler) enrichSnapshot(
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
 
-	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
-	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
-	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	now := time.Now()
+
+	vs.Labels[utils.BackupDateLabelName] = now.Format("20060102")
+	vs.Labels[utils.BackupMonthLabelName] = now.Format("200601")
+	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(now.Year())
 	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
 
 	rawCluster, err := json.Marshal(cluster)
