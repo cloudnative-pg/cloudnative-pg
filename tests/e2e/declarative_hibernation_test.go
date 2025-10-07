@@ -88,6 +88,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(meta.IsStatusConditionTrue(cluster.Status.Conditions,
 					hibernation.HibernationConditionType)).To(BeTrue())
+				g.Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseHibernated))
 			}, 300).Should(Succeed())
 		})
 
