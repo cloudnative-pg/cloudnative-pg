@@ -528,6 +528,7 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		return
 	}
 
+	status := tabby.New()
 	// If backup is managed by Barman Cloud plugin, fetch and display the ObjectStore CRD
 	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
 	// so we don't need to check both conditions
@@ -550,20 +551,14 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 			return
 		}
 
-		status := tabby.New()
 		status.AddLine(aurora.Green(fmt.Sprintf("ObjectStore Resource: %s", barmanObjectName)))
 		status.Print()
 
-		fullStatus.printBarmanObjectStoreStatus(objectStore, pluginParams)
-		fmt.Println()
-		return
-	}
-
-	status := tabby.New()
-	// FirstRecoverabilityPoint is deprecated and will be removed together
-	// with native Barman Cloud support. It is only shown when the backup
-	// section is not empty.
-	if cluster.Spec.Backup != nil {
+		fullStatus.printBarmanObjectStoreStatus(status, objectStore, pluginParams)
+	} else if cluster.Spec.Backup != nil {
+		// FirstRecoverabilityPoint is deprecated and will be removed together
+		// with native Barman Cloud support. It is only shown when the backup
+		// section is not empty.
 		FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
 		if FPoR == "" {
 			FPoR = "Not Available"
@@ -571,8 +566,8 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		status.AddLine("First Point of Recoverability:", FPoR)
 	}
 
+	status.AddLine()
 	fullStatus.printWALArchivingStatus(status)
-
 	status.Print()
 	fmt.Println()
 }
@@ -1365,7 +1360,11 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 }
 
 // printBarmanObjectStoreStatus prints the ObjectStore CRD status in a tree-like format
-func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(objectStore *ObjectStore, params map[string]string) {
+func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
+	status *tabby.Tabby,
+	objectStore *ObjectStore,
+	params map[string]string,
+) {
 	serverName := params["serverName"]
 	if serverName == "" {
 		serverName = fullStatus.Cluster.Name
@@ -1379,8 +1378,6 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(objectStore *Ob
 	}
 
 	fmt.Println(aurora.Green(fmt.Sprintf("Server: %s", serverName)))
-
-	status := tabby.New()
 
 	// Format and print first recoverability point
 	if recoveryWindow.FirstRecoverabilityPoint != nil {
@@ -1404,15 +1401,5 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(objectStore *Ob
 			aurora.Red(recoveryWindow.LastFailedBackupTime.Format("2006-01-02 15:04:05 MST")))
 	} else {
 		status.AddLine("  Last Failed Backup:", "-")
-	}
-
-	status.Print()
-	fmt.Println()
-
-	// Also display WAL archiving status from primary instance (similar to in-tree)
-	if fullStatus.tryGetPrimaryInstance() != nil {
-		status := tabby.New()
-		fullStatus.printWALArchivingStatus(status)
-		status.Print()
 	}
 }
