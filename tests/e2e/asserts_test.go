@@ -1145,13 +1145,21 @@ func AssertDetachReplicaModeCluster(
 
 func AssertWritesToReplicaFails(
 	namespace, service, appDBName, appDBUser, appDBPass string,
+	connectionParams ...map[string]string,
 ) {
 	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service), func() {
 		Eventually(func(g Gomega) {
 			forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
-				env.Ctx, env.Interface, env.RestClientConfig,
-				namespace, service,
-				appDBName, appDBUser, appDBPass)
+				env.Ctx,
+				env.Interface,
+				env.RestClientConfig,
+				namespace,
+				service,
+				appDBName,
+				appDBUser,
+				appDBPass,
+				connectionParams...,
+			)
 			defer func() {
 				_ = conn.Close()
 				forwardConn.Close()
@@ -1174,13 +1182,23 @@ func AssertWritesToReplicaFails(
 	})
 }
 
-func AssertWritesToPrimarySucceeds(namespace, service, appDBName, appDBUser, appDBPass string) {
+func AssertWritesToPrimarySucceeds(
+	namespace, service, appDBName, appDBUser, appDBPass string,
+	connectionParams ...map[string]string,
+) {
 	By(fmt.Sprintf("Verifying %v service correctly manages writes", service), func() {
 		Eventually(func(g Gomega) {
 			forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
-				env.Ctx, env.Interface, env.RestClientConfig,
-				namespace, service,
-				appDBName, appDBUser, appDBPass)
+				env.Ctx,
+				env.Interface,
+				env.RestClientConfig,
+				namespace,
+				service,
+				appDBName,
+				appDBUser,
+				appDBPass,
+				connectionParams...,
+			)
 			defer func() {
 				_ = conn.Close()
 				forwardConn.Close()
@@ -1482,9 +1500,11 @@ func CreateAndAssertServerCertificatesSecrets(
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	serverPair, err := caPair.CreateAndSignPair(cluster.GetServiceReadWriteName(), certs.CertTypeServer,
-		cluster.GetClusterAltDNSNames(),
-	)
+	altDNSNames := cluster.GetClusterAltDNSNames()
+	// Required to allow connecting via port-forwarding using "localhost" as the host
+	altDNSNames = append(altDNSNames, "localhost")
+
+	serverPair, err := caPair.CreateAndSignPair(cluster.GetServiceReadWriteName(), certs.CertTypeServer, altDNSNames)
 	Expect(err).ToNot(HaveOccurred())
 	serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
 	err = env.Client.Create(env.Ctx, serverSecret)
@@ -2093,6 +2113,7 @@ func assertReadWriteConnectionUsingPgBouncerService(
 	clusterName,
 	poolerYamlFilePath string,
 	isPoolerRW bool,
+	connectionParams ...map[string]string,
 ) {
 	poolerService, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
@@ -2101,16 +2122,15 @@ func assertReadWriteConnectionUsingPgBouncerService(
 		env.Ctx, env.Client,
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix)
 	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(namespace, poolerService, postgres.AppDBName, appUser, generatedAppUserPassword, env)
 
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
 	if isPoolerRW {
 		AssertWritesToPrimarySucceeds(namespace, poolerService, "app", appUser,
-			generatedAppUserPassword)
+			generatedAppUserPassword, connectionParams...)
 	} else {
 		AssertWritesToReplicaFails(namespace, poolerService, "app", appUser,
-			generatedAppUserPassword)
+			generatedAppUserPassword, connectionParams...)
 	}
 }
 
