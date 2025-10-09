@@ -31,14 +31,6 @@ spec:
     initdb:
       database: app
       owner: app
-      postInitSQL:
-        - |
-          CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
-          RETURNS TABLE (usename name, passwd text)
-          LANGUAGE sql SECURITY DEFINER AS
-          'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;'
-        - CREATE ROLE pgbouncer
-        - GRANT EXECUTE ON FUNCTION public.user_search(text) TO pgbouncer
 
   # Persistent storage configuration
   storage:
