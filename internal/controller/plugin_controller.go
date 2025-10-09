@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strconv"
@@ -179,9 +180,20 @@ func (r *PluginReconciler) reconcile(
 
 	serverCertificatePool := x509.NewCertPool()
 	if ok := serverCertificatePool.AppendCertsFromPEM(serverSecret.Data[corev1.TLSCertKey]); !ok {
-		// Unfortunately, by doing that, we loose the certificate parsing error
-		// and we don't know if the problem lies in the PEM block or in the DER content
-		err := fmt.Errorf("parsing error")
+		// The certificate parsing failed, but unfortunately we are not aware of
+		// the root cause.
+		//
+		// To emit a better log message, we individually execute the parsing
+		// step and look at the real error.
+		block, _ := pem.Decode(serverSecret.Data[corev1.TLSCertKey])
+		_, err := x509.ParseCertificate(block.Bytes)
+
+		// If we don't manage to get the real error, we fall back to the
+		// generic one.
+		if err == nil {
+			err = fmt.Errorf("generic parsing error")
+		}
+
 		contextLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
 		return ctrl.Result{}, err
 	}
