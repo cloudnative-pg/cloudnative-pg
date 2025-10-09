@@ -515,12 +515,26 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
 	fmt.Println(aurora.Green("Continuous Backup status"))
-	if cluster.Spec.Backup == nil {
+
+	// Check for both legacy backup configuration and plugin-based backup
+	hasLegacyBackup := cluster.Spec.Backup != nil
+	hasPluginBackup := cluster.GetEnabledWALArchivePluginName() != ""
+
+	if !hasLegacyBackup && !hasPluginBackup {
 		fmt.Println(aurora.Yellow("Not configured"))
 		fmt.Println()
 		return
 	}
 	status := tabby.New()
+
+	// Show which backup method is configured
+	if hasPluginBackup {
+		pluginName := cluster.GetEnabledWALArchivePluginName()
+		status.AddLine("Backup Method:", fmt.Sprintf("Plugin (%s)", pluginName))
+	} else if hasLegacyBackup {
+		status.AddLine("Backup Method:", "Legacy (BarmanObjectStore)")
+	}
+
 	FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
 	if FPoR == "" {
 		FPoR = "Not Available"

@@ -79,3 +79,89 @@ var _ = Describe("getPrimaryStartTime", func() {
 		})
 	})
 })
+
+var _ = Describe("printBackupStatus", func() {
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+	})
+
+	Context("when no backup is configured", func() {
+		It("should identify no backup configuration", func() {
+			hasLegacyBackup := cluster.Spec.Backup != nil
+			hasPluginBackup := cluster.GetEnabledWALArchivePluginName() != ""
+
+			Expect(hasLegacyBackup).To(BeFalse())
+			Expect(hasPluginBackup).To(BeFalse())
+		})
+	})
+
+	Context("when legacy backup is configured", func() {
+		BeforeEach(func() {
+			cluster.Spec.Backup = &apiv1.BackupConfiguration{}
+		})
+
+		It("should identify legacy backup configuration", func() {
+			hasLegacyBackup := cluster.Spec.Backup != nil
+			hasPluginBackup := cluster.GetEnabledWALArchivePluginName() != ""
+
+			Expect(hasLegacyBackup).To(BeTrue())
+			Expect(hasPluginBackup).To(BeFalse())
+		})
+	})
+
+	Context("when plugin backup is configured", func() {
+		BeforeEach(func() {
+			enabled := true
+			isWALArchiver := true
+			cluster.Spec.Plugins = []apiv1.PluginConfiguration{
+				{
+					Name:          "barman-cloud",
+					Enabled:       &enabled,
+					IsWALArchiver: &isWALArchiver,
+					Parameters: map[string]string{
+						"provider": "s3",
+					},
+				},
+			}
+		})
+
+		It("should identify plugin backup configuration", func() {
+			hasLegacyBackup := cluster.Spec.Backup != nil
+			hasPluginBackup := cluster.GetEnabledWALArchivePluginName() != ""
+
+			Expect(hasLegacyBackup).To(BeFalse())
+			Expect(hasPluginBackup).To(BeTrue())
+			Expect(cluster.GetEnabledWALArchivePluginName()).To(Equal("barman-cloud"))
+		})
+	})
+
+	Context("when both legacy and plugin backup are configured", func() {
+		BeforeEach(func() {
+			enabled := true
+			isWALArchiver := true
+			cluster.Spec.Backup = &apiv1.BackupConfiguration{}
+			cluster.Spec.Plugins = []apiv1.PluginConfiguration{
+				{
+					Name:          "barman-cloud",
+					Enabled:       &enabled,
+					IsWALArchiver: &isWALArchiver,
+				},
+			}
+		})
+
+		It("should identify both configurations", func() {
+			hasLegacyBackup := cluster.Spec.Backup != nil
+			hasPluginBackup := cluster.GetEnabledWALArchivePluginName() != ""
+
+			Expect(hasLegacyBackup).To(BeTrue())
+			Expect(hasPluginBackup).To(BeTrue())
+		})
+	})
+})
