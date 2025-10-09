@@ -69,4 +69,4 @@ Examples of accepted image tags:
     `latest` is not considered a valid tag for the image.
 
 !!! Note
-    Image tag requirements do no apply for images defined in a catalog.
+    Image tag requirements do not apply for images defined in a catalog.
