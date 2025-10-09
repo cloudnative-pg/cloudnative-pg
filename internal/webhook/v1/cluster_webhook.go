@@ -2518,7 +2518,8 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getInTreeBarmanWarnings(r)...)
 	list = append(list, getRetentionPolicyWarnings(r)...)
 	list = append(list, getStorageWarnings(r)...)
-	return append(list, getSharedBuffersWarnings(r)...)
+	list = append(list, getSharedBuffersWarnings(r)...)
+	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
 }
 
 func getStorageWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -2628,6 +2629,33 @@ func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {
 			)
 		}
 	}
+	return result
+}
+
+func getDeprecatedMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.Monitoring != nil {
+		//nolint:staticcheck // Checking deprecated fields to warn users
+		if r.Spec.Monitoring.EnablePodMonitor {
+			result = append(result,
+				"spec.monitoring.enablePodMonitor is deprecated and will be removed in a future release. "+
+					"Create a PodMonitor manually instead, if needed.")
+		}
+		//nolint:staticcheck // Checking deprecated fields to warn users
+		if len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 {
+			result = append(result,
+				"spec.monitoring.podMonitorMetricRelabelings is deprecated and will be removed in a future release. "+
+					"Create a PodMonitor manually instead, if needed.")
+		}
+		//nolint:staticcheck // Checking deprecated fields to warn users
+		if len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
+			result = append(result,
+				"spec.monitoring.podMonitorRelabelings is deprecated and will be removed in a future release. "+
+					"Create a PodMonitor manually instead, if needed.")
+		}
+	}
+
 	return result
 }
 

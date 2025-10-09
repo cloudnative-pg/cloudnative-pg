@@ -131,6 +131,8 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
 	}
 
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
+
 	allErrs := v.validate(pooler)
 
 	if len(allErrs) == 0 {
@@ -166,6 +168,8 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
 			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
 	}
+
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
 	allErrs := v.validate(pooler)
 	if len(allErrs) == 0 {
@@ -257,4 +261,21 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 		}
 	}
 	return result
+}
+
+// validateDeprecatedMonitoringFields returns warnings for deprecated monitoring fields
+func (v *PoolerCustomValidator) validateDeprecatedMonitoringFields(r *apiv1.Pooler) admission.Warnings {
+	var warns admission.Warnings
+
+	if r.Spec.Monitoring != nil {
+		//nolint:staticcheck // Checking deprecated fields to warn users
+		if r.Spec.Monitoring.EnablePodMonitor ||
+			len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 ||
+			len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
+			warns = append(warns, "spec.monitoring is deprecated and will be removed in a future release. "+
+				"Create a PodMonitor manually instead, if needed.")
+		}
+	}
+
+	return warns
 }
