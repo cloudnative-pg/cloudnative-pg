@@ -35,6 +35,8 @@ spec:
     - major: 16
       image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
       image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 
@@ -52,11 +54,14 @@ spec:
     - major: 16
       image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
       image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 
 A `Cluster` resource has the flexibility to reference either an `ImageCatalog`
-or a `ClusterImageCatalog` to precisely specify the desired image.
+(like in the following example) or a `ClusterImageCatalog` to precisely specify
+the desired image.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -67,6 +72,7 @@ spec:
   instances: 3
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
+    # Change the following to `ClusterImageCatalog` if needed
     kind: ImageCatalog
     name: postgresql
     major: 16
@@ -108,4 +114,28 @@ present in the `image-catalogs` directory:
 
 ```shell
 kubectl apply -k https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main
+```
+
+You can then view all the catalogs deployed with:
+
+```shell
+kubectl get clusterimagecatalogs.postgresql.cnpg.io
+```
+
+For example, you can create a cluster with the latest `minimal` image for PostgreSQL 18 on `trixie` with:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: angus
+spec:
+  instances: 3
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  storage:
+    size: 1Gi
 ```

@@ -11,8 +11,8 @@ Systems) objects in the database and be queried via SQL.
     in Kubernetes via CloudNativePG.
 
 The CloudNativePG Community maintains container images that are built on top
-of the official [PostGIS images hosted on DockerHub](https://hub.docker.com/r/postgis/postgis).
-For more information please visit:
+of the maintained [PostgreSQL Container images](https://github.com/cloudnative-pg/postgres-containers).
+For more information, please visit:
 
 - The [`postgis-containers` project in GitHub](https://github.com/cloudnative-pg/postgis-containers)
 - The [`postgis-containers` Container Registry in GitHub](https://github.com/cloudnative-pg/postgis-containers/pkgs/container/postgis)
@@ -36,18 +36,18 @@ do this in two ways:
 
 - install it in the application database, which is the main and supposedly only
   database you host in the cluster according to the microservice architecture, or
-- install it in the `template1` database so as to make it available for all the
+- install it in the `template1` database to make it available for all the
   databases you end up creating in the cluster, in case you adopt the monolith
   architecture where the instance is shared by multiple databases
 
 !!! Info
-    For more information on the microservice vs monolith architecture in the database
+    For more information on the microservice vs monolith architecture in the database,
     please refer to the ["How many databases should be hosted in a single PostgreSQL instance?" FAQ](faq.md)
     or the ["Database import" section](database_import.md).
 
 ## Create a new PostgreSQL cluster with PostGIS
 
-Let's suppose you want to create a new PostgreSQL 17 cluster with PostGIS 3.2.
+Let's suppose you want to create a new PostgreSQL 18 cluster with PostGIS 3.6.
 
 The first step is to ensure you use the right PostGIS container image for the
 operand, and properly set the `.spec.imageName` option in the `Cluster`
@@ -59,9 +59,11 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
 !!! Warning
     Please consider that, although convention over configuration applies in
     CloudNativePG, you should spend time configuring and tuning your system for
-    production. Also the `imageName` in the example below deliberately points
-    to the latest available image for PostgreSQL 17 - you should use a specific
+    production. Also, the `imageName` in the example below deliberately points
+    to the latest available image for PostgreSQL 18 - you should use a specific
     image name or, preferably, the SHA256 digest for true immutability.
+    Alternatively, use the provided [image catalogs](https://github.com/cloudnative-pg/postgis-containers?tab=readme-ov-file#image-catalogs).
+
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -70,7 +72,7 @@ metadata:
   name: postgis-example
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:17
+  imageName: ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie
   storage:
     size: 1Gi
   postgresql:
@@ -106,22 +108,22 @@ values from the ones in this document):
 
 ```console
 $ kubectl cnpg psql postgis-example -- app
-psql (18.0 (Debian 18.0-1.pgdg110+2))
+psql (18.0 (Debian 18.0-1.pgdg13+3))
 Type "help" for help.
 
 app=# SELECT * FROM pg_available_extensions WHERE name ~ '^postgis' ORDER BY 1;
            name           | default_version | installed_version |                          comment
 --------------------------+-----------------+-------------------+------------------------------------------------------------
- postgis                  | 3.5.2           | 3.5.2             | PostGIS geometry and geography spatial types and functions
- postgis-3                | 3.5.2           |                   | PostGIS geometry and geography spatial types and functions
- postgis_raster           | 3.5.2           |                   | PostGIS raster types and functions
- postgis_raster-3         | 3.5.2           |                   | PostGIS raster types and functions
- postgis_sfcgal           | 3.5.2           |                   | PostGIS SFCGAL functions
- postgis_sfcgal-3         | 3.5.2           |                   | PostGIS SFCGAL functions
- postgis_tiger_geocoder   | 3.5.2           | 3.5.2             | PostGIS tiger geocoder and reverse geocoder
- postgis_tiger_geocoder-3 | 3.5.2           |                   | PostGIS tiger geocoder and reverse geocoder
- postgis_topology         | 3.5.2           | 3.5.2             | PostGIS topology spatial types and functions
- postgis_topology-3       | 3.5.2           |                   | PostGIS topology spatial types and functions
+ postgis                  | 3.6.0           | 3.6.0             | PostGIS geometry and geography spatial types and functions
+ postgis-3                | 3.6.0           |                   | PostGIS geometry and geography spatial types and functions
+ postgis_raster           | 3.6.0           |                   | PostGIS raster types and functions
+ postgis_raster-3         | 3.6.0           |                   | PostGIS raster types and functions
+ postgis_sfcgal           | 3.6.0           |                   | PostGIS SFCGAL functions
+ postgis_sfcgal-3         | 3.6.0           |                   | PostGIS SFCGAL functions
+ postgis_tiger_geocoder   | 3.6.0           | 3.6.0             | PostGIS tiger geocoder and reverse geocoder
+ postgis_tiger_geocoder-3 | 3.6.0           |                   | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology         | 3.6.0           | 3.6.0             | PostGIS topology spatial types and functions
+ postgis_topology-3       | 3.6.0           |                   | PostGIS topology spatial types and functions
 (10 rows)
 ```
 
@@ -130,15 +132,14 @@ resource have been correctly installed in the `app` database.
 
 ```console
 app=# \dx
-                                        List of installed extensions
-          Name          | Version |   Schema   |                        Description
-------------------------+---------+------------+------------------------------------------------------------
- fuzzystrmatch          | 1.2     | public     | determine similarities and distance between strings
- plpgsql                | 1.0     | pg_catalog | PL/pgSQL procedural language
- postgis                | 3.5.2   | public     | PostGIS geometry and geography spatial types and functions
- postgis_tiger_geocoder | 3.5.2   | tiger      | PostGIS tiger geocoder and reverse geocoder
- postgis_topology       | 3.5.2   | topology   | PostGIS topology spatial types and functions
-(5 rows)
+                                                 List of installed extensions
+          Name          | Version | Default version |   Schema   |                        Description
+------------------------+---------+-----------------+------------+------------------------------------------------------------
+ fuzzystrmatch          | 1.2     | 1.2             | public     | determine similarities and distance between strings
+ plpgsql                | 1.0     | 1.0             | pg_catalog | PL/pgSQL procedural language
+ postgis                | 3.6.0   | 3.6.0           | public     | PostGIS geometry and geography spatial types and functions
+ postgis_tiger_geocoder | 3.6.0   | 3.6.0           | tiger      | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology       | 3.6.0   | 3.6.0           | topology   | PostGIS topology spatial types and functions
 ```
 
 Finally:
@@ -147,6 +148,7 @@ Finally:
 app=# SELECT postgis_full_version();
                                                                             postgis_full_version
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- POSTGIS="3.5.2 dea6d0a" [EXTENSION] PGSQL="170" GEOS="3.9.0-CAPI-1.16.2" PROJ="7.2.1 NETWORK_ENABLED=OFF URL_ENDPOINT=https://cdn.proj.org USER_WRITABLE_DIRECTORY=/tmp/proj DATABASE_PATH=/usr/share/proj/proj.db" (compiled against PROJ 7.2.1) LIBXML="2.9.10" LIBJSON="0.15" LIBPROTOBUF="1.3.3" WAGYU="0.5.0 (Internal)" TOPOLOGY
+ POSTGIS="3.6.0 4c1967d" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2" PROJ="9.6.0 NETWORK_ENABLED=OFF URL_ENDPOINT=https://cdn.proj.org USER_WRITABLE_DIRECTORY=/tmp/proj DATABASE_PATH=/usr/share/proj/proj.
+db" (compiled against PROJ 9.6.0) LIBXML="2.9.14" LIBJSON="0.18" LIBPROTOBUF="1.5.1" WAGYU="0.5.0 (Internal)" TOPOLOGY
 (1 row)
 ```
