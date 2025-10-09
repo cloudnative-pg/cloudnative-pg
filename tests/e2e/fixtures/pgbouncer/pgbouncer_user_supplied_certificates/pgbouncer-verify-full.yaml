@@ -10,7 +10,7 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
-    authQuery: "SELECT usename, passwd FROM public.user_search($1)"
+    authQuery: "SELECT $1, NULL"
     parameters:
       server_tls_protocols: tlsv1.3
       auth_type: cert
