@@ -487,17 +487,46 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
 	fmt.Println(aurora.Green("Continuous Backup status"))
-	if cluster.Spec.Backup == nil {
+
+	// Check if Barman Cloud plugin is configured
+	isBarmanPluginEnabled, barmanObjectName := isBarmanCloudPluginEnabled(cluster)
+
+	if cluster.Spec.Backup == nil && !isBarmanPluginEnabled {
 		fmt.Println(aurora.Yellow("Not configured"))
 		fmt.Println()
 		return
 	}
-	status := tabby.New()
-	FPoR := cluster.Status.FirstRecoverabilityPoint
-	if FPoR == "" {
-		FPoR = "Not Available"
+
+	// If backup is managed by Barman Cloud plugin, inform the user. We assume that the WALArchiving is also managed
+	// by the Barman Cloud plugin
+	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
+	// so we don't need to check both conditions
+	if isBarmanPluginEnabled {
+		if barmanObjectName == "" {
+			fmt.Println(aurora.Red("Backup is managed by the Barman Cloud plugin, " +
+				"but 'barmanObjectName' parameter is not configured."))
+			fmt.Println(aurora.Red("Please configure the 'barmanObjectName' parameter in the plugin configuration."))
+			fmt.Println()
+			return
+		}
+		fmt.Println(aurora.Cyan("Backup is managed by the Barman Cloud plugin."))
+		arg := fmt.Sprintf("Please check the Barman Cloud plugin CRD: '%s' for detailed backup status.", barmanObjectName)
+		fmt.Println(aurora.Cyan(arg))
+		fmt.Println()
+		return
 	}
-	status.AddLine("First Point of Recoverability:", FPoR)
+
+	status := tabby.New()
+	// FirstRecoverabilityPoint is deprecated and will be removed together
+	// with native Barman Cloud support. It is only shown when the backup
+	// section is not empty.
+	if cluster.Spec.Backup != nil {
+		FPoR := cluster.Status.FirstRecoverabilityPoint
+		if FPoR == "" {
+			FPoR = "Not Available"
+		}
+		status.AddLine("First Point of Recoverability:", FPoR)
+	}
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
@@ -523,6 +552,19 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 
 	status.Print()
 	fmt.Println()
+}
+
+// isBarmanCloudPluginEnabled checks if the barman-cloud plugin is enabled, and the 'barmanObject' object name
+func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, string) {
+	for _, plg := range cluster.Spec.Plugins {
+		if plg.Name == "barman-cloud.cloudnative-pg.io" {
+			if plg.IsEnabled() {
+				return true, plg.Parameters["barmanObjectName"]
+			}
+			return false, ""
+		}
+	}
+	return false, ""
 }
 
 func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
