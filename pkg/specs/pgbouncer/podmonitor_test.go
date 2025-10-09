@@ -43,6 +43,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 				Namespace: "test-namespace",
 			},
 			Spec: apiv1.PoolerSpec{
+				//nolint:staticcheck // Using deprecated type during deprecation period
 				Monitoring: &apiv1.PoolerMonitoringConfiguration{
 					EnablePodMonitor: false,
 				},
