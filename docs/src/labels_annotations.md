@@ -106,23 +106,25 @@ This label is available only on `VolumeSnapshot` resources.
 
 `app.kubernetes.io/managed-by`
 : Name of the manager. It will always be `cloudnative-pg`.
-  Common label across all CloudNativePG managed resources.
+  Available across all CloudNativePG managed resources.
 
 `app.kubernetes.io/name`
 : Name of the application. It will always be `postgresql`.
-  Common label across all CloudNativePG managed resources.
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/component`
 : Name of the component (`database`, `pooler`, ...).
-  Common label across all CloudNativePG managed resources.
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/instance`
 : Name of the related `Cluster` resource.
-  Available on pods, jobs, deployments, services, poddisruptionbudgets, podmonitors.
+  Available on pods, jobs, deployments, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/version`
 : Major version of PostgreSQL.
-  Available on pods, jobs, services, poddisruptionbudgets, podmonitors.
+  Available on pods, jobs, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 ## Predefined annotations
 
