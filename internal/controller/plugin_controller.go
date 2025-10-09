@@ -136,6 +136,8 @@ func (r *PluginReconciler) reconcile(
 		Name:      pluginServerSecret,
 	})
 	if err != nil {
+		contextLogger.Error(err, "Error while getting server secret for plugin",
+			"secretName", pluginServerSecret)
 		return ctrl.Result{}, err
 	}
 
@@ -149,6 +151,8 @@ func (r *PluginReconciler) reconcile(
 		Name:      pluginClientSecret,
 	})
 	if err != nil {
+		contextLogger.Error(err, "Error while getting client secret for plugin",
+			"secretName", pluginClientSecret)
 		return ctrl.Result{}, err
 	}
 
@@ -174,7 +178,8 @@ func (r *PluginReconciler) reconcile(
 		clientSecret.Data[corev1.TLSPrivateKeyKey],
 	)
 	if err != nil {
-		contextLogger.Error(err, "Error while parsing client key and certificate for mTLS authentication")
+		contextLogger.Error(err, "Error while parsing client key and certificate for mTLS authentication",
+			"secretName", clientSecret.Name)
 		return ctrl.Result{}, err
 	}
 
@@ -194,17 +199,18 @@ func (r *PluginReconciler) reconcile(
 			return ctrl.Result{}, err
 		}
 
-		secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
-		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
-			return ctrl.Result{}, err
+		_, err := x509.ParseCertificate(block.Bytes)
+		if err == nil {
+			// If we don't manage to get the real error, we fall back to the
+			// generic one.
+			err = fmt.Errorf(
+				"could not parse the server certificate from secret %q, please check the certificate format and validity",
+				serverSecret.Name,
+			)
 		}
 
-		// If we don't manage to get the real error, we fall back to the
-		// generic one.
-		return ctrl.Result{}, fmt.Errorf(
-			"could not parse the server certificate from secret %q, please check the certificate format and validity",
-			serverSecret.Name,
-		)
+		secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+		return ctrl.Result{}, err
 	}
 
 	pluginAddress := fmt.Sprintf("%s:%d", service.Name, pluginPort)
