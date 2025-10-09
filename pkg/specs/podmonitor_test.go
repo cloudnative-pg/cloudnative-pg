@@ -78,6 +78,7 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
@@ -89,6 +90,7 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
@@ -100,7 +102,9 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
