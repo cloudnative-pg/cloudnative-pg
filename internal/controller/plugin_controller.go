@@ -180,6 +180,8 @@ func (r *PluginReconciler) reconcile(
 
 	serverCertificatePool := x509.NewCertPool()
 	if ok := serverCertificatePool.AppendCertsFromPEM(serverSecret.Data[corev1.TLSCertKey]); !ok {
+		secretLogger := contextLogger.WithValues("secretName", serverSecret.Name,
+			"secretKey", corev1.TLSCertKey)
 		// The certificate parsing failed, but unfortunately we are not aware of
 		// the root cause.
 		//
@@ -187,21 +189,22 @@ func (r *PluginReconciler) reconcile(
 		// step and look at the real error.
 		block, _ := pem.Decode(serverSecret.Data[corev1.TLSCertKey])
 		if block == nil {
-			err := fmt.Errorf("no valid PEM block found in server certificate")
-			contextLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+			err := fmt.Errorf("no valid PEM block found in server certificate from secret %q", serverSecret.Name)
+			secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
 			return ctrl.Result{}, err
 		}
 
-		_, err := x509.ParseCertificate(block.Bytes)
+		secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
+			return ctrl.Result{}, err
+		}
 
 		// If we don't manage to get the real error, we fall back to the
 		// generic one.
-		if err == nil {
-			err = fmt.Errorf("generic parsing error")
-		}
-
-		contextLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf(
+			"could not parse the server certificate from secret %q, please check the certificate format and validity",
+			serverSecret.Name,
+		)
 	}
 
 	pluginAddress := fmt.Sprintf("%s:%d", service.Name, pluginPort)
