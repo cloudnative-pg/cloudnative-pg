@@ -19,7 +19,7 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.1"
+  GOLANG_VERSION: "1.25.2"
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
   GOLANGCI_LINT_VERSION: "v2.5.0"
   KUBEBUILDER_VERSION: "2.3.1"
@@ -617,7 +617,7 @@ jobs:
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3
+        uses: github/codeql-action/upload-sarif@e296a935590eb16afc0c0108289f68c87e2a89a5 # v4
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork

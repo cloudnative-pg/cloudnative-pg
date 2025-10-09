@@ -115,9 +115,11 @@ func (se *Reconciler) enrichSnapshot(
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
 
-	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
-	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
-	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	now := time.Now()
+
+	vs.Labels[utils.BackupDateLabelName] = now.Format("20060102")
+	vs.Labels[utils.BackupMonthLabelName] = now.Format("200601")
+	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(now.Year())
 	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
 
 	rawCluster, err := json.Marshal(cluster)
@@ -459,9 +461,9 @@ func (se *Reconciler) createSnapshot(
 		pvc.Labels = map[string]string{}
 	}
 
-	labels := pvc.Labels
+	labels := maps.Clone(pvc.Labels)
 	maps.Copy(labels, snapshotConfig.Labels)
-	annotations := pvc.Annotations
+	annotations := maps.Clone(pvc.Annotations)
 	maps.Copy(annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
 
