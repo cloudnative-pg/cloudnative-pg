@@ -35,6 +35,8 @@ spec:
     - major: 16
       image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
       image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 
@@ -52,6 +54,8 @@ spec:
     - major: 16
       image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
       image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 

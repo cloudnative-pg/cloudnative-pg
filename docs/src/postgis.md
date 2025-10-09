@@ -12,7 +12,7 @@ Systems) objects in the database and be queried via SQL.
 
 The CloudNativePG Community maintains container images that are built on top
 of the maintained [PostgreSQL Container images](https://github.com/cloudnative-pg/postgres-containers).
-For more information please visit:
+For more information, please visit:
 
 - The [`postgis-containers` project in GitHub](https://github.com/cloudnative-pg/postgis-containers)
 - The [`postgis-containers` Container Registry in GitHub](https://github.com/cloudnative-pg/postgis-containers/pkgs/container/postgis)
@@ -36,12 +36,12 @@ do this in two ways:
 
 - install it in the application database, which is the main and supposedly only
   database you host in the cluster according to the microservice architecture, or
-- install it in the `template1` database so as to make it available for all the
+- install it in the `template1` database to make it available for all the
   databases you end up creating in the cluster, in case you adopt the monolith
   architecture where the instance is shared by multiple databases
 
 !!! Info
-    For more information on the microservice vs monolith architecture in the database
+    For more information on the microservice vs monolith architecture in the database,
     please refer to the ["How many databases should be hosted in a single PostgreSQL instance?" FAQ](faq.md)
     or the ["Database import" section](database_import.md).
 
@@ -59,7 +59,7 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
 !!! Warning
     Please consider that, although convention over configuration applies in
     CloudNativePG, you should spend time configuring and tuning your system for
-    production. Also the `imageName` in the example below deliberately points
+    production. Also, the `imageName` in the example below deliberately points
     to the latest available image for PostgreSQL 18 - you should use a specific
     image name or, preferably, the SHA256 digest for true immutability.
     Alternatively, use the provided [image catalogs](https://github.com/cloudnative-pg/postgis-containers?tab=readme-ov-file#image-catalogs).
