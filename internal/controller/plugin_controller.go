@@ -186,6 +186,12 @@ func (r *PluginReconciler) reconcile(
 		// To emit a better log message, we individually execute the parsing
 		// step and look at the real error.
 		block, _ := pem.Decode(serverSecret.Data[corev1.TLSCertKey])
+		if block == nil {
+			err := fmt.Errorf("no valid PEM block found in server certificate")
+			contextLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+			return ctrl.Result{}, err
+		}
+
 		_, err := x509.ParseCertificate(block.Bytes)
 
 		// If we don't manage to get the real error, we fall back to the
