@@ -143,7 +143,7 @@ func Status(
 		status.printCertificatesStatus()
 	}
 	if !hibernated {
-		status.printBackupStatus(verbosity)
+		status.printBackupStatus()
 		status.printBasebackupStatus(verbosity)
 		status.printReplicaStatus(verbosity)
 		if verbosity > 0 {
@@ -514,7 +514,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	return errs
 }
 
-func (fullStatus *PostgresqlStatus) printBackupStatus(verbosity int) {
+func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
 	// Check if Barman Cloud plugin is configured
