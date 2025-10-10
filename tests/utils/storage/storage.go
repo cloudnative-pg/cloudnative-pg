@@ -54,7 +54,7 @@ func IsWalStorageEnabled(
 	namespace, clusterName string,
 ) (bool, error) {
 	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
-	if cluster.Spec.WalStorage == nil {
+	if cluster == nil || cluster.Spec.WalStorage == nil {
 		return false, err
 	}
 	return true, err
