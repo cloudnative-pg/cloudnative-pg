@@ -1399,7 +1399,7 @@ table contains the full details:
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
 | report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
-| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list                                                                                                                                                                                                                                                              |
+| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | version         | none                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -1481,6 +1481,12 @@ rules:
       - policy
     resources:
       - poddisruptionbudgets
+  - verbs:
+      - get
+    apiGroups:
+      - barmancloud.cnpg.io
+    resources:
+      - objectstores
 ```
 
 !!! Important
