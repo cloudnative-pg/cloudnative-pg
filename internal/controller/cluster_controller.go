@@ -138,6 +138,7 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups="",resources=pods/resize,verbs=patch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get

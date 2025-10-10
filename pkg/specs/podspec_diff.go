@@ -211,6 +211,9 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 		"security-context": func() bool {
 			return reflect.DeepEqual(currentContainer.SecurityContext, targetContainer.SecurityContext)
 		},
+		"resize-policy": func() bool {
+			return reflect.DeepEqual(currentContainer.ResizePolicy, targetContainer.ResizePolicy)
+		},
 	}
 
 	for diff, f := range comparisons {
