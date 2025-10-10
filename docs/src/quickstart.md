@@ -255,9 +255,17 @@ spec:
 
   storage:
     size: 1Gi
-
-  monitoring:
-    enablePodMonitor: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-with-metrics
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: cluster-with-metrics
+  podMetricsEndpoints:
+  - port: metrics
 EOF
 ```
 
