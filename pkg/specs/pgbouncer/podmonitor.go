@@ -60,6 +60,7 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Port: &metricsPort,
 	}
 
+	//nolint:staticcheck // Using deprecated fields during deprecation period
 	if c.pooler.Spec.Monitoring != nil {
 		endpoint.MetricRelabelConfigs = c.pooler.Spec.Monitoring.PodMonitorMetricRelabelConfigs
 		endpoint.RelabelConfigs = c.pooler.Spec.Monitoring.PodMonitorRelabelConfigs

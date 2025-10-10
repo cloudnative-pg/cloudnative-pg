@@ -267,8 +267,8 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 func (v *PoolerCustomValidator) validateDeprecatedMonitoringFields(r *apiv1.Pooler) admission.Warnings {
 	var warns admission.Warnings
 
+	//nolint:staticcheck // Checking deprecated fields to warn users
 	if r.Spec.Monitoring != nil {
-		//nolint:staticcheck // Checking deprecated fields to warn users
 		if r.Spec.Monitoring.EnablePodMonitor ||
 			len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 ||
 			len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
