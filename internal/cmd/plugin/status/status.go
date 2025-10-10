@@ -143,7 +143,7 @@ func Status(
 		status.printCertificatesStatus()
 	}
 	if !hibernated {
-		status.printBackupStatus()
+		status.printBackupStatus(verbosity)
 		status.printBasebackupStatus(verbosity)
 		status.printReplicaStatus(verbosity)
 		if verbosity > 0 {
@@ -514,16 +514,18 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	return errs
 }
 
-func (fullStatus *PostgresqlStatus) printBackupStatus() {
+func (fullStatus *PostgresqlStatus) printBackupStatus(verbosity int) {
 	cluster := fullStatus.Cluster
-
-	fmt.Println(aurora.Green("Continuous Backup status"))
 
 	// Check if Barman Cloud plugin is configured
 	isBarmanPluginEnabled, pluginParams := isBarmanCloudPluginEnabled(cluster)
 
-	if cluster.Spec.Backup == nil && !isBarmanPluginEnabled {
-		fmt.Println(aurora.Yellow("Not configured"))
+	if isBarmanPluginEnabled {
+		fmt.Println(aurora.Green("Continuous Backup status (Barman Cloud Plugin)"))
+	} else if cluster.Spec.Backup != nil {
+		fmt.Println(aurora.Green("Continuous Backup status"))
+	} else {
+		fmt.Println(aurora.Yellow("Continuous Backup not configured"))
 		fmt.Println()
 		return
 	}
@@ -542,17 +544,12 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 			return
 		}
 
-		fmt.Println(aurora.Cyan("Backup is managed by the Barman Cloud plugin."))
-
 		objectStore, err := fullStatus.getBarmanObject(barmanObjectName)
 		if err != nil {
 			fmt.Println(aurora.Red(fmt.Sprintf("Error fetching ObjectStore '%s': %v", barmanObjectName, err)))
 			fmt.Println()
 			return
 		}
-
-		status.AddLine(aurora.Green(fmt.Sprintf("ObjectStore Resource: %s", barmanObjectName)))
-		status.Print()
 
 		fullStatus.printBarmanObjectStoreStatus(status, objectStore, pluginParams)
 	} else if cluster.Spec.Backup != nil {
@@ -566,7 +563,6 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		status.AddLine("First Point of Recoverability:", FPoR)
 	}
 
-	status.AddLine()
 	fullStatus.printWALArchivingStatus(status)
 	status.Print()
 	fmt.Println()
@@ -778,7 +774,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	}
 
 	if fullStatus.areReplicationSlotsEnabled() {
-		fmt.Println(aurora.Green("Replication Slots Enabled").String())
+		fmt.Println(aurora.Cyan("Replication Slots Enabled").String())
 	}
 
 	status := tabby.New()
@@ -1377,29 +1373,29 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
 		return
 	}
 
-	fmt.Println(aurora.Green(fmt.Sprintf("Server: %s", serverName)))
+	status.AddLine("ObjectStore / Server name:", objectStore.GetName()+"/"+serverName)
 
 	// Format and print first recoverability point
 	if recoveryWindow.FirstRecoverabilityPoint != nil {
-		status.AddLine("  First Recoverability Point:",
+		status.AddLine("First Point of Recoverability:",
 			recoveryWindow.FirstRecoverabilityPoint.Format("2006-01-02 15:04:05 MST"))
 	} else {
-		status.AddLine("  First Recoverability Point:", "-")
+		status.AddLine("First Point of Recoverability:", "-")
 	}
 
 	// Format and print last successful backup time
 	if recoveryWindow.LastSuccessfulBackupTime != nil {
-		status.AddLine("  Last Successful Backup:",
+		status.AddLine("Last Successful Backup:",
 			recoveryWindow.LastSuccessfulBackupTime.Format("2006-01-02 15:04:05 MST"))
 	} else {
-		status.AddLine("  Last Successful Backup:", "-")
+		status.AddLine("Last Successful Backup:", "-")
 	}
 
 	// Format and print last failed backup time (in red if present)
 	if recoveryWindow.LastFailedBackupTime != nil {
-		status.AddLine("  Last Failed Backup:",
+		status.AddLine("Last Failed Backup:",
 			aurora.Red(recoveryWindow.LastFailedBackupTime.Format("2006-01-02 15:04:05 MST")))
 	} else {
-		status.AddLine("  Last Failed Backup:", "-")
+		status.AddLine("Last Failed Backup:", "-")
 	}
 }
