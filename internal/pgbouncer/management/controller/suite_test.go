@@ -36,6 +36,7 @@ import (
 
 const (
 	authQueryName = "authquery"
+	clientTLSName = "servertls"
 	serverCAName  = "serverca"
 	serverTLSName = "servertls"
 	clientCAName  = "clientca"
@@ -75,6 +76,7 @@ func buildTestEnv() (client.WithWatch, *apiv1.Pooler) {
 				ServerCA:  apiv1.SecretVersion{Name: serverCAName},
 				ServerTLS: apiv1.SecretVersion{Name: serverTLSName},
 				ClientCA:  apiv1.SecretVersion{Name: clientCAName},
+				ClientTLS: apiv1.SecretVersion{Name: clientTLSName},
 			},
 		},
 	}

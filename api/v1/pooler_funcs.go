@@ -36,6 +36,46 @@ func (in *Pooler) GetAuthQuerySecretName() string {
 	return in.Spec.Cluster.Name + DefaultPgBouncerPoolerSecretSuffix
 }
 
+// GetServerTLSSecretName returns the specified server TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerTLSSecretName() string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ServerTLSSecret != nil {
+		return in.Spec.PgBouncer.ServerTLSSecret.Name
+	}
+
+	return ""
+}
+
+// GetServerCASecretNameOrDefault returns the specified server CA secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerCASecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ServerCASecret != nil {
+		return in.Spec.PgBouncer.ServerCASecret.Name
+	}
+
+	return cluster.GetServerCASecretName()
+}
+
+// GetClientCASecretNameOrDefault returns the specified client CA secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetClientCASecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ClientCASecret != nil {
+		return in.Spec.PgBouncer.ClientCASecret.Name
+	}
+
+	return cluster.GetClientCASecretName()
+}
+
+// GetClientTLSSecretNameOrDefault returns the specified client TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetClientTLSSecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ClientTLSSecret != nil {
+		return in.Spec.PgBouncer.ClientTLSSecret.Name
+	}
+
+	return cluster.GetServerTLSSecretName()
+}
+
 // GetAuthQuery returns the specified AuthQuery name for PgBouncer
 // if provided or the default name otherwise.
 func (in *Pooler) GetAuthQuery() string {
@@ -54,8 +94,9 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 	}
 	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
 	// is not going to be handled by the operator.
-	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
-		in.Spec.PgBouncer.AuthQuery != "" {
+	if in.Spec.PgBouncer.AuthQuery != "" ||
+		(in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(in.Spec.PgBouncer.ServerTLSSecret != nil && in.Spec.PgBouncer.ServerTLSSecret.Name != "") {
 		return false
 	}
 	return true
