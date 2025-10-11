@@ -58,7 +58,6 @@ In addition, check that the following packages are installed in your system:
 - `gpg`,
 - `jq`,
 - `make`,
-- `pandoc`,
 - `sed`,
 - `tar`,
 - `util-linux`,
@@ -113,7 +112,7 @@ brew install jq \
   gnu-getopt \
   gnu-sed \
   gnu-tar \
-  pandoc \
+  helm \
   zlib
 ```
 
