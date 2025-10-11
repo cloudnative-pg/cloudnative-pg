@@ -57,6 +57,36 @@ var _ = Describe("BackupStatus structure", func() {
 		Expect(status.IsDone()).To(BeFalse())
 	})
 
+	It("can be set as started with image info", func() {
+		status := BackupStatus{}
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-example-1",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						ContainerID: "container-id",
+					},
+				},
+			},
+		}
+		imageInfo := &ImageInfo{
+			Image:        "postgres:16.1",
+			MajorVersion: 16,
+		}
+
+		status.SetAsStartedWithImageInfo(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, BackupMethodBarmanObjectStore, imageInfo)
+		Expect(status.Phase).To(BeEquivalentTo(BackupPhaseStarted))
+		Expect(status.InstanceID).ToNot(BeNil())
+		Expect(status.InstanceID.PodName).To(Equal("cluster-example-1"))
+		Expect(status.InstanceID.ContainerID).To(Equal("container-id"))
+		Expect(status.BackupImageInfo).ToNot(BeNil())
+		Expect(status.BackupImageInfo.Image).To(Equal("postgres:16.1"))
+		Expect(status.BackupImageInfo.MajorVersion).To(Equal(16))
+		Expect(status.IsDone()).To(BeFalse())
+	})
+
 	It("can be set to contain a snapshot list", func() {
 		status := BackupStatus{}
 		status.BackupSnapshotStatus.SetSnapshotElements([]volumesnapshotv1.VolumeSnapshot{
