@@ -100,4 +100,7 @@ const (
 
 	// LabelPostgresMajorUpgrade is a label for Cluster major version upgrade tests
 	LabelPostgresMajorUpgrade = "postgres-major-upgrade"
+
+	// LabelResizing is a label for selecting in-place pod resizing tests
+	LabelResizing = "resizing"
 )
