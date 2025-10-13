@@ -3979,7 +3979,7 @@ you need this functionality, you can create a PodMonitor manually.</p>
 Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 </tr>
-<tr><td><code>podMonitorMetricRelabelings</code> <B>[Required]</B><br/>
+<tr><td><code>podMonitorMetricRelabelings</code><br/>
 <a href="https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig"><i>[]github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1.RelabelConfig</i></a>
 </td>
 <td>
