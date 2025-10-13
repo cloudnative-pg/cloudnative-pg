@@ -630,6 +630,7 @@ balancer
 balancers
 barmanEndpointCA
 barmanObjectStore
+barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
 baseDN
@@ -1070,6 +1071,7 @@ num
 oauth
 objectmeta
 objectstore
+objectstores
 objid
 objref
 objsubid
