@@ -2640,19 +2640,20 @@ func getDeprecatedMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings 
 		if r.Spec.Monitoring.EnablePodMonitor {
 			result = append(result,
 				"spec.monitoring.enablePodMonitor is deprecated and will be removed in a future release. "+
-					"Create a PodMonitor manually instead, if needed.")
+					"Please migrate to manually managing your PodMonitor resources. "+
+					"Set this field to false and create a PodMonitor resource for your cluster as described in the documentation.")
 		}
 		//nolint:staticcheck // Checking deprecated fields to warn users
 		if len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 {
 			result = append(result,
 				"spec.monitoring.podMonitorMetricRelabelings is deprecated and will be removed in a future release. "+
-					"Create a PodMonitor manually instead, if needed.")
+					"Please migrate to manually managing your PodMonitor resources with custom relabeling configurations.")
 		}
 		//nolint:staticcheck // Checking deprecated fields to warn users
 		if len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
 			result = append(result,
 				"spec.monitoring.podMonitorRelabelings is deprecated and will be removed in a future release. "+
-					"Create a PodMonitor manually instead, if needed.")
+					"Please migrate to manually managing your PodMonitor resources with custom relabeling configurations.")
 		}
 	}
 

@@ -273,7 +273,7 @@ func (v *PoolerCustomValidator) validateDeprecatedMonitoringFields(r *apiv1.Pool
 			len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 ||
 			len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
 			warns = append(warns, "spec.monitoring is deprecated and will be removed in a future release. "+
-				"Create a PodMonitor manually instead, if needed.")
+				"Set this field to false and create a PodMonitor resource for your pooler as described in the documentation")
 		}
 	}
 
