@@ -3791,11 +3791,18 @@ spec:
                     type: boolean
                   enablePodMonitor:
                     default: false
-                    description: Enable or disable the `PodMonitor`
+                    description: |-
+                      Enable or disable the `PodMonitor`
+
+                      Deprecated: This feature will be removed in an upcoming release. If
+                      you need this functionality, you can create a PodMonitor manually.
                     type: boolean
                   podMonitorMetricRelabelings:
-                    description: The list of metric relabelings for the `PodMonitor`.
-                      Applied to samples before ingestion.
+                    description: |-
+                      The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+
+                      Deprecated: This feature will be removed in an upcoming release. If
+                      you need this functionality, you can create a PodMonitor manually.
                     items:
                       description: |-
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
@@ -3882,8 +3889,11 @@ spec:
                       type: object
                     type: array
                   podMonitorRelabelings:
-                    description: The list of relabelings for the `PodMonitor`. Applied
-                      to samples before scraping.
+                    description: |-
+                      The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+
+                      Deprecated: This feature will be removed in an upcoming release. If
+                      you need this functionality, you can create a PodMonitor manually.
                     items:
                       description: |-
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
