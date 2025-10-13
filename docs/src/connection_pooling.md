@@ -585,18 +585,10 @@ cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
     For a better understanding of the metrics please refer to the PgBouncer documentation.
 
 As for clusters, a specific pooler can be monitored using the
-[Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
-A `PodMonitor` correctly pointing to a pooler can be created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource. The default is `false`.
+[Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator)
+[`PodMonitor` resource](https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#monitoring.coreos.com/v1.PodMonitor).
 
-!!! Important
-    Any change to `PodMonitor` created automatically is overridden by the
-    operator at the next reconciliation cycle. If you need to customize it, you can
-    do so as shown in the following example.
-
-To deploy a `PodMonitor` for a specific pooler manually, you can define it as
-follows and change it as needed:
+You can deploy a `PodMonitor` for a specific pooler using the following basic example, and change it as needed:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -610,6 +602,18 @@ spec:
   podMetricsEndpoints:
   - port: metrics
 ```
+
+### Deprecation of Automatic `PodMonitor` Creation
+
+!!!warning "Feature Deprecation Notice"
+    The `.spec.monitoring.enablePodMonitor` field in the `Pooler` resource is
+    now deprecated and will be removed in a future version of the operator.
+
+If you are currently using this feature, we strongly recommend you either
+remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
+create a `PodMonitor` resource for your pooler as described above.
+This change ensures that you have complete ownership of your monitoring
+configuration, preventing it from being managed or overwritten by the operator.
 
 ## Logging
 

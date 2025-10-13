@@ -57,18 +57,19 @@ by specifying a list of one or more databases in the `target_databases` option.
 
 ### Monitoring with the Prometheus operator
 
-A specific PostgreSQL cluster can be monitored using the
-[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.75.1/Documentation/api.md#podmonitor).
+You can monitor a specific PostgreSQL cluster using the
+[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator)
+[`PodMonitor` resource](https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#monitoring.coreos.com/v1.PodMonitor).
 
-A `PodMonitor` that correctly points to the Cluster can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: `false`).
+The recommended approach is to manually create and manage a `PodMonitor` for
+each CloudNativePG cluster. This method provides you with full control over the
+monitoring configuration and lifecycle.
 
-!!! Important
-    Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
-    cycle, in case you need to customize it, you can do so as described below.
+#### Creating a `PodMonitor`
 
-To deploy a `PodMonitor` for a specific Cluster manually, define it as follows and adjust as needed:
+To monitor your cluster, define a `PodMonitor` resource as follows. Be sure to
+deploy it in the same namespace where your Prometheus Operator is configured to
+find `PodMonitor` resources.
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -78,19 +79,29 @@ metadata:
 spec:
   selector:
     matchLabels:
-      "cnpg.io/cluster": cluster-example
+      cnpg.io/cluster: cluster-example
   podMetricsEndpoints:
   - port: metrics
 ```
 
-!!! Important
-    Ensure you modify the example above with a unique name, as well as the
-    correct cluster's namespace and labels (e.g., `cluster-example`).
+!!! important "Important Configuration Details"
+    - `metadata.name`: Give your `PodMonitor` a unique name.
+    - `spec.namespaceSelector`: Use this to specify the namespace where
+      your PostgreSQL cluster is running.
+    - `spec.selector.matchLabels`: You must use the `cnpg.io/cluster: <cluster-name>`
+      label to correctly target the PostgreSQL instances.
 
-!!! Important
-    The `postgresql` label, used in previous versions of this document, is deprecated
-    and will be removed in the future. Please use the `cnpg.io/cluster` label
-    instead to select the instances.
+#### Deprecation of Automatic `PodMonitor` Creation
+
+!!!warning "Feature Deprecation Notice"
+    The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
+    now deprecated and will be removed in a future version of the operator.
+
+If you are currently using this feature, we strongly recommend you either
+remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
+create a `PodMonitor` resource for your cluster as described above.
+This change ensures that you have complete ownership of your monitoring
+configuration, preventing it from being managed or overwritten by the operator.
 
 ### Enabling TLS on the Metrics Port
 
@@ -792,7 +803,7 @@ metadata:
 spec:
   containers:
   - name: curl
-    image: curlimages/curl:8.2.1
+    image: curlimages/curl:8.16.0
     command: ['sleep', '3600']
 EOF
 ```
