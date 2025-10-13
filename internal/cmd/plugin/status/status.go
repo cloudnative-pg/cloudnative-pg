@@ -520,11 +520,12 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	// Check if Barman Cloud plugin is configured
 	isBarmanPluginEnabled, pluginParams := isBarmanCloudPluginEnabled(cluster)
 
-	if isBarmanPluginEnabled {
+	switch {
+	case isBarmanPluginEnabled:
 		fmt.Println(aurora.Green("Continuous Backup status (Barman Cloud Plugin)"))
-	} else if cluster.Spec.Backup != nil {
+	case cluster.Spec.Backup != nil:
 		fmt.Println(aurora.Green("Continuous Backup status"))
-	} else {
+	default:
 		fmt.Println(aurora.Yellow("Continuous Backup not configured"))
 		fmt.Println()
 		return
@@ -1366,10 +1367,11 @@ func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
 		serverName = fullStatus.Cluster.Name
 	}
 
-	// Print each server's recovery window information
+	// Retrieve server's recovery window information
 	recoveryWindow, ok := objectStore.Status.ServerRecoveryWindow[serverName]
 	if !ok {
-		fmt.Println(aurora.Red(fmt.Sprintf("No recovery window information found for server '%s'", serverName)))
+		fmt.Println(aurora.Red(fmt.Sprintf("No recovery window information found in ObjectStore '%s' for server '%s'",
+			objectStore.GetName(), serverName)))
 		return
 	}
 
