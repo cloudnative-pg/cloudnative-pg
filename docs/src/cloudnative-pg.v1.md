@@ -3967,6 +3967,8 @@ Default: false.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>tls</code><br/>
@@ -3982,6 +3984,8 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of metric relabelings for the <code>PodMonitor</code>. Applied to samples before ingestion.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorRelabelings</code><br/>
@@ -3989,6 +3993,8 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of relabelings for the <code>PodMonitor</code>. Applied to samples before scraping.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 </tbody>
@@ -4636,6 +4642,8 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 <td>
    <p>The configuration of the monitoring infrastructure of this pooler.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>serviceTemplate</code><br/>
