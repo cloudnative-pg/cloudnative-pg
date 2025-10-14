@@ -346,6 +346,11 @@ func (r *Reconciler) refreshCertificateFilesFromSecret(
 			"secret", secret.Name)
 	}
 
+	// ensure the permission of the private key is correct
+	if err := fileutils.EnsureFileMode(privateKeyLocation, 0o600); err != nil {
+		return false, fmt.Errorf("while fixing permissions of server private key: %w", err)
+	}
+
 	return certificateIsChanged || privateKeyIsChanged, nil
 }
 
