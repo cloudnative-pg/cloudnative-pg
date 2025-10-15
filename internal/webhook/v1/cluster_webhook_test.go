@@ -5863,3 +5863,136 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("container resize policy validation", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("passes validation when no resize policy is specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: nil,
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(BeEmpty())
+	})
+
+	It("passes validation with valid CPU and memory policies", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.NotRequired,
+					},
+					{
+						ResourceName:  corev1.ResourceMemory,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(BeEmpty())
+	})
+
+	It("fails validation with empty resource name", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  "",
+						RestartPolicy: corev1.NotRequired,
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(HaveLen(1))
+		Expect(errList[0].Type).To(Equal(field.ErrorTypeRequired))
+		Expect(errList[0].Field).To(Equal("spec.containerResizePolicy[0].resourceName"))
+	})
+
+	It("fails validation with unsupported resource name", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  "storage",
+						RestartPolicy: corev1.NotRequired,
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(HaveLen(1))
+		Expect(errList[0].Type).To(Equal(field.ErrorTypeNotSupported))
+		Expect(errList[0].Field).To(Equal("spec.containerResizePolicy[0].resourceName"))
+	})
+
+	It("fails validation with duplicate resource names", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.NotRequired,
+					},
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(HaveLen(1))
+		Expect(errList[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(errList[0].Field).To(Equal("spec.containerResizePolicy[1].resourceName"))
+	})
+
+	It("fails validation with empty restart policy", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: "",
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(HaveLen(1))
+		Expect(errList[0].Type).To(Equal(field.ErrorTypeRequired))
+		Expect(errList[0].Field).To(Equal("spec.containerResizePolicy[0].restartPolicy"))
+	})
+
+	It("fails validation with invalid restart policy", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ContainerResizePolicy: []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: "InvalidPolicy",
+					},
+				},
+			},
+		}
+
+		errList := v.validateContainerResizePolicy(cluster)
+		Expect(errList).To(HaveLen(1))
+		Expect(errList[0].Type).To(Equal(field.ErrorTypeNotSupported))
+		Expect(errList[0].Field).To(Equal("spec.containerResizePolicy[0].restartPolicy"))
+	})
+})
