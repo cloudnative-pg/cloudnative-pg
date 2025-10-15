@@ -71,6 +71,26 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
 	})
 
+	It("ignores internal configs in config hash", func() {
+		info := ConfigurationInfo{
+			Settings:           CnpgConfigurationSettings,
+			MajorVersion:       17,
+			UserSettings:       settings,
+			IncludingMandatory: true,
+		}
+		conf := CreatePostgresqlConfiguration(info)
+		confFile, sha256 := CreatePostgresqlConfFile(conf)
+		Expect(sha256).NotTo(BeEmpty())
+		Expect(confFile).To(Not(BeEmpty()))
+
+		conf.OverwriteConfig("cnpg.some_internal_setting", "some_value")
+		newConfFile, newSha256 := CreatePostgresqlConfFile(conf)
+		Expect(newSha256).NotTo(BeEmpty())
+		Expect(newConfFile).To(Not(BeEmpty()))
+		Expect(newSha256).To(Equal(sha256))
+		Expect(newConfFile).To(Not(BeEquivalentTo(confFile)))
+	})
+
 	It("is sorted by parameter name", func() {
 		settings := map[string]string{
 			"shared_buffers":  "128KB",

@@ -861,15 +861,22 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// is really irrelevant for our purposes
 	parameters := configuration.GetSortedList()
 	postgresConf := ""
+	cnpgConf := ""
 	for _, parameter := range parameters {
-		postgresConf += fmt.Sprintf(
+		line := fmt.Sprintf(
 			"%v = %v\n",
 			parameter,
 			escapePostgresConfValue(configuration.configs[parameter]))
+		if strings.HasPrefix(parameter, "cnpg.") {
+			cnpgConf += line
+		} else {
+			postgresConf += line
+		}
 	}
 
 	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf)))
-	postgresConf += fmt.Sprintf("%v = %v", CNPGConfigSha256,
+	postgresConf += cnpgConf
+	postgresConf += fmt.Sprintf("%v = %v\n", CNPGConfigSha256,
 		escapePostgresConfValue(sha256sum))
 
 	return postgresConf, sha256sum
