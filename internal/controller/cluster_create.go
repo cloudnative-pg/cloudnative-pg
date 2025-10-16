@@ -618,6 +618,9 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 	}
 	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount)
@@ -792,7 +795,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.WatchedLabelName:                "true",
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 				},
 			},
 			Data: map[string]string{
@@ -816,7 +820,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 		return nil
 	}
 
-	// The configuration changed, and we need the patch the secret we have
+	// The configuration changed, and we need the patch the configMap we have
 	patchedConfigMap := targetConfigMap.DeepCopy()
 	utils.SetOperatorVersion(&patchedConfigMap.ObjectMeta, versions.Version)
 	patchedConfigMap.Data = sourceConfigmap.Data
@@ -874,20 +878,21 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 			return err
 		}
 		// If the secret does not exist we create it
-		newConfigMap := corev1.Secret{
+		newSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      apiv1.DefaultMonitoringSecretName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.WatchedLabelName:                "true",
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 				},
 			},
 			Data: map[string][]byte{
 				apiv1.DefaultMonitoringKey: sourceSecret.Data[apiv1.DefaultMonitoringKey],
 			},
 		}
-		utils.SetOperatorVersion(&newConfigMap.ObjectMeta, versions.Version)
-		return r.Create(ctx, &newConfigMap)
+		utils.SetOperatorVersion(&newSecret.ObjectMeta, versions.Version)
+		return r.Create(ctx, &newSecret)
 	}
 
 	// We check that we own the existing configmap

@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"fmt"
+
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,9 +44,18 @@ func (c ClusterPodMonitorManager) IsPodMonitorEnabled() bool {
 
 // BuildPodMonitor builds a new PodMonitor object
 func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
+	version, _ := c.cluster.GetPostgresqlMajorVersion()
+
 	meta := metav1.ObjectMeta{
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
+		Labels: map[string]string{
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  c.cluster.Name,
+			utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+		},
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
