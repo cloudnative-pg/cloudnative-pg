@@ -860,26 +860,26 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// that we sort the configuration by parameter name as order
 	// is really irrelevant for our purposes
 	parameters := configuration.GetSortedList()
-	postgresConf := ""
-	cnpgConf := ""
+	var postgresConf strings.Builder
+	var cnpgConf strings.Builder
 	for _, parameter := range parameters {
 		line := fmt.Sprintf(
 			"%v = %v\n",
 			parameter,
 			escapePostgresConfValue(configuration.configs[parameter]))
 		if strings.HasPrefix(parameter, "cnpg.") {
-			cnpgConf += line
+			cnpgConf.WriteString(line)
 		} else {
-			postgresConf += line
+			postgresConf.WriteString(line)
 		}
 	}
 
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf)))
-	postgresConf += cnpgConf
-	postgresConf += fmt.Sprintf("%v = %v\n", CNPGConfigSha256,
-		escapePostgresConfValue(sha256sum))
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf.String())))
+	postgresConf.WriteString(cnpgConf.String())
+	postgresConf.WriteString(fmt.Sprintf("%v = %v\n", CNPGConfigSha256,
+		escapePostgresConfValue(sha256sum)))
 
-	return postgresConf, sha256sum
+	return postgresConf.String(), sha256sum
 }
 
 // escapePostgresConfValue escapes a value to make its representation
