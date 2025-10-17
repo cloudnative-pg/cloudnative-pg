@@ -42,7 +42,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore, tests.LabelBarmanCloud), func() {
 	const (
 		tableName                 = "to_restore"
 		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
@@ -555,7 +555,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 	})
 })
 
-var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tests.LabelBackupRestore, tests.LabelBarmanCloud), func() {
 	const (
 		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
 		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml.template"
