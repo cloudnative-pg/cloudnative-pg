@@ -28,8 +28,12 @@ type Secrets struct {
 	// The secret containing the credentials to be used to execute the auth_query queries.
 	AuthQuery *corev1.Secret
 
+	// The secret containing the credentials for PgBouncer to authenticate
+	// against PostgreSQL server.
+	ServerTLS *corev1.Secret
+
 	// The TLS secret that will be used for client connections (application-side)
-	Client *corev1.Secret
+	ClientTLS *corev1.Secret
 
 	// The root-CA that will be used to validate client certificates
 	ClientCA *corev1.Secret
