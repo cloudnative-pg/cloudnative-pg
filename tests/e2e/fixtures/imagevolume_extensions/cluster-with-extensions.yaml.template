@@ -20,7 +20,7 @@ spec:
         ld_library_path:
           - syslib
         image:
-          reference: ghcr.io/niccolofei/postgis:18rc1-master-trixie # wokeignore:rule=master
+          reference: ghcr.io/niccolofei/postgis:18-3.6.0-trixie
 
   bootstrap:
     initdb:
