@@ -326,6 +326,7 @@ PODNAME
 PPROF
 PV
 PVCs
+PascalBourdier
 PasswordConfiguration
 PasswordState
 PasswordStatus
@@ -554,6 +555,7 @@ WALs
 Wadle
 WalBackupConfiguration
 WalClassName
+Wallner
 XXu
 YXBw
 YY
@@ -786,6 +788,7 @@ defaultPoolSize
 demotionToken
 deployer
 deploymentStrategy
+dereference
 destinationPath
 dev
 devel
@@ -890,6 +893,7 @@ gosec
 govulncheck
 grafana
 gzip
+hardcoded
 hashicorp
 hba
 hdr
@@ -1414,6 +1418,7 @@ targetXID
 tbody
 tcp
 td
+templating
 temporaryData
 terminationGracePeriodSeconds
 th
