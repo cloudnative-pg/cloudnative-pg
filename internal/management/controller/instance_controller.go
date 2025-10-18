@@ -594,7 +594,7 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 		return false, err
 	}
 
-	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
+	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
 	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
 	// The fast shutdown process will be preceded by a CHECKPOINT.
