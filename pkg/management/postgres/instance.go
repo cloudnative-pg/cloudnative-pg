@@ -1448,38 +1448,40 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	}
 }
 
-// tryCheckpointBeforeShutdown attempts to issue a checkpoint before shutdown if the instance is a primary.
+// tryCheckpointBeforeShutdown attempts to issue a checkpoint before shutdown.
+// This is skipped if the instance is not a primary or if an immediate shutdown is requested.
 // This reduces shutdown time and subsequent promotion time for replicas, especially for systems with high
 // checkpoint_timeout.
 // All outcomes (success, failure, or skipped) are logged appropriately.
 func (instance *Instance) tryCheckpointBeforeShutdown(ctx context.Context, mode shutdownMode) {
 	contextLogger := log.FromContext(ctx).WithName("checkpoint_before_shutdown")
-	contextLogger.Info("Trying to issue a checkpoint")
+	contextLogger.Info("Attempting checkpoint before shutdown")
 
 	if mode == shutdownModeImmediate {
-		contextLogger.Info("Checkpoint skipped, immediate shutdown requested")
+		contextLogger.Info("Skipping checkpoint: immediate shutdown requested")
 		return
 	}
 
 	isPrimary, err := instance.IsPrimary()
 	if err != nil {
-		contextLogger.Error(err, "while determining instance role")
+		contextLogger.Error(err, "Failed to determine instance role, skipping checkpoint")
 		return
 	}
 
 	if !isPrimary {
-		contextLogger.Info("Checkpoint skipped, instance is not primary")
+		contextLogger.Info("Skipping checkpoint: instance is not primary")
 		return
 	}
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
-		contextLogger.Error(err, "Checkpoint failed while fetching super user db")
+		contextLogger.Error(err, "Failed to get superuser DB connection, skipping checkpoint")
 		return
 	}
 
+	contextLogger.Info("Executing CHECKPOINT command before shutdown")
 	if _, err = db.ExecContext(ctx, "CHECKPOINT"); err != nil {
-		contextLogger.Error(err, "Checkpoint execution failed")
+		contextLogger.Error(err, "Failed to execute CHECKPOINT command")
 		return
 	}
 
