@@ -339,6 +339,13 @@ func (r *BackupReconciler) checkPrerequisites(
 		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return &ctrl.Result{}, err
 	}
+
+	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
+		string(utils.HibernationAnnotationValueOn) {
+		const message = "cannot proceed with the backup as the cluster has hibernation enabled"
+		return flagMissingPrerequisite(message, "ClusterIsHibernated")
+	}
+
 	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if len(cluster.Spec.Plugins) == 0 {
 			const message = "cannot proceed with the backup as the cluster has no plugin configured"
