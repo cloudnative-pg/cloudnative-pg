@@ -60,7 +60,8 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 
 
 
-<p>Cluster is the Schema for the PostgreSQL API</p>
+<p>Cluster defines the API schema for a highly available PostgreSQL database cluster
+managed by CloudNativePG.</p>
 
 
 <table class="table">
@@ -1565,7 +1566,8 @@ Changing this option will force a rollout of all instances.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterSpec defines the desired state of Cluster</p>
+<p>ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
@@ -1989,7 +1991,8 @@ in the PostgreSQL Pods.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterStatus defines the observed state of Cluster</p>
+<p>ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
