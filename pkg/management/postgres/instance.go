@@ -511,10 +511,9 @@ func (instance *Instance) ShutdownConnections() {
 	}
 }
 
-// Shutdown shuts down a PostgreSQL instance which was previously started
-// with Startup.
-// This function will return an error whether PostgreSQL is still up
-// after the shutdown request.
+// Shutdown stops a PostgreSQL instance that was previously started with Startup.
+// Before shutting down, it attempts to execute a CHECKPOINT.
+// The function returns an error if PostgreSQL remains running after the shutdown request.
 func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -560,9 +559,9 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 	return nil
 }
 
-// TryShuttingDownSmartFast first tries to shut down the instance with mode smart,
-// then in case of failure or the given timeout expiration,
-// it will issue a fast shutdown request and wait for it to complete.
+// TryShuttingDownSmartFast first attempts to shut down the instance using the "smart" mode,
+// which is preceded by a CHECKPOINT. If this fails or the specified timeout expires,
+// it issues an "fast" shutdown request and waits for completion.
 func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -610,10 +609,10 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 	return nil
 }
 
-// TryShuttingDownFastImmediate first tries to shut down the instance with mode fast,
-// then in case of failure or the given timeout expiration,
-// it will issue an immediate shutdown request and wait for it to complete.
-// N.B. immediate shutdown can cause data loss.
+// TryShuttingDownFastImmediate first attempts to shut down the instance using the "fast" mode,
+// which is preceded by a CHECKPOINT. If this fails or the specified timeout expires,
+// it issues an "immediate" shutdown request and waits for completion.
+// Note: an immediate shutdown may lead to data loss.
 func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
