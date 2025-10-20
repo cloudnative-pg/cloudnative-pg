@@ -20,32 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package cache
 
 import (
-	"slices"
-	"sync"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-var cache sync.Map
+func TestCache(t *testing.T) {
+	RegisterFailHandler(Fail)
 
-// Store write an object into the local cache
-func Store(c string, v interface{}) {
-	cache.Store(c, v)
-}
-
-// Delete an object from the local cache
-func Delete(c string) {
-	cache.Delete(c)
-}
-
-// LoadEnv loads a key from the local cache
-func LoadEnv(c string) ([]string, error) {
-	value, ok := cache.Load(c)
-	if !ok {
-		return nil, ErrCacheMiss
-	}
-
-	if v, ok := value.([]string); ok {
-		return slices.Clone(v), nil
-	}
-
-	return nil, ErrUnsupportedObject
+	RunSpecs(t, "Internal Management Cache Test Suite")
 }
