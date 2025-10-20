@@ -193,9 +193,9 @@ to 180 and 1800 seconds, respectively.
 
 The shutdown procedure is composed of two steps:
 
-1. The instance manager requests a **smart** shut down, disallowing any
-new connection to PostgreSQL. This step will last for up to
-`.spec.smartShutdownTimeout` seconds.
+1. The instance manager first issues a `CHECKPOINT`, then initiates a **smart**
+shut down, disallowing any new connection to PostgreSQL. This step will last
+for up to `.spec.smartShutdownTimeout` seconds.
 
 2. If PostgreSQL is still up, the instance manager requests a **fast**
 shut down, terminating any existing connection and exiting promptly.
@@ -212,10 +212,11 @@ seconds.
 
 ### Shutdown of the primary during a switchover
 
-During a switchover, the shutdown procedure is slightly different from the
-general case. Indeed, the operator requires the former primary to issue a
-**fast** shut down before the selected new primary can be promoted,
-in order to ensure that all the data are available on the new primary.
+During a switchover, the shutdown procedure slightly differs from the general
+case. The instance manager of the former primary first issues a `CHECKPOINT`,
+then initiates a **fast** shutdown of PostgreSQL before the designated new
+primary is promoted, ensuring that all data are safely available on the new
+primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
 the  time given to the former primary to shut down gracefully and archive all
