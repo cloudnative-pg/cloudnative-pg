@@ -203,7 +203,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				timeout := 240
 				Eventually(func(g Gomega) {
 					operatorPod, err := operator.GetPod(env.Ctx, env.Client)
-					Expect(err).ToNot(HaveOccurred())
+					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(operatorPod.Name).NotTo(BeEquivalentTo(operatorPodName))
 					g.Expect(operator.IsReady(env.Ctx, env.Client, true)).To(BeTrue())
 				}, timeout).Should(Succeed())
