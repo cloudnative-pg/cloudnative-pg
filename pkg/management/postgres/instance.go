@@ -498,18 +498,19 @@ func (instance *Instance) ShutdownConnections() {
 	}
 }
 
-// Shutdown shuts down a PostgreSQL instance which was previously started
-// with Startup.
-// This function will return an error whether PostgreSQL is still up
-// after the shutdown request.
+// Shutdown stops a PostgreSQL instance that was previously started with Startup.
+// Before shutting down, it attempts to execute a CHECKPOINT.
+// The function returns an error if PostgreSQL remains running after the shutdown request.
 func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
 	contextLogger := log.FromContext(ctx)
-	instance.ShutdownConnections()
 
 	// check instance status
 	if !instance.isStatusRunning() {
 		return fmt.Errorf("instance is not running")
 	}
+
+	instance.tryCheckpointBeforeShutdown(ctx, options.Mode)
+	instance.ShutdownConnections()
 
 	pgCtlOptions := []string{
 		"-D",
@@ -545,9 +546,9 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 	return nil
 }
 
-// TryShuttingDownSmartFast first tries to shut down the instance with mode smart,
-// then in case of failure or the given timeout expiration,
-// it will issue a fast shutdown request and wait for it to complete.
+// TryShuttingDownSmartFast first attempts to shut down the instance using the "smart" mode,
+// which is preceded by a CHECKPOINT. If this fails or the specified timeout expires,
+// it issues an "fast" shutdown request and waits for completion.
 func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -595,10 +596,10 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 	return nil
 }
 
-// TryShuttingDownFastImmediate first tries to shut down the instance with mode fast,
-// then in case of failure or the given timeout expiration,
-// it will issue an immediate shutdown request and wait for it to complete.
-// N.B. immediate shutdown can cause data loss.
+// TryShuttingDownFastImmediate first attempts to shut down the instance using the "fast" mode,
+// which is preceded by a CHECKPOINT. If this fails or the specified timeout expires,
+// it issues an "immediate" shutdown request and waits for completion.
+// Note: an immediate shutdown may lead to data loss.
 func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -1360,4 +1361,44 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	default:
 		return false, fmt.Errorf("unrecognized request: %s", req)
 	}
+}
+
+// tryCheckpointBeforeShutdown attempts to issue a checkpoint before shutdown.
+// This is skipped if the instance is not a primary or if an immediate shutdown is requested.
+// This reduces shutdown time and subsequent promotion time for replicas, especially for systems with high
+// checkpoint_timeout.
+// All outcomes (success, failure, or skipped) are logged appropriately.
+func (instance *Instance) tryCheckpointBeforeShutdown(ctx context.Context, mode shutdownMode) {
+	contextLogger := log.FromContext(ctx).WithName("checkpoint_before_shutdown")
+	contextLogger.Info("Attempting checkpoint before shutdown")
+
+	if mode == shutdownModeImmediate {
+		contextLogger.Info("Skipping checkpoint: immediate shutdown requested")
+		return
+	}
+
+	isPrimary, err := instance.IsPrimary()
+	if err != nil {
+		contextLogger.Error(err, "Failed to determine instance role, skipping checkpoint")
+		return
+	}
+
+	if !isPrimary {
+		contextLogger.Info("Skipping checkpoint: instance is not primary")
+		return
+	}
+
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		contextLogger.Error(err, "Failed to get superuser DB connection, skipping checkpoint")
+		return
+	}
+
+	contextLogger.Info("Executing CHECKPOINT command before shutdown")
+	if _, err = db.ExecContext(ctx, "CHECKPOINT"); err != nil {
+		contextLogger.Error(err, "Failed to execute CHECKPOINT command")
+		return
+	}
+
+	contextLogger.Info("Checkpoint completed successfully")
 }
