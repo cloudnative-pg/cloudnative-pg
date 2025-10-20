@@ -552,23 +552,11 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 		return false, err
 	}
 
-	contextLogger.Info("This is an old primary node. Requesting a checkpoint before demotion")
+	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		contextLogger.Error(err, "Cannot connect to primary server")
-	} else {
-		_, err = db.Exec("CHECKPOINT")
-		if err != nil {
-			contextLogger.Error(err, "Error while requesting a checkpoint")
-		}
-	}
-
-	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
-
-	// Here we need to invoke a fast shutdown on the instance, and wait the instance
-	// manager to be stopped.
-	// When the Pod will restart, we will demote as a replica of the new primary
+	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
+	// The fast shutdown process will be preceded by a CHECKPOINT.
+	// When the Pod restarts, it will be demoted to act as a replica of the new primary.
 	r.Instance().RequestFastImmediateShutdown()
 
 	// We wait for the lifecycle manager to have received the immediate shutdown request
