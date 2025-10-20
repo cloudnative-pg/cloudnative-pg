@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package cache
 
 import (
+	"slices"
 	"sync"
 )
 
@@ -43,8 +44,7 @@ func LoadEnv(c string) ([]string, error) {
 	}
 
 	if v, ok := value.([]string); ok {
-		clone := append([]string(nil), v...)
-		return clone, nil
+		return slices.Clone(v), nil
 	}
 
 	return nil, ErrUnsupportedObject
