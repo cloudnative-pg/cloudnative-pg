@@ -201,7 +201,8 @@ type ImageCatalogRef struct {
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
 
-// ClusterSpec defines the desired state of Cluster
+// ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
 	// +optional
@@ -720,7 +721,8 @@ type AvailableArchitecture struct {
 	Hash string `json:"hash"`
 }
 
-// ClusterStatus defines the observed state of Cluster
+// ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
 	// +optional
@@ -2331,7 +2333,8 @@ type RoleConfiguration struct {
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
 
-// Cluster is the Schema for the PostgreSQL API
+// Cluster defines the API schema for a highly available PostgreSQL database cluster
+// managed by CloudNativePG.
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

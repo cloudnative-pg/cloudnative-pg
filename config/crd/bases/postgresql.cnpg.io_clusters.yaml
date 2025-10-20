@@ -37,7 +37,9 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: Cluster is the Schema for the PostgreSQL API
+        description: |-
+          Cluster defines the API schema for a highly available PostgreSQL database cluster
+          managed by CloudNativePG.
         properties:
           apiVersion:
             description: |-
