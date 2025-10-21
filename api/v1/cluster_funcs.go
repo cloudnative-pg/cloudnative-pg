@@ -1149,12 +1149,9 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if cluster.Status.PoolerIntegrations != nil {
-		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
-			if pgBouncerSecretName == secret {
-				return true
-			}
-		}
+	if cluster.Status.PoolerIntegrations != nil &&
+		slices.Contains(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets, secret) {
+		return true
 	}
 
 	// watch the secrets defined in external clusters
@@ -1201,7 +1198,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	contextLogger := log.FromContext(ctx)
 
 	currentTimestamp := pgTime.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
+	keysAndValues := []any{
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
 		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
