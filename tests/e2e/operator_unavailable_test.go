@@ -206,6 +206,8 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(operatorPod.Name).NotTo(BeEquivalentTo(operatorPodName))
 					g.Expect(operator.IsReady(env.Ctx, env.Client, true)).To(BeTrue())
+					g.Expect(operator.PodRestarted(operatorPod)).To(BeFalse(),
+						"operator pod should not have any container restarts")
 				}, timeout).Should(Succeed())
 			})
 
