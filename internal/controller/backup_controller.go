@@ -169,6 +169,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
+		string(utils.HibernationAnnotationValueOn) {
+		message := "cannot backup a hibernated cluster"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterIsHibernated", message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
+		return ctrl.Result{}, nil
+	}
+
 	// Load the required plugins
 	pluginClient, err := cnpgiClient.WithPlugins(
 		ctx,
