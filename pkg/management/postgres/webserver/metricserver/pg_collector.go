@@ -317,7 +317,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect implements prometheus.Collector, collecting the Metrics values to
-// export. Note that those metrics are updated in the updatePgMetrics function
+// export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("collecting Postgres instance metrics")
 	e.updateInstanceMetrics()
