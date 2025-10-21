@@ -1104,12 +1104,9 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if cluster.Status.PoolerIntegrations != nil {
-		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
-			if pgBouncerSecretName == secret {
-				return true
-			}
-		}
+	if cluster.Status.PoolerIntegrations != nil &&
+		slices.Contains(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets, secret) {
+		return true
 	}
 
 	// watch the secrets defined in external clusters
@@ -1153,15 +1150,14 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
 func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
-	contextLogger := log.FromContext(ctx)
-
 	currentTimestamp := pgTime.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
+
+	contextLogger := log.FromContext(ctx).WithValues(
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
 		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
 		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-	}
+	)
 
 	var errs []string
 
@@ -1170,11 +1166,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceTargetPrimaryTimestamp",
-			diff.Milliseconds(),
-		)
+		contextLogger = contextLogger.WithValues("msPassedSinceTargetPrimaryTimestamp", diff.Milliseconds())
 	} else {
 		errs = append(errs, err.Error())
 	}
@@ -1184,9 +1176,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.CurrentPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceCurrentPrimaryTimestamp",
+		contextLogger = contextLogger.WithValues("msPassedSinceCurrentPrimaryTimestamp",
 			currentPrimaryDifference.Milliseconds(),
 		)
 	} else {
@@ -1201,8 +1191,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		cluster.Status.CurrentPrimaryTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
+		contextLogger = contextLogger.WithValues(
 			"msDifferenceBetweenCurrentAndTargetPrimary",
 			currentPrimaryTargetDifference.Milliseconds(),
 		)
@@ -1211,10 +1200,10 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	if len(errs) > 0 {
-		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+		contextLogger = contextLogger.WithValues("timestampParsingErrors", errs)
 	}
 
-	contextLogger.Info(logMessage, keysAndValues...)
+	contextLogger.Info(logMessage)
 }
 
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
