@@ -158,18 +158,20 @@ var _ = Describe("PodMonitor test", func() {
 		expectedEndpoint := monitoringv1.PodMetricsEndpoint{
 			Port:   &metricsPort,
 			Scheme: "https",
-			TLSConfig: &monitoringv1.SafeTLSConfig{
-				CA: monitoringv1.SecretOrConfigMap{
-					Secret: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "test-ca",
+			HTTPConfig: monitoringv1.HTTPConfig{
+				TLSConfig: &monitoringv1.SafeTLSConfig{
+					CA: monitoringv1.SecretOrConfigMap{
+						Secret: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "test-ca",
+							},
+							Key: certs.CACertKey,
 						},
-						Key: certs.CACertKey,
 					},
+					Cert:               monitoringv1.SecretOrConfigMap{},
+					ServerName:         ptr.To(cluster.GetServiceReadWriteName()),
+					InsecureSkipVerify: ptr.To(true),
 				},
-				Cert:               monitoringv1.SecretOrConfigMap{},
-				ServerName:         ptr.To(cluster.GetServiceReadWriteName()),
-				InsecureSkipVerify: ptr.To(true),
 			},
 		}
 
