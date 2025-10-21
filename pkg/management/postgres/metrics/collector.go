@@ -59,10 +59,12 @@ type QueriesCollector struct {
 	errorUserQueriesGauge prometheus.Gauge
 
 	computedMetrics []prometheus.Metric
+	timeLastUpdated time.Time
 
-	// metricsMu guards access to computedMetrics and error metrics to avoid
-	// races between Update (writer) and Collect (reader)
-	metricsMu sync.RWMutex
+	// metricsMutex guards access to computedMetrics, error metrics, and timestamp
+	// of last update,
+	// to avoid races between Update (writer) and Collect (reader)
+	metricsMutex sync.RWMutex
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
@@ -74,10 +76,10 @@ var isPathPattern = regexp.MustCompile(`[][*?]`)
 
 // Update recomputes the metrics from the user queries
 func (q *QueriesCollector) Update() error {
-	// Start a fresh error state for this cycle
-	q.metricsMu.Lock()
-	defer q.metricsMu.Unlock()
+	q.metricsMutex.Lock()
+	defer q.metricsMutex.Unlock()
 
+	// Start a fresh error state for this cycle
 	q.errorUserQueriesGauge.Set(0)
 	q.errorUserQueries.Reset()
 
@@ -89,7 +91,16 @@ func (q *QueriesCollector) Update() error {
 	}
 
 	q.createMetricsFromUserQueries(isPrimary)
+	q.timeLastUpdated = time.Now()
 	return nil
+}
+
+// ShouldUpdate finds if the metrics from queries need to be rerun,
+// or the cached values can be used
+func (q *QueriesCollector) ShouldUpdate(ttl time.Duration) bool {
+	q.metricsMutex.Lock()
+	defer q.metricsMutex.Unlock()
+	return q.timeLastUpdated.IsZero() || time.Since(q.timeLastUpdated) > ttl
 }
 
 // Collect sends the pre-computed metrics to the output channel.
@@ -97,8 +108,8 @@ func (q *QueriesCollector) Update() error {
 // fetched from the database during collection.
 func (q *QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	// Guard the snapshot read and error metrics collection
-	q.metricsMu.RLock()
-	defer q.metricsMu.RUnlock()
+	q.metricsMutex.RLock()
+	defer q.metricsMutex.RUnlock()
 	for _, m := range q.computedMetrics {
 		ch <- m
 	}

@@ -1462,7 +1462,7 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 				g.Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_test_rows{datname="%v"} 1`,
 					targetSecret))).Should(BeTrue(),
 					"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			}, testTimeouts[timeouts.MetricsRefreshInterval]).To(Succeed())
+			}, testTimeouts[timeouts.Short]).To(Succeed())
 
 			if pod.Name != cluster.Status.CurrentPrimary {
 				continue
@@ -2508,7 +2508,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(
 								"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
 					}
 				}
-			}, testTimeouts[timeouts.MetricsRefreshInterval]).Should(Succeed())
+			}, testTimeouts[timeouts.Short]).Should(Succeed())
 		}
 	})
 }
@@ -2564,7 +2564,7 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 						"Metric collection issues on pod %v."+
 							"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
 				}
-			}, testTimeouts[timeouts.MetricsRefreshInterval]).To(Succeed())
+			}, testTimeouts[timeouts.Short]).To(Succeed())
 		}
 	})
 }

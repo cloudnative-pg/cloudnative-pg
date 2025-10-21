@@ -4000,11 +4000,13 @@ you need this functionality, you can create a PodMonitor manually.</p>
 you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
-<tr><td><code>refreshInterval</code><br/>
+<tr><td><code>metricsQueriesTTL</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
 </td>
 <td>
-   <p>The interval between updates of the monitoring query metrics.
+   <p>The interval during which metrics computed from queries are considered current.
+Once it is exceeded, a new scrape will trigger a rerun
+of the queries.
 If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.</p>
 </td>
 </tr>

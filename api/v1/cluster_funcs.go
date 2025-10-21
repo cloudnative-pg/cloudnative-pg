@@ -1184,14 +1184,15 @@ func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	return false
 }
 
-// GetMetricsRefreshInterval returns the interval between updates of the metrics queries.
+// GetMetricsQueriesTTL returns the Time To Live of the metrics computed from
+// queries. Once exceeded, a scrape of the metric will trigger a rerun of the queries.
 // Default value is 30 seconds
-func (cluster *Cluster) GetMetricsRefreshInterval() *metav1.Duration {
-	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.RefreshInterval != nil {
-		return cluster.Spec.Monitoring.RefreshInterval
+func (cluster *Cluster) GetMetricsQueriesTTL() metav1.Duration {
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.MetricsQueriesTTL != nil {
+		return *cluster.Spec.Monitoring.MetricsQueriesTTL
 	}
 
-	return &metav1.Duration{
+	return metav1.Duration{
 		Duration: 30 * time.Second,
 	}
 }

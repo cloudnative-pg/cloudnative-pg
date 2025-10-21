@@ -1043,6 +1043,7 @@ memstats
 metav
 metric's
 metricNameKS
+metricsQueriesTTL
 microservice
 microservices
 microsoft
@@ -1236,7 +1237,6 @@ recoverytarget
 recv
 redefinitions
 redhat
-refreshInterval
 rehydrate
 rehydrated
 rehydration

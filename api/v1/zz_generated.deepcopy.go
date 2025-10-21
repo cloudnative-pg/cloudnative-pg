@@ -1990,8 +1990,8 @@ func (in *MonitoringConfiguration) DeepCopyInto(out *MonitoringConfiguration) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.RefreshInterval != nil {
-		in, out := &in.RefreshInterval, &out.RefreshInterval
+	if in.MetricsQueriesTTL != nil {
+		in, out := &in.MetricsQueriesTTL, &out.MetricsQueriesTTL
 		*out = new(metav1.Duration)
 		**out = **in
 	}
