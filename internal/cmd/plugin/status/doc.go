@@ -18,4 +18,5 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 // Package status implements the kubectl-cnpg status command
+// +kubebuilder:skip
 package status
