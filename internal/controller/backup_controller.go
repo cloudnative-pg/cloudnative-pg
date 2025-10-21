@@ -342,7 +342,7 @@ func (r *BackupReconciler) checkPrerequisites(
 
 	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
 		string(utils.HibernationAnnotationValueOn) {
-		const message = "cannot proceed with the backup as the cluster has hibernation enabled"
+		const message = "cannot backup a hibernated cluster"
 		return flagMissingPrerequisite(message, "ClusterIsHibernated")
 	}
 
