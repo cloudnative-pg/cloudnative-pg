@@ -60,13 +60,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		postgisEntry           = "postgis"
 		postgresqlEntry        = "postgresql"
 		postgresqlMinimalEntry = "postgresql-minimal"
+
 		// custom registry envs
 		customPostgresImageRegistryEnvVar = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
 		customPostgisImageRegistryEnvVar  = "POSTGIS_MAJOR_UPGRADE_IMAGE_REGISTRY"
-	)
 
-	// PostgisImageRepository is the default repository for Postgis container images
-	var (
+		// PostgisImageRepository is the default repository for Postgis container images
 		PostgisImageRepository = "ghcr.io/cloudnative-pg/postgis"
 	)
 
