@@ -130,7 +130,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 						expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
 						assertIncludesMetrics(g, out, expectedMetrics)
 						return nil
-					}, testTimeouts[timeouts.MetricsRefreshInterval]).Should(Succeed())
+					}, testTimeouts[timeouts.Short]).Should(Succeed())
 				})
 			}
 		})
@@ -245,7 +245,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 						assertIncludesMetrics(g, out, expectedMetrics)
 						assertExcludesMetrics(g, out, nonCollectableMetrics)
 						return nil
-					}, testTimeouts[timeouts.MetricsRefreshInterval]).Should(Succeed())
+					}, testTimeouts[timeouts.Short]).Should(Succeed())
 				})
 			}
 		})
@@ -367,7 +367,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 						fmt.Sprintf("while getting pod metrics for pod: %v", pod.Name))
 					g.Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric),
 						fmt.Sprintf("expected metric %v not found in pod %v", expectedMetric, pod.Name))
-				}, testTimeouts[timeouts.MetricsRefreshInterval]).Should(Succeed())
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 			}
 		})
 

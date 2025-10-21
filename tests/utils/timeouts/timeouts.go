@@ -55,7 +55,6 @@ const (
 	VolumeSnapshotIsReady     Timeout = "volumeSnapshotIsReady"
 	Short                     Timeout = "short"
 	ManagedServices           Timeout = "managedServices"
-	MetricsRefreshInterval    Timeout = "metricsRefreshSeconds"
 )
 
 // DefaultTestTimeouts contains the default timeout in seconds for various events
@@ -78,7 +77,6 @@ var DefaultTestTimeouts = map[Timeout]int{
 	VolumeSnapshotIsReady:     300,
 	Short:                     5,
 	ManagedServices:           30,
-	MetricsRefreshInterval:    40,
 }
 
 // Timeouts returns the map of timeouts, where each event gets the timeout specified

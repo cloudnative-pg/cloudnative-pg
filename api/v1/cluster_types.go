@@ -2223,10 +2223,12 @@ type MonitoringConfiguration struct {
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 
-	// The interval between updates of the monitoring query metrics.
+	// The interval during which metrics computed from queries are considered current.
+	// Once it is exceeded, a new scrape will trigger a rerun
+	// of the queries.
 	// If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
 	// +optional
-	RefreshInterval *metav1.Duration `json:"refreshInterval,omitempty"`
+	MetricsQueriesTTL *metav1.Duration `json:"metricsQueriesTTL,omitempty"`
 }
 
 // ClusterMonitoringTLSConfiguration is the type containing the TLS configuration

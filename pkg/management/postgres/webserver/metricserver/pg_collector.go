@@ -319,10 +319,44 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector, collecting the Metrics values to
 // export. Note that those metrics are updated in the updatePgMetrics function
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	log.Debug("collecting pgmetrics")
+	log.Debug("collecting Postgres instance metrics")
+	e.updateInstanceMetrics()
+	e.collectInstanceMetrics(ch)
+
 	if e.queries != nil {
+		var TTL *metav1.Duration
+		if cluster, _ := e.getCluster(); cluster != nil {
+			ttl := cluster.GetMetricsQueriesTTL()
+			TTL = &ttl
+		}
+		// if we can't get the cluster, we recompute the queries just to be safe
+		if TTL == nil || e.queries.ShouldUpdate(TTL.Duration) {
+			e.updateMetricsFromQueries()
+		} else {
+			log.Debug("using cached metrics from queries, as TTL is not exceeded")
+		}
+		log.Debug("collecting metrics from queries")
 		e.queries.Collect(ch)
 	}
+}
+
+func (e *Exporter) updateMetricsFromQueries() {
+	// Work on predefined metrics and custom queries
+	label := "Collect." + e.queries.Name()
+	collectionStart := time.Now()
+	log.Debug("updating metrics from queries")
+	if err := e.queries.Update(); err != nil {
+		log.Error(err, "Error during query update", "collector", e.queries.Name())
+		e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
+		e.Metrics.Error.Set(1)
+	}
+	log.Debug("created metrics from user queries",
+		"duration", time.Since(collectionStart).Seconds())
+	e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
+}
+
+// collectInstanceMetrics sends the computed instance metrics to the channel
+func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.CollectionsTotal
 	ch <- e.Metrics.Error
 	e.Metrics.PgCollectionErrors.Collect(ch)
@@ -362,44 +396,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// Start starts a loop to refresh pgMetrics, such that it obeys the
-// Runnable interface
-func (e *Exporter) Start(ctx context.Context) error {
-	contextLogger := log.FromContext(ctx)
-	interval := &metav1.Duration{
-		Duration: 30 * time.Second,
-	}
-	ticker := time.NewTicker(interval.Duration)
-
-	go func() {
-		contextLogger.Info("Starting metrics update loop", "interval", interval.Duration)
-		cluster, err := e.getCluster()
-		if err == nil && cluster.GetMetricsRefreshInterval() != interval {
-			interval = cluster.GetMetricsRefreshInterval()
-			ticker.Reset(interval.Duration)
-			contextLogger.Info("Updated refresh interval", "interval", interval.Duration)
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				contextLogger.Info("context cancelled for metrics refresh")
-				return
-			case t := <-ticker.C:
-				contextLogger.Info("metrics update tick", "time", t)
-				e.updatePgMetrics()
-			}
-		}
-	}()
-
-	contextLogger.Info("Metric refresh loop stopped")
-
-	return nil
-}
-
-// updatePgMetrics updates instance metrics and userQuery-derived metrics
-// NOTE: it runs on each scrape of the prometheus endpoint
-func (e *Exporter) updatePgMetrics() {
+// updateInstanceMetrics updates metrics from the instance manager
+func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
@@ -434,21 +432,6 @@ func (e *Exporter) updatePgMetrics() {
 	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
-
-	// Work on predefined metrics and custom queries
-	if e.queries != nil {
-		label := "Collect." + e.queries.Name()
-		collectionStart := time.Now()
-		log.Debug("updating metric queries")
-		if err := e.queries.Update(); err != nil {
-			log.Error(err, "Error during query update", "collector", e.queries.Name())
-			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
-			e.Metrics.Error.Set(1)
-		}
-		log.Debug("created metrics from user queries",
-			"duration", time.Since(collectionStart).Seconds())
-		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
-	}
 
 	isPrimary, err := e.instance.IsPrimary()
 	if err != nil {

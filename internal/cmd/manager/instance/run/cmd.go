@@ -367,11 +367,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 		return err
 	}
 
-	if err = mgr.Add(metricsExporter); err != nil {
-		contextLogger.Error(err, "unable to add metricsExporter updater runnable")
-		return err
-	}
-
 	contextLogger.Info("starting tablespace manager")
 	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
 		SetupWithManager(mgr); err != nil {
