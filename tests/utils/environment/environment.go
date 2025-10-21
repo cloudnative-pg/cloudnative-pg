@@ -69,6 +69,8 @@ type TestingEnvironment struct {
 	Ctx                context.Context
 	Scheme             *runtime.Scheme
 	Log                logr.Logger
+	PostgresImageName  string
+	PostgresImageTag   string
 	PostgresVersion    uint64
 	createdNamespaces  *uniqueStringSlice
 }
@@ -122,11 +124,14 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 
 	postgresImage := versions.DefaultImageName
 
-	// Fetching postgres image version.
+	// Fetching postgres image.
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
 		postgresImage = postgresImageFromUser
 	}
 	imageReference := reference.New(postgresImage)
+	env.PostgresImageName = imageReference.Name
+	env.PostgresImageTag = imageReference.Tag
+
 	postgresImageVersion, err := version.FromTag(imageReference.Tag)
 	if err != nil {
 		return nil, err
