@@ -618,10 +618,12 @@ func TestBarmanConnectivity(
 	env := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;",
 		postgres.BarmanBackupEndpointCACertificateLocation, minioID, minioKey)
 
-	cmd := fmt.Sprintf("barman-cloud-check-wal-archive --cloud-provider aws-s3 --endpoint-url https://%s:9000"+
-		" s3://cluster-backups/ %s --test", minioSvcName, clusterName)
+	endpointURL := fmt.Sprintf("https://%s:9000", minioSvcName)
+	destinationPath := fmt.Sprintf("s3://%s/", "not-evaluated")
+	cmd := fmt.Sprintf("barman-cloud-check-wal-archive --cloud-provider aws-s3 --endpoint-url %s %s %s --test",
+		endpointURL, destinationPath, clusterName)
 
-	_, _, err := run.Unchecked(fmt.Sprintf(
+	stdout, stderr, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%s %s\"",
 		namespace,
 		primaryPodName,
@@ -629,7 +631,7 @@ func TestBarmanConnectivity(
 		cmd,
 	))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("barman connectivity test failed: %w (stdout: %s, stderr: %s)", err, stdout, stderr)
 	}
 	return true, nil
 }
