@@ -1788,3 +1788,211 @@ var _ = Describe("Failover quorum", func() {
 		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
 })
+
+var _ = Describe("GetPodSecurityContext", func() {
+	It("returns defaults when Spec.PodSecurityContext is nil", func() {
+		cluster := Cluster{}
+		sc := cluster.GetPodSecurityContext()
+
+		Expect(sc).ToNot(BeNil())
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+	})
+
+	It("merges only selected fields when user provides a partial PodSecurityContext", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					RunAsUser: ptr.To(int64(1000)),
+				},
+			},
+		}
+
+		sc := cluster.GetPodSecurityContext()
+		// Provided RunAsUser is preserved
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(1000)))
+		// RunAsGroup is merged from defaults
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		// SeccompProfile is filled from defaults
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		// Fields not merged remain as provided (nil)
+		Expect(sc.FSGroup).To(BeNil())
+		Expect(sc.RunAsNonRoot).To(BeNil())
+	})
+
+	It("honors Cluster.Spec.SeccompProfile when PodSecurityContext.SeccompProfile is nil", func() {
+		profilePath := "/path/to/profile"
+		localhostProfile := &corev1.SeccompProfile{
+			Type:             corev1.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &profilePath,
+		}
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				SeccompProfile:     localhostProfile,
+				PodSecurityContext: &corev1.PodSecurityContext{},
+			},
+		}
+
+		sc := cluster.GetPodSecurityContext()
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile).To(BeEquivalentTo(localhostProfile))
+		Expect(sc.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+		// Non-merged fields remain nil
+		Expect(sc.FSGroup).To(BeNil())
+		Expect(sc.RunAsNonRoot).To(BeNil())
+		// Merged UID/GID come from defaults
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+	})
+
+	It("preserves FSGroup and RunAsNonRoot when user sets them", func() {
+		gid := int64(999)
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					FSGroup:      &gid,
+					RunAsNonRoot: ptr.To(true),
+				},
+			},
+		}
+
+		sc := cluster.GetPodSecurityContext()
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(999)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		// Other fields are merged
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("GetSecurityContext", func() {
+	It("returns defaults when Spec.SecurityContext is nil", func() {
+		cluster := &Cluster{}
+		sc := cluster.GetSecurityContext()
+
+		Expect(sc).ToNot(BeNil())
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeFalse())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeTrue())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeFalse())
+	})
+
+	It("merges provided partial SecurityContext with defaults", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: ptr.To(int64(1000)),
+				},
+			},
+		}
+
+		sc := cluster.GetSecurityContext()
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(1000)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeFalse())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeTrue())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeFalse())
+	})
+
+	It("honors Cluster.Spec.SeccompProfile for container security context", func() {
+		profilePath := "/path/to/container/profile"
+		localhostProfile := &corev1.SeccompProfile{
+			Type:             corev1.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &profilePath,
+		}
+		cluster := &Cluster{Spec: ClusterSpec{SeccompProfile: localhostProfile}}
+
+		sc := cluster.GetSecurityContext()
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile).To(BeEquivalentTo(localhostProfile))
+		Expect(sc.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+	})
+
+	It("does not override non-nil Capabilities, even if empty", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{},
+				},
+			},
+		}
+
+		sc := cluster.GetSecurityContext()
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(BeNil())
+		// Other defaults still merge in for nil fields
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(DefaultPostgresGID)))
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(DefaultPostgresUID)))
+	})
+
+	It("preserves boolean and capabilities settings provided by the user", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					Privileged:               ptr.To(true),
+					RunAsNonRoot:             ptr.To(false),
+					ReadOnlyRootFilesystem:   ptr.To(false),
+					AllowPrivilegeEscalation: ptr.To(true),
+					Capabilities: &corev1.Capabilities{
+						Add:  []corev1.Capability{"NET_BIND_SERVICE"},
+						Drop: []corev1.Capability{"MKNOD"},
+					},
+				},
+			},
+		}
+
+		sc := cluster.GetSecurityContext()
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeTrue())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeFalse())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeFalse())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeTrue())
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Add).To(ContainElement(corev1.Capability("NET_BIND_SERVICE")))
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("MKNOD")))
+	})
+})
