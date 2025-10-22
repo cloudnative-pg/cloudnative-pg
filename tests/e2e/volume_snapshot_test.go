@@ -222,18 +222,14 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
 				})
 
-				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
-						clusterToSnapshotName)
+				By("verify connectivity of barman to minio", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
-							minioEnv.ServiceName)
-						if err != nil {
-							return false, err
-						}
-						return connectionStatus, nil
+						connectionStatus, err := minio.TestBarmanConnectivity(
+							namespace, clusterToSnapshotName, primaryPod.Name,
+							"minio", "minio123", minioEnv.ServiceName)
+						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
 
@@ -672,18 +668,14 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
 				})
 
-				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
-						clusterToSnapshotName)
+				By("verify connectivity of barman to minio", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
-							minioEnv.ServiceName)
-						if err != nil {
-							return false, err
-						}
-						return connectionStatus, nil
+						connectionStatus, err := minio.TestBarmanConnectivity(
+							namespace, clusterToSnapshotName, primaryPod.Name,
+							"minio", "minio123", minioEnv.ServiceName)
+						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
 			})
