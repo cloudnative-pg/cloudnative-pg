@@ -210,7 +210,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			cluster.Spec.ImageName = fmt.Sprintf("%s:%s-standard-trixie", env.PostgresImageName, targetTag)
+			cluster.Spec.ImageName = env.StandardImageName(targetTag)
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log"] = "all, -misc"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_catalog"] = "off"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_parameter"] = "on"
@@ -261,7 +261,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("%s:%s-minimal-trixie", env.PostgresImageName, targetTag)
+			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
@@ -456,7 +456,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("%s:%s-minimal-trixie", env.PostgresImageName, targetTag)
+			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
