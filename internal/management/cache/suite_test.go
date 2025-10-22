@@ -17,6 +17,17 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package status implements the kubectl-cnpg status command
-// +kubebuilder:skip
-package status
+package cache
+
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+func TestCache(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Internal Management Cache Test Suite")
+}
