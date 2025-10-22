@@ -95,17 +95,6 @@ func (resources *managedResources) noInstanceIsAlive() bool {
 	return true
 }
 
-// Retrieve a PVC by name
-func (resources *managedResources) getPVC(name string) *corev1.PersistentVolumeClaim {
-	for _, pvc := range resources.pvcs.Items {
-		if name == pvc.Name {
-			return &pvc
-		}
-	}
-
-	return nil
-}
-
 // getManagedResources get the managed resources of various types
 func (r *ClusterReconciler) getManagedResources(
 	ctx context.Context,
@@ -218,29 +207,6 @@ func (r *ClusterReconciler) getManagedJobs(
 	})
 
 	return childJobs, nil
-}
-
-// Set the PvcStatusAnnotation to Ready for a PVC
-func (r *ClusterReconciler) setPVCStatusReady(
-	ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
-		return nil
-	}
-
-	contextLogger.Trace("Marking PVC as ready", "pvcName", pvc.Name)
-
-	oldPvc := pvc.DeepCopy()
-
-	if pvc.Annotations == nil {
-		pvc.Annotations = make(map[string]string, 1)
-	}
-	pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
-
-	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
 
 func (r *ClusterReconciler) updateResourceStatus(
