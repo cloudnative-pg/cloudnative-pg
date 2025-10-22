@@ -66,25 +66,26 @@ const (
 	MinimalTrixieSuffix = "minimal-trixie"
 
 	// Official CloudNativePG image repositories
-	officialPostgresImageRepository = "ghcr.io/cloudnative-pg/postgresql"
-	defaultPostGISImageRepository   = "ghcr.io/cloudnative-pg/postgis"
-	defaultPostGISVersion           = "3"
+	defaultPostgresImageRepository = "ghcr.io/cloudnative-pg/postgresql"
+	defaultPostGISImageRepository  = "ghcr.io/cloudnative-pg/postgis"
+	defaultPostGISVersion          = "3"
 )
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
-	RestClientConfig       *rest.Config
-	Client                 client.Client
-	Interface              kubernetes.Interface
-	APIExtensionClient     apiextensionsclientset.Interface
-	Ctx                    context.Context
-	Scheme                 *runtime.Scheme
-	Log                    logr.Logger
-	PostgresImageName      string
-	PostgresImageTag       string
-	PostgresVersion        uint64
-	PostGISImageRepository string
-	createdNamespaces      *uniqueStringSlice
+	RestClientConfig        *rest.Config
+	Client                  client.Client
+	Interface               kubernetes.Interface
+	APIExtensionClient      apiextensionsclientset.Interface
+	Ctx                     context.Context
+	Scheme                  *runtime.Scheme
+	Log                     logr.Logger
+	PostgresImageName       string
+	PostgresImageTag        string
+	PostgresVersion         uint64
+	PostgresImageRepository string
+	PostGISImageRepository  string
+	createdNamespaces       *uniqueStringSlice
 }
 
 type uniqueStringSlice struct {
@@ -143,6 +144,12 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	imageReference := reference.New(postgresImage)
 	env.PostgresImageName = imageReference.Name
 	env.PostgresImageTag = imageReference.Tag
+
+	// Set PostgreSQL image repository (can be overridden via env variable)
+	env.PostgresImageRepository = defaultPostgresImageRepository
+	if postgresRepoFromUser, exist := os.LookupEnv("POSTGRES_IMG_REPOSITORY"); exist {
+		env.PostgresImageRepository = postgresRepoFromUser
+	}
 
 	// Set PostGIS image repository (can be overridden via env variable)
 	env.PostGISImageRepository = defaultPostGISImageRepository
@@ -237,21 +244,21 @@ func (env *TestingEnvironment) PostGISImageName(tag string) string {
 // OfficialPostgresImageName returns the full image name for the official CloudNativePG Postgres image.
 // Example: ghcr.io/cloudnative-pg/postgresql:17
 func (env *TestingEnvironment) OfficialPostgresImageName(tag string) string {
-	return fmt.Sprintf("%s:%s", officialPostgresImageRepository, tag)
+	return fmt.Sprintf("%s:%s", defaultPostgresImageRepository, tag)
 }
 
 // OfficialStandardImageName returns the full image name for the official standard Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
 func (env *TestingEnvironment) OfficialStandardImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", officialPostgresImageRepository, tag, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", defaultPostgresImageRepository, tag, StandardTrixieSuffix)
 }
 
 // OfficialMinimalImageName returns the full image name for the official minimal Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
 func (env *TestingEnvironment) OfficialMinimalImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", officialPostgresImageRepository, tag, MinimalTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", defaultPostgresImageRepository, tag, MinimalTrixieSuffix)
 }
 
 // OfficialPostGISImageName returns the full image name for the official CloudNativePG PostGIS image.

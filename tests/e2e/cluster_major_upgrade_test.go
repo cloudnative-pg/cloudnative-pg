@@ -113,7 +113,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	generatePostgreSQLCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = env.StandardImageName(tagVersion)
+		cluster.Spec.ImageName = env.OfficialStandardImageName(tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitSQL = []string{
 			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
 			"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
@@ -124,13 +124,13 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	generatePostgreSQLMinimalCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
 		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion)
-		cluster.Spec.ImageName = env.MinimalImageName(tagVersion)
+		cluster.Spec.ImageName = env.OfficialMinimalImageName(tagVersion)
 		return cluster
 	}
 
 	generatePostGISCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = env.PostGISImageName(tagVersion)
+		cluster.Spec.ImageName = env.OfficialPostGISImageName(tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
 			"CREATE EXTENSION postgis",
 			"CREATE EXTENSION postgis_raster",
@@ -159,10 +159,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	}
 
 	determineVersionsForTesting := func() versionInfo {
-		currentImage := os.Getenv("POSTGRES_IMG")
-		Expect(currentImage).ToNot(BeEmpty())
-
-		currentVersion, err := version.FromTag(reference.New(currentImage).Tag)
+		currentVersion, err := version.FromTag(env.PostgresImageTag)
 		Expect(err).NotTo(HaveOccurred())
 		currentMajor := currentVersion.Major()
 		currentTag := strconv.FormatUint(currentMajor, 10)
@@ -185,7 +182,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			// Beta images don't have a major version only tag yet, and
 			// are most likely in the following format: "18beta1", "18rc2"
 			// So, we split at the first `-` and use that prefix to build the target image.
-			targetTag = strings.Split(reference.New(currentImage).Tag, "-")[0]
+			targetTag = strings.Split(env.PostgresImageTag, "-")[0]
 			GinkgoWriter.Printf("Using %v as the current major and upgrading to %v.\n", currentMajor, targetMajor)
 		}
 

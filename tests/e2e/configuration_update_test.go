@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -248,9 +247,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		// TODO: remove this once all E2Es run on minimal images
 		// https://github.com/cloudnative-pg/cloudnative-pg/issues/8123
-		currentImage := os.Getenv("POSTGRES_IMG")
-		Expect(currentImage).ToNot(BeEmpty())
-		targetTag = strings.Split(reference.New(currentImage).Tag, "-")[0]
+		targetTag = strings.Split(env.PostgresImageTag, "-")[0]
 	})
 
 	Context("PrimaryUpdateMethod: switchover", Ordered, func() {
