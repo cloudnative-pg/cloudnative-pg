@@ -59,29 +59,30 @@ const (
 	// RetryTimeout retry timeout (in seconds) when a client api call or kubectl cli request get failed
 	RetryTimeout = 60
 
-	// Image suffix constants
+	// StandardTrixieSuffix is the suffix for standard Trixie images
 	StandardTrixieSuffix = "standard-trixie"
-	MinimalTrixieSuffix  = "minimal-trixie"
 
-	// PostGIS configuration
-	DefaultPostGISImageRepository = "ghcr.io/cloudnative-pg/postgis"
-	DefaultPostGISVersion         = "3"
+	// MinimalTrixieSuffix is the suffix for minimal Trixie images
+	MinimalTrixieSuffix = "minimal-trixie"
+
+	defaultPostGISImageRepository = "ghcr.io/cloudnative-pg/postgis"
+	defaultPostGISVersion         = "3"
 )
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
-	RestClientConfig   *rest.Config
-	Client             client.Client
-	Interface          kubernetes.Interface
-	APIExtensionClient apiextensionsclientset.Interface
-	Ctx                context.Context
-	Scheme             *runtime.Scheme
-	Log                logr.Logger
-	PostgresImageName  string
-	PostgresImageTag   string
-	PostgresVersion    uint64
+	RestClientConfig       *rest.Config
+	Client                 client.Client
+	Interface              kubernetes.Interface
+	APIExtensionClient     apiextensionsclientset.Interface
+	Ctx                    context.Context
+	Scheme                 *runtime.Scheme
+	Log                    logr.Logger
+	PostgresImageName      string
+	PostgresImageTag       string
+	PostgresVersion        uint64
 	PostGISImageRepository string
-	createdNamespaces  *uniqueStringSlice
+	createdNamespaces      *uniqueStringSlice
 }
 
 type uniqueStringSlice struct {
@@ -142,7 +143,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.PostgresImageTag = imageReference.Tag
 
 	// Set PostGIS image repository (can be overridden via env variable)
-	env.PostGISImageRepository = DefaultPostGISImageRepository
+	env.PostGISImageRepository = defaultPostGISImageRepository
 	if postgisRepoFromUser, exist := os.LookupEnv("POSTGIS_IMG_REPOSITORY"); exist {
 		env.PostGISImageRepository = postgisRepoFromUser
 	}
@@ -228,5 +229,5 @@ func (env *TestingEnvironment) MinimalImageName(tag string) string {
 // PostGISImageName returns the full image name for a PostGIS image.
 // Example: ghcr.io/cloudnative-pg/postgis:17-3-standard-trixie
 func (env *TestingEnvironment) PostGISImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s-%s", env.PostGISImageRepository, tag, DefaultPostGISVersion, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s-%s", env.PostGISImageRepository, tag, defaultPostGISVersion, StandardTrixieSuffix)
 }
