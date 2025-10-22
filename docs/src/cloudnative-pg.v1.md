@@ -3934,8 +3934,9 @@ cluster to be reconciled</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Only one plugin can be declared as WALArchiver.
-Cannot be active if &quot;.spec.backup.barmanObjectStore&quot; configuration is present.</p>
+   <p>Marks the plugin as the WAL archiver. At most one plugin can be
+designated as a WAL archiver. This cannot be enabled if the
+<code>.spec.backup.barmanObjectStore</code> configuration is present.</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>
