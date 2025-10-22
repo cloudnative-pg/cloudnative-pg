@@ -267,12 +267,23 @@ var _ = Describe("cluster_create unit tests", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
-		By("executing createOrPatchServiceAccount (create)", func() {
+		By("executing createOrPatchServiceAccount (create) with default name", func() {
 			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		sa := &corev1.ServiceAccount{}
+
+		By("making sure that the serviceaccount has been created with cluster name", func() {
+			expectResourceExists(env.client, cluster.Name, namespace, sa)
+		})
+
+		By("executing createOrPatchServiceAccount (create)", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		sa = &corev1.ServiceAccount{}
 
 		By("making sure that the serviceaccount has been created", func() {
 			expectResourceExists(env.client, cluster.Name, namespace, sa)
@@ -332,6 +343,32 @@ var _ = Describe("cluster_create unit tests", func() {
 				}))
 				Expect(updatedSA.OwnerReferences).To(BeNil())
 			})
+		})
+	})
+
+	It("should use custom service account name when specified", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		customSAName := "custom-sa-name"
+		cluster.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+			Metadata: apiv1.Metadata{
+				Name: customSAName,
+			},
+		}
+
+		By("creating service account with custom name", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying service account exists with custom name", func() {
+			sa := &corev1.ServiceAccount{}
+			expectResourceExists(env.client, customSAName, namespace, sa)
+		})
+
+		By("verifying old default service account does not exist", func() {
+			sa := &corev1.ServiceAccount{}
+			expectResourceDoesntExist(env.client, cluster.Name, namespace, sa)
 		})
 	})
 

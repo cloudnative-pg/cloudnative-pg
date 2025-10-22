@@ -572,7 +572,8 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
 	var sa corev1.ServiceAccount
-	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
+	saName := specs.GetServiceAccountName(cluster)
+	if err := r.Get(ctx, client.ObjectKey{Name: saName, Namespace: cluster.Namespace}, &sa); err != nil {
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting service account: %w", err)
 		}
@@ -591,6 +592,10 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	if err != nil {
 		return fmt.Errorf("while generating service account: %w", err)
 	}
+
+	// Set the name to cluster.Name first (default)
+	sa.Name = cluster.Name
+
 	// we add the ownerMetadata only when creating the SA
 	cluster.SetInheritedData(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
@@ -1027,7 +1032,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
-	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
+	roleBinding := specs.CreateRoleBinding(*cluster)
 	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)

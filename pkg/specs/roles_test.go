@@ -171,6 +171,19 @@ var _ = Describe("Roles", func() {
 		Expect(serviceAccount.Rules).To(HaveLen(15))
 	})
 
+	It("uses custom service account name when specified", func() {
+		customName := "custom-sa"
+		clusterWithCustomSA := cluster
+		clusterWithCustomSA.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+			Metadata: apiv1.Metadata{
+				Name: customName,
+			},
+		}
+		role := CreateRole(clusterWithCustomSA, nil)
+		Expect(role.Name).To(Equal(customName))
+		Expect(role.Namespace).To(Equal(cluster.Namespace))
+	})
+
 	It("should contain every secret of the origin backup and backup configuration of every external cluster", func() {
 		serviceAccount := CreateRole(cluster, &backupOrigin)
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))

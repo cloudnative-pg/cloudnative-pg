@@ -198,7 +198,7 @@ func createClusterPodSpec(
 			cluster.GetPostgresGID()),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
-		ServiceAccountName:            cluster.Name,
+		ServiceAccountName:            GetServiceAccountName(&cluster),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,

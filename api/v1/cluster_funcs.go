@@ -168,6 +168,13 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 	if st == nil {
 		return
 	}
+
+	// Only override the name if a custom name is specified
+	if st.Metadata.Name != "" {
+		sa.Name = st.Metadata.Name
+	}
+	// If st.Metadata.Name is empty, keep the existing sa.Name (which should be cluster.Name)
+
 	if sa.Labels == nil {
 		sa.Labels = map[string]string{}
 	}

@@ -28,8 +28,45 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
+
+// GetServiceAccountName returns the service account name for the cluster.
+// If ServiceAccountTemplate.Metadata.Name is specified, it returns that name.
+// Otherwise, it returns the cluster name as the default.
+func GetServiceAccountName(cluster *apiv1.Cluster) string {
+	if cluster.Spec.ServiceAccountTemplate != nil &&
+		cluster.Spec.ServiceAccountTemplate.Metadata.Name != "" {
+		return cluster.Spec.ServiceAccountTemplate.Metadata.Name
+	}
+	return cluster.Name
+}
+
+// CreateRoleBindingFromMeta creates a RoleBinding when you only have ObjectMeta
+// This is used for resources like Pooler that aren't clusters
+func CreateRoleBindingFromMeta(objectMeta metav1.ObjectMeta) rbacv1.RoleBinding {
+	return rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: objectMeta.Namespace,
+			Name:      objectMeta.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				APIGroup:  "",
+				Name:      objectMeta.Name,
+				Namespace: objectMeta.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     objectMeta.Name,
+		},
+	}
+}
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
 func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1.ServiceAccount) error {
