@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -210,7 +209,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-standard-trixie", targetTag)
+			cluster.Spec.ImageName = env.StandardImageName(targetTag)
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log"] = "all, -misc"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_catalog"] = "off"
 			cluster.Spec.PostgresConfiguration.Parameters["pgaudit.log_parameter"] = "on"
@@ -248,9 +247,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		// TODO: remove this once all E2Es run on minimal images
 		// https://github.com/cloudnative-pg/cloudnative-pg/issues/8123
-		currentImage := os.Getenv("POSTGRES_IMG")
-		Expect(currentImage).ToNot(BeEmpty())
-		targetTag = strings.Split(reference.New(currentImage).Tag, "-")[0]
+		targetTag = strings.Split(env.PostgresImageTag, "-")[0]
 	})
 
 	Context("PrimaryUpdateMethod: switchover", Ordered, func() {
@@ -261,7 +258,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-trixie", targetTag)
+			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
@@ -456,7 +453,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := generateBaseCluster(namespace)
-			cluster.Spec.ImageName = fmt.Sprintf("ghcr.io/cloudnative-pg/postgresql:%s-minimal-trixie", targetTag)
+			cluster.Spec.ImageName = env.MinimalImageName(targetTag)
 			cluster.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodRestart
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())

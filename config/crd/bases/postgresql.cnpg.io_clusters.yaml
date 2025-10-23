@@ -3026,8 +3026,9 @@ spec:
                         isWALArchiver:
                           default: false
                           description: |-
-                            Only one plugin can be declared as WALArchiver.
-                            Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+                            Marks the plugin as the WAL archiver. At most one plugin can be
+                            designated as a WAL archiver. This cannot be enabled if the
+                            `.spec.backup.barmanObjectStore` configuration is present.
                           type: boolean
                         name:
                           description: Name is the plugin name
@@ -4064,8 +4065,9 @@ spec:
                     isWALArchiver:
                       default: false
                       description: |-
-                        Only one plugin can be declared as WALArchiver.
-                        Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+                        Marks the plugin as the WAL archiver. At most one plugin can be
+                        designated as a WAL archiver. This cannot be enabled if the
+                        `.spec.backup.barmanObjectStore` configuration is present.
                       type: boolean
                     name:
                       description: Name is the plugin name
