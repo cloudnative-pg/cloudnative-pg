@@ -281,10 +281,10 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 	case isPrimaryFenced:
 		summary.AddLine("Status:", aurora.Red("Primary instance is fenced"))
 	default:
-		// Avoid printing the start time when hibernated or fenced
-		primaryStartTime := getPrimaryStartTime(cluster)
-		if len(primaryStartTime) > 0 {
-			summary.AddLine("Primary start time:", primaryStartTime)
+		// Avoid printing the promotion time when hibernated or fenced
+		primaryPromotionTime := getPrimaryPromotionTime(cluster)
+		if len(primaryPromotionTime) > 0 {
+			summary.AddLine("Primary promotion time:", primaryPromotionTime)
 		}
 		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
@@ -1329,11 +1329,11 @@ func (fullStatus *PostgresqlStatus) printPluginStatus(verbosity int) {
 	fmt.Println()
 }
 
-func getPrimaryStartTime(cluster *apiv1.Cluster) string {
-	return getPrimaryStartTimeIdempotent(cluster, time.Now())
+func getPrimaryPromotionTime(cluster *apiv1.Cluster) string {
+	return getPrimaryPromotionTimeIdempotent(cluster, time.Now())
 }
 
-func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
+func getPrimaryPromotionTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
 	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
 		return ""
 	}
@@ -1346,11 +1346,11 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 		return aurora.Red("error: " + err.Error()).String()
 	}
 
-	uptime := currentTime.Sub(primaryInstanceTimestamp)
+	duration := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
-		"%s (uptime %s)",
+		"%s (%s)",
 		primaryInstanceTimestamp.Round(time.Second),
-		uptime.Round(time.Second),
+		duration.Round(time.Second),
 	)
 }
 
