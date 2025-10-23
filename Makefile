@@ -59,7 +59,7 @@ GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.12.0
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.51.0
+SPELLCHECK_VERSION ?= 0.52.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
@@ -397,11 +397,7 @@ ifneq ($(shell $(PREFLIGHT) --version 2>/dev/null | awk '{print $$3}'), $(PREFLI
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	if [ "$${OS}" != "linux" ] ; then \
-		echo "Unsupported OS: $${OS}" ;\
-	else \
-		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
-		chmod +x $(LOCALBIN)/preflight ;\
-	fi \
+	curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
+	chmod +x $(LOCALBIN)/preflight ;\
 	}
 endif

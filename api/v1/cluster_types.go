@@ -205,7 +205,8 @@ type ImageCatalogRef struct {
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
 
-// ClusterSpec defines the desired state of Cluster
+// ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
 	// +optional
@@ -343,7 +344,7 @@ type ClusterSpec struct {
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-	// (that is: `stopDelay` - `smartShutdownTimeout`).
+	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
 	// +kubebuilder:default:=180
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
@@ -803,7 +804,8 @@ type AvailableArchitecture struct {
 	Hash string `json:"hash"`
 }
 
-// ClusterStatus defines the observed state of Cluster
+// ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
 	// +optional
@@ -1393,6 +1395,12 @@ type SynchronousReplicaConfiguration struct {
 	// +kubebuilder:validation:Enum=required;preferred
 	// +optional
 	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
+
+	// FailoverQuorum enables a quorum-based check before failover, improving
+	// data durability and safety during failover events in CloudNativePG-managed
+	// PostgreSQL clusters.
+	// +optional
+	FailoverQuorum bool `json:"failoverQuorum"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -1788,19 +1796,58 @@ type Import struct {
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 
-	// List of custom options to pass to the `pg_dump` command. IMPORTANT:
-	// Use these options with caution and at your own risk, as the operator
-	// does not validate their content. Be aware that certain options may
-	// conflict with the operator's intended functionality or design.
+	// List of custom options to pass to the `pg_dump` command.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
 	// +optional
 	PgDumpExtraOptions []string `json:"pgDumpExtraOptions,omitempty"`
 
-	// List of custom options to pass to the `pg_restore` command. IMPORTANT:
-	// Use these options with caution and at your own risk, as the operator
-	// does not validate their content. Be aware that certain options may
-	// conflict with the operator's intended functionality or design.
+	// List of custom options to pass to the `pg_restore` command.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
 	// +optional
 	PgRestoreExtraOptions []string `json:"pgRestoreExtraOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `pre-data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestorePredataOptions []string `json:"pgRestorePredataOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestoreDataOptions []string `json:"pgRestoreDataOptions,omitempty"`
+
+	// Custom options to pass to the `pg_restore` command during the `post-data`
+	// section. This setting overrides the generic `pgRestoreExtraOptions` value.
+	//
+	// IMPORTANT: Use with caution. The operator does not validate these options,
+	// and certain flags may interfere with its intended functionality or design.
+	// You are responsible for ensuring that the provided options are compatible
+	// with your environment and desired behavior.
+	//
+	// +optional
+	PgRestorePostdataOptions []string `json:"pgRestorePostdataOptions,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot
@@ -2157,6 +2204,9 @@ type MonitoringConfiguration struct {
 
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
@@ -2166,10 +2216,16 @@ type MonitoringConfiguration struct {
 	TLSConfig *ClusterMonitoringTLSConfiguration `json:"tls,omitempty"`
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
@@ -2313,8 +2369,9 @@ type PluginConfiguration struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Only one plugin can be declared as WALArchiver.
-	// Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+	// Marks the plugin as the WAL archiver. At most one plugin can be
+	// designated as a WAL archiver. This cannot be enabled if the
+	// `.spec.backup.barmanObjectStore` configuration is present.
 	// +kubebuilder:default:=false
 	// +optional
 	IsWALArchiver *bool `json:"isWALArchiver,omitempty"`
@@ -2466,7 +2523,8 @@ type RoleConfiguration struct {
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
 
-// Cluster is the Schema for the PostgreSQL API
+// Cluster defines the API schema for a highly available PostgreSQL database cluster
+// managed by CloudNativePG.
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

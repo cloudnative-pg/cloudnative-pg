@@ -1009,7 +1009,7 @@ it from the actual pod. This means that you will be using the `postgres` user.
 ```console
 $ kubectl cnpg psql cluster-example
 
-psql (17.5 (Debian 17.5-1.pgdg110+1))
+psql (18.0 (Debian 18.0-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -1021,7 +1021,7 @@ select to work against a replica by using the `--replica` option:
 ```console
 $ kubectl cnpg psql --replica cluster-example
 
-psql (17.5 (Debian 17.5-1.pgdg110+1))
+psql (18.0 (Debian 18.0-1.pgdg110+1))
 
 Type "help" for help.
 
@@ -1399,7 +1399,7 @@ table contains the full details:
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
 | report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
-| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list                                                                                                                                                                                                                                                              |
+| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | version         | none                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -1481,6 +1481,12 @@ rules:
       - policy
     resources:
       - poddisruptionbudgets
+  - verbs:
+      - get
+    apiGroups:
+      - barmancloud.cnpg.io
+    resources:
+      - objectstores
 ```
 
 !!! Important

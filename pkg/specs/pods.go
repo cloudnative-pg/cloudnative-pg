@@ -280,6 +280,16 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		},
 	}
 
+	if cluster.Annotations[utils.EnableInstancePprofAnnotationName] == "true" {
+		containers[0].Ports = append(containers[0].Ports, corev1.ContainerPort{
+			Name:          "pprof",
+			ContainerPort: 6060,
+			Protocol:      "TCP",
+		})
+
+		containers[0].Command = append(containers[0].Command, "--pprof-server")
+	}
+
 	if enableHTTPS {
 		containers[0].StartupProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
 		containers[0].LivenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
@@ -456,7 +466,7 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
+	// TODO: remove tlsEnabled when we drop the support for instances created without TLS
 	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")

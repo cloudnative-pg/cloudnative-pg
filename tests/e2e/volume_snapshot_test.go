@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -59,8 +59,8 @@ var _ = Describe("Verify Volume Snapshot",
 			backupName string,
 			clusterName string,
 			namespace string,
-		) (volumesnapshot.VolumeSnapshotList, error) {
-			var snapshotList volumesnapshot.VolumeSnapshotList
+		) (volumesnapshotv1.VolumeSnapshotList, error) {
+			var snapshotList volumesnapshotv1.VolumeSnapshotList
 			err := env.Client.List(env.Ctx, &snapshotList, k8client.InNamespace(namespace),
 				k8client.MatchingLabels{
 					utils.ClusterLabelName:    clusterName,
@@ -222,18 +222,14 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
 				})
 
-				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
-						clusterToSnapshotName)
+				By("verify connectivity of barman to minio", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
-							minioEnv.ServiceName)
-						if err != nil {
-							return false, err
-						}
-						return connectionStatus, nil
+						connectionStatus, err := minio.TestBarmanConnectivity(
+							namespace, clusterToSnapshotName, primaryPod.Name,
+							"minio", "minio123", minioEnv.ServiceName)
+						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
 
@@ -374,8 +370,8 @@ var _ = Describe("Verify Volume Snapshot",
 			getAndVerifySnapshots := func(
 				clusterToBackup *apiv1.Cluster,
 				backup apiv1.Backup,
-			) volumesnapshot.VolumeSnapshotList {
-				snapshotList := volumesnapshot.VolumeSnapshotList{}
+			) volumesnapshotv1.VolumeSnapshotList {
+				snapshotList := volumesnapshotv1.VolumeSnapshotList{}
 				By("fetching the volume snapshots", func() {
 					var err error
 					snapshotList, err = getSnapshots(backup.Name, clusterToBackup.Name, backup.Namespace)
@@ -672,18 +668,14 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
 				})
 
-				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
-						clusterToSnapshotName)
+				By("verify connectivity of barman to minio", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
-							minioEnv.ServiceName)
-						if err != nil {
-							return false, err
-						}
-						return connectionStatus, nil
+						connectionStatus, err := minio.TestBarmanConnectivity(
+							namespace, clusterToSnapshotName, primaryPod.Name,
+							"minio", "minio123", minioEnv.ServiceName)
+						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
 			})

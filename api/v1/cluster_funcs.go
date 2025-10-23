@@ -22,9 +22,9 @@ package v1
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -175,8 +175,8 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 		sa.Annotations = map[string]string{}
 	}
 
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+	maps.Copy(sa.Labels, st.Metadata.Labels)
+	maps.Copy(sa.Annotations, st.Metadata.Annotations)
 }
 
 // MatchesTopology checks if the two topologies have
@@ -668,7 +668,7 @@ func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
 		return meta.Annotations
 	}
 
-	utils.MergeMap(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
+	maps.Copy(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
 
 	return meta.Annotations
 }
@@ -1149,12 +1149,9 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if cluster.Status.PoolerIntegrations != nil {
-		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
-			if pgBouncerSecretName == secret {
-				return true
-			}
-		}
+	if cluster.Status.PoolerIntegrations != nil &&
+		slices.Contains(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets, secret) {
+		return true
 	}
 
 	// watch the secrets defined in external clusters
@@ -1198,15 +1195,14 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
 func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
-	contextLogger := log.FromContext(ctx)
-
 	currentTimestamp := pgTime.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
+
+	contextLogger := log.FromContext(ctx).WithValues(
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
 		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
 		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-	}
+	)
 
 	var errs []string
 
@@ -1215,11 +1211,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceTargetPrimaryTimestamp",
-			diff.Milliseconds(),
-		)
+		contextLogger = contextLogger.WithValues("msPassedSinceTargetPrimaryTimestamp", diff.Milliseconds())
 	} else {
 		errs = append(errs, err.Error())
 	}
@@ -1229,9 +1221,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.CurrentPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceCurrentPrimaryTimestamp",
+		contextLogger = contextLogger.WithValues("msPassedSinceCurrentPrimaryTimestamp",
 			currentPrimaryDifference.Milliseconds(),
 		)
 	} else {
@@ -1246,8 +1236,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		cluster.Status.CurrentPrimaryTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
+		contextLogger = contextLogger.WithValues(
 			"msDifferenceBetweenCurrentAndTargetPrimary",
 			currentPrimaryTargetDifference.Milliseconds(),
 		)
@@ -1256,10 +1245,10 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	if len(errs) > 0 {
-		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+		contextLogger = contextLogger.WithValues("timestampParsingErrors", errs)
 	}
 
-	contextLogger.Info(logMessage, keysAndValues...)
+	contextLogger.Info(logMessage)
 }
 
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
@@ -1564,16 +1553,10 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 
 // IsFailoverQuorumActive check if we should enable the
 // quorum failover protection alpha-feature.
-func (cluster *Cluster) IsFailoverQuorumActive() (bool, error) {
-	failoverQuorumAnnotation, ok := cluster.GetAnnotations()[utils.FailoverQuorumAnnotationName]
-	if !ok || failoverQuorumAnnotation == "" {
-		return false, nil
+func (cluster *Cluster) IsFailoverQuorumActive() bool {
+	if cluster.Spec.PostgresConfiguration.Synchronous == nil {
+		return false
 	}
 
-	v, err := strconv.ParseBool(failoverQuorumAnnotation)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse failover quorum annotation '%v': %v", failoverQuorumAnnotation, err)
-	}
-
-	return v, nil
+	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }

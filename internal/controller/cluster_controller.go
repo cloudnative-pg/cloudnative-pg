@@ -513,13 +513,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// ensuring the primary to be healthy. The hibernation starts from the
 	// primary Pod to ensure the replicas are in sync and doing it here avoids
 	// any unwanted switchover.
-	if result, err := hibernation.Reconcile(
+	hibernationResult, err := hibernation.Reconcile(
 		ctx,
 		r.Client,
 		cluster,
 		resources.instances.Items,
-	); result != nil || err != nil {
-		return *result, err
+	)
+	if hibernationResult != nil {
+		return *hibernationResult, err
+	}
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// We have already updated the status in updateResourceStatus call,
@@ -1005,6 +1009,11 @@ func (r *ClusterReconciler) reconcilePods(
 	}
 
 	// Are there nodes to be removed? Remove one of them
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
+	}
+
+	// Should we scale down the cluster?
 	if cluster.Status.Instances > cluster.Spec.Instances {
 		if err := r.scaleDownCluster(ctx, cluster, resources); err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)

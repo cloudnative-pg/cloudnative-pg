@@ -281,6 +281,7 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicies
 NetworkPolicy
 Niccolò
 NodeAffinity
@@ -462,6 +463,7 @@ SecurityProfiles
 Seealso
 SelectorType
 ServerCASecret
+ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
@@ -530,6 +532,7 @@ Uncomment
 Unrealizable
 UpdateStrategy
 UsageSpec
+UsageSpecType
 VLDB
 VLDBs
 VM
@@ -635,6 +638,7 @@ balancer
 balancers
 barmanEndpointCA
 barmanObjectStore
+barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
 baseDN
@@ -812,6 +816,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enableInstancePprof
 enableMetricsTLS
 enablePDB
 enablePodAntiAffinity
@@ -840,6 +845,7 @@ externalclusters
 facto
 failover
 failoverDelay
+failoverQuorum
 failoverquorums
 failovers
 failureThreshold
@@ -1076,6 +1082,7 @@ num
 oauth
 objectmeta
 objectstore
+objectstores
 objid
 objref
 objsubid
@@ -1121,7 +1128,10 @@ pgBouncerIntegration
 pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
+pgRestoreDataOptions
 pgRestoreExtraOptions
+pgRestorePostdataOptions
+pgRestorePredataOptions
 pgRouting
 pgSQL
 pgadmin

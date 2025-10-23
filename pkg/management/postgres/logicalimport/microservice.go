@@ -69,7 +69,7 @@ func Microservice(
 		databases[0],
 		initDB.Database,
 		initDB.Owner,
-		initDB.Import.PgRestoreExtraOptions,
+		buildPgRestoreSectionOptions(initDB.Import),
 	); err != nil {
 		return err
 	}

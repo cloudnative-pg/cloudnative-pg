@@ -22,7 +22,7 @@ package v1
 import (
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -59,7 +59,7 @@ var _ = Describe("BackupStatus structure", func() {
 
 	It("can be set to contain a snapshot list", func() {
 		status := BackupStatus{}
-		status.BackupSnapshotStatus.SetSnapshotElements([]volumesnapshot.VolumeSnapshot{
+		status.BackupSnapshotStatus.SetSnapshotElements([]volumesnapshotv1.VolumeSnapshot{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",

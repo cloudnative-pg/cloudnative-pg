@@ -23,9 +23,8 @@ import (
 	"context"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -95,7 +94,7 @@ func GetCandidateStorageSourceForReplica(
 
 	if result := getCandidateSourceFromBackupList(
 		ctx,
-		cluster.CreationTimestamp,
+		cluster,
 		backupList,
 	); result != nil {
 		return result
@@ -117,25 +116,57 @@ func GetCandidateStorageSourceForReplica(
 // given a backup list
 func getCandidateSourceFromBackupList(
 	ctx context.Context,
-	clusterCreationTime metav1.Time,
+	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
 	contextLogger := log.FromContext(ctx)
 
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Warning(
+			"unable to determine cluster major version; skipping backup as a recovery source",
+			"error", err.Error(),
+		)
+		return nil
+	}
+
+	isCorrectMajorVersion := func(backup *apiv1.Backup) bool {
+		// If we don't have image info, we can't determine the cluster version reliably; skip enforcement
+		if cluster.Status.PGDataImageInfo == nil {
+			return true
+		}
+
+		backupMajorVersion := backup.Status.MajorVersion
+		if backupMajorVersion == 0 {
+			contextLogger.Warning(
+				"majorVersion on backup status is not populated, cannot use it as a recovery source.",
+			)
+			return false
+		}
+
+		return majorVersion == backupMajorVersion
+	}
+
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
-		contextLogger := contextLogger.WithValues()
 
 		if !backup.IsCompletedVolumeSnapshot() {
 			contextLogger.Trace("skipping backup, not a valid storage source candidate")
 			continue
 		}
 
-		if backup.CreationTimestamp.Before(&clusterCreationTime) {
+		if backup.CreationTimestamp.Before(&cluster.CreationTimestamp) {
 			contextLogger.Info(
-				"skipping backup as a potential recovery storage source candidate " +
-					"because if was created before the Cluster object")
+				"skipping backup as a potential recovery storage source candidate because it was created before the Cluster object",
+			)
+			continue
+		}
+
+		if !isCorrectMajorVersion(backup) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate because of major version mismatch",
+			)
 			continue
 		}
 
@@ -151,7 +182,7 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 	var result StorageSource
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		reference := corev1.TypedLocalObjectReference{
-			APIGroup: ptr.To(volumesnapshot.GroupName),
+			APIGroup: ptr.To(volumesnapshotv1.GroupName),
 			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     element.Name,
 		}

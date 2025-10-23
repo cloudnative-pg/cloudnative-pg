@@ -37,12 +37,12 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.0"
+  GOLANG_VERSION: "1.25.3"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.30.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.17.7"
+  ROOK_VERSION: "v1.18.4"
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.3.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
@@ -162,7 +162,7 @@ jobs:
         id: refs
 
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -286,7 +286,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -369,7 +369,7 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -534,7 +534,7 @@ jobs:
           git commit -m "${COMMIT_MESSAGE}"
       -
         name: Push changes
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
@@ -658,14 +658,14 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -885,7 +885,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -909,7 +909,7 @@ jobs:
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -983,6 +983,7 @@ jobs:
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
             kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
@@ -1232,14 +1233,14 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1263,7 +1264,7 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
+        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1325,9 +1326,9 @@ jobs:
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.16.2"
+          VELERO_VERSION: "v1.17.0"
           # renovate: datasource=docker depName=velero/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.12.2"
+          VELERO_AWS_PLUGIN_VERSION: "v1.13.0"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1619,14 +1620,14 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1656,7 +1657,7 @@ jobs:
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
           SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
@@ -1703,6 +1704,19 @@ jobs:
       -
         name: Configure Storage
         run: |
+          # Even if the cluster is ready, it might take some time before the
+          # volumesnapshot CRDs are available
+          attempt=1
+          max_attempts=10
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+            if kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io >/dev/null 2>&1; then
+              echo "VolumeSnapshot CRDs are available."
+              break
+            fi
+            echo "Waiting for snapshot CRDs..."
+            sleep 20
+            attempt=$((attempt+1))
+          done
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
           # Change to use standard-rwo as default storage account
@@ -1933,7 +1947,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -1948,7 +1962,7 @@ jobs:
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1973,7 +1987,7 @@ jobs:
         name: Install OpenShift Cluster ${{ matrix.k8s_version }}
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
-          openshift-install create cluster --dir hack/ --log-level warn
+          openshift-install create cluster --dir hack/ --log-level debug
       -
         name: Install operator-sdk
         run: |
@@ -1987,9 +2001,8 @@ jobs:
         run: |
           export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
           oc create ns cloudnative-pg
-          oc -n cloudnative-pg create secret generic cnpg-pull-secret \
-          --from-file=.dockerconfigjson=$HOME/.docker/config.json \
-          --type=kubernetes.io/dockerconfigjson
+          oc -n cloudnative-pg create secret docker-registry cnpg-pull-secret \
+            --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD"
       -
         name: Run preflight operator test
         env:
@@ -1998,10 +2011,12 @@ jobs:
           PFLT_SCORECARD_WAIT_TIME: "1200"
           PFLT_ARTIFACTS: "preflight_operator_results"
         run: |
-          PATH=$(pwd)/bin/:${PATH} \
-          KUBECONFIG=$(pwd)/hack/auth/kubeconfig \
-          bin/preflight check operator ${BUNDLE_IMG} \
-          --docker-config $HOME/.docker/config.json --loglevel trace
+          export PATH=$(pwd)/bin/:${PATH}
+          export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
+          oc -n cloudnative-pg get secret cnpg-pull-secret \
+            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > docker-config.json
+          preflight check operator ${BUNDLE_IMG} \
+            --docker-config docker-config.json --loglevel trace
       -
         name: Check preflight operator results
         run: |

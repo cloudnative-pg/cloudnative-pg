@@ -29,7 +29,7 @@ import (
 	"github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -512,54 +512,6 @@ var _ = Describe("configuration change validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
-	})
-
-	It("doesn't complain when the configuration is exactly the same", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := clusterOld.DeepCopy()
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("doesn't complain when we change a setting which is not fixed", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(BeEmpty())
-	})
-
-	It("complains when changing postgres major version and settings", func() {
-		clusterOld := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:10.5",
-				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Parameters: map[string]string{
-						"shared_buffers": "4G",
-					},
-				},
-			},
-		}
-		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(HaveLen(1))
 	})
 
 	It("produces no error when WAL size settings are correct", func() {
@@ -1123,6 +1075,26 @@ var _ = Describe("configuration change validation", func() {
 		Expect(v.validateWALLevelChange(cluster, oldCluster)).To(BeEmpty())
 	})
 
+	It("complains when changing image and settings simultaneously if PrimaryUpdateMethodSwitchover", func() {
+		clusterOld := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryUpdateMethod: apiv1.PrimaryUpdateMethodSwitchover,
+				ImageName:           "postgres:10.5",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"shared_buffers": "4G",
+					},
+				},
+			},
+		}
+		Expect(v.validateConfigurationChange(clusterNew, clusterOld)).To(HaveLen(1))
+	})
+
 	Describe("wal_log_hints", func() {
 		It("should reject wal_log_hints set to an invalid value", func() {
 			cluster := &apiv1.Cluster{
@@ -1473,6 +1445,10 @@ var _ = Describe("validate image name change", func() {
 			Expect(v.validateImageChange(clusterNew, clusterOld)).To(HaveLen(1))
 		})
 		It("complains going from imageCatalogRef to lower major default imageName", func() {
+			defaultVersion, err := pgversion.FromTag(reference.New(versions.DefaultImageName).Tag)
+			Expect(err).ToNot(HaveOccurred())
+			higherVersion := int(defaultVersion.Major()) + 1
+
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					ImageCatalogRef: &apiv1.ImageCatalogRef{
@@ -1480,14 +1456,14 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 18,
+						Major: higherVersion,
 					},
 				},
 				Status: apiv1.ClusterStatus{
 					Image: "test",
 					PGDataImageInfo: &apiv1.ImageInfo{
 						Image:        "test",
-						MajorVersion: 18,
+						MajorVersion: higherVersion,
 					},
 				},
 			}
@@ -4243,12 +4219,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &apiv1.BootstrapRecovery{
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
@@ -4267,12 +4243,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &apiv1.BootstrapRecovery{
 						VolumeSnapshots: &apiv1.DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								APIGroup: ptr.To(volumesnapshotv1.GroupName),
 								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
@@ -4289,12 +4265,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgwal",
 				},
@@ -4307,7 +4283,7 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 			VolumeSnapshots: &apiv1.DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(volumesnapshotv1.GroupName),
 					Kind:     apiv1.VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
@@ -4323,12 +4299,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 				VolumeSnapshots: &apiv1.DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},
@@ -4343,12 +4319,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&apiv1.BootstrapRecovery{
 				VolumeSnapshots: &apiv1.DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						APIGroup: ptr.To(volumesnapshotv1.GroupName),
 						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},
@@ -5796,13 +5772,29 @@ var _ = Describe("getStorageWarnings", func() {
 	})
 })
 
-var _ = Describe("failoverQuorum validation", func() {
+var _ = Describe("failoverQuorum annotation validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	It("fails if it is active but no synchronous replication is configured", func() {
+	It("fails if the annotation value is wrong", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FailoverQuorumAnnotationName: "toast",
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
+		}
+
+		errList := v.validateFailoverQuorumAlphaAnnotation(cluster)
+		Expect(errList).To(HaveLen(1))
+	})
+
+	It("fails if the annotation is active but no synchronous replication is configured", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -5814,22 +5806,25 @@ var _ = Describe("failoverQuorum validation", func() {
 			},
 		}
 
-		errList := v.validateFailoverQuorum(cluster)
+		errList := v.validateFailoverQuorumAlphaAnnotation(cluster)
 		Expect(errList).To(HaveLen(1))
 	})
+})
 
-	It("requires at least three instances", func() {
+var _ = Describe("failoverQuorum validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts two or more instances", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.FailoverQuorumAnnotationName: "t",
-				},
-			},
 			Spec: apiv1.ClusterSpec{
-				Instances: 3,
+				Instances: 2,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Synchronous: &apiv1.SynchronousReplicaConfiguration{
-						Number: 1,
+						Number:         1,
+						FailoverQuorum: true,
 					},
 				},
 			},
@@ -5838,18 +5833,13 @@ var _ = Describe("failoverQuorum validation", func() {
 		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(BeEmpty())
 
-		cluster.Spec.Instances = 2
+		cluster.Spec.Instances = 3
 		errList = v.validateFailoverQuorum(cluster)
-		Expect(errList).To(HaveLen(1))
+		Expect(errList).To(BeEmpty())
 	})
 
 	It("check if the number of external synchronous replicas is coherent", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.FailoverQuorumAnnotationName: "t",
-				},
-			},
 			Spec: apiv1.ClusterSpec{
 				Instances: 3,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5863,6 +5853,7 @@ var _ = Describe("failoverQuorum validation", func() {
 							"three",
 							"four",
 						},
+						FailoverQuorum: true,
 					},
 				},
 			},

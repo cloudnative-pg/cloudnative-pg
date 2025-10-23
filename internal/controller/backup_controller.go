@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +65,9 @@ const backupPhase = ".status.phase"
 // clusterName indicates the path inside the Backup kind
 // where the name of the cluster is written
 const clusterNameField = ".spec.cluster.name"
+
+// ErrPrimaryImageNeedsUpdate is returned when the primary instance is not running with the latest image
+var ErrPrimaryImageNeedsUpdate = fmt.Errorf("primary instance not having expected image, cannot run backup")
 
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
@@ -107,6 +110,7 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
+// nolint: gocognito
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
@@ -189,6 +193,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 
+	// The backup is ready to start, and before starting it we store
+	// the major version inside the Backup resource.
+	if err := r.reconcileMajorVersion(ctx, &backup, &cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error setting major version for backup: %w", err)
+	}
+
 	switch {
 	case backup.Spec.Method.IsManagedByInstance():
 		res, err := r.startBackupManagedByInstance(ctx, cluster, backup)
@@ -228,7 +238,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	// If no good running backups are found we elect a pod for the backup
 	pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-	if apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
@@ -328,6 +338,11 @@ func (r *BackupReconciler) checkPrerequisites(
 		r.Recorder.Event(&backup, "Warning", reason, message)
 		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
 		return &ctrl.Result{}, err
+	}
+	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
+		string(utils.HibernationAnnotationValueOn) {
+		const message = "cannot backup a hibernated cluster"
+		return flagMissingPrerequisite(message, "ClusterIsHibernated")
 	}
 	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if len(cluster.Spec.Plugins) == 0 {
@@ -483,7 +498,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	contextLogger := log.FromContext(ctx)
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
-	if apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
 		r.Recorder.Eventf(
 			backup,
 			"Warning",
@@ -658,6 +673,27 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	backup *apiv1.Backup,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
+
+	podHasLatestMajorImage := func(pod *corev1.Pod) bool {
+		// No backup should run during a major version upgrade
+		if cluster.Status.PGDataImageInfo != nil &&
+			cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
+			return false
+		}
+
+		if len(pod.Spec.Containers) == 0 {
+			contextLogger.Warning("Instance has no containers, discarded as target for backup")
+			return false
+		}
+
+		if pod.Spec.Containers[0].Image != cluster.Status.Image {
+			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
+			return false
+		}
+
+		return true
+	}
+
 	pods, err := GetManagedInstances(ctx, cluster, r.Client)
 	if err != nil {
 		return nil, err
@@ -676,6 +712,11 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 				"pod", item.Pod.Name)
 			continue
 		}
+
+		if !podHasLatestMajorImage(item.Pod) {
+			continue
+		}
+
 		switch backupTarget {
 		case apiv1.BackupTargetPrimary:
 			if item.IsPrimary {
@@ -695,12 +736,18 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
 
 	var pod corev1.Pod
-	err = r.Get(ctx, client.ObjectKey{
+	if err = r.Get(ctx, client.ObjectKey{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Status.TargetPrimary,
-	}, &pod)
+	}, &pod); err != nil {
+		return nil, err
+	}
 
-	return &pod, err
+	if !podHasLatestMajorImage(&pod) {
+		return nil, ErrPrimaryImageNeedsUpdate
+	}
+
+	return &pod, nil
 }
 
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
@@ -778,7 +825,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		)
 	if utils.HaveVolumeSnapshot() {
 		controllerBuilder = controllerBuilder.Watches(
-			&storagesnapshotv1.VolumeSnapshot{},
+			&volumesnapshotv1.VolumeSnapshot{},
 			handler.EnqueueRequestsFromMapFunc(r.mapVolumeSnapshotsToBackups()),
 			builder.WithPredicates(volumeSnapshotsPredicate),
 		)
@@ -861,4 +908,22 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *BackupReconciler) reconcileMajorVersion(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) error {
+	majorVersion, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		return fmt.Errorf("cannot get major version from cluster: %w", err)
+	}
+
+	if backup.Status.MajorVersion == majorVersion {
+		return nil
+	}
+
+	backup.Status.MajorVersion = majorVersion
+	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }

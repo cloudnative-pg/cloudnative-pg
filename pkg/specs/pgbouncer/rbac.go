@@ -21,7 +21,7 @@ package pgbouncer
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -36,7 +36,7 @@ func ServiceAccount(pooler *apiv1.Pooler) *corev1.ServiceAccount {
 }
 
 // Role creates a role for a given pooler
-func Role(pooler *apiv1.Pooler) *v1.Role {
+func Role(pooler *apiv1.Pooler) *rbacv1.Role {
 	secretNames := []string{pooler.GetAuthQuerySecretName()}
 	if pooler.Status.Secrets != nil {
 		if pooler.Status.Secrets.ServerCA.Name != "" {
@@ -52,9 +52,9 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 		}
 	}
 
-	return &v1.Role{ObjectMeta: metav1.ObjectMeta{
+	return &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{
 		Name: pooler.Name, Namespace: pooler.Namespace,
-	}, Rules: []v1.PolicyRule{
+	}, Rules: []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
 				"postgresql.cnpg.io",
@@ -104,6 +104,6 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 }
 
 // RoleBinding creates a role binding for a given pooler
-func RoleBinding(pooler *apiv1.Pooler) v1.RoleBinding {
+func RoleBinding(pooler *apiv1.Pooler) rbacv1.RoleBinding {
 	return specs.CreateRoleBinding(pooler.ObjectMeta)
 }

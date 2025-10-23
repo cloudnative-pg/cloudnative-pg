@@ -1,7 +1,9 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/go:1.24-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    },
     "ghcr.io/mpriscella/features/kind:1": {},
     "ghcr.io/rjfmachado/devcontainer-features/cloud-native:1": {
       "kubectl": "latest",

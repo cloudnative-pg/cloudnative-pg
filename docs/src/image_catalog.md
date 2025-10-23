@@ -31,11 +31,13 @@ metadata:
 spec:
   images:
     - major: 15
-      image: ghcr.io/cloudnative-pg/postgresql:15.6
+      image: ghcr.io/cloudnative-pg/postgresql:15.14-system-trixie
     - major: 16
-      image: ghcr.io/cloudnative-pg/postgresql:16.8
+      image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
-      image: ghcr.io/cloudnative-pg/postgresql:17.5
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 
 **Example of a Cluster-Wide Catalog using `ClusterImageCatalog` Resource:**
@@ -48,15 +50,18 @@ metadata:
 spec:
   images:
     - major: 15
-      image: ghcr.io/cloudnative-pg/postgresql:15.6
+      image: ghcr.io/cloudnative-pg/postgresql:15.14-system-trixie
     - major: 16
-      image: ghcr.io/cloudnative-pg/postgresql:16.8
+      image: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
     - major: 17
-      image: ghcr.io/cloudnative-pg/postgresql:17.5
+      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie
 ```
 
 A `Cluster` resource has the flexibility to reference either an `ImageCatalog`
-or a `ClusterImageCatalog` to precisely specify the desired image.
+(like in the following example) or a `ClusterImageCatalog` to precisely specify
+the desired image.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -67,6 +72,7 @@ spec:
   instances: 3
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
+    # Change the following to `ClusterImageCatalog` if needed
     kind: ImageCatalog
     name: postgresql
     major: 16
@@ -80,33 +86,56 @@ Any alterations to the images within a catalog trigger automatic updates for
 
 ## CloudNativePG Catalogs
 
-The CloudNativePG project maintains `ClusterImageCatalogs` for the images it
-provides. These catalogs are regularly updated with the latest images for each
-major version. By applying the `ClusterImageCatalog.yaml` file from the
-CloudNativePG project's GitHub repositories, cluster administrators can ensure
-that their clusters are automatically updated to the latest version within the
-specified major release.
+The CloudNativePG project maintains `ClusterImageCatalog` manifests for all
+supported images.
 
-### PostgreSQL Container Images
+These catalogs are regularly updated and published in the
+[artifacts repository](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs).
 
-You can install the
-[latest version of the cluster catalog for the PostgreSQL Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog-bookworm.yaml)
-([cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers) repository)
-with:
+Each catalog corresponds to a specific combination of image type (e.g.
+`minimal`) and Debian release (e.g. `trixie`). It lists the most up-to-date
+container images for every supported PostgreSQL major version.
+
+By installing these catalogs, cluster administrators can ensure that their
+PostgreSQL clusters are automatically updated to the latest patch release
+within a given PostgreSQL major version, for the selected Debian distribution
+and image type.
+
+For example, to install the latest catalog for the `minimal` PostgreSQL
+container images on Debian `trixie`, run:
 
 ```shell
-kubectl apply \
-  -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog-bookworm.yaml
+kubectl apply -f \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/refs/heads/main/image-catalogs/catalog-minimal-trixie.yaml
 ```
 
-### PostGIS Container Images
-
-You can install the
-[latest version of the cluster catalog for the PostGIS Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml)
-([cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers) repository)
-with:
+You can install all the available catalogs by using the `kustomization` file
+present in the `image-catalogs` directory:
 
 ```shell
-kubectl apply \
-  -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
+kubectl apply -k https://github.com/cloudnative-pg/artifacts//image-catalogs?ref=main
+```
+
+You can then view all the catalogs deployed with:
+
+```shell
+kubectl get clusterimagecatalogs.postgresql.cnpg.io
+```
+
+For example, you can create a cluster with the latest `minimal` image for PostgreSQL 18 on `trixie` with:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: angus
+spec:
+  instances: 3
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  storage:
+    size: 1Gi
 ```

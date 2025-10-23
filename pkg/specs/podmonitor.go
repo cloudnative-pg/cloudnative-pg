@@ -72,7 +72,9 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 
 	if c.cluster.Spec.Monitoring != nil {
+		//nolint:staticcheck // Using deprecated fields during deprecation period
 		endpoint.MetricRelabelConfigs = c.cluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs
+		//nolint:staticcheck // Using deprecated fields during deprecation period
 		endpoint.RelabelConfigs = c.cluster.Spec.Monitoring.PodMonitorRelabelConfigs
 	}
 

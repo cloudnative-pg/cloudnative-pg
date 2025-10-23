@@ -39,10 +39,12 @@ import (
 // AllowedPgbouncerGenericConfigurationParameters is the list of allowed parameters for PgBouncer
 var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"application_name_add_host",
+	"auth_type",
 	"autodb_idle_timeout",
 	"cancel_wait_timeout",
 	"client_idle_timeout",
 	"client_login_timeout",
+	"client_tls_sslmode",
 	"default_pool_size",
 	"disable_pqexec",
 	"dns_max_ttl",
@@ -78,6 +80,7 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"server_round_robin",
 	"server_tls_ciphers",
 	"server_tls_protocols",
+	"server_tls_sslmode",
 	"stats_period",
 	"suspend_timeout",
 	"tcp_defer_accept",
@@ -128,6 +131,8 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
 	}
 
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
+
 	allErrs := v.validate(pooler)
 
 	if len(allErrs) == 0 {
@@ -163,6 +168,8 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
 			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
 	}
+
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
 	allErrs := v.validate(pooler)
 	if len(allErrs) == 0 {
@@ -254,4 +261,21 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 		}
 	}
 	return result
+}
+
+// validateDeprecatedMonitoringFields returns warnings for deprecated monitoring fields
+func (v *PoolerCustomValidator) validateDeprecatedMonitoringFields(r *apiv1.Pooler) admission.Warnings {
+	var warns admission.Warnings
+
+	//nolint:staticcheck // Checking deprecated fields to warn users
+	if r.Spec.Monitoring != nil {
+		if r.Spec.Monitoring.EnablePodMonitor ||
+			len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 ||
+			len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
+			warns = append(warns, "spec.monitoring is deprecated and will be removed in a future release. "+
+				"Set this field to false and create a PodMonitor resource for your pooler as described in the documentation")
+		}
+	}
+
+	return warns
 }

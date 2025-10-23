@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -317,6 +318,10 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
+	if err := r.reconcilePgbouncerAuthUser(ctx, postgresDB, cluster); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile pgbouncer integration: %w", err)
+	}
+
 	// Reconcile postgresql.auto.conf file permissions (< PG 17)
 	// IMPORTANT: this needs a database connection to determine
 	// the PostgreSQL major version
@@ -397,6 +402,9 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
+	reloadImages := r.requiresImagesRollout(ctx, cluster)
+	reloadNeeded = reloadNeeded || reloadImages
+
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(
@@ -416,6 +424,40 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
 	return reloadNeeded, nil
+}
+
+func (r *InstanceReconciler) requiresImagesRollout(ctx context.Context, cluster *apiv1.Cluster) bool {
+	contextLogger := log.FromContext(ctx)
+
+	latestImages := stringset.New()
+	latestImages.Put(cluster.Spec.ImageName)
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		latestImages.Put(extension.ImageVolumeSource.Reference)
+	}
+
+	if r.runningImages == nil {
+		r.runningImages = latestImages
+		contextLogger.Info("Detected running images", "runningImages", r.runningImages.ToSortedList())
+
+		return false
+	}
+
+	contextLogger.Trace(
+		"Calculated image requirements",
+		"latestImages", latestImages.ToSortedList(),
+		"runningImages", r.runningImages.ToSortedList())
+
+	if latestImages.Eq(r.runningImages) {
+		return false
+	}
+
+	contextLogger.Info(
+		"Detected drift between the bootstrap images and the configuration. Skipping configuration reload",
+		"runningImages", r.runningImages.ToSortedList(),
+		"latestImages", latestImages.ToSortedList(),
+	)
+
+	return true
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
@@ -552,23 +594,11 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 		return false, err
 	}
 
-	contextLogger.Info("This is an old primary node. Requesting a checkpoint before demotion")
+	contextLogger.Info("This is the former primary instance. Shutting it down to allow it to be demoted to a replica.")
 
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		contextLogger.Error(err, "Cannot connect to primary server")
-	} else {
-		_, err = db.Exec("CHECKPOINT")
-		if err != nil {
-			contextLogger.Error(err, "Error while requesting a checkpoint")
-		}
-	}
-
-	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
-
-	// Here we need to invoke a fast shutdown on the instance, and wait the instance
-	// manager to be stopped.
-	// When the Pod will restart, we will demote as a replica of the new primary
+	// Perform a fast shutdown on the instance and wait for the instance manager to stop.
+	// The fast shutdown process will be preceded by a CHECKPOINT.
+	// When the Pod restarts, it will be demoted to act as a replica of the new primary.
 	r.Instance().RequestFastImmediateShutdown()
 
 	// We wait for the lifecycle manager to have received the immediate shutdown request
@@ -633,10 +663,6 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 				errors = append(errors,
 					fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 			}
-		}
-		if err = r.reconcilePoolers(ctx, db, databaseName, cluster.Status.PoolerIntegrations); err != nil {
-			errors = append(errors,
-				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 		}
 	}
 	if errors != nil {
@@ -724,13 +750,29 @@ func (r *InstanceReconciler) reconcileExtensions(
 
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
-func (r *InstanceReconciler) reconcilePoolers(
-	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations,
-) (err error) {
-	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
-		return err
+func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
+	ctx context.Context,
+	db *sql.DB,
+	cluster *apiv1.Cluster,
+) error {
+	// This need to be executed only against the primary node
+	ok, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("unable to check if instance is primary: %w", err)
+	}
+	if !ok {
+		return nil
 	}
 
+	// If there is no integrated pgbouncer, we directly skip the
+	// integration.
+	integrations := cluster.Status.PoolerIntegrations
+	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
+		return nil
+	}
+
+	// Otherwise, we need to ensure that both the role and the
+	// auth_query function are present in the superuser database.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -752,7 +794,9 @@ func (r *InstanceReconciler) reconcilePoolers(
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, apiv1.PGBouncerPoolerUserName))
+
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+			apiv1.PoolerAuthDBName, apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}

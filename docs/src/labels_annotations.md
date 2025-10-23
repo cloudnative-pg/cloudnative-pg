@@ -65,6 +65,10 @@ CloudNativePG manages the following predefined labels:
 `cnpg.io/jobRole`
 : Role of the job (that is, `import`, `initdb`, `join`, ...)
 
+`cnpg.io/majorVersion`
+: Integer PostgreSQL major version of the backup's data directory (for example, `17`).
+This label is available only on `VolumeSnapshot` resources.
+
 `cnpg.io/onlineBackup`
 : Whether the backup is online (hot) or taken when Postgres is down (cold).
   This label is available only on `VolumeSnapshot` resources.
@@ -242,6 +246,13 @@ CloudNativePG manages the following predefined annotations:
 
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
+
+`alpha.cnpg.io/unrecoverable`
+:   Experimental annotation applied to a `Pod` running a PostgreSQL instance.
+    It instructs the operator to delete the `Pod` and all its associated PVCs.
+    The instance will then be recreated according to the configured join
+    strategy. This annotation can only be used on instances that are neither the
+    current primary nor the designated target primary.
 
 ## Prerequisites
 

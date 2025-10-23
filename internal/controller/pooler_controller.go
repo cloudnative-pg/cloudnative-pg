@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -135,7 +135,7 @@ func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentRecon
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.Pooler{}).
 		Named("pooler").
-		Owns(&v1.Deployment{}).
+		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.Role{}).
@@ -240,7 +240,7 @@ func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
 			result[idx] = reconcile.Request{NamespacedName: value}
 		}
 
-		return
+		return result
 	}
 }
 

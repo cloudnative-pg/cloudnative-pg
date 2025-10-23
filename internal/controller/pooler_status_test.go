@@ -23,11 +23,10 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,12 +39,12 @@ var _ = Describe("pooler_status unit tests", func() {
 		env = buildTestEnvironment()
 	})
 
-	assertClusterInheritedStatus := func(pooler *v1.Pooler, cluster *v1.Cluster) {
+	assertClusterInheritedStatus := func(pooler *apiv1.Pooler, cluster *apiv1.Cluster) {
 		Expect(pooler.Status.Secrets.ServerCA.Name).To(Equal(cluster.GetServerCASecretName()))
 		Expect(pooler.Status.Secrets.ServerTLS.Name).To(Equal(cluster.GetServerTLSSecretName()))
 		Expect(pooler.Status.Secrets.ClientCA.Name).To(Equal(cluster.GetClientCASecretName()))
 	}
-	assertAuthUserStatus := func(pooler *v1.Pooler, authUserSecret *corev1.Secret) {
+	assertAuthUserStatus := func(pooler *apiv1.Pooler, authUserSecret *corev1.Secret) {
 		Expect(pooler.Status.Secrets.PgBouncerSecrets.AuthQuery.Name).To(Equal(authUserSecret.Name))
 		Expect(pooler.Status.Secrets.PgBouncerSecrets.AuthQuery.Version).To(Equal(authUserSecret.ResourceVersion))
 	}
@@ -96,39 +95,6 @@ var _ = Describe("pooler_status unit tests", func() {
 		Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
 	})
 
-	It("should correctly set pod resources to the bootstrap init container", func() {
-		cluster := newFakeCNPGCluster(env.client, "test-namespace")
-
-		pooler := &v1.Pooler{
-			Spec: v1.PoolerSpec{
-				Template: &v1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Resources: &corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("100m"),
-								corev1.ResourceMemory: resource.MustParse("128Mi"),
-							},
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("200m"),
-								corev1.ResourceMemory: resource.MustParse("256Mi"),
-							},
-						},
-					},
-				},
-			},
-		}
-
-		dep, err := pgbouncer.Deployment(pooler, cluster)
-		Expect(err).ToNot(HaveOccurred())
-		// check that the init container has the correct resources
-		Expect(dep.Spec.Template.Spec.InitContainers).To(HaveLen(1))
-		initResources := dep.Spec.Template.Spec.InitContainers[0].Resources
-		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
-		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
-		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("200m")))
-		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("256Mi")))
-	})
-
 	It("should correctly interact with the api server", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
@@ -148,14 +114,14 @@ var _ = Describe("pooler_status unit tests", func() {
 		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster, Deployment: dep}
 
 		By("making sure it updates the remote stored status when there are changes", func() {
-			poolerBefore := &v1.Pooler{}
+			poolerBefore := &apiv1.Pooler{}
 			err := env.client.Get(ctx, poolerQuery, poolerBefore)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
-			poolerAfter := &v1.Pooler{}
+			poolerAfter := &apiv1.Pooler{}
 			err = env.client.Get(ctx, poolerQuery, poolerAfter)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -166,14 +132,14 @@ var _ = Describe("pooler_status unit tests", func() {
 		})
 
 		By("making sure it doesn't update the remote stored status when there aren't changes", func() {
-			poolerBefore := &v1.Pooler{}
+			poolerBefore := &apiv1.Pooler{}
 			err := env.client.Get(ctx, poolerQuery, poolerBefore)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
-			poolerAfter := &v1.Pooler{}
+			poolerAfter := &apiv1.Pooler{}
 			err = env.client.Get(ctx, poolerQuery, poolerAfter)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(poolerBefore.Status).To(BeEquivalentTo(poolerAfter.Status))

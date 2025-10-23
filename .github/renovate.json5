@@ -8,7 +8,7 @@
   ],
   rebaseWhen: 'never',
   prConcurrentLimit: 5,
-  baseBranches: [
+  baseBranchPatterns: [
     'main',
     'release-1.25',
     'release-1.26',
@@ -48,6 +48,15 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
+      ],
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^docker-bake\\.hcl$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?\\s*=\\s*["\']?(?<depName>[^:@]+):(?<currentValue>[a-z0-9.-]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?["\']?,?\\s',
       ],
     },
     {
