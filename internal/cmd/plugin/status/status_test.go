@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("getPrimaryStartTime", func() {
+var _ = Describe("getPrimaryPromotionTime", func() {
 	var cluster *apiv1.Cluster
 
 	Context("when CurrentPrimaryTimestamp is empty", func() {
@@ -44,7 +44,7 @@ var _ = Describe("getPrimaryStartTime", func() {
 		})
 
 		It("should return an empty string", func() {
-			Expect(getPrimaryStartTime(cluster)).To(Equal(""))
+			Expect(getPrimaryPromotionTime(cluster)).To(Equal(""))
 		})
 	})
 
@@ -61,7 +61,7 @@ var _ = Describe("getPrimaryStartTime", func() {
 			}
 
 			expected := fmt.Sprintf("%s (uptime %s)", currentPrimaryTimestamp.Round(time.Second), uptime)
-			Expect(getPrimaryStartTimeIdempotent(cluster, now)).To(Equal(expected))
+			Expect(getPrimaryPromotionTimeIdempotent(cluster, now)).To(Equal(expected))
 		})
 	})
 
@@ -75,7 +75,7 @@ var _ = Describe("getPrimaryStartTime", func() {
 		})
 
 		It("should return the error message", func() {
-			Expect(getPrimaryStartTime(cluster)).To(ContainSubstring("error"))
+			Expect(getPrimaryPromotionTime(cluster)).To(ContainSubstring("error"))
 		})
 	})
 })
