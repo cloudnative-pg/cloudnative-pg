@@ -674,6 +674,9 @@ const (
 
 	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
 	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
+
+	// PhaseWaitingForManagedRoleSecrets is set when the cluster is waiting for managed role secrets to be created
+	PhaseWaitingForManagedRoleSecrets = "Waiting for managed role secrets to be created"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral

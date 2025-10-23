@@ -167,6 +167,11 @@ func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluste
 		return err
 	}
 
+	// Check if managed role secrets exist before proceeding with bootstrap
+	if err := r.ensureManagedRoleSecretsExist(ctx, cluster); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -232,6 +237,89 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)
 	}
+	return nil
+}
+
+// ensureManagedRoleSecretsExist checks that all required managed role secrets exist
+// before proceeding with the database initialization. This prevents the situation
+// where the database is initialized without proper credentials for managed roles,
+// which can happen when using external secret managers like external-secrets.
+func (r *ClusterReconciler) ensureManagedRoleSecretsExist(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// If there are no managed roles configured, there's nothing to check
+	if cluster.Spec.Managed == nil || len(cluster.Spec.Managed.Roles) == 0 {
+		return nil
+	}
+
+	// If the cluster is already initialized (has a current primary), skip this check
+	// as the secrets might have been created after initialization
+	if cluster.Status.CurrentPrimary != "" {
+		return nil
+	}
+
+	// Check if this is an initdb bootstrap
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.InitDB == nil {
+		// For other bootstrap methods (recovery, pg_basebackup), we don't need to wait
+		// as they will handle managed roles after the database is up
+		return nil
+	}
+
+	// Collect missing secrets
+	var missingSecrets []string
+
+	for _, role := range cluster.Spec.Managed.Roles {
+		// Skip roles without password secrets or with disabled passwords
+		if role.PasswordSecret == nil || role.DisablePassword {
+			continue
+		}
+
+		secretName := role.PasswordSecret.Name
+		if secretName == "" {
+			continue
+		}
+
+		var secret corev1.Secret
+		err := r.Get(ctx,
+			client.ObjectKey{Namespace: cluster.Namespace, Name: secretName},
+			&secret)
+
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				missingSecrets = append(missingSecrets, secretName)
+				contextLogger.Info("Managed role secret not found, waiting for it to be created",
+					"secretName", secretName,
+					"roleName", role.Name)
+			} else {
+				// If we get an error other than NotFound, return it
+				return fmt.Errorf("error checking managed role secret %s: %w", secretName, err)
+			}
+		}
+	}
+
+	// If there are missing secrets, register the phase and return ErrNextLoop
+	// to requeue the reconciliation
+	if len(missingSecrets) > 0 {
+		contextLogger.Info("Waiting for managed role secrets to be created",
+			"missingSecrets", missingSecrets)
+
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseWaitingForManagedRoleSecrets,
+			fmt.Sprintf("Waiting for managed role secrets to be created: %v", missingSecrets),
+		); err != nil {
+			return err
+		}
+
+		// Return ErrNextLoop to requeue without error
+		return ErrNextLoop
+	}
+
+	contextLogger.Debug("All managed role secrets exist, proceeding with initialization")
 	return nil
 }
 

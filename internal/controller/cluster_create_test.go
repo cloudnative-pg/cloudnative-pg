@@ -1343,4 +1343,371 @@ var _ = Describe("Service Reconciling", func() {
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
 	})
+
+	Describe("ensureManagedRoleSecretsExist", func() {
+		var env *testingEnvironment
+		var cluster *apiv1.Cluster
+		var namespace string
+
+		BeforeEach(func() {
+			env = buildTestEnvironment()
+			namespace = newFakeNamespace(env.client)
+			cluster = &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						InitDB: &apiv1.BootstrapInitDB{
+							Database: "app",
+							Owner:    "app",
+						},
+					},
+				},
+			}
+		})
+
+		It("should proceed when no managed roles are configured", func(ctx SpecContext) {
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should proceed when cluster already has a primary", func(ctx SpecContext) {
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "testrole",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			}
+			cluster.Status.CurrentPrimary = "cluster-1"
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should proceed for non-initdb bootstrap methods", func(ctx SpecContext) {
+			cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{},
+			}
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "testrole",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			}
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return ErrNextLoop when managed role secret is missing", func(ctx SpecContext) {
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "testrole",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "missing-secret",
+						},
+					},
+				},
+			}
+
+			// Create the cluster in the fake client so RegisterPhase can patch it
+			Expect(env.client.Create(ctx, cluster)).To(Succeed())
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).To(Equal(ErrNextLoop))
+
+			// Verify the phase was set
+			var updatedCluster apiv1.Cluster
+			Expect(env.client.Get(ctx, k8client.ObjectKeyFromObject(cluster), &updatedCluster)).To(Succeed())
+			Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForManagedRoleSecrets))
+		})
+
+		It("should proceed when all managed role secrets exist", func(ctx SpecContext) {
+			secretName := "test-secret"
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"username": []byte("testrole"),
+					"password": []byte("testpass"),
+				},
+				Type: corev1.SecretTypeBasicAuth,
+			}
+			Expect(env.client.Create(ctx, secret)).To(Succeed())
+
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "testrole",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: secretName,
+						},
+					},
+				},
+			}
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should skip roles without password secrets", func(ctx SpecContext) {
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "testrole",
+						DisablePassword: true,
+					},
+				},
+			}
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should handle multiple managed roles with mixed secret states", func(ctx SpecContext) {
+			existingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "existing-secret",
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"username": []byte("role1"),
+					"password": []byte("pass1"),
+				},
+				Type: corev1.SecretTypeBasicAuth,
+			}
+			Expect(env.client.Create(ctx, existingSecret)).To(Succeed())
+
+			cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "role1",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "existing-secret",
+						},
+					},
+					{
+						Name: "role2",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "missing-secret",
+						},
+					},
+				},
+			}
+
+			// Create the cluster in the fake client so RegisterPhase can patch it
+			Expect(env.client.Create(ctx, cluster)).To(Succeed())
+
+			err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+			Expect(err).To(Equal(ErrNextLoop))
+
+			// Verify the phase was set
+			var updatedCluster apiv1.Cluster
+			Expect(env.client.Get(ctx, k8client.ObjectKeyFromObject(cluster), &updatedCluster)).To(Succeed())
+			Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForManagedRoleSecrets))
+		})
+	})
+})
+
+var _ = Describe("ensureManagedRoleSecretsExist", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("should succeed when no managed roles are configured", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should succeed when managed roles have no password secrets", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:            "test-role",
+					DisablePassword: true,
+				},
+			},
+		}
+
+		err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should succeed when cluster is already initialized (has current primary)", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name: "test-role",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: "missing-secret",
+					},
+				},
+			},
+		}
+		cluster.Status.CurrentPrimary = "test-cluster-1"
+
+		err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should succeed when not using initdb bootstrap", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name: "test-role",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: "missing-secret",
+					},
+				},
+			},
+		}
+		cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+			Recovery: &apiv1.BootstrapRecovery{
+				Source: "source-cluster",
+			},
+		}
+
+		err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return ErrNextLoop when managed role secret is missing during initdb", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name: "test-role",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: "missing-secret",
+					},
+				},
+			},
+		}
+
+		err := env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Equal(ErrNextLoop))
+
+		// Verify the phase was set correctly
+		var updatedCluster apiv1.Cluster
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForManagedRoleSecrets))
+		Expect(updatedCluster.Status.PhaseReason).To(ContainSubstring("missing-secret"))
+	})
+
+	It("should succeed when all managed role secrets exist", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		secretName := "test-role-secret"
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name: "test-role",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: secretName,
+					},
+				},
+			},
+		}
+
+		// Create the secret
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Type: corev1.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				"username": []byte("test-role"),
+				"password": []byte("test-password"),
+			},
+		}
+		err := env.client.Create(ctx, secret)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return ErrNextLoop when some secrets are missing", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		existingSecretName := "existing-secret"
+		missingSecretName := "missing-secret"
+
+		cluster.Spec.Managed = &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name: "role-with-secret",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: existingSecretName,
+					},
+				},
+				{
+					Name: "role-without-secret",
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: missingSecretName,
+					},
+				},
+			},
+		}
+
+		// Create only one of the secrets
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      existingSecretName,
+				Namespace: namespace,
+			},
+			Type: corev1.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				"username": []byte("role-with-secret"),
+				"password": []byte("test-password"),
+			},
+		}
+		err := env.client.Create(ctx, secret)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = env.clusterReconciler.ensureManagedRoleSecretsExist(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(Equal(ErrNextLoop))
+
+		// Verify the phase was set correctly
+		var updatedCluster apiv1.Cluster
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForManagedRoleSecrets))
+		Expect(updatedCluster.Status.PhaseReason).To(ContainSubstring(missingSecretName))
+	})
 })
