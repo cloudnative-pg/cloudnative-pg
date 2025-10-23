@@ -35,6 +35,15 @@ as it is composed of a community PostgreSQL image and the latest
     in your system to take advantage of the improvements introduced in
     Barman cloud (as well as improve the security aspects of your cluster).
 
+!!! Warning "Changes in Barman Cloud 3.16+ and Bucket Creation"
+    Starting with Barman Cloud 3.16, most Barman Cloud commands no longer
+    automatically create the target bucket, assuming it already exists. Only the
+    `barman-cloud-check-wal-archive` command creates the bucket now. Whenever this
+    is not the first operation run on an empty bucket, CloudNativePG will throw an
+    error. As a result, to ensure reliable, future-proof operations and avoid
+    potential issues, we strongly recommend that you create and configure your
+    object store bucket *before* creating a `Cluster` resource that references it.
+
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
 [replica clusters](../replica_cluster.md)
