@@ -20,12 +20,16 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"context"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -313,4 +317,256 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
+})
+
+func (r *ClusterReconciler) pausePoolersDuringSwitchoverTest(ctx context.Context, cluster *apiv1.Cluster, poolers []apiv1.Pooler) error {
+	contextLogger := log.FromContext(ctx)
+
+	poolerList := apiv1.PoolerList{Items: poolers}
+
+	if len(poolerList.Items) == 0 {
+		contextLogger.Debug("No poolers found for cluster, skipping pause operation")
+		return nil
+	}
+
+	contextLogger.Info("Pausing poolers during switchover", "poolerCount", len(poolerList.Items))
+
+	for i := range poolerList.Items {
+		pooler := &poolerList.Items[i]
+
+		if pooler.Spec.Cluster.Name != cluster.Name {
+			continue
+		}
+
+		if pooler.Spec.PgBouncer != nil && pooler.Spec.PgBouncer.IsPaused() {
+			contextLogger.Debug("Pooler is already paused, skipping", "pooler", pooler.Name)
+			continue
+		}
+
+		if !pooler.IsAutomatedIntegration() {
+			contextLogger.Debug("Pooler has manual auth configuration, skipping pause", "pooler", pooler.Name)
+			continue
+		}
+
+		poolerCopy := pooler.DeepCopy()
+		if poolerCopy.Spec.PgBouncer == nil {
+			poolerCopy.Spec.PgBouncer = &apiv1.PgBouncerSpec{}
+		}
+
+		poolerCopy.Spec.PgBouncer.Paused = &[]bool{true}[0]
+		if poolerCopy.Annotations == nil {
+			poolerCopy.Annotations = make(map[string]string)
+		}
+		poolerCopy.Annotations["cnpg.io/pausedDuringSwitchover"] = "true"
+
+		if err := r.Update(ctx, poolerCopy); err != nil {
+			contextLogger.Error(err, "Failed to pause pooler during switchover", "pooler", pooler.Name)
+			continue
+		}
+
+		contextLogger.Info("Paused pooler during switchover", "pooler", pooler.Name)
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) resumePoolersAfterSwitchoverTest(ctx context.Context, cluster *apiv1.Cluster, poolers []apiv1.Pooler) error {
+	contextLogger := log.FromContext(ctx)
+
+	poolerList := apiv1.PoolerList{Items: poolers}
+
+	if len(poolerList.Items) == 0 {
+		contextLogger.Debug("No poolers found for cluster, skipping resume operation")
+		return nil
+	}
+
+	contextsResumed := 0
+	for i := range poolerList.Items {
+		pooler := &poolerList.Items[i]
+
+		if pooler.Spec.Cluster.Name != cluster.Name {
+			continue
+		}
+
+		if pooler.Annotations == nil || pooler.Annotations["cnpg.io/pausedDuringSwitchover"] != "true" {
+			continue
+		}
+
+		poolerCopy := pooler.DeepCopy()
+		if poolerCopy.Spec.PgBouncer == nil {
+			continue 
+		}
+
+		poolerCopy.Spec.PgBouncer.Paused = &[]bool{false}[0]
+		delete(poolerCopy.Annotations, "cnpg.io/pausedDuringSwitchover")
+
+		if err := r.Update(ctx, poolerCopy); err != nil {
+			contextLogger.Error(err, "Failed to resume pooler after switchover", "pooler", pooler.Name)
+			continue
+		}
+
+		contextsResumed++
+		contextLogger.Info("Resumed pooler after switchover", "pooler", pooler.Name)
+	}
+
+	if contextsResumed > 0 {
+		contextLogger.Info("Resumed poolers after switchover", "poolerCount", contextsResumed)
+	}
+
+	return nil
+}
+
+var _ = Describe("Pooler switchover integration", func() {
+	var env *testingEnvironment
+	var ctx context.Context
+	var namespace string
+	var cluster *apiv1.Cluster
+	var pooler *apiv1.Pooler
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		ctx = context.Background()
+		namespace = newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, namespace)
+		pooler = newFakePooler(env.client, cluster)
+	})
+
+	Context("pausePoolersDuringSwitchover", func() {
+		It("should pause poolers with automated integration during switchover", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode: apiv1.PgBouncerPoolModeSession,
+			}
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.pausePoolersDuringSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &updatedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPooler.Spec.PgBouncer.IsPaused()).To(BeTrue())
+			Expect(updatedPooler.Annotations["cnpg.io/pausedDuringSwitchover"]).To(Equal("true"))
+		})
+
+		It("should skip poolers that are already paused", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode: apiv1.PgBouncerPoolModeSession,
+				Paused:   ptr.To(true),
+			}
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.pausePoolersDuringSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &updatedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPooler.Spec.PgBouncer.IsPaused()).To(BeTrue())
+			Expect(updatedPooler.Annotations).ToNot(HaveKey("cnpg.io/pausedDuringSwitchover"))
+		})
+
+		It("should skip poolers with manual auth configuration", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode:  apiv1.PgBouncerPoolModeSession,
+				AuthQuery: "SELECT username, password FROM users WHERE username = $1",
+			}
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.pausePoolersDuringSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &updatedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPooler.Spec.PgBouncer.IsPaused()).To(BeFalse())
+			Expect(updatedPooler.Annotations).ToNot(HaveKey("cnpg.io/pausedDuringSwitchover"))
+		})
+
+		It("should handle clusters with no poolers gracefully", func() {
+			err := env.clusterReconciler.pausePoolersDuringSwitchoverTest(ctx, cluster, []apiv1.Pooler{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("resumePoolersAfterSwitchover", func() {
+		It("should resume poolers that were paused during switchover", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode: apiv1.PgBouncerPoolModeSession,
+				Paused:   ptr.To(true),
+			}
+			if pooler.Annotations == nil {
+				pooler.Annotations = make(map[string]string)
+			}
+			pooler.Annotations["cnpg.io/pausedDuringSwitchover"] = "true"
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.resumePoolersAfterSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &updatedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPooler.Spec.PgBouncer.IsPaused()).To(BeFalse())
+			Expect(updatedPooler.Annotations).ToNot(HaveKey("cnpg.io/pausedDuringSwitchover"))
+		})
+
+		It("should skip poolers that were not paused during switchover", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode: apiv1.PgBouncerPoolModeSession,
+				Paused:   ptr.To(true),
+			}
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.resumePoolersAfterSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &updatedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedPooler.Spec.PgBouncer.IsPaused()).To(BeTrue())
+		})
+
+		It("should handle clusters with no poolers gracefully", func() {
+			err := env.clusterReconciler.resumePoolersAfterSwitchoverTest(ctx, cluster, []apiv1.Pooler{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("full switchover integration test", func() {
+		It("should pause poolers during switchover and resume them after completion", func() {
+			pooler.Spec.PgBouncer = &apiv1.PgBouncerSpec{
+				PoolMode: apiv1.PgBouncerPoolModeSession,
+			}
+			err := env.client.Update(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+
+			var initialPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &initialPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(initialPooler.Spec.PgBouncer.IsPaused()).To(BeFalse())
+
+			err = env.clusterReconciler.pausePoolersDuringSwitchoverTest(ctx, cluster, []apiv1.Pooler{*pooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var pausedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &pausedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pausedPooler.Spec.PgBouncer.IsPaused()).To(BeTrue())
+			Expect(pausedPooler.Annotations["cnpg.io/pausedDuringSwitchover"]).To(Equal("true"))
+
+			err = env.clusterReconciler.resumePoolersAfterSwitchoverTest(ctx, cluster, []apiv1.Pooler{pausedPooler})
+			Expect(err).ToNot(HaveOccurred())
+
+			var resumedPooler apiv1.Pooler
+			err = env.client.Get(ctx, client.ObjectKeyFromObject(pooler), &resumedPooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resumedPooler.Spec.PgBouncer.IsPaused()).To(BeFalse())
+			Expect(resumedPooler.Annotations).ToNot(HaveKey("cnpg.io/pausedDuringSwitchover"))
+		})
+	})
 })
