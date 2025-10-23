@@ -91,7 +91,7 @@ uses a `Merge` policy to update only the specified fields (`password`, `pgpass`,
 `jdbc-uri` and `uri`) in the `cluster-example-app` secret.
 
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: cluster-example-app-secret
@@ -180,7 +180,7 @@ named `vault-token` exists in the same namespace, containing the token used to
 authenticate with Vault.
 
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: SecretStore
 metadata:
   name: vault-backend
