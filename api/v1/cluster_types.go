@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -693,6 +693,14 @@ type ServiceAccountTemplate struct {
 	// Metadata are the metadata to be used for the generated
 	// service account
 	Metadata Metadata `json:"metadata"`
+
+	// Create determines whether the operator should create the ServiceAccount.
+	// When set to false, the operator will use an existing ServiceAccount
+	// with the name specified in metadata.name (or cluster name if not specified).
+	// Default is true (operator creates the ServiceAccount).
+	// +optional
+	// +kubebuilder:default=true
+	Create *bool `json:"create,omitempty"`
 }
 
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue

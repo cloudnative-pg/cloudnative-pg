@@ -5241,6 +5241,14 @@ spec:
               serviceAccountTemplate:
                 description: Configure the generation of the service account
                 properties:
+                  create:
+                    default: true
+                    description: |-
+                      Create determines whether the operator should create the ServiceAccount.
+                      When set to false, the operator will use an existing ServiceAccount
+                      with the name specified in metadata.name (or cluster name if not specified).
+                      Default is true (operator creates the ServiceAccount).
+                    type: boolean
                   metadata:
                     description: |-
                       Metadata are the metadata to be used for the generated

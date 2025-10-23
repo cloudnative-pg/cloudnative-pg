@@ -573,6 +573,25 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
 	var sa corev1.ServiceAccount
 	saName := specs.GetServiceAccountName(cluster)
+
+	// Check if we should use an external ServiceAccount
+	if !specs.ShouldCreateServiceAccount(cluster) {
+		contextLogger := log.FromContext(ctx)
+		contextLogger.Info("Using external ServiceAccount, skipping creation",
+			"serviceAccountName", saName)
+
+		// Validate that the external ServiceAccount exists
+		if err := specs.ValidateExternalServiceAccount(ctx, r.Client, cluster); err != nil {
+			return err
+		}
+
+		// Record event that we're using an external SA
+		r.Recorder.Event(cluster, "Normal", "UsingExternalServiceAccount",
+			fmt.Sprintf("Using external ServiceAccount: %s", saName))
+
+		return nil // Don't create or patch, just use the existing one
+	}
+
 	if err := r.Get(ctx, client.ObjectKey{Name: saName, Namespace: cluster.Namespace}, &sa); err != nil {
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting service account: %w", err)

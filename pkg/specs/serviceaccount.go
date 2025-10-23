@@ -22,11 +22,14 @@ package specs
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -42,6 +45,52 @@ func GetServiceAccountName(cluster *apiv1.Cluster) string {
 		return cluster.Spec.ServiceAccountTemplate.Metadata.Name
 	}
 	return cluster.Name
+}
+
+// ShouldCreateServiceAccount returns true if the operator should create the ServiceAccount
+func ShouldCreateServiceAccount(cluster *apiv1.Cluster) bool {
+	if cluster.Spec.ServiceAccountTemplate == nil {
+		return true // Default behavior: create SA
+	}
+
+	if cluster.Spec.ServiceAccountTemplate.Create == nil {
+		return true // Default behavior: create SA
+	}
+
+	return *cluster.Spec.ServiceAccountTemplate.Create
+}
+
+// ValidateExternalServiceAccount verifies that a pre-existing ServiceAccount exists
+// and is accessible. Returns an error if the ServiceAccount doesn't exist or cannot be accessed.
+func ValidateExternalServiceAccount(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	if ShouldCreateServiceAccount(cluster) {
+		return nil // Not using external SA, nothing to validate
+	}
+
+	saName := GetServiceAccountName(cluster)
+	var sa corev1.ServiceAccount
+
+	err := cli.Get(ctx, client.ObjectKey{
+		Name:      saName,
+		Namespace: cluster.Namespace,
+	}, &sa)
+
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return fmt.Errorf(
+				"external ServiceAccount %q does not exist in namespace %q. "+
+					"Either create the ServiceAccount or set spec.serviceAccountTemplate.create=true "+
+					"to have the operator create it",
+				saName, cluster.Namespace)
+		}
+		return fmt.Errorf("failed to get external ServiceAccount %q: %w", saName, err)
+	}
+
+	return nil
 }
 
 // CreateRoleBindingFromMeta creates a RoleBinding when you only have ObjectMeta
