@@ -60,7 +60,7 @@ var _ = Describe("getPrimaryPromotionTime", func() {
 				},
 			}
 
-			expected := fmt.Sprintf("%s (uptime %s)", currentPrimaryTimestamp.Round(time.Second), uptime)
+			expected := fmt.Sprintf("%s (%s)", currentPrimaryTimestamp.Round(time.Second), uptime)
 			Expect(getPrimaryPromotionTimeIdempotent(cluster, now)).To(Equal(expected))
 		})
 	})
