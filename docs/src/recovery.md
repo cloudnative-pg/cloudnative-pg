@@ -367,7 +367,7 @@ spec:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
       recoveryTarget:
-        targetTime: "2023-07-06T08:00:39"
+        targetTime: "2023-06-11 08:00:39.00000+02"
   externalClusters:
     - name: origin
       plugin:
@@ -404,8 +404,7 @@ recovery target.
 Here are the recovery target criteria you can use:
 
 targetTime
-:  Time stamp up to which recovery proceeds, expressed in
-   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format.
+:  Time stamp up to which recovery proceeds, expressed in the form of a timestamp.
    (The precise stopping point is also influenced by the `exclusive` option.)
 
 :::warning
