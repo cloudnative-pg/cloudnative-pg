@@ -30,7 +30,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
@@ -324,13 +323,13 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.collectInstanceMetrics(ch)
 
 	if e.queries != nil {
-		var TTL *metav1.Duration
+		var defaultClusterForTTL apiv1.Cluster
+		ttl := defaultClusterForTTL.GetMetricsQueriesTTL().Duration
 		if cluster, _ := e.getCluster(); cluster != nil {
-			ttl := cluster.GetMetricsQueriesTTL()
-			TTL = &ttl
+			ttl = cluster.GetMetricsQueriesTTL().Duration
 		}
-		// if we can't get the cluster, we recompute the queries just to be safe
-		if TTL == nil || e.queries.ShouldUpdate(TTL.Duration) {
+
+		if e.queries.ShouldUpdate(ttl) {
 			e.updateMetricsFromQueries()
 		} else {
 			log.Debug("using cached metrics from queries, as TTL is not exceeded")
