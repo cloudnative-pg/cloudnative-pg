@@ -98,8 +98,8 @@ func (q *QueriesCollector) Update() error {
 // ShouldUpdate finds if the metrics from queries need to be rerun,
 // or the cached values can be used
 func (q *QueriesCollector) ShouldUpdate(ttl time.Duration) bool {
-	q.metricsMutex.Lock()
-	defer q.metricsMutex.Unlock()
+	q.metricsMutex.RLock()
+	defer q.metricsMutex.RUnlock()
 	return q.timeLastUpdated.IsZero() || time.Since(q.timeLastUpdated) > ttl
 }
 
