@@ -3,7 +3,7 @@
 ## Supported Versions
 
 For details on all Community supported versions of CloudNativePG, please refer to the
-["Supported releases" section in the official documentation](https://cloudnative-pg.io/documentation/current/supported_releases/).
+["Supported releases" section in the official documentation](/docs/src/supported_releases.md).
 
 ## Reporting a Vulnerability
 
