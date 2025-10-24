@@ -386,6 +386,12 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// ContainerResizePolicy defines the resize policy for the PostgreSQL container
+	// in instance pods (primary and replica). This allows fine-grained control
+	// over how resource changes are applied to running containers.
+	// +optional
+	ContainerResizePolicy []corev1.ContainerResizePolicy `json:"containerResizePolicy,omitempty"`
+
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
 	// +optional
