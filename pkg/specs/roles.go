@@ -251,7 +251,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	return rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
+			Name:      GetServiceAccountName(&cluster),
 		},
 		Rules: rules,
 	}

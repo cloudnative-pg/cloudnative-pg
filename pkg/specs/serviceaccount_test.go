@@ -22,7 +22,9 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -119,5 +121,109 @@ var _ = Describe("Service accounts", func() {
 			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("GetServiceAccountName", func() {
+	It("returns cluster name when no template is specified", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		}
+		Expect(GetServiceAccountName(cluster)).To(Equal("test-cluster"))
+	})
+
+	It("returns cluster name when template exists but name is empty", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "",
+					},
+				},
+			},
+		}
+		Expect(GetServiceAccountName(cluster)).To(Equal("test-cluster"))
+	})
+
+	It("returns custom name when specified in template", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "custom-sa-name",
+					},
+				},
+			},
+		}
+		Expect(GetServiceAccountName(cluster)).To(Equal("custom-sa-name"))
+	})
+})
+
+var _ = Describe("ShouldCreateServiceAccount", func() {
+	It("returns true when no template is specified", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		}
+		Expect(ShouldCreateServiceAccount(cluster)).To(BeTrue())
+	})
+
+	It("returns true when create is not specified (default)", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "custom-sa",
+					},
+				},
+			},
+		}
+		Expect(ShouldCreateServiceAccount(cluster)).To(BeTrue())
+	})
+
+	It("returns true when create is explicitly true", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "custom-sa",
+					},
+					Create: ptr.To(true),
+				},
+			},
+		}
+		Expect(ShouldCreateServiceAccount(cluster)).To(BeTrue())
+	})
+
+	It("returns false when create is explicitly false", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "external-sa",
+					},
+					Create: ptr.To(false),
+				},
+			},
+		}
+		Expect(ShouldCreateServiceAccount(cluster)).To(BeFalse())
 	})
 })
