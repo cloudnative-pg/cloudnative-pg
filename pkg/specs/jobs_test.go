@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -194,5 +195,54 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(initdbFlags).Should(ContainSubstring("--icu-locale=und"))
 		Expect(initdbFlags).ShouldNot(ContainSubstring("--locale="))
 		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
+	})
+
+	It("contains correct labels", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						PostInitSQL:            []string{"testPostInitSql"},
+						PostInitTemplateSQL:    []string{"testPostInitTemplateSql"},
+						PostInitApplicationSQL: []string{"testPostInitApplicationSql"},
+						PostInitApplicationSQLRefs: &apiv1.SQLRefs{
+							SecretRefs: []apiv1.SecretKeySelector{
+								{
+									Key: "secretKey1",
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: "secretName1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(job.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.JobRoleLabelName:                "initdb",
+			utils.InstanceNameLabelName:           "cluster-0",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
+		Expect(job.Spec.Template.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.JobRoleLabelName:                "initdb",
+			utils.InstanceNameLabelName:           "cluster-0",
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 	})
 })
