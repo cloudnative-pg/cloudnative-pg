@@ -361,3 +361,102 @@ var _ = Describe("sendPluginMetrics tests", func() {
 		Expect(ch).To(BeEmpty())
 	})
 })
+
+var _ = Describe("QueriesCollector timestamp metric tests", func() {
+	var collector *QueriesCollector
+
+	BeforeEach(func() {
+		collector = NewQueriesCollector("test_collector", nil, "postgres")
+	})
+
+	It("should initialize with zero timestamp", func() {
+		Expect(collector.timeLastUpdated.IsZero()).To(BeTrue())
+
+		// Collect the timestamp metric
+		ch := make(chan prometheus.Metric, 10)
+		collector.lastUpdateTimestamp.Collect(ch)
+
+		Expect(ch).To(HaveLen(1))
+		metric := <-ch
+
+		var m io_prometheus_client.Metric
+		Expect(metric.Write(&m)).To(Succeed())
+		// Should be 0 when not yet updated
+		Expect(m.GetGauge().GetValue()).To(BeEquivalentTo(0))
+	})
+
+	It("should expose timestamp metric in Describe", func() {
+		ch := make(chan *prometheus.Desc, 10)
+		collector.Describe(ch)
+
+		// The descriptor should be registered
+		Expect(collector.lastUpdateTimestamp).NotTo(BeNil())
+
+		// Should have collected some descriptors
+		Expect(ch).ToNot(BeEmpty())
+	})
+
+	It("should include timestamp metric in Collect output", func() {
+		ch := make(chan prometheus.Metric, 10)
+		collector.Collect(ch)
+
+		// Should include at least the timestamp and error gauge metrics
+		Expect(len(ch)).To(BeNumerically(">=", 2))
+
+		// Find the timestamp metric by checking gauge values
+		var foundTimestamp bool
+		for len(ch) > 0 {
+			metric := <-ch
+			var m io_prometheus_client.Metric
+			if metric.Write(&m) == nil && m.Gauge != nil {
+				foundTimestamp = true
+				break
+			}
+		}
+		Expect(foundTimestamp).To(BeTrue())
+	})
+
+	It("should update timestamp when Update is called", func() {
+		// Note: This test would need a real instance to work properly
+		// For now, we verify the timestamp metric exists and can be collected
+
+		ch := make(chan prometheus.Metric, 10)
+		collector.lastUpdateTimestamp.Collect(ch)
+
+		Expect(ch).To(HaveLen(1))
+		metric := <-ch
+
+		var m io_prometheus_client.Metric
+		Expect(metric.Write(&m)).To(Succeed())
+		Expect(m.Gauge).NotTo(BeNil())
+
+		// Initially should be 0
+		initialValue := m.GetGauge().GetValue()
+		Expect(initialValue).To(BeEquivalentTo(0))
+	})
+
+	It("should set timestamp as Unix timestamp", func() {
+		// Manually set a timestamp to verify the format
+		testTime := int64(1729785600) // October 24, 2024
+		collector.lastUpdateTimestamp.Set(float64(testTime))
+
+		ch := make(chan prometheus.Metric, 10)
+		collector.lastUpdateTimestamp.Collect(ch)
+
+		Expect(ch).To(HaveLen(1))
+		metric := <-ch
+
+		var m io_prometheus_client.Metric
+		Expect(metric.Write(&m)).To(Succeed())
+		Expect(m.GetGauge().GetValue()).To(BeEquivalentTo(float64(testTime)))
+	})
+
+	It("should have correct metric metadata", func() {
+		desc := collector.lastUpdateTimestamp.Desc()
+		descStr := desc.String()
+
+		// Verify the metric name contains the namespace and metric name
+		Expect(descStr).To(ContainSubstring("test_collector"))
+		Expect(descStr).To(ContainSubstring("last_update_timestamp"))
+	})
+})

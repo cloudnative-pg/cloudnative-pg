@@ -57,6 +57,7 @@ type QueriesCollector struct {
 
 	errorUserQueries      *prometheus.CounterVec
 	errorUserQueriesGauge prometheus.Gauge
+	lastUpdateTimestamp   prometheus.Gauge
 
 	computedMetrics []prometheus.Metric
 	timeLastUpdated time.Time
@@ -92,6 +93,8 @@ func (q *QueriesCollector) Update() error {
 
 	q.createMetricsFromUserQueries(isPrimary)
 	q.timeLastUpdated = time.Now()
+	// Update the timestamp metric to reflect when metrics were last computed
+	q.lastUpdateTimestamp.Set(float64(q.timeLastUpdated.Unix()))
 	return nil
 }
 
@@ -116,6 +119,7 @@ func (q *QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	// Add errors into errorUserQueriesVec and errorUserQueriesGauge metrics
 	q.errorUserQueriesGauge.Collect(ch)
 	q.errorUserQueries.Collect(ch)
+	q.lastUpdateTimestamp.Collect(ch)
 }
 
 func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
@@ -284,6 +288,7 @@ func (q *QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 	// add error user queries description
 	q.errorUserQueries.Describe(ch)
 	q.errorUserQueriesGauge.Describe(ch)
+	q.lastUpdateTimestamp.Describe(ch)
 }
 
 // NewQueriesCollector creates a new PgCollector working over a set of custom queries
@@ -309,6 +314,11 @@ func NewQueriesCollector(
 			Namespace: name,
 			Name:      "last_error",
 			Help:      "1 if the last collection ended with error, 0 otherwise.",
+		}),
+		lastUpdateTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Name:      "last_update_timestamp",
+			Help:      "Timestamp of the last metrics update.",
 		}),
 	}
 }
