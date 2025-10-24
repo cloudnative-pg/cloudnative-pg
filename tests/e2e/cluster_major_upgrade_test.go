@@ -130,7 +130,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 	generatePostGISCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
 		cluster := generateBaseCluster(namespace, storageClass)
-		cluster.Spec.ImageName = env.OfficialPostGISImageName(tagVersion)
+		cluster.Spec.ImageName = env.PostGISImageName(tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
 			"CREATE EXTENSION postgis",
 			"CREATE EXTENSION postgis_raster",
@@ -206,8 +206,8 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 		// Set custom targets when detecting env variables
 		if envValue := os.Getenv(customPostgresImageRegistryEnvVar); envValue != "" {
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.StandardTrixieSuffix)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.MinimalTrixieSuffix)
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.StandardSuffix)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.MinimalSuffix)
 		}
 		if envValue := os.Getenv(customPostgisImageRegistryEnvVar); envValue != "" {
 			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-trixie", envValue, targetTag)
