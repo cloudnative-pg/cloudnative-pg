@@ -1184,6 +1184,19 @@ func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	return false
 }
 
+// GetMetricsQueriesTTL returns the Time To Live of the metrics computed from
+// queries. Once exceeded, a scrape of the metric will trigger a rerun of the queries.
+// Default value is 30 seconds
+func (cluster *Cluster) GetMetricsQueriesTTL() metav1.Duration {
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.MetricsQueriesTTL != nil {
+		return *cluster.Spec.Monitoring.MetricsQueriesTTL
+	}
+
+	return metav1.Duration{
+		Duration: 30 * time.Second,
+	}
+}
+
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not
 func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 	if cluster.Spec.EnableSuperuserAccess != nil {
