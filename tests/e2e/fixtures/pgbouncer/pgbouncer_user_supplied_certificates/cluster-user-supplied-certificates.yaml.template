@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pgbouncer-separate-client-server-ca
+  name: cluster-user-supplied-certificates
 spec:
   instances: 2
 
@@ -17,10 +17,15 @@ spec:
       log_replication_commands: 'on'
 
   certificates:
-    serverCASecret: my-postgresql-server-ca
-    serverTLSSecret: my-postgresql-server
-    clientCASecret: my-postgresql-client-ca
-    replicationTLSSecret: my-postgresql-client
+    serverTLSSecret: pg-server-cert
+    serverCASecret: pg-server-ca
+    clientCASecret: pg-client-ca
+    replicationTLSSecret: pg-client-streaming-replica
+
+  managed:
+    roles:
+      - name: pgbouncer
+        login: true
 
   bootstrap:
     initdb:

@@ -123,18 +123,11 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 	}
 	poolerLog.Info("Validation for Pooler upon creation", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
-	var warns admission.Warnings
-	if !pooler.IsAutomatedIntegration() {
-		poolerLog.Info("Pooler not automatically configured, manual configuration required",
-			"name", pooler.Name, "namespace", pooler.Namespace, "cluster", pooler.Spec.Cluster.Name)
-		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
-			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
-	}
+	warns := v.getAdmissionWarnings(pooler)
 
 	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
 	allErrs := v.validate(pooler)
-
 	if len(allErrs) == 0 {
 		return warns, nil
 	}
@@ -142,6 +135,27 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		pooler.Name, allErrs)
+}
+
+// getAdmissionWarnings gets the admission webhook warnings
+func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.Warnings {
+	var warns admission.Warnings
+
+	if !r.IsAutomatedIntegration() {
+		poolerLog.Info("Pooler not automatically configured, manual configuration required",
+			"name", r.Name, "namespace", r.Namespace, "cluster", r.Spec.Cluster.Name)
+		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
+			"Manually configure it as described in the docs.", r.Name, r.Spec.Cluster.Name, r.Namespace))
+	}
+
+	if r.Spec.PgBouncer != nil &&
+		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" { //nolint:staticcheck
+		warns = append(
+			warns,
+			"The .spec.pgbouncer.authQuerySecret field has been deprecated")
+	}
+
+	return warns
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
@@ -154,20 +168,14 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 		return nil, fmt.Errorf("expected a Pooler object for the newObj but got %T", newObj)
 	}
 
-	oldPooler, ok := oldObj.(*apiv1.Pooler)
+	_, ok = oldObj.(*apiv1.Pooler)
 	if !ok {
 		return nil, fmt.Errorf("expected a Pooler object for the oldObj but got %T", oldObj)
 	}
 
 	poolerLog.Info("Validation for Pooler upon update", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
-	var warns admission.Warnings
-	if oldPooler.IsAutomatedIntegration() && !pooler.IsAutomatedIntegration() {
-		poolerLog.Info("Pooler not automatically configured, manual configuration required",
-			"name", pooler.Name, "namespace", pooler.Namespace, "cluster", pooler.Spec.Cluster.Name)
-		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
-			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
-	}
+	warns := v.getAdmissionWarnings(pooler)
 
 	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
@@ -195,21 +203,27 @@ func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, obj runtime.Ob
 }
 
 func (v *PoolerCustomValidator) validatePgBouncer(r *apiv1.Pooler) field.ErrorList {
-	var result field.ErrorList
-	switch {
-	case r.Spec.PgBouncer == nil:
-		result = append(result,
+	if r.Spec.PgBouncer == nil {
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer"),
-				"", "required pgbouncer configuration"))
-	case r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" &&
-		r.Spec.PgBouncer.AuthQuery == "":
+				"",
+				"required pgbouncer configuration",
+			),
+		}
+	}
+
+	hasPGAuthentication := (r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(r.Spec.PgBouncer.ServerTLSSecret != nil && r.Spec.PgBouncer.ServerTLSSecret.Name != "")
+
+	var result field.ErrorList
+	switch {
+	case hasPGAuthentication && r.Spec.PgBouncer.AuthQuery == "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuery"),
 				"", "must specify an auth query when providing an auth query secret"))
-	case (r.Spec.PgBouncer.AuthQuerySecret == nil || r.Spec.PgBouncer.AuthQuerySecret.Name == "") &&
-		r.Spec.PgBouncer.AuthQuery != "":
+	case !hasPGAuthentication && r.Spec.PgBouncer.AuthQuery != "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuerySecret", "name"),
