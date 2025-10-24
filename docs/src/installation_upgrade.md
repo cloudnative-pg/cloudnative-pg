@@ -8,12 +8,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.1.yaml
 ```
 
 You can verify that with:
@@ -264,7 +264,7 @@ only the operator itself.
 
 -->
 
-### Upgrading to 1.27.0 or 1.26.1
+### Upgrading to 1.27 from a previous minor version
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
@@ -288,11 +288,6 @@ spec:
 ```
 
 ### Upgrading to 1.26 from a previous minor version
-
-!!! Important
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.26.1, or at a minimum, to the latest stable version of your current minor
-    release (for example, 1.25.x).
 
 !!! Warning
     Due to changes in the startup probe for the manager component
@@ -349,56 +344,3 @@ that apply declarative changes to enable or disable hibernation.
 The `hibernate status` command has been removed, as its purpose is now
 fulfilled by the standard `status` command.
 
-### Upgrading to 1.25 from a previous minor version
-
-!!! Warning
-    Every time you are upgrading to a higher minor release, make sure you
-    go through the release notes and upgrade instructions of all the
-    intermediate minor releases. For example, if you want to move
-    from 1.23.x to 1.25, make sure you go through the release notes
-    and upgrade instructions for 1.24 and 1.25.
-
-No changes to existing 1.24 cluster configurations are required when upgrading
-to 1.25.
-
-### Upgrading to 1.24 from a previous minor version
-
-#### From Replica Clusters to Distributed Topology
-
-One of the key enhancements in CloudNativePG 1.24.0 is the upgrade of the
-replica cluster feature.
-
-The former replica cluster feature, now referred to as the "Standalone Replica
-Cluster," is no longer recommended for Disaster Recovery (DR) and High
-Availability (HA) scenarios that span multiple Kubernetes clusters. Standalone
-replica clusters are best suited for read-only workloads, such as reporting,
-OLAP, or creating development environments with test data.
-
-For DR and HA purposes, CloudNativePG now introduces the Distributed Topology
-strategy for replica clusters. This new strategy allows you to build PostgreSQL
-clusters across private, public, hybrid, and multi-cloud environments, spanning
-multiple regions and potentially different cloud providers. It also provides an
-API to control the switchover operation, ensuring that only one cluster acts as
-the primary at any given time.
-
-This Distributed Topology strategy enhances resilience and scalability, making
-it a robust solution for modern, distributed applications that require high
-availability and disaster recovery capabilities across diverse infrastructure
-setups.
-
-You can seamlessly transition from a previous replica cluster configuration to a
-distributed topology by modifying all the `Cluster` resources involved in the
-distributed PostgreSQL setup. Ensure the following steps are taken:
-
-- Configure the `externalClusters` section to include all the clusters involved
-  in the distributed topology. We strongly suggest using the same configuration
-  across all `Cluster` resources for maintainability and consistency.
-- Configure the `primary` and `source` fields in the `.spec.replica` stanza to
-  reflect the distributed topology. The `primary` field should contain the name
-  of the current primary cluster in the distributed topology, while the `source`
-  field should contain the name of the cluster each `Cluster` resource is
-  replicating from. It is important to note that the `enabled` field, which was
-  previously set to `true` or `false`, should now be unset (default).
-
-For more information, please refer to
-the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).

@@ -205,7 +205,8 @@ type ImageCatalogRef struct {
 
 // +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
 
-// ClusterSpec defines the desired state of Cluster
+// ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
 	// +optional
@@ -803,7 +804,8 @@ type AvailableArchitecture struct {
 	Hash string `json:"hash"`
 }
 
-// ClusterStatus defines the observed state of Cluster
+// ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+// CloudNativePG.
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
 	// +optional
@@ -2202,6 +2204,9 @@ type MonitoringConfiguration struct {
 
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
@@ -2211,10 +2216,16 @@ type MonitoringConfiguration struct {
 	TLSConfig *ClusterMonitoringTLSConfiguration `json:"tls,omitempty"`
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
@@ -2358,8 +2369,9 @@ type PluginConfiguration struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Only one plugin can be declared as WALArchiver.
-	// Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+	// Marks the plugin as the WAL archiver. At most one plugin can be
+	// designated as a WAL archiver. This cannot be enabled if the
+	// `.spec.backup.barmanObjectStore` configuration is present.
 	// +kubebuilder:default:=false
 	// +optional
 	IsWALArchiver *bool `json:"isWALArchiver,omitempty"`
@@ -2511,7 +2523,8 @@ type RoleConfiguration struct {
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
 
-// Cluster is the Schema for the PostgreSQL API
+// Cluster defines the API schema for a highly available PostgreSQL database cluster
+// managed by CloudNativePG.
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

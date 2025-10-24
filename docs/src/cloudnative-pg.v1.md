@@ -60,7 +60,8 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 
 
 
-<p>Cluster is the Schema for the PostgreSQL API</p>
+<p>Cluster defines the API schema for a highly available PostgreSQL database cluster
+managed by CloudNativePG.</p>
 
 
 <table class="table">
@@ -1565,7 +1566,8 @@ Changing this option will force a rollout of all instances.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterSpec defines the desired state of Cluster</p>
+<p>ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
@@ -1989,7 +1991,8 @@ in the PostgreSQL Pods.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterStatus defines the observed state of Cluster</p>
+<p>ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
@@ -3967,6 +3970,8 @@ Default: false.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>tls</code><br/>
@@ -3982,6 +3987,8 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of metric relabelings for the <code>PodMonitor</code>. Applied to samples before ingestion.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorRelabelings</code><br/>
@@ -3989,6 +3996,8 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of relabelings for the <code>PodMonitor</code>. Applied to samples before scraping.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 </tbody>
@@ -4317,8 +4326,9 @@ cluster to be reconciled</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Only one plugin can be declared as WALArchiver.
-Cannot be active if &quot;.spec.backup.barmanObjectStore&quot; configuration is present.</p>
+   <p>Marks the plugin as the WAL archiver. At most one plugin can be
+designated as a WAL archiver. This cannot be enabled if the
+<code>.spec.backup.barmanObjectStore</code> configuration is present.</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>
@@ -4636,6 +4646,8 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 <td>
    <p>The configuration of the monitoring infrastructure of this pooler.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>serviceTemplate</code><br/>

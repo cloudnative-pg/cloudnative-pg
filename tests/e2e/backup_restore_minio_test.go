@@ -100,16 +100,14 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
-			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
+			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-						namespace, clusterName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
-					if err != nil {
-						return false, err
-					}
-					return connectionStatus, nil
+					connectionStatus, err := minio.TestBarmanConnectivity(
+						namespace, clusterName, primaryPod.Name,
+						"minio", "minio123", minioEnv.ServiceName)
+					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
 		})
@@ -609,16 +607,14 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
 
-			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
+			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-						namespace, clusterName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
-					if err != nil {
-						return false, err
-					}
-					return connectionStatus, nil
+					connectionStatus, err := minio.TestBarmanConnectivity(
+						namespace, clusterName, primaryPod.Name,
+						"minio", "minio123", minioEnv.ServiceName)
+					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
 		})

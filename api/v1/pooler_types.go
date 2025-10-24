@@ -88,6 +88,9 @@ type PoolerSpec struct {
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this pooler.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
 

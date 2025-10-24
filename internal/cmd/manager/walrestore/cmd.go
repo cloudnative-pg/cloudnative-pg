@@ -406,7 +406,14 @@ func isStreamingAvailable(cluster *apiv1.Cluster, podName string) bool {
 		return false
 	}
 
-	// Easy case: If this pod is a replica, the streaming is always available
+	// Easy case take 1: we are helping PostgreSQL to create the first
+	// instance of a Cluster. No streaming connection is possible.
+	if cluster.Status.CurrentPrimary == "" {
+		return false
+	}
+
+	// Easy case take 2: If this pod is a replica, the streaming is always
+	// available
 	if cluster.Status.CurrentPrimary != podName {
 		return true
 	}

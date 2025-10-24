@@ -606,28 +606,32 @@ func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
 	return output, nil
 }
 
-// TestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false
-func TestConnectivityUsingBarmanCloudWalArchive(
+// TestBarmanConnectivity validates the barman connectivity to the minio endpoint
+func TestBarmanConnectivity(
 	namespace,
 	clusterName,
-	podName,
-	id,
-	key string,
+	primaryPodName,
+	minioID,
+	minioKey string,
 	minioSvcName string,
 ) (bool, error) {
-	// test connectivity should work with valid sample "000000010000000000000000" wal file
-	// using barman-cloud-wal-archive script
-	cmd := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;"+
-		"barman-cloud-wal-archive --cloud-provider aws-s3 --endpoint-url https://%s:9000 s3://cluster-backups/ %s "+
-		"000000010000000000000000 --test", postgres.BarmanBackupEndpointCACertificateLocation, id, key,
-		minioSvcName, clusterName)
-	_, _, err := run.Unchecked(fmt.Sprintf(
-		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%v\"",
+	env := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;",
+		postgres.BarmanBackupEndpointCACertificateLocation, minioID, minioKey)
+
+	endpointURL := fmt.Sprintf("https://%s:9000", minioSvcName)
+	destinationPath := fmt.Sprintf("s3://%s/", "not-evaluated")
+	cmd := fmt.Sprintf("barman-cloud-check-wal-archive --cloud-provider aws-s3 --endpoint-url %s %s %s --test",
+		endpointURL, destinationPath, clusterName)
+
+	stdout, stderr, err := run.Unchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%s %s\"",
 		namespace,
-		podName,
-		cmd))
+		primaryPodName,
+		env,
+		cmd,
+	))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("barman connectivity test failed: %w (stdout: %s, stderr: %s)", err, stdout, stderr)
 	}
 	return true, nil
 }
