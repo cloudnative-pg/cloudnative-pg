@@ -62,8 +62,16 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		postgresqlMinimalEntry = "postgresql-minimal"
 
 		// custom registry envs
-		customPostgresImageRegistryEnvVar = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
-		customPostgisImageRegistryEnvVar  = "POSTGIS_MAJOR_UPGRADE_IMAGE_REGISTRY"
+		customPostgresImageRegistryEnvVar       = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
+		customPostgresImageStandardSuffixEnvVar = "POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX"
+		customPostgresImageMinimalSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX"
+		customPostgresImagePostGISSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX"
+
+		// default suffixes used when overriding registry via env vars
+		// as defined by postgres-trunk-containers tests
+		defaultStandardSuffix = "-standard-trixie"
+		defaultMinimalSuffix  = "-minimal-trixie"
+		defaultPostGISSuffix  = "-postgis-trixie"
 	)
 
 	type scenario struct {
@@ -204,13 +212,24 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			postgresqlMinimalEntry: env.MinimalImageName(targetTag),
 		}
 
-		// Set custom targets when detecting env variables
+		// Set custom targets when detecting env variables (used by postgres-trunk-containers tests)
 		if envValue := os.Getenv(customPostgresImageRegistryEnvVar); envValue != "" {
-			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.StandardSuffix)
-			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v-%s", envValue, targetTag, environment.MinimalSuffix)
-		}
-		if envValue := os.Getenv(customPostgisImageRegistryEnvVar); envValue != "" {
-			targetImages[postgisEntry] = fmt.Sprintf("%v:%v-postgis-trixie", envValue, targetTag)
+			standardSuffix := os.Getenv(customPostgresImageStandardSuffixEnvVar)
+			if standardSuffix == "" {
+				standardSuffix = defaultStandardSuffix
+			}
+			minimalSuffix := os.Getenv(customPostgresImageMinimalSuffixEnvVar)
+			if minimalSuffix == "" {
+				minimalSuffix = defaultMinimalSuffix
+			}
+			postgisSuffix := os.Getenv(customPostgresImagePostGISSuffixEnvVar)
+			if postgisSuffix == "" {
+				postgisSuffix = defaultPostGISSuffix
+			}
+
+			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, standardSuffix)
+			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, minimalSuffix)
+			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, postgisSuffix)
 		}
 
 		return targetImages

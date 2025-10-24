@@ -65,10 +65,12 @@ const (
 	// MinimalSuffix is the suffix for minimal images
 	MinimalSuffix = "minimal-trixie"
 
+	// PostGISSuffix is the suffix for PostGIS images
+	PostGISSuffix = "3-standard-trixie"
+
 	// Official CloudNativePG image repositories
 	defaultPostgresImageRepository = "ghcr.io/cloudnative-pg/postgresql"
 	defaultPostGISImageRepository  = "ghcr.io/cloudnative-pg/postgis"
-	defaultPostGISVersion          = "3"
 )
 
 // TestingEnvironment struct for operator testing
@@ -217,28 +219,22 @@ func (env TestingEnvironment) CreateUniqueTestNamespace(
 	return name, namespaces.CreateTestNamespace(ctx, crudClient, name, opts...)
 }
 
-// ImageNameWithSuffix constructs a full image name by appending a suffix to the tag.
-// It uses the PostgresImageName from the environment and formats it as: name:tag-suffix
-func (env *TestingEnvironment) ImageNameWithSuffix(tag, suffix string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, suffix)
-}
-
 // StandardImageName returns the full image name for a standard Postgres image.
 // Example: ghcr.io/cloudnative-pg/postgresql:17-standard-trixie
 func (env *TestingEnvironment) StandardImageName(tag string) string {
-	return env.ImageNameWithSuffix(tag, StandardSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, StandardSuffix)
 }
 
 // MinimalImageName returns the full image name for a minimal Postgres image.
 // Example: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
 func (env *TestingEnvironment) MinimalImageName(tag string) string {
-	return env.ImageNameWithSuffix(tag, MinimalSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, MinimalSuffix)
 }
 
 // PostGISImageName returns the full image name for the official CloudNativePG PostGIS image.
 // Example: ghcr.io/cloudnative-pg/postgis:17-3-standard-trixie
 func (env *TestingEnvironment) PostGISImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s-%s", env.PostGISImageRepository, tag, defaultPostGISVersion, StandardSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostGISImageRepository, tag, PostGISSuffix)
 }
 
 // OfficialStandardImageName returns the full image name for the official CloudNativePG standard Postgres image.
