@@ -59,16 +59,18 @@ const (
 	// RetryTimeout retry timeout (in seconds) when a client api call or kubectl cli request get failed
 	RetryTimeout = 60
 
-	// StandardTrixieSuffix is the suffix for standard Trixie images
-	StandardTrixieSuffix = "standard-trixie"
+	// StandardSuffix is the suffix for standard images
+	StandardSuffix = "standard-trixie"
 
-	// MinimalTrixieSuffix is the suffix for minimal Trixie images
-	MinimalTrixieSuffix = "minimal-trixie"
+	// MinimalSuffix is the suffix for minimal images
+	MinimalSuffix = "minimal-trixie"
+
+	// PostGISSuffix is the suffix for PostGIS images
+	PostGISSuffix = "3-standard-trixie"
 
 	// Official CloudNativePG image repositories
 	defaultPostgresImageRepository = "ghcr.io/cloudnative-pg/postgresql"
 	defaultPostGISImageRepository  = "ghcr.io/cloudnative-pg/postgis"
-	defaultPostGISVersion          = "3"
 )
 
 // TestingEnvironment struct for operator testing
@@ -217,53 +219,34 @@ func (env TestingEnvironment) CreateUniqueTestNamespace(
 	return name, namespaces.CreateTestNamespace(ctx, crudClient, name, opts...)
 }
 
-// ImageNameWithSuffix constructs a full image name by appending a suffix to the tag.
-// It uses the PostgresImageName from the environment and formats it as: name:tag-suffix
-func (env *TestingEnvironment) ImageNameWithSuffix(tag, suffix string) string {
-	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, suffix)
-}
-
 // StandardImageName returns the full image name for a standard Postgres image.
 // Example: ghcr.io/cloudnative-pg/postgresql:17-standard-trixie
 func (env *TestingEnvironment) StandardImageName(tag string) string {
-	return env.ImageNameWithSuffix(tag, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, StandardSuffix)
 }
 
 // MinimalImageName returns the full image name for a minimal Postgres image.
 // Example: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
 func (env *TestingEnvironment) MinimalImageName(tag string) string {
-	return env.ImageNameWithSuffix(tag, MinimalTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, MinimalSuffix)
 }
 
-// PostGISImageName returns the full image name for a PostGIS image.
+// PostGISImageName returns the full image name for the official CloudNativePG PostGIS image.
 // Example: ghcr.io/cloudnative-pg/postgis:17-3-standard-trixie
 func (env *TestingEnvironment) PostGISImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s-%s", env.PostGISImageRepository, tag, defaultPostGISVersion, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostGISImageRepository, tag, PostGISSuffix)
 }
 
-// OfficialPostgresImageName returns the full image name for the official CloudNativePG Postgres image.
-// Example: ghcr.io/cloudnative-pg/postgresql:17
-func (env *TestingEnvironment) OfficialPostgresImageName(tag string) string {
-	return fmt.Sprintf("%s:%s", defaultPostgresImageRepository, tag)
-}
-
-// OfficialStandardImageName returns the full image name for the official standard Postgres image.
+// OfficialStandardImageName returns the full image name for the official CloudNativePG standard Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
 func (env *TestingEnvironment) OfficialStandardImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", defaultPostgresImageRepository, tag, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, StandardSuffix)
 }
 
-// OfficialMinimalImageName returns the full image name for the official minimal Postgres image.
+// OfficialMinimalImageName returns the full image name for the official CloudNativePG minimal Postgres image.
 // This is used for major upgrade tests where source images must come from the official registry.
 // Example: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
 func (env *TestingEnvironment) OfficialMinimalImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s", defaultPostgresImageRepository, tag, MinimalTrixieSuffix)
-}
-
-// OfficialPostGISImageName returns the full image name for the official CloudNativePG PostGIS image.
-// This is used for major upgrade tests where source images must come from the official registry.
-// Example: ghcr.io/cloudnative-pg/postgis:16-3-standard-trixie
-func (env *TestingEnvironment) OfficialPostGISImageName(tag string) string {
-	return fmt.Sprintf("%s:%s-%s-%s", defaultPostGISImageRepository, tag, defaultPostGISVersion, StandardTrixieSuffix)
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, MinimalSuffix)
 }
