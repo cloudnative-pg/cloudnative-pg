@@ -688,7 +688,9 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 			return false
 		}
 
-		if pod.Spec.Containers[0].Image != cluster.Status.Image {
+		idx := slices.IndexFunc(pod.Spec.Containers, func(container Container) bool { return container.name == "postgres" })
+
+		if pod.Spec.Containers[idx].Image != cluster.Status.Image {
 			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
 			return false
 		}
