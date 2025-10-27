@@ -427,7 +427,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 	It("should initialize cache metrics with zero values", func() {
 		ch := make(chan prometheus.Metric, 10)
 		collector.cacheHits.Collect(ch)
-		collector.cacheMisses.Collect(ch)
+		collector.cacheMiss.Collect(ch)
 
 		Expect(ch).To(HaveLen(2))
 
@@ -449,7 +449,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		collector.Describe(ch)
 
 		Expect(collector.cacheHits).NotTo(BeNil())
-		Expect(collector.cacheMisses).NotTo(BeNil())
+		Expect(collector.cacheMiss).NotTo(BeNil())
 		Expect(ch).ToNot(BeEmpty())
 	})
 
@@ -507,13 +507,13 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		// Note: This will fail without a real instance, but we can test the reset logic
 		collector.metricsMutex.Lock()
 		collector.cacheHits.Set(0)
-		collector.cacheMisses.Set(1)
+		collector.cacheMiss.Set(1)
 		collector.metricsMutex.Unlock()
 
 		// Verify cache hits were reset to 0 and cache misses set to 1
 		ch = make(chan prometheus.Metric, 10)
 		collector.cacheHits.Collect(ch)
-		collector.cacheMisses.Collect(ch)
+		collector.cacheMiss.Collect(ch)
 
 		Expect(ch).To(HaveLen(2))
 
@@ -535,7 +535,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		// 1. Cache miss (update)
 		collector.metricsMutex.Lock()
 		collector.cacheHits.Set(0)
-		collector.cacheMisses.Set(1)
+		collector.cacheMiss.Set(1)
 		collector.metricsMutex.Unlock()
 
 		// 2. Multiple cache hits during this period
@@ -547,7 +547,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		// 3. Verify we have 4 hits and 1 miss
 		ch := make(chan prometheus.Metric, 10)
 		collector.cacheHits.Collect(ch)
-		collector.cacheMisses.Collect(ch)
+		collector.cacheMiss.Collect(ch)
 
 		Expect(ch).To(HaveLen(2))
 
@@ -564,7 +564,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		// 4. New cache period starts (cache miss/update)
 		collector.metricsMutex.Lock()
 		collector.cacheHits.Set(0)
-		collector.cacheMisses.Set(1)
+		collector.cacheMiss.Set(1)
 		collector.metricsMutex.Unlock()
 
 		// 5. New hits in the new period
@@ -574,7 +574,7 @@ var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
 		// 6. Verify counters were reset and now show the new period
 		ch = make(chan prometheus.Metric, 10)
 		collector.cacheHits.Collect(ch)
-		collector.cacheMisses.Collect(ch)
+		collector.cacheMiss.Collect(ch)
 
 		Expect(ch).To(HaveLen(2))
 
