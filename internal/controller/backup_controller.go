@@ -466,8 +466,15 @@ func (r *BackupReconciler) isValidBackupRunning(
 		return false, fmt.Errorf("unknown.spec.target received: %s", backup.Spec.Target)
 	}
 
+	pgContainerStatus, err := getPostgresContainerStatus(&pod)
+	if err != nil {
+		contextLogger.Warning("Cannot get postgres container status, assuming container restarted",
+			"error", err)
+		return false, nil
+	}
+
 	containerIsNotRestarted := utils.PodHasContainerStatuses(pod) &&
-		backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
+		backup.Status.InstanceID.ContainerID == pgContainerStatus.ContainerID
 	isPodActive := utils.IsPodActive(pod)
 	if isCorrectPodElected && containerIsNotRestarted && isPodActive {
 		contextLogger.Info("Backup is already running on",
@@ -539,9 +546,14 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
+		pgContainerStatus, err := getPostgresContainerStatus(targetPod)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get postgres container status: %w", err)
+		}
+
 		backup.Status.SetAsStarted(
 			targetPod.Name,
-			targetPod.Status.ContainerStatuses[0].ContainerID,
+			pgContainerStatus.ContainerID,
 			apiv1.BackupMethodVolumeSnapshot,
 		)
 		// given that we use only kubernetes resources we can use the backup name as ID
@@ -688,9 +700,13 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 			return false
 		}
 
-		idx := slices.IndexFunc(pod.Spec.Containers, func(container Container) bool { return container.name == "postgres" })
+		pgContainer, err := getPostgresContainer(pod)
+		if err != nil {
+			contextLogger.Warning("Instance has no postgres container, discarded as target for backup")
+			return false
+		}
 
-		if pod.Spec.Containers[idx].Image != cluster.Status.Image {
+		if pgContainer.Image != cluster.Status.Image {
 			contextLogger.Debug("Instance not having expected image, discarded as target for backup")
 			return false
 		}
@@ -754,6 +770,26 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	return &pod, nil
 }
 
+// getPostgresContainerStatus returns the container status for the postgres container in a pod
+func getPostgresContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, error) {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == specs.PostgresContainerName {
+			return &pod.Status.ContainerStatuses[i], nil
+		}
+	}
+	return nil, fmt.Errorf("postgres container status not found in pod %s", pod.Name)
+}
+
+// getPostgresContainer returns the postgres container spec from a pod
+func getPostgresContainer(pod *corev1.Pod) (*corev1.Container, error) {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name == specs.PostgresContainerName {
+			return &pod.Spec.Containers[i], nil
+		}
+	}
+	return nil, fmt.Errorf("postgres container not found in pod %s", pod.Name)
+}
+
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
 // or failed if needed
 func startInstanceManagerBackup(
@@ -763,9 +799,14 @@ func startInstanceManagerBackup(
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
 ) error {
+	pgContainerStatus, err := getPostgresContainerStatus(pod)
+	if err != nil {
+		return fmt.Errorf("cannot get postgres container status: %w", err)
+	}
+
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, backup.Spec.Method)
+	status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, backup.Spec.Method)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
@@ -773,10 +814,10 @@ func startInstanceManagerBackup(
 	config := ctrl.GetConfigOrDie()
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 
-	var err error
 	var stdout, stderr string
 	err = retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
-		stdout, stderr, err = utils.ExecCommand(
+		var execErr error
+		stdout, stderr, execErr = utils.ExecCommand(
 			ctx,
 			clientInterface,
 			config,
@@ -787,7 +828,7 @@ func startInstanceManagerBackup(
 			"backup",
 			backup.GetName(),
 		)
-		return err
+		return execErr
 	})
 	if err != nil {
 		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
