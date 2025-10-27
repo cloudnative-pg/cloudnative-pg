@@ -197,7 +197,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 					apiv1.ExtensionConfiguration{
 						Name: "pgvector",
 						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: "ghcr.io/niccolofei/pgvector:18rc1-master-trixie", // wokeignore:rule=master
+							Reference: "ghcr.io/niccolofei/pgvector:18-0.8.1-trixie",
 						},
 					})
 				// Setting some pgvector GUCs
