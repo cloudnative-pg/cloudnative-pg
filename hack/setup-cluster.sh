@@ -27,11 +27,17 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
+# renovate: datasource=docker depName=kindest/node
 KIND_NODE_DEFAULT_VERSION=v1.34.0
+# renovate: datasource=github-releases depName=kubernetes-csi/csi-driver-host-path
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
 EXTERNAL_SNAPSHOTTER_VERSION=v8.4.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
 EXTERNAL_PROVISIONER_VERSION=v6.0.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
 EXTERNAL_RESIZER_VERSION=v2.0.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
 EXTERNAL_ATTACHER_VERSION=v4.10.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
