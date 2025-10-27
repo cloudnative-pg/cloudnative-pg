@@ -187,7 +187,7 @@ spec:
   maxSyncReplicas: 1
 
   storage:
-    size: 1G
+    size: 1Gi
 ```
 
 You can update it to the new format as follows:
@@ -201,7 +201,7 @@ spec:
   instances: 3
 
   storage:
-    size: 1G
+    size: 1Gi
 
   postgresql:
     synchronous:

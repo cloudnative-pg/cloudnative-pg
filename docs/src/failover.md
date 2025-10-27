@@ -151,7 +151,7 @@ spec:
       failoverQuorum: true
 
   storage:
-    size: 1G
+    size: 1Gi
 ```
 
 For backward compatibility, the legacy annotation
