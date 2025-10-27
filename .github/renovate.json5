@@ -36,9 +36,11 @@
       customType: 'regex',
       managerFilePatterns: [
         '/^Makefile$/',
+        '/^hack/setup-cluster.sh$/',
+        '/^hack/e2e/run-e2e-kind.sh$/',
       ],
       matchStrings: [
-        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\?=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
       ],
     },
     {
@@ -58,86 +60,6 @@
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?\\s*=\\s*["\']?(?<depName>[^:@]+):(?<currentValue>[a-z0-9.-]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?["\']?,?\\s',
       ],
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^.github/workflows/continuous-delivery.yml/',
-        '/^hack/setup-cluster.sh$/',
-      ],
-      matchStrings: [
-        'EXTERNAL_SNAPSHOTTER_VERSION: "(?<currentValue>.*?)"',
-        'EXTERNAL_SNAPSHOTTER_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kubernetes-csi/external-snapshotter',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^hack/setup-cluster.sh$/',
-      ],
-      matchStrings: [
-        'EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kubernetes-csi/external-provisioner',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^hack/setup-cluster.sh$/',
-      ],
-      matchStrings: [
-        'EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kubernetes-csi/external-resizer',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^hack/setup-cluster.sh$/',
-      ],
-      matchStrings: [
-        'EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kubernetes-csi/external-attacher',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^hack/setup-cluster.sh$/',
-      ],
-      matchStrings: [
-        'CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kubernetes-csi/csi-driver-host-path',
-      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/^hack/setup-cluster.sh$/',
-        '/^hack/e2e/run-e2e-kind.sh$/',
-      ],
-      matchStrings: [
-        'KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
-      ],
-      datasourceTemplate: 'docker',
-      versioningTemplate: 'loose',
-      depNameTemplate: 'kindest/node',
     },
     {
       customType: 'regex',
@@ -317,5 +239,15 @@
       pinDigests: true,
       separateMajorMinor: false,
     },
+    {
+      groupName: 'Containers no-digests',
+      matchPackageNames: [
+        'kindest{/,}**',
+        'getwoke{/,}**',
+        'jonasbn/github-action-spellcheck'
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    }
   ],
 }
