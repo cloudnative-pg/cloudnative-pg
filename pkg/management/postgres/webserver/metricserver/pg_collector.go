@@ -330,9 +330,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		if e.queries.ShouldUpdate(ttl) {
+			log.Trace("no cache, updating metrics from queries", "ttlSeconds", ttl.Seconds())
 			e.updateMetricsFromQueries()
 		} else {
-			log.Debug("using cached metrics from queries, as TTL is not exceeded")
+			log.Debug("using cached metrics from queries, as TTL is not exceeded",
+				"ttlSeconds", ttl.Seconds())
+			e.queries.RecordCacheHit()
 		}
 		log.Debug("collecting metrics from queries")
 		e.queries.Collect(ch)

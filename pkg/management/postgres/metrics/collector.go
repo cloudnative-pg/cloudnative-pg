@@ -58,6 +58,8 @@ type QueriesCollector struct {
 	errorUserQueries      *prometheus.CounterVec
 	errorUserQueriesGauge prometheus.Gauge
 	lastUpdateTimestamp   prometheus.Gauge
+	cacheHits             prometheus.Gauge
+	cacheMisses           prometheus.Gauge
 
 	computedMetrics []prometheus.Metric
 	timeLastUpdated time.Time
@@ -84,6 +86,10 @@ func (q *QueriesCollector) Update() error {
 	q.errorUserQueriesGauge.Set(0)
 	q.errorUserQueries.Reset()
 
+	// Reset cache hit/miss counters when we update (cache miss)
+	q.cacheHits.Set(0)
+	q.cacheMisses.Set(1)
+
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		q.errorUserQueriesGauge.Set(1)
@@ -106,6 +112,13 @@ func (q *QueriesCollector) ShouldUpdate(ttl time.Duration) bool {
 	return q.timeLastUpdated.IsZero() || time.Since(q.timeLastUpdated) > ttl
 }
 
+// RecordCacheHit increments the cache hit counter for the current cache period
+func (q *QueriesCollector) RecordCacheHit() {
+	q.metricsMutex.Lock()
+	defer q.metricsMutex.Unlock()
+	q.cacheHits.Add(1)
+}
+
 // Collect sends the pre-computed metrics to the output channel.
 // These metrics were cached during the last Update() call and are not
 // fetched from the database during collection.
@@ -120,6 +133,8 @@ func (q *QueriesCollector) Collect(ch chan<- prometheus.Metric) {
 	q.errorUserQueriesGauge.Collect(ch)
 	q.errorUserQueries.Collect(ch)
 	q.lastUpdateTimestamp.Collect(ch)
+	q.cacheHits.Collect(ch)
+	q.cacheMisses.Collect(ch)
 }
 
 func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
@@ -289,6 +304,8 @@ func (q *QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 	q.errorUserQueries.Describe(ch)
 	q.errorUserQueriesGauge.Describe(ch)
 	q.lastUpdateTimestamp.Describe(ch)
+	q.cacheHits.Describe(ch)
+	q.cacheMisses.Describe(ch)
 }
 
 // NewQueriesCollector creates a new PgCollector working over a set of custom queries
@@ -319,6 +336,16 @@ func NewQueriesCollector(
 			Namespace: name,
 			Name:      "last_update_timestamp",
 			Help:      "Timestamp of the last metrics update.",
+		}),
+		cacheHits: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Name:      "cache_hits",
+			Help:      "Total number of hits for the current cache.",
+		}),
+		cacheMisses: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Name:      "cache_misses",
+			Help:      "Total number of misses for the current cache.",
 		}),
 	}
 }

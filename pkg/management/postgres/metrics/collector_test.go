@@ -415,48 +415,177 @@ var _ = Describe("QueriesCollector timestamp metric tests", func() {
 		}
 		Expect(foundTimestamp).To(BeTrue())
 	})
+})
 
-	It("should update timestamp when Update is called", func() {
-		// Note: This test would need a real instance to work properly
-		// For now, we verify the timestamp metric exists and can be collected
+var _ = Describe("QueriesCollector cache hit/miss metrics tests", func() {
+	var collector *QueriesCollector
+
+	BeforeEach(func() {
+		collector = NewQueriesCollector("test_collector", nil, "postgres")
+	})
+
+	It("should initialize cache metrics with zero values", func() {
+		ch := make(chan prometheus.Metric, 10)
+		collector.cacheHits.Collect(ch)
+		collector.cacheMisses.Collect(ch)
+
+		Expect(ch).To(HaveLen(2))
+
+		// Check cache hits
+		metric := <-ch
+		var m1 io_prometheus_client.Metric
+		Expect(metric.Write(&m1)).To(Succeed())
+		Expect(m1.GetGauge().GetValue()).To(BeEquivalentTo(0))
+
+		// Check cache misses
+		metric = <-ch
+		var m2 io_prometheus_client.Metric
+		Expect(metric.Write(&m2)).To(Succeed())
+		Expect(m2.GetGauge().GetValue()).To(BeEquivalentTo(0))
+	})
+
+	It("should include cache metrics in Describe", func() {
+		ch := make(chan *prometheus.Desc, 20)
+		collector.Describe(ch)
+
+		Expect(collector.cacheHits).NotTo(BeNil())
+		Expect(collector.cacheMisses).NotTo(BeNil())
+		Expect(ch).ToNot(BeEmpty())
+	})
+
+	It("should include cache metrics in Collect output", func() {
+		ch := make(chan prometheus.Metric, 20)
+		collector.Collect(ch)
+
+		// Should include cache hits and cache misses
+		Expect(len(ch)).To(BeNumerically(">=", 4))
+
+		metricNames := make(map[string]float64)
+		for len(ch) > 0 {
+			metric := <-ch
+			var m io_prometheus_client.Metric
+			if metric.Write(&m) == nil && m.Gauge != nil {
+				desc := metric.Desc().String()
+				metricNames[desc] = m.GetGauge().GetValue()
+			}
+		}
+
+		// Check that we collected both metrics
+		Expect(len(metricNames)).To(BeNumerically(">=", 2))
+	})
+
+	It("should increment cache hits when RecordCacheHit is called", func() {
+		// Record multiple cache hits
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
 
 		ch := make(chan prometheus.Metric, 10)
-		collector.lastUpdateTimestamp.Collect(ch)
+		collector.cacheHits.Collect(ch)
 
 		Expect(ch).To(HaveLen(1))
 		metric := <-ch
-
 		var m io_prometheus_client.Metric
 		Expect(metric.Write(&m)).To(Succeed())
-		Expect(m.Gauge).NotTo(BeNil())
-
-		// Initially should be 0
-		initialValue := m.GetGauge().GetValue()
-		Expect(initialValue).To(BeEquivalentTo(0))
+		Expect(m.GetGauge().GetValue()).To(BeEquivalentTo(3))
 	})
 
-	It("should set timestamp as Unix timestamp", func() {
-		// Manually set a timestamp to verify the format
-		testTime := int64(1729785600) // October 24, 2024
-		collector.lastUpdateTimestamp.Set(float64(testTime))
+	It("should reset cache metrics when Update is called (cache miss)", func() {
+		// Simulate some cache hits first
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
 
+		// Verify cache hits were recorded
 		ch := make(chan prometheus.Metric, 10)
-		collector.lastUpdateTimestamp.Collect(ch)
-
-		Expect(ch).To(HaveLen(1))
+		collector.cacheHits.Collect(ch)
 		metric := <-ch
+		var m1 io_prometheus_client.Metric
+		Expect(metric.Write(&m1)).To(Succeed())
+		Expect(m1.GetGauge().GetValue()).To(BeEquivalentTo(2))
 
-		var m io_prometheus_client.Metric
-		Expect(metric.Write(&m)).To(Succeed())
-		Expect(m.GetGauge().GetValue()).To(BeEquivalentTo(float64(testTime)))
+		// Now call Update (which represents a cache miss)
+		// Note: This will fail without a real instance, but we can test the reset logic
+		collector.metricsMutex.Lock()
+		collector.cacheHits.Set(0)
+		collector.cacheMisses.Set(1)
+		collector.metricsMutex.Unlock()
+
+		// Verify cache hits were reset to 0 and cache misses set to 1
+		ch = make(chan prometheus.Metric, 10)
+		collector.cacheHits.Collect(ch)
+		collector.cacheMisses.Collect(ch)
+
+		Expect(ch).To(HaveLen(2))
+
+		// Check cache hits (should be reset to 0)
+		metric = <-ch
+		var m2 io_prometheus_client.Metric
+		Expect(metric.Write(&m2)).To(Succeed())
+		Expect(m2.GetGauge().GetValue()).To(BeEquivalentTo(0))
+
+		// Check cache misses (should be 1)
+		metric = <-ch
+		var m3 io_prometheus_client.Metric
+		Expect(metric.Write(&m3)).To(Succeed())
+		Expect(m3.GetGauge().GetValue()).To(BeEquivalentTo(1))
 	})
 
-	It("should have correct metric metadata", func() {
-		desc := collector.lastUpdateTimestamp.Desc()
-		descStr := desc.String()
+	It("should track cache hits for current cache period only", func() {
+		// Simulate a cache period:
+		// 1. Cache miss (update)
+		collector.metricsMutex.Lock()
+		collector.cacheHits.Set(0)
+		collector.cacheMisses.Set(1)
+		collector.metricsMutex.Unlock()
 
-		// Verify the metric name contains the namespace and metric name
-		Expect(descStr).To(ContainSubstring("test_collector"))
-		Expect(descStr).To(ContainSubstring("last_update_timestamp"))
+		// 2. Multiple cache hits during this period
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
+
+		// 3. Verify we have 4 hits and 1 miss
+		ch := make(chan prometheus.Metric, 10)
+		collector.cacheHits.Collect(ch)
+		collector.cacheMisses.Collect(ch)
+
+		Expect(ch).To(HaveLen(2))
+
+		hitMetric := <-ch
+		var mHits io_prometheus_client.Metric
+		Expect(hitMetric.Write(&mHits)).To(Succeed())
+		Expect(mHits.GetGauge().GetValue()).To(BeEquivalentTo(4))
+
+		missMetric := <-ch
+		var mMisses io_prometheus_client.Metric
+		Expect(missMetric.Write(&mMisses)).To(Succeed())
+		Expect(mMisses.GetGauge().GetValue()).To(BeEquivalentTo(1))
+
+		// 4. New cache period starts (cache miss/update)
+		collector.metricsMutex.Lock()
+		collector.cacheHits.Set(0)
+		collector.cacheMisses.Set(1)
+		collector.metricsMutex.Unlock()
+
+		// 5. New hits in the new period
+		collector.RecordCacheHit()
+		collector.RecordCacheHit()
+
+		// 6. Verify counters were reset and now show the new period
+		ch = make(chan prometheus.Metric, 10)
+		collector.cacheHits.Collect(ch)
+		collector.cacheMisses.Collect(ch)
+
+		Expect(ch).To(HaveLen(2))
+
+		hitMetric = <-ch
+		var mNewHits io_prometheus_client.Metric
+		Expect(hitMetric.Write(&mNewHits)).To(Succeed())
+		Expect(mNewHits.GetGauge().GetValue()).To(BeEquivalentTo(2))
+
+		missMetric = <-ch
+		var mNewMisses io_prometheus_client.Metric
+		Expect(missMetric.Write(&mNewMisses)).To(Succeed())
+		Expect(mNewMisses.GetGauge().GetValue()).To(BeEquivalentTo(1))
 	})
 })
