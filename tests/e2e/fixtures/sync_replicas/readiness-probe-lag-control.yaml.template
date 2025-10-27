@@ -28,4 +28,4 @@ spec:
 
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    size: 2Gi
+    size: 3Gi
