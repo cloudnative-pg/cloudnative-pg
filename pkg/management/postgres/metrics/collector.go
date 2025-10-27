@@ -345,7 +345,7 @@ func NewQueriesCollector(
 		cacheMisses: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: name,
 			Name:      "cache_misses",
-			Help:      "Total number of misses for the current cache.",
+			Help:      "Indicator: 1 if metrics were recomputed on last update (cache miss), 0 if cache used.",
 		}),
 	}
 }
