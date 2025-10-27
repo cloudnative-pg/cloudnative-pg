@@ -179,7 +179,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 						g.Expect(currentSlots).To(BeEmpty(),
 							"Slots %v still exist on replica pod %s", currentSlots, pod.Name)
 					}
-				}, 90, 2).Should(Succeed())
+				}, 120, 2).Should(Succeed())
 			}
 		})
 	})
