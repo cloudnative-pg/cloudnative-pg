@@ -4007,7 +4007,8 @@ you need this functionality, you can create a PodMonitor manually.</p>
    <p>The interval during which metrics computed from queries are considered current.
 Once it is exceeded, a new scrape will trigger a rerun
 of the queries.
-If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.</p>
+If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server.</p>
 </td>
 </tr>
 </tbody>
