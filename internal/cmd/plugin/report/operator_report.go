@@ -52,38 +52,69 @@ type operatorReport struct {
 // writeToZip makes a new section in the ZIP file, and adds in it various
 // Kubernetes object manifests
 func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat, folder string) error {
-	singleObjects := []struct {
-		content interface{}
-		name    string
-	}{
-		{content: or.deployment, name: "deployment"},
-		{content: or.operatorPods, name: "operator-pods"},
-		{content: or.events, name: "events"},
-		{content: or.validatingWebhookConfig, name: "validating-webhook-configuration"},
-		{content: or.mutatingWebhookConfig, name: "mutating-webhook-configuration"},
-		{content: or.webhookService, name: "webhook-service"},
-	}
-
 	newFolder := filepath.Join(folder, "manifests")
 	_, err := zipper.Create(newFolder + "/")
 	if err != nil {
 		return err
 	}
 
-	for _, object := range singleObjects {
-		err := addContentToZip(object.content, object.name, newFolder, format, zipper)
+	// Always include deployment (required resource)
+	if err := addContentToZip(or.deployment, "deployment", newFolder, format, zipper); err != nil {
+		return err
+	}
+
+	// Include pods only if collected
+	if len(or.operatorPods) > 0 {
+		if err := addContentToZip(or.operatorPods, "operator-pods", newFolder, format, zipper); err != nil {
+			return err
+		}
+	}
+
+	// Include events only if collected
+	if len(or.events.Items) > 0 {
+		if err := addContentToZip(or.events, "events", newFolder, format, zipper); err != nil {
+			return err
+		}
+	}
+
+	// Include validating webhook config only if collected
+	if or.validatingWebhookConfig != nil && len(or.validatingWebhookConfig.Items) > 0 {
+		err := addContentToZip(or.validatingWebhookConfig, "validating-webhook-configuration",
+			newFolder, format, zipper)
 		if err != nil {
 			return err
 		}
 	}
 
-	multiObjects := [][]namedObject{or.configs, or.secrets}
-	for _, obj := range multiObjects {
-		err := addObjectsToZip(obj, newFolder, format, zipper)
+	// Include mutating webhook config only if collected
+	if or.mutatingWebhookConfig != nil && len(or.mutatingWebhookConfig.Items) > 0 {
+		err := addContentToZip(or.mutatingWebhookConfig, "mutating-webhook-configuration",
+			newFolder, format, zipper)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Include webhook service only if collected (check for non-empty name)
+	if or.webhookService.Name != "" {
+		if err := addContentToZip(or.webhookService, "webhook-service", newFolder, format, zipper); err != nil {
+			return err
+		}
+	}
+
+	// Include configs and secrets only if collected
+	if len(or.configs) > 0 {
+		if err := addObjectsToZip(or.configs, newFolder, format, zipper); err != nil {
+			return err
+		}
+	}
+
+	if len(or.secrets) > 0 {
+		if err := addObjectsToZip(or.secrets, newFolder, format, zipper); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -95,31 +126,36 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 //   - events in the operator namespace
 //   - operator's Validating/MutatingWebhookConfiguration and their associated services
 //   - operator pod's logs (if `includeLogs` is true)
+//
+// operator implements the "report operator" subcommand
+// Produces a zip file containing
+//   - operator deployment (required - cannot generate report without identifying the operator)
+//   - operator pod definition (optional - gracefully skipped if no permissions)
+//   - operator configuration Configmap and Secret key (optional - gracefully skipped if no permissions)
+//   - events in the operator namespace (optional - gracefully skipped if no permissions)
+//   - operator's Validating/MutatingWebhookConfiguration and their associated services (optional)
+//   - operator pod's logs (optional, if `includeLogs` is true)
 func operator(ctx context.Context, format plugin.OutputFormat,
 	file string, stopRedaction, includeLogs, logTimeStamp bool, now time.Time,
 ) error {
 	// Configure redactors
 	secretRedactor, configMapRedactor := configureRedactors(stopRedaction)
 
-	// Collect required namespace-scoped resources (these must succeed)
-	deployment, pods, err := collectRequiredResources(ctx)
+	// Collect deployment (the only truly required resource)
+	deployment, err := getOperatorDeployment(ctx)
+	if errors.Is(err, errNoOperatorDeployment) {
+		return fmt.Errorf("%w\n"+
+			"HINT: Operator might be installed in another namespace."+
+			"Specify a namespace using the '-n' option", err)
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get operator deployment: %w", err)
 	}
 
-	// Collect configurations with redaction
-	secrets, configs, err := collectConfigurations(ctx, deployment, secretRedactor, configMapRedactor)
-	if err != nil {
-		return err
-	}
-
-	// Collect events
-	events, err := collectEvents(ctx, pods[0].Namespace)
-	if err != nil {
-		return err
-	}
-
-	// Collect optional cluster-scoped resources (these can fail gracefully)
+	// Collect all optional resources (all can fail gracefully)
+	pods := tryCollectPods(ctx)
+	secrets, configs := tryCollectConfigurations(ctx, deployment, secretRedactor, configMapRedactor)
+	events := tryCollectEvents(ctx, deployment.Namespace)
 	mutatingWebhook, validatingWebhook := tryCollectWebhooks(ctx, stopRedaction)
 	webhookService := tryCollectWebhookService(ctx, mutatingWebhook)
 
@@ -158,70 +194,70 @@ func configureRedactors(stopRedaction bool) (
 	return redactSecret, redactConfigMap
 }
 
-// collectRequiredResources gathers deployment and pods which are required for the report
-func collectRequiredResources(ctx context.Context) (appsv1.Deployment, []corev1.Pod, error) {
-	deployment, err := getOperatorDeployment(ctx)
-	if errors.Is(err, errNoOperatorDeployment) {
-		return appsv1.Deployment{}, nil, fmt.Errorf("%w\n"+
-			"HINT: Operator might be installed in another namespace."+
-			"Specify a namespace using the '-n' option", err)
-	}
-	if err != nil {
-		return appsv1.Deployment{}, nil, fmt.Errorf("could not get operator deployment: %w", err)
-	}
-
+// tryCollectPods attempts to collect operator pods, logging warnings on failure
+func tryCollectPods(ctx context.Context) []corev1.Pod {
 	pods, err := getOperatorPods(ctx)
 	if err != nil {
-		return appsv1.Deployment{}, nil, fmt.Errorf("could not get operator pod: %w", err)
+		logWarning("could not get operator pods", err,
+			"Continuing without pod information. This is expected if you don't have permissions to list pods.")
+		return nil
 	}
-
-	return deployment, pods, nil
+	return pods
 }
 
-// collectConfigurations gathers secrets and configmaps with appropriate redaction
-func collectConfigurations(
+// tryCollectConfigurations attempts to collect secrets and configmaps, logging warnings on failure
+func tryCollectConfigurations(
 	ctx context.Context,
 	deployment appsv1.Deployment,
 	secretRedactor func(corev1.Secret) corev1.Secret,
 	configMapRedactor func(corev1.ConfigMap) corev1.ConfigMap,
-) ([]namedObject, []namedObject, error) {
+) ([]namedObject, []namedObject) {
+	var secrets []namedObject
+	var configs []namedObject
+
+	// Try to collect secrets
 	operatorSecrets, err := getOperatorSecrets(ctx, deployment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get operator secrets: %w", err)
+		logWarning("could not get operator secrets", err,
+			"Continuing without secrets information. This is expected if you don't have permissions to list secrets.")
+	} else {
+		secrets = make([]namedObject, 0, len(operatorSecrets))
+		for _, ss := range operatorSecrets {
+			secrets = append(secrets, namedObject{
+				Name:   ss.Name + "(secret)",
+				Object: secretRedactor(ss),
+			})
+		}
 	}
 
-	secrets := make([]namedObject, 0, len(operatorSecrets))
-	for _, ss := range operatorSecrets {
-		secrets = append(secrets, namedObject{
-			Name:   ss.Name + "(secret)",
-			Object: secretRedactor(ss),
-		})
-	}
-
+	// Try to collect configmaps
 	operatorConfigMaps, err := getOperatorConfigMaps(ctx, deployment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get operator configmap: %w", err)
+		logWarning("could not get operator configmaps", err,
+			"Continuing without configmap information. This is expected if you don't have permissions to list configmaps.")
+	} else {
+		configs = make([]namedObject, 0, len(operatorConfigMaps))
+		for _, cm := range operatorConfigMaps {
+			configs = append(configs, namedObject{
+				Name:   cm.Name,
+				Object: configMapRedactor(cm),
+			})
+		}
 	}
 
-	configs := make([]namedObject, 0, len(operatorConfigMaps))
-	for _, cm := range operatorConfigMaps {
-		configs = append(configs, namedObject{
-			Name:   cm.Name,
-			Object: configMapRedactor(cm),
-		})
-	}
-
-	return secrets, configs, nil
+	return secrets, configs
 }
 
-// collectEvents gathers events from the specified namespace
-func collectEvents(ctx context.Context, namespace string) (corev1.EventList, error) {
+// tryCollectEvents attempts to collect events, logging warnings on failure
+func tryCollectEvents(ctx context.Context, namespace string) corev1.EventList {
 	var events corev1.EventList
 	err := plugin.Client.List(ctx, &events, client.InNamespace(namespace))
 	if err != nil {
-		return corev1.EventList{}, fmt.Errorf("could not get events: %w", err)
+		logWarning("could not get events", err,
+			"Continuing without events information. This is expected if you don't have permissions to list events.")
+		return corev1.EventList{}
 	}
-	return events, nil
+	return events
 }
 
 // tryCollectWebhooks attempts to collect webhook configurations, logging warnings on failure

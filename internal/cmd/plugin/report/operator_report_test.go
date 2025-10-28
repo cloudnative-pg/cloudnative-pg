@@ -21,10 +21,12 @@ package report
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -114,5 +116,74 @@ var _ = Describe("logWarning", func() {
 		Expect(output).To(ContainSubstring("WARNING: could not get webhooks: permission denied"))
 		Expect(output).To(ContainSubstring("         Continuing without webhook information"))
 		Expect(output).To(ContainSubstring("cluster-level permissions"))
+	})
+})
+
+var _ = Describe("tryCollectConfigurations", func() {
+	It("should handle errors gracefully", func() {
+		// This is a demonstration test - in production these would use mocked clients
+		// The function is designed to handle errors without panicking
+		deployment := appsv1.Deployment{}
+
+		// Capture warnings to avoid polluting test output
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		secrets, configs := tryCollectConfigurations(
+			context.Background(),
+			deployment,
+			redactSecret,
+			redactConfigMap,
+		)
+
+		// Restore stdout
+		_ = w.Close()
+		os.Stdout = oldStdout
+		_, _ = io.Copy(io.Discard, r)
+
+		// When errors occur, function returns nil slices (not empty slices)
+		// This is acceptable as writeToZip checks for nil/empty
+		_ = secrets
+		_ = configs
+	})
+})
+
+var _ = Describe("assembleSections", func() {
+	It("should create sections array with at least the main report", func() {
+		rep := operatorReport{
+			deployment: appsv1.Deployment{},
+		}
+
+		sections := assembleSections(
+			context.Background(),
+			rep,
+			nil,
+			"yaml",
+			false,
+			false,
+		)
+
+		// Should always have at least the main report section
+		Expect(sections).ToNot(BeEmpty())
+	})
+
+	It("should add logs section when includeLogs is true", func() {
+		rep := operatorReport{
+			deployment: appsv1.Deployment{},
+		}
+		pods := []corev1.Pod{{}}
+
+		sections := assembleSections(
+			context.Background(),
+			rep,
+			pods,
+			"yaml",
+			true, // includeLogs
+			false,
+		)
+
+		// Should have main report + logs section
+		Expect(len(sections)).To(BeNumerically(">=", 2))
 	})
 })

@@ -47,8 +47,7 @@ func getWebhooks(
 	)
 
 	if err := plugin.Client.List(ctx, &mutatingWebhookConfigList); err != nil {
-		// Return empty lists instead of error to handle permission issues gracefully
-		return &mWebhookConfig, &vWebhookConfig, fmt.Errorf("insufficient permissions to list mutating webhooks: %w", err)
+		return nil, nil, fmt.Errorf("insufficient permissions to list mutating webhooks: %w", err)
 	}
 
 	for _, item := range mutatingWebhookConfigList.Items {
@@ -67,8 +66,7 @@ func getWebhooks(
 	}
 
 	if err := plugin.Client.List(ctx, &validatingWebhookConfigList); err != nil {
-		// Return empty lists instead of error to handle permission issues gracefully
-		return &mWebhookConfig, &vWebhookConfig, fmt.Errorf("insufficient permissions to list validating webhooks: %w", err)
+		return nil, nil, fmt.Errorf("insufficient permissions to list validating webhooks: %w", err)
 	}
 
 	for _, item := range validatingWebhookConfigList.Items {
@@ -87,7 +85,7 @@ func getWebhooks(
 	}
 
 	if len(mWebhookConfig.Items) == 0 && len(vWebhookConfig.Items) == 0 {
-		return &mWebhookConfig, &vWebhookConfig, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"can't find the webhooks that targeting resources within the group %s",
 			apiv1.SchemeGroupVersion.Group,
 		)

@@ -501,12 +501,26 @@ regarding the operator deployment, configuration and events.
     By default, operator logs are not collected, but you can enable operator
     log collection with the `--logs` flag
 
-* **deployment information**: the operator Deployment and operator Pod
-* **configuration**: the Secrets and ConfigMaps in the operator namespace
-* **events**: the Events in the operator namespace
-* **webhook configuration**: the mutating and validating webhook configurations
-* **webhook service**: the webhook service
-* **logs**: logs for the operator Pod (optional, off by default) in JSON-lines format
+!!! Important "Least-Privilege Support"
+    The `report operator` command works with minimal permissions. Only the operator
+    deployment is **required** - all other resources are optional and collected on a
+    best-effort basis. If you lack permissions for certain resources, warnings are
+    logged and report generation continues with available data.
+
+The report includes:
+
+* **deployment information** (required): the operator Deployment
+* **operator pods** (optional): the operator Pod information
+* **configuration** (optional): Secrets and ConfigMaps in the operator namespace
+* **events** (optional): Events in the operator namespace
+* **webhook configuration** (optional): mutating and validating webhook configurations
+* **webhook service** (optional): the webhook service
+* **logs** (optional): operator Pod logs in JSON-lines format (requires `--logs` flag)
+
+**Minimal permissions**: Read access (`get`) to the operator deployment.
+
+**Full report permissions**: Add `list` on pods, events; `get` on secrets, configmaps,
+services (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
 
 The command will generate a ZIP file containing various manifest in YAML format
 (by default, but settable to JSON with the `-o` flag).
@@ -1397,7 +1411,7 @@ table contains the full details:
 | publication     | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | reload          | clusters: get,patch                                                                                                                                                                                                                                                                                                                                   |
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
-| report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
+| report operator | **Required:**<br/>deployments: get<br/>**Optional (for full report):**<br/>configmaps: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/>validatingwebhookconfigurations: list[^1]<br/>**If OLM is present:**<br/>clusterserviceversions: list[^1]<br/>installplans: list[^1]<br/>subscriptions: list[^1] |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
 | status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
