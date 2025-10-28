@@ -55,6 +55,20 @@ by specifying a list of one or more databases in the `target_databases` option.
     with Prometheus and Grafana, you can find a quick setup guide
     in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
 
+### Output caching
+
+By default, the outputs of monitoring queries are cached for thirty
+seconds. This is done to enhance resource efficiency and to avoid
+PostgreSQL to run monitoring queries every time the prometheus
+endpoint is scraped.
+
+The cache itself can be observed by the `cache_hits`, `cache_misses`
+and `last_update_timestamp` metrics.
+
+Setting the `cluster.spec.monitoring.metricsQueriesTTL` to zero will
+disable the cache, and in that case the metrics will be run on every
+metrics endpoint scrape.
+
 ### Monitoring with the Prometheus operator
 
 You can monitor a specific PostgreSQL cluster using the

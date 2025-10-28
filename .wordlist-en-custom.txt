@@ -1043,6 +1043,7 @@ memstats
 metav
 metric's
 metricNameKS
+metricsQueriesTTL
 microservice
 microservices
 microsoft

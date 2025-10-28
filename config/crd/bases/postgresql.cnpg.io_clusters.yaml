@@ -3840,6 +3840,14 @@ spec:
                       Deprecated: This feature will be removed in an upcoming release. If
                       you need this functionality, you can create a PodMonitor manually.
                     type: boolean
+                  metricsQueriesTTL:
+                    description: |-
+                      The interval during which metrics computed from queries are considered current.
+                      Once it is exceeded, a new scrape will trigger a rerun
+                      of the queries.
+                      If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+                      Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server.
+                    type: string
                   podMonitorMetricRelabelings:
                     description: |-
                       The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
