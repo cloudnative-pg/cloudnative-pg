@@ -42,11 +42,19 @@ const (
 
 	// ClientTLSCertPath is the path where the client TLS certificate
 	// is stored
-	clientTLSCertPath = ConfigsDir + "/server-tls/tls.crt"
+	clientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
 
 	// ClientTLSKeyPath is the path where the client TLS private key
 	// is stored
-	clientTLSKeyPath = ConfigsDir + "/server-tls/tls.key"
+	clientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
+
+	// ServerTLSCertPath is the path where the server TLS certificate
+	// is stored
+	serverTLSCertPath = ConfigsDir + "/server-tls/tls.crt"
+
+	// ServerTLSKeyPath is the path where the server TLS private key
+	// is stored
+	serverTLSKeyPath = ConfigsDir + "/server-tls/tls.key"
 
 	// ClientTLSCAPath is the path where the public key of the CA
 	// used to authenticate clients is stored
@@ -147,34 +155,41 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 
 	// if no user is provided we have to check the secret for a username, and we must be using basic auth
 	// if a user is provided it will overwrite the user in the secret, or we could be using cert auth
-	authQuerySecretType, err := detectSecretType(secrets.AuthQuery)
-	if err != nil {
-		return nil, fmt.Errorf("while detecting auth user secret type: %w", err)
+	authQuerySecret := secrets.AuthQuery
+	if authQuerySecret == nil {
+		authQuerySecret = secrets.ServerTLS
 	}
 
-	switch authQuerySecretType {
-	case corev1.SecretTypeBasicAuth:
-		authQueryUser = string(secrets.AuthQuery.Data["username"])
-		authQueryPassword = strings.ReplaceAll(string(secrets.AuthQuery.Data["password"]), "\"", "\"\"")
-
-	case corev1.SecretTypeTLS:
-		keyPair, err := certs.ParseServerSecret(secrets.AuthQuery)
+	if authQuerySecret != nil {
+		authQuerySecretType, err := detectSecretType(authQuerySecret)
 		if err != nil {
-			return nil, fmt.Errorf("while parsing TLS secret for auth user: %w", err)
+			return nil, fmt.Errorf("while detecting auth user secret type: %w", err)
 		}
 
-		certificate, err := keyPair.ParseCertificate()
-		if err != nil {
-			return nil, fmt.Errorf("while parsing certificate for auth user: %w", err)
+		switch authQuerySecretType {
+		case corev1.SecretTypeBasicAuth:
+			authQueryUser = string(authQuerySecret.Data["username"])
+			authQueryPassword = strings.ReplaceAll(string(authQuerySecret.Data["password"]), "\"", "\"\"")
+
+		case corev1.SecretTypeTLS:
+			keyPair, err := certs.ParseServerSecret(authQuerySecret)
+			if err != nil {
+				return nil, fmt.Errorf("while parsing TLS secret for auth user: %w", err)
+			}
+
+			certificate, err := keyPair.ParseCertificate()
+			if err != nil {
+				return nil, fmt.Errorf("while parsing certificate for auth user: %w", err)
+			}
+
+			authQueryUser = certificate.Subject.CommonName
+			isCertAuth = true
+			files[authUserCrtPath] = authQuerySecret.Data[certs.TLSCertKey]
+			files[authUserKeyPath] = authQuerySecret.Data[certs.TLSPrivateKeyKey]
+
+		default:
+			return nil, fmt.Errorf("unsupported secret type for auth query: %s", authQuerySecret.Type)
 		}
-
-		authQueryUser = certificate.Subject.CommonName
-		isCertAuth = true
-		files[authUserCrtPath] = secrets.AuthQuery.Data[certs.TLSCertKey]
-		files[authUserKeyPath] = secrets.AuthQuery.Data[certs.TLSPrivateKeyKey]
-
-	default:
-		return nil, fmt.Errorf("unsupported secret type for auth query: %s", secrets.AuthQuery.Type)
 	}
 
 	parameters := buildPgBouncerParameters(pooler.Spec.PgBouncer.Parameters)
@@ -184,6 +199,11 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		parameters["server_tls_key_file"] = authUserKeyPath
 	} else {
 		parameters["auth_file"] = authFilePath
+	}
+
+	if secrets.ServerTLS != nil {
+		parameters["server_tls_cert_file"] = serverTLSCertPath
+		parameters["server_tls_key_file"] = serverTLSKeyPath
 	}
 
 	templateData := struct {
@@ -211,22 +231,20 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		PgHba:      pooler.Spec.PgBouncer.PgHBA,
 	}
 
-	err = pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
-	if err != nil {
+	if err := pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData); err != nil {
 		return nil, fmt.Errorf("while executing %s template: %w", PgBouncerIniFileName, err)
 	}
 	files[filepath.Join(ConfigsDir, PgBouncerIniFileName)] = pgbouncerIni.Bytes()
 
 	if !isCertAuth {
-		err = pgBouncerUserListTemplate.Execute(&pgbouncerUserList, templateData)
+		err := pgBouncerUserListTemplate.Execute(&pgbouncerUserList, templateData)
 		if err != nil {
 			return nil, fmt.Errorf("while executing %s template: %w", PgBouncerUserListFileName, err)
 		}
 		files[filepath.Join(ConfigsDir, PgBouncerUserListFileName)] = pgbouncerUserList.Bytes()
 	}
 
-	err = pgBouncerHBATemplate.Execute(&pgbouncerHBA, templateData)
-	if err != nil {
+	if err := pgBouncerHBATemplate.Execute(&pgbouncerHBA, templateData); err != nil {
 		return nil, fmt.Errorf("while executing %s template: %w", PgBouncerHBAConfFileName, err)
 	}
 	files[filepath.Join(ConfigsDir, PgBouncerHBAConfFileName)] = pgbouncerHBA.Bytes()
@@ -234,8 +252,13 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	// The required crypto-material
 	files[serverTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
 	files[clientTLSCAPath] = secrets.ClientCA.Data[certs.CACertKey]
-	files[clientTLSCertPath] = secrets.Client.Data[certs.TLSCertKey]
-	files[clientTLSKeyPath] = secrets.Client.Data[certs.TLSPrivateKeyKey]
+	files[clientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
+	files[clientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
+
+	if secrets.ServerTLS != nil {
+		files[serverTLSCertPath] = secrets.ServerTLS.Data[certs.TLSCertKey]
+		files[serverTLSKeyPath] = secrets.ServerTLS.Data[certs.TLSPrivateKeyKey]
+	}
 
 	return files, nil
 }

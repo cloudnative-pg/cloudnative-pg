@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-verify-full
+spec:
+  cluster:
+    name: cluster-user-supplied-certificates
+
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    # for mTLS authentication, `authQuery` could be removed in a future version
+    # of pgbouncer
+    authQuery: "SELECT $1, NULL"
+    parameters:
+      server_tls_protocols: tlsv1.3
+      auth_type: cert
+      server_tls_sslmode: verify-full
+      client_tls_sslmode: verify-full
+
+    serverTLSSecret:
+      name: pooler-server-cert
+    serverCASecret:
+      name: pg-server-ca
+    clientCASecret:
+      name: pooler-client-ca
+    clientTLSSecret:
+      name: pooler-client-cert

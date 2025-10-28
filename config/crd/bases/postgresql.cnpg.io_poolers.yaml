@@ -319,6 +319,30 @@ spec:
                       query. In case it is specified, also an AuthQuery
                       (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
                       has to be specified and no automatic CNPG Cluster integration will be triggered.
+
+                      Deprecated.
+                    properties:
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  clientCASecret:
+                    description: |-
+                      ClientCASecret provides PgBouncer’s client_tls_ca_file, the root
+                      CA for validating client certificates
+                    properties:
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  clientTLSSecret:
+                    description: |-
+                      ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)
+                      and client_tls_cert_file (certificate) used to accept client connections
                     properties:
                       name:
                         description: Name of the referent.
@@ -355,6 +379,29 @@ spec:
                     - session
                     - transaction
                     type: string
+                  serverCASecret:
+                    description: |-
+                      ServerCASecret provides PgBouncer’s server_tls_ca_file, the root
+                      CA for validating PostgreSQL certificates
+                    properties:
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  serverTLSSecret:
+                    description: |-
+                      ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+                      `server_tls_key_file` and `server_tls_cert_file`, used when
+                      authenticating against PostgreSQL.
+                    properties:
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - name
+                    type: object
                 type: object
               serviceTemplate:
                 description: Template for the Service to be created
@@ -9195,6 +9242,16 @@ spec:
                 properties:
                   clientCA:
                     description: The client CA secret version
+                    properties:
+                      name:
+                        description: The name of the secret
+                        type: string
+                      version:
+                        description: The ResourceVersion of the secret
+                        type: string
+                    type: object
+                  clientTLS:
+                    description: The client TLS secret version
                     properties:
                       name:
                         description: The name of the secret
