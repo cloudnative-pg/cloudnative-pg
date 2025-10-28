@@ -106,6 +106,7 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 				Phase: corev1.PodRunning,
 				ContainerStatuses: []corev1.ContainerStatus{
 					{
+						Name:        "postgres",
 						ContainerID: containerID,
 					},
 				},
