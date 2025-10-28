@@ -11,4 +11,4 @@ spec:
       number: 2
 
   storage:
-    size: 1G
+    size: 1Gi
