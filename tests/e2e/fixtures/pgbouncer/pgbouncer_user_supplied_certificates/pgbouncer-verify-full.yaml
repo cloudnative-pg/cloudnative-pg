@@ -10,6 +10,8 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
+    # for mTLS authentication, `authQuery` could be removed in a future version
+    # of pgbouncer
     authQuery: "SELECT $1, NULL"
     parameters:
       server_tls_protocols: tlsv1.3
