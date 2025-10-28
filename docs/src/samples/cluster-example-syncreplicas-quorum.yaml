@@ -12,4 +12,4 @@ spec:
       failoverQuorum: true
 
   storage:
-    size: 1G
+    size: 1Gi

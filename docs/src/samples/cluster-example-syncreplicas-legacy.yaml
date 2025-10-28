@@ -9,4 +9,4 @@ spec:
   maxSyncReplicas: 3
 
   storage:
-    size: 1G
+    size: 1Gi
