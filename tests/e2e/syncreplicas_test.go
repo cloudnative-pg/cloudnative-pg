@@ -139,8 +139,12 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			// This will generate 1Gi of data in the primary node and, since the replica we fenced
+			// This will generate ~1GB of data in the primary node and, since the replica we fenced
 			// is not aligned, will generate lag.
+			// The test creates 1M rows, then doubles 3 times (2M, 4M, 8M rows = ~400-500MB data).
+			// However, PostgreSQL generates significant WAL overhead, temporary files, and index data
+			// during these operations. The fixtures using this function should have at least 3Gi
+			// of storage to ensure sufficient space for data, WAL files, and temporary operations.
 			_, _, err = exec.Command(
 				env.Ctx, env.Interface, env.RestClientConfig,
 				*primary, specs.PostgresContainerName, &commandTimeout,
