@@ -14,9 +14,9 @@ spec:
   # Container resize policy configuration for in-place updates
   containerResizePolicy:
     - resourceName: cpu
-      resizePolicy: NotRequired  # Allows in-place CPU updates
+      restartPolicy: NotRequired  # Allows in-place CPU updates
     - resourceName: memory
-      resizePolicy: NotRequired  # Allows in-place memory updates
+      restartPolicy: NotRequired  # Allows in-place memory updates
 
   # Initial resource configuration (minimal for faster testing)
   resources:

@@ -190,6 +190,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		}
 		log.FromContext(ctx).Info("In-place resource update successful for primary pod",
 			"pod", primaryPod.Name)
+		return false, nil
 	}
 
 	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {

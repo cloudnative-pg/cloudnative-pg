@@ -1066,12 +1066,12 @@ var _ = Describe("NewInstance", func() {
 	})
 
 	It("applies container resize policy to PostgreSQL container", func(ctx SpecContext) {
-		cluster := v1.Cluster{
+		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
 				Namespace: "default",
 			},
-			Spec: v1.ClusterSpec{
+			Spec: apiv1.ClusterSpec{
 				Instances: 1,
 				ContainerResizePolicy: []corev1.ContainerResizePolicy{
 					{
@@ -1084,7 +1084,7 @@ var _ = Describe("NewInstance", func() {
 					},
 				},
 			},
-			Status: v1.ClusterStatus{
+			Status: apiv1.ClusterStatus{
 				Image: "postgres:13.11",
 			},
 		}
@@ -1116,15 +1116,15 @@ var _ = Describe("NewInstance", func() {
 	})
 
 	It("works without container resize policy", func(ctx SpecContext) {
-		cluster := v1.Cluster{
+		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
 				Namespace: "default",
 			},
-			Spec: v1.ClusterSpec{
+			Spec: apiv1.ClusterSpec{
 				Instances: 1,
 			},
-			Status: v1.ClusterStatus{
+			Status: apiv1.ClusterStatus{
 				Image: "postgres:13.11",
 			},
 		}

@@ -121,10 +121,10 @@ spec:
   instances: 3
   
   containerResizePolicy:
-    - name: postgres
-      resizePolicy: NotRequired
-    - name: barman-cloud-backup
-      resizePolicy: RestartContainer
+    - resourceName: cpu
+      restartPolicy: NotRequired
+    - resourceName: memory
+      restartPolicy: NotRequired
 
   resources:
     requests:

@@ -24,12 +24,12 @@ spec:
   # This enables in-place resource updates for the postgres container
   containerResizePolicy:
     - resourceName: cpu
-      resizePolicy: NotRequired  # Allows in-place CPU/memory updates
+      restartPolicy: NotRequired  # Allows in-place CPU/memory updates
     - resourceName: memory
-      resizePolicy: RestartContainer  # Requires restart for resource changes
+      restartPolicy: RestartContainer  # Requires restart for resource changes
 
   # Initial resource configuration
-  # These can be updated in-place when resizePolicy is NotRequired
+  # These can be updated in-place when restartPolicy is NotRequired
   resources:
     requests:
       memory: "1Gi"    # Initial memory request

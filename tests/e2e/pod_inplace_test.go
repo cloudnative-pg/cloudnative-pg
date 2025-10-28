@@ -309,7 +309,7 @@ var _ = Describe("Pod Inplace Resource Updates", Label(tests.LabelSelfHealing), 
 					return false, err
 				}
 
-				// Check if memory resources are updated
+				// Check if memory resources are updated in cluster spec
 				if updatedCluster.Spec.Resources.Requests.Memory().Cmp(resource.MustParse("768Mi")) != 0 {
 					return false, nil
 				}
@@ -325,6 +325,22 @@ var _ = Describe("Pod Inplace Resource Updates", Label(tests.LabelSelfHealing), 
 				for _, pod := range currentPodList.Items {
 					if originalPodUIDs[pod.Name] != pod.UID {
 						return false, nil // Pod was recreated
+					}
+				}
+
+				// Also verify the pod resources are actually updated (not just the cluster spec)
+				for _, pod := range currentPodList.Items {
+					for _, container := range pod.Spec.Containers {
+						if container.Name == "postgres" {
+							// Check if pod container has the new memory limits
+							if container.Resources.Limits.Memory().Cmp(resource.MustParse("1.5Gi")) != 0 {
+								return false, nil
+							}
+							// Check if pod container has the new memory requests
+							if container.Resources.Requests.Memory().Cmp(resource.MustParse("768Mi")) != 0 {
+								return false, nil
+							}
+						}
 					}
 				}
 
@@ -363,7 +379,7 @@ var _ = Describe("Pod Inplace Resource Updates", Label(tests.LabelSelfHealing), 
 				env.Ctx, env.Client,
 				namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
-		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, namespace, 120)
-		Expect(err).ToNot(HaveOccurred())
+		// Note: Namespace cleanup is automatically handled by DeferCleanup
+		// registered in CreateTestNamespace (namespace.go:119)
 	})
 })
