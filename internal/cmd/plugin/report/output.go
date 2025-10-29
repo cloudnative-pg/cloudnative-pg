@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -32,12 +33,25 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-// reportName produces a timestamped report string apt for file/folder naming
+// Format to generate a sortable timestamp `YYYYMMDD_hhmmss`
+const sortableTimestampFormat = "20060102_150405"
+
+// reportName returns a filesystem-safe, timestamped report name.
+// Format: report_<kind>[_<object>]_YYYYMMDD_hhmmss
 func reportName(kind string, timestamp time.Time, objName ...string) string {
+	var builder strings.Builder
+	builder.WriteString("report_")
+	builder.WriteString(kind)
+
 	if len(objName) != 0 {
-		return fmt.Sprintf("report_%s_%s_%s", kind, objName[0], timestamp.Format(time.RFC3339))
+		builder.WriteString("_")
+		builder.WriteString(objName[0])
 	}
-	return fmt.Sprintf("report_%s_%s", kind, timestamp.Format(time.RFC3339))
+
+	builder.WriteString("_")
+	builder.WriteString(timestamp.Format(sortableTimestampFormat))
+
+	return builder.String()
 }
 
 // zipFileWriter abstracts any function that will write a new file into a ZIP
