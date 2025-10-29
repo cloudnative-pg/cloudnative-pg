@@ -961,15 +961,20 @@ func (r *ClusterReconciler) reconcilePods(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if err := r.markPVCReadyForCompletedJobs(ctx, resources); err != nil {
+	if err := persistentvolumeclaim.MarkPVCReadyForCompletedJobs(
+		ctx,
+		r.Client,
+		resources.pvcs.Items,
+		resources.jobs.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 
-	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
+	if err := persistentvolumeclaim.EnsureHealthyPVCsAnnotation(ctx, r.Client, cluster, resources.pvcs.Items); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -1067,38 +1072,6 @@ func (r *ClusterReconciler) reconcilePods(
 	}
 
 	return r.handleRollingUpdate(ctx, cluster, instancesStatus)
-}
-
-func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	resources *managedResources,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	// Make sure that all healthy PVCs are marked as ready
-	for _, pvcName := range cluster.Status.HealthyPVC {
-		pvc := resources.getPVC(pvcName)
-		if pvc == nil {
-			return fmt.Errorf(
-				"could not find the pvc: %s, from the list of managed pvc",
-				pvcName,
-			)
-		}
-
-		if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
-			continue
-		}
-
-		contextLogger.Info("PVC is already attached to the pod, marking it as ready",
-			"pvc", pvc.Name)
-		if err := r.setPVCStatusReady(ctx, pvc); err != nil {
-			contextLogger.Error(err, "can't update PVC annotation as ready")
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (r *ClusterReconciler) handleRollingUpdate(
@@ -1530,43 +1503,4 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 		}
 		return requests
 	}
-}
-
-func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
-	ctx context.Context,
-	resources *managedResources,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	completeJobs := utils.FilterJobsWithOneCompletion(resources.jobs.Items)
-	if len(completeJobs) == 0 {
-		return nil
-	}
-
-	for _, job := range completeJobs {
-		for _, pvc := range resources.pvcs.Items {
-			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
-				continue
-			}
-
-			if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
-				continue
-			}
-
-			roleName := job.Spec.Template.Labels[utils.JobRoleLabelName]
-			contextLogger.Info(
-				"The job finished, setting PVC as ready",
-				"pvcName", pvc.Name,
-				"role", roleName,
-				"jobName", job.Name,
-			)
-
-			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
-				contextLogger.Error(err, "unable to annotate PVC as ready")
-				return err
-			}
-		}
-	}
-
-	return nil
 }
