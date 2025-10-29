@@ -298,7 +298,7 @@ spec:
 ```
 
 CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
-`/extensions/postgis/system`, allowing PostgreSQL to locate and load these
+`/extensions/postgis/syslib`, allowing PostgreSQL to locate and load these
 system libraries at runtime.
 
 !!! Important
