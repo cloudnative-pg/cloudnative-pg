@@ -6677,6 +6677,12 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              selectorLabels:
+                description: |-
+                  SelectorLabels is the label query used to select pods managed by this cluster.
+                  This field is populated by the operator and used by the scale sub-resource
+                  to enable VPA (Vertical Pod Autoscaler) support.
+                type: string
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
                   to replica cluster
@@ -6770,6 +6776,7 @@ spec:
     storage: true
     subresources:
       scale:
+        labelSelectorPath: .status.selectorLabels
         specReplicasPath: .spec.instances
         statusReplicasPath: .status.instances
       status: {}

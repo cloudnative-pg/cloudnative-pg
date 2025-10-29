@@ -247,6 +247,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
 
+	// Set the label selector for VPA support
+	// This allows VPA to discover pods managed by this cluster through the scale sub-resource
+	cluster.Status.SelectorLabels = fmt.Sprintf("%s=%s,%s=%s",
+		utils.ClusterLabelName, cluster.Name,
+		utils.PodRoleLabelName, string(utils.PodRoleInstance))
+
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
