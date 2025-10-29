@@ -367,7 +367,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 						cluster.GetPostgresGID()),
 					Affinity:                  CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:               cluster.Spec.Affinity.Tolerations,
-					ServiceAccountName:        cluster.Name,
+					ServiceAccountName:        GetServiceAccountName(&cluster),
 					RestartPolicy:             corev1.RestartPolicyNever,
 					NodeSelector:              cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints: cluster.Spec.TopologySpreadConstraints,

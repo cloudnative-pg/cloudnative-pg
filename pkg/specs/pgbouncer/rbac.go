@@ -109,5 +109,5 @@ func Role(pooler *apiv1.Pooler) *rbacv1.Role {
 
 // RoleBinding creates a role binding for a given pooler
 func RoleBinding(pooler *apiv1.Pooler) rbacv1.RoleBinding {
-	return specs.CreateRoleBinding(pooler.ObjectMeta)
+	return specs.CreateRoleBindingFromMeta(pooler.ObjectMeta)
 }

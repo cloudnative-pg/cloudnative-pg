@@ -716,6 +716,45 @@ var _ = Describe("PodSpec drift detection", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
+	It("should use custom service account name in pod spec when specified", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: "custom-sa-name",
+					},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:16",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod.Spec.ServiceAccountName).To(Equal("custom-sa-name"))
+	})
+
+	It("should use cluster name as service account name by default", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:16",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod.Spec.ServiceAccountName).To(Equal("test-cluster"))
+	})
+
 	It("detects missing volume mounts in postgres container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{

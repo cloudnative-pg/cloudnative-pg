@@ -223,6 +223,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
 		v.validateExtensions,
+		v.validateServiceAccountTemplate,
 	}
 
 	for _, validate := range validations {
@@ -2857,4 +2858,38 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 	}
 
 	return result
+}
+
+func (v *ClusterCustomValidator) validateServiceAccountTemplate(cluster *apiv1.Cluster) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if cluster.Spec.ServiceAccountTemplate == nil {
+		return allErrs
+	}
+
+	template := cluster.Spec.ServiceAccountTemplate
+	basePath := field.NewPath("spec", "serviceAccountTemplate")
+
+	// Validate custom name if specified
+	if template.Metadata.Name != "" {
+		if errs := validationutil.IsDNS1123Subdomain(template.Metadata.Name); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(
+				basePath.Child("metadata", "name"),
+				template.Metadata.Name,
+				strings.Join(errs, ", "),
+			))
+		}
+	}
+
+	// When create=false, name must be specified
+	if template.Create != nil && !*template.Create {
+		if template.Metadata.Name == "" {
+			allErrs = append(allErrs, field.Required(
+				basePath.Child("metadata", "name"),
+				"metadata.name is required when create=false (using external ServiceAccount)",
+			))
+		}
+	}
+
+	return allErrs
 }

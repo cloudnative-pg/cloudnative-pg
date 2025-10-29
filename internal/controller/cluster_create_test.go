@@ -267,12 +267,23 @@ var _ = Describe("cluster_create unit tests", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
-		By("executing createOrPatchServiceAccount (create)", func() {
+		By("executing createOrPatchServiceAccount (create) with default name", func() {
 			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		sa := &corev1.ServiceAccount{}
+
+		By("making sure that the serviceaccount has been created with cluster name", func() {
+			expectResourceExists(env.client, cluster.Name, namespace, sa)
+		})
+
+		By("executing createOrPatchServiceAccount (create)", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		sa = &corev1.ServiceAccount{}
 
 		By("making sure that the serviceaccount has been created", func() {
 			expectResourceExists(env.client, cluster.Name, namespace, sa)
@@ -332,6 +343,32 @@ var _ = Describe("cluster_create unit tests", func() {
 				}))
 				Expect(updatedSA.OwnerReferences).To(BeNil())
 			})
+		})
+	})
+
+	It("should use custom service account name when specified", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		customSAName := "custom-sa-name"
+		cluster.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+			Metadata: apiv1.Metadata{
+				Name: customSAName,
+			},
+		}
+
+		By("creating service account with custom name", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying service account exists with custom name", func() {
+			sa := &corev1.ServiceAccount{}
+			expectResourceExists(env.client, customSAName, namespace, sa)
+		})
+
+		By("verifying old default service account does not exist", func() {
+			sa := &corev1.ServiceAccount{}
+			expectResourceDoesntExist(env.client, cluster.Name, namespace, sa)
 		})
 	})
 
@@ -683,6 +720,124 @@ var _ = Describe("Set cluster metadata of service account", func() {
 		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
 		Expect(sa.Annotations).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Annotations))
 		Expect(sa.Labels).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Labels))
+	})
+})
+
+var _ = Describe("External Service Account", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("should use external ServiceAccount when create=false", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		externalSAName := "pre-existing-sa"
+		cluster := newFakeCNPGCluster(env.client, namespace)
+
+		By("creating an external ServiceAccount", func() {
+			externalSA := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      externalSAName,
+					Namespace: namespace,
+				},
+			}
+			err := env.client.Create(ctx, externalSA)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("creating cluster configured to use external SA", func() {
+			cluster.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+				Metadata: apiv1.Metadata{
+					Name: externalSAName,
+				},
+				Create: ptr.To(false),
+			}
+			err := env.client.Update(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("reconciling the cluster", func() {
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: namespace,
+			}, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying the external SA still exists unchanged", func() {
+			sa := &corev1.ServiceAccount{}
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      externalSAName,
+				Namespace: namespace,
+			}, sa)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify it doesn't have owner references (not managed by operator)
+			Expect(sa.OwnerReferences).To(BeEmpty())
+		})
+
+		By("verifying pods would use the external SA", func() {
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: namespace,
+			}, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			pod, err := specs.NewInstance(ctx, *cluster, 1, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pod.Spec.ServiceAccountName).To(Equal(externalSAName))
+		})
+	})
+
+	It("should fail when external SA doesn't exist", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		nonExistentSA := "does-not-exist"
+
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+			Metadata: apiv1.Metadata{
+				Name: nonExistentSA,
+			},
+			Create: ptr.To(false),
+		}
+
+		err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("does not exist"))
+	})
+
+	It("should create SA when create=true (default behavior)", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		customSAName := "operator-managed-sa"
+
+		cluster.Spec.ServiceAccountTemplate = &apiv1.ServiceAccountTemplate{
+			Metadata: apiv1.Metadata{
+				Name: customSAName,
+			},
+			Create: ptr.To(true),
+		}
+
+		By("reconciling to create SA", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying SA was created with owner reference", func() {
+			sa := &corev1.ServiceAccount{}
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      customSAName,
+				Namespace: namespace,
+			}, sa)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify it has owner references (managed by operator)
+			Expect(sa.OwnerReferences).ToNot(BeEmpty())
+		})
 	})
 })
 

@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,8 +37,34 @@ var _ = Describe("Role binding", func() {
 	}
 
 	It("is created with the same name as the cluster", func() {
-		roleBinding := CreateRoleBinding(cluster.ObjectMeta)
+		roleBinding := CreateRoleBinding(cluster)
 		Expect(roleBinding.Name).To(Equal(cluster.Name))
 		Expect(roleBinding.Namespace).To(Equal(cluster.Namespace))
+		Expect(roleBinding.Subjects[0].Name).To(Equal(cluster.Name))
+		Expect(roleBinding.RoleRef.Name).To(Equal(cluster.Name))
 	})
+
+	It("uses custom service account name when specified", func() {
+		customSAName := "custom-sa"
+		clusterWithCustomSA := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "thistest",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
+					Metadata: apiv1.Metadata{
+						Name: customSAName,
+					},
+				},
+			},
+		}
+
+		roleBinding := CreateRoleBinding(clusterWithCustomSA)
+		Expect(roleBinding.Name).To(Equal(clusterWithCustomSA.Name)) // RoleBinding name stays as cluster name
+		Expect(roleBinding.Namespace).To(Equal(clusterWithCustomSA.Namespace))
+		Expect(roleBinding.Subjects[0].Name).To(Equal(customSAName)) // Custom SA name
+		Expect(roleBinding.RoleRef.Name).To(Equal(customSAName))     // Custom Role name
+	})
+
 })
