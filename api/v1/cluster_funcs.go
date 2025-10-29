@@ -1499,9 +1499,13 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 			target.TargetLSN)
 	}
 	if target.TargetTime != "" {
+		tt := pgTime.ConvertToPostgresFormat(target.TargetTime)
+		if strings.HasSuffix(tt, "Z") {
+			tt += "ulu"
+		}
 		result += fmt.Sprintf(
 			"recovery_target_time = '%v'\n",
-			pgTime.ConvertToPostgresFormat(target.TargetTime))
+			tt)
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
