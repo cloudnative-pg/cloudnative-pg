@@ -98,7 +98,8 @@ func getWebhookService(
 	ctx context.Context,
 	mutatingWebhookList *admissionregistrationv1.MutatingWebhookConfigurationList,
 ) (corev1.Service, error) {
-	if len(mutatingWebhookList.Items) == 0 ||
+	if mutatingWebhookList == nil ||
+		len(mutatingWebhookList.Items) == 0 ||
 		len(mutatingWebhookList.Items[0].Webhooks) == 0 {
 		return corev1.Service{}, nil
 	}

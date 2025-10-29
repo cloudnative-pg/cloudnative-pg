@@ -504,8 +504,9 @@ regarding the operator deployment, configuration and events.
 !!! Important "Least-Privilege Support"
     The `report operator` command works with minimal permissions. Only the operator
     deployment is **required** - all other resources are optional and collected on a
-    best-effort basis. If you lack permissions for certain resources, warnings are
-    logged and report generation continues with available data.
+    best-effort basis. If you lack permissions for certain resources (e.g., webhooks,
+    OLM resources), warnings are logged and report generation continues with available
+    data.
 
 The report includes:
 
@@ -513,14 +514,27 @@ The report includes:
 * **operator pods** (optional): the operator Pod information
 * **configuration** (optional): Secrets and ConfigMaps in the operator namespace
 * **events** (optional): Events in the operator namespace
-* **webhook configuration** (optional): mutating and validating webhook configurations
+* **webhook configuration** (optional): mutating and validating webhook configurations (cluster-scoped)
 * **webhook service** (optional): the webhook service
+* **OLM resources** (optional): subscriptions, cluster service versions, install plans (if OLM is installed)
 * **logs** (optional): operator Pod logs in JSON-lines format (requires `--logs` flag)
 
-**Minimal permissions**: Read access (`get`) to the operator deployment.
+**Minimal permissions**: Read access (`get`) to the operator deployment in the operator
+namespace. This allows namespace-scoped users to generate basic troubleshooting reports.
 
-**Full report permissions**: Add `list` on pods, events; `get` on secrets, configmaps,
-services (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
+**Recommended permissions for full report**: Add `list` on pods, events; `get` on secrets,
+configmaps, services (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
+
+!!! Example "Namespace-Scoped User"
+    A user with only namespace-scoped permissions can still generate useful reports:
+
+    ```sh
+    # With only deployment read access
+    kubectl cnpg report operator -n cnpg-system -f report.zip
+    ```
+
+    The command will log warnings for inaccessible resources but successfully generate
+    a report with the deployment manifest, which is often sufficient for basic troubleshooting.
 
 The command will generate a ZIP file containing various manifest in YAML format
 (by default, but settable to JSON with the `-o` flag).

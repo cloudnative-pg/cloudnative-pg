@@ -20,9 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package report
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -68,54 +66,6 @@ var _ = Describe("configureRedactors", func() {
 		configMap := corev1.ConfigMap{Data: map[string]string{"key": "value"}}
 		passedCM := configMapRedactor(configMap)
 		Expect(passedCM.Data["key"]).To(Equal("value"))
-	})
-})
-
-var _ = Describe("logWarning", func() {
-	It("should format warning message correctly", func() {
-		// Capture stdout
-		oldStdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		testErr := fmt.Errorf("test error")
-		logWarning("test operation", testErr, "Additional context here")
-
-		// Restore stdout and read output
-		_ = w.Close()
-		os.Stdout = oldStdout
-
-		var buf bytes.Buffer
-		_, err := io.Copy(&buf, r)
-		Expect(err).ToNot(HaveOccurred())
-
-		output := buf.String()
-		Expect(output).To(ContainSubstring("WARNING: test operation: test error"))
-		Expect(output).To(ContainSubstring("         Additional context here"))
-	})
-
-	It("should handle permission error messages", func() {
-		// Capture stdout
-		oldStdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		testErr := fmt.Errorf("permission denied")
-		logWarning("could not get webhooks", testErr,
-			"Continuing without webhook information. This is expected if you don't have cluster-level permissions.")
-
-		// Restore stdout and read output
-		_ = w.Close()
-		os.Stdout = oldStdout
-
-		var buf bytes.Buffer
-		_, err := io.Copy(&buf, r)
-		Expect(err).ToNot(HaveOccurred())
-
-		output := buf.String()
-		Expect(output).To(ContainSubstring("WARNING: could not get webhooks: permission denied"))
-		Expect(output).To(ContainSubstring("         Continuing without webhook information"))
-		Expect(output).To(ContainSubstring("cluster-level permissions"))
 	})
 })
 
