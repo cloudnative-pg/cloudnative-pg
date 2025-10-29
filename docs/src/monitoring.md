@@ -749,6 +749,75 @@ Currently, the operator exposes default `kubebuilder` metrics. See
 [kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html)
 for more details.
 
+### Enabling TLS for operator metrics
+
+By default, the operator exposes metrics via HTTP on port 8080. To enable TLS
+for the metrics endpoint, you need to:
+
+1. Create a Kubernetes secret containing TLS certificates (`tls.crt` and `tls.key`)
+2. Mount the secret to the operator pod
+3. Set the `METRICS_CERT_DIR` environment variable to point to the certificate directory
+
+Example configuration:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cnpg-metrics-certs
+  namespace: cnpg-system
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64-encoded-certificate>
+  tls.key: <base64-encoded-key>
+```
+
+Then, update the operator deployment to mount the secret and set the environment variable:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+        - name: METRICS_CERT_DIR
+          value: /run/secrets/cnpg.io/metrics
+        volumeMounts:
+        - mountPath: /run/secrets/cnpg.io/metrics
+          name: metrics-certificates
+          readOnly: true
+      volumes:
+      - name: metrics-certificates
+        secret:
+          secretName: cnpg-metrics-certs
+          defaultMode: 420
+```
+
+!!! Note
+    When `METRICS_CERT_DIR` is set, the operator will automatically enable
+    TLS for the metrics server. The PodMonitor configuration must be updated
+    to use HTTPS scheme.
+
+With TLS enabled, update the PodMonitor to use HTTPS:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-controller-manager
+  namespace: cnpg-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  podMetricsEndpoints:
+    - port: metrics
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true  # or configure proper CA validation
+```
+
 ### Monitoring the operator with Prometheus
 
 The operator can be monitored using the
