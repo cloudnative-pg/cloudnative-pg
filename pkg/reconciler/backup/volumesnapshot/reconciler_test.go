@@ -380,6 +380,7 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 	It("should transfer specified labels to annotations", func() {
 		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
 		labels[utils.InstanceNameLabelName] = exampleValueTwo
+		//nolint:staticcheck
 		labels[utils.ClusterRoleLabelName] = "value3"
 		labels["extraLabel"] = "value4" // This should not be transferred
 
@@ -387,6 +388,7 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 
 		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
 		Expect(annotations[utils.InstanceNameLabelName]).To(Equal(exampleValueTwo))
+		//nolint:staticcheck
 		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
 		Expect(annotations).ToNot(HaveKey("extraLabel"))
 
@@ -398,12 +400,14 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 
 	It("should not modify annotations if label is not present", func() {
 		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
+		//nolint:staticcheck
 		labels[utils.ClusterRoleLabelName] = "value3"
 
 		transferLabelsToAnnotations(labels, annotations)
 
 		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
 		Expect(annotations).ToNot(HaveKey(utils.InstanceNameLabelName))
+		//nolint:staticcheck
 		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
 	})
 

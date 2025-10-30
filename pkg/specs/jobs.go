@@ -122,6 +122,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 			"cluster", cluster.Name,
 			"namespace", cluster.Namespace)
 
+		//nolint:staticcheck // still in use for backward compatibility
 		options = append(options, config.Options...)
 		initCommand = append(
 			initCommand,

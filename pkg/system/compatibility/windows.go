@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright © contributors to CloudNativePG, established as
