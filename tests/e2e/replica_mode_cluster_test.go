@@ -384,14 +384,19 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			By("creating a backup and waiting until it's completed", func() {
 				backupName := fmt.Sprintf("%v-backup", clusterName)
-				backup, err := backups.CreateOnDemand(
-					env.Ctx,
-					env.Client,
-					namespace,
-					clusterName,
-					backupName,
-					apiv1.BackupTargetStandby,
-					apiv1.BackupMethodBarmanObjectStore,
+				backup, err := backups.Create(
+					env.Ctx, env.Client,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      backupName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetStandby,
+							Method:  apiv1.BackupMethodBarmanObjectStore,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
+					},
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -439,14 +444,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("creating a snapshot and waiting until it's completed", func() {
 				var err error
 				snapshotName := fmt.Sprintf("%v-snapshot", clusterName)
-				backup, err = backups.CreateOnDemand(
+				backup, err = backups.Create(
 					env.Ctx,
 					env.Client,
-					namespace,
-					clusterName,
-					snapshotName,
-					apiv1.BackupTargetStandby,
-					apiv1.BackupMethodVolumeSnapshot,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      snapshotName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetStandby,
+							Method:  apiv1.BackupMethodVolumeSnapshot,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
+					},
 				)
 				Expect(err).ToNot(HaveOccurred())
 
