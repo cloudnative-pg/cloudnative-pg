@@ -384,17 +384,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			By("creating a backup and waiting until it's completed", func() {
 				backupName := fmt.Sprintf("%v-backup", clusterName)
-				backup, err := backups.Create(env.Ctx, env.Client, apiv1.Backup{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backupName,
+				backup, err := backups.Create(
+					env.Ctx, env.Client,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      backupName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetStandby,
+							Method:  apiv1.BackupMethodBarmanObjectStore,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
 					},
-					Spec: apiv1.BackupSpec{
-						Target:  apiv1.BackupTargetStandby,
-						Method:  apiv1.BackupMethodBarmanObjectStore,
-						Cluster: apiv1.LocalObjectReference{Name: clusterName},
-					},
-				})
+				)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(func() (apiv1.BackupPhase, error) {
