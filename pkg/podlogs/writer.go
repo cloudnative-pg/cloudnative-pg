@@ -69,22 +69,26 @@ func (spl *Writer) sendLogsToWriter(
 	writer io.Writer,
 	options *corev1.PodLogOptions,
 ) error {
-	request := spl.Client.CoreV1().Pods(spl.Pod.Namespace).GetLogs(spl.Pod.Name, options)
-
 	if options.Previous {
 		jsWriter := json.NewEncoder(writer)
 		if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
 			return err
 		}
 		// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-		if err := executeGetLogRequest(ctx, request, writer); err != nil {
+		previousOpts := options.DeepCopy()
+		previousRequest := spl.Client.CoreV1().Pods(spl.Pod.Namespace).GetLogs(spl.Pod.Name, previousOpts)
+		if err := executeGetLogRequest(ctx, previousRequest, writer); err != nil {
 			// we try to print the json-safe error message. We don't exit on error
 			_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
 		}
 		if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
 			return err
 		}
+		// Now fetch current logs with Previous set to false
+		options.Previous = false
 	}
+
+	request := spl.Client.CoreV1().Pods(spl.Pod.Namespace).GetLogs(spl.Pod.Name, options)
 	return executeGetLogRequest(ctx, request, writer)
 }
 
@@ -107,7 +111,7 @@ func (spl *Writer) Multiple(
 		containerOpts := opts.DeepCopy()
 		containerOpts.Container = container.Name
 
-		if err := spl.sendLogsToWriter(ctx, writer, opts); err != nil {
+		if err := spl.sendLogsToWriter(ctx, writer, containerOpts); err != nil {
 			return err
 		}
 	}
