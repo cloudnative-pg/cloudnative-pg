@@ -26,9 +26,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,13 +77,27 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	requestedMajorVersion := requestedImageInfo.MajorVersion
 
 	if currentMajorVersion > requestedMajorVersion {
-		// Major version downgrade requested. This is not allowed.
+		// Major version downgrade requested - check for downgrade plugin
+		hasDowngradePlugin, err := r.hasDowngradePlugin(ctx)
+		if err != nil {
+			contextLogger.Error(err, "Failed to check for downgrade plugin")
+			return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, "Failed to check for downgrade plugin")
+		}
+		if !hasDowngradePlugin {
+			contextLogger.Info("Major version downgrade not supported - no downgrade plugin found")
+			return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, "Major version downgrade not supported - no downgrade plugin registered")
+		}
+
 		contextLogger.Info(
-			"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
+			"Major version downgrade requested",
 			"currentImage", cluster.Status.PGDataImageInfo.Image,
 			"requestedImage", requestedImageInfo)
-		return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
-			currentMajorVersion, requestedMajorVersion)
+		return nil, status.PatchWithOptimisticLock(
+			ctx,
+			r.Client,
+			cluster,
+			status.SetImage(requestedImageInfo.Image),
+		)
 	}
 
 	if currentMajorVersion < requestedMajorVersion {
@@ -182,6 +198,22 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 	}
 
 	return apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}, nil
+}
+
+// hasDowngradePlugin checks if any loaded plugin has the downgrade label
+// Can be implemented using capabilities instead by extending the grpc spec
+func (r *ClusterReconciler) hasDowngradePlugin(ctx context.Context) (bool, error) {
+	deployments := &appsv1.DeploymentList{}
+	labelSelector := labels.SelectorFromSet(labels.Set{"downgrade-plugin": "true"})
+	listOpts := &client.ListOptions{
+		LabelSelector: labelSelector,
+	}
+
+	if err := r.List(ctx, deployments, listOpts); err != nil {
+		return false, fmt.Errorf("failed to list deployments with downgrade-plugin label: %w", err)
+	}
+
+	return len(deployments.Items) > 0, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
