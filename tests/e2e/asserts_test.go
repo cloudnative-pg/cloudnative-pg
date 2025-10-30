@@ -2757,7 +2757,7 @@ func AssertReplicationSlotsOnPod(
 	isActiveOnPrimary bool,
 	isActiveOnReplica bool,
 ) {
-	GinkgoWriter.Println("checking contain slots:", expectedSlots, "for pod:", pod.Name)
+	GinkgoWriter.Println("Checking slots presence:", expectedSlots, "in pod:", pod.Name)
 	Eventually(func() ([]string, error) {
 		currentSlots, err := replicationslot.GetReplicationSlotsOnPod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -2770,7 +2770,7 @@ func AssertReplicationSlotsOnPod(
 				namespace, clusterName, postgres.AppDBName)
 		})
 
-	GinkgoWriter.Println("executing replication slot assertion query on pod", pod.Name)
+	GinkgoWriter.Println("Verifying slots status for pod", pod.Name)
 
 	for _, slot := range expectedSlots {
 		query := fmt.Sprintf(
