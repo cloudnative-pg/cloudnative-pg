@@ -237,14 +237,20 @@ var _ = Describe("Verify Volume Snapshot",
 				By("creating a snapshot and waiting until it's completed", func() {
 					var err error
 					backupName := fmt.Sprintf("%s-example", clusterToSnapshotName)
-					backup, err = backups.CreateOnDemand(
+					backup, err = backups.Create(
 						env.Ctx,
 						env.Client,
-						namespace,
-						clusterToSnapshotName,
-						backupName,
-						apiv1.BackupTargetStandby,
-						apiv1.BackupMethodVolumeSnapshot,
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      backupName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetStandby,
+								Method:  apiv1.BackupMethodVolumeSnapshot,
+								Cluster: apiv1.LocalObjectReference{Name: clusterToSnapshotName},
+							},
+						},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					// trigger a checkpoint
@@ -566,14 +572,20 @@ var _ = Describe("Verify Volume Snapshot",
 
 				backupName := "single-instance-snap"
 				By("taking a backup snapshot", func() {
-					_, err := backups.CreateOnDemand(
+					_, err := backups.Create(
 						env.Ctx,
 						env.Client,
-						namespace,
-						clusterToBackupName,
-						backupName,
-						apiv1.BackupTargetStandby,
-						apiv1.BackupMethodVolumeSnapshot,
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      backupName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetStandby,
+								Method:  apiv1.BackupMethodVolumeSnapshot,
+								Cluster: apiv1.LocalObjectReference{Name: clusterToBackupName},
+							},
+						},
 					)
 					Expect(err).NotTo(HaveOccurred())
 				})
