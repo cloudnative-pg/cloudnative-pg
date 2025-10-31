@@ -206,7 +206,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			It("correctly executes PITR with a cold snapshot", func() {
+			assertExecutesPITRwithColdSnapshot := func(recoveryTargetTime string) {
 				DeferCleanup(func() error {
 					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
@@ -296,11 +296,7 @@ var _ = Describe("Verify Volume Snapshot",
 					// right after the creation of the test data, we wait for 1s to avoid not
 					// including the newly created data within the recovery_target_time
 					time.Sleep(1 * time.Second)
-					// Get the recovery_target_time and pass it to the template engine
-					recoveryTargetTime := time.Now().Format(time.RFC3339)
-					GinkgoWriter.Println("XXX RECOVERY TARGET", recoveryTargetTime)
-					err := os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
-					Expect(err).ToNot(HaveOccurred())
+					Expect(os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)).To(Succeed())
 
 					forward, conn, err := postgres.ForwardPSQLConnection(
 						env.Ctx,
@@ -342,6 +338,25 @@ var _ = Describe("Verify Volume Snapshot",
 						TableName:    tableName,
 					}
 					AssertDataExpectedCount(env, tableLocator, 2)
+				})
+			}
+
+			When("targetTime is specified in Postgres timestamp format", func() {
+				It("correctly executes PITR with a cold snapshot", func() {
+					// Get the recovery_target_time and pass it to the template engine
+					recoveryTargetTime, err := postgres.GetCurrentTimestamp(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						namespace, clusterToSnapshotName,
+					)
+					Expect(err).ShouldNot(HaveOccurred())
+					assertExecutesPITRwithColdSnapshot(recoveryTargetTime)
+				})
+			})
+
+			When("targetTime is specified in RFC3339 format", func() {
+				It("correctly executes PITR with a cold snapshot", func() {
+					recoveryTargetTime := time.Now().Format(time.RFC3339)
+					assertExecutesPITRwithColdSnapshot(recoveryTargetTime)
 				})
 			})
 		})
