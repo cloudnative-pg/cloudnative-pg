@@ -156,7 +156,7 @@ func buildPrimaryPVC(serial int) corev1.PersistentVolumeClaim {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("cluster-example-%d", serial),
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: fmt.Sprintf("%v", serial),
@@ -170,7 +170,7 @@ func buildInvalidPrimaryPVC(serial int) corev1.PersistentVolumeClaim {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("cluster-example-%d", serial),
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: fmt.Sprintf("%v - this is a test", serial),
@@ -184,7 +184,7 @@ func buildReplicaPVC(serial int) corev1.PersistentVolumeClaim {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("cluster-example-%d", serial),
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
+				utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: fmt.Sprintf("%v", serial),

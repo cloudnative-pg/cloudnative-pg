@@ -90,6 +90,7 @@ func reconcileInstanceRoleLabel(
 		instanceReconciler := metadataReconciler{
 			name: "instance-role",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+				//nolint:staticcheck // still in use for backward compatibility
 				if pvc.Labels[utils.ClusterRoleLabelName] != instanceRole {
 					return false
 				}
