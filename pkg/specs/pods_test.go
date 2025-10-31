@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -938,9 +939,6 @@ var _ = Describe("NewInstance", func() {
 				Name:      "test-cluster",
 				Namespace: "default",
 			},
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:18.0",
-			},
 		}
 
 		pod, err := NewInstance(ctx, cluster, 1, true)
@@ -952,7 +950,7 @@ var _ = Describe("NewInstance", func() {
 			utils.PodRoleLabelName:                string(utils.PodRoleInstance),
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  "test-cluster",
-			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppVersionLabelName:   versions.Version,
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))

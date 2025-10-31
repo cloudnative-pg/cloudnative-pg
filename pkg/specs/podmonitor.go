@@ -20,8 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
-	"fmt"
-
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -44,8 +43,6 @@ func (c ClusterPodMonitorManager) IsPodMonitorEnabled() bool {
 
 // BuildPodMonitor builds a new PodMonitor object
 func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
-	version, _ := c.cluster.GetPostgresqlMajorVersion()
-
 	meta := metav1.ObjectMeta{
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
@@ -53,7 +50,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  c.cluster.Name,
-			utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+			utils.KubernetesAppVersionLabelName:   versions.Version,
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 		},
 	}
