@@ -62,11 +62,13 @@ var _ = Describe("object metadata test", func() {
 			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
 			Expect(updated).To(BeTrue())
 
+			//nolint:staticcheck
 			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 			Expect(primaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
 			Expect(updated).To(BeTrue())
+			//nolint:staticcheck
 			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
@@ -83,6 +85,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "newPrimaryPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelReplica,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
@@ -93,6 +96,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "newReplicaPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelPrimary,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
@@ -101,11 +105,13 @@ var _ = Describe("object metadata test", func() {
 
 			updated := updateRoleLabels(context.Background(), cluster, newPrimaryPod)
 			Expect(updated).To(BeTrue())
+			//nolint:staticcheck
 			Expect(newPrimaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 			Expect(newPrimaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, newReplicaPod)
 			Expect(updated).To(BeTrue())
+			//nolint:staticcheck
 			Expect(newReplicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 			Expect(newReplicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
@@ -133,11 +139,13 @@ var _ = Describe("object metadata test", func() {
 
 			updated := updateRoleLabels(context.Background(), cluster, oldPrimaryPod)
 			Expect(updated).To(BeFalse())
+			//nolint:staticcheck
 			Expect(oldPrimaryPod.Labels).ToNot(ContainElement(utils.ClusterRoleLabelName))
 			Expect(oldPrimaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, oldReplicaPod)
 			Expect(updated).To(BeFalse())
+			//nolint:staticcheck
 			Expect(oldReplicaPod.Labels).ToNot(ContainElement(utils.ClusterRoleLabelName))
 			Expect(oldReplicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
@@ -154,6 +162,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "primaryPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelPrimary,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
@@ -164,6 +173,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "replicaPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelReplica,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
@@ -172,11 +182,13 @@ var _ = Describe("object metadata test", func() {
 
 			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
 			Expect(updated).To(BeFalse())
+			//nolint:staticcheck
 			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 			Expect(primaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
 			Expect(updated).To(BeFalse())
+			//nolint:staticcheck
 			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
@@ -193,6 +205,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "primaryPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 				},
@@ -202,6 +215,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "replicaPod",
 					Labels: map[string]string{
+						//nolint:staticcheck
 						utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
@@ -209,11 +223,13 @@ var _ = Describe("object metadata test", func() {
 
 			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
 			Expect(updated).To(BeTrue())
+			//nolint:staticcheck
 			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 			Expect(primaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
 			Expect(updated).To(BeTrue())
+			//nolint:staticcheck
 			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
@@ -507,6 +523,7 @@ var _ = Describe("metadata reconciliation test", func() {
 			for _, pod := range updatedInstanceList.Items {
 				Expect(pod.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 				Expect(pod.Labels[utils.InstanceNameLabelName]).To(Equal(pod.Name))
+				//nolint:staticcheck
 				Expect(pod.Labels[utils.ClusterRoleLabelName]).To(Or(Equal(specs.ClusterRoleLabelPrimary),
 					Equal(specs.ClusterRoleLabelReplica)))
 				Expect(pod.Labels[utils.ClusterInstanceRoleLabelName]).To(Or(Equal(specs.ClusterRoleLabelPrimary),
@@ -556,6 +573,7 @@ var _ = Describe("metadata update functions", func() {
 		It("Should updateRoleLabels correctly", func() {
 			modified := updateRoleLabels(ctx, cluster, instance)
 			Expect(modified).To(BeTrue())
+			//nolint:staticcheck
 			Expect(instance.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 			Expect(instance.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 		})

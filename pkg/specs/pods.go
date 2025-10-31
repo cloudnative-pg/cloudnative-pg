@@ -513,7 +513,8 @@ func buildInstance(
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName:    envConfig.Hash,
+				//nolint:staticcheck // still in use for backward compatibility
+				utils.PodEnvHashAnnotationName: envConfig.Hash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,

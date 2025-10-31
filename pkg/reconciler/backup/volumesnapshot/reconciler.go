@@ -508,6 +508,7 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 	labelsToBeTransferred := []string{
 		utils.InstanceNameLabelName,
 		utils.ClusterInstanceRoleLabelName,
+		//nolint:staticcheck // still in use for backward compatibility
 		utils.ClusterRoleLabelName,
 		utils.PvcRoleLabelName,
 	}

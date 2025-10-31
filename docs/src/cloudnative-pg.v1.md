@@ -1040,8 +1040,8 @@ created from scratch</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>The list of options that must be passed to initdb when creating the cluster.
-Deprecated: This could lead to inconsistent configurations,
+   <p>The list of options that must be passed to initdb when creating the cluster.</p>
+<p>Deprecated: This could lead to inconsistent configurations,
 please use the explicit provided parameters instead.
 If defined, explicit values will be ignored.</p>
 </td>

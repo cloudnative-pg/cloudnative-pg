@@ -67,6 +67,7 @@ const (
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 
 	// ClusterRoleLabelName is the name of label applied to instances to mark primary/replica
+	//
 	// Deprecated: Use ClusterInstanceRoleLabelName.
 	ClusterRoleLabelName = "role"
 
@@ -139,6 +140,7 @@ const (
 	HibernatePgControlDataAnnotationName = MetadataNamespace + "/hibernatePgControlData"
 
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
+	//
 	// Deprecated: the PodSpec annotation covers the environment drift. This annotation is
 	// kept for backward compatibility
 	PodEnvHashAnnotationName = MetadataNamespace + "/podEnvHash"
