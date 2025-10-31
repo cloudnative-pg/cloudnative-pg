@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright © contributors to CloudNativePG, established as
