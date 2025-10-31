@@ -1553,6 +1553,7 @@ type BootstrapInitDB struct {
 	Secret *LocalObjectReference `json:"secret,omitempty"`
 
 	// The list of options that must be passed to initdb when creating the cluster.
+	//
 	// Deprecated: This could lead to inconsistent configurations,
 	// please use the explicit provided parameters instead.
 	// If defined, explicit values will be ignored.

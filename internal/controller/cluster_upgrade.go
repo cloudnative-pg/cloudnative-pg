@@ -553,6 +553,7 @@ func checkClusterHasDifferentRestartAnnotation(
 }
 
 // checkPodEnvironmentIsOutdated checks if the environment variables in the pod have changed.
+//
 // Deprecated: this function doesn't take into account plugin changes, use PodSpec annotation.
 func checkPodEnvironmentIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	// Check if there is a change in the environment section

@@ -84,6 +84,7 @@ var _ = Describe("Reconcile Metadata", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-3",
 						Labels: map[string]string{
+							//nolint:staticcheck
 							utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 						},
 						Annotations: map[string]string{
@@ -107,6 +108,7 @@ var _ = Describe("Reconcile Metadata", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-2",
 						Labels: map[string]string{
+							//nolint:staticcheck
 							utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 						},
 						Annotations: map[string]string{
@@ -118,6 +120,7 @@ var _ = Describe("Reconcile Metadata", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-1",
 						Labels: map[string]string{
+							//nolint:staticcheck
 							utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 						},
 						Annotations: map[string]string{
@@ -388,7 +391,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName:        clusterName + "-1",
 			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "primary",
+			utils.ClusterRoleLabelName:         "primary", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "primary",
 		}))
 		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
@@ -401,7 +404,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName:        clusterName + "-2",
 			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
+			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
@@ -414,7 +417,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName:        clusterName + "-3",
 			utils.PvcRoleLabelName:             "PG_WAL",
-			utils.ClusterRoleLabelName:         "replica",
+			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
@@ -427,7 +430,7 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
 			utils.InstanceNameLabelName:        clusterName + "-3",
 			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
+			utils.ClusterRoleLabelName:         "replica", //nolint:staticcheck
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
