@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -230,7 +231,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.InstanceNameLabelName:           "cluster-0",
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppVersionLabelName:   versions.Version,
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
@@ -240,7 +241,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.InstanceNameLabelName:           "cluster-0",
 			utils.KubernetesAppLabelName:          utils.AppName,
 			utils.KubernetesAppInstanceLabelName:  cluster.Name,
-			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppVersionLabelName:   versions.Version,
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))

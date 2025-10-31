@@ -46,7 +46,7 @@ const (
 	ManagerName = "cloudnative-pg"
 
 	// AppName is the name of the application
-	AppName = "postgresql"
+	AppName = "postgresql.cnpg.io"
 
 	// DatabaseComponentName is the name of the component for the database.
 	DatabaseComponentName = "database"

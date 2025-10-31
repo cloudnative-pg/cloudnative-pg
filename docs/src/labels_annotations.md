@@ -109,7 +109,7 @@ This label is available only on `VolumeSnapshot` resources.
   Available across all CloudNativePG managed resources.
 
 `app.kubernetes.io/name`
-: Name of the application. It will always be `postgresql`.
+: Name of the application. It will always be `postgresql.cnpg.io`.
   Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
   podDisruptionBudgets, podMonitors.
 
@@ -123,7 +123,7 @@ This label is available only on `VolumeSnapshot` resources.
   Available on pods, jobs, deployments, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/version`
-: Major version of PostgreSQL.
+: CloudNativePG version managing the resource.
   Available on pods, jobs, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 ## Predefined annotations

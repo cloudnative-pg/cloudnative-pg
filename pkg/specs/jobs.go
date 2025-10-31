@@ -32,6 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 type postInitFolder string
@@ -320,7 +321,6 @@ func (role jobRole) getJobName(instanceName string) string {
 func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
-	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
@@ -334,7 +334,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				utils.JobRoleLabelName:                string(role),
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -348,7 +348,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 						utils.JobRoleLabelName:                string(role),
 						utils.KubernetesAppLabelName:          utils.AppName,
 						utils.KubernetesAppInstanceLabelName:  cluster.Name,
-						utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+						utils.KubernetesAppVersionLabelName:   versions.Version,
 						utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 						utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 					},

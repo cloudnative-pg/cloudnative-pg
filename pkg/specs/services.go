@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 func buildInstanceServicePorts() []corev1.ServicePort {
@@ -45,8 +46,6 @@ func buildInstanceServicePorts() []corev1.ServicePort {
 
 // CreateClusterAnyService create a service insisting on all the pods
 func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
-	version, _ := cluster.GetPostgresqlMajorVersion()
-
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceAnyName(),
@@ -55,7 +54,7 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 				utils.ClusterLabelName:                cluster.Name,
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -74,8 +73,6 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadService create a service insisting on all the ready pods
 func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
-	version, _ := cluster.GetPostgresqlMajorVersion()
-
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadName(),
@@ -84,7 +81,7 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 				utils.ClusterLabelName:                cluster.Name,
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -102,8 +99,6 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadOnlyService create a service insisting on all the ready pods
 func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
-	version, _ := cluster.GetPostgresqlMajorVersion()
-
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadOnlyName(),
@@ -112,7 +107,7 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 				utils.ClusterLabelName:                cluster.Name,
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -130,8 +125,6 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 
 // CreateClusterReadWriteService create a service insisting on the primary pod
 func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
-	version, _ := cluster.GetPostgresqlMajorVersion()
-
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadWriteName(),
@@ -140,7 +133,7 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 				utils.ClusterLabelName:                cluster.Name,
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},

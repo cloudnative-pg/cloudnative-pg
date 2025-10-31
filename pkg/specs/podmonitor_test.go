@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -69,7 +70,7 @@ var _ = Describe("PodMonitor test", func() {
 				utils.ClusterLabelName:                cluster.Name,
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   "18",
+				utils.KubernetesAppVersionLabelName:   versions.Version,
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			}))
@@ -134,7 +135,6 @@ var _ = Describe("PodMonitor test", func() {
 				Name:      clusterName,
 			},
 			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
 				},
@@ -152,7 +152,6 @@ var _ = Describe("PodMonitor test", func() {
 				Name:      clusterName,
 			},
 			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
 					TLSConfig: &apiv1.ClusterMonitoringTLSConfiguration{
