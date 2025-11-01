@@ -1943,6 +1943,22 @@ sources to the pods to be used by Env</p>
 Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
+<tr><td><code>podSecurityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podsecuritycontext-v1-core"><i>core/v1.PodSecurityContext</i></a>
+</td>
+<td>
+   <p>The PodSecurityContext applied to every Pod of the cluster.
+Defaults to: {}</p>
+</td>
+</tr>
+<tr><td><code>securityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#securitycontext-v1-core"><i>core/v1.SecurityContext</i></a>
+</td>
+<td>
+   <p>The SecurityContext applied to every Container in the Pod of the cluster.
+Defaults to: {}</p>
+</td>
+</tr>
 <tr><td><code>tablespaces</code><br/>
 <a href="#postgresql-cnpg-io-v1-TablespaceConfiguration"><i>[]TablespaceConfiguration</i></a>
 </td>
