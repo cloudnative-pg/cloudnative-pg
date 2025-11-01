@@ -32,6 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 type postInitFolder string
@@ -328,18 +329,28 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Name:      jobName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.ClusterLabelName:      cluster.Name,
-				utils.JobRoleLabelName:      string(role),
+				utils.InstanceNameLabelName:           instanceName,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.JobRoleLabelName:                string(role),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.InstanceNameLabelName: instanceName,
-						utils.ClusterLabelName:      cluster.Name,
-						utils.JobRoleLabelName:      string(role),
+						utils.InstanceNameLabelName:           instanceName,
+						utils.ClusterLabelName:                cluster.Name,
+						utils.JobRoleLabelName:                string(role),
+						utils.KubernetesAppLabelName:          utils.AppName,
+						utils.KubernetesAppInstanceLabelName:  cluster.Name,
+						utils.KubernetesAppVersionLabelName:   versions.Version,
+						utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+						utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 					},
 				},
 				Spec: corev1.PodSpec{

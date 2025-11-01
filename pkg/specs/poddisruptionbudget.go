@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
@@ -43,6 +44,13 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -72,6 +80,13 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{

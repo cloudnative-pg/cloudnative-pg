@@ -42,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // Reconciler is an object capable of executing a volume snapshot on a running cluster
@@ -87,6 +88,13 @@ func (se *Reconciler) enrichSnapshot(
 
 	vs.Labels[utils.BackupNameLabelName] = backup.Name
 	vs.Labels[utils.MajorVersionLabelName] = strconv.Itoa(backup.Status.MajorVersion)
+
+	// Common labels
+	vs.Labels[utils.KubernetesAppManagedByLabelName] = utils.ManagerName
+	vs.Labels[utils.KubernetesAppLabelName] = utils.AppName
+	vs.Labels[utils.KubernetesAppInstanceLabelName] = cluster.Name
+	vs.Labels[utils.KubernetesAppVersionLabelName] = versions.Version
+	vs.Labels[utils.KubernetesAppComponentLabelName] = utils.DatabaseComponentName
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:

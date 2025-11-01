@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -66,7 +67,12 @@ var _ = Describe("PodMonitor test", func() {
 			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 			monitor := mgr.BuildPodMonitor()
 			Expect(monitor.Labels).To(BeEquivalentTo(map[string]string{
-				utils.ClusterLabelName: cluster.Name,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(monitor.Spec.Selector.MatchLabels).To(BeEquivalentTo(map[string]string{
 				utils.ClusterLabelName: cluster.Name,

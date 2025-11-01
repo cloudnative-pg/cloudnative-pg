@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -932,6 +933,29 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 })
 
 var _ = Describe("NewInstance", func() {
+	It("applies correct labels", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                "test-cluster",
+			utils.InstanceNameLabelName:           "test-cluster-1",
+			utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "test-cluster",
+			utils.KubernetesAppVersionLabelName:   versions.Version,
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
+	})
+
 	It("applies JSON patch from annotation", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

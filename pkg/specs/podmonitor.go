@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -45,6 +46,13 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	meta := metav1.ObjectMeta{
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
+		Labels: map[string]string{
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  c.cluster.Name,
+			utils.KubernetesAppVersionLabelName:   versions.Version,
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+		},
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 

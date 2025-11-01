@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
@@ -252,6 +253,9 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Rules: rules,
 	}

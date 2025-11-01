@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -521,9 +522,14 @@ func buildInstance(
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				utils.ClusterLabelName:      cluster.Name,
-				utils.InstanceNameLabelName: podName,
-				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+				utils.ClusterLabelName:                cluster.Name,
+				utils.InstanceNameLabelName:           podName,
+				utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 func buildInstanceServicePorts() []corev1.ServicePort {
@@ -49,6 +50,14 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceAnyName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:                     corev1.ServiceTypeClusterIP,
@@ -68,6 +77,14 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,
@@ -86,6 +103,14 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadOnlyName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,
@@ -104,6 +129,14 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadWriteName(),
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeClusterIP,

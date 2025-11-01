@@ -49,7 +49,12 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.pooler.Namespace,
 		Name:      c.pooler.Name,
 		Labels: map[string]string{
-			utils.PgbouncerNameLabel: c.pooler.Name,
+			utils.PgbouncerNameLabel:              c.pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  c.pooler.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		},
 	}
 
