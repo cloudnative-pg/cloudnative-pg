@@ -84,12 +84,46 @@ In the above example:
 - It includes all tables (`spec.target.allTables: true`) from the `app`
   database (`spec.dbname`).
 
+### Fine-grained control over publication tables
+
+While the `allTables` option provides a convenient way to replicate all tables
+in a database, PostgreSQL version 15 and later introduce enhanced flexibility
+through the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
+command. This allows you to precisely define which tables, or even which types
+of data changes, should be included in a publication.
+
 !!! Important
-    While `allTables` simplifies configuration, PostgreSQL offers fine-grained
-    control for replicating specific tables or targeted data changes. For advanced
-    configurations, consult the [PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html).
-    Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
-    for details on declaratively customizing replication targets.
+    If you are using PostgreSQL versions earlier than 15, review the syntax and
+    options available for `CREATE PUBLICATION` in your specific release. Some
+    parameters and features may not be supported.
+
+For complex or tailored replication setups, refer to the
+[PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html).
+
+Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
+for details on declaratively customizing replication targets.
+
+The following example defines a publication that replicates all tables in the
+`portal` schema of the `app` database, along with the `users` table from the
+`access` schema:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: publisher
+spec:
+  cluster:
+    name: freddie
+  dbname: app
+  name: publisher
+  target:
+    objects:
+      - tablesInSchema: portal
+      - table:
+          name: users
+          schema: access
+```
 
 ### Required Fields in the `Publication` Manifest
 
@@ -347,7 +381,7 @@ metadata:
 spec:
   instances: 1
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
 
   storage:
     size: 1Gi
@@ -395,6 +429,8 @@ metadata:
   name: king
 spec:
   instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
 
   storage:
     size: 1Gi
