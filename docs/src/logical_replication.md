@@ -381,7 +381,7 @@ metadata:
 spec:
   instances: 1
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
 
   storage:
     size: 1Gi
@@ -429,6 +429,8 @@ metadata:
   name: king
 spec:
   instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
 
   storage:
     size: 1Gi
