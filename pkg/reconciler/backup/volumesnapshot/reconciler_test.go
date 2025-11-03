@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -77,6 +78,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Annotations: map[string]string{},
 			},
 			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
 				Backup: &apiv1.BackupConfiguration{
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
@@ -120,8 +122,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Name:      backupName,
 			},
 			Status: apiv1.BackupStatus{
-				StartedAt: ptr.To(startedAt),
-				StoppedAt: ptr.To(stoppedAt),
+				StartedAt:    ptr.To(startedAt),
+				StoppedAt:    ptr.To(stoppedAt),
+				MajorVersion: 18,
 			},
 		}
 	})
@@ -352,6 +355,41 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		data, err := utils.GetFencedInstances(latestCluster.Annotations)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(data.Len()).To(Equal(0))
+	})
+
+	It("should properly enrich the backup with labels", func(ctx SpecContext) {
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod).
+			Build()
+
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		err = mockClient.List(ctx, &snapshotList)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, snapshot := range snapshotList.Items {
+			// Expected common labels
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppInstanceLabelName, cluster.Name))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppVersionLabelName, "18"))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+			// Backup specific labels
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupNameLabelName, backup.Name))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupDateLabelName, time.Now().Format("20060102")))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupMonthLabelName, time.Now().Format("200601")))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupYearLabelName, strconv.Itoa(time.Now().Year())))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.MajorVersionLabelName, "18"))
+		}
 	})
 })
 

@@ -1128,6 +1128,7 @@ passwordStatus
 pc
 pdf
 periodSeconds
+persistentVolumeClaims
 persistentvolumeclaim
 persistentvolumeclaims
 pgAdmin
@@ -1166,9 +1167,11 @@ podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
 podCount
+podDisruptionBudgets
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
+podMonitors
 podName
 podStatuses
 podmonitor

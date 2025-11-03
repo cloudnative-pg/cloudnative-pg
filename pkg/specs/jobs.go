@@ -320,6 +320,7 @@ func (role jobRole) getJobName(instanceName string) string {
 func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
@@ -328,18 +329,28 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Name:      jobName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.ClusterLabelName:      cluster.Name,
-				utils.JobRoleLabelName:      string(role),
+				utils.InstanceNameLabelName:           instanceName,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.JobRoleLabelName:                string(role),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.InstanceNameLabelName: instanceName,
-						utils.ClusterLabelName:      cluster.Name,
-						utils.JobRoleLabelName:      string(role),
+						utils.InstanceNameLabelName:           instanceName,
+						utils.ClusterLabelName:                cluster.Name,
+						utils.JobRoleLabelName:                string(role),
+						utils.KubernetesAppLabelName:          utils.AppName,
+						utils.KubernetesAppInstanceLabelName:  cluster.Name,
+						utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+						utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+						utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 					},
 				},
 				Spec: corev1.PodSpec{

@@ -91,10 +91,15 @@ var _ = Describe("Deployment", func() {
 		// Check the metadata
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
-		Expect(deployment.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-		Expect(deployment.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(deployment.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
-
+		Expect(deployment.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.PgbouncerNameLabel:              pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 		// Check the DeploymentSpec
 		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
@@ -102,8 +107,15 @@ var _ = Describe("Deployment", func() {
 		// Check the PodTemplateSpec
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
+		Expect(podTemplate.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.PgbouncerNameLabel:              pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())
