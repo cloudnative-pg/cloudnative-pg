@@ -119,7 +119,7 @@ This label is available only on `VolumeSnapshot` resources.
   podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/instance`
-: Name of the related `Cluster` resource.
+: Name of the owning `Cluster` resource.
   Available on pods, jobs, deployments, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 `app.kubernetes.io/version`
