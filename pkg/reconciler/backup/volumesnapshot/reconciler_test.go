@@ -39,7 +39,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -382,7 +381,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppInstanceLabelName, cluster.Name))
-			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppVersionLabelName, versions.Version))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppVersionLabelName, "18"))
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
 			// Backup specific labels
 			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupNameLabelName, backup.Name))

@@ -20,13 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"fmt"
+
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
@@ -39,6 +40,7 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 	}
 	minAvailableReplicas := int32(cluster.Spec.Instances - 2) //nolint:gosec
 	allReplicasButOne := intstr.FromInt32(minAvailableReplicas)
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -47,7 +49,7 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 			Labels: map[string]string{
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -76,6 +78,8 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 	}
 	one := intstr.FromInt32(1)
 
+	version, _ := cluster.GetPostgresqlMajorVersion()
+
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
@@ -83,7 +87,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 			Labels: map[string]string{
 				utils.KubernetesAppLabelName:          utils.AppName,
 				utils.KubernetesAppInstanceLabelName:  cluster.Name,
-				utils.KubernetesAppVersionLabelName:   versions.Version,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
