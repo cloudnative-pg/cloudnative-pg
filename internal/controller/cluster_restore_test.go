@@ -1004,3 +1004,237 @@ var _ = Describe("getNonSidecarInitContainerStatuses", func() {
 		})
 	})
 })
+
+var _ = Describe("ensureInitContainersAreCompleted - multiple pods", func() {
+	var (
+		mockCli k8client.Client
+		cluster *apiv1.Cluster
+		pod1    *corev1.Pod
+		pod2    *corev1.Pod
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+	})
+
+	Context("when multiple pods exist with mixed init container states", func() {
+		BeforeEach(func() {
+			pod1 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: string(utils.PodRoleInstance),
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-1"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-1",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 0,
+									Reason:   "Completed",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			pod2 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: string(utils.PodRoleInstance),
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-2"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-2",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			}
+
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, pod1, pod2).
+				Build()
+		})
+
+		It("should requeue when at least one pod has running init containers", func(ctx SpecContext) {
+			res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).ToNot(BeNil())
+			Expect(res.RequeueAfter).To(Equal(5 * time.Second))
+		})
+	})
+
+	Context("when multiple pods exist and one has a failed init container", func() {
+		BeforeEach(func() {
+			pod1 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: string(utils.PodRoleInstance),
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-1"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-1",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 0,
+									Reason:   "Completed",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			pod2 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: string(utils.PodRoleInstance),
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-2"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-2",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 1,
+									Reason:   "Error",
+									Message:  "restore failed",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, pod1, pod2).
+				Build()
+		})
+
+		It("should requeue with 10 second delay when a pod has failed init container", func(ctx SpecContext) {
+			res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).ToNot(BeNil())
+			Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+		})
+	})
+
+	Context("when multiple pods exist but only one matches the pod role label", func() {
+		BeforeEach(func() {
+			pod1 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: string(utils.PodRoleInstance),
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-1"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-1",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 0,
+									Reason:   "Completed",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			pod2 = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-2",
+					Namespace: "default",
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PodRoleLabelName: "other-role",
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "init-2"},
+					},
+				},
+				Status: corev1.PodStatus{
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "init-2",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			}
+
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, pod1, pod2).
+				Build()
+		})
+
+		It("should ignore pods that don't match the pod role label", func(ctx SpecContext) {
+			res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).To(BeNil())
+		})
+	})
+})

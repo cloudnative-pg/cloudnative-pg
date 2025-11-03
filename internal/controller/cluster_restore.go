@@ -371,50 +371,55 @@ func ensureInitContainersAreCompleted(
 		return nil, err
 	}
 
-	restoredPod := getPodWithNonSidecarInitContainers(podList)
-	if restoredPod == nil {
+	// Get all pods with non-sidecar init containers (excluding those with owner references)
+	podsWithInitContainers := getPodsWithNonSidecarInitContainers(podList)
+	if len(podsWithInitContainers) == 0 {
 		return nil, nil
 	}
 
-	// Check all non-sidecar init containers
-	nonSidecarStatuses := getNonSidecarInitContainerStatuses(
-		restoredPod.Status.InitContainerStatuses,
-		restoredPod.Spec.InitContainers,
-	)
+	// Check all pods and their init containers
+	for _, pod := range podsWithInitContainers {
+		// Check all non-sidecar init containers in this pod
+		nonSidecarStatuses := getNonSidecarInitContainerStatuses(
+			pod.Status.InitContainerStatuses,
+			pod.Spec.InitContainers,
+		)
 
-	if len(nonSidecarStatuses) == 0 {
-		contextLogger.Info("waiting for init containers to start", "podName", restoredPod.Name)
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	// Check if any non-sidecar init container is still running or hasn't started
-	for _, status := range nonSidecarStatuses {
-		if status.State.Terminated == nil {
-			contextLogger.Info("init container running, waiting for completion",
-				"podName", restoredPod.Name,
-				"initContainerName", status.Name)
+		if len(nonSidecarStatuses) == 0 {
+			contextLogger.Info("waiting for init containers to start", "podName", pod.Name)
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
-	}
 
-	// Check if any non-sidecar init container failed
-	for _, status := range nonSidecarStatuses {
-		if status.State.Terminated.ExitCode != 0 {
-			contextLogger.Info("init container failed",
-				"podName", restoredPod.Name,
-				"initContainerName", status.Name,
-				"exitCode", status.State.Terminated.ExitCode,
-				"reason", status.State.Terminated.Reason,
-				"message", status.State.Terminated.Message)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		// Check if any non-sidecar init container is still running or hasn't started
+		for _, status := range nonSidecarStatuses {
+			if status.State.Terminated == nil {
+				contextLogger.Info("init container running, waiting for completion",
+					"podName", pod.Name,
+					"initContainerName", status.Name)
+				return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+		}
+
+		// Check if any non-sidecar init container failed
+		for _, status := range nonSidecarStatuses {
+			if status.State.Terminated.ExitCode != 0 {
+				contextLogger.Info("init container failed",
+					"podName", pod.Name,
+					"initContainerName", status.Name,
+					"exitCode", status.State.Terminated.ExitCode,
+					"reason", status.State.Terminated.Reason,
+					"message", status.State.Terminated.Message)
+				return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
 		}
 	}
 
-	contextLogger.Info("all init containers completed, proceeding to orphan pods deletion")
+	contextLogger.Info("all init containers in all pods completed, proceeding to orphan pods deletion")
 	return nil, nil
 }
 
-func getPodWithNonSidecarInitContainers(podList corev1.PodList) *corev1.Pod {
+func getPodsWithNonSidecarInitContainers(podList corev1.PodList) []*corev1.Pod {
+	var podsWithInitContainers []*corev1.Pod
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
 		if len(pod.OwnerReferences) != 0 {
@@ -422,10 +427,10 @@ func getPodWithNonSidecarInitContainers(podList corev1.PodList) *corev1.Pod {
 		}
 
 		if hasNonSidecarInitContainers(&pod) {
-			return &pod
+			podsWithInitContainers = append(podsWithInitContainers, &pod)
 		}
 	}
-	return nil
+	return podsWithInitContainers
 }
 
 func hasNonSidecarInitContainers(pod *corev1.Pod) bool {
