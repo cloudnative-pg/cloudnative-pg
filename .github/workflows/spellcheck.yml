@@ -1,6 +1,7 @@
 name: spellcheck-woke
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 permissions: read-all
