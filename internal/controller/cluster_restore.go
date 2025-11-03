@@ -371,7 +371,7 @@ func ensureInitContainersAreCompleted(
 		return nil, err
 	}
 
-	// Get all pods with non-sidecar init containers (excluding those with owner references)
+	// Get all pods with non-sidecar init containers
 	podsWithInitContainers := getPodsWithNonSidecarInitContainers(podList)
 	if len(podsWithInitContainers) == 0 {
 		return nil, nil
@@ -422,10 +422,6 @@ func getPodsWithNonSidecarInitContainers(podList corev1.PodList) []*corev1.Pod {
 	var podsWithInitContainers []*corev1.Pod
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		if len(pod.OwnerReferences) != 0 {
-			continue
-		}
-
 		if hasNonSidecarInitContainers(&pod) {
 			podsWithInitContainers = append(podsWithInitContainers, &pod)
 		}

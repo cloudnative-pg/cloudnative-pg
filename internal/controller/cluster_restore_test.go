@@ -801,7 +801,7 @@ var _ = Describe("ensureInitContainersAreCompleted", func() {
 				})
 		})
 
-		Context("when pod has owner references", func() {
+		Context("when pod has owner references but init containers completed", func() {
 			BeforeEach(func() {
 				pod.OwnerReferences = []metav1.OwnerReference{
 					{
@@ -811,13 +811,24 @@ var _ = Describe("ensureInitContainersAreCompleted", func() {
 						APIVersion: "apps/v1",
 					},
 				}
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name: "restore-init",
+						State: corev1.ContainerState{
+							Terminated: &corev1.ContainerStateTerminated{
+								ExitCode: 0,
+								Reason:   "Completed",
+							},
+						},
+					},
+				}
 				mockCli = fake.NewClientBuilder().
 					WithScheme(k8scheme.BuildWithAllKnownScheme()).
 					WithObjects(cluster, pod).
 					Build()
 			})
 
-			It("should ignore the pod", func(ctx SpecContext) {
+			It("should still check and wait for init containers", func(ctx SpecContext) {
 				res, err := ensureInitContainersAreCompleted(ctx, mockCli, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res).To(BeNil())
