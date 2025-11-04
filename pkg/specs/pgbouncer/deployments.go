@@ -79,7 +79,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 				},
 			},
 		}).
-		WithSecurityContext(specs.CreatePodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
+		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
 		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
@@ -191,4 +191,21 @@ func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.Deploymen
 		return *strategy.DeepCopy()
 	}
 	return appsv1.DeploymentStrategy{}
+}
+
+// createPodSecurityContext defines the security context under which the containers are running
+func createPodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group int64) *corev1.PodSecurityContext {
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return nil
+	}
+
+	trueValue := true
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot:   &trueValue,
+		RunAsUser:      &user,
+		RunAsGroup:     &group,
+		FSGroup:        &group,
+		SeccompProfile: seccompProfile,
+	}
 }

@@ -440,23 +440,6 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 	return affinity
 }
 
-// CreatePodSecurityContext defines the security context under which the containers are running
-func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group int64) *corev1.PodSecurityContext {
-	// Under Openshift we inherit SecurityContext from the restricted security context constraint
-	if utils.HaveSecurityContextConstraints() {
-		return nil
-	}
-
-	trueValue := true
-	return &corev1.PodSecurityContext{
-		RunAsNonRoot:   &trueValue,
-		RunAsUser:      &user,
-		RunAsGroup:     &group,
-		FSGroup:        &group,
-		SeccompProfile: seccompProfile,
-	}
-}
-
 // NewInstance creates a new instance Pod with the plugin patches applied
 func NewInstance(
 	ctx context.Context,
