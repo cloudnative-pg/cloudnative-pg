@@ -462,6 +462,7 @@ SecretRefs
 SecretStore
 SecretVersion
 SecretsResourceVersion
+SecurityContextConstraints
 SecurityProfiles
 Seealso
 SelectorType

@@ -462,13 +462,16 @@ type ClusterSpec struct {
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
-	// The PodSecurityContext applied to every Pod of the cluster.
-	// Defaults to: {}
+	// Override the PodSecurityContext applied to every Pod of the cluster.
+	// When set, this overrides the operator's default PodSecurityContext for the cluster.
+	// If omitted, the operator defaults are used.
+	// This field doesn't have any effect if SecurityContextConstraints are present.
 	// +optional
 	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 
-	// The SecurityContext applied to every Container in the Pod of the cluster.
-	// Defaults to: {}
+	// Override the SecurityContext applied to every Container in the Pod of the cluster.
+	// When set, this overrides the operator's default Container SecurityContext.
+	// If omitted, the operator defaults are used.
 	// +optional
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
