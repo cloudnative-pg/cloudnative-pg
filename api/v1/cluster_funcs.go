@@ -1332,13 +1332,8 @@ func (cluster *Cluster) GetSecurityContext() *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
 
-	uid := cluster.GetPostgresUID()
-	gid := cluster.GetPostgresGID()
-
 	defaultContext := &corev1.SecurityContext{
 		SeccompProfile: cluster.GetSeccompProfile(),
-		RunAsUser:      &uid,
-		RunAsGroup:     &gid,
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{
 				"ALL",
