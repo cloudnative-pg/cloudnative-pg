@@ -92,7 +92,7 @@ type leaderElectionConfiguration struct {
 // it here to respect the project layout created by kubebuilder.
 func RunController(
 	metricsAddr string,
-	configMapName,
+	configMapName string,
 	secretName string,
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
