@@ -43,7 +43,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		},
 		VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
-		SecurityContext: cluster.GetSecurityContext(),
+		SecurityContext: GetSecurityContext(&cluster),
 	}
 
 	addManagerLoggingOptions(cluster, &container)
@@ -58,4 +58,55 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
+}
+
+// GetSecurityContext return the proper SecurityContext in the cluster for Containers in Pods
+func GetSecurityContext(cluster *apiv1.Cluster) *corev1.SecurityContext {
+	trueValue := true
+	falseValue := false
+
+	defaultContext := &corev1.SecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{
+				"ALL",
+			},
+		},
+		Privileged:               &falseValue,
+		RunAsNonRoot:             &trueValue,
+		ReadOnlyRootFilesystem:   &trueValue,
+		AllowPrivilegeEscalation: &falseValue,
+	}
+
+	if cluster.Spec.SecurityContext == nil {
+		return defaultContext
+	}
+
+	definedContext := cluster.Spec.SecurityContext
+	if definedContext.RunAsUser == nil {
+		definedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if definedContext.RunAsGroup == nil {
+		definedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if definedContext.SeccompProfile == nil {
+		definedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+	if definedContext.Capabilities == nil {
+		definedContext.Capabilities = defaultContext.Capabilities
+	}
+	if definedContext.Privileged == nil {
+		definedContext.Privileged = defaultContext.Privileged
+	}
+	if definedContext.RunAsNonRoot == nil {
+		definedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+	}
+	if definedContext.ReadOnlyRootFilesystem == nil {
+		definedContext.ReadOnlyRootFilesystem = defaultContext.ReadOnlyRootFilesystem
+	}
+	if definedContext.AllowPrivilegeEscalation == nil {
+		definedContext.AllowPrivilegeEscalation = defaultContext.AllowPrivilegeEscalation
+	}
+
+	return definedContext
 }

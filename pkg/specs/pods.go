@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -192,7 +193,7 @@ func createClusterPodSpec(
 		SchedulerName:                 cluster.Spec.SchedulerName,
 		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
 		Volumes:                       createPostgresVolumes(&cluster, podName),
-		SecurityContext:               cluster.GetPodSecurityContext(),
+		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.Name,
@@ -272,7 +273,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					Protocol:      "TCP",
 				},
 			},
-			SecurityContext: cluster.GetSecurityContext(),
+			SecurityContext: GetSecurityContext(&cluster),
 		},
 	}
 
@@ -438,6 +439,42 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 		return nil
 	}
 	return affinity
+}
+
+// GetPodSecurityContext return the proper PodSecurityContext set in the cluster for Pods
+func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return nil
+	}
+
+	uid := cluster.GetPostgresUID()
+	gid := cluster.GetPostgresGID()
+	defaultContext := &corev1.PodSecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
+		RunAsUser:      &uid,
+		RunAsGroup:     &gid,
+		RunAsNonRoot:   ptr.To(true),
+		FSGroup:        &gid,
+	}
+
+	if cluster.Spec.PodSecurityContext == nil {
+		return defaultContext
+	}
+
+	definedContext := cluster.Spec.PodSecurityContext
+
+	if definedContext.RunAsUser == nil {
+		definedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if definedContext.RunAsGroup == nil {
+		definedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if definedContext.SeccompProfile == nil {
+		definedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+
+	return definedContext
 }
 
 // NewInstance creates a new instance Pod with the plugin patches applied

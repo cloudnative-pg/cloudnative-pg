@@ -68,7 +68,7 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		Command:         prepareCommand,
 		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster),
 		Resources:       cluster.Spec.Resources,
-		SecurityContext: cluster.GetSecurityContext(),
+		SecurityContext: specs.GetSecurityContext(cluster),
 	}
 
 	majorUpgradeCommand := []string{
