@@ -34,7 +34,7 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.3.1
 	github.com/spf13/cobra v1.10.1
-	github.com/stern/stern v1.33.0
+	github.com/stern/stern v1.33.1
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
