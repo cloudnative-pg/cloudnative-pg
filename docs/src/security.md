@@ -394,6 +394,14 @@ CloudNativePG provides fine-grained control over security contexts for both
 pods and containers through the `spec.podSecurityContext` and
 `spec.securityContext` fields respectively.
 
+!!! Important
+    Changing security contexts can significantly affect the security posture
+    of your PostgreSQL clusters and may prevent pods from starting or
+    operating correctly. Before making changes, review which fields you will
+    override and how they merge with the operator defaults, test changes
+    in a non-production environment, and apply the minimal, well-documented
+    modifications necessary.
+
 **Pod Security Context** (`spec.podSecurityContext`):
 This allows you to override the default `PodSecurityContext` applied to all
 PostgreSQL cluster pods. When specified, it will merge with the operator's
@@ -408,10 +416,11 @@ metadata:
 spec:
   instances: 3
   podSecurityContext:
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
+    runAsUser: 26
+    runAsGroup: 26
+    fsGroup: 26
     supplementalGroups: [2000, 3000]
+    fsGroupChangePolicy: "OnRootMismatch"
 ```
 
 **Container Security Context** (`spec.securityContext`):
@@ -429,6 +438,8 @@ spec:
   instances: 3
   securityContext:
     allowPrivilegeEscalation: false
+    # Note: capabilities are not merged with operator defaults.
+    # If specified, they fully replace any defaults.
     capabilities:
       drop:
       - ALL
