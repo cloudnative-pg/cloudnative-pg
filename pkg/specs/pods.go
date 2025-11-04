@@ -462,7 +462,8 @@ func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
 		return defaultContext
 	}
 
-	definedContext := cluster.Spec.PodSecurityContext
+	// Create a copy to avoid mutating the cluster object
+	definedContext := cluster.Spec.PodSecurityContext.DeepCopy()
 
 	if definedContext.RunAsUser == nil {
 		definedContext.RunAsUser = defaultContext.RunAsUser

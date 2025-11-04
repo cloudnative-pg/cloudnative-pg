@@ -82,7 +82,8 @@ func GetSecurityContext(cluster *apiv1.Cluster) *corev1.SecurityContext {
 		return defaultContext
 	}
 
-	definedContext := cluster.Spec.SecurityContext
+	// Create a copy to avoid mutating the cluster object
+	definedContext := cluster.Spec.SecurityContext.DeepCopy()
 	if definedContext.RunAsUser == nil {
 		definedContext.RunAsUser = defaultContext.RunAsUser
 	}
