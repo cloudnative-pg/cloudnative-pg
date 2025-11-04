@@ -764,7 +764,7 @@ Example configuration:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: cnpg-metrics-certs
+  name: cnpg-metrics-cert
   namespace: cnpg-system
 type: kubernetes.io/tls
 data:
@@ -790,7 +790,7 @@ spec:
       volumes:
       - name: metrics-certificates
         secret:
-          secretName: cnpg-metrics-certs
+          secretName: cnpg-metrics-cert
           defaultMode: 420
 ```
 
