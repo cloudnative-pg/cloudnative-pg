@@ -1298,6 +1298,11 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 
 // GetPodSecurityContext return the proper PodSecurityContext set in the cluster for Pods
 func (cluster *Cluster) GetPodSecurityContext() *corev1.PodSecurityContext {
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return nil
+	}
+
 	uid := cluster.GetPostgresUID()
 	gid := cluster.GetPostgresGID()
 	defaultContext := &corev1.PodSecurityContext{
