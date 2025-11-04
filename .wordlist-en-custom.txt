@@ -351,6 +351,7 @@ PodDisruptionBudget
 PodDisruptionBudgets
 PodMeta
 PodMonitor
+PodSecurityContext
 PodSecurityPolicy
 PodSpec
 PodStatus
@@ -1173,6 +1174,7 @@ podMonitorMetricRelabelings
 podMonitorRelabelings
 podMonitors
 podName
+podSecurityContext
 podStatuses
 podmonitor
 podtemplates
