@@ -34,10 +34,9 @@ var (
 	mx                sync.Mutex
 )
 
-// Stream opens a stream reading from the executable of the current binary
+// Stream opens a stream reading from the executable of the current process binary (os.Args[0] after path cleaning).
 func Stream() (io.ReadCloser, error) {
-	processBinaryFileName := filepath.Clean(os.Args[0])
-	return os.Open(processBinaryFileName)
+	return os.Open(filepath.Clean(os.Args[0]))
 }
 
 // StreamByName opens a stream reading from an executable given its name
