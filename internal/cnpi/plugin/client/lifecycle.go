@@ -70,8 +70,11 @@ func (data *data) innerLifecycleHook(
 	if gvk.Kind == "" || gvk.Version == "" {
 		gvk, err = apiutil.GVKForObject(object, runtimeScheme)
 		if err != nil {
-			// Skip unknown object, but returning the same object so the reconcile can continue
-			contextLogger.Debug("skipping unknown object", "object", object, "error", err)
+			// Skip unknown object, but returning the same object so the reconcile can continue,
+			// but we avoid logging the entire object to avoid exposing sensitive data
+			contextLogger.Debug("skipping unknown object",
+				"object kind", object.GetObjectKind(),
+				"error", err)
 			return object, nil
 		}
 	}
