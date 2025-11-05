@@ -749,6 +749,30 @@ Currently, the operator exposes default `kubebuilder` metrics. See
 [kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html)
 for more details.
 
+### Monitoring the operator with Prometheus
+
+The operator can be monitored using the
+[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining a
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
+pointing to the operator pod(s), as follows (note it's applied in the same
+namespace as the operator):
+
+```yaml
+kubectl -n cnpg-system apply -f - <<EOF
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-controller-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  podMetricsEndpoints:
+    - port: metrics
+EOF
+```
+
 ### Enabling TLS for operator metrics
 
 By default, the operator exposes metrics via HTTP on port 8080. To enable TLS
@@ -816,30 +840,6 @@ spec:
       scheme: https
       tlsConfig:
         insecureSkipVerify: true  # or configure proper CA validation
-```
-
-### Monitoring the operator with Prometheus
-
-The operator can be monitored using the
-[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining a
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
-pointing to the operator pod(s), as follows (note it's applied in the same
-namespace as the operator):
-
-```yaml
-kubectl -n cnpg-system apply -f - <<EOF
----
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: cnpg-controller-manager
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
-  podMetricsEndpoints:
-    - port: metrics
-EOF
 ```
 
 ## How to inspect the exported metrics
