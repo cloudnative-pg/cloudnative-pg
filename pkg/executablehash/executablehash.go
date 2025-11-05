@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -35,8 +36,8 @@ var (
 
 // Stream opens a stream reading from the executable of the current binary
 func Stream() (io.ReadCloser, error) {
-	processBinaryFileName := os.Args[0]
-	return os.Open(processBinaryFileName) // #nosec
+	processBinaryFileName := filepath.Clean(os.Args[0])
+	return os.Open(processBinaryFileName)
 }
 
 // StreamByName opens a stream reading from an executable given its name
