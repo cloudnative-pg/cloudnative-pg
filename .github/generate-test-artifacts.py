@@ -162,14 +162,16 @@ def write_artifact(artifact, artifact_dir, matrix):
     Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
     ID in Elastic to each object.
     """
+    if artifact_dir is None:
+        print("No artifact dir provided")
+        return
     whitespace = re.compile(r"\s")
     slug = whitespace.sub("_", artifact["name"])
     h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
-    filename = matrix["id"] + "_" + h + ".json"
-    if artifact_dir != "":
-        filename = artifact_dir + "/" + filename
+    filename = clean_path(matrix["id"] + "_" + h + ".json")
+    artifact_file = os.path.join(artifact_dir, filename)
     try:
-        with open(filename, "w") as f:
+        with open(artifact_file, "w") as f:
             f.write(json.dumps(artifact))
     except (FileNotFoundError, PermissionError) as e:
         print(f"Error: {e}")
@@ -203,6 +205,21 @@ def create_artifact(matrix, name, state, error):
         "branch": branch,
     }
 
+def clean_path(path):
+    base_file = os.path.basename(path)
+    base_dir = os.path.dirname(path)
+
+    sanitized_file = ""
+    sanitized_dir = ""
+    # We have a file on the path
+    if base_file:
+        sanitized_file = os.path.normpath(base_file)
+
+    # We will always have a directory, but better check
+    if base_dir:
+        sanitized_dir = os.path.normpath(base_dir)
+
+    return os.path.join(sanitized_dir, sanitized_file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -213,6 +230,7 @@ if __name__ == "__main__":
         "--file",
         type=str,
         help="report JSON file with test run, as produce by ginkgo",
+        required=True,
     )
     parser.add_argument(
         "-o",
@@ -220,6 +238,7 @@ if __name__ == "__main__":
         type=str,
         default="",
         help="directory where we write the artifacts",
+        required=True,
     )
     parser.add_argument(
         "-m", "--matrix", type=str, help="the matrix with GH execution variables"
@@ -246,16 +265,15 @@ if __name__ == "__main__":
 
     print(matrix)
 
-    outputDir = ""
-    if args.outdir:
-        outputDir = args.outdir
-        if not os.path.exists(outputDir):
-            os.makedirs(outputDir)
-            print("Directory ", outputDir, " Created ")
+    outputDir = clean_path(args.outdir)
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+        print("Directory ", outputDir, " Created ")
 
     # If the ginkgo report file is not found, produce a "failed" artifact
-    if not os.path.exists(args.file):
-        print("Report ", args.file, " not found ")
+    file_report = clean_path(args.file)
+    if not os.path.exists(file_report):
+        print("Report ", file_report, " not found ")
         # we still want to get an entry in the E2E Dashboard for workflows that even
         # failed to run the ginkgo suite or failed to produce a JSON report.
         # We create a custom Artifact with a `failed` status for the Dashboard
@@ -263,7 +281,7 @@ if __name__ == "__main__":
             matrix,
             "Open Ginkgo report",
             "failed",
-            "ginkgo Report Not Found: " + args.file,
+            "ginkgo Report Not Found: " + file_report,
         )
         write_artifact(artifact, outputDir, matrix)
         exit(0)
@@ -271,7 +289,7 @@ if __name__ == "__main__":
     # MAIN LOOP: go over each `SpecReport` in the Ginkgo JSON output, convert
     # each to the normalized JSON format and create a JSON file for each of those
     try:
-        with open(args.file) as json_file:
+        with open(file_report) as json_file:
             testResults = json.load(json_file)
             for t in testResults[0]["SpecReports"]:
                 if (t["State"] != "skipped") and is_user_spec(t):
