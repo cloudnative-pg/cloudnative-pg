@@ -606,43 +606,14 @@ jobs:
 
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04 # master
-        id: snyk
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
-        # Snyk can be used to break the build when it detects vulnerabilities.
-        # In this case we want to upload the issues to GitHub Code Scanning.
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile
-
-      - name: Mangle sarif before upload
-        if: |
-          steps.snyk.conclusion == 'success' &&
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        run: |
-          # Replace security-severity invalid values with 0.
-          # See https://github.com/github/codeql-action/issues/2187
-          sed -i 's/"security-severity": "null"/"security-severity": "0"/g' snyk.sarif
-          sed -i 's/"security-severity": "undefined"/"security-severity": "0"/g' snyk.sarif
-
-          # Patch SARIF with unique categories.
-          # See https://github.blog/changelog/2025-07-21-code-scanning-will-stop-combining-multiple-sarif-runs-uploaded-in-the-same-sarif-file/
-          jq 'if .runs then .runs |= (to_entries | map(.value.automationDetails.id = "snyk-category-\(.key)" | .value)) else . end' \
-            snyk.sarif > tmp.sarif && mv tmp.sarif snyk.sarif
-
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@0499de31b99561a6d14a36a5f662c2a54f91beee # v4
-        if: |
-          steps.snyk.conclusion == 'success' &&
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        with:
-          sarif_file: snyk.sarif
 
       - name: Install cosign
         if: |
