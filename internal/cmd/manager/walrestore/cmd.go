@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -123,7 +123,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
 		//
@@ -262,10 +262,15 @@ func restoreWALViaPlugins(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walName string,
+	pgData string,
 	destinationPathName string,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
+	// check if the `destinationPathName` is an absolute path or just the filename
+	if !filepath.IsAbs(destinationPathName) {
+		destinationPathName = filepath.Join(pgData, destinationPathName)
+	}
 	plugins := repository.New()
 	defer plugins.Close()
 
