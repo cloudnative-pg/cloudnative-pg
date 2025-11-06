@@ -207,20 +207,9 @@ def create_artifact(matrix, name, state, error):
 
 
 def clean_path(path):
-    base_file = os.path.basename(path)
-    base_dir = os.path.dirname(path)
-
-    sanitized_file = ""
-    sanitized_dir = ""
-    # We have a file on the path
-    if base_file:
-        sanitized_file = os.path.normpath(base_file)
-
-    # We will always have a directory, but better check
-    if base_dir:
-        sanitized_dir = os.path.normpath(base_dir)
-
-    return os.path.join(sanitized_dir, sanitized_file)
+    """Sanitize a path, removing any redundant separators and up-level references"""
+    normpath = os.path.normpath(path)
+    return os.path.join(os.path.dirname(normpath), os.path.basename(normpath))
 
 
 if __name__ == "__main__":
