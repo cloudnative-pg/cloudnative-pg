@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -39,7 +40,6 @@ import (
 )
 
 const (
-	ldapPassword        = "ldapPassword"
 	ldapBaseDN          = "ldapBaseDN"
 	ldapBindDN          = "ldapBindDN"
 	ldapSearchAttribute = "ldapSearchAttribute"
@@ -52,6 +52,8 @@ const (
 )
 
 var _ = Describe("testing the building of the ldap config string", func() {
+	ldapPassword := rand.String(12)
+
 	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "configurationTest",
