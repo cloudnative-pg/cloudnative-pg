@@ -775,14 +775,16 @@ EOF
 
 ### Enabling TLS for operator metrics
 
-By default, the operator exposes metrics via HTTP on port 8080. To enable TLS
-for the metrics endpoint, you need to:
+By default, the operator exposes its metrics over HTTP on port `8080`.
+To secure this endpoint with TLS, follow these steps:
 
-1. Create a Kubernetes secret containing TLS certificates (`tls.crt` and `tls.key`)
-2. Mount the secret to the operator pod
-3. Set the `METRICS_CERT_DIR` environment variable to point to the certificate directory
+1. Create a Kubernetes Secret containing the TLS certificate (`tls.crt`) and
+   private key (`tls.key`).
+2. Mount the Secret into the operator Pod.
+3. Set the `METRICS_CERT_DIR` environment variable to point to the directory
+   where the certificates are mounted.
 
-Example configuration:
+Example `Secret` definition:
 
 ```yaml
 apiVersion: v1
@@ -796,7 +798,8 @@ data:
   tls.key: <base64-encoded-key>
 ```
 
-Then, update the operator deployment to mount the secret and set the environment variable:
+Next, update the operator deployment to mount the secret and configure the
+environment variable:
 
 ```yaml
 spec:
@@ -819,11 +822,11 @@ spec:
 ```
 
 !!! Note
-    When `METRICS_CERT_DIR` is set, the operator will automatically enable
-    TLS for the metrics server. The PodMonitor configuration must be updated
-    to use HTTPS scheme.
+    When `METRICS_CERT_DIR` is set, the operator automatically enables TLS for
+    the metrics server. You must also update your PodMonitor configuration to
+    use the `https` scheme.
 
-With TLS enabled, update the PodMonitor to use HTTPS:
+Example `PodMonitor` configuration with TLS enabled:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
