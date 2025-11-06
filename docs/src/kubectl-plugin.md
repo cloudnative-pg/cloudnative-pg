@@ -143,20 +143,20 @@ brew upgrade kubectl-cnpg
 CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
-* Linux
-    * amd64
-    * arm 5/6/7
-    * arm64
-    * s390x
-    * ppc64le
-* macOS
-    * amd64
-    * arm64
-* Windows
-    * 386
-    * amd64
-    * arm 5/6/7
-    * arm64
+- Linux
+  - amd64
+  - arm 5/6/7
+  - arm64
+  - s390x
+  - ppc64le
+- macOS
+  - amd64
+  - arm64
+- Windows
+  - 386
+  - amd64
+  - arm 5/6/7
+  - arm64
 
 ### Configuring auto-completion
 
@@ -245,14 +245,14 @@ The flags in the above command have the following meaning:
 The `status` command provides an overview of the current status of your
 cluster, including:
 
-* **general information**: name of the cluster, PostgreSQL's system ID, number of
+- **general information**: name of the cluster, PostgreSQL's system ID, number of
   instances, current timeline and position in the WAL
-* **backup**: point of recoverability, and WAL archiving status as returned by
+- **backup**: point of recoverability, and WAL archiving status as returned by
   the `pg_stat_archiver` view from the primary - or designated primary in the
   case of a replica cluster
-* **streaming replication**: information taken directly from the `pg_stat_replication`
+- **streaming replication**: information taken directly from the `pg_stat_replication`
   view on the primary instance
-* **instances**: information about each Postgres instance, taken directly by each
+- **instances**: information about each Postgres instance, taken directly by each
   instance manager; in the case of a standby, the `Current LSN` field corresponds
   to the latest write-ahead log location that has been replayed during recovery
   (replay LSN).
@@ -446,8 +446,8 @@ The `kubectl cnpg maintenance` command helps to modify one or more clusters
 across namespaces and set the maintenance window values, it will change
 the following fields:
 
-* .spec.nodeMaintenanceWindow.inProgress
-* .spec.nodeMaintenanceWindow.reusePVC
+- `.spec.nodeMaintenanceWindow.inProgress`
+- `.spec.nodeMaintenanceWindow.reusePVC`
 
 Accepts as argument `set` and `unset` using this to set the
 `inProgress` to `true` in case `set`and to `false` in case of `unset`.
@@ -501,23 +501,59 @@ regarding the operator deployment, configuration and events.
     By default, operator logs are not collected, but you can enable operator
     log collection with the `--logs` flag
 
-* **deployment information**: the operator Deployment and operator Pod
-* **configuration**: the Secrets and ConfigMaps in the operator namespace
-* **events**: the Events in the operator namespace
-* **webhook configuration**: the mutating and validating webhook configurations
-* **webhook service**: the webhook service
-* **logs**: logs for the operator Pod (optional, off by default) in JSON-lines format
+!!! Important "Least-Privilege Support"
+    The `report operator` command works with minimal permissions. Only the operator
+    deployment is **required** - all other resources are optional and collected on a
+    best-effort basis. If you lack permissions for certain resources (e.g., webhooks,
+    OLM resources), warnings are logged and report generation continues with available
+    data.
+
+The report includes:
+
+- **deployment information** (required): the operator `Deployment`
+- **operator pods** (optional): the operator `Pod` information
+- **configuration** (optional): `Secrets` and `ConfigMaps` in the operator
+  namespace
+- **events** (optional): `Events` in the operator namespace
+- **webhook configuration** (optional): mutating and validating webhook
+  configurations (cluster-scoped)
+- **webhook service** (optional): the webhook service
+- **OLM resources** (optional): subscriptions, cluster service versions,
+  install plans (if OLM is installed)
+- **logs** (optional): operator `Pod` logs in JSON-lines format (requires
+  `--logs` flag)
+
+!!! Warning "Minimal permissions"
+    Read access (`get`) to the operator deployment in the operator namespace.
+    This allows namespace-scoped users to generate basic troubleshooting reports.
+
+!!! Important "Recommended permissions for full report"
+    Add `list` on pods, events; `get` on secrets, configmaps, services
+    (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
+
+A user with only namespace-scoped permissions can still generate useful
+reports:
+
+```sh
+# With only deployment read access
+kubectl cnpg report operator -n cnpg-system -f report.zip
+```
+
+!!! Info
+    The command will log warnings for inaccessible resources but successfully
+    generate a report with the deployment manifest, which is often sufficient for
+    basic troubleshooting.
 
 The command will generate a ZIP file containing various manifest in YAML format
-(by default, but settable to JSON with the `-o` flag).
-Use the `-f` flag to name a result file explicitly. If the `-f` flag is not used, a
-default time-stamped filename is created for the zip file.
+(by default, but settable to JSON with the `-o` flag). Use the `-f` flag to
+name a result file explicitly. If the `-f` flag is not used, a default
+time-stamped filename is created for the zip file.
 
 !!! Note
-    The report plugin obeys `kubectl` conventions, and will look for objects constrained
-    by namespace. The CNPG Operator will generally not be installed in the same
-    namespace as the clusters.
-    E.g. the default installation namespace is cnpg-system
+    The report plugin obeys `kubectl` conventions, and will look for objects
+    constrained by namespace. The CNPG Operator will generally not be installed in
+    the same namespace as the clusters. E.g. the default installation namespace is
+    cnpg-system.
 
 ```sh
 kubectl cnpg report operator -n cnpg-system
@@ -639,12 +675,12 @@ metadata:
 
 The `cluster` sub-command gathers the following:
 
-* **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
-* **cluster pods**: pods in the cluster namespace matching the cluster name
-* **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
-* **events**: events in the cluster namespace
-* **pod logs**: logs for the cluster Pods (optional, off by default) in JSON-lines format
-* **job logs**: logs for the Pods created by jobs (optional, off by default) in JSON-lines format
+- **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
+- **cluster pods**: pods in the cluster namespace matching the cluster name
+- **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
+- **events**: events in the cluster namespace
+- **pod logs**: logs for the cluster Pods (optional, off by default) in JSON-lines format
+- **job logs**: logs for the Pods created by jobs (optional, off by default) in JSON-lines format
 
 The `cluster` sub-command accepts the `-f` and `-o` flags, as the `operator` does.
 If the `-f` flag is not used, a default timestamped report name will be used.
@@ -1397,7 +1433,7 @@ table contains the full details:
 | publication     | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | reload          | clusters: get,patch                                                                                                                                                                                                                                                                                                                                   |
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
-| report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
+| report operator | **Required:**<br/>deployments: get<br/>**Optional (for full report):**<br/>configmaps: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/>validatingwebhookconfigurations: list[^1]<br/>**If OLM is present:**<br/>clusterserviceversions: list[^1]<br/>installplans: list[^1]<br/>subscriptions: list[^1] |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
 | status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
