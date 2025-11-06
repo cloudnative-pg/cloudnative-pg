@@ -375,6 +375,7 @@ is, the container runtime default.
 
 The security context of PostgreSQL containers using the default `seccompProfile`
 will look like this:
+
 ```
 securityContext:
   allowPrivilegeEscalation: false
@@ -408,6 +409,7 @@ PostgreSQL cluster pods. When specified, it will merge with the operator's
 default settings, with your values taking precedence for explicitly set fields.
 
 Example:
+
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -429,6 +431,7 @@ containers within the PostgreSQL cluster pods. Like `podSecurityContext`, it
 merges with the operator's defaults.
 
 Example:
+
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
