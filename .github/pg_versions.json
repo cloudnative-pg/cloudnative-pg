@@ -1,26 +1,26 @@
 {
   "18": [
     "18.0-system-trixie",
-    "18.0-202510201453-system-trixie"
+    "18.0-202511030807-system-trixie"
   ],
   "17": [
     "17.6-system-trixie",
-    "17.6-202510201453-system-trixie"
+    "17.6-202511030807-system-trixie"
   ],
   "16": [
     "16.10-system-trixie",
-    "16.10-202510201453-system-trixie"
+    "16.10-202511030807-system-trixie"
   ],
   "15": [
     "15.14-system-trixie",
-    "15.14-202510201453-system-trixie"
+    "15.14-202511030807-system-trixie"
   ],
   "14": [
     "14.19-system-trixie",
-    "14.19-202510201453-system-trixie"
+    "14.19-202511030807-system-trixie"
   ],
   "13": [
     "13.22-system-trixie",
-    "13.22-202510201453-system-trixie"
+    "13.22-202511030807-system-trixie"
   ]
 }
