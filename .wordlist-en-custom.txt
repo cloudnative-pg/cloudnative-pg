@@ -351,6 +351,7 @@ PodDisruptionBudget
 PodDisruptionBudgets
 PodMeta
 PodMonitor
+PodSecurityContext
 PodSecurityPolicy
 PodSpec
 PodStatus
@@ -461,6 +462,7 @@ SecretRefs
 SecretStore
 SecretVersion
 SecretsResourceVersion
+SecurityContextConstraints
 SecurityProfiles
 Seealso
 SelectorType
@@ -1173,6 +1175,7 @@ podMonitorMetricRelabelings
 podMonitorRelabelings
 podMonitors
 podName
+podSecurityContext
 podStatuses
 podmonitor
 podtemplates

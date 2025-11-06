@@ -49,6 +49,13 @@ your PostgreSQL cluster.
   A basic cluster with the existing `Secret` and `ConfigMap` mounted into Postgres
   pod using projected volume mount.
 
+## Security
+
+**Sample cluster with custom security contexts**
+: [`cluster-example-security-context.yaml`](samples/cluster-example-security-context.yaml)
+  A cluster demonstrating how to customize both Pod and Container security contexts.
+  This is useful when working with Pod Security Standards or meeting specific security requirements.
+
 ## Backups
 
 **Customized storage class and backups**
