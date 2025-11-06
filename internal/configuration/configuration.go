@@ -80,6 +80,10 @@ type Data struct {
 	// need to written. This is different between plain Kubernetes and OpenShift
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
 
+	// MetricsCertDir is the directory where the certificates for the metrics
+	// server are stored. If set, the metrics server will use TLS.
+	MetricsCertDir string `json:"metricsCertDir" env:"METRICS_CERT_DIR"`
+
 	// PluginSocketDir is the directory where the plugins sockets are to be
 	// found
 	PluginSocketDir string `json:"pluginSocketDir" env:"PLUGIN_SOCKET_DIR"`
