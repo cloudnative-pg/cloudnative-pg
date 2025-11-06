@@ -154,7 +154,7 @@ def write_artifact(artifact, artifact_dir, matrix):
     """writes an artifact to local storage as a JSON file
 
     The computed filename will be used as the ID to introduce the payload into
-    Elastic for the E2E Test . Should be unique across the current GH run.
+    Elastic for the E2E Test. Should be unique across the current GH run.
     So: MatrixID + Test
     Because we may run this on MSFT Azure, where filename length limits still
     exist, we HASH the test name.
@@ -205,6 +205,7 @@ def create_artifact(matrix, name, state, error):
         "branch": branch,
     }
 
+
 def clean_path(path):
     base_file = os.path.basename(path)
     base_dir = os.path.dirname(path)
@@ -220,6 +221,7 @@ def clean_path(path):
         sanitized_dir = os.path.normpath(base_dir)
 
     return os.path.join(sanitized_dir, sanitized_file)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
