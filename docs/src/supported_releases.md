@@ -83,7 +83,7 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.28.x          | No                   |    Nov 2025  | ~  May 2026     | 1.34, 1.33, 1.32, 1.31        | 1.30, 1.29                | 14 - 18                     |
+| 1.28.x          | No                   |    Nov 2025  | ~  May 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
 | 1.27.x          | Yes                  | 12 Aug 2025  | ~  Feb 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 17                     |
 | 1.26.x          | Yes                  | May 23, 2025 | 12 Nov 2025     | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
