@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# check-pr-in-release-branches.sh <string>
+# check-pr-in-release-branches.sh <PR_ID>
 #
-# Example: ./hack/check-pr-in-release-branches.sh #7988
+# Example: ./hack/check-pr-in-release-branches.sh 7988
 
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <string>"
+    echo "Usage: $0 <PR_ID>"
     exit 1
 fi
 
@@ -18,7 +18,7 @@ branches="main $(git for-each-ref --format '%(refname)' 'refs/heads/release*' | 
 found=0
 for branch in $branches; do
     echo "Checking branch: $branch"
-    if git log "origin/$branch" --grep="$search_string" -i --oneline | grep -q .; then
+    if git log "origin/$branch" --grep="#${search_string}" -i --oneline | grep -q .; then
         echo "✅ Found \"$search_string\" in commits on branch: $branch"
         found=1
     else
