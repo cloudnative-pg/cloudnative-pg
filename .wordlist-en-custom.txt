@@ -149,6 +149,7 @@ EKS
 EOF
 EOL
 ESO
+EdwinaZhu
 EmbeddedObjectMetadata
 EnablePDB
 EncryptionType
@@ -226,6 +227,7 @@ Isovalent
 Istio
 Istio's
 JSON
+JefeDavis
 Jihyuk
 Jitendra
 KV
@@ -242,6 +244,7 @@ LDAPBindSearchAuth
 LDAPConfig
 LDAPScheme
 LF
+LFX
 LLC
 LPV
 LSN
@@ -563,7 +566,9 @@ XXu
 YXBw
 YY
 YYYY
+Ying
 Zalando
+Zhu
 Zstandard
 abd
 accessKeyId
@@ -785,6 +790,7 @@ datistemplate
 datname
 dbe
 dbname
+ddf
 ddl
 de
 declaratively
@@ -898,6 +904,7 @@ gosec
 govulncheck
 grafana
 gzip
+hanshal
 hardcoded
 hashicorp
 hba
