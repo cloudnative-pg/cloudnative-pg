@@ -971,7 +971,6 @@ italy
 jdbc
 jobCount
 jq
-jsilvela
 json
 jsonpath
 kb
