@@ -1,3 +1,9 @@
+---
+id: monitoring
+sidebar_position: 31
+title: Monitoring
+---
+
 # Monitoring
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,3 +1,9 @@
+---
+id: kubernetes_upgrade
+sidebar_position: 38
+title: Kubernetes Upgrade and Maintenance
+---
+
 # Kubernetes Upgrade and Maintenance
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

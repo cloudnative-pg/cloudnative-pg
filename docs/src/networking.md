@@ -1,3 +1,9 @@
+---
+id: networking
+sidebar_position: 53
+title: Networking
+---
+
 # Networking
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

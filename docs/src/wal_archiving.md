@@ -1,3 +1,9 @@
+---
+id: wal_archiving
+sidebar_position: 20
+title: WAL Archiving
+---
+
 # WAL archiving
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

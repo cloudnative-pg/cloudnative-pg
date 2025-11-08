@@ -1,3 +1,9 @@
+---
+id: samples
+sidebar_position: 52
+title: Samples
+---
+
 # Examples
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

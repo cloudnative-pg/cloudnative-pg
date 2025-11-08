@@ -1,3 +1,9 @@
+---
+id: postgis
+sidebar_position: 45
+title: PostGIS
+---
+
 # PostGIS
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

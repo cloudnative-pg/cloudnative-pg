@@ -1,3 +1,9 @@
+---
+id: cloudnative-pg.v1
+sidebar_position: 56
+title: API Reference
+---
+
 # API Reference
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

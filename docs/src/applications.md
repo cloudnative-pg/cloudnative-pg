@@ -1,3 +1,9 @@
+---
+id: applications
+sidebar_position: 35
+title: Connecting from an Application
+---
+
 # Connecting from an application
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

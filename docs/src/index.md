@@ -1,3 +1,9 @@
+---
+id: index
+sidebar_position: 2
+title: Index
+---
+
 # CloudNativePG
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

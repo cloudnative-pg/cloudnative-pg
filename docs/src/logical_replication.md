@@ -1,3 +1,9 @@
+---
+id: logical_replication
+sidebar_position: 18
+title: Logical Replication
+---
+
 # Logical Replication
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,3 +1,9 @@
+---
+id: release_notes
+sidebar_position: 59
+title: Release Notes
+---
+
 # Release notes
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

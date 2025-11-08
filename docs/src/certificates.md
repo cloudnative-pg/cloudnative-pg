@@ -1,3 +1,9 @@
+---
+id: certificates
+sidebar_position: 33
+title: Certificates
+---
+
 # Certificates
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

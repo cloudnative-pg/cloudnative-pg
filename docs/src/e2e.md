@@ -1,3 +1,9 @@
+---
+id: e2e
+sidebar_position: 46
+title: End-to-End Tests
+---
+
 # End-to-End Tests
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

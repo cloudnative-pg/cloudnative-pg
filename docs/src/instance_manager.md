@@ -1,3 +1,9 @@
+---
+id: instance_manager
+sidebar_position: 12
+title: Instance Manager
+---
+
 # Postgres instance manager
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

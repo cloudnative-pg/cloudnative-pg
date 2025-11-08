@@ -1,3 +1,9 @@
+---
+id: declarative_database_management
+sidebar_position: 25
+title: PostgreSQL Database Management
+---
+
 # PostgreSQL Database Management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

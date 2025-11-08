@@ -1,3 +1,9 @@
+---
+id: recovery
+sidebar_position: 21
+title: Recovery
+---
+
 # Recovery
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

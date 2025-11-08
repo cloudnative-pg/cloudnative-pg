@@ -1,3 +1,9 @@
+---
+id: rolling_update
+sidebar_position: 16
+title: Rolling Updates
+---
+
 # Rolling Updates
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

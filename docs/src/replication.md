@@ -1,3 +1,9 @@
+---
+id: replication
+sidebar_position: 17
+title: Replication
+---
+
 # Replication
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

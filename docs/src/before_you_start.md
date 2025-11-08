@@ -1,3 +1,9 @@
+---
+id: before_you_start
+sidebar_position: 3
+title: Before You Start
+---
+
 # Before You Start
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

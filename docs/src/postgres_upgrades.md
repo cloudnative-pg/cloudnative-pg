@@ -1,3 +1,9 @@
+---
+id: postgres_upgrades
+sidebar_position: 39
+title: PostgreSQL Upgrades
+---
+
 # PostgreSQL Upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

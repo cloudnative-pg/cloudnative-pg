@@ -1,3 +1,9 @@
+---
+id: cluster_conf
+sidebar_position: 28
+title: Instance Pod Configuration
+---
+
 # Instance pod configuration
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

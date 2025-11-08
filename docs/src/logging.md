@@ -1,3 +1,9 @@
+---
+id: logging
+sidebar_position: 32
+title: Logging
+---
+
 # Logging
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

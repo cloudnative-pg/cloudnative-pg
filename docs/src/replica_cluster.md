@@ -1,3 +1,9 @@
+---
+id: replica_cluster
+sidebar_position: 37
+title: Replica Clusters
+---
+
 # Replica clusters
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

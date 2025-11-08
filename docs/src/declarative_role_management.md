@@ -1,3 +1,9 @@
+---
+id: declarative_role_management
+sidebar_position: 24
+title: PostgreSQL Role Management
+---
+
 # PostgreSQL Role Management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

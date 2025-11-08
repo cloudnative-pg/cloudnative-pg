@@ -1,3 +1,9 @@
+---
+id: failover
+sidebar_position: 41
+title: Automated failover
+---
+
 # Automated failover
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

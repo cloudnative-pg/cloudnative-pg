@@ -1,3 +1,9 @@
+---
+id: labels_annotations
+sidebar_position: 30
+title: Labels and Annotations
+---
+
 # Labels and annotations
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
