@@ -282,11 +282,6 @@ func archiveWALViaPlugins(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	// check if the `walName` is an absolute path or just the filename
-	if !filepath.IsAbs(walName) {
-		walName = filepath.Join(pgData, walName)
-	}
-
 	plugins := repository.New()
 	defer plugins.Close()
 
@@ -306,7 +301,7 @@ func archiveWALViaPlugins(
 		}
 	}
 
-	return client.ArchiveWAL(ctx, cluster, walName)
+	return client.ArchiveWAL(ctx, cluster, postgres.BuildWALPath(pgData, walName))
 }
 
 // isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory

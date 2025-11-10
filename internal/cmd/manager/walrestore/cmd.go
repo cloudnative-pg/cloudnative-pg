@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -267,10 +266,6 @@ func restoreWALViaPlugins(
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// check if the `destinationPathName` is an absolute path or just the filename
-	if !filepath.IsAbs(destinationPathName) {
-		destinationPathName = filepath.Join(pgData, destinationPathName)
-	}
 	plugins := repository.New()
 	defer plugins.Close()
 
@@ -287,7 +282,7 @@ func restoreWALViaPlugins(
 	}
 	defer client.Close(ctx)
 
-	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
+	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName))
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
