@@ -165,7 +165,7 @@ jobs:
           check-latest: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
@@ -609,21 +609,11 @@ jobs:
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile
-
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@0499de31b99561a6d14a36a5f662c2a54f91beee # v4
-        if: |
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        continue-on-error: true
-        with:
-          sarif_file: snyk.sarif
 
       - name: Install cosign
         if: |
