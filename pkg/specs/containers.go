@@ -43,7 +43,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		},
 		VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
-		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
+		SecurityContext: GetSecurityContext(&cluster),
 	}
 
 	addManagerLoggingOptions(cluster, &container)
@@ -60,12 +60,13 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
 }
 
-// CreateContainerSecurityContext initializes container security context. It applies the seccomp profile if supported.
-func CreateContainerSecurityContext(seccompProfile *corev1.SeccompProfile) *corev1.SecurityContext {
+// GetSecurityContext return the proper SecurityContext in the cluster for Containers in Pods
+func GetSecurityContext(cluster *apiv1.Cluster) *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
 
-	return &corev1.SecurityContext{
+	defaultContext := &corev1.SecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{
 				"ALL",
@@ -75,6 +76,38 @@ func CreateContainerSecurityContext(seccompProfile *corev1.SeccompProfile) *core
 		RunAsNonRoot:             &trueValue,
 		ReadOnlyRootFilesystem:   &trueValue,
 		AllowPrivilegeEscalation: &falseValue,
-		SeccompProfile:           seccompProfile,
 	}
+
+	if cluster.Spec.SecurityContext == nil {
+		return defaultContext
+	}
+
+	// Create a copy to avoid mutating the cluster object
+	definedContext := cluster.Spec.SecurityContext.DeepCopy()
+	if definedContext.RunAsUser == nil {
+		definedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if definedContext.RunAsGroup == nil {
+		definedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if definedContext.SeccompProfile == nil {
+		definedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+	if definedContext.Capabilities == nil {
+		definedContext.Capabilities = defaultContext.Capabilities
+	}
+	if definedContext.Privileged == nil {
+		definedContext.Privileged = defaultContext.Privileged
+	}
+	if definedContext.RunAsNonRoot == nil {
+		definedContext.RunAsNonRoot = defaultContext.RunAsNonRoot
+	}
+	if definedContext.ReadOnlyRootFilesystem == nil {
+		definedContext.ReadOnlyRootFilesystem = defaultContext.ReadOnlyRootFilesystem
+	}
+	if definedContext.AllowPrivilegeEscalation == nil {
+		definedContext.AllowPrivilegeEscalation = defaultContext.AllowPrivilegeEscalation
+	}
+
+	return definedContext
 }

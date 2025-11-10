@@ -1083,8 +1083,8 @@ created from scratch</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>The list of options that must be passed to initdb when creating the cluster.
-Deprecated: This could lead to inconsistent configurations,
+   <p>The list of options that must be passed to initdb when creating the cluster.</p>
+<p>Deprecated: This could lead to inconsistent configurations,
 please use the explicit provided parameters instead.
 If defined, explicit values will be ignored.</p>
 </td>
@@ -1941,6 +1941,25 @@ sources to the pods to be used by Env</p>
 <td>
    <p>The SeccompProfile applied to every Pod and Container.
 Defaults to: <code>RuntimeDefault</code></p>
+</td>
+</tr>
+<tr><td><code>podSecurityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podsecuritycontext-v1-core"><i>core/v1.PodSecurityContext</i></a>
+</td>
+<td>
+   <p>Override the PodSecurityContext applied to every Pod of the cluster.
+When set, this overrides the operator's default PodSecurityContext for the cluster.
+If omitted, the operator defaults are used.
+This field doesn't have any effect if SecurityContextConstraints are present.</p>
+</td>
+</tr>
+<tr><td><code>securityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#securitycontext-v1-core"><i>core/v1.SecurityContext</i></a>
+</td>
+<td>
+   <p>Override the SecurityContext applied to every Container in the Pod of the cluster.
+When set, this overrides the operator's default Container SecurityContext.
+If omitted, the operator defaults are used.</p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>

@@ -59,6 +59,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithLabel(utils.KubernetesAppLabelName, utils.AppName).
+		WithLabel(utils.KubernetesAppInstanceLabelName, cluster.Name).
+		WithLabel(utils.KubernetesAppComponentLabelName, utils.PoolerComponentName).
+		WithLabel(utils.KubernetesAppManagedByLabelName, utils.ManagerName).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -75,7 +79,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 				},
 			},
 		}).
-		WithSecurityContext(specs.CreatePodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
+		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
 		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
@@ -96,8 +100,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			true).
 		WithInitContainerResources(specs.BootstrapControllerContainerName, pooler.GetResourcesRequirements(), false).
 		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
-			specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()),
-			true).
+			specs.GetSecurityContext(cluster), true).
 		WithVolume(&corev1.Volume{
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
@@ -121,7 +124,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:  "PSQL_HISTORY",
 			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
 		}, false).
-		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()), true).
+		WithContainerSecurityContext("pgbouncer", specs.GetSecurityContext(cluster), true).
 		WithServiceAccountName(pooler.Name, true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
 			TimeoutSeconds: 5,
@@ -138,9 +141,13 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Labels: map[string]string{
-				utils.ClusterLabelName:   cluster.Name,
-				utils.PgbouncerNameLabel: pooler.Name,
-				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+				utils.ClusterLabelName:                cluster.Name,
+				utils.PgbouncerNameLabel:              pooler.Name,
+				utils.PodRoleLabelName:                string(utils.PodRolePooler),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.PoolerSpecHashAnnotationName: poolerHash,
@@ -184,4 +191,21 @@ func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.Deploymen
 		return *strategy.DeepCopy()
 	}
 	return appsv1.DeploymentStrategy{}
+}
+
+// createPodSecurityContext defines the security context under which the containers are running
+func createPodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group int64) *corev1.PodSecurityContext {
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return nil
+	}
+
+	trueValue := true
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot:   &trueValue,
+		RunAsUser:      &user,
+		RunAsGroup:     &group,
+		FSGroup:        &group,
+		SeccompProfile: seccompProfile,
+	}
 }

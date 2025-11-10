@@ -38,6 +38,40 @@ const AlphaMetadataNamespace = "alpha.cnpg.io"
 // MetadataNamespace is the annotation and label namespace used by the operator
 const MetadataNamespace = "cnpg.io"
 
+// KubernetesAppNamespaceDomain is the domain used for the official kubernetes app labels
+const KubernetesAppNamespaceDomain = "app.kubernetes.io"
+
+const (
+	// ManagerName is the name of the manager for cnpg controlled objects
+	ManagerName = "cloudnative-pg"
+
+	// AppName is the name of the application
+	AppName = "postgresql"
+
+	// DatabaseComponentName is the name of the component for the database.
+	DatabaseComponentName = "database"
+
+	// PoolerComponentName is the name of the component for the pooler.
+	PoolerComponentName = "pooler"
+)
+
+const (
+	// KubernetesAppManagedByLabelName is the name of the label applied to all managed objects
+	KubernetesAppManagedByLabelName = KubernetesAppNamespaceDomain + "/managed-by"
+
+	// KubernetesAppLabelName is the name of the label used to indicate the name of the application
+	KubernetesAppLabelName = KubernetesAppNamespaceDomain + "/name"
+
+	// KubernetesAppInstanceLabelName is the name of the label used to indicate the unique instance of this application
+	KubernetesAppInstanceLabelName = KubernetesAppNamespaceDomain + "/instance"
+
+	// KubernetesAppVersionLabelName is the name of the label used to indicate the version postgres
+	KubernetesAppVersionLabelName = KubernetesAppNamespaceDomain + "/version"
+
+	// KubernetesAppComponentLabelName is the name of the label used to indicate the component within the architecture
+	KubernetesAppComponentLabelName = KubernetesAppNamespaceDomain + "/component"
+)
+
 // When you add a new label or annotation, please make sure that you also update the
 // publicly visible documentation, namely the `docs/src/labels_annotations.md` file
 const (
@@ -70,6 +104,7 @@ const (
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 
 	// ClusterRoleLabelName is the name of label applied to instances to mark primary/replica
+	//
 	// Deprecated: Use ClusterInstanceRoleLabelName.
 	ClusterRoleLabelName = "role"
 
@@ -145,6 +180,7 @@ const (
 	HibernatePgControlDataAnnotationName = MetadataNamespace + "/hibernatePgControlData"
 
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
+	//
 	// Deprecated: the PodSpec annotation covers the environment drift. This annotation is
 	// kept for backward compatibility
 	PodEnvHashAnnotationName = MetadataNamespace + "/podEnvHash"

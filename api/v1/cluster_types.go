@@ -462,6 +462,19 @@ type ClusterSpec struct {
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
+	// Override the PodSecurityContext applied to every Pod of the cluster.
+	// When set, this overrides the operator's default PodSecurityContext for the cluster.
+	// If omitted, the operator defaults are used.
+	// This field doesn't have any effect if SecurityContextConstraints are present.
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// Override the SecurityContext applied to every Container in the Pod of the cluster.
+	// When set, this overrides the operator's default Container SecurityContext.
+	// If omitted, the operator defaults are used.
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
@@ -1647,6 +1660,7 @@ type BootstrapInitDB struct {
 	Secret *LocalObjectReference `json:"secret,omitempty"`
 
 	// The list of options that must be passed to initdb when creating the cluster.
+	//
 	// Deprecated: This could lead to inconsistent configurations,
 	// please use the explicit provided parameters instead.
 	// If defined, explicit values will be ignored.

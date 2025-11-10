@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -64,27 +65,97 @@ var (
 	}
 )
 
-var _ = Describe("The PostgreSQL security context with", func() {
-	It("default RuntimeDefault profile", func() {
+var _ = Describe("GetPodSecurityContext", func() {
+	It("returns defaults when Spec.PodSecurityContext is nil", func() {
 		cluster := apiv1.Cluster{}
-		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+		sc := GetPodSecurityContext(&cluster)
 
-		Expect(securityContext.SeccompProfile).ToNot(BeNil())
-		Expect(securityContext.SeccompProfile.Type).To(BeEquivalentTo(corev1.SeccompProfileTypeRuntimeDefault))
+		Expect(sc).ToNot(BeNil())
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(apiv1.DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
 	})
 
-	It("defined SeccompProfile profile", func() {
+	It("merges only selected fields when user provides a partial PodSecurityContext", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					RunAsUser: ptr.To(int64(1000)),
+				},
+			},
+		}
+
+		sc := GetPodSecurityContext(&cluster)
+		// Provided RunAsUser is preserved
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(1000)))
+		// RunAsGroup is merged from defaults
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		// SeccompProfile is filled from defaults
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		// Fields not merged remain as provided (nil)
+		Expect(sc.FSGroup).To(BeNil())
+		Expect(sc.RunAsNonRoot).To(BeNil())
+	})
+
+	It("honors Cluster.Spec.SeccompProfile when PodSecurityContext.SeccompProfile is nil", func() {
 		profilePath := "/path/to/profile"
 		localhostProfile := &corev1.SeccompProfile{
 			Type:             corev1.SeccompProfileTypeLocalhost,
 			LocalhostProfile: &profilePath,
 		}
-		cluster := apiv1.Cluster{Spec: apiv1.ClusterSpec{SeccompProfile: localhostProfile}}
-		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				SeccompProfile:     localhostProfile,
+				PodSecurityContext: &corev1.PodSecurityContext{},
+			},
+		}
 
-		Expect(securityContext.SeccompProfile).ToNot(BeNil())
-		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))
-		Expect(securityContext.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+		sc := GetPodSecurityContext(&cluster)
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile).To(BeEquivalentTo(localhostProfile))
+		Expect(sc.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+		// Non-merged fields remain nil
+		Expect(sc.FSGroup).To(BeNil())
+		Expect(sc.RunAsNonRoot).To(BeNil())
+		// Merged UID/GID come from defaults
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(apiv1.DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+	})
+
+	It("preserves FSGroup and RunAsNonRoot when user sets them", func() {
+		gid := int64(999)
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSecurityContext: &corev1.PodSecurityContext{
+					FSGroup:      &gid,
+					RunAsNonRoot: ptr.To(true),
+				},
+			},
+		}
+
+		sc := GetPodSecurityContext(&cluster)
+		Expect(sc.FSGroup).ToNot(BeNil())
+		Expect(*sc.FSGroup).To(Equal(int64(999)))
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		// Other fields are merged
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(apiv1.DefaultPostgresUID)))
+		Expect(sc.RunAsGroup).ToNot(BeNil())
+		Expect(*sc.RunAsGroup).To(Equal(int64(apiv1.DefaultPostgresGID)))
+		Expect(sc.SeccompProfile).ToNot(BeNil())
 	})
 })
 
@@ -932,6 +1003,32 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 })
 
 var _ = Describe("NewInstance", func() {
+	It("applies correct labels", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+			},
+		}
+
+		pod, err := NewInstance(ctx, cluster, 1, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                "test-cluster",
+			utils.InstanceNameLabelName:           "test-cluster-1",
+			utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  "test-cluster",
+			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
+	})
+
 	It("applies JSON patch from annotation", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

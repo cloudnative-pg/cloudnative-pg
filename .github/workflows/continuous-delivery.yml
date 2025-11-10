@@ -37,7 +37,7 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.3"
+  GOLANG_VERSION: "1.25.4"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.30.0"
@@ -362,7 +362,7 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
@@ -673,7 +673,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -1954,7 +1954,7 @@ jobs:
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
@@ -2174,7 +2174,7 @@ jobs:
 
       - name: Compute the E2E test summary
         id: generate-summary
-        uses: cloudnative-pg/ciclops@f5a7b357a09f09052ec0358ac49e020f151f1653 # v1.3.1
+        uses: cloudnative-pg/ciclops@fc1c72c2eb99e10aa437f14cd8563686b4b6e3b1 # v1.3.2
         with:
           artifact_directory: test-artifacts/data
 

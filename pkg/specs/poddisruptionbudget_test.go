@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,12 +39,23 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 			Name:      "thistest",
 			Namespace: "default",
 		},
-		Spec: apiv1.ClusterSpec{Instances: instancesNum},
+		Spec: apiv1.ClusterSpec{
+			ImageName: "postgres:18.0",
+			Instances: instancesNum,
+		},
 	}
 
 	It("have the same name as the PostgreSQL cluster", func() {
 		result := BuildReplicasPodDisruptionBudget(cluster)
 		Expect(result.Name).To(Equal(cluster.Name))
+		Expect(result.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppVersionLabelName:   "18",
+			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 		Expect(result.Namespace).To(Equal(cluster.Namespace))
 	})
 

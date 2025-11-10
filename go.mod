@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.25.0
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -18,7 +18,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.3
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jackc/puddle/v2 v2.2.2
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -28,13 +28,13 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.3.1
 	github.com/spf13/cobra v1.10.1
-	github.com/stern/stern v1.33.0
+	github.com/stern/stern v1.33.1
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
@@ -48,7 +48,7 @@ require (
 	k8s.io/cli-runtime v0.34.1
 	k8s.io/client-go v0.34.1
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
-	sigs.k8s.io/controller-runtime v0.22.3
+	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/yaml v1.6.0
 )
 

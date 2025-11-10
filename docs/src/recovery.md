@@ -520,7 +520,7 @@ completed**:
 2. If the `app` user does not exist, it will be created.
 3. If the `app` user is not the owner of the `app` database, ownership will be
    granted to the `app` user.
-4. If the `username` value matches the `owner` value in the secret, the
+4. If the `owner` value matches the `username` value in the secret, the
    password for the application user (the `app` user in this case) will be
    updated to the `password` value in the secret.
 

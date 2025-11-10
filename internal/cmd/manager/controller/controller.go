@@ -66,7 +66,7 @@ const (
 	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
 	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 
-	// The name of the directory containing the TLS certificates
+	// The name of the directory containing the TLS certificates for webhooks
 	defaultWebhookCertDir = "/run/secrets/cnpg.io/webhook"
 
 	// LeaderElectionID The operator Leader Election ID
@@ -91,8 +91,8 @@ type leaderElectionConfiguration struct {
 // This code really belongs to app/controller_manager.go but we can't put
 // it here to respect the project layout created by kubebuilder.
 func RunController(
-	metricsAddr,
-	configMapName,
+	metricsAddr string,
+	configMapName string,
 	secretName string,
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
@@ -106,10 +106,8 @@ func RunController(
 		"build", versions.Info)
 
 	managerOptions := ctrl.Options{
-		Scheme: scheme,
-		Metrics: server.Options{
-			BindAddress: metricsAddr,
-		},
+		Scheme:           scheme,
+		Metrics:          buildMetricsOpts(metricsAddr, conf),
 		LeaderElection:   leaderConfig.enable,
 		LeaseDuration:    &leaderConfig.leaseDuration,
 		RenewDeadline:    &leaderConfig.renewDeadline,
@@ -313,6 +311,25 @@ func RunController(
 	}
 
 	return nil
+}
+
+func buildMetricsOpts(metricsAddr string, conf *configuration.Data) server.Options {
+	metricsOptions := server.Options{
+		BindAddress: metricsAddr,
+	}
+
+	if conf.MetricsCertDir == "" {
+		setupLog.Info("Metrics server enabled without TLS")
+		return metricsOptions
+	}
+
+	metricsOptions.CertName = "tls.crt"
+	metricsOptions.KeyName = "tls.key"
+	metricsOptions.SecureServing = true
+	metricsOptions.CertDir = conf.MetricsCertDir
+	setupLog.Info("Metrics server enabled with TLS", "certDir", conf.MetricsCertDir)
+
+	return metricsOptions
 }
 
 // loadConfiguration reads the configuration from the provided configmap and secret

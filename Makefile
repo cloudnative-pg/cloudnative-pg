@@ -59,7 +59,7 @@ GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.12.7
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.53.0
+SPELLCHECK_VERSION ?= 0.54.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose

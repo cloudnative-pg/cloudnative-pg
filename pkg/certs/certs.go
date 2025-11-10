@@ -40,6 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -237,6 +238,9 @@ func (pair KeyPair) GenerateCASecret(namespace, name string) *corev1.Secret {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Data: map[string][]byte{
 			CAPrivateKeyKey: pair.Private,
@@ -252,6 +256,9 @@ func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *corev1.Se
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Data: map[string][]byte{
 			TLSPrivateKeyKey: pair.Private,
