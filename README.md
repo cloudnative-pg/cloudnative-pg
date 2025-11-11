@@ -125,7 +125,7 @@ MariaDB cluster).
 
 ## Resources
 
-- [Roadmap](https://github.com/orgs/cloudnative-pg/projects/1)
+- [Roadmap](ROADMAP.md)
 - [Website](https://cloudnative-pg.io)
 - [FAQ](docs/src/faq.md)
 - [Blog](https://cloudnative-pg.io/blog/)
