@@ -197,6 +197,30 @@ kubectl logs -n cnpg-system \
   jq -r . > cnpg_logs.json
 ```
 
+### Instance manager status endpoint does not listen on port 8000
+
+If you see log entries such as `{"msg":"Starting webserver","address":":8000","hasTLS":true}` but nothing is
+listening on `:8000`, the operator cannot reach the instance status API. This typically occurs when the socket bind
+fails (for example, on certain K3s control-plane nodes). As of the current releases, CloudNativePG surfaces this
+condition with an explicit error similar to:
+
+```
+{"level":"error","msg":"failed to bind webserver on :8000: listen tcp :8000: bind: permission denied"}
+```
+
+When that happens:
+
+1. Confirm the listener is missing:
+   ```shell
+   kubectl exec -n <namespace> <pod> -- lsof -i :8000 || true
+   kubectl exec -n <namespace> <pod> -- netstat -tlnp | grep :8000 || true
+   ```
+2. Inspect node-level services, security policies, or port conflicts preventing the bind.
+3. If necessary, reschedule the pod on a worker node or free the conflicting port on the control-plane node.
+
+Once the bind succeeds, the commands above will show the listener and the operator will resume collecting the pod
+status.
+
 Get CloudNativePG operator version by using `kubectl-cnpg` plugin:
 
 ```shell
