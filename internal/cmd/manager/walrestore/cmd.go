@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -123,7 +123,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	destinationPathName := destinationPath
+	if !filepath.IsAbs(destinationPathName) && pgData != "" {
+		destinationPathName = filepath.Join(pgData, destinationPathName)
+	}
+
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, destinationPathName)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
 		//

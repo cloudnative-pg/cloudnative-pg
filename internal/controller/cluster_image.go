@@ -74,6 +74,19 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
 	requestedMajorVersion := requestedImageInfo.MajorVersion
 
+	// Rollback path: if the requested major matches the PGDATA major, but the current
+	// status.Image points to a different major (e.g., failed/aborted upgrade),
+	// realign .status.image to the requested image without treating it as a downgrade.
+	if requestedMajorVersion == currentMajorVersion && cluster.Status.Image != requestedImageInfo.Image {
+		return nil, status.PatchWithOptimisticLock(
+			ctx,
+			r.Client,
+			cluster,
+			status.SetImage(requestedImageInfo.Image),
+			status.SetPGDataImageInfo(&requestedImageInfo),
+		)
+	}
+
 	if currentMajorVersion > requestedMajorVersion {
 		// Major version downgrade requested. This is not allowed.
 		contextLogger.Info(
