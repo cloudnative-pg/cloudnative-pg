@@ -100,7 +100,7 @@ CloudNativePG can be extended via the [CNPG-I plugin interface](https://github.c
 
 ## Resources
 
-- [Roadmap](https://github.com/orgs/cloudnative-pg/projects/1)
+- [Roadmap](ROADMAP.md)
 - [Website](https://cloudnative-pg.io)
 - [FAQ](docs/src/faq.md)
 - [Blog](https://cloudnative-pg.io/blog/)
