@@ -117,8 +117,14 @@ func NewCmd() *cobra.Command {
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
+			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
+			// same name. As this part of the code is run inside a retry block, we need to allow SkipNameValidation
+			// only on retries, because a previous run may have already created a controller
+			// Reference https://github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.19.0
+			var skipNameValidation bool
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
-				return runSubCommand(ctx, instance, pprofHTTPServer)
+				defer func() { skipNameValidation = true }()
+				return runSubCommand(ctx, instance, pprofHTTPServer, skipNameValidation)
 			})
 
 			if errors.Is(err, errNoFreeWALSpace) {
@@ -159,13 +165,19 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer bool) error { //nolint:gocognit,gocyclo
+func runSubCommand( //nolint:gocognit,gocyclo
+	ctx context.Context,
+	instance *postgres.Instance,
+	pprofServer bool,
+	skipNameValidation bool,
+) error {
 	var err error
 
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
-		"build", versions.Info)
+		"build", versions.Info,
+		"skipNameValidation", skipNameValidation)
 
 	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
 	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
@@ -228,11 +240,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 		Logger:           contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
 		PprofBindAddress: getPprofServerAddress(pprofServer),
 		Controller: ctrlconfig.Controller{
-			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
-			// same name. As this part of the code is run inside a retry block, we need to allow SkipNameValidation,
-			// because a previous run may have already created a controller
-			// Reference https://github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.19.0
-			SkipNameValidation: ptr.To(true),
+			SkipNameValidation: ptr.To(skipNameValidation),
 		},
 	})
 	if err != nil {
