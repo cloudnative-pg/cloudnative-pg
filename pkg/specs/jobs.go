@@ -361,8 +361,13 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
-							Name:            string(role),
-							Image:           cluster.Status.Image,
+							Name: string(role),
+							Image: func() string {
+								if cluster.Spec.ImageName != "" {
+									return cluster.Spec.ImageName
+								}
+								return cluster.Status.Image
+							}(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,
