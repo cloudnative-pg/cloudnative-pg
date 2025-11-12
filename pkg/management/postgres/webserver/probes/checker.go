@@ -55,9 +55,9 @@ type Checker interface {
 }
 
 type executor struct {
-	cli       client.Client
-	instance  *postgres.Instance
 	probeType probeType
+	cache     *clusterCache
+	instance  *postgres.Instance
 }
 
 // NewReadinessChecker creates a new instance of the readiness probe checker
@@ -66,7 +66,10 @@ func NewReadinessChecker(
 	instance *postgres.Instance,
 ) Checker {
 	return &executor{
-		cli:       cli,
+		cache: newClusterCache(
+			cli,
+			client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
+		),
 		instance:  instance,
 		probeType: probeTypeReadiness,
 	}
@@ -78,7 +81,10 @@ func NewStartupChecker(
 	instance *postgres.Instance,
 ) Checker {
 	return &executor{
-		cli:       cli,
+		cache: newClusterCache(
+			cli,
+			client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
+		),
 		instance:  instance,
 		probeType: probeTypeStartup,
 	}
@@ -89,29 +95,43 @@ func (e *executor) IsHealthy(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithValues("probeType", e.probeType)
 
-	var cluster apiv1.Cluster
-	if err := e.cli.Get(
-		ctx,
-		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
-		&cluster,
-	); err != nil {
-		contextLogger.Warning(
-			fmt.Sprintf("%s check failed, cannot check Cluster definition", e.probeType),
-			"err", err.Error(),
-		)
+	if clusterRefreshed := e.cache.tryRefreshLatestClusterWithTimeout(ctx); clusterRefreshed {
+		probeRunner := getProbeRunnerFromCluster(e.probeType, *e.cache.getLatestKnownCluster())
+		if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
+			contextLogger.Warning("probe failing", "err", err.Error())
+			http.Error(
+				w,
+				fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		contextLogger.Trace("probe succeeding")
+		_, _ = fmt.Fprint(w, "OK")
+		return
+	}
+
+	contextLogger = contextLogger.WithValues("apiServerReachable", false)
+
+	if e.cache.getLatestKnownCluster() == nil {
+		contextLogger.Warning("no cluster definition has been received cannot proceed")
 		http.Error(
 			w,
-			fmt.Sprintf("%s check failed cannot get Cluster definition: %s", e.probeType, err.Error()),
+			fmt.Sprintf("%s check failed: cannot get Cluster definition and no cached definition available", e.probeType),
 			http.StatusInternalServerError,
 		)
 		return
 	}
 
-	probeRunner := getProbeRunnerFromCluster(e.probeType, cluster)
+	// Use the cached cluster definition as a fallback
+	contextLogger.Warning("probe using cached cluster definition due to API server connectivity issue")
+
+	probeRunner := getProbeRunnerFromCluster(e.probeType, *e.cache.getLatestKnownCluster())
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
-		contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
+		contextLogger.Warning("probe failing", "err", err.Error())
 		http.Error(
 			w,
 			fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
@@ -120,7 +140,7 @@ func (e *executor) IsHealthy(
 		return
 	}
 
-	contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
+	contextLogger.Debug("probe succeeding with cached cluster definition")
 	_, _ = fmt.Fprint(w, "OK")
 }
 
