@@ -613,7 +613,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ env.CONTROLLER_IMG }}
-          args: --severity-threshold=high --file=Dockerfile
+          args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
 
       - name: Install cosign
         if: |
