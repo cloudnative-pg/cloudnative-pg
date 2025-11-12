@@ -67,7 +67,7 @@ distros = {
   }
   ubi = {
     # renovate: datasource=docker
-    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:990002083442f6a93cd3249da32ecb7c3f6be778a1bec3a73a9c17fbc40edc15",
+    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:11e2cc207dc895c0cce721e556e38b8ad5e6e29a983fd57fe9d4aebf0840a502",
     tag = "-ubi9"
   }
 }
