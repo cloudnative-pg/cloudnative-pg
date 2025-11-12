@@ -206,10 +206,14 @@ func createClusterPodSpec(
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
 func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
+	imageName := cluster.Status.Image
+	if cluster.Spec.ImageName != "" {
+		imageName = cluster.Spec.ImageName
+	}
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
-			Image:           cluster.Status.Image,
+			Image:           imageName,
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
