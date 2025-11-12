@@ -247,3 +247,66 @@ var _ = Describe("WAL files checking", func() {
 		}
 	})
 })
+
+var _ = Describe("BuildWALPath", func() {
+	const pgData = "/var/lib/postgresql/data/pgdata"
+
+	Context("when walPath is a relative path", func() {
+		It("should join pgData with the relative path", func() {
+			relativePath := "pg_wal/000000010000000000000001"
+			expectedPath := "/var/lib/postgresql/data/pgdata/pg_wal/000000010000000000000001"
+
+			result := BuildWALPath(pgData, relativePath)
+
+			Expect(result).To(Equal(expectedPath))
+		})
+
+		It("should handle just a filename", func() {
+			filename := "000000010000000000000001"
+			expectedPath := "/var/lib/postgresql/data/pgdata/000000010000000000000001"
+
+			result := BuildWALPath(pgData, filename)
+
+			Expect(result).To(Equal(expectedPath))
+		})
+
+		It("should handle subdirectory with filename", func() {
+			relativePath := "pg_wal/archive_status/000000010000000000000001.ready"
+			expectedPath := "/var/lib/postgresql/data/pgdata/pg_wal/archive_status/000000010000000000000001.ready"
+
+			result := BuildWALPath(pgData, relativePath)
+
+			Expect(result).To(Equal(expectedPath))
+		})
+	})
+
+	Context("when walPath is an absolute path", func() {
+		It("should use the absolute path as-is without joining with pgData", func() {
+			absolutePath := "/var/lib/postgresql/data/pgdata/pg_wal/000000010000000000000001"
+
+			result := BuildWALPath(pgData, absolutePath)
+
+			Expect(result).To(Equal(absolutePath))
+		})
+
+		It("should not duplicate pgData when path is already absolute (the bug scenario from #9067)", func() {
+			// This is the scenario from issue #9067: pg_rewind passes an absolute path
+			absolutePath := "/var/lib/postgresql/data/pgdata/pg_wal/00000001000000010000005F"
+
+			result := BuildWALPath(pgData, absolutePath)
+
+			// Verify the bug is fixed: result should be the absolute path, not duplicated
+			Expect(result).To(Equal(absolutePath))
+			// Verify it doesn't create the buggy duplicated path
+			Expect(result).NotTo(ContainSubstring("/var/lib/postgresql/data/pgdata/var/lib/postgresql/data/pgdata"))
+		})
+
+		It("should handle absolute paths from different roots", func() {
+			differentAbsolutePath := "/tmp/wal/000000010000000000000001"
+
+			result := BuildWALPath(pgData, differentAbsolutePath)
+
+			Expect(result).To(Equal(differentAbsolutePath))
+		})
+	})
+})

@@ -153,7 +153,7 @@ func internalRun(
 	// We allow plugins to archive WALs even if there is no plugin
 	// directly enabled by the user, to retain compatibility with
 	// the old API.
-	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
+	if err := archiveWALViaPlugins(ctx, cluster, pgData, path.Join(pgData, walName)); err != nil {
 		return err
 	}
 
@@ -265,6 +265,7 @@ func getMaxResult(cluster *apiv1.Cluster) int {
 func archiveWALViaPlugins(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	pgData string,
 	walName string,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -286,7 +287,7 @@ func archiveWALViaPlugins(
 		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
 	}
 
-	return client.ArchiveWAL(ctx, cluster, walName)
+	return client.ArchiveWAL(ctx, cluster, postgres.BuildWALPath(pgData, walName))
 }
 
 // isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
