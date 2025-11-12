@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -123,7 +122,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
 		//
@@ -262,6 +261,7 @@ func restoreWALViaPlugins(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walName string,
+	pgData string,
 	destinationPathName string,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
@@ -282,7 +282,7 @@ func restoreWALViaPlugins(
 	}
 	defer client.Close(ctx)
 
-	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
+	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName))
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
