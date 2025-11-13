@@ -1,8 +1,8 @@
 header:
   schema-version: 1.0.0
-  last-updated: '2024-11-13'
-  last-reviewed: '2024-11-13'
-  expiration-date: '2025-11-14T01:00:00.000Z'
+  last-updated: '2025-11-13'
+  last-reviewed: '2025-11-13'
+  expiration-date: '2026-11-14T01:00:00.000Z'
   project-url: https://github.com/cloudnative-pg/cloudnative-pg
   project-release: '1.28.0'
 project-lifecycle:
