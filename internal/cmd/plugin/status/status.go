@@ -217,7 +217,7 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 }
 
 func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client kubernetes.Interface) (string, error) {
-	timeout := time.Second * 10
+	timeout := time.Second * 45
 
 	// Compute the disk space through `du`
 	output, _, err := utils.ExecCommand(
