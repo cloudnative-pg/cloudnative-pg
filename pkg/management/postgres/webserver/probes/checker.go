@@ -116,20 +116,21 @@ func (e *executor) IsHealthy(
 
 	contextLogger = contextLogger.WithValues("apiServerReachable", false)
 
-	if e.cache.getLatestKnownCluster() == nil {
-		contextLogger.Warning("no cluster definition has been received cannot proceed")
-		http.Error(
-			w,
-			fmt.Sprintf("%s check failed: cannot get Cluster definition and no cached definition available", e.probeType),
-			http.StatusInternalServerError,
-		)
-		return
+	// Use the cached cluster definition as a fallback, or create a default if none exists
+	cluster := e.cache.getLatestKnownCluster()
+	if cluster == nil {
+		// We were never able to download a cluster definition. This should not
+		// happen because we check the API server connectivity as soon as the
+		// instance manager starts, before starting the probe web server.
+		//
+		// To be safe, we use an empty cluster with default probe settings.
+		contextLogger.Warning("no cluster definition has been received, using default probe settings")
+		cluster = &apiv1.Cluster{}
+	} else {
+		contextLogger.Warning("probe using cached cluster definition due to API server connectivity issue")
 	}
 
-	// Use the cached cluster definition as a fallback
-	contextLogger.Warning("probe using cached cluster definition due to API server connectivity issue")
-
-	probeRunner := getProbeRunnerFromCluster(e.probeType, *e.cache.getLatestKnownCluster())
+	probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
 		contextLogger.Warning("probe failing", "err", err.Error())
 		http.Error(
