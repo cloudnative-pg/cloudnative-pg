@@ -28,7 +28,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -55,22 +54,6 @@ var _ = Describe("Pod Inplace Resource Updates", Label(tests.LabelSelfHealing), 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-
-		// Wait for cluster to be ready
-		By("waiting for cluster to be ready", func() {
-			timeout := 120
-			Eventually(func() (bool, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}, cluster)
-				if err != nil {
-					return false, err
-				}
-				return cluster.Status.Phase == apiv1.PhaseHealthy, nil
-			}, timeout).Should(BeTrue())
-		})
 
 		// Test 1: In-place resource update with NotRequired policy
 		By("testing in-place resource update with NotRequired policy", func() {
@@ -371,15 +354,5 @@ var _ = Describe("Pod Inplace Resource Updates", Label(tests.LabelSelfHealing), 
 				}
 			}
 		})
-	})
-
-	AfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			namespaces.DumpNamespaceObjects(
-				env.Ctx, env.Client,
-				namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-		// Note: Namespace cleanup is automatically handled by DeferCleanup
-		// registered in CreateTestNamespace (namespace.go:119)
 	})
 })
