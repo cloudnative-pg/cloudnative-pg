@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,7 +61,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -83,6 +87,7 @@ func init() {
 // NewCmd creates the "instance run" subcommand
 func NewCmd() *cobra.Command {
 	var pgData string
+	var parentNode string
 	var podName string
 	var clusterName string
 	var namespace string
@@ -115,8 +120,14 @@ func NewCmd() *cobra.Command {
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
+			initInfo := &postgres.InitInfo{
+				PgData:     pgData,
+				ParentNode: parentNode,
+				PodName:    podName,
+			}
+
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
-				return runSubCommand(ctx, instance, pprofHTTPServer)
+				return runSubCommand(ctx, instance, initInfo, pprofHTTPServer)
 			})
 
 			if errors.Is(err, errNoFreeWALSpace) {
@@ -138,6 +149,8 @@ func NewCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be started up")
+	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node to copy PGDATA from if it "+
+		"does not already exist in the current pod")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
@@ -157,13 +170,88 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer bool) error { //nolint:gocognit,gocyclo
+func runSubCommand(ctx context.Context, instance *postgres.Instance, initInfo *postgres.InitInfo, pprofServer bool) error { //nolint:gocognit,gocyclo
 	var err error
 
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
+
+	// Check if the WAL volume is present
+	pgWalVolumeExists, err := fileutils.FileExists(specs.PgWalVolumePath)
+	if err != nil {
+		contextLogger.Error(err, "Error while checking for an existing wal volume")
+		return fmt.Errorf("while verifying if the wal volume exists: %w", err)
+	}
+	if pgWalVolumeExists {
+		initInfo.PgWal = specs.PgWalVolumePgWalPath
+	}
+
+	// Check if the required directories exist
+	pgDataExists, pgWalExists, err := initInfo.CheckTargetDirectoriesExist(ctx)
+	if err != nil {
+		return err
+	}
+	if !pgDataExists || !ptr.Deref(pgWalExists, true) {
+		var err1, err2 error
+
+		if !pgDataExists {
+			err1 = errors.New("The data directory does not currently exist")
+			contextLogger.Info("The data directory does not currently exist")
+		}
+
+		if !ptr.Deref(pgWalExists, true) {
+			err2 = errors.New("The WAL directory does not currently exist")
+			contextLogger.Info("The WAL directory does not currently exist")
+		}
+
+		// Return an error if no parent node was provided.
+		if initInfo.ParentNode == "" {
+			err := errors.Join(err1, err2)
+			contextLogger.Error(err, "Cannot start the instance since a parent node was not provided and directories were missing")
+			return err
+		}
+
+		if instance.Cluster == nil {
+			// Create a temporary client for cluster retrieval
+			cli, err := management.NewControllerRuntimeClient()
+			if err != nil {
+				contextLogger.Error(err, "Error creating Kubernetes client")
+				return err
+			}
+
+			// Download the cluster definition from the API server
+			var cluster apiv1.Cluster
+			if err := cli.Get(ctx,
+				client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
+				&cluster,
+			); err != nil {
+				contextLogger.Error(err, "Error while getting cluster")
+				return err
+			}
+			instance.Cluster = &cluster
+
+			if _, err := instancecertificate.NewReconciler(cli, instance).RefreshSecrets(ctx, &cluster); err != nil {
+				contextLogger.Error(err, "Error while refreshing secrets")
+				return err
+			}
+		}
+
+		if err := initInfo.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
+			return err
+		}
+
+		// Run "pg_basebackup" to download the data directory from the primary
+		if err := initInfo.Join(ctx, instance.Cluster); err != nil {
+			contextLogger.Error(err, "Error rejoining node")
+			return err
+		}
+	}
+
+	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
+		return err
+	}
 
 	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
 	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
@@ -300,10 +388,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 	}
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
-
-	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
-		return err
-	}
 
 	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
 	if err = mgr.Add(postgresLifecycleManager); err != nil {

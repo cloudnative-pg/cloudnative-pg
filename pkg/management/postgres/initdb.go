@@ -25,6 +25,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/jackc/pgx/v5"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -150,19 +152,11 @@ type InitInfo struct {
 func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
 
-	pgDataExists, err := fileutils.FileExists(info.PgData)
+	pgDataExists, pgWalExistsPtr, err := info.CheckTargetDirectoriesExist(ctx)
 	if err != nil {
-		contextLogger.Error(err, "Error while checking for an existing data directory")
-		return fmt.Errorf("while verifying if the data directory exists: %w", err)
+		return err
 	}
-
-	pgWalExists := false
-	if info.PgWal != "" {
-		if pgWalExists, err = fileutils.FileExists(info.PgWal); err != nil {
-			contextLogger.Error(err, "Error while checking for an existing WAL directory")
-			return fmt.Errorf("while verifying if the WAL directory exists: %w", err)
-		}
-	}
+	pgWalExists := ptr.Deref(pgWalExistsPtr, false)
 
 	if !pgDataExists && !pgWalExists {
 		return nil
@@ -176,6 +170,29 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 
 	contextLogger.Info("pg_controldata check on existing directory failed, cleaning up folders", "err", err, "out", out)
 	return info.removeExistingTargetDataDirectories(ctx, pgDataExists, pgWalExists)
+}
+
+// CheckTargetDirectoriesExist returns whether or not the data and WAL directories exist.
+func (info InitInfo) CheckTargetDirectoriesExist(ctx context.Context) (pgDataExists bool, pgWalExists *bool, err error) {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
+
+	pgDataExists, err = fileutils.FileExists(info.PgData)
+	if err != nil {
+		contextLogger.Error(err, "Error while checking for an existing data directory")
+		err = fmt.Errorf("while verifying if the data directory exists: %w", err)
+	}
+
+	if info.PgWal != "" {
+		walExists, err2 := fileutils.FileExists(info.PgWal)
+		if err != nil {
+			contextLogger.Error(err2, "Error while checking for an existing WAL directory")
+			err = errors.Join(err, fmt.Errorf("while verifying if the WAL directory exists: %w", err2))
+			return
+		}
+		pgWalExists = &walExists
+	}
+
+	return
 }
 
 func (info InitInfo) removeExistingTargetDataDirectories(ctx context.Context, pgDataExists, pgWalExists bool) error {

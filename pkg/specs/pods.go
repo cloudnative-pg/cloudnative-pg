@@ -254,6 +254,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				"/controller/manager",
 				"instance",
 				"run",
+				"--parent-node", cluster.GetServiceReadWriteName(),
 			},
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
