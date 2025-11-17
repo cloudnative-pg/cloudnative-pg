@@ -99,10 +99,10 @@ var _ = Describe("clusterCache", func() {
 			// With a cancelled context, the operation should fail
 			// Note: With fake client, this might still succeed if it's fast enough,
 			// but in real scenarios with actual API server delays, this would fail
-			success := cache.tryRefreshLatestClusterWithTimeout(cancelledCtx)
+			_ = cache.tryRefreshLatestClusterWithTimeout(cancelledCtx)
+
 			// We don't assert the result here because the fake client is too fast
 			// This test mainly verifies the code doesn't panic with a cancelled context
-			_ = success
 		})
 
 		It("should cache the cluster definition across multiple calls", func() {

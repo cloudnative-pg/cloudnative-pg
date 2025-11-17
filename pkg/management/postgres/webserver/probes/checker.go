@@ -116,18 +116,15 @@ func (e *executor) IsHealthy(
 
 	contextLogger = contextLogger.WithValues("apiServerReachable", false)
 
-	// Use the cached cluster definition as a fallback, or create a default if none exists
 	cluster := e.cache.getLatestKnownCluster()
 	if cluster == nil {
-		// We were never able to download a cluster definition. This should not
-		// happen because we check the API server connectivity as soon as the
-		// instance manager starts, before starting the probe web server.
-		//
-		// To be safe, we use an empty cluster with default probe settings.
-		contextLogger.Warning(fmt.Sprintf("no cluster definition has been received for %s probe, using default probe settings", e.probeType))
+		contextLogger.Warning(
+			fmt.Sprintf("no cluster definition has been received for %s probe, using default probe settings", e.probeType),
+		)
 		cluster = &apiv1.Cluster{}
 	} else {
-		contextLogger.Warning(fmt.Sprintf("%s probe using cached cluster definition due to API server connectivity issue", e.probeType))
+		contextLogger.Warning(
+			fmt.Sprintf("%s probe using cached cluster definition due to API server connectivity issue", e.probeType))
 	}
 
 	probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
