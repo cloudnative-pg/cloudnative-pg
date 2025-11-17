@@ -245,6 +245,7 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
 	})
+  
 	It("disables service links to prevent argument list too long errors", func() {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
