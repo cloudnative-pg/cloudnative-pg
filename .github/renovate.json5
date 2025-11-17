@@ -100,6 +100,17 @@
       datasourceTemplate: 'docker',
       versioningTemplate: 'regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$',
     },
+    {
+      customType: 'regex',
+      managerFilePatterns:  [
+        '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
+        '/^hack/e2e/run-e2e-local.sh$/',
+        '/^hack/e2e/run-e2e\\.sh$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+go install ([^@]+?)@(?<currentValue>.+)',
+      ],
+    },
   ],
   packageRules: [
     {
