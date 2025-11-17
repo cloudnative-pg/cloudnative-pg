@@ -95,12 +95,12 @@ func (e *executor) IsHealthy(
 	ctx context.Context,
 	w http.ResponseWriter,
 ) {
-	contextLogger := log.FromContext(ctx).WithValues("probeType", e.probeType)
+	contextLogger := log.FromContext(ctx)
 
 	if clusterRefreshed := e.cache.tryRefreshLatestClusterWithTimeout(ctx); clusterRefreshed {
 		probeRunner := getProbeRunnerFromCluster(e.probeType, *e.cache.getLatestKnownCluster())
 		if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
-			contextLogger.Warning("probe failing", "err", err.Error())
+			contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 			http.Error(
 				w,
 				fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
@@ -109,7 +109,7 @@ func (e *executor) IsHealthy(
 			return
 		}
 
-		contextLogger.Trace("probe succeeding")
+		contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
 		_, _ = fmt.Fprint(w, "OK")
 		return
 	}
@@ -124,15 +124,15 @@ func (e *executor) IsHealthy(
 		// instance manager starts, before starting the probe web server.
 		//
 		// To be safe, we use an empty cluster with default probe settings.
-		contextLogger.Warning("no cluster definition has been received, using default probe settings")
+		contextLogger.Warning(fmt.Sprintf("no cluster definition has been received for %s probe, using default probe settings", e.probeType))
 		cluster = &apiv1.Cluster{}
 	} else {
-		contextLogger.Warning("probe using cached cluster definition due to API server connectivity issue")
+		contextLogger.Warning(fmt.Sprintf("%s probe using cached cluster definition due to API server connectivity issue", e.probeType))
 	}
 
 	probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
-		contextLogger.Warning("probe failing", "err", err.Error())
+		contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 		http.Error(
 			w,
 			fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
@@ -141,7 +141,7 @@ func (e *executor) IsHealthy(
 		return
 	}
 
-	contextLogger.Debug("probe succeeding with cached cluster definition")
+	contextLogger.Debug(fmt.Sprintf("%s probe succeeding with cached cluster definition", e.probeType))
 	_, _ = fmt.Fprint(w, "OK")
 }
 
