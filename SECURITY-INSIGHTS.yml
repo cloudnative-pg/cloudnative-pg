@@ -1,52 +1,60 @@
 header:
-  schema-version: 1.0.0
-  last-updated: '2025-11-13'
-  last-reviewed: '2025-11-13'
-  expiration-date: '2026-11-14T01:00:00.000Z'
-  project-url: https://github.com/cloudnative-pg/cloudnative-pg
-  project-release: '1.28.0'
-project-lifecycle:
-  stage: active
-  bug-fixes-only: false
-  core-maintainers:
-  - github:gbartolini
-  - github:fcanovai
-  - github:leonardoce
-  - github:sxd
-  - github:mnencia
-  - github:armru
-  - github:phisco
-contribution-policy:
-  accepts-pull-requests: true
-  accepts-automated-pull-requests: false
-  code-of-conduct: https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md
-documentation:
-  - https://cloudnative-pg.io/documentation/current/
-distribution-points:
-  - https://github.com/cloudnative-pg/cloudnative-pg
-security-testing:
-  - tool-type: sca
-    tool-name: Dependabot
-    tool-version: latest
-    integration:
-      ad-hoc: false
-      ci: true
-      before-release: true
-    comment: |
-      Dependabot is enabled for this repo.
-security-contacts:
-  - type: email
-    value: security@cloudnative-pg.io
-vulnerability-reporting:
-  accepts-vulnerability-reports: true
-  security-policy: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/SECURITY.md
-  email-contact: security@cloudnative-pg.io
-  comment: |
-    The first and best way to report a vulnerability is by using private security issues in GitHub.
-dependencies:
-  third-party-packages: true
-  dependencies-lists:
-    - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/go.mod
-  sbom:
-    - sbom-format: SPDX
-      sbom-url: https://cloudnative-pg.io/documentation/current/security/#attestations
+  schema-version: 2.1.0
+  last-updated: '2025-11-17'
+  last-reviewed: '2025-11-17'
+  url: https://github.com/cloudnative-pg/cloudnative-pg
+
+project:
+  name: CloudNativePG
+  administrators:
+    - name: Gabriele Bartolini
+      primary: true
+    - name: Francesco Canovai
+      primary: false
+    - name: Leonardo Cecchi
+      primary: false
+    - name: Jonathan Gonzalez V.
+      primary: false
+    - name: Marco Nenciarini
+      primary: false
+    - name: Armando Ruocco
+      primary: false
+    - name: Philippe Scorsolini
+      primary: false
+  repositories:
+    - name: CloudNativePG
+      url: https://github.com/cloudnative-pg/cloudnative-pg
+      comment: |
+        Main repository for the CloudNativePG project
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+
+repository:
+  url: https://github.com/cloudnative-pg/cloudnative-pg
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: false
+  core-team:
+    - name: Gabriele Bartolini
+      primary: true
+    - name: Francesco Canovai
+      primary: false
+    - name: Leonardo Cecchi
+      primary: false
+    - name: Jonathan Gonzalez V.
+      primary: false
+    - name: Marco Nenciarini
+      primary: false
+    - name: Armando Ruocco
+      primary: false
+    - name: Philippe Scorsolini
+      primary: false
+  license:
+    url: http://www.apache.org/licenses/LICENSE-2.0
+    expression: Apache-2.0
+  security:
+    assessments:
+      self:
+        comment: |
+          Self assessment has not yet been completed.
