@@ -906,7 +906,8 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.1
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -979,6 +980,7 @@ jobs:
           max_attempts: 1
           command: |
             STORAGECLASSNAME=default
+            # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
@@ -1262,7 +1264,8 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.1
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5
@@ -1649,7 +1652,8 @@ jobs:
           timeout_seconds: 120
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.1
       -
         name: Set cluster name
         run: |
