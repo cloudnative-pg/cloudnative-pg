@@ -151,38 +151,52 @@ func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
 }
 
 func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
-	result := ""
-	for _, object := range obj.Objects {
-		if len(result) > 0 {
-			result += ", "
+	var parts []string
+	var currentTables []string
+
+	flushTables := func() {
+		if len(currentTables) > 0 {
+			parts = append(parts, fmt.Sprintf("TABLE %s", strings.Join(currentTables, ", ")))
+			currentTables = nil
 		}
-		result += toPublicationObjectSQL(&object)
 	}
 
-	return result
+	for _, object := range obj.Objects {
+		if len(object.TablesInSchema) > 0 {
+			// Flush any accumulated tables before adding schema
+			flushTables()
+			parts = append(parts, fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{object.TablesInSchema}.Sanitize()))
+		} else if object.Table != nil {
+			// Accumulate table definitions
+			// Note: Grouping consecutive tables under a single TABLE keyword ensures
+			// compatibility with PostgreSQL 13/14. Mixed TABLE and TABLES IN SCHEMA
+			// in the same publication requires PostgreSQL 15+.
+			currentTables = append(currentTables, toTableDefinitionSQL(object.Table))
+		}
+	}
+
+	// Flush any remaining tables
+	flushTables()
+
+	return strings.Join(parts, ", ")
 }
 
-func toPublicationObjectSQL(obj *apiv1.PublicationTargetObject) string {
-	if len(obj.TablesInSchema) > 0 {
-		return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.TablesInSchema}.Sanitize())
-	}
-
+func toTableDefinitionSQL(table *apiv1.PublicationTargetTable) string {
 	result := strings.Builder{}
-	result.WriteString("TABLE ")
 
-	if obj.Table.Only {
+	if table.Only {
 		result.WriteString("ONLY ")
 	}
 
-	if len(obj.Table.Schema) > 0 {
-		result.WriteString(fmt.Sprintf("%s.", pgx.Identifier{obj.Table.Schema}.Sanitize()))
+	if len(table.Schema) > 0 {
+		result.WriteString(fmt.Sprintf("%s.", pgx.Identifier{table.Schema}.Sanitize()))
 	}
 
-	result.WriteString(pgx.Identifier{obj.Table.Name}.Sanitize())
+	result.WriteString(pgx.Identifier{table.Name}.Sanitize())
 
-	if len(obj.Table.Columns) > 0 {
-		sanitizedColumns := make([]string, 0, len(obj.Table.Columns))
-		for _, column := range obj.Table.Columns {
+	if len(table.Columns) > 0 {
+		sanitizedColumns := make([]string, 0, len(table.Columns))
+		for _, column := range table.Columns {
 			sanitizedColumns = append(sanitizedColumns, pgx.Identifier{column}.Sanitize())
 		}
 		result.WriteString(fmt.Sprintf(" (%s)", strings.Join(sanitizedColumns, ", ")))

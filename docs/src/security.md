@@ -375,6 +375,7 @@ is, the container runtime default.
 
 The security context of PostgreSQL containers using the default `seccompProfile`
 will look like this:
+
 ```
 securityContext:
   allowPrivilegeEscalation: false
@@ -387,6 +388,80 @@ securityContext:
   seccompProfile:
     type: RuntimeDefault
 ```
+
+#### Customizing Security Contexts
+
+CloudNativePG provides fine-grained control over security contexts for both
+pods and containers through the `spec.podSecurityContext` and
+`spec.securityContext` fields respectively.
+
+!!! Important
+    Changing security contexts can significantly affect the security posture
+    of your PostgreSQL clusters and may prevent pods from starting or
+    operating correctly. Before making changes, review which fields you will
+    override and how they merge with the operator defaults, test changes
+    in a non-production environment, and apply the minimal, well-documented
+    modifications necessary.
+
+**Pod Security Context** (`spec.podSecurityContext`):
+This allows you to override the default `PodSecurityContext` applied to all
+PostgreSQL cluster pods. When specified, it will merge with the operator's
+default settings, with your values taking precedence for explicitly set fields.
+
+Example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  podSecurityContext:
+    runAsUser: 26
+    runAsGroup: 26
+    fsGroup: 26
+    supplementalGroups: [2000, 3000]
+    fsGroupChangePolicy: "OnRootMismatch"
+```
+
+**Container Security Context** (`spec.securityContext`):
+This allows you to override the default `SecurityContext` applied to all
+containers within the PostgreSQL cluster pods. Like `podSecurityContext`, it
+merges with the operator's defaults.
+
+Example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  securityContext:
+    allowPrivilegeEscalation: false
+    # Note: capabilities are not merged with operator defaults.
+    # If specified, they fully replace any defaults.
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - NET_BIND_SERVICE
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+```
+
+!!! Important
+    For any fields you don't explicitly set, the operator will apply its
+    secure defaults. This ensures that even partial configurations maintain
+    security best practices.
+
+!!! Note
+    These fields are particularly useful when working with the
+    [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+    `restricted` profile, which has strict requirements for pod and container
+    security contexts.
 
 #### Security Context Constraints
 

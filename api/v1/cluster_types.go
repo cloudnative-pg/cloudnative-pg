@@ -462,6 +462,19 @@ type ClusterSpec struct {
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
+	// Override the PodSecurityContext applied to every Pod of the cluster.
+	// When set, this overrides the operator's default PodSecurityContext for the cluster.
+	// If omitted, the operator defaults are used.
+	// This field doesn't have any effect if SecurityContextConstraints are present.
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// Override the SecurityContext applied to every Container in the Pod of the cluster.
+	// When set, this overrides the operator's default Container SecurityContext.
+	// If omitted, the operator defaults are used.
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
@@ -1641,6 +1654,7 @@ type BootstrapInitDB struct {
 	Secret *LocalObjectReference `json:"secret,omitempty"`
 
 	// The list of options that must be passed to initdb when creating the cluster.
+	//
 	// Deprecated: This could lead to inconsistent configurations,
 	// please use the explicit provided parameters instead.
 	// If defined, explicit values will be ignored.
@@ -2222,6 +2236,14 @@ type MonitoringConfiguration struct {
 	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+
+	// The interval during which metrics computed from queries are considered current.
+	// Once it is exceeded, a new scrape will trigger a rerun
+	// of the queries.
+	// If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+	// Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server.
+	// +optional
+	MetricsQueriesTTL *metav1.Duration `json:"metricsQueriesTTL,omitempty"`
 }
 
 // ClusterMonitoringTLSConfiguration is the type containing the TLS configuration

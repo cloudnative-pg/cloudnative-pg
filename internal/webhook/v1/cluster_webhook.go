@@ -2519,7 +2519,20 @@ func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admissio
 	list = append(list, getRetentionPolicyWarnings(r)...)
 	list = append(list, getStorageWarnings(r)...)
 	list = append(list, getSharedBuffersWarnings(r)...)
+	list = append(list, getMonitoringFieldsWarnings(r)...)
 	return append(list, getDeprecatedMonitoringFieldsWarnings(r)...)
+}
+
+func getMonitoringFieldsWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if r.GetMetricsQueriesTTL().Duration == 0 {
+		result = append(result,
+			"spec.monitoring.metricsQueriesTTL is explicitly set to 0; this disables automatic TTL behavior "+
+				"and can cause heavy load on the PostgreSQL server.")
+	}
+
+	return result
 }
 
 func getStorageWarnings(r *apiv1.Cluster) admission.Warnings {

@@ -81,6 +81,7 @@ ClassName
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+ClientTLSSecret
 CloudNativePG
 CloudNativePG's
 ClusterBinding
@@ -148,6 +149,7 @@ EKS
 EOF
 EOL
 ESO
+EdwinaZhu
 EmbeddedObjectMetadata
 EnablePDB
 EncryptionType
@@ -225,6 +227,7 @@ Isovalent
 Istio
 Istio's
 JSON
+JefeDavis
 Jihyuk
 Jitendra
 KV
@@ -241,6 +244,7 @@ LDAPBindSearchAuth
 LDAPConfig
 LDAPScheme
 LF
+LFX
 LLC
 LPV
 LSN
@@ -350,6 +354,7 @@ PodDisruptionBudget
 PodDisruptionBudgets
 PodMeta
 PodMonitor
+PodSecurityContext
 PodSecurityPolicy
 PodSpec
 PodStatus
@@ -460,6 +465,7 @@ SecretRefs
 SecretStore
 SecretVersion
 SecretsResourceVersion
+SecurityContextConstraints
 SecurityProfiles
 Seealso
 SelectorType
@@ -560,7 +566,9 @@ XXu
 YXBw
 YY
 YYYY
+Ying
 Zalando
+Zhu
 Zstandard
 abd
 accessKeyId
@@ -690,6 +698,8 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientTLS
+clientTLSSecret
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -780,6 +790,7 @@ datistemplate
 datname
 dbe
 dbname
+ddf
 ddl
 de
 declaratively
@@ -893,6 +904,7 @@ gosec
 govulncheck
 grafana
 gzip
+hanshal
 hardcoded
 hashicorp
 hba
@@ -1043,6 +1055,7 @@ memstats
 metav
 metric's
 metricNameKS
+metricsQueriesTTL
 microservice
 microservices
 microsoft
@@ -1124,6 +1137,7 @@ passwordStatus
 pc
 pdf
 periodSeconds
+persistentVolumeClaims
 persistentvolumeclaim
 persistentvolumeclaims
 pgAdmin
@@ -1144,6 +1158,7 @@ pgbarman
 pgbasebackup
 pgbench
 pgbouncer
+pgbouncer's
 pgdata
 pgpass
 pgstatstatements
@@ -1161,10 +1176,13 @@ podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
 podCount
+podDisruptionBudgets
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
+podMonitors
 podName
+podSecurityContext
 podStatuses
 podmonitor
 podtemplates

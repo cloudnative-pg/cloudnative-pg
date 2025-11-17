@@ -123,11 +123,14 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
-						cluster.IsMetricsTLSEnabled())
-					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
-					expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
-					assertIncludesMetrics(out, expectedMetrics)
+					Eventually(func(g Gomega) error {
+						out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+							cluster.IsMetricsTLSEnabled())
+						g.Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
+						expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
+						assertIncludesMetrics(g, out, expectedMetrics)
+						return nil
+					}, testTimeouts[timeouts.Short]).Should(Succeed())
 				})
 			}
 		})
@@ -235,11 +238,14 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
-						cluster.IsMetricsTLSEnabled())
-					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
-					assertIncludesMetrics(out, expectedMetrics)
-					assertExcludesMetrics(out, nonCollectableMetrics)
+					Eventually(func(g Gomega) error {
+						out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+							cluster.IsMetricsTLSEnabled())
+						g.Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
+						assertIncludesMetrics(g, out, expectedMetrics)
+						assertExcludesMetrics(g, out, nonCollectableMetrics)
+						return nil
+					}, testTimeouts[timeouts.Short]).Should(Succeed())
 				})
 			}
 		})
@@ -354,12 +360,14 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 					time.Duration(timeouts.DefaultTestTimeouts[timeouts.Short])*time.Second,
 				).Should(Succeed(), fmt.Sprintf("on pod %v", pod.Name))
 
-				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
-					replicaCluster.IsMetricsTLSEnabled())
-				Expect(err).ShouldNot(HaveOccurred(),
-					fmt.Sprintf("while getting pod metrics for pod: %v", pod.Name))
-				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric),
-					fmt.Sprintf("expected metric %v not found in pod %v", expectedMetric, pod.Name))
+				Eventually(func(g Gomega) {
+					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+						replicaCluster.IsMetricsTLSEnabled())
+					g.Expect(err).ShouldNot(HaveOccurred(),
+						fmt.Sprintf("while getting pod metrics for pod: %v", pod.Name))
+					g.Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric),
+						fmt.Sprintf("expected metric %v not found in pod %v", expectedMetric, pod.Name))
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 			}
 		})
 

@@ -1,0 +1,44 @@
+# Example of PostgreSQL cluster with custom security contexts
+#
+# This example demonstrates how to customize both PodSecurityContext and
+# Container SecurityContext for a PostgreSQL cluster. This is particularly
+# useful when working with Pod Security Standards (PSS) or when you need
+# to meet specific security requirements.
+#
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-security-context
+spec:
+  instances: 3
+
+  # Storage configuration
+  storage:
+    size: 1Gi
+
+  # Custom PodSecurityContext
+  # This will be applied to all pods in the cluster and merged with operator defaults.
+  # Only RunAsUser, RunAsGroup, and SeccompProfile are merged from defaults if not specified.
+  podSecurityContext:
+    runAsUser: 26
+    runAsGroup: 26
+    fsGroup: 26
+    runAsNonRoot: true
+    supplementalGroups: [1000, 2000]
+    fsGroupChangePolicy: "OnRootMismatch"
+
+  # Custom Container SecurityContext
+  # This will be applied to all containers in the cluster pods and merged with operator defaults.
+  # The operator provides secure defaults for all fields, which will be used if not explicitly set.
+  securityContext:
+    allowPrivilegeEscalation: false
+    # Note: capabilities are not merged with operator defaults.
+    # If specified, they fully replace any defaults.
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - NET_BIND_SERVICE
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true

@@ -318,8 +318,47 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector, collecting the Metrics values to
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.collectPgMetrics(ch)
+	log.Debug("collecting Postgres instance metrics")
+	e.updateInstanceMetrics()
+	e.collectInstanceMetrics(ch)
 
+	if e.queries != nil {
+		var defaultClusterForTTL apiv1.Cluster
+		ttl := defaultClusterForTTL.GetMetricsQueriesTTL().Duration
+		if cluster, _ := e.getCluster(); cluster != nil {
+			ttl = cluster.GetMetricsQueriesTTL().Duration
+		}
+
+		if e.queries.ShouldUpdate(ttl) {
+			log.Trace("no cache, updating metrics from queries", "ttlSeconds", ttl.Seconds())
+			e.updateMetricsFromQueries()
+		} else {
+			log.Debug("using cached metrics from queries, as TTL is not exceeded",
+				"ttlSeconds", ttl.Seconds())
+			e.queries.RecordCacheHit()
+		}
+		log.Debug("collecting metrics from queries")
+		e.queries.Collect(ch)
+	}
+}
+
+func (e *Exporter) updateMetricsFromQueries() {
+	// Work on predefined metrics and custom queries
+	label := "Collect." + e.queries.Name()
+	collectionStart := time.Now()
+	log.Debug("updating metrics from queries")
+	if err := e.queries.Update(); err != nil {
+		log.Error(err, "Error during query update", "collector", e.queries.Name())
+		e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
+		e.Metrics.Error.Set(1)
+	}
+	log.Debug("created metrics from user queries",
+		"duration", time.Since(collectionStart).Seconds())
+	e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
+}
+
+// collectInstanceMetrics sends the computed instance metrics to the channel
+func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.CollectionsTotal
 	ch <- e.Metrics.Error
 	e.Metrics.PgCollectionErrors.Collect(ch)
@@ -359,7 +398,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
+// updateInstanceMetrics updates metrics from the instance manager
+func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
@@ -394,18 +434,6 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
-
-	// Work on predefined metrics and custom queries
-	if e.queries != nil {
-		label := "Collect." + e.queries.Name()
-		collectionStart := time.Now()
-		if err := e.queries.Collect(ch); err != nil {
-			log.Error(err, "Error during collection", "collector", e.queries.Name())
-			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
-			e.Metrics.Error.Set(1)
-		}
-		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
-	}
 
 	isPrimary, err := e.instance.IsPrimary()
 	if err != nil {

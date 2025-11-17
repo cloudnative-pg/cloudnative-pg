@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.25.0
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -18,7 +18,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.3
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jackc/puddle/v2 v2.2.2
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -26,28 +26,29 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/onsi/ginkgo/v2 v2.27.1
+	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.2
 	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_model v0.6.2
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.3.1
 	github.com/spf13/cobra v1.10.1
-	github.com/stern/stern v1.33.0
+	github.com/stern/stern v1.33.1
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/term v0.36.0
+	golang.org/x/term v0.37.0
 	google.golang.org/grpc v1.76.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.1
-	k8s.io/apiextensions-apiserver v0.34.1
-	k8s.io/apimachinery v0.34.1
-	k8s.io/cli-runtime v0.34.1
-	k8s.io/client-go v0.34.1
+	k8s.io/api v0.34.2
+	k8s.io/apiextensions-apiserver v0.34.2
+	k8s.io/apimachinery v0.34.2
+	k8s.io/cli-runtime v0.34.2
+	k8s.io/client-go v0.34.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
-	sigs.k8s.io/controller-runtime v0.22.3
+	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -104,13 +105,11 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
@@ -118,7 +117,7 @@ require (
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect

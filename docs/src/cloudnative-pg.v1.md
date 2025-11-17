@@ -1083,8 +1083,8 @@ created from scratch</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>The list of options that must be passed to initdb when creating the cluster.
-Deprecated: This could lead to inconsistent configurations,
+   <p>The list of options that must be passed to initdb when creating the cluster.</p>
+<p>Deprecated: This could lead to inconsistent configurations,
 please use the explicit provided parameters instead.
 If defined, explicit values will be ignored.</p>
 </td>
@@ -1941,6 +1941,25 @@ sources to the pods to be used by Env</p>
 <td>
    <p>The SeccompProfile applied to every Pod and Container.
 Defaults to: <code>RuntimeDefault</code></p>
+</td>
+</tr>
+<tr><td><code>podSecurityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podsecuritycontext-v1-core"><i>core/v1.PodSecurityContext</i></a>
+</td>
+<td>
+   <p>Override the PodSecurityContext applied to every Pod of the cluster.
+When set, this overrides the operator's default PodSecurityContext for the cluster.
+If omitted, the operator defaults are used.
+This field doesn't have any effect if SecurityContextConstraints are present.</p>
+</td>
+</tr>
+<tr><td><code>securityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#securitycontext-v1-core"><i>core/v1.SecurityContext</i></a>
+</td>
+<td>
+   <p>Override the SecurityContext applied to every Container in the Pod of the cluster.
+When set, this overrides the operator's default Container SecurityContext.
+If omitted, the operator defaults are used.</p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>
@@ -4000,6 +4019,17 @@ you need this functionality, you can create a PodMonitor manually.</p>
 you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
+<tr><td><code>metricsQueriesTTL</code><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
+</td>
+<td>
+   <p>The interval during which metrics computed from queries are considered current.
+Once it is exceeded, a new scrape will trigger a rerun
+of the queries.
+If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4242,6 +4272,39 @@ by pgbouncer</p>
    <p>The pool mode. Default: <code>session</code>.</p>
 </td>
 </tr>
+<tr><td><code>serverTLSSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+<code>server_tls_key_file</code> and <code>server_tls_cert_file</code>, used when
+authenticating against PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>serverCASecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ServerCASecret provides PgBouncer’s server_tls_ca_file, the root
+CA for validating PostgreSQL certificates</p>
+</td>
+</tr>
+<tr><td><code>clientCASecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ClientCASecret provides PgBouncer’s client_tls_ca_file, the root
+CA for validating client certificates</p>
+</td>
+</tr>
+<tr><td><code>clientTLSSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)
+and client_tls_cert_file (certificate) used to accept client connections</p>
+</td>
+</tr>
 <tr><td><code>authQuerySecret</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
@@ -4250,6 +4313,7 @@ by pgbouncer</p>
 query. In case it is specified, also an AuthQuery
 (e.g. &quot;SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1&quot;)
 has to be specified and no automatic CNPG Cluster integration will be triggered.</p>
+<p>Deprecated.</p>
 </td>
 </tr>
 <tr><td><code>authQuery</code><br/>
@@ -4553,6 +4617,13 @@ part for now.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>clientTLS</code><br/>
+<a href="#postgresql-cnpg-io-v1-SecretVersion"><i>SecretVersion</i></a>
+</td>
+<td>
+   <p>The client TLS secret version</p>
+</td>
+</tr>
 <tr><td><code>serverTLS</code><br/>
 <a href="#postgresql-cnpg-io-v1-SecretVersion"><i>SecretVersion</i></a>
 </td>

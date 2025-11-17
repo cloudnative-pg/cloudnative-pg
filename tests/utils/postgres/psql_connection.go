@@ -70,6 +70,7 @@ func startForwardConnection(
 	dbname,
 	userApp,
 	passApp string,
+	extraConnectionParams ...map[string]string,
 ) (*PSQLForwardConnection, *sql.DB, error) {
 	forwarder, err := forwardconnection.NewForwardConnection(
 		dialer,
@@ -91,7 +92,11 @@ func startForwardConnection(
 	}
 
 	connParameters := createConnectionParameters(userApp, passApp, localPort)
-
+	for _, params := range extraConnectionParams {
+		for key, value := range params {
+			connParameters[key] = value
+		}
+	}
 	pooler := pool.NewPgbouncerConnectionPool(configfile.CreateConnectionString(connParameters))
 
 	conn, err := pooler.Connection(dbname)
@@ -188,6 +193,7 @@ func ForwardPSQLServiceConnection(
 	dbname,
 	userApp,
 	passApp string,
+	extraConnectionParams ...map[string]string,
 ) (*PSQLForwardConnection, *sql.DB, error) {
 	dialer, portMap, err := forwardconnection.NewDialerFromService(
 		ctx,
@@ -200,7 +206,14 @@ func ForwardPSQLServiceConnection(
 		return nil, nil, err
 	}
 
-	psqlForwardConn, conn, err := startForwardConnection(dialer, portMap, dbname, userApp, passApp)
+	psqlForwardConn, conn, err := startForwardConnection(
+		dialer,
+		portMap,
+		dbname,
+		userApp,
+		passApp,
+		extraConnectionParams...,
+	)
 	if err != nil {
 		return nil, nil, err
 	}

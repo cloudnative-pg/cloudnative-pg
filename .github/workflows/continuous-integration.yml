@@ -19,9 +19,9 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.3"
+  GOLANG_VERSION: "1.25.4"
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
-  GOLANGCI_LINT_VERSION: "v2.5.0"
+  GOLANGCI_LINT_VERSION: "v2.6.2"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.30.0"
@@ -165,7 +165,7 @@ jobs:
           check-latest: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
@@ -543,7 +543,7 @@ jobs:
           RACE: "true"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -609,21 +609,11 @@ jobs:
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ env.CONTROLLER_IMG }}
-          args: --severity-threshold=high --file=Dockerfile
-
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4
-        if: |
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        continue-on-error: true
-        with:
-          sarif_file: snyk.sarif
+          args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
 
       - name: Install cosign
         if: |
@@ -665,7 +655,7 @@ jobs:
           ref: ${{ needs.buildx.outputs.commit }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -775,13 +765,13 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: Setting up KinD cluster
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
         with:
           wait: "600s"
           version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false

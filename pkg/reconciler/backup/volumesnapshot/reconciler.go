@@ -88,6 +88,13 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupNameLabelName] = backup.Name
 	vs.Labels[utils.MajorVersionLabelName] = strconv.Itoa(backup.Status.MajorVersion)
 
+	// Common labels
+	vs.Labels[utils.KubernetesAppManagedByLabelName] = utils.ManagerName
+	vs.Labels[utils.KubernetesAppLabelName] = utils.AppName
+	vs.Labels[utils.KubernetesAppInstanceLabelName] = cluster.Name
+	vs.Labels[utils.KubernetesAppVersionLabelName] = fmt.Sprint(backup.Status.MajorVersion)
+	vs.Labels[utils.KubernetesAppComponentLabelName] = utils.DatabaseComponentName
+
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
 		cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
@@ -509,6 +516,7 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 	labelsToBeTransferred := []string{
 		utils.InstanceNameLabelName,
 		utils.ClusterInstanceRoleLabelName,
+		//nolint:staticcheck // still in use for backward compatibility
 		utils.ClusterRoleLabelName,
 		utils.PvcRoleLabelName,
 	}

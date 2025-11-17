@@ -104,6 +104,27 @@ This label is available only on `VolumeSnapshot` resources.
 `cnpg.io/instanceRole`
 : Whether the instance running in a pod is a `primary` or a `replica`.
 
+`app.kubernetes.io/managed-by`
+: Name of the manager. It will always be `cloudnative-pg`.
+  Available across all CloudNativePG managed resources.
+
+`app.kubernetes.io/name`
+: Name of the application. It will always be `postgresql`.
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/component`
+: Name of the component (`database`, `pooler`, ...).
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/instance`
+: Name of the owning `Cluster` resource.
+  Available on pods, jobs, deployments, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/version`
+: Major version of PostgreSQL.
+  Available on pods, jobs, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 ## Predefined annotations
 

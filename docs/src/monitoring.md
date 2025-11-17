@@ -18,7 +18,7 @@ more `ConfigMap` or `Secret` resources (see the
 
 !!! Important
     CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
-    in a `ConfigMap` named `default-monitoring`.
+    in a `ConfigMap` named `cnpg-default-monitoring`.
 
 !!! Info
     You can inspect the exported metrics by following the instructions in
@@ -54,6 +54,20 @@ by specifying a list of one or more databases in the `target_databases` option.
     If you are interested in evaluating the integration of CloudNativePG
     with Prometheus and Grafana, you can find a quick setup guide
     in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
+
+### Output caching
+
+By default, the outputs of monitoring queries are cached for thirty
+seconds. This is done to enhance resource efficiency and to avoid
+PostgreSQL to run monitoring queries every time the prometheus
+endpoint is scraped.
+
+The cache itself can be observed by the `cache_hits`, `cache_misses`
+and `last_update_timestamp` metrics.
+
+Setting the `cluster.spec.monitoring.metricsQueriesTTL` to zero will
+disable the cache, and in that case the metrics will be run on every
+metrics endpoint scrape.
 
 ### Monitoring with the Prometheus operator
 
@@ -757,6 +771,78 @@ spec:
   podMetricsEndpoints:
     - port: metrics
 EOF
+```
+
+### Enabling TLS for operator metrics
+
+By default, the operator exposes its metrics over HTTP on port `8080`.
+To secure this endpoint with TLS, follow these steps:
+
+1. Create a Kubernetes Secret containing the TLS certificate (`tls.crt`) and
+   private key (`tls.key`).
+2. Mount the Secret into the operator Pod.
+3. Set the `METRICS_CERT_DIR` environment variable to point to the directory
+   where the certificates are mounted.
+
+Example `Secret` definition:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cnpg-metrics-cert
+  namespace: cnpg-system
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64-encoded-certificate>
+  tls.key: <base64-encoded-key>
+```
+
+Next, update the operator deployment to mount the secret and configure the
+environment variable:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+        - name: METRICS_CERT_DIR
+          value: /run/secrets/cnpg.io/metrics
+        volumeMounts:
+        - mountPath: /run/secrets/cnpg.io/metrics
+          name: metrics-certificates
+          readOnly: true
+      volumes:
+      - name: metrics-certificates
+        secret:
+          secretName: cnpg-metrics-cert
+          defaultMode: 420
+```
+
+!!! Note
+    When `METRICS_CERT_DIR` is set, the operator automatically enables TLS for
+    the metrics server. You must also update your PodMonitor configuration to
+    use the `https` scheme.
+
+Example `PodMonitor` configuration with TLS enabled:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-controller-manager
+  namespace: cnpg-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  podMetricsEndpoints:
+    - port: metrics
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true  # or configure proper CA validation
 ```
 
 ## How to inspect the exported metrics

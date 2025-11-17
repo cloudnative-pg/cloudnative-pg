@@ -103,7 +103,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			Expect(err).NotTo(HaveOccurred())
 			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
-				Size:         "1G",
+				Size:         "1Gi",
 				StorageClass: &WalStorageClass,
 			}
 			return env.Client.Update(env.Ctx, cluster)

@@ -1,10 +1,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: pooler-connection-tls-ro
+  name: pooler-ro
 spec:
   cluster:
-    name: pgbouncer-separate-client-server-ca
+    name: cluster-user-supplied-certificates
 
   instances: 1
   type: ro

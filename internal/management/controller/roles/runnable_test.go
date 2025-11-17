@@ -31,6 +31,7 @@ import (
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -576,8 +577,11 @@ const (
 	secretNameNoPass   = "vinci-secret-no-pass"
 	secretNameNotExist = "vinci-secret-name-not-exist"
 	userNameNotExist   = "vinci-not-exist"
-	userName           = "vinci"
-	password           = "vinci1234"
+)
+
+var (
+	userName = rand.String(12)
+	password = rand.String(12)
 )
 
 var _ = DescribeTable("role secrets test",

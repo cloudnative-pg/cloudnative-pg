@@ -49,18 +49,31 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		}
 	}
 
-	if cluster := resources.Cluster; cluster != nil {
-		updatedStatus.Secrets.ServerTLS = apiv1.SecretVersion{
-			Name:    cluster.GetServerTLSSecretName(),
-			Version: cluster.Status.SecretsResourceVersion.ServerSecretVersion,
-		}
+	if resources.ServerCASecret != nil {
 		updatedStatus.Secrets.ServerCA = apiv1.SecretVersion{
-			Name:    cluster.GetServerCASecretName(),
-			Version: cluster.Status.SecretsResourceVersion.ServerCASecretVersion,
+			Name:    resources.ServerCASecret.Name,
+			Version: resources.ServerCASecret.ResourceVersion,
 		}
+	}
+
+	if resources.ClientCASecret != nil {
 		updatedStatus.Secrets.ClientCA = apiv1.SecretVersion{
-			Name:    cluster.GetClientCASecretName(),
-			Version: cluster.Status.SecretsResourceVersion.ClientCASecretVersion,
+			Name:    resources.ClientCASecret.Name,
+			Version: resources.ClientCASecret.ResourceVersion,
+		}
+	}
+
+	if resources.ClientTLSSecret != nil {
+		updatedStatus.Secrets.ClientTLS = apiv1.SecretVersion{
+			Name:    resources.ClientTLSSecret.Name,
+			Version: resources.ClientTLSSecret.ResourceVersion,
+		}
+	}
+
+	if resources.ServerTLSSecret != nil {
+		updatedStatus.Secrets.ServerTLS = apiv1.SecretVersion{
+			Name:    resources.ServerTLSSecret.Name,
+			Version: resources.ServerTLSSecret.ResourceVersion,
 		}
 	}
 

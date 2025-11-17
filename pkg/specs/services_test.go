@@ -33,9 +33,12 @@ import (
 )
 
 var _ = Describe("Services specification", func() {
-	postgresql := apiv1.Cluster{
+	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clustername",
+			Name: "clusterName",
+		},
+		Spec: apiv1.ClusterSpec{
+			ImageName: "postgres:18.0",
 		},
 	}
 	expectedPort := corev1.ServicePort{
@@ -45,44 +48,50 @@ var _ = Describe("Services specification", func() {
 		Port:       postgres.ServerPort,
 	}
 
-	It("create a configured -any service", func() {
-		service := CreateClusterAnyService(postgresql)
-		Expect(service.Name).To(Equal("clustername-any"))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
+	// shared expected labels
+	expectedLabels := map[string]string{
+		utils.ClusterLabelName:                cluster.Name,
+		utils.KubernetesAppLabelName:          utils.AppName,
+		utils.KubernetesAppInstanceLabelName:  cluster.Name,
+		utils.KubernetesAppVersionLabelName:   "18",
+		utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+		utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+	}
+
+	// helper to assert common service properties
+	assertService := func(
+		service *corev1.Service,
+		expectedName string,
+		publishNotReady bool,
+		selectorKey, selectorValue string,
+	) {
+		Expect(service.Name).To(Equal(expectedName))
+		Expect(service.Labels).To(BeEquivalentTo(expectedLabels))
+		Expect(service.Spec.PublishNotReadyAddresses).To(Equal(publishNotReady))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal(cluster.Name))
+		Expect(service.Spec.Selector[selectorKey]).To(Equal(selectorValue))
 		Expect(service.Spec.Ports).To(HaveLen(1))
 		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+	}
+
+	It("create a configured -any service", func() {
+		service := CreateClusterAnyService(cluster)
+		assertService(service, cluster.Name+"-any", true, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -r service", func() {
-		service := CreateClusterReadService(postgresql)
-		Expect(service.Name).To(Equal("clustername-r"))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		service := CreateClusterReadService(cluster)
+		assertService(service, cluster.Name+"-r", false, utils.PodRoleLabelName, string(utils.PodRoleInstance))
 	})
 
 	It("create a configured -ro service", func() {
-		service := CreateClusterReadOnlyService(postgresql)
-		Expect(service.Name).To(Equal("clustername-ro"))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		service := CreateClusterReadOnlyService(cluster)
+		assertService(service, cluster.Name+"-ro", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelReplica)
 	})
 
 	It("create a configured -rw service", func() {
-		service := CreateClusterReadWriteService(postgresql)
-		Expect(service.Name).To(Equal("clustername-rw"))
-		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
-		Expect(service.Spec.Ports).To(HaveLen(1))
-		Expect(service.Spec.Ports).To(ContainElement(expectedPort))
+		service := CreateClusterReadWriteService(cluster)
+		assertService(service, cluster.Name+"-rw", false, utils.ClusterInstanceRoleLabelName, ClusterRoleLabelPrimary)
 	})
 })
 
@@ -152,6 +161,7 @@ var _ = Describe("BuildManagedServices", func() {
 			Expect(services).NotTo(BeNil())
 			Expect(services).To(HaveLen(1))
 			Expect(services[0].ObjectMeta.Name).To(Equal("test-service"))
+			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.IsManagedLabelName, "true"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue("test-label", "test-value"))
 			Expect(services[0].ObjectMeta.Annotations).To(HaveKeyWithValue("test-annotation", "test-value"))

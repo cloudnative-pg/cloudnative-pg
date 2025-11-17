@@ -11,7 +11,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.3"
+  GOLANG_VERSION: "1.25.4"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -75,7 +75,7 @@ jobs:
             /src/docs/src/${{ env.FILE }}
       -
         name: Release
-        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2
         with:
           body_path: release_notes.md
           draft: false
@@ -183,7 +183,7 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
@@ -257,7 +257,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 

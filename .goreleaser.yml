@@ -125,7 +125,7 @@ changelog:
   disable: true
 
 signs:
-  - artifacts: checksum
+  - artifacts: all
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
 krews:
