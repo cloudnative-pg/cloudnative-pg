@@ -66,9 +66,9 @@ if notinpath "${go_bin}"; then
   export PATH="${go_bin}:${PATH}"
 fi
 
-if ! which ginkgo &>/dev/null; then
-  go install github.com/onsi/ginkgo/v2/ginkgo
-fi
+# renovate: datasource=github-releases depName=onsi/ginkgo
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.2
+
 
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
