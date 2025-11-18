@@ -1,6 +1,6 @@
 ---
 id: postgresql_conf
-sidebar_position: 23
+sidebar_position: 220
 title: PostgreSQL Configuration
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: bootstrap
-sidebar_position: 9
+sidebar_position: 80
 title: Bootstrap
 ---
 

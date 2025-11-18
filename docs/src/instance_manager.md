@@ -1,6 +1,6 @@
 ---
 id: instance_manager
-sidebar_position: 12
+sidebar_position: 110
 title: Instance Manager
 ---
 

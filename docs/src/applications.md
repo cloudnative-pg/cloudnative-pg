@@ -1,6 +1,6 @@
 ---
 id: applications
-sidebar_position: 35
+sidebar_position: 340
 title: Connecting from an Application
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: wal_archiving
-sidebar_position: 20
+sidebar_position: 190
 title: WAL Archiving
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: operator_conf
-sidebar_position: 27
+sidebar_position: 260
 title: Operator Configuration
 ---
 

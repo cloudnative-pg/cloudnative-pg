@@ -1,6 +1,6 @@
 ---
 id: logical_replication
-sidebar_position: 18
+sidebar_position: 170
 title: Logical Replication
 ---
 

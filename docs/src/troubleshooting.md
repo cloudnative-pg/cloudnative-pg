@@ -1,6 +1,6 @@
 ---
 id: troubleshooting
-sidebar_position: 42
+sidebar_position: 410
 title: Troubleshooting
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: postgres_upgrades
-sidebar_position: 39
+sidebar_position: 380
 title: PostgreSQL Upgrades
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: ssl_connections
-sidebar_position: 34
+sidebar_position: 330
 title: Client TLS/SSL connections
 ---
 

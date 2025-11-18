@@ -1,6 +1,6 @@
 ---
 id: labels_annotations
-sidebar_position: 30
+sidebar_position: 290
 title: Labels and Annotations
 ---
 

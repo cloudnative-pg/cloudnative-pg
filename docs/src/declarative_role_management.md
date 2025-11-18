@@ -1,6 +1,6 @@
 ---
 id: declarative_role_management
-sidebar_position: 24
+sidebar_position: 230
 title: PostgreSQL Role Management
 ---
 

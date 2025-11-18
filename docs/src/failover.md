@@ -1,6 +1,6 @@
 ---
 id: failover
-sidebar_position: 41
+sidebar_position: 400
 title: Automated failover
 ---
 

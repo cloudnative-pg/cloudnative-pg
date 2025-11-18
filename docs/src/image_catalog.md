@@ -1,6 +1,6 @@
 ---
 id: image_catalog
-sidebar_position: 8
+sidebar_position: 70
 title: Image Catalog
 ---
 

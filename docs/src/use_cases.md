@@ -1,6 +1,6 @@
 ---
 id: use_cases
-sidebar_position: 4
+sidebar_position: 30
 title: Use Cases
 ---
 
