@@ -1540,7 +1540,7 @@ jobs:
           if [ -n "${CLOUDFORMATION_STATUS_CURRENT}" ] ; then
             echo "::warning file=continuous-delivery.yml::eksctl failed deleting a cluster cleanly"
             # When the status of CloudFormation stack managed by eksctl reports an error, try to delete resources directly with AWS CLI
-            pip install boto3
+            pip install .github/workflow-requirements.txt
             for vpc_id in $(aws ec2 describe-vpcs | jq -r '.Vpcs[] | select(.Tags?[]? | .Key == "Name" and (.Value | contains("'"${STACK_NAME}"'"))).VpcId'); do
               python .github/vpc_destroy.py --vpc_id "${vpc_id}" --region "${REGION_NAME}" --services ec2
             done
