@@ -1,7 +1,7 @@
 ---
 id: index
 sidebar_position: 10
-title: Index
+title: CloudNativePG
 ---
 
 # CloudNativePG
