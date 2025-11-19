@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install packaging==25.0
+          pip install -r .github/workflow-requirements.txt
 
       - name: Generate PostgreSQL JSON files
         run: |

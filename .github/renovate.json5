@@ -30,6 +30,17 @@
     'do not backport',
     'no-issue',
   ],
+  'pip-compile': {
+    managerFilePatterns: [
+      '/(^|/)workflow-requirements\\.txt$/',
+    ],
+  },
+  pip_requirements: {
+    enabled: false,
+  },
+  pip_setup: {
+    enabled: false,
+  },
   customManagers: [
     {
       customType: 'regex',
