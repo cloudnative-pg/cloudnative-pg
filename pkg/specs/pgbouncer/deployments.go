@@ -40,11 +40,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
-const (
-	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.24.1"
-)
-
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
@@ -80,7 +75,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			},
 		}).
 		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
-		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
+		WithContainerImage("pgbouncer", config.Current.PgbouncerImageName, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
 			"pgbouncer",
