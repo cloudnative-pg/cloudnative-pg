@@ -108,6 +108,10 @@ type Data struct {
 	// used by default for new clusters
 	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
 
+	// PgbouncerImageName is the name of the image of PgBouncer that is
+	// used by default for new poolers
+	PgbouncerImageName string `json:"pgbouncerImageName" env:"PGBOUNCER_IMAGE_NAME"`
+
 	// InheritedAnnotations is a list of annotations that every resource could inherit from
 	// the owning Cluster
 	InheritedAnnotations []string `json:"inheritedAnnotations" env:"INHERITED_ANNOTATIONS"`
@@ -180,6 +184,7 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName:  DefaultOperatorPullSecretName,
 		OperatorImageName:       versions.DefaultOperatorImageName,
 		PostgresImageName:       versions.DefaultImageName,
+		PgbouncerImageName:      versions.DefaultPgbouncerImage,
 		PluginSocketDir:         DefaultPluginSocketDir,
 		CreateAnyService:        false,
 		CertificateDuration:     CertificateDuration,

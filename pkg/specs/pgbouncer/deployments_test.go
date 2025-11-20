@@ -120,7 +120,7 @@ var _ = Describe("Deployment", func() {
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())
 		Expect(podTemplate.Spec.Containers[0].Name).To(Equal("pgbouncer"))
-		Expect(podTemplate.Spec.Containers[0].Image).To(Equal(DefaultPgbouncerImage))
+		Expect(podTemplate.Spec.Containers[0].Image).To(Equal(config.Current.PgbouncerImageName))
 	})
 
 	It("sets the correct number of replicas", func() {
