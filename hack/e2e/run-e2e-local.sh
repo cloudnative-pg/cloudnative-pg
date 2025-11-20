@@ -54,10 +54,15 @@ function get_postgres_image() {
   grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
 }
 
+function get_pgbouncer_image() {
+  grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
+}
+
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
 export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
 export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-$(get_default_snapshot_class "$E2E_CSI_STORAGE_CLASS")}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
+export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(get_pgbouncer_image)}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 
 # Ensure GOBIN is in path, we'll use this to install and execute ginkgo
