@@ -20,7 +20,6 @@
     'contribute/**',
     'licenses/**',
     'pkg/versions/**',
-    'pkg/specs/pgbouncer/',
   ],
   postUpdateOptions: [
     'gomodTidy',
