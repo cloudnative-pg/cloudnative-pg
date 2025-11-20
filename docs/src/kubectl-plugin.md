@@ -360,6 +360,13 @@ also view PostgreSQL configuration, HBA settings, and certificates.
 
 The command also supports output in `yaml` and `json` format.
 
+!!! Note
+    The `status` command executes operations that access the pod filesystem,
+    such as `du` to calculate cluster size and `cat` to read configuration files.
+    For clusters with large data volumes (e.g., over 1TB), these operations may
+    take longer than the default timeout of 10 seconds. You can adjust the timeout
+    using the `--timeout` flag (e.g., `kubectl cnpg status sandbox --timeout 45s`).
+
 ### Promote
 
 The meaning of this command is to `promote` a pod in the cluster to primary, so you
