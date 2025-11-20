@@ -109,7 +109,7 @@ type Data struct {
 	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
 
 	// PgbouncerImageName is the name of the image of PgBouncer that is
-	// used by default for new clusters
+	// used by default for new poolers
 	PgbouncerImageName string `json:"pgbouncerImageName" env:"PGBOUNCER_IMAGE_NAME"`
 
 	// InheritedAnnotations is a list of annotations that every resource could inherit from
