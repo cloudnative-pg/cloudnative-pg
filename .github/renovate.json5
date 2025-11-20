@@ -19,7 +19,6 @@
     'contribute/**',
     'licenses/**',
     'pkg/versions/**',
-    'pkg/specs/pgbouncer/',
   ],
   postUpdateOptions: [
     'gomodTidy',
@@ -89,7 +88,6 @@
       customType: 'regex',
       managerFilePatterns: [
         '/^pkg\\/versions\\/versions\\.go$/',
-        '/^pkg\\/specs\\/pgbouncer\\/deployments\\.go$/',
       ],
       matchStrings: [
         'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
