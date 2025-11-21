@@ -250,6 +250,11 @@ const (
 	// port the plugin is listening to
 	PluginPortAnnotationName = MetadataNamespace + "/pluginPort"
 
+	// PluginServerNameAnnotationName is the name of the annotation containing the
+	// server name to use for TLS verification when connecting to the plugin.
+	// If not specified, defaults to the service name
+	PluginServerNameAnnotationName = MetadataNamespace + "/pluginServerName"
+
 	// WebhookValidationAnnotationName is the name of the annotation describing if
 	// the validation webhook should be enabled or disabled
 	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
