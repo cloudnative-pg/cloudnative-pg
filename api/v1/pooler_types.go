@@ -97,6 +97,10 @@ type PoolerSpec struct {
 	// Template for the Service to be created
 	// +optional
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
+
+	// Template for the Service account to be created
+	// +optional
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 }
 
 // PoolerMonitoringConfiguration is the type containing all the monitoring
