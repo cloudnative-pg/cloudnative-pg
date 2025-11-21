@@ -1,2 +1,2 @@
-boto3==1.41.0
+boto3==1.41.1
 packaging==25.0
