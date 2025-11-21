@@ -191,7 +191,7 @@ func (r *PoolerReconciler) updateRBAC(
 		}
 	}
 
-	roleBinding := pgbouncer.RoleBinding(pooler)
+	roleBinding := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 	if resources.RoleBinding == nil {
 		if err := ctrl.SetControllerReference(pooler, &roleBinding, r.Scheme); err != nil {
 			return err
