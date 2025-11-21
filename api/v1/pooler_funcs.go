@@ -114,3 +114,11 @@ func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
 
 	return *in.Spec.Template.Spec.Resources
 }
+
+// GetServiceAccount returns service account belogs to cluster
+func (in *Pooler) GetServiceAccountName() string {
+	if in.Spec.ServiceAccountName != nil {
+		return *in.Spec.ServiceAccountName
+	}
+	return in.ObjectMeta.Name
+}
