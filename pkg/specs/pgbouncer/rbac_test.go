@@ -69,7 +69,7 @@ var _ = Describe("Pooler ServiceAccount, Role, and RoleBinding", func() {
 
 	Context("when creating a RoleBinding", func() {
 		It("returns the correct RoleBinding", func() {
-			roleBinding := RoleBinding(pooler)
+			roleBinding := RoleBinding(pooler, pooler.GetServiceAccountName())
 			Expect(roleBinding.Name).To(Equal(pooler.Name))
 			Expect(roleBinding.Namespace).To(Equal(pooler.Namespace))
 		})
