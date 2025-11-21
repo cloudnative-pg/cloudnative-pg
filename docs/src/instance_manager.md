@@ -1,7 +1,7 @@
 ---
 id: instance_manager
 sidebar_position: 110
-title: Instance Manager
+title: Postgres Instance Manager
 ---
 
 # Postgres instance manager

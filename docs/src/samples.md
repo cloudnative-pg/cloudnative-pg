@@ -1,7 +1,7 @@
 ---
 id: samples
 sidebar_position: 510
-title: Samples
+title: Examples
 ---
 
 # Examples

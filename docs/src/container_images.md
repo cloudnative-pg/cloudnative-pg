@@ -1,7 +1,7 @@
 ---
 id: container_images
 sidebar_position: 460
-title: Container Images
+title: Container Image Requirements
 ---
 
 # Container Image Requirements
