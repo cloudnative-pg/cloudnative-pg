@@ -37,7 +37,7 @@ var _ = Describe("Role binding", func() {
 	}
 
 	It("is created with the same name as the cluster", func() {
-		roleBinding := CreateRoleBinding(cluster.ObjectMeta)
+		roleBinding := CreateRoleBinding(cluster.ObjectMeta, cluster.GetServiceAccountName())
 		Expect(roleBinding.Name).To(Equal(cluster.Name))
 		Expect(roleBinding.Namespace).To(Equal(cluster.Namespace))
 	})
