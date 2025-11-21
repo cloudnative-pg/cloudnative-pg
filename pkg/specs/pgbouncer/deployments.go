@@ -24,6 +24,7 @@ package pgbouncer
 import (
 	"path"
 
+	"github.com/cloudnative-pg/machinery/pkg/hash"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 // Deployment create the deployment of pgbouncer, given
