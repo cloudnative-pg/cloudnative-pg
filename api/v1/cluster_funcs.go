@@ -1589,3 +1589,11 @@ func (cluster *Cluster) GetPodSelectorIPs() map[string][]string {
 	}
 	return result
 }
+
+// GetServiceAccountName returns the name of the ServiceAccount for this cluster.
+func (cluster *Cluster) GetServiceAccountName() string {
+	if cluster.Spec.ServiceAccountName != "" {
+		return cluster.Spec.ServiceAccountName
+	}
+	return cluster.Name
+}
