@@ -403,6 +403,9 @@ spec:
                     - name
                     type: object
                 type: object
+              serviceAccountName:
+                description: Template for the Service account to be created
+                type: string
               serviceTemplate:
                 description: Template for the Service to be created
                 properties:
