@@ -98,7 +98,11 @@ type PoolerSpec struct {
 	// +optional
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 
-	// Template for the Service account to be created
+	// Name of an existing ServiceAccount to use for the cluster.
+	// When specified, the operator will not create a new ServiceAccount
+	// but will use the provided one. This is useful for sharing a single
+	// ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).
+	// If not specified, a ServiceAccount will be created with the cluster name.
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 }
