@@ -5,11 +5,12 @@
 for PostgreSQL that introduces support for storing GIS (Geographic Information
 Systems) objects in the database and be queried via SQL.
 
-!!! Important
+:::info[Important]
     This section assumes you are familiar with PostGIS and provides some basic
     information about how to create a new PostgreSQL cluster with a PostGIS database
     in Kubernetes via CloudNativePG.
 
+:::
 The CloudNativePG Community maintains container images that are built on top
 of the maintained [PostgreSQL Container images](https://github.com/cloudnative-pg/postgres-containers).
 For more information, please visit:
@@ -40,11 +41,12 @@ do this in two ways:
   databases you end up creating in the cluster, in case you adopt the monolith
   architecture where the instance is shared by multiple databases
 
-!!! Info
+:::info
     For more information on the microservice vs monolith architecture in the database,
     please refer to the ["How many databases should be hosted in a single PostgreSQL instance?" FAQ](faq.md)
     or the ["Database import" section](database_import.md).
 
+:::
 ## Create a new PostgreSQL cluster with PostGIS
 
 Let's suppose you want to create a new PostgreSQL 18 cluster with PostGIS 3.6.
@@ -56,7 +58,7 @@ resource.
 The [`postgis-example.yaml` manifest](samples/postgis-example.yaml) below
 provides some guidance on how the creation of a PostGIS cluster can be done.
 
-!!! Warning
+:::warning
     Please consider that, although convention over configuration applies in
     CloudNativePG, you should spend time configuring and tuning your system for
     production. Also, the `imageName` in the example below deliberately points
@@ -65,6 +67,7 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
     Alternatively, use the provided [image catalogs](https://github.com/cloudnative-pg/postgis-containers?tab=readme-ov-file#image-catalogs).
 
 
+:::
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -98,10 +101,11 @@ spec:
 The example leverages the `Database` resource's declarative extension
 management to add the specified extensions to the `app` database.
 
-!!! Info
+:::info
     For more details, see the
     ["Managing Extensions in a Database" section](declarative_database_management.md#managing-extensions-in-a-database).
 
+:::
 You can easily verify the available version of PostGIS that is in the
 container, by connecting to the `app` database (you might obtain different
 values from the ones in this document):

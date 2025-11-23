@@ -84,10 +84,11 @@ Running a plugin as its own Deployment decouples its lifecycle from the
 operator’s and allows independent scaling. In this setup, the plugin exposes a
 TCP gRPC endpoint behind a Service, with **mTLS** for secure communication.
 
-!!! Warning
+:::warning
     CloudNativePG does **not** discover plugins dynamically. If you deploy a new
     plugin, you must **restart the operator** to detect it.
 
+:::
 Example Deployment:
 
 ```yaml
@@ -158,10 +159,11 @@ spec:
     [...]
 ```
 
-!!! Note
+:::note
     You can provide your own certificate bundles, but the recommended method is
     to use [Cert-manager](https://cert-manager.io).
 
+:::
 #### Customizing the Certificate DNS Name
 
 By default, CloudNativePG uses the Service name as the server name for TLS

@@ -35,11 +35,12 @@ CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
 released open source under Apache License 2.0.
 The [source code repository is in GitHub](https://github.com/cloudnative-pg/cloudnative-pg).
 
-!!! Note
+:::note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     users can expect a "Level V - Auto Pilot" subset of capabilities from the
     CloudNativePG Operator.
 
+:::
 ## Supported Kubernetes distributions
 
 Each minor release of CloudNativePG is designed to work with a range of
@@ -85,12 +86,13 @@ Three image flavors are available, each extending the previous one:
 - [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
 - [`system`](https://github.com/cloudnative-pg/postgres-containers#system-images) *(deprecated)*
 
-!!! Important
+:::info[Important]
     The `system` images are deprecated and will be removed once in-core
     Barman Cloud support is phased out. They remain usable for now, but you may
     want to plan a future migration to `minimal` or `standard` images with the
     Barman Cloud plugin, or another supported backup solution.
 
+:::
 By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
@@ -173,11 +175,12 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Multi-arch container images, including Software Bill of Materials (SBOM) and
   provenance attestations for security compliance.
 
-!!! Info
+:::info
     CloudNativePG does not use `StatefulSet`s for managing data persistence.
     Instead, it directly manages Persistent Volume Claims (PVCs).
     See ["Custom Pod Controller"](controller.md) for more details.
 
+:::
 ## About this guide
 
 Follow the instructions in the ["Quickstart"](quickstart.md) to test
