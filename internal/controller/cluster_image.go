@@ -165,7 +165,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Error getting %v/%v: %v",
 			catalogKind, catalogName, err)
 		contextLogger.Error(err, "while getting imageCatalog",
-			"catalogKind", catalogKind, "catalogName", catalogName, "error", err)
+			"catalogKind", catalogKind, "catalogName", catalogName)
 		return apiv1.ImageInfo{}, err
 	}
 
