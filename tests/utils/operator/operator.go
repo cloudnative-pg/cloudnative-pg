@@ -153,7 +153,7 @@ func GetPod(ctx context.Context, crudClient client.Client) (corev1.Pod, error) {
 		return corev1.Pod{}, err
 	}
 
-	return podList.Items[0], nil
+	return activePods[0], nil
 }
 
 // NamespaceName returns the namespace the operator Deployment is running in
