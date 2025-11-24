@@ -310,7 +310,25 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 					DatabaseName: dbname,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				Eventually(func(g Gomega) int {
+					row, err := postgres.RunQueryRowOverForward(
+						env.Ctx,
+						env.Client,
+						env.Interface,
+						env.RestClientConfig,
+						tableLocator.Namespace,
+						tableLocator.ClusterName,
+						tableLocator.DatabaseName,
+						apiv1.ApplicationUserSecretSuffix,
+						fmt.Sprintf("SELECT COUNT(*) FROM %s", tableLocator.TableName),
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					var nRows int
+					err = row.Scan(&nRows)
+					g.Expect(err).ToNot(HaveOccurred())
+					return nRows
+				}, 300).Should(BeEquivalentTo(2))
 			})
 
 			By("removing the objects", func() {
