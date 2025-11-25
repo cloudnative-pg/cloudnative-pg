@@ -168,7 +168,7 @@ recovery_target_timeline = 'latest'
 
 The [`STANDBY_TCP_USER_TIMEOUT` operator configuration setting](operator_conf.md#available-options),
 if specified, sets the `tcp_user_timeout` parameter on all standby instances
-managed by the operator.
+managed by the operator. The default value is 10000 (10 seconds).
 
 The `tcp_user_timeout` parameter determines how long transmitted data can
 remain unacknowledged before the TCP connection is forcibly closed. Adjusting

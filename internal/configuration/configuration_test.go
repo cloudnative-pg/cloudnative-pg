@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package configuration
 
 import (
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -169,5 +170,26 @@ var _ = Describe("Annotation and label inheritance", func() {
 	It("returns zero as default delay for instances rollout when not set", func() {
 		config := Data{}
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
+	})
+})
+
+var _ = Describe("Configuration Defaults", func() {
+	AfterEach(func() {
+		err := os.Unsetenv("STANDBY_TCP_USER_TIMEOUT")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should have StandbyTCPUserTimeout default to 10000", func() {
+		config := newDefaultConfig()
+		Expect(config.StandbyTCPUserTimeout).To(Equal(10000))
+	})
+
+	It("should correctly parse ConfigMap with STANDBY_TCP_USER_TIMEOUT set to 0", func() {
+		config := newDefaultConfig()
+		Expect(config.StandbyTCPUserTimeout).To(Equal(10000))
+		err := os.Setenv("STANDBY_TCP_USER_TIMEOUT", "0")
+		Expect(err).NotTo(HaveOccurred())
+		config.ReadConfigMap(nil)
+		Expect(config.StandbyTCPUserTimeout).To(Equal(0))
 	})
 })
