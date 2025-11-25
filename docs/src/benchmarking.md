@@ -1,3 +1,9 @@
+---
+id: benchmarking
+sidebar_position: 530
+title: Benchmarking
+---
+
 # Benchmarking
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

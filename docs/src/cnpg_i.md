@@ -1,3 +1,9 @@
+---
+id: cnpg_i
+sidebar_position: 480
+title: CNPG-I
+---
+
 # CNPG-I
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

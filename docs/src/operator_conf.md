@@ -1,3 +1,9 @@
+---
+id: operator_conf
+sidebar_position: 260
+title: Operator configuration
+---
+
 # Operator configuration
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
