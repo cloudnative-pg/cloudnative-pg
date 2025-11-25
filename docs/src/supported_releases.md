@@ -1,3 +1,9 @@
+---
+id: supported_releases
+sidebar_position: 560
+title: Supported releases
+---
+
 # Supported releases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

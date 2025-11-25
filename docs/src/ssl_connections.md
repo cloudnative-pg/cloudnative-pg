@@ -1,3 +1,9 @@
+---
+id: ssl_connections
+sidebar_position: 330
+title: Client TLS/SSL connections
+---
+
 # Client TLS/SSL connections
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,3 +1,9 @@
+---
+id: storage
+sidebar_position: 280
+title: Storage
+---
+
 # Storage
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

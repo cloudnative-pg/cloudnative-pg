@@ -1,3 +1,8 @@
+---
+id: backup_barmanobjectstore
+title: Backup on object stores
+---
+
 # Backup on object stores
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

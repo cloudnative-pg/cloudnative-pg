@@ -1,3 +1,9 @@
+---
+id: bootstrap
+sidebar_position: 80
+title: Bootstrap
+---
+
 # Bootstrap
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,3 +1,9 @@
+---
+id: security
+sidebar_position: 100
+title: Security
+---
+
 # Security
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,4 +1,10 @@
-# Instance pod configuration
+---
+id: cluster_conf
+sidebar_position: 270
+title: Instance Pod configuration
+---
+
+# Instance Pod configuration
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 ## Projected volumes
