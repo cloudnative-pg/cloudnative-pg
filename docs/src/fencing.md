@@ -1,3 +1,9 @@
+---
+id: fencing
+sidebar_position: 420
+title: Fencing
+---
+
 # Fencing
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

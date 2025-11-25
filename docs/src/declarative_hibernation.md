@@ -1,3 +1,9 @@
+---
+id: declarative_hibernation
+sidebar_position: 430
+title: Declarative hibernation
+---
+
 # Declarative hibernation
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
