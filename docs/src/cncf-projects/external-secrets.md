@@ -1,3 +1,8 @@
+---
+id: external-secrets
+title: External Secrets
+---
+
 # External Secrets
 
 [External Secrets](https://external-secrets.io/latest/) is a CNCF Sandbox

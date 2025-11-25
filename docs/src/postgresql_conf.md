@@ -1,3 +1,9 @@
+---
+id: postgresql_conf
+sidebar_position: 220
+title: PostgreSQL Configuration
+---
+
 # PostgreSQL Configuration
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

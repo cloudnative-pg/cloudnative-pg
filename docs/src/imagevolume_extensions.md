@@ -1,3 +1,9 @@
+---
+id: imagevolume_extensions
+sidebar_position: 470
+title: Image Volume Extensions
+---
+
 # Image Volume Extensions
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

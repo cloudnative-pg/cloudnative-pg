@@ -1,3 +1,9 @@
+---
+id: kubectl-plugin
+sidebar_position: 390
+title: Kubectl Plugin
+---
+
 # Kubectl Plugin
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

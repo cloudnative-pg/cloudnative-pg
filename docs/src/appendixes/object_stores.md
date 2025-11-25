@@ -1,3 +1,8 @@
+---
+id: object_stores
+title: Appendix C - Common object stores for backups
+---
+
 # Appendix C - Common object stores for backups
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
