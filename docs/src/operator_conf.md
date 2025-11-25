@@ -1,7 +1,7 @@
 ---
 id: operator_conf
 sidebar_position: 260
-title: Operator Configuration
+title: Operator configuration
 ---
 
 # Operator configuration

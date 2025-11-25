@@ -1,7 +1,7 @@
 ---
 id: wal_archiving
 sidebar_position: 190
-title: WAL Archiving
+title: WAL archiving
 ---
 
 # WAL archiving

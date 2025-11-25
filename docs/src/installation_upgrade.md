@@ -1,7 +1,7 @@
 ---
 id: installation_upgrade
 sidebar_position: 50
-title: Installation and Upgrade
+title: Installation and upgrades
 ---
 
 # Installation and upgrades

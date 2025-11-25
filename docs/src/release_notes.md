@@ -1,7 +1,7 @@
 ---
 id: release_notes
 sidebar_position: 580
-title: Release Notes
+title: Release notes
 ---
 
 # Release notes

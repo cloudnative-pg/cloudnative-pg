@@ -1,10 +1,10 @@
 ---
 id: before_you_start
 sidebar_position: 20
-title: Before You Start
+title: Before you start
 ---
 
-# Before You Start
+# Before you start
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Before we get started, it is essential to go over some terminology that is

@@ -1,10 +1,10 @@
 ---
 id: rolling_update
 sidebar_position: 150
-title: Rolling Updates
+title: Rolling updates
 ---
 
-# Rolling Updates
+# Rolling updates
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 The operator allows you to change the PostgreSQL version used in a cluster

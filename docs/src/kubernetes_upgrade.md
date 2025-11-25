@@ -1,10 +1,10 @@
 ---
 id: kubernetes_upgrade
 sidebar_position: 370
-title: Kubernetes Upgrade and Maintenance
+title: Kubernetes upgrade and maintenance
 ---
 
-# Kubernetes Upgrade and Maintenance
+# Kubernetes upgrade and maintenance
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Maintaining an up-to-date Kubernetes cluster is crucial for ensuring optimal

@@ -1,10 +1,10 @@
 ---
 id: postgres_upgrades
 sidebar_position: 380
-title: PostgreSQL Upgrades
+title: PostgreSQL upgrades
 ---
 
-# PostgreSQL Upgrades
+# PostgreSQL upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 PostgreSQL upgrades fall into two categories:

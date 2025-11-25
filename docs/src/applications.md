@@ -1,7 +1,7 @@
 ---
 id: applications
 sidebar_position: 340
-title: Connecting from an Application
+title: Connecting from an application
 ---
 
 # Connecting from an application

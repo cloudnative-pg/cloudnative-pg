@@ -1,7 +1,7 @@
 ---
 id: replica_cluster
 sidebar_position: 360
-title: Replica Clusters
+title: Replica clusters
 ---
 
 # Replica clusters

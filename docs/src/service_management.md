@@ -1,10 +1,10 @@
 ---
 id: service_management
 sidebar_position: 210
-title: Service Management
+title: Service management
 ---
 
-# Service Management
+# Service management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 A PostgreSQL cluster should only be accessed via standard Kubernetes network

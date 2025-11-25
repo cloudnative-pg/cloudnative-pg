@@ -1,7 +1,7 @@
 ---
 id: operator_capability_levels
 sidebar_position: 490
-title: Operator Capability Levels
+title: Operator capability levels
 ---
 
 # Operator capability levels

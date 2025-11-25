@@ -1,7 +1,7 @@
 ---
 id: use_cases
 sidebar_position: 30
-title: Use Cases
+title: Use cases
 ---
 
 # Use cases

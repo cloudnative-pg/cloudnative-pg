@@ -4,7 +4,7 @@ sidebar_position: 290
 title: Labels and Annotations
 ---
 
-# Labels and annotations
+# Labels and Annotations
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Resources in Kubernetes are organized in a flat structure, with no hierarchical

@@ -1,10 +1,10 @@
 ---
 id: declarative_role_management
 sidebar_position: 230
-title: PostgreSQL Role Management
+title: PostgreSQL Role management
 ---
 
-# PostgreSQL Role Management
+# PostgreSQL Role management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 From its inception, CloudNativePG has managed the creation of specific roles
