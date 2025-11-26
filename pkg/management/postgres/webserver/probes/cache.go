@@ -30,6 +30,7 @@ import (
 
 // clusterCache provides a resilient way to fetch cluster definitions with caching
 // to handle transient API server connectivity issues
+// Note: This cache is not thread-safe and should be used by a single probe executor.
 type clusterCache struct {
 	cli     client.Client
 	key     client.ObjectKey
