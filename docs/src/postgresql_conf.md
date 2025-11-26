@@ -168,19 +168,20 @@ role within the cluster. These parameters are effectively applied only when the
 instance is operating as a replica.
 
 ```text
-primary_conninfo = 'host=<PRIMARY> user=postgres dbname=postgres'
+primary_conninfo = 'host=<PRIMARY> user=postgres dbname=postgres tcp_user_timeout=5000'
 recovery_target_timeline = 'latest'
 ```
 
-The [`STANDBY_TCP_USER_TIMEOUT` operator configuration setting](operator_conf.md#available-options),
-if specified, sets the `tcp_user_timeout` parameter on all standby instances
-managed by the operator.
-
-The `tcp_user_timeout` parameter determines how long transmitted data can
-remain unacknowledged before the TCP connection is forcibly closed. Adjusting
-this value allows you to fine-tune the responsiveness of standby instances to
-network disruptions. For more details, refer to the
-[PostgreSQL documentation](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT).
+!!! Important
+    By default, every standby sets `tcp_user_timeout` to **5 seconds**, as shown
+    above. This parameter defines how long transmitted data may remain
+    unacknowledged before the TCP connection is forcibly closed. Adjusting it lets
+    you control how quickly a standby reacts to network issues.
+    If the default value does not meet your requirements, you can override it
+    for all standbys managed by the operator using the
+    [`STANDBY_TCP_USER_TIMEOUT` operator configuration option](operator_conf.md#available-options).
+    For additional details on `tcp_user_timeout`, refer to the
+    [PostgreSQL documentation](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT).
 
 ### Log control settings
 

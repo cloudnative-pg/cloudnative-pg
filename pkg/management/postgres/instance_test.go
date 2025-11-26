@@ -361,3 +361,58 @@ func getLibraryPathFromEnv(envs []string) string {
 
 	return ldLibraryPath
 }
+
+var _ = Describe("GetPrimaryConnInfo", func() {
+	var instance *Instance
+
+	BeforeEach(func() {
+		instance = &Instance{
+			Cluster: &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+		}
+		instance.WithPodName("test-cluster-1").WithClusterName("test-cluster")
+	})
+
+	AfterEach(func() {
+		err := os.Unsetenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should use default 5000ms tcp_user_timeout when env var is not set", func() {
+		err := os.Unsetenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+		Expect(err).ToNot(HaveOccurred())
+		connInfo := instance.GetPrimaryConnInfo()
+		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='5000'"))
+	})
+
+	It("should use custom tcp_user_timeout when env var is set", func() {
+		err := os.Setenv("CNPG_STANDBY_TCP_USER_TIMEOUT", "10000")
+		Expect(err).ToNot(HaveOccurred())
+		connInfo := instance.GetPrimaryConnInfo()
+		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='10000'"))
+	})
+
+	It("should allow setting tcp_user_timeout to 0 explicitly", func() {
+		err := os.Setenv("CNPG_STANDBY_TCP_USER_TIMEOUT", "0")
+		Expect(err).ToNot(HaveOccurred())
+		connInfo := instance.GetPrimaryConnInfo()
+		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='0'"))
+	})
+
+	It("should escape single quotes in tcp_user_timeout value", func() {
+		err := os.Setenv("CNPG_STANDBY_TCP_USER_TIMEOUT", "5000'injection")
+		Expect(err).ToNot(HaveOccurred())
+		connInfo := instance.GetPrimaryConnInfo()
+		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='5000\\'injection'"))
+	})
+
+	It("should escape backslashes in tcp_user_timeout value", func() {
+		err := os.Setenv("CNPG_STANDBY_TCP_USER_TIMEOUT", "5000\\test")
+		Expect(err).ToNot(HaveOccurred())
+		connInfo := instance.GetPrimaryConnInfo()
+		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='5000\\\\test'"))
+	})
+})
