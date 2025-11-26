@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -72,7 +73,13 @@ func ListenAndServe() error {
 		ReadTimeout:       webserver.DefaultReadTimeout,
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
-	err := server.ListenAndServe()
+
+	// Bind explicitly to surface any socket errors immediately
+	ln, listenErr := net.Listen("tcp", server.Addr)
+	if listenErr != nil {
+		return fmt.Errorf("failed to bind pgbouncer metrics server on %s: %w", server.Addr, listenErr)
+	}
+	err := server.Serve(ln)
 
 	// The metricsServer has been shut down
 	if errors.Is(err, http.ErrServerClosed) {

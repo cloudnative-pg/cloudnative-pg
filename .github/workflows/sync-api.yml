@@ -9,6 +9,8 @@ permissions: read-all
 
 jobs:
   trigger-sync:
+    # Skip on forks; requires upstream secrets
+    if: ${{ github.repository_owner == 'cloudnative-pg' }}
     runs-on: ubuntu-latest
     steps:
       - name: Invoke repository dispatch
