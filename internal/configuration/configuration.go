@@ -165,7 +165,9 @@ type Data struct {
 	// added as a tcp_user_timeout option to the primary_conninfo
 	// string, which is used by the standby server to connect to the
 	// primary server in CloudNativePG.
-	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
+	// When nil, the instance manager will use a default value of 5000ms.
+	// Set to 0 explicitly to use the system's default.
+	StandbyTCPUserTimeout *int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
 
 	// KubernetesClusterDomain defines the domain suffix for service FQDNs
 	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
@@ -189,7 +191,7 @@ func newDefaultConfig() *Data {
 		CreateAnyService:        false,
 		CertificateDuration:     CertificateDuration,
 		ExpiringCheckThreshold:  ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:   0,
+		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
 	}

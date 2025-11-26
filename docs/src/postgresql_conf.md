@@ -172,9 +172,10 @@ primary_conninfo = 'host=<PRIMARY> user=postgres dbname=postgres'
 recovery_target_timeline = 'latest'
 ```
 
-The [`STANDBY_TCP_USER_TIMEOUT` operator configuration setting](operator_conf.md#available-options),
-if specified, sets the `tcp_user_timeout` parameter on all standby instances
-managed by the operator.
+The [`STANDBY_TCP_USER_TIMEOUT` operator configuration setting](operator_conf.md#available-options)
+sets the `tcp_user_timeout` parameter on all standby instances
+managed by the operator. By default, this is set to 5000 milliseconds (5 seconds).
+To use the system's default, explicitly set it to `0`.
 
 The `tcp_user_timeout` parameter determines how long transmitted data can
 remain unacknowledged before the TCP connection is forcibly closed. Adjusting
