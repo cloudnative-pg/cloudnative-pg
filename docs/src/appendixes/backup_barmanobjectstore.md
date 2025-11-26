@@ -1,3 +1,8 @@
+---
+id: backup_barmanobjectstore
+title: Appendix B - Backup on object stores
+---
+
 # Appendix B - Backup on object stores
 
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->

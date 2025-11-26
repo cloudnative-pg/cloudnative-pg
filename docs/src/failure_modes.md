@@ -1,3 +1,9 @@
+---
+id: failure_modes
+sidebar_position: 140
+title: Failure Modes
+---
+
 # Failure Modes
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

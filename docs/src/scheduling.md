@@ -1,3 +1,9 @@
+---
+id: scheduling
+sidebar_position: 120
+title: Scheduling
+---
+
 # Scheduling
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

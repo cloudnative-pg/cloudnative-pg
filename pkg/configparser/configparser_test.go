@@ -44,6 +44,9 @@ type FakeData struct {
 
 	//  Threshold to consider a certificate as expiring
 	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
+
+	// OptionalTimeout is an optional pointer to int for testing
+	OptionalTimeout *int `json:"optionalTimeout" env:"OPTIONAL_TIMEOUT"`
 }
 
 var defaultInheritedAnnotations = []string{
@@ -116,5 +119,56 @@ var _ = Describe("Data test suite", func() {
 		config.readConfigMap(nil)
 		Expect(config.InheritedAnnotations).To(Equal(defaultInheritedAnnotations))
 		Expect(config.InheritedLabels).To(BeNil())
+	})
+
+	Context("pointer types", func() {
+		It("leaves pointer nil when no value is provided", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "")
+			config := &FakeData{}
+			ReadConfigMap(config, &FakeData{}, nil)
+			Expect(config.OptionalTimeout).To(BeNil())
+		})
+
+		It("sets pointer from environment value", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "5000")
+			config := &FakeData{}
+			ReadConfigMap(config, &FakeData{}, nil)
+			Expect(config.OptionalTimeout).ToNot(BeNil())
+			Expect(*config.OptionalTimeout).To(Equal(5000))
+		})
+
+		It("sets pointer from map value", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "")
+			config := &FakeData{}
+			ReadConfigMap(config, &FakeData{}, map[string]string{
+				"OPTIONAL_TIMEOUT": "3000",
+			})
+			Expect(config.OptionalTimeout).ToNot(BeNil())
+			Expect(*config.OptionalTimeout).To(Equal(3000))
+		})
+
+		It("allows setting pointer to zero value explicitly", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "0")
+			config := &FakeData{}
+			ReadConfigMap(config, &FakeData{}, nil)
+			Expect(config.OptionalTimeout).ToNot(BeNil())
+			Expect(*config.OptionalTimeout).To(Equal(0))
+		})
+
+		It("uses default pointer value when set", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "")
+			config := &FakeData{}
+			defaultValue := 1000
+			ReadConfigMap(config, &FakeData{OptionalTimeout: &defaultValue}, nil)
+			Expect(config.OptionalTimeout).ToNot(BeNil())
+			Expect(*config.OptionalTimeout).To(Equal(1000))
+		})
+
+		It("skips invalid pointer value", func() {
+			GinkgoT().Setenv("OPTIONAL_TIMEOUT", "invalid")
+			config := &FakeData{}
+			ReadConfigMap(config, &FakeData{}, nil)
+			Expect(config.OptionalTimeout).To(BeNil())
+		})
 	})
 })

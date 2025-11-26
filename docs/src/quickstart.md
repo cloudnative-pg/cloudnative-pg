@@ -1,3 +1,9 @@
+---
+id: quickstart
+sidebar_position: 60
+title: Quickstart
+---
+
 # Quickstart
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

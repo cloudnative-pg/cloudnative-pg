@@ -1,3 +1,9 @@
+---
+id: image_catalog
+sidebar_position: 70
+title: Image Catalog
+---
+
 # Image Catalog
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

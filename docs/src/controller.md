@@ -1,3 +1,9 @@
+---
+id: controller
+sidebar_position: 500
+title: Custom Pod Controller
+---
+
 # Custom Pod Controller
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

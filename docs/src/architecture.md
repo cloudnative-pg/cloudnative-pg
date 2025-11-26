@@ -1,3 +1,9 @@
+---
+id: architecture
+sidebar_position: 40
+title: Architecture
+---
+
 # Architecture
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

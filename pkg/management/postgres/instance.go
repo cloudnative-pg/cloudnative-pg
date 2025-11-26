@@ -1400,10 +1400,13 @@ func (instance *Instance) GetPrimaryConnInfo() string {
 	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName()) + " dbname=postgres"
 
 	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
-	if len(standbyTCPUserTimeout) > 0 {
-		result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
-			strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
+	if len(standbyTCPUserTimeout) == 0 {
+		// Default to 5000ms (5 seconds) if not explicitly set
+		standbyTCPUserTimeout = "5000"
 	}
+
+	result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
+		strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
 
 	return result
 }

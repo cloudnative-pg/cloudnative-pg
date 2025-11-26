@@ -21,11 +21,15 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -221,5 +225,60 @@ var _ = Describe("Cluster image detection", func() {
 		Expect(cluster.Status.Image).To(Equal("postgres:17.2"))
 		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16.2"))
 		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
+	})
+})
+
+var _ = Describe("Cluster image detection with errors", func() {
+	It("emits an event when ImageCatalog retrieval fails", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(cluster).
+			WithStatusSubresource(cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object,
+					opts ...client.GetOption,
+				) error {
+					if _, ok := obj.(*apiv1.ImageCatalog); ok {
+						return fmt.Errorf("simulated error: no kind match")
+					}
+					return cl.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+
+		recorder := record.NewFakeRecorder(10)
+		r := &ClusterReconciler{
+			Client:   fakeClient,
+			Recorder: recorder,
+		}
+
+		result, err := r.reconcileImage(ctx, cluster)
+
+		// reconcileImage handles the error by updating the status, so it returns nil error
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(&ctrl.Result{}))
+
+		// Check if the event was recorded
+		// The event string format is "Type Reason Message"
+		// We expect: Warning DiscoverImage Error getting ImageCatalog/catalog: ...
+		Eventually(recorder.Events).Should(Receive(ContainSubstring(
+			"Warning DiscoverImage Error getting ImageCatalog/catalog")))
 	})
 })

@@ -1,3 +1,9 @@
+---
+id: installation_upgrade
+sidebar_position: 50
+title: Installation and upgrades
+---
+
 # Installation and upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

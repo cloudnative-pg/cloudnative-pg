@@ -1,3 +1,9 @@
+---
+id: faq
+sidebar_position: 540
+title: Frequently Asked Questions (FAQ)
+---
+
 # Frequently Asked Questions (FAQ)
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

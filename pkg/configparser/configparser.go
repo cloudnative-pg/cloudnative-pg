@@ -64,7 +64,7 @@ var configparserLog = log.WithName("configparser")
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map.
 // Config and defaults are supposed to be pointers to structs of the same type
-func ReadConfigMap(target interface{}, defaults interface{}, data map[string]string) {
+func ReadConfigMap(target interface{}, defaults interface{}, data map[string]string) { //nolint: gocognit
 	ensurePointerToCompatibleStruct("target", target, "default", defaults)
 
 	count := reflect.TypeOf(defaults).Elem().NumField()
@@ -88,6 +88,21 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 
 		case reflect.Int:
 			value = fmt.Sprintf("%v", valueField.Int())
+
+		case reflect.Ptr:
+			// Handle pointer types - if not nil, get the underlying value
+			if !valueField.IsNil() {
+				switch valueField.Elem().Kind() {
+				case reflect.Int:
+					value = fmt.Sprintf("%v", valueField.Elem().Int())
+				default:
+					configparserLog.Info(
+						"Skipping unsupported pointer type while parsing default configuration",
+						"field", field.Name, "kind", valueField.Elem().Kind())
+					continue
+				}
+			}
+			// If nil, value stays empty, which means we'll only set it if env/data provides a value
 
 		case reflect.Slice:
 			if valueField.Type().Elem().Kind() != reflect.String {
@@ -129,6 +144,29 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 				continue
 			}
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetInt(intValue)
+		case reflect.Ptr:
+			// Handle pointer types
+			if value == "" {
+				// If no value is provided, leave the pointer as nil
+				continue
+			}
+			switch t.Elem().Kind() {
+			case reflect.Int:
+				intValue, err := strconv.ParseInt(value, 10, 0)
+				if err != nil {
+					configparserLog.Info(
+						"Skipping invalid integer pointer value parsing configuration",
+						"field", field.Name, "value", value)
+					continue
+				}
+				intVal := int(intValue)
+				reflect.ValueOf(target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(&intVal))
+			default:
+				configparserLog.Info(
+					"Skipping unsupported pointer type while parsing configuration",
+					"field", field.Name, "kind", t.Elem().Kind())
+				continue
+			}
 		case reflect.String:
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetString(value)
 		case reflect.Slice:

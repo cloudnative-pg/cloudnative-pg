@@ -934,6 +934,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalogs
+imagevolume
 img
 immediateCheckpoint
 impactful

@@ -1,3 +1,9 @@
+---
+id: troubleshooting
+sidebar_position: 410
+title: Troubleshooting
+---
+
 # Troubleshooting
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

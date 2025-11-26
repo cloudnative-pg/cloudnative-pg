@@ -1,3 +1,9 @@
+---
+id: connection_pooling
+sidebar_position: 350
+title: Connection Pooling
+---
+
 # Connection pooling
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

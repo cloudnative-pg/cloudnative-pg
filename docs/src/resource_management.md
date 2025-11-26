@@ -1,3 +1,9 @@
+---
+id: resource_management
+sidebar_position: 130
+title: Resource management
+---
+
 # Resource management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

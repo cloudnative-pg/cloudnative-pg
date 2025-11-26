@@ -1,3 +1,9 @@
+---
+id: tablespaces
+sidebar_position: 250
+title: Tablespaces
+---
+
 # Tablespaces
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

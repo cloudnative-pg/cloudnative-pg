@@ -1,3 +1,9 @@
+---
+id: database_import
+sidebar_position: 90
+title: Importing Postgres databases
+---
+
 # Importing Postgres databases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
