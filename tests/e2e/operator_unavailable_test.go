@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"os"
 	"sync"
 	"time"
 
@@ -57,8 +56,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-
-		if os.Getenv("LEADER_ELECTION") == "false" {
+		if !MustGetEnvProfile().IsLeaderElectionEnabled() {
 			Skip("Leader election is disabled")
 		}
 	})

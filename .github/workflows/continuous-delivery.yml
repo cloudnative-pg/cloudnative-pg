@@ -1743,8 +1743,6 @@ jobs:
           cat config/manager/env_override.yaml
       -
         name: Run E2E tests
-        env:
-          LEADER_ELECTION: "false"
         run: hack/e2e/run-e2e.sh
       -
         name: Report failed E2E tests
