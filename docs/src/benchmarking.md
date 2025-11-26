@@ -13,8 +13,8 @@ Benchmarking is focused on two aspects:
     Do not use these plugins in a production environment, as it might have
     catastrophic consequences on your databases and the other
     workloads/applications that run in the same shared environment.
-
 :::
+
 ### pgbench
 
 The `kubectl` CNPG plugin command `pgbench` executes a user-defined `pgbench` job
@@ -36,8 +36,8 @@ kubectl cnpg pgbench \
 :::info[IMPORTANT]
     Please refer to the [`pgbench` documentation](https://www.postgresql.org/docs/current/pgbench.html)
     for information about the specific options to be used in your jobs.
-
 :::
+
 This example creates a job called `pgbench-init` that initializes for `pgbench`
 OLTP-like purposes the `app` database in a `Cluster` named `cluster-example`,
 using a scale factor of 1000:
@@ -52,8 +52,8 @@ kubectl cnpg pgbench \
 :::note
     This will generate a database with 100000000 records, taking approximately 13GB
     of space on disk.
-
 :::
+
 You can see the progress of the job with:
 
 ```shell
@@ -131,8 +131,8 @@ modification/execution.
     fio job values using a ConfigMap. If you want to provide custom job values, we
     recommend generating a manifest using the `--dry-run` flag and providing your
     custom job values in the generated ConfigMap.
-
 :::
+
 Example of default usage:
 
 ```shell

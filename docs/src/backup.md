@@ -8,8 +8,8 @@
     CloudNativePG. If you still wish to use `pg_dump`, refer to the
     [*Troubleshooting / Emergency backup* section](troubleshooting.md#emergency-backup)
     for guidance.
-
 :::
+
 :::info[Important]
     Starting with version 1.26, native backup and recovery capabilities are
     being **progressively phased out** of the core operator and moved to official
@@ -17,8 +17,8 @@
     **backup-agnostic architecture**, enabled by its extensible
     interface—**CNPG-I**—which standardizes the management of **WAL archiving**,
     **physical base backups**, and corresponding **recovery processes**.
-
 :::
+
 CloudNativePG currently supports **physical backups of PostgreSQL clusters** in
 two main ways:
 
@@ -72,8 +72,8 @@ is fundamental for the following reasons:
 :::warning
     WAL archive alone is useless. Without a physical base backup, you cannot
     restore a PostgreSQL cluster.
-
 :::
+
 In general, the presence of a WAL archive enhances the resilience of a
 PostgreSQL cluster, allowing each instance to fetch any required WAL file from
 the archive if needed (normally the WAL archive has higher retention periods
@@ -93,8 +93,8 @@ recovery, even across regions.
     environments — where none of the above benefits are needed and the WAL
     archive is not necessary. RPO in this case can be any value, such as
     24 hours (daily backups) or infinite (no backup at all).
-
 :::
+
 ### Cold and Hot backups
 
 Hot backups have already been defined in the previous section. They require the
@@ -129,8 +129,8 @@ CloudNativePG currently supports two main approaches for physical backups:
     CNPG-I is designed to enable third parties to build and integrate their own
     backup plugins. Over time, we expect the ecosystem of supported backup
     solutions to grow.
-
 :::
+
 ### Object Store–Based Backups
 
 Backups to an object store (e.g. AWS S3, Azure Blob, GCS):
@@ -205,8 +205,8 @@ resource.
     For a complete list of configuration options, refer to the
     [`ScheduledBackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ScheduledBackupSpec)
     in the API reference.
-
 :::
+
 ### Cron Schedule
 
 The `schedule` field defines **when** the backup should occur, using a
@@ -216,8 +216,8 @@ The `schedule` field defines **when** the backup should occur, using a
 :::warning
     This format differs from the traditional Unix/Linux `crontab`—it includes a
     **seconds** field as the first entry.
-
 :::
+
 Example of a daily scheduled backup:
 
 ```yaml
@@ -242,8 +242,8 @@ since seconds are not supported.
 :::tip[Hint]
     The frequency of your backups directly impacts your **Recovery Time Objective**
     ([RTO](before_you_start.md#rto)).
-
 :::
+
 To optimize your disaster recovery strategy based on continuous backup:
 
 - Regularly test restoring from your backups.
@@ -289,8 +289,8 @@ by creating a `Backup` resource.
     For a full list of available options, see the
     [`BackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BackupSpec) in the
     API reference.
-
 :::
+
 ### Example: Requesting an On-Demand Backup
 
 To start an on-demand backup, apply a `Backup` request custom resource like the
@@ -363,8 +363,8 @@ Status:
     On-demand backups do **not** include Kubernetes secrets for the PostgreSQL
     superuser or application user. You should ensure these secrets are included in
     your broader Kubernetes cluster backup strategy.
-
 :::
+
 ## Backup Methods
 
 CloudNativePG currently supports the following backup methods for scheduled
@@ -410,8 +410,8 @@ cluster. If no replicas are available, the backup will fall back to the
     The examples in this section are focused on backup target selection and do not
     take the backup method (`spec.method`) into account, as it is not relevant to
     the scope being discussed.
-
 :::
+
 ### How It Works
 
 When `prefer-standby` is the target (the default behavior), CloudNativePG will
@@ -433,8 +433,8 @@ This strategy minimizes interference with the primary’s workload.
     when backing up from an online standby we do not force a switch of the WAL on the
     primary. This might produce unexpected results in the short term (before
     `archive_timeout` kicks in) in deployments with low write activity.
-
 :::
+
 ### Forcing Backup on the Primary
 
 To always run backups on the primary instance, explicitly set the backup target
@@ -455,8 +455,8 @@ spec:
     volume snapshots**, as this will require shutting down the primary instance
     temporarily—interrupting all write operations. The same caution applies to
     single-instance clusters, even if you haven't explicitly set the target.
-
 :::
+
 ### Overriding the Cluster-Wide Target
 
 You can override the cluster-level target on a per-backup basis, using either
@@ -495,5 +495,4 @@ For example: ["Retention Policies" with Barman Cloud Plugin](https://cloudnative
     Users are encouraged to rely on the retention mechanisms provided by the
     backup plugin they are using. This ensures better flexibility and consistency
     with the backup method in use.
-
 :::

@@ -46,8 +46,8 @@ every 24 hours in the `cluster-example` Postgres cluster from the
 :::info[Important]
     Before proceeding, ensure that the `cluster-example` Postgres cluster is up
     and running in your environment.
-
 :::
+
 By default, CloudNativePG generates and manages a Kubernetes `Secret` named
 `cluster-example-app`, which contains the credentials for the `app` user in the
 `cluster-example` cluster. You can read more about this in the
@@ -168,8 +168,8 @@ a PostgreSQL password and securely store it in Vault.
     outside the scope of CloudNativePG. While it's possible to run Vault inside
     Kubernetes, it is more commonly deployed externally. For detailed instructions,
     consult the [HashiCorp Vault documentation](https://www.vaultproject.io/docs).
-
 :::
+
 Continuing from the previous example, we will now create the necessary
 `SecretStore` and `PushSecret` resources to complete the integration with
 Vault.
@@ -218,14 +218,14 @@ This configuration creates a `SecretStore` resource named `vault-backend`.
     consider using more secure authentication methods.
     Refer to the [External Secrets Operator documentation](https://external-secrets.io/latest/provider/hashicorp-vault/)
     for a full list of supported authentication mechanisms.
-
 :::
+
 :::info
     HashiCorp Vault must have a KV secrets engine enabled at the `secrets` path
     with version `v2`. If your Vault instance uses a different path or
     version, be sure to update the `path` and `version` fields accordingly.
-
 :::
+
 ### Creating the `PushSecret`
 
 The `PushSecret` resource is used to push a Kubernetes `Secret` to HashiCorp

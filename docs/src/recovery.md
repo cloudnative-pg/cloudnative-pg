@@ -9,8 +9,8 @@ the latest archived WAL file.
 
 :::info[Important]
     A valid WAL archive is required to perform PITR.
-
 :::
+
 In CloudNativePG, recovery is **not performed in-place** on an existing
 cluster. Instead, it is used to **bootstrap a new cluster** from a physical
 backup.
@@ -18,8 +18,8 @@ backup.
 :::note
     For more details on configuring the `bootstrap` stanza, refer to
     [Bootstrap](bootstrap.md).
-
 :::
+
 The `recovery` bootstrap mode allows you to initialize a cluster from a
 physical base backup and replay the associated WAL files to bring the system to
 a consistent and optionally point-in-time state.
@@ -41,8 +41,8 @@ recovery from volume snapshots.
 :::info[Important]
     For legacy documentation, see
     [Appendix B – Recovery from an Object Store](appendixes/backup_barmanobjectstore.md#recovery-from-an-object-store).
-
 :::
+
 ## Recovery from an Object Store with the Barman Cloud Plugin
 
 This section outlines how to recover a PostgreSQL cluster from an object store
@@ -52,13 +52,13 @@ using the recommended Barman Cloud Plugin.
     The object store must contain backup data produced by a CloudNativePG
     `Cluster`—either using the **deprecated native Barman Cloud integration** or
     the **Barman Cloud Plugin**.
-
 :::
+
 :::info
     For full details, refer to the
     [“Recovery of a Postgres Cluster” section in the Barman Cloud Plugin documentation](https://cloudnative-pg.io/plugin-barman-cloud/docs/concepts/#recovery-of-a-postgres-cluster).
-
 :::
+
 Begin by defining the object store that holds both your base backups and WAL
 files. The Barman Cloud Plugin uses a custom `ObjectStore` resource for this
 purpose. The following example shows how to configure one for Azure Blob
@@ -120,8 +120,8 @@ spec:
     databases—because it involves a full base backup. This limitation will be
     addressed in the future with support for online backups and PVC cloning in
     the scale-up process.
-
 :::
+
 CloudNativePG allows you to create a new cluster from a `VolumeSnapshot` of a
 `PersistentVolumeClaim` (PVC) that belongs to an existing `Cluster`.
 These snapshots are created using the declarative API for
@@ -200,8 +200,8 @@ as documented in ["Configure the application database"](#configure-the-applicati
       be recovered using the snapshot, and available WALs from the source cluster.
     2. Take a snapshot of the primary in the replica cluster.
     3. Increase the number of instances in the replica cluster as desired.
-
 :::
+
 ## Recovery from a `Backup` object
 
 If a `Backup` resource is already available in the namespace in which you need
@@ -256,8 +256,8 @@ perform a point-in-time recovery (see [Point in Time Recovery (PITR)](#point-in-
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
     up WAL fetching from the archive by concurrently downloading the transaction
     logs from the recovery object store.
-
 :::
+
 ## Point in time recovery (PITR)
 
 Instead of replaying all the WALs up to the latest one, after extracting a base
@@ -268,8 +268,8 @@ archive is mandatory.
 :::info[Important]
     PITR requires you to specify a recovery target by using the options
     described in [Recovery targets](#recovery-targets).
-
 :::
+
 The operator generates the configuration parameters required for this
 feature to work if you specify a recovery target.
 
@@ -320,8 +320,8 @@ uses that backup as the base for the recovery.
 
 :::info[Important]
     You need to make sure that such a backup exists and is accessible.
-
 :::
+
 If you don't specify the backup ID, the operator detects the base backup for
 the recovery as follows:
 
@@ -379,20 +379,20 @@ recovery target.
     If the backed-up cluster had `walStorage` enabled, you also must specify
     the volume snapshot containing the `PGWAL` directory, as mentioned in
     [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects).
-
 :::
+
 :::warning
     It's your responsibility to ensure that the end time of the base backup in
     the volume snapshot is before the recovery target timestamp.
-
 :::
+
 :::warning
     If you added or removed a [tablespace](tablespaces.md) in your cluster
     since the last base backup, replaying the WAL will fail. You need a base
     backup between the time of the tablespace change and the recovery target
     timestamp.
-
 :::
+
 ### Recovery targets
 
 Here are the recovery target criteria you can use:
@@ -406,8 +406,8 @@ targetTime
     PostgreSQL recovery will stop when it encounters the first transaction that
     occurs after the specified time. If no such transaction exists after the
     target time, the recovery process will fail.
-
 :::
+
 targetXID
 :  Transaction ID up to which recovery proceeds.
    (The precise stopping point is also influenced by the `exclusive` option.)
@@ -434,8 +434,8 @@ targetImmediate
     `targetTime` or `targetLSN`. However, this isn't possible for the remaining
     targets: `targetName`, `targetXID`, and `targetImmediate`. In such cases, it's
     mandatory to specify `backupID`.
-
 :::
+
 This example uses a `targetName`-based recovery target:
 
 ```yaml
@@ -509,8 +509,8 @@ for more information about secrets.
     including the catalog, are permitted. This restriction includes any role
     overrides, which are deferred until the `Cluster` transitions to primary.
     During this phase, users remain as defined in the source cluster.
-
 :::
+
 The following example configures the `app` database with the owner `app` and
 the password stored in the provided secret `app-secret`, following the
 bootstrap from a live cluster.
@@ -560,8 +560,8 @@ For details and instructions on the `recovery` bootstrap method, see
     works, we suggest that you configure the recovery cluster as the original
     one when it comes to `.spec.postgresql.parameters`. Once the new cluster is
     restored, you can then change the settings as desired.
-
 :::
+
 The way it works is that the operator injects an init container in the first
 instance of the new cluster, and the init container starts recovering the
 backup from the object storage.
@@ -570,8 +570,8 @@ backup from the object storage.
     The duration of the base backup copy in the new PVC depends on
     the size of the backup, as well as the speed of both the network and the
     storage.
-
 :::
+
 When the base backup recovery process is complete, the operator starts the
 Postgres instance in recovery mode. In this phase, PostgreSQL is up, though not
 able to accept connections, and the pod is healthy according to the
@@ -609,13 +609,12 @@ data.
     cluster remains in the `Setting up primary` state, and the associated pods will
     fail with an error. The pod logs will display:
     `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive`.
-
 :::
+
 :::info[Important]
     You can bypass this safety check by setting the
     `cnpg.io/skipEmptyWalArchiveCheck` annotation to `enabled` on the recovered
     cluster. However, this is strongly discouraged unless you are highly
     familiar with PostgreSQL's recovery process. Skipping the check incorrectly can
     lead to severe data loss. Use with caution and only in expert scenarios.
-
 :::

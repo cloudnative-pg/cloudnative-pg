@@ -179,8 +179,8 @@ CREATE TABLE facts_202312 PARTITION OF facts
 :::info[Important]
     This example assumes you're familiar with
     [PostgreSQL declarative partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html).
-
 :::
+
 ## Tablespace ownership
 
 By default, unless otherwise specified, tablespaces are owned by the `app`
@@ -207,8 +207,8 @@ the `postgres` user, like in the following excerpt:
     an existing role. Otherwise, the status of the cluster reports the
     issue and stops reconciling tablespaces until fixed. It's your responsibility
     to monitor the status and the log and to promptly intervene by fixing the issue.
-
 :::
+
 If you define a tablespace with an owner that doesn't exist, CloudNativePG can't
 create the tablespace and reflects this in the cluster status:
 
@@ -255,13 +255,13 @@ tablespace map) both on object stores and volume snapshots.
     incomplete view of the tablespaces from the replica and thus an incomplete
     backup. The lag will be resolved in a maximum of 5 minutes, with the next
     reconciliation.
-
 :::
+
 :::warning
     When you add or remove a tablespace in an existing cluster, recovery
     from WAL will fail until you take a new base backup.
-
 :::
+
 Once a cluster with tablespaces has a base backup, you can restore a
 new cluster from it. When it comes to the recovery side, it's your
 responsibility to ensure that the `Cluster` definition of the recovered

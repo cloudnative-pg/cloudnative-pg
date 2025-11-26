@@ -8,12 +8,12 @@ your PostgreSQL cluster.
     These examples are for demonstration and experimentation
     purposes. You can execute them on a personal Kubernetes cluster with Minikube
     or Kind, as described in [Quick start](quickstart.md).
-
 :::
+
 :::note[Reference]
     For a list of available options, see [API reference](cloudnative-pg.v1.md).
-
 :::
+
 ## Basics
 
 **Basic cluster**

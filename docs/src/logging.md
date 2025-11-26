@@ -13,8 +13,8 @@ management tools, including command line ones like
     For more information, see the
     [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
     documentation.
-
 :::
+
 Each log entry includes the following fields:
 
 - `level` – The log level (e.g., `info`, `notice`).
@@ -31,8 +31,8 @@ Each log entry includes the following fields:
     the `level` and `ts` fields using the `log-field-level` and
     `log-field-timestamp` flags in the operator controller. This can be configured
     by editing the `Deployment` definition of the `cloudnative-pg` operator.
-
 :::
+
 ## Cluster Logs
 
 You can configure the log level for the instance pods in the cluster
@@ -43,8 +43,8 @@ specification using the `logLevel` option. Available log levels are: `error`,
     Currently, the log level can only be set at the time the instance starts.
     Changes to the log level in the cluster specification after the cluster has
     started will only apply to new pods, not existing ones.
-
 :::
+
 ## Operator Logs
 
 The logs produced by the operator pod can be configured with log
@@ -99,8 +99,8 @@ Each PostgreSQL log entry is a JSON object with the `logger` key set to
 :::info
     Internally, the operator uses PostgreSQL's CSV log format. For more details,
     refer to the [PostgreSQL documentation on CSV log format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
-
 :::
+
 ## PGAudit Logs
 
 CloudNativePG offers seamless and native support for
@@ -114,16 +114,16 @@ section of the cluster configuration.
     CloudNativePG automatically manages this based on the presence of `pgaudit.*`
     parameters in the PostgreSQL configuration. The operator handles both the
     addition and removal of the library from `shared_preload_libraries`.
-
 :::
+
 Additionally, the operator manages the creation and removal of the PGAudit
 extension across all databases within the cluster.
 
 :::info[Important]
     CloudNativePG executes the `CREATE EXTENSION` and `DROP EXTENSION` commands
     in all databases within the cluster that accept connections.
-
 :::
+
 The following example demonstrates a PostgreSQL `Cluster` deployment with
 PGAudit enabled and configured:
 

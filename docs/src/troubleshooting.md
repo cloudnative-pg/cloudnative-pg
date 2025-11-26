@@ -8,8 +8,8 @@ CloudNativePG in your Kubernetes cluster deployment.
     As a Kubernetes administrator, you should have the
     [`kubectl` Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/) page
     bookmarked!
-
 :::
+
 ## Before you start
 
 ### Kubernetes environment
@@ -80,8 +80,8 @@ backup of the main `app` database.
     in the client machine that runs the `kubectl` command, so make sure that
     all protections are in place and you have enough space to store the
     backup file.
-
 :::
+
 The following example shows how to take a logical backup of the `app` database
 in the `cluster-example` Postgres cluster, from the `cluster-example-1` pod:
 
@@ -93,8 +93,8 @@ kubectl exec cluster-example-1 -c postgres \
 :::note
     You can easily adapt the above command to backup your cluster, by providing
     the names of the objects you have used in your environment.
-
 :::
+
 The above command issues a `pg_dump` command in custom format, which is the most
 versatile way to take [logical backups in PostgreSQL](https://www.postgresql.org/docs/current/app-pgdump.html).
 
@@ -120,8 +120,8 @@ kubectl exec -i new-cluster-example-1 -c postgres \
     sure you assign the right ownership. If you are not familiar with PostgreSQL,
     we advise that you do these critical operations under the guidance of
     a professional support company.
-
 :::
+
 The above steps might be integrated into the `cnpg` plugin at some stage in the future.
 
 ## Logs
@@ -147,8 +147,8 @@ for doing so:
 :::note
     The following sections provide examples of how to retrieve logs for various
     resources when troubleshooting CloudNativePG.
-
 :::
+
 ## Operator information
 
 By default, the CloudNativePG operator is installed in the
@@ -167,8 +167,8 @@ kubectl get pods -n cnpg-system
     running, identified by a name starting with `cnpg-controller-manager-`.
     In case you have set up your operator for high availability, you should have more entries.
     Those pods are managed by a deployment named `cnpg-controller-manager`.
-
 :::
+
 Collect the relevant information about the operator that is running in pod
 `<POD>` with:
 
@@ -194,8 +194,8 @@ kubectl logs -n cnpg-system \
 
 :::tip
     You can add `-f` flag to above command to follow logs in real time.
-
 :::
+
 Save logs to a JSON file by running:
 
 ```shell
@@ -275,8 +275,8 @@ kubectl cnpg status -n <NAMESPACE> <CLUSTER>
 
 :::tip
     You can print more information by adding the `--verbose` option.
-
 :::
+
 Get PostgreSQL container image version:
 
 ```shell
@@ -292,8 +292,8 @@ Output:
 :::note
     Also you can use `kubectl-cnpg status -n <NAMESPACE> <CLUSTER_NAME>`
     to get the same information.
-
 :::
+
 ## Pod information
 
 You can retrieve the list of instances that belong to a given PostgreSQL
@@ -582,8 +582,8 @@ the `cnpg.io/coredumpFilter` annotation.
 :::info
     Please refer to ["Labels and annotations"](labels_annotations.md)
     for more details on the standard annotations that CloudNativePG provides.
-
 :::
+
 By default, the `cnpg.io/coredumpFilter` is set to `0x31` in order to
 exclude shared memory segments from the dump, as this is the safest
 approach in most cases.
@@ -592,13 +592,13 @@ approach in most cases.
     Please refer to
     ["Core dump filtering settings" section of "The `/proc` Filesystem" page of the Linux Kernel documentation](https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings).
     for more details on how to set the bitmask that controls the core dump filter.
-
 :::
+
 :::info[Important]
     Beware that this setting only takes effect during Pod startup and that changing
     the annotation doesn't trigger an automated rollout of the instances.
-
 :::
+
 Although you might not personally be involved in inspecting core dumps,
 you might be asked to provide them so that a Postgres expert can look
 into them. First, verify that you have a core dump in the `PGDATA`
@@ -652,8 +652,8 @@ pprof port and flag.
 
 :::info[Important]
     The pprof server only serves plain HTTP on port `6060`.
-
 :::
+
 ### Example
 
 Enable pprof on a cluster by adding the annotation:
@@ -678,8 +678,8 @@ the corresponding flag) and triggers a rolling update.
     This is **not** the intended way to expose the feature in production.
     Treat pprof as a sensitive debugging interface and never expose it publicly.
     If you must access it remotely, secure it with proper network policies and access controls.
-
 :::
+
 Use port-forwarding to access the pprof endpoints:
 
 ```bash

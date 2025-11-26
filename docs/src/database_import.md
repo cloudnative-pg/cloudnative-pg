@@ -26,8 +26,8 @@ As a result, the instructions in this section are suitable for both:
     sure that applications are compatible with the new version and that the
     upgrade path of the objects contained in the database (including extensions) is
     feasible.
-
 :::
+
 In both cases, the operation is performed on a consistent **snapshot** of the
 origin database.
 
@@ -37,8 +37,8 @@ origin database.
     database after the start of the backup will not be in the destination cluster -
     hence why this feature is referred to as "offline import" or "offline major
     upgrade".
-
 :::
+
 ## How it works
 
 Conceptually, the import requires you to create a new cluster from scratch
@@ -67,8 +67,8 @@ second via the `monolith` type.
     privileges to take a logical backup with `pg_dump`. Please refer to the
     [PostgreSQL documentation on `pg_dump`](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
-
 :::
+
 ## The `microservice` type
 
 With the microservice approach, you can specify a single database you want to
@@ -143,8 +143,8 @@ spec:
     legacy data to a better system, inside Kubernetes.
     This is the main reason why we used 9.6 in the examples of this section.
     We'd be interested to hear from you, should you experience any issues in this area.
-
 :::
+
 There are a few things you need to be aware of when using the `microservice` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
@@ -167,8 +167,8 @@ There are a few things you need to be aware of when using the `microservice` typ
     for the destination cluster. If you do not set `initdb.database` or
     `initdb.owner` for the destination cluster, both parameters will default to
     `app`.
-
 :::
+
 ## The `monolith` type
 
 With the monolith approach, you can specify a set of roles and databases you
@@ -265,8 +265,8 @@ There are a few things you need to be aware of when using the `monolith` type:
     do not match any of the databases or users being imported, the instance
     manager will create a new, empty application database and owner role with those
     specified names, while leaving the imported databases and owners unchanged.
-
 :::
+
 ## A practical example
 
 There is nothing to stop you from using the `monolith` approach to import a
@@ -389,8 +389,8 @@ permanently written on disk.
     WAL archiving, if requested, and WAL level will be honored after the
     database import process has completed. Similarly, replicas will be cloned
     after the bootstrap phase, when the actual cluster resource starts.
-
 :::
+
 There are other optimizations you can do during the import phase. Although this
 topic is beyond the scope of CloudNativePG, we recommend that you reduce
 unnecessary writes in the checkpoint area by tuning Postgres GUCs like
@@ -466,8 +466,8 @@ improve performance.
 :::note
     When provided, stage-specific options take precedence over the general
     `pgRestoreExtraOptions`.
-
 :::
+
 :::warning
     The `pgDumpExtraOptions`, `pgRestoreExtraOptions`, and all stage-specific
     restore options (`pgRestorePredataOptions`, `pgRestoreDataOptions`,
@@ -476,8 +476,8 @@ improve performance.
     operator’s intended functionality or design. Use these options with caution
     and always test them thoroughly in a safe, controlled environment before
     applying them in production.
-
 :::
+
 ## Online Import and Upgrades
 
 Logical replication offers a powerful way to import any PostgreSQL database

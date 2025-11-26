@@ -9,8 +9,8 @@ intended for public testing prior to the final release.
 :::info[Important]
     CloudNativePG release candidates are not intended for use in production
     systems.
-
 :::
+
 ## Purpose of Release Candidates
 
 Release candidates are provided to the community for extensive testing before

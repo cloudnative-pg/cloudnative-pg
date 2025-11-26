@@ -15,8 +15,8 @@ a `major` field indicating the major version of the image.
     from conducting any PostgreSQL version detection. It is the user's
     responsibility to ensure alignment between the declared major version in
     the catalog and the PostgreSQL image.
-
 :::
+
 The `major` field's value must remain unique within a catalog, preventing
 duplication across images. Distinct catalogs, however, may
 expose different images under the same `major` value.

@@ -158,8 +158,8 @@ Feel free to report any relevant missing entry as a PR.
     (which includes some of our maintainers) is working on an independent and
     vendor neutral project to list the operators called
     [Operator Feature Matrix](https://github.com/dokc/operator-feature-matrix).
-
 :::
+
 **You say that CloudNativePG is a fully declarative operator.
 What do you mean by that?**
 

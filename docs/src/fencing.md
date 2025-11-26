@@ -101,8 +101,8 @@ This consists of an initial fast shutdown with a timeout set to
     started up again without performing a failover.
 
     Given that, we advise users to fence primary instances only if strictly required.
-
 :::
+
 If a fenced instance is deleted, the pod will be recreated normally, but the
 postmaster won't be started. This can be extremely helpful when instances
 are `Crashlooping`.

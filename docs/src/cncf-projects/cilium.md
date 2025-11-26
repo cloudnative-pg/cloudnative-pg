@@ -37,8 +37,8 @@ authorized Pods.
 :::info[Important]
     Before proceeding, ensure that the `cluster-example` Postgres cluster is up
     and running in your environment.
-
 :::
+
 ## Default Deny Behavior in Cilium
 
 By default, Cilium does **not** deny all traffic unless explicitly configured
@@ -100,8 +100,8 @@ spec:
     using the YAML manifests. If the operator was installed using a different
     process (Helm, OLM, etc.), the namespace may be different. Make sure to adjust
     the namespace properly.
-
 :::
+
 ## Allowing access between cluster Pods
 
 Since the default policy is "deny all", we need to explicitly allow access

@@ -266,8 +266,8 @@ These processes are described in the next sections.
     Before you proceed, ensure you review the ["About PostgreSQL Roles" section](#about-postgresql-roles)
     above and use identical role definitions, including secrets, in all
     `Cluster` objects participating in the distributed topology.
-
 :::
+
 ### Demoting a Primary to a Replica Cluster
 
 CloudNativePG provides the functionality to demote a primary cluster to a
@@ -322,8 +322,8 @@ cluster's status. The token is listed under the `Demotion token` section.
 :::note
     The `demotionToken` obtained from `cluster-eu-south` will serve as the
     `promotionToken` for `cluster-eu-central`.
-
 :::
+
 You can verify the role change using the `cnpg` plugin, checking the status of
 the cluster:
 
@@ -356,8 +356,8 @@ replica:
     It is crucial to apply the changes to the `primary` and `promotionToken`
     fields simultaneously. If the promotion token is omitted, a failover will be
     triggered, necessitating a rebuild of the former primary.
-
 :::
+
 After making these adjustments, CloudNativePG will initiate the promotion of
 the replica cluster to a primary cluster. Initially, CloudNativePG will wait
 for the designated primary cluster to replicate all Write-Ahead Logging (WAL)
@@ -387,8 +387,8 @@ clusters.
     Standalone Replica Clusters were previously known as Replica Clusters
     before the introduction of the Distributed Topology strategy in CloudNativePG
     1.24.
-
 :::
+
 In CloudNativePG, a Standalone Replica Cluster is a PostgreSQL cluster in
 continuous recovery with the following configurations:
 
@@ -404,14 +404,14 @@ from the original source.
     Disabling replication is an **irreversible** operation. Once replication is
     disabled and the designated primary is promoted to primary, the replica cluster
     and the source cluster become two independent clusters definitively.
-
 :::
+
 :::info[Important]
     Standalone replica clusters are suitable for several use cases, primarily
     involving read-only workloads. If you are planning to setup a disaster
     recovery solution, look into "Distributed Topology" above.
-
 :::
+
 ### Main Differences with Distributed Topology
 
 Although Standalone Replica Clusters can be used for disaster recovery
@@ -541,8 +541,8 @@ a backup of the source cluster has been created already.
     cluster, we need to make sure there is network connectivity between the two
     clusters, and that all the necessary secrets which hold passwords or
     certificates are properly created in advance.
-
 :::
+
 ### Example using a Volume Snapshot
 
 If you use volume snapshots and your storage class provides
@@ -620,8 +620,8 @@ The main use cases of delayed replicas can be summarized into:
 :::warning
     The `minApplyDelay` option of delayed replicas cannot be used in
     conjunction with `promotionToken`.
-
 :::
+
 By integrating delayed replicas into your replication strategy, you can enhance
 the resilience and data protection capabilities of your PostgreSQL environment.
 Adjust the delay duration based on your specific needs and the criticality of
@@ -632,5 +632,4 @@ your data.
     efficient to rely on volume snapshot-based recovery for faster outcomes.
     Evaluate and choose the approach that best aligns with your unique requirements
     and infrastructure.
-
 :::

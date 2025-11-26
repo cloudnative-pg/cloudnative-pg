@@ -10,8 +10,8 @@ can be linked together and put in relationship through *labels* and
     For more information, see the Kubernetes documentation on
     [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) and
     [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
-
 :::
+
 In brief:
 
 - An annotation is used to assign additional non-identifying information to
@@ -27,8 +27,8 @@ they're inherited by all resources created by it (including pods).
 :::note
     Label and annotation inheritance is the technique adopted by CloudNativePG
     instead of alternative approaches such as pod templates.
-
 :::
+
 ## Predefined labels
 
 CloudNativePG manages the following predefined labels:
@@ -294,8 +294,8 @@ The following continues from that example and limits it to the following:
     annotations and labels. You can also use wildcards
     in naming and adopt strategies like using `mycompany/*` for all labels
     or setting annotations starting with `mycompany/` to be inherited.
-
 :::
+
 ## Defining cluster's metadata
 
 When defining the cluster, before any resource is deployed, you can

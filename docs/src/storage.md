@@ -14,8 +14,8 @@ and bare metal, are also valid in container contexts managed by Kubernetes.
     concepts, on top of all the valuable knowledge you've built over
     the years in terms of storage for database workloads on VMs and
     physical servers.
-
 :::
+
 There are two primary methods of access to storage:
 
 - **Network** – Either directly or indirectly. (Think of an NFS volume locally
@@ -39,15 +39,15 @@ guarantees higher and more predictable performance.
     workloads. We recommend clearly setting performance expectations by
     first benchmarking the storage using tools such as [fio](https://fio.readthedocs.io/en/latest/fio_doc.html)
     and then the database using [pgbench](https://www.postgresql.org/docs/current/pgbench.html).
-
 :::
+
 :::info
     CloudNativePG doesn't use `StatefulSet` for managing data persistence.
     Rather, it manages PVCs directly. If you want
     to know more, see
     [Custom pod controller](controller.md).
-
 :::
+
 ## Backup and recovery
 
 Since CloudNativePG supports volume snapshots for both backup and recovery,
@@ -58,8 +58,8 @@ solution, especially if you manage very large databases.
     See the Kubernetes documentation for a list of all
     the supported [container storage interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
     that provide snapshot capabilities.
-
 :::
+
 ## Benchmarking CloudNativePG
 
 Before deploying the database in production, we recommend that you benchmark
@@ -86,8 +86,8 @@ Briefly, we recommend operating at two levels:
     where results don't vary due to the influence of external workloads.
 
     Know your system: benchmark it.
-
 :::
+
 ## Encryption at rest
 
 Encryption at rest is possible with CloudNativePG. The operator delegates that
@@ -115,8 +115,8 @@ defined as a *PVC group*.
     CloudNativePG was designed to work interchangeably with all storage classes.
     As usual, we recommend properly benchmarking the storage class in a
     controlled environment before deploying to production.
-
 :::
+
 The easiest way to configure the storage for a PostgreSQL class is to request
 storage of a certain size, like in the following example:
 
@@ -185,8 +185,8 @@ PostgreSQL.)
     using the `walSegmentSize` option. This option is applied at cluster
     initialization time, as described in
     [Bootstrap an empty cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb).
-
 :::
+
 In most cases, having `pg_wal` on the same volume where `PGDATA`
 resides is fine. However, having WALs stored in a separate
 volume has a few benefits:
@@ -213,8 +213,8 @@ volume has a few benefits:
 :::note[Write-Ahead Log (WAL)]
     See [Reliability and the Write-Ahead Log](https://www.postgresql.org/docs/current/wal.html)
     in the PostgreSQL documentation for more information.
-
 :::
+
 You can add a separate volume for WAL using the `.spec.walStorage` option.
 It follows the same rules described for the `storage` field and provisions a
 dedicated PVC. For example:
@@ -235,8 +235,8 @@ spec:
 :::info[Important]
     Removing `walStorage` isn't supported. Once added, a separate volume for
     WALs can't be removed from an existing Postgres cluster.
-
 :::
+
 ## Volumes for tablespaces
 
 CloudNativePG supports declarative tablespaces. You can add one or more
@@ -319,8 +319,8 @@ $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
     this process. The same procedure applies if you want to regenerate the WAL
     volume PVC. You can do this by also disabling `resizeInUseVolumes` for the
     `.spec.walStorage` section.
-
 :::
+
 For example, if a PVC dedicated to WAL storage is present:
 
 ```
@@ -355,8 +355,8 @@ their representation inside the Kubernetes cluster. This is also known as
     We recommend that you avoid pre-provisioning volumes, as it has an effect
     on the high availability and self-healing capabilities of the operator. It
     breaks the fully declarative model on which CloudNativePG was built.
-    
 :::
+
 To use a pre-provisioned volume in CloudNativePG:
 
 1. Manually create the volume outside Kubernetes.
@@ -374,8 +374,8 @@ To use a pre-provisioned volume in CloudNativePG:
     exists. (The scheduling configuration is based on the affinity rules of your
     cluster.) Make sure you check for any pods stuck in `Pending` after you deploy
     the cluster. If the condition persists, investigate why it's happening.
-
 :::
+
 ## Block storage considerations (Ceph/Longhorn)
 
 Most block storage solutions in Kubernetes, such as Longhorn and Ceph,

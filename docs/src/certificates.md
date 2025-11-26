@@ -12,8 +12,8 @@ To set up a cluster, the operator requires:
 :::note
     You can find all the secrets used by the cluster and their expiration dates
     in the cluster's status.
-
 :::
+
 CloudNativePG is very flexible when it comes to TLS certificates. It
 primarily operates in two modes:
 
@@ -33,8 +33,8 @@ generated outside CNPG.
     disregarding the DNS name. This approach is due to the typical absence of DNS
     names in user-provided certificates for the `<cluster>-rw` service used for
     communication within the cluster.
-
 :::
+
 ## Operator-Managed Mode
 
 By default, the operator automatically generates a single Certificate Authority
@@ -46,15 +46,15 @@ expiration (within a 90-day validity period).
     You can adjust this default behavior by configuring the
     `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD` environment variables.
     For detailed guidance, refer to the [Operator Configuration](operator_conf.md).
-
 :::
+
 :::info[Important]
     Certificate renewal does not cause any downtime for the PostgreSQL server,
     as a simple reload operation is sufficient. However, any user-managed
     certificates not controlled by CloudNativePG must be re-issued following the
     renewal process.
-
 :::
+
 When generating certificates, the operator assumes that the Kubernetes
 cluster's DNS zone is set to `cluster.local` by default. This behavior can be
 customized by setting the `KUBERNETES_CLUSTER_DOMAIN` environment variable. A
@@ -117,21 +117,21 @@ the following parameters:
 :::note
     The operator still creates and manages the two secrets related to client
     certificates.
-
 :::
+
 :::note
     The operator and instances verify server certificates against the CA only,
     disregarding the DNS name. This approach is due to the typical absence of DNS
     names in user-provided certificates for the `<cluster>-rw` service used for
     communication within the cluster.
-
 :::
+
 :::note
     If you want ConfigMaps and secrets to be reloaded by instances, you can add
     a label with the key `cnpg.io/reload` to it. Otherwise you must reload the
     instances using the `kubectl cnpg reload` subcommand.
-
 :::
+
 #### Example
 
 Given the following files:
@@ -260,19 +260,19 @@ the following parameters:
 :::note
     The operator still creates and manages the two secrets related to server
     certificates.
-
 :::
+
 :::note
     As the cluster isn't in control of the client CA secret key, you can no
     longer generate client certificates using `kubectl cnpg certificate`.
-
 :::
+
 :::note
     If you want ConfigMaps and secrets to be automatically reloaded by
     instances, you can add a label with the key `cnpg.io/reload` to it. Otherwise,
     you must reload the instances using the `kubectl cnpg reload` subcommand.
-
 :::
+
 #### Customizing the `streaming_replica` client certificate
 
 In some environments, it may not be possible to generate a certificate with the

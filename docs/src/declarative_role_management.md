@@ -153,8 +153,8 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
 :::warning
     New roles created without `passwordSecret` will have a `NULL` password
     inside PostgreSQL.
-
 :::
+
 ### Password hashed
 
 You can also provide pre-encrypted passwords by specifying the password
@@ -253,5 +253,4 @@ petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" do
     to ignore roles that exist in the database but are not included in the spec.
     The lifecycle of these roles will continue to be managed within PostgreSQL,
     allowing CloudNativePG users to adopt this feature at their convenience.
-
 :::

@@ -12,8 +12,8 @@ framework.
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     you can expect a "Level V - Auto Pilot" set of capabilities from the
     CloudNativePG operator.
-
 :::
+
 Each capability level is associated with a certain set of management features the operator offers:
 
 1. Basic install
@@ -24,8 +24,8 @@ Each capability level is associated with a certain set of management features th
 
 :::note
     We consider this framework as a guide for future work and implementations in the operator.
-
 :::
+
 ## Level 1: Basic install
 
 Capability level 1 involves installing and configuring the
@@ -35,8 +35,8 @@ operator and a PostgreSQL cluster configuration.
 
 :::info[Important]
     We consider information security part of this level.
-
 :::
+
 ### Operator deployment via declarative configuration
 
 The operator is installed in a declarative way using a Kubernetes manifest
@@ -245,8 +245,8 @@ it also makes sure that all instances are properly reloaded or restarted.
 :::note
     Changes with `ALTER SYSTEM` aren't detected, meaning
     that the cluster state isn't enforced.
-
 :::
+
 ### Import of existing PostgreSQL databases
 
 The operator provides a declarative way to import existing

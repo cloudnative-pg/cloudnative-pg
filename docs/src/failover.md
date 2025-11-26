@@ -29,8 +29,8 @@ controller will initiate the failover process, in two steps:
     fashion, and that the failing primary will not start streaming WALs again upon
     restart. These safeguards prevent timeline discrepancies between the new primary
     and the replicas.
-
 :::
+
 During the time the failing primary is being shut down:
 
 1. It will first try a PostgreSQL's *fast shutdown* with
@@ -45,8 +45,8 @@ During the time the failing primary is being shut down:
     and clients are forcibly disconnected, then the server is shut down.
     "Immediate" mode will abort all PostgreSQL server processes immediately,
     without a clean shutdown.
-
 :::
+
 ## RTO and RPO impact
 
 Failover may result in the service being impacted ([RTO](before_you_start.md#rto))
@@ -69,8 +69,8 @@ and/or data being lost ([RPO](before_you_start.md#rpo)):
     as in the case of a switchover. Increasing the time for fast shutdown is safer
     from an RPO point of view, but possibly delays the return to normal operation -
     negatively affecting RTO.
-
 :::
+
 :::warning
     As already mentioned in the ["Instance Manager" section](instance_manager.md)
     when explaining the switchover process, the `.spec.switchoverDelay` option
@@ -79,8 +79,8 @@ and/or data being lost ([RPO](before_you_start.md#rpo)):
     level. On the contrary, setting it to a high value, might remove the risk of
     data loss while leaving the cluster without an active primary for a longer time
     during the switchover.
-
 :::
+
 ## Delayed failover
 
 As anticipated above, the `.spec.failoverDelay` option allows you to delay the start
@@ -102,8 +102,8 @@ prevent premature failover for short-lived network or node instability.
 :::warning
     *Failover quorum* is an experimental feature introduced in version 1.27.0.
     Use with caution in production environments.
-
 :::
+
 Failover quorum is a mechanism that enhances data durability and safety during
 failover events in CloudNativePG-managed PostgreSQL clusters.
 
@@ -174,8 +174,8 @@ takes precedence over the `Cluster` spec option:
     `.spec.postgresql.synchronous.failoverQuorum` option and remove the annotation
     from their manifests. The annotation is **deprecated** and will be removed in a
     future release.
-
 :::
+
 ### How it works
 
 Before promoting a replica to primary, the operator performs a quorum check,
@@ -207,8 +207,8 @@ Users can force a promotion of a replica to primary through the
     make sure you fully understand the risk of data loss and carefully consider the
     consequences of prioritizing the resumption of write workloads for your
     applications.
-
 :::
+
 An additional CRD is used to track the quorum state of the cluster. A `Cluster`
 with the quorum failover enabled will have a `FailoverQuorum` resource with the same
 name as the `Cluster` resource. The `FailoverQuorum` CR is created by the
@@ -222,8 +222,8 @@ replication.
     PostgreSQL configuration changes, when it is not possible to determine the
     configuration, the `FailoverQuorum` resource will be reset, preventing any
     failover until the new configuration is applied.
-
 :::
+
 The `FailoverQuorum` resource works in conjunction with PostgreSQL synchronous
 replication.
 
@@ -232,8 +232,8 @@ replication.
     client but that have not been performed synchronously, such as those made
     explicitly disabling synchronous replication with
     `SET synchronous_commit TO local`, will be present on a promoted replica.
-
 :::
+
 ### Quorum Failover Example Scenarios
 
 In the following scenarios, `R` is the number of promotable replicas, `W` is

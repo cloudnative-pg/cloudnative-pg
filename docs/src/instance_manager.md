@@ -26,8 +26,8 @@ standby, has fully started.
     [`pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html).
     However, the behavior can be customized by specifying a different startup
     strategy.
-
 :::
+
 While the startup probe is running, the liveness and readiness probes remain
 disabled. Following Kubernetes standards, if the startup probe fails, the
 kubelet will terminate the container, which will then be restarted.
@@ -43,8 +43,8 @@ your specific environment.
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
     prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL
     hasn’t fully initialized.
-
 :::
+
 CloudNativePG configures the startup probe with the following default parameters:
 
 ```yaml
@@ -63,13 +63,13 @@ section of your configuration.
 :::warning
     Be sure that any custom probe settings are tailored to your cluster's
     operational requirements to avoid unintended disruptions.
-
 :::
+
 :::info
     For more details on probe configuration, refer to the
     [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
-
 :::
+
 If you manually specify `.spec.probes.startup.failureThreshold`, it will
 override the default behavior and disable the automatic use of `startDelay`.
 
@@ -116,16 +116,16 @@ To accommodate these requirements, CloudNativePG extends the
     The `.spec.probes.startup.maximumLag` option is validated and enforced only
     during the startup phase of the pod, meaning it applies exclusively when the
     replica is starting.
-
 :::
+
 :::warning
     Incorrect configuration of the `maximumLag` option can cause continuous
     failures of the startup probe, leading to repeated replica restarts. Ensure
     you understand how this option works and configure appropriate values for
     `failureThreshold` and `periodSeconds` to give the replica enough time to
     catch up with its source.
-
 :::
+
 The following example requires a replica to have a maximum lag of 16Mi from the
 source to be considered started:
 
@@ -172,13 +172,13 @@ section of your configuration.
 :::warning
     Be sure that any custom probe settings are tailored to your cluster's
     operational requirements to avoid unintended disruptions.
-
 :::
+
 :::info
     For more details on probe configuration, refer to the
     [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
-
 :::
+
 If you manually specify `.spec.probes.liveness.failureThreshold`, it will
 override the default behavior and disable the automatic use of
 `livenessProbeTimeout`.
@@ -221,8 +221,8 @@ spec:
     Be aware that the default liveness probe settings—automatically derived from `livenessProbeTimeout`—might
     be aggressive (30 seconds). As such, we recommend explicitly setting the
     liveness probe configuration to suit your environment.
-
 :::
+
 The spec also accepts two optional network settings: `requestTimeout`
 and `connectionTimeout`, both defaulting to `1000` (in milliseconds).
 In cloud environments, you may need to increase these values.
@@ -249,8 +249,8 @@ accept traffic and serve requests at any point during the pod's lifecycle.
     [`pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html).
     However, the behavior can be customized by specifying a different readiness
     strategy.
-
 :::
+
 Following Kubernetes standards, if the readiness probe fails, the pod will be
 marked unready and will not receive traffic from any services. An unready pod
 is also ineligible for promotion during automated failover scenarios.
@@ -281,13 +281,13 @@ spec:
 :::warning
     Ensure that any custom probe settings are aligned with your cluster’s
     operational requirements to prevent unintended disruptions.
-
 :::
+
 :::info
     For more information on configuring probes, see the
     [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
-
 :::
+
 ### Readiness Probe Strategy
 
 In certain scenarios, you may need to customize the readiness strategy for your
@@ -304,8 +304,8 @@ section for detailed information on these options.
     Unlike the startup probe, the `.spec.probes.readiness.maximumLag` option is
     continuously monitored. A lagging replica may become unready if this setting is
     not appropriately tuned.
-
 :::
+
 :::warning
     Incorrect configuration of the `maximumLag` option can lead to repeated
     readiness probe failures, causing serious consequences, such as:
@@ -315,14 +315,14 @@ section for detailed information on these options.
     - Disruptions in read/read-only services.
     - In longer failover times scenarios, replicas might be declared unready,
       leading to a cluster stall requiring manual intervention.
-
 :::
+
 :::note[Recommendation]
     Use the `streaming` and `maximumLag` options with extreme caution. If
     you're unfamiliar with PostgreSQL replication, rely on the default
     strategy. Seek professional advice if unsure.
-
 :::
+
 The following example requires a replica to have a maximum lag of 64Mi from the
 source to be considered ready. It also provides approximately 300 seconds (30
 failures × 10 seconds) for the startup probe to succeed:
@@ -365,8 +365,8 @@ seconds.
     the database [RPO](before_you_start.md#rpo), don't delete the Pod where
     the primary instance is running. In this case, perform a switchover to
     another instance first.
-
 :::
+
 ### Shutdown of the primary during a switchover
 
 During a switchover, the shutdown procedure slightly differs from the general
@@ -386,8 +386,8 @@ the WAL files. By default it is set to `3600` (1 hour).
     and/or backup level. On the contrary, setting it to a high value, might remove
     the risk of data loss while leaving the cluster without an active primary for a
     longer time during the switchover.
-
 :::
+
 ## Failover
 
 In case of primary pod failure, the cluster will go into failover mode.
@@ -408,15 +408,15 @@ metrics on disk usage exported to Prometheus.
 :::info[Important]
     In a production system, it is critical to monitor the database
     continuously. Exhausted disk storage can lead to a database server shutdown.
-
 :::
+
 :::note
     The detection of exhausted storage relies on a storage class that
     accurately reports disk size and usage. This may not be the case in simulated
     Kubernetes environments like Kind or with test storage class implementations
     such as `csi-driver-host-path`.
-
 :::
+
 If the disk containing the WALs becomes full and no more WAL segments can be
 stored, PostgreSQL will stop working. CloudNativePG correctly detects this issue
 by verifying that there is enough space to store the next WAL segment,

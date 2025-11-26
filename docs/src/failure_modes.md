@@ -6,8 +6,8 @@
     scenarios. Since these largely follow standard Kubernetes behavior, we have
     streamlined the content to avoid duplication of information that belongs to the
     underlying Kubernetes stack and is not specific to CloudNativePG.
-
 :::
+
 CloudNativePG adheres to standard Kubernetes principles for self-healing and
 high availability. We assume familiarity with core Kubernetes concepts such as
 storage classes, PVCs, nodes, and Pods. For CloudNativePG-specific details,
@@ -18,8 +18,8 @@ covers startup, liveness, and readiness probes, as well as the
 :::info[Important]
     If you are running CloudNativePG in production, we strongly recommend
     seeking [professional support](https://cloudnative-pg.io/support/).
-
 :::
+
 ## Self-Healing
 
 ### Primary Failure
@@ -50,8 +50,8 @@ may be required.
 
 :::info[Important]
     Do not perform manual operations without [professional support](https://cloudnative-pg.io/support/).
-
 :::
+
 ### Disabling Reconciliation
 
 To temporarily disable the reconciliation loop for a PostgreSQL cluster, use
@@ -73,5 +73,4 @@ operations.
     This annotation should be removed as soon as the issue is resolved. Leaving
     it in place prevents the operator from executing self-healing actions,
     including failover.
-
 :::

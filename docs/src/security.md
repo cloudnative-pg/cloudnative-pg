@@ -9,14 +9,14 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
     performing regular InfoSec duties on your Kubernetes cluster. Please
     familiarize yourself with the ["Overview of Cloud Native Security"](https://kubernetes.io/docs/concepts/security/overview/)
     page from the Kubernetes documentation.
-
 :::
+
 :::note[About the 4C's Security Model]
     Please refer to ["The 4C’s Security Model in Kubernetes"](https://www.enterprisedb.com/blog/4cs-security-model-kubernetes)
     blog article to get a better understanding and context of the approach EDB
     has taken with security in CloudNativePG.
-
 :::
+
 ## Code
 
 CloudNativePG's source code undergoes systematic static analysis, including
@@ -57,8 +57,8 @@ please use this medium to report it.
     A failure in the static code analysis phase of the CI/CD pipeline will
     block the entire delivery process of CloudNativePG. Every commit must pass all
     the linters defined by GolangCI-Lint.
-
 :::
+
 ## Container
 
 Every container image in CloudNativePG is automatically built via CI/CD
@@ -71,8 +71,8 @@ PostgreSQL version.
     to incorporate the latest security updates at both the base image and package
     levels. This ensures that container images distributed to the community receive
     **patch-level updates** regularly.
-
 :::
+
 During the CI/CD process, images are scanned using the following tools:
 
 - **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
@@ -151,8 +151,8 @@ container-level security:
     For more information on the approach that EDB has taken regarding security
     at the container level in CloudNativePG, please refer to the blog article
     ["Security and Containers in CloudNativePG"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql).
-
 :::
+
 ## Cluster
 
 Security at the cluster level takes into account all Kubernetes components that
@@ -179,8 +179,8 @@ more about these roles, you can use the `kubectl describe clusterrole` or
     accessible by the users of the operator that interact only with `Cluster`,
     `Pooler`, `Backup`, `ScheduledBackup`, `Database`, `Publication`,
     `Subscription`, `ImageCatalog` and `ClusterImageCatalog` resources.
-
 :::
+
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
 namespaced or non-namespaced resources.
@@ -272,8 +272,8 @@ permission management.
    OLM allows you to deploy the operator in its own namespace and configure it
    to watch specific namespaces used for CloudNativePG clusters. This setup helps
    to contain permissions and restrict access more effectively.
-
 :::
+
 #### Why Are ClusterRole Permissions Needed?
 
 The operator currently requires `ClusterRole` permissions to read `nodes` and
@@ -301,8 +301,8 @@ PostgreSQL `Cluster` resource name.
     The operand can only access a specific and limited subset of resources
     through the API server. A service account is the
     [recommended way to access the API server from within a Pod](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/).
-
 :::
+
 For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
 file. For example, to retrieve the permissions of a generic `mypg` cluster in the
@@ -320,8 +320,8 @@ kubectl get rolebinding -n myns mypg -o yaml
 
 :::info[Important]
     Remember that **roles are limited to a given namespace**.
-
 :::
+
 Below we provide a quick summary of the permissions associated with the service
 account for generic Kubernetes resources.
 
@@ -411,8 +411,8 @@ pods and containers through the `spec.podSecurityContext` and
     override and how they merge with the operator defaults, test changes
     in a non-production environment, and apply the minimal, well-documented
     modifications necessary.
-
 :::
+
 **Pod Security Context** (`spec.podSecurityContext`):
 This allows you to override the default `PodSecurityContext` applied to all
 PostgreSQL cluster pods. When specified, it will merge with the operator's
@@ -466,15 +466,15 @@ spec:
     For any fields you don't explicitly set, the operator will apply its
     secure defaults. This ensures that even partial configurations maintain
     security best practices.
-
 :::
+
 :::note
     These fields are particularly useful when working with the
     [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
     `restricted` profile, which has strict requirements for pod and container
     security contexts.
-
 :::
+
 #### Security Context Constraints
 
 When running in an environment that is utilizing
@@ -492,6 +492,7 @@ the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` con
 
 :::note[Example of cluster annotations]
 :::
+
 ```
 	kind: Cluster
 	metadata:
@@ -505,8 +506,8 @@ the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` con
 :::warning
     Using this kind of annotations can result in your cluster to stop working.
     If this is the case, the annotation can be safely removed from the `Cluster`.
-
 :::
+
 The AppArmor configuration must be at Kubernetes node level, meaning that the
 underlying operating system must have this option enable and properly
 configured.
@@ -536,8 +537,8 @@ You can find more information in the [networking document](networking.md).
     make sure you keep this in mind in case you add any network policy,
     and refer to the "Exposed Ports" section below for a list of ports used by
     CloudNativePG for finer control.
-
 :::
+
 Network policies are beyond the scope of this document.
 Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 section of the Kubernetes documentation for further information.
@@ -568,8 +569,8 @@ if requested by setting `enableSuperuserAccess` to `true`, for the
     where changes to PostgreSQL are performed in a declarative way through the
     `spec` of the `Cluster` resource, while providing developers with full powers
     inside the database through the database owner user.
-
 :::
+
 As far as password encryption is concerned, CloudNativePG follows
 the default behavior of PostgreSQL: starting from PostgreSQL 14,
 `password_encryption` is by default set to `scram-sha-256`, while on earlier
@@ -578,15 +579,15 @@ versions it is set to `md5`.
 :::info[Important]
     Please refer to the ["Password authentication"](https://www.postgresql.org/docs/current/auth-password.html)
     section in the PostgreSQL documentation for details.
-
 :::
+
 :::note
     The operator supports toggling the `enableSuperuserAccess` option. When you
     disable it on a running cluster, the operator will ignore the content of the secret,
     remove it (if previously generated by the operator) and set the password of the
     `postgres` user to `NULL` (de facto disabling remote access through password authentication).
-
 :::
+
 See the ["Secrets" section in the "Connecting from an application" page](applications.md#secrets) for more information.
 
 You can use those files to configure application access to the database.
@@ -613,8 +614,8 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
 
 :::info[Important]
     Examples assume that the Kubernetes cluster runs in a private and secure network.
-
 :::
+
 ### Storage
 
 CloudNativePG delegates encryption at rest to the underlying storage class. For

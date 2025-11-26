@@ -50,8 +50,8 @@ For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
     before the `postmaster`. This behavior helps keep the PostgreSQL instance
     alive for as long as possible and enables a clean shutdown procedure in the
     event of an eviction.
-
 :::
+
 To avoid resources related issues in Kubernetes, we can refer to the best practices for "out of resource" handling
 while creating a cluster:
 
@@ -109,5 +109,4 @@ section in the PostgreSQL documentation.
     For more details on resource management, please refer to the
     ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
     page from the Kubernetes documentation.
-
 :::

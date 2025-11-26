@@ -57,8 +57,8 @@ the PostgreSQL cluster.
 :::info
     For field-level details, see the
     [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExtensionConfiguration).
-
 :::
+
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 
 By default, CloudNativePG automatically manages the relevant GUCs, setting:
@@ -76,15 +76,15 @@ requiring manual configuration inside the pod.
     Depending on how your extension container images are built and their layout,
     you may need to adjust the default `extension_control_path` and
     `dynamic_library_path` values to match the image structure.
-
 :::
+
 :::info[Important]
     If the extension image includes shared libraries, they must be compiled
     with the same PostgreSQL major version, operating system distribution, and CPU
     architecture as the PostgreSQL container image used by your cluster, to ensure
     compatibility and prevent runtime issues.
-
 :::
+
 ## How to add a new extension
 
 Adding an extension to a database in CloudNativePG involves a few steps:
@@ -102,8 +102,8 @@ Adding an extension to a database in CloudNativePG involves a few steps:
     First, allow the pod to roll out with the new extension image, then update
     the PostgreSQL configuration.
     This limitation will be addressed in a future release of CloudNativePG.
-
 :::
+
 For illustration purposes, this guide uses a simple, fictitious extension named
 `foo` that supports `CREATE EXTENSION`.
 
@@ -143,8 +143,8 @@ image.
     ensure you have thoroughly tested it in a staging environment to prevent
     configuration issues that could leave your PostgreSQL cluster in an unhealthy
     state.
-
 :::
+
 Once mounted, CloudNativePG will automatically configure PostgreSQL by appending:
 
 - `/extensions/foo/share` to `extension_control_path`
@@ -311,8 +311,8 @@ system libraries at runtime.
     changing this value requires a **cluster restart** for the new value to take effect.
     CloudNativePG does not currently trigger this restart automatically; you will need to
     manually restart the cluster (e.g., using `cnpg restart`) after modifying `ld_library_path`.
-
 :::
+
 ## Image Specifications
 
 A standard extension container image for CloudNativePG includes two
@@ -336,8 +336,8 @@ manual configuration.
     be built using the distribution’s native packaging system (for example, using
     Debian or RPM packages). This approach ensures consistency, security, and
     compatibility with the PostgreSQL images used in your clusters.
-
 :::
+
 ## Caveats
 
 Currently, adding, removing, or updating an extension image triggers a

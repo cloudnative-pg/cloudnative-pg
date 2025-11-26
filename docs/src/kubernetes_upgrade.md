@@ -47,8 +47,8 @@ storage, or simply *local storage*, is employed to enhance performance.
     handle scenarios where volumes are reused by pods on different nodes after a
     drain operation. In such cases, you can skip the remaining sections of this
     document.
-
 :::
+
 ## Pod Disruption Budgets
 
 By default, CloudNativePG safeguards Postgres cluster operations. If a node is
@@ -100,8 +100,8 @@ on draining the node during development activities.
     it is currently recommended to transition to direct control of pod disruption
     budgets, as explained in the previous section. This section is retained
     mainly for backward compatibility.
-
 :::
+
 Prior to release 1.23, CloudNativePG had just one declarative mechanism to manage
 Kubernetes upgrades when dealing with local storage: you had to temporarily put
 the cluster in **maintenance mode** through the `nodeMaintenanceWindow` option
@@ -114,8 +114,8 @@ enlarging the partition on the physical node or updating the node itself.
     behaviors of Kubernetes are either disabled or running with
     some limitations, including self-healing, rolling updates,
     and Pod disruption budget.
-
 :::
+
 The `nodeMaintenanceWindow` option of the cluster has two further
 settings:
 
@@ -145,22 +145,22 @@ reusePVC disabled: see section below.
     to add the `--delete-emptydir-data` option.
     Don't be afraid: it refers to another volume internally used
     by the operator - not the PostgreSQL data directory.
-
 :::
+
 :::info[Important]
     `PodDisruptionBudget` management can be disabled by setting the
     `.spec.enablePDB` field to `false`. In that case, the operator won't
     create `PodDisruptionBudgets` and will delete them if they were
     previously created.
-
 :::
+
 ### Single instance clusters with `reusePVC` set to `false`
 
 :::info[Important]
     We recommend to always create clusters with more
     than one instance in order to guarantee high availability.
-
 :::
+
 Deleting the only PostgreSQL instance in a single instance cluster with
 `reusePVC` set to `false` would imply all data being lost,
 therefore we prevent users from draining nodes such instances might be running

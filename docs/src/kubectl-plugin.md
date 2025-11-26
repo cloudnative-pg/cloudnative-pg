@@ -10,8 +10,8 @@ You can install the `cnpg` plugin using a variety of methods.
 :::note
     For air-gapped systems, installation via package managers, using previously
     downloaded files, may be a good option.
-
 :::
+
 ### Via the installation script
 
 ```sh
@@ -119,8 +119,8 @@ kubectl krew upgrade cnpg
 
 :::note
     Please note that the Homebrew community manages the availability of the [kubectl-cnpg plugin on Homebrew](https://formulae.brew.sh/formula/kubectl-cnpg).
-
 :::
+
 If you already have [Homebrew](https://brew.sh/) installed, you can simply
 run:
 
@@ -139,8 +139,8 @@ brew upgrade kubectl-cnpg
 :::note
     Auto-completion for the kubectl plugin is already managed by Homebrew.
     There's no need to create the `kubectl_complete-cnpg` script mentioned below.
-
 :::
+
 ### Supported Architectures
 
 CloudNativePG Plugin is currently built for the following
@@ -183,8 +183,8 @@ sudo mv kubectl_complete-cnpg /usr/local/bin
 
 :::info[Important]
     The name of the script needs to be exactly the one provided since it's used by the kubectl auto-complete process
-
 :::
+
 ## Use
 
 Once the plugin is installed and deployed, you can start using it like this:
@@ -197,8 +197,8 @@ kubectl cnpg COMMAND [ARGS...]
     The plugin automatically detects if the standard output channel is connected to a terminal.
     In such cases, it may add ANSI colors to the command output. To disable colors, use the
     `--color=never` option with the command.
-
 :::
+
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
@@ -268,8 +268,8 @@ cluster, including:
     the `Current Write LSN` location in the main header, might be different
     from the `Current LSN` field in the instances status as it is taken at
     two different time intervals.
-
 :::
+
 ```sh
 kubectl cnpg status sandbox
 ```
@@ -372,8 +372,8 @@ The command also supports output in `yaml` and `json` format.
     For clusters with large data volumes (e.g., over 1TB), these operations may
     take longer than the default timeout of 10 seconds. You can adjust the timeout
     using the `--timeout` flag (e.g., `kubectl cnpg status sandbox --timeout 45s`).
-
 :::
+
 ### Promote
 
 The meaning of this command is to `promote` a pod in the cluster to primary, so you
@@ -441,8 +441,8 @@ common case for this will be a minor upgrade of PostgreSQL image.
 :::note
     If you want ConfigMaps and Secrets to be **automatically** reloaded
     by instances, you can add a label with key `cnpg.io/reload` to it.
-
 :::
+
 ### Reload
 
 The `kubectl cnpg reload` command requests the operator to trigger a reconciliation
@@ -511,21 +511,21 @@ regarding the operator deployment, configuration and events.
     The Data map will show the **keys** but the values will be empty.
     The flag `-S` / `--stopRedaction` will defeat the redaction and show the
     values. Use only at your own risk, this will share private data.
-
 :::
+
 :::note
     By default, operator logs are not collected, but you can enable operator
     log collection with the `--logs` flag
-
 :::
+
 :::info[Least-Privilege Support]
     The `report operator` command works with minimal permissions. Only the operator
     deployment is **required** - all other resources are optional and collected on a
     best-effort basis. If you lack permissions for certain resources (e.g., webhooks,
     OLM resources), warnings are logged and report generation continues with available
     data.
-
 :::
+
 The report includes:
 
 - **deployment information** (required): the operator `Deployment`
@@ -544,13 +544,13 @@ The report includes:
 :::warning[Minimal permissions]
     Read access (`get`) to the operator deployment in the operator namespace.
     This allows namespace-scoped users to generate basic troubleshooting reports.
-
 :::
+
 :::info[Recommended permissions for full report]
     Add `list` on pods, events; `get` on secrets, configmaps, services
     (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
-
 :::
+
 A user with only namespace-scoped permissions can still generate useful
 reports:
 
@@ -563,8 +563,8 @@ kubectl cnpg report operator -n cnpg-system -f report.zip
     The command will log warnings for inaccessible resources but successfully
     generate a report with the deployment manifest, which is often sufficient for
     basic troubleshooting.
-
 :::
+
 The command will generate a ZIP file containing various manifest in YAML format
 (by default, but settable to JSON with the `-o` flag). Use the `-f` flag to
 name a result file explicitly. If the `-f` flag is not used, a default
@@ -575,8 +575,8 @@ time-stamped filename is created for the zip file.
     constrained by namespace. The CNPG Operator will generally not be installed in
     the same namespace as the clusters. E.g. the default installation namespace is
     cnpg-system.
-
 :::
+
 ```sh
 kubectl cnpg report operator -n cnpg-system
 ```
@@ -630,8 +630,8 @@ Archive:  report_operator_<TIMESTAMP>.zip
     when investigating restarted operators.
     In all cases, it will also try to get the CURRENT operator logs. If current
     and previous logs are available, it will show them both.
-
 :::
+
 ```output
 ====== Beginning of Previous Log =====
 2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.28.0-rc1","build":{"Version":"1.28.0-rc1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
@@ -713,8 +713,8 @@ so the `-S` is disabled.
 :::note
     By default, cluster logs are not collected, but you can enable cluster
     log collection with the `--logs` flag
-
 :::
+
 Usage:
 
 ```sh
@@ -929,8 +929,8 @@ of the supported flags and their usage.
 
 :::info
     You can also increase the verbosity of the log by adding more `-v` options.
-
 :::
+
 ### Destroy
 
 The `kubectl cnpg destroy` command helps remove an instance and all the
@@ -969,8 +969,8 @@ annotation.
 :::info
     For more details, see the ["Declarative Hibernation"](declarative_hibernation.md)
     documentation page.
-
 :::
+
 To simplify the process, the `cnpg` plugin for `kubectl` provides a `hibernate`
 command, which acts as a convenient shortcut for applying the annotation.
 
@@ -1067,8 +1067,8 @@ it from the actual pod. This means that you will be using the `postgres` user.
 :::info[Important]
     As you will be connecting as `postgres` user, in production environments this
     method should be used with extreme care, by authorized personnel only.
-
 :::
+
 ```console
 $ kubectl cnpg psql cluster-example
 
@@ -1106,8 +1106,8 @@ reachable in your `PATH` variable to correctly work.
     The `kubectl cnpg snapshot` command has been removed.
     Please use the [`backup` command](#requesting-a-new-physical-backup) to request
     backups using volume snapshots.
-
 :::
+
 ### Using pgAdmin4 for evaluation/demonstration purposes only
 
 [pgAdmin](https://www.pgadmin.org/) stands as the most popular and feature-rich
@@ -1122,8 +1122,8 @@ Kubernetes deployment.
 :::info[Important]
     Deployment of pgAdmin in Kubernetes production environments is beyond the
     scope of this document and, more broadly, of the CloudNativePG project.
-
 :::
+
 However, **for the purposes of demonstration and evaluation**, CloudNativePG
 offers a suitable solution. The `cnpg` plugin implements the `pgadmin4`
 command, providing a straightforward method to connect to a given database
@@ -1182,8 +1182,8 @@ kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
 
 :::warning
     Never deploy pgAdmin in production using the plugin.
-
 :::
+
 ### Logical Replication Publications
 
 The `cnpg publication` command group is designed to streamline the creation and
@@ -1197,8 +1197,8 @@ databases.
     limitations of PostgreSQL's native logical replication system before using
     these commands.
     In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
-
 :::
+
 #### Creating a new publication
 
 To create a logical replication publication, use the `cnpg publication create`
@@ -1224,8 +1224,8 @@ There are two primary use cases:
 :::warning
     When connecting to an external cluster, ensure that the specified user has
     sufficient permissions to execute the `CREATE PUBLICATION` command.
-
 :::
+
 You have several options, similar to the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
 command, to define the group of tables to replicate. Notable options include:
 
@@ -1276,8 +1276,8 @@ which will create a publication named `app` for all the tables in the
     There are two sample files that have been provided for illustration and inspiration:
     [logical-source](samples/cluster-example-logical-source.yaml) and
     [logical-destination](samples/cluster-example-logical-destination.yaml).
-
 :::
+
 #### Dropping a publication
 
 The `cnpg publication drop` command seamlessly complements the `create` command
@@ -1312,8 +1312,8 @@ databases.
     understanding of both the capabilities and limitations of PostgreSQL's
     native logical replication system.
     In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
-
 :::
+
 In addition to subscription management, we provide a helpful command for
 synchronizing all sequences from the source cluster. While its applicability
 may vary, this command can be particularly useful in scenarios involving major
@@ -1363,14 +1363,14 @@ will create a subscription for `app` on the destination cluster.
     Prioritize testing subscriptions in a non-production environment to ensure
     their effectiveness and identify any potential issues before implementing them
     in a production setting.
-
 :::
+
 :::info
     There are two sample files that have been provided for illustration and inspiration:
     [logical-source](samples/cluster-example-logical-source.yaml) and
     [logical-destination](samples/cluster-example-logical-destination.yaml).
-
 :::
+
 #### Dropping a subscription
 
 The `cnpg subscription drop` command seamlessly complements the `create` command.
@@ -1436,8 +1436,8 @@ kubectl cnpg subscription sync-sequences destination-cluster \
     Prioritize testing subscriptions in a non-production environment to
     guarantee their effectiveness and detect any potential issues before deploying
     them in a production setting.
-
 :::
+
 ## Integration with K9s
 
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
@@ -1565,5 +1565,4 @@ rules:
 :::info[Important]
     Keeping the verbs restricted per `resources` and per `apiGroups` helps to
     prevent inadvertently granting more than intended permissions.
-
 :::

@@ -8,8 +8,8 @@
     the plugin-based interface after appropriate testing. The Barman Cloud
     Plugin documentation describes
     [how to use common object stores](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
-
 :::
+
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 
@@ -183,8 +183,8 @@ spec:
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
     add a label with key `cnpg.io/reload` to the Secrets/ConfigMaps. Otherwise, you will have to reload
     the instances using the `kubectl cnpg reload` subcommand.
-
 :::
+
 ## Azure Blob Storage
 
 [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) is the
@@ -352,5 +352,4 @@ Now the operator will use the credentials to authenticate against Google Cloud S
     This way of authentication will create a JSON file inside the container with all the needed
     information to access your Google Cloud Storage bucket, meaning that if someone gets access to the pod
     will also have write permissions to the bucket.
-
 :::

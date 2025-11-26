@@ -10,8 +10,8 @@ the best node possible, based on several criteria.
     for more information on scheduling, including all the available policies. On
     this page we assume you are familiar with concepts like affinity,
     anti-affinity, node selectors, and so on.
-
 :::
+
 You can control how the CloudNativePG cluster's instances should be
 scheduled through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
 section in the definition of the cluster, which supports:
@@ -92,8 +92,8 @@ for automated horizontal scaling in a Kubernetes cluster.
 
 :::note[Inter-pod Affinity and Anti-Affinity]
     For more details, refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
-
 :::
+
 ### Topology Considerations
 
 In cloud environments, you might consider using `topology.kubernetes.io/zone`
@@ -120,8 +120,8 @@ the operator-generated rules are disabled.
     Pod specification. The following YAML example demonstrates how to configure
     only one instance of PostgreSQL per worker node, regardless of which PostgreSQL
     cluster it belongs to:
-
 :::
+
 ```yaml
     additionalPodAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -159,15 +159,15 @@ for tolerations.
 :::note[Taints and Tolerations]
     More information on taints and tolerations can be found in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
-
 :::
+
 ## Isolating PostgreSQL workloads
 
 :::info[Important]
     Before proceeding, please ensure you have read the
     ["Architecture"](architecture.md) section of the documentation.
-
 :::
+
 While you can deploy PostgreSQL on Kubernetes in various ways, we recommend
 following these essential principles for production environments:
 

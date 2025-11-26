@@ -51,8 +51,8 @@ for a more comprehensive example.
     You'll need to either change the `targetPort` in the webhook service, to be
     one of the allowed ones, or open the webhooks' port (`9443`) on the
     firewall.
-
 :::
+
 ### Testing the latest development snapshot
 
 If you want to test or evaluate the latest development snapshot of
@@ -82,8 +82,8 @@ curl -sSfL \
 :::info[Important]
     Snapshots are not supported by the CloudNativePG Community, and are not
     intended for use in production.
-
 :::
+
 ### Using the Helm Chart
 
 The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
@@ -109,8 +109,8 @@ is `cnpg-cloudnative-pg`.
 :::note
     With Helm you can customize the name of the deployment via the
     `fullnameOverride` field in the [*"values.yaml"* file](https://helm.sh/docs/chart_template_guide/values_files/).
-
 :::
+
 You can get more information using the `describe` command in `kubectl`:
 
 ```sh
@@ -142,16 +142,16 @@ plane for self-managed Kubernetes installations).
     You can change the default behavior of the operator by overriding
     some default options. For more information, please refer to the
     ["Operator configuration"](operator_conf.md) section.
-
 :::
+
 ## Upgrades
 
 :::info[Important]
     Please carefully read the [release notes](release_notes.md)
     before performing an upgrade as some versions might require
     extra steps.
-
 :::
+
 Upgrading CloudNativePG operator is a two-step process:
 
 1. upgrade the controller and the related Kubernetes resources
@@ -173,8 +173,8 @@ promote the new primary instance using the `cnpg` plugin for `kubectl`.
 
 :::note[Rolling updates]
     This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
-
 :::
+
 :::info[Important]
     In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
@@ -182,8 +182,8 @@ promote the new primary instance using the `cnpg` plugin for `kubectl`.
     instance, the instance will be automatically restarted as `supervised` value is
     not supported for `primaryUpdateStrategy`. In either case, your applications will
     have to reconnect to PostgreSQL.
-
 :::
+
 The default rolling update behavior can be replaced with in-place updates of
 the instance manager. This approach does not require a restart of the
 PostgreSQL instance, thereby avoiding a switchover within the cluster. This
@@ -268,8 +268,8 @@ only the operator itself.
     We strongly recommend that all CloudNativePG users upgrade to version
     1.28.0, or at least to the latest stable version of your current minor release
     (e.g., 1.27.x).
-
 :::
+
 -->
 
 ### Upgrading to 1.27 from a previous minor version
@@ -278,8 +278,8 @@ only the operator itself.
     We strongly recommend that all CloudNativePG users upgrade to version
     1.27.0, or at least to the latest stable version of your current minor release
     (e.g., 1.26.1).
-
 :::
+
 Version 1.27 introduces a change in the default behavior of the
 [liveness probe](instance_manager.md#liveness-probe): it now enforces the
 [shutdown of an isolated primary](instance_manager.md#primary-isolation)
@@ -304,8 +304,8 @@ spec:
     upgrading the operator will trigger a restart of your PostgreSQL clusters,
     even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
     Your applications will need to reconnect to PostgreSQL after the upgrade.
-
 :::
+
 #### Deprecation of backup metrics and fields in the `Cluster` `.status`
 
 With the transition to a backup and recovery agnostic approach based on CNPG-I
@@ -330,8 +330,8 @@ The following Prometheus metrics are also deprecated:
     Barman Cloud, these fields and metrics are no longer synchronized and will
     not be updated. Users still relying on the in-core support for Barman Cloud
     and volume snapshots can continue to use these fields for the time being.
-
 :::
+
 Under the new plugin-based approach, multiple backup methods can operate
 simultaneously, each with its own timeline for backup and recovery. For
 example, some plugins may provide snapshots without WAL archiving, while others

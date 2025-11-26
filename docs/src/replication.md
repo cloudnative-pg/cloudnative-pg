@@ -13,8 +13,8 @@ read-only workloads and offloading of some work from the primary.
     replicate with another Postgres `Cluster` resource, even across different
     Kubernetes clusters, please refer to the
     ["Replica clusters"](replica_cluster.md) section.
-
 :::
+
 ## Application-level replication
 
 Having contributed throughout the years to the replication feature in
@@ -90,8 +90,8 @@ hostssl replication streaming_replica all cert map=cnpg_streaming_replica
     For details on how CloudNativePG manages certificates, please refer
     to the ["Certificates" section](certificates.md#client-streaming_replica-certificate)
     in the documentation.
-
 :::
+
 If configured, the operator manages replication slots for all the replicas in the
 HA cluster, ensuring that WAL files required by each standby are retained on
 the primary's storage, even after a failover or switchover.
@@ -101,8 +101,8 @@ the primary's storage, even after a failover or switchover.
     High Availability replicas, please refer to the
     ["Replication slots for High Availability" section](#replication-slots-for-high-availability)
     below.
-
 :::
+
 ### Continuous backup integration
 
 In case continuous backup is configured in the cluster, CloudNativePG
@@ -123,14 +123,14 @@ CloudNativePG supports both
     than strict data durability in your setup, this setting can be adjusted. For
     details on managing this behavior, refer to the [Data Durability and Synchronous Replication](#data-durability-and-synchronous-replication)
     section.
-
 :::
+
 :::info[Important]
     The [*failover quorum* feature](failover.md#failover-quorum-quorum-based-failover) (experimental)
     can be used alongside synchronous replication to improve data durability
     and safety during failover events.
-
 :::
+
 Direct configuration of the `synchronous_standby_names` option is not
 permitted. However, CloudNativePG automatically populates this option with the
 names of local pods, while also allowing customization to extend synchronous
@@ -233,8 +233,8 @@ set `method` to `first`.
     synchronous replication beyond the current cluster using the
     `maxStandbyNamesFromCluster`, `standbyNamesPre`, and `standbyNamesPost`
     options explained below.
-
 :::
+
 ### Controlling `synchronous_standby_names` Content
 
 By default, CloudNativePG populates `synchronous_standby_names` with the names
@@ -259,8 +259,8 @@ the PostgreSQL cluster. You can customize the content of
     `standbyNamesPost`. CloudNativePG expects that you manage any standby with
     an `application_name` listed here, ensuring their high availability.
     Incorrect entries can jeopardize your PostgreSQL database uptime.
-
 :::
+
 #### Examples
 
 Here are some examples, all based on a `cluster-example` with three instances:
@@ -332,8 +332,8 @@ replication. It can be set to `required` or `preferred`, with the default being
 :::info[Important]
     `preferred` can only be used when `standbyNamesPre` and `standbyNamesPost`
     are unset.
-
 :::
+
 #### Required Data Durability
 
 When `dataDurability` is set to `required`, PostgreSQL only considers
@@ -411,16 +411,16 @@ number of standbys are available.
     once. However, CloudNativePG allows you to configure startup and readiness
     probes for replicas based on maximum lag. For more details, please refer to
     the ["Postgres instance manager" section](instance_manager.md).
-
 :::
+
 This setting balances data safety with availability, enabling applications to
 continue writing during temporary standby unavailability—hence, it’s also known
 as *self-healing mode*.
 
 :::warning
     This mode may result in data loss if all standbys become unavailable.
-
 :::
+
 With `preferred` data durability, **only healthy replicas** are included in
 `synchronous_standby_names`.
 
@@ -480,12 +480,12 @@ spec:
     control over the `synchronous_standby_names` option.
     It is recommended to gradually migrate to the new configuration method for
     synchronous replication, as explained in the previous paragraph.
-
 :::
+
 :::info[Important]
     The deprecated method and the new method are mutually exclusive.
-
 :::
+
 CloudNativePG supports the configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
 and `maxSyncReplicas`, which are the minimum and the maximum number of expected
@@ -498,8 +498,8 @@ the number of available replicas to determine the quorum.
     replicas indistinctively. You can limit on which nodes your synchronous
     replicas can be scheduled, by working on node labels through the
     `syncReplicaElectionConstraint` option as described in the next section.
-
 :::
+
 Synchronous replication is disabled by default (`minSyncReplicas` and
 `maxSyncReplicas` are not defined).
 In case both `minSyncReplicas` and `maxSyncReplicas` are set, CloudNativePG
@@ -521,8 +521,8 @@ Where:
     `minSyncReplicas` if such value is higher than the currently available
     number of replicas. Synchronous replication is automatically disabled
     when `readyReplicas` is `0`.
-
 :::
+
 As stated in the
 [PostgreSQL documentation](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION),
 the *method `ANY` specifies a quorum-based synchronous replication and makes
@@ -534,8 +534,8 @@ requested number of synchronous standbys in the list*.
     synchronous replication settings, our recommendation is to plan for
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
-
 :::
+
 ### Select nodes for synchronous replication
 
 CloudNativePG enables you to select which PostgreSQL instances are eligible to
@@ -546,14 +546,14 @@ Postgres pod are.
 :::note[Scheduling]
     For more information on the general pod affinity and anti-affinity rules,
     please check the ["Scheduling" section](scheduling.md).
-
 :::
+
 :::warning
     The `.spec.postgresql.syncReplicaElectionConstraint` option only applies to the
     legacy implementation of synchronous replication
     (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated)).
-
 :::
+
 As an example use-case for this feature: in a cluster with a single sync
 replica, we would be able to ensure the sync replica will be in a different
 availability zone from the primary instance, usually identified by
@@ -573,8 +573,8 @@ the replicas are eligible for synchronous replication.
     The self-healing enforcement still applies while defining additional
     constraints for synchronous replica election
     (see ["Synchronous replication"](replication.md#synchronous-replication)).
-
 :::
+
 The example below shows how this can be done through the
 `syncReplicaElectionConstraint` section within `.spec.postgresql`.
 `nodeLabelsAntiAffinity` allows you to specify those node labels that need to be
@@ -692,8 +692,8 @@ replication slots, you can still [create your own slots via SQL](https://www.pos
     we receive from users. The reason is that replication slots exist
     for a specific purpose and each should be managed by a specific application
     the oversees the entire lifecycle of the slot on the primary.
-
 :::
+
 CloudNativePG can manage the synchronization of any user managed physical
 replication slots between the primary and standbys, similarly to what it does
 for the HA replication slots explained above (the only difference is that you
@@ -736,8 +736,8 @@ Here follows a brief description of the main options:
     Users utilizing this feature should carefully monitor user-defined replication
     slots to ensure they align with their operational requirements and do not
     interfere with the failover process.
-
 :::
+
 ### Synchronization frequency
 
 You can also control the frequency with which a standby queries the
@@ -865,6 +865,4 @@ the lag from the primary.
 :::note[Monitoring]
     Please refer to the ["Monitoring" section](monitoring.md) for details on
     how to monitor a CloudNativePG deployment.
-
-
 :::
