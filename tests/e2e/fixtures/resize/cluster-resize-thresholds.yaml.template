@@ -1,0 +1,45 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-resize-thresholds
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "110"
+      log_checkpoints: "on"
+
+  # Resource requirements for initial setup
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  # Strict threshold configuration for testing
+  resourceResizePolicy:
+    strategy: InPlace
+    cpu:
+      restartPolicy: NotRequired
+      maxIncreasePct: 50  # Very strict - only 50% increase allowed
+      maxDecreasePct: 25  # Only 25% decrease allowed
+    memory:
+      restartPolicy: RestartContainer
+      maxIncreasePct: 25  # Very strict - only 25% increase allowed
+      maxDecreasePct: 10  # Only 10% decrease allowed
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
