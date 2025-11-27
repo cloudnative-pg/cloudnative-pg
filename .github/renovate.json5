@@ -20,7 +20,6 @@
     'contribute/**',
     'licenses/**',
     'pkg/versions/**',
-    'pkg/specs/pgbouncer/',
   ],
   postUpdateOptions: [
     'gomodTidy',
@@ -31,6 +30,17 @@
     'do not backport',
     'no-issue',
   ],
+  'pip-compile': {
+    managerFilePatterns: [
+      '/(^|/)workflow-requirements\\.txt$/',
+    ],
+  },
+  pip_requirements: {
+    enabled: false,
+  },
+  pip_setup: {
+    enabled: false,
+  },
   customManagers: [
     {
       customType: 'regex',
@@ -79,7 +89,6 @@
       customType: 'regex',
       managerFilePatterns: [
         '/^pkg\\/versions\\/versions\\.go$/',
-        '/^pkg\\/specs\\/pgbouncer\\/deployments\\.go$/',
       ],
       matchStrings: [
         'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
@@ -99,6 +108,17 @@
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns:  [
+        '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
+        '/^hack/e2e/run-e2e-local.sh$/',
+        '/^hack/e2e/run-e2e\\.sh$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+go install ([^@]+?)@(?<currentValue>.+)',
+      ],
     },
   ],
   packageRules: [

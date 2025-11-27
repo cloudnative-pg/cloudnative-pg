@@ -34,10 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -115,8 +117,14 @@ func NewCmd() *cobra.Command {
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
+			// Since version 0.19.0 of controller-runtime, it is not allowed to create multiple controllers with the
+			// same name. As this part of the code is run inside a retry block, we need to allow SkipNameValidation
+			// only on retries, because a previous run may have already created a controller
+			// Reference https://github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.19.0
+			var skipNameValidation bool
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
-				return runSubCommand(ctx, instance, pprofHTTPServer)
+				defer func() { skipNameValidation = true }()
+				return runSubCommand(ctx, instance, pprofHTTPServer, skipNameValidation)
 			})
 
 			if errors.Is(err, errNoFreeWALSpace) {
@@ -157,13 +165,19 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer bool) error { //nolint:gocognit,gocyclo
+func runSubCommand( //nolint:gocognit,gocyclo
+	ctx context.Context,
+	instance *postgres.Instance,
+	pprofServer bool,
+	skipNameValidation bool,
+) error {
 	var err error
 
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
-		"build", versions.Info)
+		"build", versions.Info,
+		"skipNameValidation", skipNameValidation)
 
 	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
 	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
@@ -225,6 +239,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 		},
 		Logger:           contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
 		PprofBindAddress: getPprofServerAddress(pprofServer),
+		Controller: ctrlconfig.Controller{
+			SkipNameValidation: ptr.To(skipNameValidation),
+		},
 	})
 	if err != nil {
 		contextLogger.Error(err, "unable to set up overall controller manager")
@@ -279,6 +296,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 	// postgres CSV logs handler (PGAudit too)
 	postgresLogPipe := logpipe.NewLogPipe()
 	if err := mgr.Add(postgresLogPipe); err != nil {
+		contextLogger.Error(err, "unable to add CSV logs handler")
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, postgresLogPipe.GetInitializedCondition())
@@ -288,6 +306,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 	rawPipe := logpipe.NewRawLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName),
 		logpipe.LoggingCollectorRecordName)
 	if err := mgr.Add(rawPipe); err != nil {
+		contextLogger.Error(err, "unable to add raw logs handler")
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, rawPipe.GetExecutedCondition())
@@ -296,12 +315,14 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 	// json logs handler
 	jsonPipe := logpipe.NewJSONLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName+".json"))
 	if err := mgr.Add(jsonPipe); err != nil {
+		contextLogger.Error(err, "unable to add JSON logs handler")
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
 
 	if err := instancestorage.ReconcileWalDirectory(ctx); err != nil {
+		contextLogger.Error(err, "unable to move `pg_wal` directory to the attached volume")
 		return err
 	}
 
@@ -338,6 +359,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 	defer onlineUpgradeCancelFunc()
 	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
+		contextLogger.Error(err, "unable to create remote webserver runnable")
 		return err
 	}
 	if err = mgr.Add(remoteSrv); err != nil {
@@ -351,6 +373,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 		mgr.GetEventRecorderFor("local-webserver"),
 	)
 	if err != nil {
+		contextLogger.Error(err, "unable to create local webserver runnable")
 		return err
 	}
 	if err = mgr.Add(localSrv); err != nil {
@@ -360,10 +383,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance, pprofServer
 
 	metricsServer, err := metricserver.New(instance, metricsExporter)
 	if err != nil {
+		contextLogger.Error(err, "unable to create metrics server runnable")
 		return err
 	}
 	if err = mgr.Add(metricsServer); err != nil {
-		contextLogger.Error(err, "unable to add local webserver runnable")
+		contextLogger.Error(err, "unable to add metrics server runnable")
 		return err
 	}
 

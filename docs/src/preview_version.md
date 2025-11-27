@@ -1,3 +1,9 @@
+---
+id: preview_version
+sidebar_position: 570
+title: Preview Versions
+---
+
 # Preview Versions
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -36,11 +42,9 @@ are not backwards compatible and could be removed entirely.
 
 There are currently no preview versions available.
 
-<!--
 The current preview version is **1.28.0-rc1**.
 
 For more information on the current preview version and how to test, please view the links below:
 
 - [Announcement](https://cloudnative-pg.io/releases/cloudnative-pg-1-28.0-rc1-released/)
 - [Documentation](https://cloudnative-pg.io/documentation/preview/)
--->

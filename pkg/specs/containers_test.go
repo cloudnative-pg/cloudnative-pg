@@ -22,6 +22,7 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -57,31 +58,110 @@ var _ = Describe("Bootstrap Container creation", func() {
 	})
 })
 
-var _ = Describe("Container Security Context creation", func() {
-	It("with valid SeccompProfile", func() {
+var _ = Describe("GetSecurityContext", func() {
+	It("returns defaults when Spec.SecurityContext is nil", func() {
 		cluster := &apiv1.Cluster{}
-		runtimeProfile := &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		}
-		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
+		sc := GetSecurityContext(cluster)
 
-		Expect(securityContext.SeccompProfile).ToNot(BeNil())
-		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(runtimeProfile))
+		Expect(sc).ToNot(BeNil())
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile.Type).To(Equal(corev1.SeccompProfileTypeRuntimeDefault))
+		Expect(sc.RunAsUser).To(BeNil())
+		Expect(sc.RunAsGroup).To(BeNil())
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeFalse())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeTrue())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeFalse())
 	})
 
-	It("with defined SeccompProfile", func() {
-		profilePath := "/path/to/profile"
+	It("merges provided partial SecurityContext with defaults", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser: ptr.To(int64(1000)),
+				},
+			},
+		}
+
+		sc := GetSecurityContext(cluster)
+		Expect(sc.RunAsUser).ToNot(BeNil())
+		Expect(*sc.RunAsUser).To(Equal(int64(1000)))
+		Expect(sc.RunAsGroup).To(BeNil())
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeFalse())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeTrue())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeTrue())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeFalse())
+	})
+
+	It("honors Cluster.Spec.SeccompProfile for container security context", func() {
+		profilePath := "/path/to/container/profile"
 		localhostProfile := &corev1.SeccompProfile{
 			Type:             corev1.SeccompProfileTypeLocalhost,
 			LocalhostProfile: &profilePath,
 		}
-		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{
-			SeccompProfile: localhostProfile,
-		}}
+		cluster := &apiv1.Cluster{Spec: apiv1.ClusterSpec{SeccompProfile: localhostProfile}}
 
-		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
-		Expect(securityContext.SeccompProfile).ToNot(BeNil())
-		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))
-		Expect(securityContext.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+		sc := GetSecurityContext(cluster)
+		Expect(sc.SeccompProfile).ToNot(BeNil())
+		Expect(sc.SeccompProfile).To(BeEquivalentTo(localhostProfile))
+		Expect(sc.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
+	})
+
+	It("does not override non-nil Capabilities, even if empty", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{},
+				},
+			},
+		}
+
+		sc := GetSecurityContext(cluster)
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Drop).To(BeNil())
+		Expect(sc.RunAsUser).To(BeNil())
+		Expect(sc.RunAsGroup).To(BeNil())
+	})
+
+	It("preserves boolean and capabilities settings provided by the user", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				SecurityContext: &corev1.SecurityContext{
+					Privileged:               ptr.To(true),
+					RunAsNonRoot:             ptr.To(false),
+					ReadOnlyRootFilesystem:   ptr.To(false),
+					AllowPrivilegeEscalation: ptr.To(true),
+					Capabilities: &corev1.Capabilities{
+						Add:  []corev1.Capability{"NET_BIND_SERVICE"},
+						Drop: []corev1.Capability{"MKNOD"},
+					},
+				},
+			},
+		}
+
+		sc := GetSecurityContext(cluster)
+		Expect(sc.Privileged).ToNot(BeNil())
+		Expect(*sc.Privileged).To(BeTrue())
+		Expect(sc.RunAsNonRoot).ToNot(BeNil())
+		Expect(*sc.RunAsNonRoot).To(BeFalse())
+		Expect(sc.ReadOnlyRootFilesystem).ToNot(BeNil())
+		Expect(*sc.ReadOnlyRootFilesystem).To(BeFalse())
+		Expect(sc.AllowPrivilegeEscalation).ToNot(BeNil())
+		Expect(*sc.AllowPrivilegeEscalation).To(BeTrue())
+		Expect(sc.Capabilities).ToNot(BeNil())
+		Expect(sc.Capabilities.Add).To(ContainElement(corev1.Capability("NET_BIND_SERVICE")))
+		Expect(sc.Capabilities.Drop).To(ContainElement(corev1.Capability("MKNOD")))
 	})
 })

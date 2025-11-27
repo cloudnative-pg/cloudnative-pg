@@ -1,3 +1,9 @@
+---
+id: operator_capability_levels
+sidebar_position: 490
+title: Operator capability levels
+---
+
 # Operator capability levels
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

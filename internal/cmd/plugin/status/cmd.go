@@ -22,6 +22,7 @@ package status
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -47,8 +48,9 @@ func NewCmd() *cobra.Command {
 
 			verbose, _ := cmd.Flags().GetCount("verbose")
 			output, _ := cmd.Flags().GetString("output")
+			timeout, _ := cmd.Flags().GetDuration("timeout")
 
-			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output))
+			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output), timeout)
 		},
 	}
 
@@ -56,6 +58,8 @@ func NewCmd() *cobra.Command {
 		"verbose", "v", "Increase verbosity to display more information")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
+	statusCmd.Flags().DurationP(
+		"timeout", "t", 10*time.Second, "Timeout for operations that access pod filesystems (e.g., du, cat)")
 
 	return statusCmd
 }

@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -189,7 +190,7 @@ func ensureClusterRestoreCanStart(
 	c client.Client,
 	cluster *apiv1.Cluster,
 ) (*ctrl.Result, error) {
-	return nil, nil
+	return ensureInitContainersAreCompleted(ctx, c, cluster)
 }
 
 func ensureClusterIsNotFenced(
@@ -348,4 +349,124 @@ func restoreOrphanPVCs(
 	}
 
 	return nil
+}
+
+func ensureInitContainersAreCompleted(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithValues("step", "ensure_init_containers_are_completed")
+
+	var podList corev1.PodList
+	if err := cli.List(
+		ctx,
+		&podList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			utils.ClusterLabelName: cluster.Name,
+			utils.PodRoleLabelName: string(utils.PodRoleInstance),
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	// Get all pods with non-sidecar init containers
+	podsWithInitContainers := getPodsWithNonSidecarInitContainers(podList)
+	if len(podsWithInitContainers) == 0 {
+		return nil, nil
+	}
+
+	// Check all pods and their init containers
+	for _, pod := range podsWithInitContainers {
+		// Check all non-sidecar init containers in this pod
+		nonSidecarStatuses := getNonSidecarInitContainerStatuses(
+			pod.Status.InitContainerStatuses,
+			pod.Spec.InitContainers,
+		)
+
+		if len(nonSidecarStatuses) == 0 {
+			contextLogger.Info("waiting for init containers to start", "podName", pod.Name)
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		// Check if any non-sidecar init container is still running or hasn't started
+		for _, status := range nonSidecarStatuses {
+			if status.State.Terminated == nil {
+				contextLogger.Info("init container running, waiting for completion",
+					"podName", pod.Name,
+					"initContainerName", status.Name)
+				return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+		}
+
+		// Check if any non-sidecar init container failed
+		for _, status := range nonSidecarStatuses {
+			if status.State.Terminated.ExitCode != 0 {
+				contextLogger.Info("init container failed",
+					"podName", pod.Name,
+					"initContainerName", status.Name,
+					"exitCode", status.State.Terminated.ExitCode,
+					"reason", status.State.Terminated.Reason,
+					"message", status.State.Terminated.Message)
+				return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+		}
+	}
+
+	contextLogger.Info("all init containers in all pods completed, proceeding to orphan pods deletion")
+	return nil, nil
+}
+
+func getPodsWithNonSidecarInitContainers(podList corev1.PodList) []*corev1.Pod {
+	var podsWithInitContainers []*corev1.Pod
+	for idx := range podList.Items {
+		pod := podList.Items[idx]
+		if hasNonSidecarInitContainers(&pod) {
+			podsWithInitContainers = append(podsWithInitContainers, &pod)
+		}
+	}
+	return podsWithInitContainers
+}
+
+func hasNonSidecarInitContainers(pod *corev1.Pod) bool {
+	for _, initContainer := range pod.Spec.InitContainers {
+		if isSidecarInitContainer(&initContainer) {
+			continue
+		}
+		return true
+	}
+
+	return false
+}
+
+func isSidecarInitContainer(initContainer *corev1.Container) bool {
+	return initContainer.RestartPolicy != nil && *initContainer.RestartPolicy == corev1.ContainerRestartPolicyAlways
+}
+
+func getNonSidecarInitContainerStatuses(
+	statuses []corev1.ContainerStatus,
+	initContainers []corev1.Container,
+) []corev1.ContainerStatus {
+	// Build a map of init container names to their specs for quick lookup
+	initContainerSpecMap := make(map[string]*corev1.Container)
+	for i := range initContainers {
+		initContainerSpecMap[initContainers[i].Name] = &initContainers[i]
+	}
+
+	// Collect all non-sidecar init container statuses
+	nonSidecarStatuses := make([]corev1.ContainerStatus, 0, len(statuses))
+	for i := range statuses {
+		status := statuses[i]
+		initContainerSpec, exists := initContainerSpecMap[status.Name]
+		if !exists {
+			continue
+		}
+
+		if !isSidecarInitContainer(initContainerSpec) {
+			nonSidecarStatuses = append(nonSidecarStatuses, status)
+		}
+	}
+
+	return nonSidecarStatuses
 }
