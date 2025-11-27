@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -32,6 +33,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
+
+// databaseEntry represents a rendered database entry for the pgbouncer.ini [databases] section
+type databaseEntry struct {
+	Name   string
+	Config string
+}
 
 const (
 	// ConfigsDir is the directory in which all pgbouncer configurations are
@@ -82,8 +89,7 @@ const (
 
 	pgBouncerIniTemplateString = `
 [databases]
-* = host={{.Pooler.Spec.Cluster.Name}}-{{.Pooler.Spec.Type}}
-
+{{ .DatabaseEntries }}
 [pgbouncer]
 pool_mode = {{ .Pooler.Spec.PgBouncer.PoolMode }}
 auth_user = {{ .AuthQueryUser }}
@@ -214,6 +220,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthDBName        string
 		Parameters        string
 		PgHba             []string
+		DatabaseEntries   string
 	}{
 		Pooler:            pooler,
 		AuthQuery:         pooler.GetAuthQuery(),
@@ -227,8 +234,9 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		//
 		// Also, we want the list of parameters inside the PgBouncer configuration
 		// to be stable.
-		Parameters: stringifyPgBouncerParameters(parameters),
-		PgHba:      pooler.Spec.PgBouncer.PgHBA,
+		Parameters:      stringifyPgBouncerParameters(parameters),
+		PgHba:           pooler.Spec.PgBouncer.PgHBA,
+		DatabaseEntries: buildDatabaseEntries(pooler),
 	}
 
 	if err := pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData); err != nil {
@@ -261,4 +269,88 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	}
 
 	return files, nil
+}
+
+// buildDatabaseEntries creates the [databases] section entries for pgbouncer.ini.
+// A default wildcard entry is always added to ensure all databases can be accessed.
+// The entries are sorted by database name to ensure stable configuration output,
+// with the wildcard entry always appearing last.
+func buildDatabaseEntries(pooler *apiv1.Pooler) string {
+	defaultHost := fmt.Sprintf("%s-%s", pooler.Spec.Cluster.Name, pooler.Spec.Type)
+
+	// Build entries for each configured database (skip any wildcard entries)
+	entries := make([]databaseEntry, 0, len(pooler.Spec.PgBouncer.Databases)+1)
+	for _, db := range pooler.Spec.PgBouncer.Databases {
+		// Skip wildcard entries - the wildcard is always added automatically
+		if db.Name == "*" {
+			continue
+		}
+		entry := buildSingleDatabaseEntry(db, defaultHost)
+		entries = append(entries, entry)
+	}
+
+	// Always add the default wildcard entry to ensure all databases can be accessed
+	entries = append(entries, databaseEntry{
+		Name:   "*",
+		Config: fmt.Sprintf("host=%s", defaultHost),
+	})
+
+	// Sort entries by database name for stable output
+	// Wildcards (*) should come last
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Name == "*" {
+			return false
+		}
+		if entries[j].Name == "*" {
+			return true
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	// Build the final string
+	var result strings.Builder
+	for _, entry := range entries {
+		result.WriteString(entry.Name)
+		result.WriteString(" = ")
+		result.WriteString(entry.Config)
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// buildSingleDatabaseEntry builds a single database entry configuration string.
+// PgBouncer database entry format: dbname = host=X dbname=Y pool_mode=Z pool_size=N ...
+func buildSingleDatabaseEntry(db apiv1.PgBouncerDatabaseConfig, defaultHost string) databaseEntry {
+	var parts []string
+
+	// Host configuration - always use the cluster service
+	parts = append(parts, fmt.Sprintf("host=%s", defaultHost))
+
+	// DBName - if different from the client-facing name
+	if db.DBName != "" {
+		parts = append(parts, fmt.Sprintf("dbname=%s", db.DBName))
+	}
+
+	// Pool mode override (explicit field takes precedence over parameters)
+	if db.PoolMode != "" {
+		parts = append(parts, fmt.Sprintf("pool_mode=%s", db.PoolMode))
+	}
+
+	// Additional parameters - sort keys for stable output
+	if len(db.Parameters) > 0 {
+		keys := make([]string, 0, len(db.Parameters))
+		for k := range db.Parameters {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			parts = append(parts, fmt.Sprintf("%s=%s", k, db.Parameters[k]))
+		}
+	}
+
+	return databaseEntry{
+		Name:   db.Name,
+		Config: strings.Join(parts, " "),
+	}
 }
