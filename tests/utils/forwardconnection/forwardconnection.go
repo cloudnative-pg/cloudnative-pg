@@ -120,7 +120,7 @@ func NewDialer(
 }
 
 // StartAndWait begins the port-forwarding and waits until it's ready
-func (fc *ForwardConnection) StartAndWait() error {
+func (fc *ForwardConnection) StartAndWait(ctx context.Context) error {
 	var err error
 	go func() {
 		ginkgo.GinkgoWriter.Println("Starting port-forward")
@@ -140,6 +140,9 @@ func (fc *ForwardConnection) StartAndWait() error {
 	case <-fc.stopChannel:
 		ginkgo.GinkgoWriter.Println("port-forward closed")
 		return err
+	case <-ctx.Done():
+		close(fc.stopChannel)
+		return ctx.Err()
 	}
 }
 
