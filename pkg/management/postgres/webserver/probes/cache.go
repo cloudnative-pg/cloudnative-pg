@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -62,6 +63,13 @@ func (c *clusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*api
 	var cluster apiv1.Cluster
 	err := c.cli.Get(timeoutContext, c.key, &cluster)
 	if err != nil {
+		log.FromContext(ctx).Debug(
+			"Failed to refresh cluster definition, using cached value",
+			"cluster", c.key.Name,
+			"namespace", c.key.Namespace,
+			"err", err.Error(),
+		)
+
 		// Return the current cached value on failure
 		c.mu.RLock()
 		cached := c.latestKnownCluster
