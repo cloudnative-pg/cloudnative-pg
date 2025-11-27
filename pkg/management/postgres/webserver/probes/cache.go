@@ -21,6 +21,7 @@ package probes
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,13 +30,14 @@ import (
 )
 
 // clusterCache provides a resilient way to fetch cluster definitions with caching
-// to handle transient API server connectivity issues
-// Note: This cache is not thread-safe and should be used by a single probe executor.
+// to handle transient API server connectivity issues.
+// This cache is thread-safe and can be shared across concurrent probe requests.
 type clusterCache struct {
 	cli     client.Client
 	key     client.ObjectKey
 	timeout time.Duration
 
+	mu                 sync.RWMutex
 	latestKnownCluster *apiv1.Cluster
 }
 
@@ -63,11 +65,15 @@ func (c *clusterCache) tryRefreshLatestClusterWithTimeout(ctx context.Context) b
 		return false
 	}
 
+	c.mu.Lock()
 	c.latestKnownCluster = cluster.DeepCopy()
+	c.mu.Unlock()
 	return true
 }
 
 // getLatestKnownCluster returns the latest known cluster definition, or nil if none is available
 func (c *clusterCache) getLatestKnownCluster() *apiv1.Cluster {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.latestKnownCluster
 }
