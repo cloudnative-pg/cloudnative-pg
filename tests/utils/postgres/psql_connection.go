@@ -26,13 +26,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/forwardconnection"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -65,6 +68,7 @@ func createConnectionParameters(user, password, localPort string) map[string]str
 }
 
 func startForwardConnection(
+	ctx context.Context,
 	dialer httpstream.Dialer,
 	portMap []string,
 	dbname,
@@ -72,17 +76,39 @@ func startForwardConnection(
 	passApp string,
 	extraConnectionParams ...map[string]string,
 ) (*PSQLForwardConnection, *sql.DB, error) {
-	forwarder, err := forwardconnection.NewForwardConnection(
-		dialer,
-		portMap,
-		io.Discard,
-		io.Discard,
-	)
-	if err != nil {
-		return nil, nil, err
+	var forwarder *forwardconnection.ForwardConnection
+	var err error
+
+	// We retry the connection establishment because sometimes the port-forward
+	// might get stuck or fail. We use a shorter timeout for each attempt.
+	backoff := wait.Backoff{
+		Steps:    5,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
 	}
 
-	if err = forwarder.StartAndWait(); err != nil {
+	err = retry.OnError(backoff, resources.RetryAlways, func() error {
+		// Create a child context with a timeout for this attempt
+		innerCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+
+		forwarder, err = forwardconnection.NewForwardConnection(
+			dialer,
+			portMap,
+			io.Discard,
+			io.Discard,
+		)
+		if err != nil {
+			return err
+		}
+
+		if err = forwarder.StartAndWait(innerCtx); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -169,6 +195,7 @@ func ForwardPSQLConnectionWithCreds(
 	}
 
 	psqlForwardConn, conn, err := startForwardConnection(
+		ctx,
 		dialer,
 		[]string{forwardconnection.PostgresPortMap},
 		dbname,
@@ -207,6 +234,7 @@ func ForwardPSQLServiceConnection(
 	}
 
 	psqlForwardConn, conn, err := startForwardConnection(
+		ctx,
 		dialer,
 		portMap,
 		dbname,
