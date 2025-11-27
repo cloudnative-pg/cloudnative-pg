@@ -186,6 +186,14 @@ func (info InitInfo) concludeRestore(
 	if _, err := info.GetInstance(cluster).migratePostgresAutoConfFile(ctx); err != nil {
 		return err
 	}
+
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path is empty
+	if err := fileutils.CreateEmptyFile(filePath); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
+	}
+
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {

@@ -146,7 +146,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 
 	filePath := filepath.Join(env.info.PgData, constants.CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
-	// destination path it is empty
+	// destination path is empty
 	if err := fileutils.CreateEmptyFile(filePath); err != nil {
 		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
