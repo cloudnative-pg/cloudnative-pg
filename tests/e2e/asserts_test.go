@@ -2643,6 +2643,7 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 		envVars := buildTemplateEnvs(map[string]string{
 			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
 			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
+			"PG_MAJOR":                   strconv.FormatUint(env.PostgresVersion, 10),
 		})
 
 		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {
