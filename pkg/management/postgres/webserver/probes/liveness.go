@@ -118,7 +118,7 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	contextLogger.Debug(
+	contextLogger.Trace(
 		"Instance connectivity test succeeded - liveness probe succeeding",
 		"latestKnownInstancesReportedState", cluster.Status.InstancesReportedState,
 	)

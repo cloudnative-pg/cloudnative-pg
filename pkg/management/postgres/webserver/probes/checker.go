@@ -138,7 +138,7 @@ func (e *executor) IsHealthy(
 		return
 	}
 
-	contextLogger.Debug(fmt.Sprintf("%s probe succeeding with cached cluster definition", e.probeType))
+	contextLogger.Trace(fmt.Sprintf("%s probe succeeding with cached cluster definition", e.probeType))
 	_, _ = fmt.Fprint(w, "OK")
 }
 
