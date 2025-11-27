@@ -26,27 +26,23 @@ import (
 	"net/http"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 type livenessExecutor struct {
-	cache    *clusterCache
+	cache    *ClusterCache
 	instance *postgres.Instance
 }
 
 // NewLivenessChecker creates a new instance of the liveness probe checker
 func NewLivenessChecker(
-	cli client.Client,
 	instance *postgres.Instance,
+	cache *ClusterCache,
 ) Checker {
 	return &livenessExecutor{
-		cache: newClusterCache(
-			cli,
-			client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		),
+		cache:    cache,
 		instance: instance,
 	}
 }

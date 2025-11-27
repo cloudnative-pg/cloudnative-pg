@@ -100,12 +100,18 @@ func NewRemoteWebServer(
 		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
 	}
 
+	// Create a shared cache for all probe types to reduce memory usage and ensure consistency
+	sharedCache := probes.NewClusterCache(
+		typedClient,
+		client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
+	)
+
 	endpoints := remoteWebserverEndpoints{
 		typedClient:      typedClient,
 		instance:         instance,
-		livenessChecker:  probes.NewLivenessChecker(typedClient, instance),
-		readinessChecker: probes.NewReadinessChecker(typedClient, instance),
-		startupChecker:   probes.NewStartupChecker(typedClient, instance),
+		livenessChecker:  probes.NewLivenessChecker(instance, sharedCache),
+		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
+		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}
 
 	serveMux := http.NewServeMux()

@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -56,20 +55,17 @@ type Checker interface {
 
 type executor struct {
 	probeType probeType
-	cache     *clusterCache
+	cache     *ClusterCache
 	instance  *postgres.Instance
 }
 
 // NewReadinessChecker creates a new instance of the readiness probe checker
 func NewReadinessChecker(
-	cli client.Client,
 	instance *postgres.Instance,
+	cache *ClusterCache,
 ) Checker {
 	return &executor{
-		cache: newClusterCache(
-			cli,
-			client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		),
+		cache:     cache,
 		instance:  instance,
 		probeType: probeTypeReadiness,
 	}
@@ -77,14 +73,11 @@ func NewReadinessChecker(
 
 // NewStartupChecker creates a new instance of the startup probe checker
 func NewStartupChecker(
-	cli client.Client,
 	instance *postgres.Instance,
+	cache *ClusterCache,
 ) Checker {
 	return &executor{
-		cache: newClusterCache(
-			cli,
-			client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		),
+		cache:     cache,
 		instance:  instance,
 		probeType: probeTypeStartup,
 	}

@@ -30,10 +30,10 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// clusterCache provides a resilient way to fetch cluster definitions with caching
+// ClusterCache provides a resilient way to fetch cluster definitions with caching
 // to handle transient API server connectivity issues.
-// This cache is thread-safe and can be shared across concurrent probe requests.
-type clusterCache struct {
+// This cache is thread-safe and can be shared across multiple probe types.
+type ClusterCache struct {
 	cli     client.Client
 	key     client.ObjectKey
 	timeout time.Duration
@@ -42,9 +42,9 @@ type clusterCache struct {
 	latestKnownCluster *apiv1.Cluster
 }
 
-// newClusterCache creates a new cluster cache instance
-func newClusterCache(cli client.Client, key client.ObjectKey) *clusterCache {
-	return &clusterCache{
+// NewClusterCache creates a new cluster cache instance that can be shared across multiple probes
+func NewClusterCache(cli client.Client, key client.ObjectKey) *ClusterCache {
+	return &ClusterCache{
 		cli: cli,
 		key: key,
 		// We set a safe context timeout of 500ms to avoid a failed request from taking
@@ -56,7 +56,7 @@ func newClusterCache(cli client.Client, key client.ObjectKey) *clusterCache {
 
 // tryGetLatestClusterWithTimeout attempts to fetch a fresh cluster definition with a timeout.
 // Returns the refreshed cluster and true if successful, or the cached cluster (may be nil) and false on failure.
-func (c *clusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*apiv1.Cluster, bool) {
+func (c *ClusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*apiv1.Cluster, bool) {
 	timeoutContext, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 

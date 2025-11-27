@@ -34,12 +34,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("clusterCache", func() {
+var _ = Describe("ClusterCache", func() {
 	var (
 		ctx      context.Context
 		cli      client.Client
 		instance *postgres.Instance
-		cache    *clusterCache
+		cache    *ClusterCache
 		cluster  *apiv1.Cluster
 	)
 
@@ -65,7 +65,7 @@ var _ = Describe("clusterCache", func() {
 			WithNamespace("test-namespace").
 			WithClusterName("test-cluster")
 
-		cache = newClusterCache(cli, client.ObjectKey{
+		cache = NewClusterCache(cli, client.ObjectKey{
 			Namespace: instance.GetNamespaceName(),
 			Name:      instance.GetClusterName(),
 		})
@@ -81,7 +81,7 @@ var _ = Describe("clusterCache", func() {
 		})
 
 		It("should return false when the cluster is not found", func() {
-			cache = newClusterCache(cli, client.ObjectKey{
+			cache = NewClusterCache(cli, client.ObjectKey{
 				Namespace: "test-namespace",
 				Name:      "non-existent-cluster",
 			})
