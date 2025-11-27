@@ -97,8 +97,9 @@ func (e *executor) IsHealthy(
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	if clusterRefreshed := e.cache.tryRefreshLatestClusterWithTimeout(ctx); clusterRefreshed {
-		probeRunner := getProbeRunnerFromCluster(e.probeType, *e.cache.getLatestKnownCluster())
+	cluster, clusterRefreshed := e.cache.tryGetLatestClusterWithTimeout(ctx)
+	if clusterRefreshed {
+		probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
 		if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
 			contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 			http.Error(
@@ -116,7 +117,6 @@ func (e *executor) IsHealthy(
 
 	contextLogger = contextLogger.WithValues("apiServerReachable", false)
 
-	cluster := e.cache.getLatestKnownCluster()
 	if cluster == nil {
 		contextLogger.Warning(
 			fmt.Sprintf("no cluster definition has been received for %s probe, using default probe settings", e.probeType),

@@ -71,13 +71,13 @@ var _ = Describe("clusterCache", func() {
 		})
 	})
 
-	Context("tryRefreshLatestClusterWithTimeout", func() {
+	Context("tryGetLatestClusterWithTimeout", func() {
 		It("should successfully refresh the cluster definition", func() {
-			success := cache.tryRefreshLatestClusterWithTimeout(ctx)
+			cluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeTrue())
-			Expect(cache.getLatestKnownCluster()).ToNot(BeNil())
-			Expect(cache.getLatestKnownCluster().Name).To(Equal("test-cluster"))
-			Expect(cache.getLatestKnownCluster().Spec.Instances).To(Equal(3))
+			Expect(cluster).ToNot(BeNil())
+			Expect(cluster.Name).To(Equal("test-cluster"))
+			Expect(cluster.Spec.Instances).To(Equal(3))
 		})
 
 		It("should return false when the cluster is not found", func() {
@@ -86,9 +86,9 @@ var _ = Describe("clusterCache", func() {
 				Name:      "non-existent-cluster",
 			})
 
-			success := cache.tryRefreshLatestClusterWithTimeout(ctx)
+			cluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeFalse())
-			Expect(cache.getLatestKnownCluster()).To(BeNil())
+			Expect(cluster).To(BeNil())
 		})
 
 		It("should handle context cancellation", func() {
@@ -99,7 +99,7 @@ var _ = Describe("clusterCache", func() {
 			// With a cancelled context, the operation should fail
 			// Note: With fake client, this might still succeed if it's fast enough,
 			// but in real scenarios with actual API server delays, this would fail
-			_ = cache.tryRefreshLatestClusterWithTimeout(cancelledCtx)
+			_, _ = cache.tryGetLatestClusterWithTimeout(cancelledCtx)
 
 			// We don't assert the result here because the fake client is too fast
 			// This test mainly verifies the code doesn't panic with a cancelled context
@@ -107,9 +107,10 @@ var _ = Describe("clusterCache", func() {
 
 		It("should cache the cluster definition across multiple calls", func() {
 			// First refresh
-			success := cache.tryRefreshLatestClusterWithTimeout(ctx)
+			firstCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeTrue())
-			firstCluster := cache.getLatestKnownCluster()
+			Expect(firstCluster).ToNot(BeNil())
+			Expect(firstCluster.Spec.Instances).To(Equal(3))
 
 			// Update the cluster
 			cluster.Spec.Instances = 5
@@ -117,19 +118,16 @@ var _ = Describe("clusterCache", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Second refresh should get the updated cluster
-			success = cache.tryRefreshLatestClusterWithTimeout(ctx)
+			secondCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeTrue())
-			secondCluster := cache.getLatestKnownCluster()
-
-			Expect(firstCluster.Spec.Instances).To(Equal(3))
+			Expect(secondCluster).ToNot(BeNil())
 			Expect(secondCluster.Spec.Instances).To(Equal(5))
 		})
 
 		It("should maintain the cached cluster when refresh fails", func() {
 			// First successful refresh
-			success := cache.tryRefreshLatestClusterWithTimeout(ctx)
+			cachedCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeTrue())
-			cachedCluster := cache.getLatestKnownCluster()
 			Expect(cachedCluster).ToNot(BeNil())
 
 			// Change cache to point to non-existent cluster
@@ -139,25 +137,10 @@ var _ = Describe("clusterCache", func() {
 			}
 
 			// Second refresh should fail but cache should remain
-			success = cache.tryRefreshLatestClusterWithTimeout(ctx)
+			stillCachedCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
 			Expect(success).To(BeFalse())
 			// Cache should still have the old cluster
-			Expect(cache.getLatestKnownCluster()).To(Equal(cachedCluster))
-		})
-	})
-
-	Context("getLatestKnownCluster", func() {
-		It("should return nil when no cluster has been cached", func() {
-			Expect(cache.getLatestKnownCluster()).To(BeNil())
-		})
-
-		It("should return the cached cluster after a successful refresh", func() {
-			success := cache.tryRefreshLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeTrue())
-
-			cachedCluster := cache.getLatestKnownCluster()
-			Expect(cachedCluster).ToNot(BeNil())
-			Expect(cachedCluster.Name).To(Equal("test-cluster"))
+			Expect(stillCachedCluster).To(Equal(cachedCluster))
 		})
 	})
 })

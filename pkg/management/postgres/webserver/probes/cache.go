@@ -53,27 +53,25 @@ func newClusterCache(cli client.Client, key client.ObjectKey) *clusterCache {
 	}
 }
 
-// tryRefreshLatestClusterWithTimeout refreshes the latest cluster definition with a timeout,
-// returns a bool indicating if the operation was successful
-func (c *clusterCache) tryRefreshLatestClusterWithTimeout(ctx context.Context) bool {
+// tryGetLatestClusterWithTimeout attempts to fetch a fresh cluster definition with a timeout.
+// Returns the refreshed cluster and true if successful, or the cached cluster (may be nil) and false on failure.
+func (c *clusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*apiv1.Cluster, bool) {
 	timeoutContext, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	var cluster apiv1.Cluster
 	err := c.cli.Get(timeoutContext, c.key, &cluster)
 	if err != nil {
-		return false
+		// Return the current cached value on failure
+		c.mu.RLock()
+		cached := c.latestKnownCluster
+		c.mu.RUnlock()
+		return cached, false
 	}
 
 	c.mu.Lock()
 	c.latestKnownCluster = cluster.DeepCopy()
+	result := c.latestKnownCluster
 	c.mu.Unlock()
-	return true
-}
-
-// getLatestKnownCluster returns the latest known cluster definition, or nil if none is available
-func (c *clusterCache) getLatestKnownCluster() *apiv1.Cluster {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.latestKnownCluster
+	return result, true
 }

@@ -72,13 +72,14 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	if clusterRefreshed := e.cache.tryRefreshLatestClusterWithTimeout(ctx); clusterRefreshed {
+	cluster, clusterRefreshed := e.cache.tryGetLatestClusterWithTimeout(ctx)
+	if clusterRefreshed {
 		// We correctly reached the API server but, as a failsafe measure, we
 		// exercise the reachability checker and leave a log message if something
 		// is not right.
-		// In this way a network configuration problem can be discovered as
+		// In this way, a network configuration problem can be discovered as
 		// quickly as possible.
-		if err := evaluateLivenessPinger(ctx, e.cache.getLatestKnownCluster().DeepCopy()); err != nil {
+		if err := evaluateLivenessPinger(ctx, cluster.DeepCopy()); err != nil {
 			contextLogger.Warning(
 				"Instance connectivity error - liveness probe succeeding because "+
 					"the API server is reachable",
@@ -92,7 +93,7 @@ func (e *livenessExecutor) IsHealthy(
 
 	contextLogger = contextLogger.WithValues("apiServerReachable", false)
 
-	if e.cache.getLatestKnownCluster() == nil {
+	if cluster == nil {
 		// We were never able to download a cluster definition. This should not
 		// happen because we check the API server connectivity as soon as the
 		// instance manager starts, before starting the probe web server.
@@ -106,7 +107,7 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	err := evaluateLivenessPinger(ctx, e.cache.getLatestKnownCluster().DeepCopy())
+	err := evaluateLivenessPinger(ctx, cluster.DeepCopy())
 	if err != nil {
 		contextLogger.Error(err, "Instance connectivity error - liveness probe failing")
 		http.Error(
@@ -119,7 +120,7 @@ func (e *livenessExecutor) IsHealthy(
 
 	contextLogger.Debug(
 		"Instance connectivity test succeeded - liveness probe succeeding",
-		"latestKnownInstancesReportedState", e.cache.getLatestKnownCluster().Status.InstancesReportedState,
+		"latestKnownInstancesReportedState", cluster.Status.InstancesReportedState,
 	)
 	_, _ = fmt.Fprint(w, "OK")
 }
