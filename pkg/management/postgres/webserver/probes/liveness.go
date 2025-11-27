@@ -79,7 +79,7 @@ func (e *livenessExecutor) IsHealthy(
 		// is not right.
 		// In this way, a network configuration problem can be discovered as
 		// quickly as possible.
-		if err := evaluateLivenessPinger(ctx, cluster.DeepCopy()); err != nil {
+		if err := evaluateLivenessPinger(ctx, *cluster); err != nil {
 			contextLogger.Warning(
 				"Instance connectivity error - liveness probe succeeding because "+
 					"the API server is reachable",
@@ -107,7 +107,7 @@ func (e *livenessExecutor) IsHealthy(
 		return
 	}
 
-	err := evaluateLivenessPinger(ctx, cluster.DeepCopy())
+	err := evaluateLivenessPinger(ctx, *cluster)
 	if err != nil {
 		contextLogger.Error(err, "Instance connectivity error - liveness probe failing")
 		http.Error(
@@ -127,7 +127,7 @@ func (e *livenessExecutor) IsHealthy(
 
 func evaluateLivenessPinger(
 	ctx context.Context,
-	cluster *apiv1.Cluster,
+	cluster apiv1.Cluster,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -159,7 +159,7 @@ func evaluateLivenessPinger(
 		return fmt.Errorf("failed to build instance reachability checker: %w", err)
 	}
 
-	if err := checker.ensureInstancesAreReachable(cluster); err != nil {
+	if err := checker.ensureInstancesAreReachable(&cluster); err != nil {
 		return fmt.Errorf("liveness check failed: %w", err)
 	}
 

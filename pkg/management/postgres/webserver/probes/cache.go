@@ -70,7 +70,7 @@ func (c *clusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*api
 	}
 
 	c.mu.Lock()
-	c.latestKnownCluster = cluster.DeepCopy()
+	c.latestKnownCluster = &cluster
 	result := c.latestKnownCluster
 	c.mu.Unlock()
 	return result, true
