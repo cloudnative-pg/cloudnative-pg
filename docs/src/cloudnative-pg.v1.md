@@ -24,6 +24,25 @@ title: API Reference
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
 - [Subscription](#postgresql-cnpg-io-v1-Subscription)
 
+
+!!! Important
+    Because the Kubernetes resource type names used by CloudNativePG are fairly generic, for example, "backup", they 
+    may in their short form conflict with resource types from other operators unrelated to CloudNativePG. When used 
+    with tools such as `kubectl` it is therefore advisable to use the _fully qualified form_ of the resource type name 
+    which includes the namespace.
+
+    For example:
+
+    `kubectl delete cluster.postgresql.cnpg.io mycluster`
+
+    is future proof and unambiguous.
+
+    When the name is ambiguous, `kubectl` will [not error](https://github.com/kubernetes/kubectl/issues/1704),
+    rather it will silently act on the namespace first in the alphabet. In other words: In a scenario with
+    ambigiuity on resource type names the result of the kubectl command may be unexpected.
+
+
+
 ## Backup     {#postgresql-cnpg-io-v1-Backup}
 
 
