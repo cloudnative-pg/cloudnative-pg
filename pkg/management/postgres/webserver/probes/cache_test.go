@@ -73,62 +73,49 @@ var _ = Describe("ClusterCache", func() {
 
 	Context("tryGetLatestClusterWithTimeout", func() {
 		It("should successfully refresh the cluster definition", func() {
-			cluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeTrue())
-			Expect(cluster).ToNot(BeNil())
+			var cluster apiv1.Cluster
+			err := cache.tryGetLatestClusterWithTimeout(ctx, &cluster)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.Name).To(Equal("test-cluster"))
 			Expect(cluster.Spec.Instances).To(Equal(3))
 		})
 
-		It("should return false when the cluster is not found", func() {
+		It("should return an error when the cluster is not found", func() {
 			cache = NewClusterCache(cli, client.ObjectKey{
 				Namespace: "test-namespace",
 				Name:      "non-existent-cluster",
 			})
 
-			cluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeFalse())
-			Expect(cluster).To(BeNil())
-		})
-
-		It("should handle context cancellation", func() {
-			// Create a context that is already cancelled
-			cancelledCtx, cancel := context.WithCancel(ctx)
-			cancel()
-
-			// With a cancelled context, the operation should fail
-			// Note: With fake client, this might still succeed if it's fast enough,
-			// but in real scenarios with actual API server delays, this would fail
-			_, _ = cache.tryGetLatestClusterWithTimeout(cancelledCtx)
-
-			// We don't assert the result here because the fake client is too fast
-			// This test mainly verifies the code doesn't panic with a cancelled context
+			var cluster apiv1.Cluster
+			err := cache.tryGetLatestClusterWithTimeout(ctx, &cluster)
+			Expect(err).To(HaveOccurred())
+			Expect(cluster.Name).To(BeEmpty())
 		})
 
 		It("should cache the cluster definition across multiple calls", func() {
 			// First refresh
-			firstCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeTrue())
-			Expect(firstCluster).ToNot(BeNil())
+			var firstCluster apiv1.Cluster
+			err := cache.tryGetLatestClusterWithTimeout(ctx, &firstCluster)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(firstCluster.Spec.Instances).To(Equal(3))
 
 			// Update the cluster
 			cluster.Spec.Instances = 5
-			err := cli.Update(ctx, cluster)
+			err = cli.Update(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Second refresh should get the updated cluster
-			secondCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeTrue())
-			Expect(secondCluster).ToNot(BeNil())
+			var secondCluster apiv1.Cluster
+			err = cache.tryGetLatestClusterWithTimeout(ctx, &secondCluster)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(secondCluster.Spec.Instances).To(Equal(5))
 		})
 
 		It("should maintain the cached cluster when refresh fails", func() {
 			// First successful refresh
-			cachedCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeTrue())
-			Expect(cachedCluster).ToNot(BeNil())
+			var cachedCluster apiv1.Cluster
+			err := cache.tryGetLatestClusterWithTimeout(ctx, &cachedCluster)
+			Expect(err).ToNot(HaveOccurred())
 
 			// Change cache to point to non-existent cluster
 			cache.key = client.ObjectKey{
@@ -137,8 +124,9 @@ var _ = Describe("ClusterCache", func() {
 			}
 
 			// Second refresh should fail but cache should remain
-			stillCachedCluster, success := cache.tryGetLatestClusterWithTimeout(ctx)
-			Expect(success).To(BeFalse())
+			var stillCachedCluster apiv1.Cluster
+			err = cache.tryGetLatestClusterWithTimeout(ctx, &stillCachedCluster)
+			Expect(err).To(HaveOccurred())
 			// Cache should still have the old cluster
 			Expect(stillCachedCluster).To(Equal(cachedCluster))
 		})

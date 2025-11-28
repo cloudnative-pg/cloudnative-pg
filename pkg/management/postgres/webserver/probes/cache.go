@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -55,28 +54,20 @@ func NewClusterCache(cli client.Client, key client.ObjectKey) *ClusterCache {
 }
 
 // tryGetLatestClusterWithTimeout attempts to fetch a fresh cluster definition with a timeout.
-// Returns the refreshed cluster and true if successful, or the cached cluster (may be nil) and false on failure.
-func (c *ClusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*apiv1.Cluster, bool) {
-	timeoutContext, cancel := context.WithTimeout(ctx, c.timeout)
+// Writes the cluster data into the provided output parameter.
+// Returns nil on success, or an error on failure (falling back to cached value if available).
+func (c *ClusterCache) tryGetLatestClusterWithTimeout(ctx context.Context, out *apiv1.Cluster) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	var cluster apiv1.Cluster
-	err := c.cli.Get(timeoutContext, c.key, &cluster)
+	err := c.cli.Get(timeoutCtx, c.key, out)
 	if err != nil {
-		log.FromContext(ctx).Debug(
-			"Failed to refresh cluster definition, using cached value",
-			"cluster", c.key.Name,
-			"namespace", c.key.Namespace,
-			"err", err.Error(),
-		)
-
-		// Return the current cached value on failure
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-		if c.latestKnownCluster == nil {
-			return nil, false
+		if c.latestKnownCluster != nil {
+			c.latestKnownCluster.DeepCopyInto(out)
 		}
-		return c.latestKnownCluster.DeepCopy(), false
+		return err
 	}
 
 	c.mu.Lock()
@@ -84,6 +75,6 @@ func (c *ClusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*api
 	if c.latestKnownCluster == nil {
 		c.latestKnownCluster = &apiv1.Cluster{}
 	}
-	cluster.DeepCopyInto(c.latestKnownCluster)
-	return &cluster, true
+	out.DeepCopyInto(c.latestKnownCluster)
+	return nil
 }

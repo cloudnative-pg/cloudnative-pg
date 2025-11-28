@@ -90,37 +90,20 @@ func (e *executor) IsHealthy(
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	cluster, clusterRefreshed := e.cache.tryGetLatestClusterWithTimeout(ctx)
-	if clusterRefreshed {
-		probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
-		if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
-			contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
-			http.Error(
-				w,
-				fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
-				http.StatusInternalServerError,
-			)
-			return
+	var cluster apiv1.Cluster
+	if err := e.cache.tryGetLatestClusterWithTimeout(ctx, &cluster); err != nil {
+		contextLogger = contextLogger.WithValues("apiServerReachable", false,
+			"apiServerErr", err.Error())
+		settingSource := "cached cluster definition"
+		if cluster.Name == "" {
+			settingSource = "default probe configuration"
 		}
-
-		contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	contextLogger = contextLogger.WithValues("apiServerReachable", false)
-
-	if cluster == nil {
 		contextLogger.Warning(
-			fmt.Sprintf("no cluster definition has been received for %s probe, using default probe settings", e.probeType),
+			fmt.Sprintf("%s probe using %s due to API server connectivity issue", e.probeType, settingSource),
 		)
-		cluster = &apiv1.Cluster{}
-	} else {
-		contextLogger.Warning(
-			fmt.Sprintf("%s probe using cached cluster definition due to API server connectivity issue", e.probeType))
 	}
 
-	probeRunner := getProbeRunnerFromCluster(e.probeType, *cluster)
+	probeRunner := getProbeRunnerFromCluster(e.probeType, cluster)
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
 		contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 		http.Error(
@@ -131,7 +114,7 @@ func (e *executor) IsHealthy(
 		return
 	}
 
-	contextLogger.Trace(fmt.Sprintf("%s probe succeeding with cached cluster definition", e.probeType))
+	contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
 	_, _ = fmt.Fprint(w, "OK")
 }
 
