@@ -66,8 +66,10 @@ type remoteWebserverEndpoints struct {
 	instance             *postgres.Instance
 	currentBackup        *backupConnection
 	ongoingBackupRequest sync.Mutex
-	// livenessChecker is a  stateful probe
-	livenessChecker probes.Checker
+	// Stateful probes with persistent caches for API server resilience
+	livenessChecker  probes.Checker
+	readinessChecker probes.Checker
+	startupChecker   probes.Checker
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -98,10 +100,18 @@ func NewRemoteWebServer(
 		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
 	}
 
+	// Create a shared cache for all probe types to reduce memory usage and ensure consistency
+	sharedCache := probes.NewClusterCache(
+		typedClient,
+		client.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
+	)
+
 	endpoints := remoteWebserverEndpoints{
-		typedClient:     typedClient,
-		instance:        instance,
-		livenessChecker: probes.NewLivenessChecker(typedClient, instance),
+		typedClient:      typedClient,
+		instance:         instance,
+		livenessChecker:  probes.NewLivenessChecker(instance, sharedCache),
+		readinessChecker: probes.NewReadinessChecker(instance, sharedCache),
+		startupChecker:   probes.NewStartupChecker(instance, sharedCache),
 	}
 
 	serveMux := http.NewServeMux()
@@ -212,7 +222,7 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 	}
 }
 
-// isServerStartedUp evaluates the liveness probe
+// isServerStartedUp evaluates the startup probe
 func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
 	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
@@ -222,8 +232,7 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
-	checker := probes.NewStartupChecker(ws.typedClient, ws.instance)
-	checker.IsHealthy(req.Context(), w)
+	ws.startupChecker.IsHealthy(req.Context(), w)
 }
 
 // This is the failsafe entrypoint
@@ -243,8 +252,7 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 		return
 	}
 
-	checker := probes.NewReadinessChecker(ws.typedClient, ws.instance)
-	checker.IsHealthy(req.Context(), w)
+	ws.readinessChecker.IsHealthy(req.Context(), w)
 }
 
 // This probe is for the instance status, including replication
