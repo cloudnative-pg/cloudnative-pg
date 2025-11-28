@@ -248,8 +248,7 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.release-binaries.result == 'success' &&
-      needs.check-version.outputs.is_latest == 'true' &&
-      needs.check-version.outputs.is_stable == 'true'
+      needs.check-version.outputs.is_latest == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
