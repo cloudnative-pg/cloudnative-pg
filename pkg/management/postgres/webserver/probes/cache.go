@@ -72,14 +72,18 @@ func (c *ClusterCache) tryGetLatestClusterWithTimeout(ctx context.Context) (*api
 
 		// Return the current cached value on failure
 		c.mu.RLock()
-		cached := c.latestKnownCluster
-		c.mu.RUnlock()
-		return cached, false
+		defer c.mu.RUnlock()
+		if c.latestKnownCluster == nil {
+			return nil, false
+		}
+		return c.latestKnownCluster.DeepCopy(), false
 	}
 
 	c.mu.Lock()
-	c.latestKnownCluster = &cluster
-	result := c.latestKnownCluster
-	c.mu.Unlock()
-	return result, true
+	defer c.mu.Unlock()
+	if c.latestKnownCluster == nil {
+		c.latestKnownCluster = &apiv1.Cluster{}
+	}
+	cluster.DeepCopyInto(c.latestKnownCluster)
+	return &cluster, true
 }
