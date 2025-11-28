@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -55,18 +54,18 @@ type Checker interface {
 }
 
 type executor struct {
-	cli       client.Client
-	instance  *postgres.Instance
 	probeType probeType
+	cache     *ClusterCache
+	instance  *postgres.Instance
 }
 
 // NewReadinessChecker creates a new instance of the readiness probe checker
 func NewReadinessChecker(
-	cli client.Client,
 	instance *postgres.Instance,
+	cache *ClusterCache,
 ) Checker {
 	return &executor{
-		cli:       cli,
+		cache:     cache,
 		instance:  instance,
 		probeType: probeTypeReadiness,
 	}
@@ -74,11 +73,11 @@ func NewReadinessChecker(
 
 // NewStartupChecker creates a new instance of the startup probe checker
 func NewStartupChecker(
-	cli client.Client,
 	instance *postgres.Instance,
+	cache *ClusterCache,
 ) Checker {
 	return &executor{
-		cli:       cli,
+		cache:     cache,
 		instance:  instance,
 		probeType: probeTypeStartup,
 	}
@@ -92,21 +91,16 @@ func (e *executor) IsHealthy(
 	contextLogger := log.FromContext(ctx)
 
 	var cluster apiv1.Cluster
-	if err := e.cli.Get(
-		ctx,
-		client.ObjectKey{Namespace: e.instance.GetNamespaceName(), Name: e.instance.GetClusterName()},
-		&cluster,
-	); err != nil {
+	if err := e.cache.tryGetLatestClusterWithTimeout(ctx, &cluster); err != nil {
+		contextLogger = contextLogger.WithValues("apiServerReachable", false,
+			"apiServerErr", err.Error())
+		settingSource := "cached cluster definition"
+		if cluster.Name == "" {
+			settingSource = "default probe configuration"
+		}
 		contextLogger.Warning(
-			fmt.Sprintf("%s check failed, cannot check Cluster definition", e.probeType),
-			"err", err.Error(),
+			fmt.Sprintf("%s probe using %s due to API server connectivity issue", e.probeType, settingSource),
 		)
-		http.Error(
-			w,
-			fmt.Sprintf("%s check failed cannot get Cluster definition: %s", e.probeType, err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
 	}
 
 	probeRunner := getProbeRunnerFromCluster(e.probeType, cluster)
