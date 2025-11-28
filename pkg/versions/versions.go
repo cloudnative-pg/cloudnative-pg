@@ -26,7 +26,7 @@ const (
 	Version = "1.25.4"
 
 	// DefaultImageName is the default image used by the operator to create pods
-	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie"
+	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
 	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.25.4"
