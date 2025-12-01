@@ -56,6 +56,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		if !MustGetEnvProfile().IsLeaderElectionEnabled() {
+			Skip("Leader election is disabled")
+		}
 	})
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
