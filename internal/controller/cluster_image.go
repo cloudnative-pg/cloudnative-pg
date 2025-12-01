@@ -77,6 +77,16 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 
 	// Case 2: nothing to be done.
 	if !imageChanged && !extensionsChanged {
+		// In case user rolls back failed major upgrade.
+		if cluster.Status.Image != requestedImageInfo.Image {
+			return nil, status.PatchWithOptimisticLock(
+				ctx,
+				r.Client,
+				cluster,
+				status.SetImage(requestedImageInfo.Image),
+				status.SetPGDataImageInfo(&requestedImageInfo),
+			)
+		}
 		return nil, nil
 	}
 
