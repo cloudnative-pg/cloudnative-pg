@@ -294,6 +294,8 @@ func (se *Reconciler) completeSnapshotBackupStep(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	backup.Status.SetAsCompleted()
+	backup.Status.StoppedAt = backup.Status.ReconciliationTerminatedAt.DeepCopy()
+
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err

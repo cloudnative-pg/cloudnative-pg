@@ -47,6 +47,8 @@ func (backupStatus *BackupStatus) SetAsFailed(
 	} else {
 		backupStatus.Error = ""
 	}
+
+	backupStatus.ReconciliationTerminatedAt = ptr.To(metav1.Now())
 }
 
 // SetAsFinalizing marks a certain backup as finalizing
@@ -59,7 +61,7 @@ func (backupStatus *BackupStatus) SetAsFinalizing() {
 func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
 	backupStatus.Error = ""
-	backupStatus.StoppedAt = ptr.To(metav1.Now())
+	backupStatus.ReconciliationTerminatedAt = ptr.To(metav1.Now())
 }
 
 // SetAsStarted marks a certain backup as started
@@ -70,6 +72,7 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, meth
 		ContainerID: containerID,
 	}
 	backupStatus.Method = method
+	backupStatus.ReconciliationStartedAt = ptr.To(metav1.Now())
 }
 
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
