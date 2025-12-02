@@ -1140,13 +1140,13 @@ func (r *ClusterReconciler) handleRollingUpdate(
 }
 
 // SetupWithManager creates a ClusterReconciler
-func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, namespaced bool, maxConcurrentReconciles int) error {
 	err := r.createFieldIndexes(ctx, mgr)
 	if err != nil {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1172,21 +1172,26 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters()),
 		).
 		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+
+	// Only monitor cluster wide resources if not namespaced
+	if !namespaced {
+		b = b.Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
 		).
-		Watches(
-			&apiv1.ImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Watches(
-			&apiv1.ClusterImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+			Watches(
+				&apiv1.ClusterImageCatalog{},
+				handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
+				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+			)
+	}
+
+	return b.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and

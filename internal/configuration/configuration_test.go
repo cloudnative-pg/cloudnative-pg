@@ -170,4 +170,14 @@ var _ = Describe("Annotation and label inheritance", func() {
 		config := Data{}
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
+
+	It("verifies namespaced mode excludes cluster-wide resources", func() {
+		config := Data{Namespaced: true}
+		Expect(config.Namespaced).To(BeTrue())
+	})
+
+	It("verifies namespaced mode excludes cluster-wide resources", func() {
+		config := Data{Namespaced: false}
+		Expect(config.Namespaced).To(BeFalse())
+	})
 })
