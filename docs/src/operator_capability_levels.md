@@ -448,11 +448,15 @@ one and supports all the options available in
 
 ### Zero-Data-Loss Clusters Through Synchronous Replication
 
-Achieve *zero data loss* (RPO=0) in your local high-availability CloudNativePG
-cluster with support for both quorum-based and priority-based synchronous
-replication. The operator offers a flexible way to define the number of
-expected synchronous standby replicas available at any time, and allows
-customization of the `synchronous_standby_names` option as needed.
+CloudNativePG enables *zero-data-loss (RPO=0)* high-availability clusters by
+combining synchronous replication with optional [failover quorum](failover.md#failover-quorum-quorum-based-failover):
+you can define how many synchronous standby replicas must be available at any
+given time, ensuring that failover only proceeds when data is safely
+replicated.
+Both quorum-based and priority-based synchronous replication are supported, and
+the operator provides full flexibility in configuring the
+`synchronous_standby_names` setting to match your durability and performance
+requirements.
 
 ### Replica clusters
 
