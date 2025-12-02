@@ -305,6 +305,14 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		in, out := &in.StoppedAt, &out.StoppedAt
 		*out = (*in).DeepCopy()
 	}
+	if in.ReconciliationStartedAt != nil {
+		in, out := &in.ReconciliationStartedAt, &out.ReconciliationStartedAt
+		*out = (*in).DeepCopy()
+	}
+	if in.ReconciliationTerminatedAt != nil {
+		in, out := &in.ReconciliationTerminatedAt, &out.ReconciliationTerminatedAt
+		*out = (*in).DeepCopy()
+	}
 	if in.BackupLabelFile != nil {
 		in, out := &in.BackupLabelFile, &out.BackupLabelFile
 		*out = make([]byte, len(*in))

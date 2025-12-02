@@ -1057,13 +1057,14 @@ malcolm
 mallocs
 managedRoleSecretVersion
 managedRolesStatus
+matchExpressions
+matchLabels
+mateusoliveira
 managedconfiguration
 managedroles
 managedservice
 managedservices
-matchExpressions
-matchLabels
-mateusoliveira
+maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
@@ -1287,6 +1288,8 @@ readthedocs
 readyInstances
 reconciler
 reconciliationLoop
+reconciliationStartedAt
+reconciliationTerminatedAt
 reconnection
 recoverability
 recoveredCluster
