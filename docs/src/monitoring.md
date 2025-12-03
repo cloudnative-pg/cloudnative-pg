@@ -114,19 +114,83 @@ spec:
       your PostgreSQL cluster is running.
     - `spec.selector.matchLabels`: You must use the `cnpg.io/cluster: <cluster-name>`
       label to correctly target the PostgreSQL instances.
+    - In some Prometheus setups where RBAC is configured for metric scraping 
+      the attribute `podMetricsEndpoints` is required in the `.spec` stanza to collect metrics.
+    - In order to avoid breaking the Grafana dashboard due to labels namespace and pod missing,
+      it is important to add metric relabeling logic under `.spec.podMetricsEndpoint`.
 :::
+
+Here's a comprehensive, possible starter example:
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-example
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: cluster-example
+  podMetricsEndpoints:
+  - bearerTokenSecret:
+      key: ''
+      name: ''
+    port: metrics
+    relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+```
 
 #### Deprecation of Automatic `PodMonitor` Creation
 
-!!!warning "Feature Deprecation Notice"
+:::warning "Feature Deprecation Notice"
     The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
     now deprecated and will be removed in a future version of the operator.
+:::
 
 If you are currently using this feature, we strongly recommend you either
 remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
 create a `PodMonitor` resource for your cluster as described above.
 This change ensures that you have complete ownership of your monitoring
 configuration, preventing it from being managed or overwritten by the operator.
+
+:::info When migrating from operator managed PodMonitor resource 
+      Ensure that cnpg.io/cluster: `<cluster-name>` is not included in metadata.labels. Including it will cause the operator to delete your PodMonitor during reconciliation. The label should only appear in spec.selector.matchLabels to target the correct pods.
+:::
+
+:::warning "Data continuity after switching to manual PodMonitor"
+    It might be possible that, after switching podmonitor as suggested previously you are required to add the following yaml to your PodMonitor definition under .spec.podMetricsEndpoints
+:::
+    
+```
+relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+```
+#### Monitoring PgBouncer Poolers
+To monitor PgBouncer instances created via the Pooler CRD, create a separate PodMonitor that targets the pooler pods:
+
+```
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: pooler-example-rw-podmonitor
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/podRole: pooler
+      cnpg.io/poolerName: pooler-example-rw
+  podMetricsEndpoints:
+    - port: metrics
+```
+Replace pooler-example-rw with the name of your Pooler resource.
+
+:::info
+The information described for the cluster PodMonitor applies equally to the PgBouncer PodMonitor.
+:::
 
 ### Enabling TLS on the Metrics Port
 
