@@ -70,11 +70,12 @@ func (backupStatus *BackupStatus) SetAsCompleted() {
 }
 
 // SetAsStarted marks a certain backup as started
-func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, method BackupMethod) {
+func (backupStatus *BackupStatus) SetAsStarted(podName, containerID, executableHash string, method BackupMethod) {
 	backupStatus.Phase = BackupPhaseStarted
 	backupStatus.InstanceID = &InstanceID{
-		PodName:     podName,
-		ContainerID: containerID,
+		PodName:        podName,
+		ContainerID:    containerID,
+		ExecutableHash: executableHash,
 	}
 	backupStatus.Method = method
 	backupStatus.ReconciliationStartedAt = ptr.To(metav1.Now())
