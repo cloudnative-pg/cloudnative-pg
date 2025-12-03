@@ -24,19 +24,22 @@ Optional Components:
   is needed)
 - `du` (used for `kubectl cnpg status`)
 
-!!! Important
+:::info[Important]
     Only [PostgreSQL versions officially supported by PGDG](https://postgresql.org/) are allowed.
+:::
 
-!!! Info
+:::info
     Barman Cloud executables are no longer required in CloudNativePG. The
     recommended approach is to use the dedicated [Barman Cloud Plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
+:::
 
 No entry point or command is required in the image definition. CloudNativePG
 automatically overrides it with its instance manager.
 
-!!! Warning
+:::warning
     CloudNativePG only supports **Primary with multiple/optional Hot Standby
     Servers architecture** for PostgreSQL application container images.
+:::
 
 The CloudNativePG community provides and maintains
 [public PostgreSQL container images](https://github.com/cloudnative-pg/postgres-containers)
@@ -68,8 +71,10 @@ Examples of accepted image tags:
 - `15.5-10`
 - `16.0`
 
-!!! Warning
+:::warning
     `latest` is not considered a valid tag for the image.
+:::
 
-!!! Note
+:::note
     Image tag requirements do not apply for images defined in a catalog.
+:::

@@ -7,13 +7,14 @@ title: Appendix B - Backup on object stores
 
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Warning
+:::warning
     As of CloudNativePG 1.26, **native Barman Cloud support is deprecated** in
     favor of the **Barman Cloud Plugin**. This page has been moved to the appendix
     for reference purposes. While the native integration remains functional for
     now, we strongly recommend beginning a gradual migration to the plugin-based
     interface after appropriate testing.  For guidance, see
     [Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
+:::
 
 CloudNativePG natively supports **online/hot backup** of PostgreSQL
 clusters through continuous physical backup and WAL archiving on an object
@@ -35,12 +36,13 @@ You can use the image `ghcr.io/cloudnative-pg/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
-!!! Important
+:::info[Important]
     Always ensure that you are running the latest version of the operands
     in your system to take advantage of the improvements introduced in
     Barman cloud (as well as improve the security aspects of your cluster).
+:::
 
-!!! Warning "Changes in Barman Cloud 3.16+ and Bucket Creation"
+:::warning[Changes in Barman Cloud 3.16+ and Bucket Creation]
     Starting with Barman Cloud 3.16, most Barman Cloud commands no longer
     automatically create the target bucket, assuming it already exists. Only the
     `barman-cloud-check-wal-archive` command creates the bucket now. Whenever this
@@ -48,6 +50,7 @@ as it is composed of a community PostgreSQL image and the latest
     error. As a result, to ensure reliable, future-proof operations and avoid
     potential issues, we strongly recommend that you create and configure your
     object store bucket *before* creating a `Cluster` resource that references it.
+:::
 
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
@@ -71,9 +74,10 @@ in CloudNativePG.
 The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
 a `Cluster` resource.
 
-!!! Info
+:::info
     Please refer to [`BarmanObjectStoreConfiguration`](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)
     in the barman-cloud API for a full list of options.
+:::
 
 If required, you can choose to compress WAL files as soon as they
 are uploaded and/or encrypt them:
@@ -98,7 +102,7 @@ PostgreSQL implements a sequential archiving scheme, where the
 `archive_command` will be executed sequentially for every WAL
 segment to be archived.
 
-!!! Important
+:::info[Important]
     By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
     that WAL files, even in case of low workloads, are closed and archived
     at least every 5 minutes, providing a deterministic time-based value for
@@ -106,6 +110,7 @@ segment to be archived.
     of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
     our experience suggests that the default value set by the operator is
     suitable for most use cases.
+:::
 
 When the bandwidth between the PostgreSQL instance and the object
 store allows archiving more than one WAL file in parallel, you
@@ -164,7 +169,7 @@ spec:
     retentionPolicy: "30d"
 ```
 
-!!! Note "There's more ..."
+:::note[There's more ...]
     The **recovery window retention policy** is focused on the concept of
     *Point of Recoverability* (`PoR`), a moving point in time determined by
     `current time - recovery window`. The *first valid backup* is the first
@@ -174,6 +179,7 @@ spec:
     file, starting from the first valid backup. Base backups that are older
     than the first valid backup will be marked as *obsolete* and permanently
     removed after the next backup is completed.
+:::
 
 ## Compression algorithms
 
@@ -338,16 +344,18 @@ are named `app` by default. If the PostgreSQL cluster being restored uses
 different names, you must specify these names before exiting the recovery phase,
 as documented in ["Configure the application database"](../recovery.md#configure-the-application-database).
 
-!!! Important
+:::info[Important]
     By default, the `recovery` method strictly uses the `name` of the
     cluster in the `externalClusters` section as the name of the main folder
     of the backup data within the object store. This name is normally reserved
     for the name of the server. You can specify a different folder name
     using the `barmanObjectStore.serverName` property.
+:::
 
-!!! Note
+:::note
     This example takes advantage of the parallel WAL restore feature,
     dedicating up to 8 jobs to concurrently fetch the required WAL files from the
     archive. This feature can appreciably reduce the recovery time. Make sure that
     you plan ahead for this scenario and correctly tune the value of this parameter
     for your environment. It will make a difference when you need it, and you will.
+:::

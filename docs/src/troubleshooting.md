@@ -10,10 +10,11 @@ title: Troubleshooting
 In this page, you can find some basic information on how to troubleshoot
 CloudNativePG in your Kubernetes cluster deployment.
 
-!!! Hint
+:::tip[Hint]
     As a Kubernetes administrator, you should have the
     [`kubectl` Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/) page
     bookmarked!
+:::
 
 ## Before you start
 
@@ -78,13 +79,14 @@ regular backups.
 In some emergency situations, you might need to take an emergency logical
 backup of the main `app` database.
 
-!!! Important
+:::info[Important]
     The instructions you find below must be executed only in emergency situations
     and the temporary backup files kept under the data protection policies
     that are effective in your organization. The dump file is indeed stored
     in the client machine that runs the `kubectl` command, so make sure that
     all protections are in place and you have enough space to store the
     backup file.
+:::
 
 The following example shows how to take a logical backup of the `app` database
 in the `cluster-example` Postgres cluster, from the `cluster-example-1` pod:
@@ -94,9 +96,10 @@ kubectl exec cluster-example-1 -c postgres \
   -- pg_dump -Fc -d app > app.dump
 ```
 
-!!! Note
+:::note
     You can easily adapt the above command to backup your cluster, by providing
     the names of the objects you have used in your environment.
+:::
 
 The above command issues a `pg_dump` command in custom format, which is the most
 versatile way to take [logical backups in PostgreSQL](https://www.postgresql.org/docs/current/app-pgdump.html).
@@ -114,7 +117,7 @@ kubectl exec -i new-cluster-example-1 -c postgres \
   -- pg_restore --no-owner --role=app -d app --verbose < app.dump
 ```
 
-!!! Important
+:::info[Important]
     The example in this section assumes that you have no other global objects
     (databases and roles) to dump and restore, as per our recommendation. In case
     you have multiple roles, make sure you have taken a backup using `pg_dumpall -g`
@@ -123,6 +126,7 @@ kubectl exec -i new-cluster-example-1 -c postgres \
     sure you assign the right ownership. If you are not familiar with PostgreSQL,
     we advise that you do these critical operations under the guidance of
     a professional support company.
+:::
 
 The above steps might be integrated into the `cnpg` plugin at some stage in the future.
 
@@ -146,9 +150,10 @@ for doing so:
   `cnpg.io/clusterName` label), filter log entries, customize output formats,
   and more.
 
-!!! Note
+:::note
     The following sections provide examples of how to retrieve logs for various
     resources when troubleshooting CloudNativePG.
+:::
 
 ## Operator information
 
@@ -163,11 +168,12 @@ You can get a list of the operator pods by running:
 kubectl get pods -n cnpg-system
 ```
 
-!!! Note
+:::note
     Under normal circumstances, you should have one pod where the operator is
     running, identified by a name starting with `cnpg-controller-manager-`.
     In case you have set up your operator for high availability, you should have more entries.
     Those pods are managed by a deployment named `cnpg-controller-manager`.
+:::
 
 Collect the relevant information about the operator that is running in pod
 `<POD>` with:
@@ -192,8 +198,9 @@ kubectl logs -n cnpg-system \
   deployment/cnpg-controller-manager --all-containers=true
 ```
 
-!!! Tip
+:::tip
     You can add `-f` flag to above command to follow logs in real time.
+:::
 
 Save logs to a JSON file by running:
 
@@ -272,8 +279,9 @@ Another important command to gather is the `status` one, as provided by the
 kubectl cnpg status -n <NAMESPACE> <CLUSTER>
 ```
 
-!!! Tip
+:::tip
     You can print more information by adding the `--verbose` option.
+:::
 
 Get PostgreSQL container image version:
 
@@ -287,9 +295,10 @@ Output:
   Image Name:    ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 ```
 
-!!! Note
+:::note
     Also you can use `kubectl-cnpg status -n <NAMESPACE> <CLUSTER_NAME>`
     to get the same information.
+:::
 
 ## Pod information
 
@@ -576,22 +585,25 @@ to always run the latest minor version of PostgreSQL).
 CloudNativePG allows you to control what to include in the core dump through
 the `cnpg.io/coredumpFilter` annotation.
 
-!!! Info
+:::info
     Please refer to ["Labels and annotations"](labels_annotations.md)
     for more details on the standard annotations that CloudNativePG provides.
+:::
 
 By default, the `cnpg.io/coredumpFilter` is set to `0x31` in order to
 exclude shared memory segments from the dump, as this is the safest
 approach in most cases.
 
-!!! Info
+:::info
     Please refer to
     ["Core dump filtering settings" section of "The `/proc` Filesystem" page of the Linux Kernel documentation](https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings).
     for more details on how to set the bitmask that controls the core dump filter.
+:::
 
-!!! Important
+:::info[Important]
     Beware that this setting only takes effect during Pod startup and that changing
     the annotation doesn't trigger an automated rollout of the instances.
+:::
 
 Although you might not personally be involved in inspecting core dumps,
 you might be asked to provide them so that a Postgres expert can look
@@ -644,8 +656,9 @@ You can disable pprof at any time by either removing the annotation or setting
 it to `"false"`. The operator will roll out changes automatically to remove the
 pprof port and flag.
 
-!!! Important
+:::info[Important]
     The pprof server only serves plain HTTP on port `6060`.
+:::
 
 ### Example
 
@@ -666,11 +679,12 @@ spec:
 Changing this annotation updates the instance pod spec (adds port `6060` and
 the corresponding flag) and triggers a rolling update.
 
-!!! Warning
+:::warning
     The example below uses `kubectl port-forward` for local testing only.
     This is **not** the intended way to expose the feature in production.
     Treat pprof as a sensitive debugging interface and never expose it publicly.
     If you must access it remotely, secure it with proper network policies and access controls.
+:::
 
 Use port-forwarding to access the pprof endpoints:
 
