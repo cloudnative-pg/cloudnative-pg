@@ -22,7 +22,7 @@ jobs:
     outputs:
       is_latest: ${{ env.IS_LATEST }}
       is_stable: ${{ env.IS_STABLE }}
-      is_rc : ${{ steps.check-release.outputs.is_rc }}
+      is_rc: ${{ steps.check-release.outputs.is_rc }}
     steps:
       -
         name: Checkout
@@ -46,7 +46,7 @@ jobs:
             is_stable="true"
           fi
           is_rc="false"
-          if [[ "$tag" =~ ^.*-rc[0-9]$ ]]; then
+          if [[ "$tag" =~ ^.*-rc[0-9]+$ ]]; then
             is_rc="true"
           fi
           echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
