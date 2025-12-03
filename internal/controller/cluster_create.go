@@ -974,8 +974,14 @@ func createOrPatchPodMonitor(
 	// Pod monitor disabled and no pod monitor - nothing to do
 	case !manager.IsPodMonitorEnabled() && podMonitor == nil:
 		return nil
-	// Pod monitor disabled and pod monitor present - delete it
+	// Pod monitor disabled and pod monitor present - delete it only if it's operator managed
 	case !manager.IsPodMonitorEnabled() && podMonitor != nil:
+		// We check for operator managed label if it doesn't exist skip resource deletion
+		if _, label := podMonitor.Labels["cnpg.io/cluster"]; !label {
+			contextLogger.Info("User defined PodMonitor detected, skipping..")
+			return nil
+		}
+		// Label exists, we delete to avoid stale resources
 		contextLogger.Info("Deleting PodMonitor")
 		if err := cli.Delete(ctx, podMonitor); err != nil {
 			if !apierrs.IsNotFound(err) {
