@@ -319,6 +319,11 @@ type InstanceID struct {
 	// The container ID
 	// +optional
 	ContainerID string `json:"ContainerID,omitempty"`
+	// The instance manager executable hash. This is used to detect if the instance
+	// manager binary was upgraded (e.g., during a release) which would terminate
+	// any running backup process.
+	// +optional
+	ExecutableHash string `json:"executableHash,omitempty"`
 }
 
 // +genclient

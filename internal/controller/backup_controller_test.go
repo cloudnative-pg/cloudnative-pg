@@ -68,6 +68,8 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 					TargetPrimary: clusterPrimary,
 				},
 			}
+			err := env.backupReconciler.Create(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
 
 			backup = &apiv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,6 +89,8 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 					},
 				},
 			}
+			err = env.backupReconciler.Create(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
 
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -102,7 +106,7 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 					},
 				},
 			}
-			err := env.backupReconciler.Create(ctx, pod)
+			err = env.backupReconciler.Create(ctx, pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			pod.Status = corev1.PodStatus{

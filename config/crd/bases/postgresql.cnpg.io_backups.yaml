@@ -313,6 +313,12 @@ spec:
                   ContainerID:
                     description: The container ID
                     type: string
+                  executableHash:
+                    description: |-
+                      The instance manager executable hash. This is used to detect if the instance
+                      manager binary was upgraded (e.g., during a release) which would terminate
+                      any running backup process.
+                    type: string
                   podName:
                     description: The pod name
                     type: string
