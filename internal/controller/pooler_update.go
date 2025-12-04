@@ -220,13 +220,21 @@ func (r *PoolerReconciler) updateRBAC(
 //   - the ServiceAccount exits
 //   - it contains the ImagePullSecret if required
 //
-// Any other property of the ServiceAccount is preserved
+// # Any other property of the ServiceAccount is preserved
+//
+// If a custom ServiceAccount is specified via serviceAccountName,
+// this method validates that it exists but does not create or modify it.
 func (r *PoolerReconciler) updateServiceAccount(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+
+	// If a custom ServiceAccount is specified, validate it exists and return
+	if pooler.Spec.ServiceAccountName != nil {
+		return r.validateExistingServiceAccount(ctx, pooler)
+	}
 
 	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler, configuration.Current)
 	if err != nil {
@@ -254,6 +262,26 @@ func (r *PoolerReconciler) updateServiceAccount(
 		if err := r.Patch(ctx, resources.ServiceAccount, client.MergeFrom(origServiceAccount)); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// validateExistingServiceAccount checks if the specified ServiceAccount exists for a Pooler
+func (r *PoolerReconciler) validateExistingServiceAccount(ctx context.Context, pooler *apiv1.Pooler) error {
+	var sa corev1.ServiceAccount
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      pooler.GetServiceAccountName(),
+		Namespace: pooler.Namespace,
+	}, &sa)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(pooler, "Warning", "ServiceAccountNotFound",
+				"Specified ServiceAccount %q not found in namespace %q",
+				pooler.GetServiceAccountName(), pooler.Namespace)
+			return fmt.Errorf("serviceAccount %q not found: %w", pooler.GetServiceAccountName(), err)
+		}
+		return fmt.Errorf("while validating existing service account: %w", err)
 	}
 
 	return nil
