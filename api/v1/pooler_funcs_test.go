@@ -20,6 +20,9 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -36,5 +39,41 @@ var _ = Describe("Pooler type tests", func() {
 			Paused: &trueVal,
 		}
 		Expect(pgbouncer.IsPaused()).To(BeTrue())
+	})
+})
+
+var _ = Describe("Pooler GetServiceAccountName", func() {
+	It("returns pooler name when serviceAccountName is not specified", func() {
+		pooler := &Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-pooler",
+			},
+			Spec: PoolerSpec{},
+		}
+		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
+	})
+
+	It("returns custom serviceAccountName when specified", func() {
+		pooler := &Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-pooler",
+			},
+			Spec: PoolerSpec{
+				ServiceAccountName: ptr.To("shared-service-account"),
+			},
+		}
+		Expect(pooler.GetServiceAccountName()).To(Equal("shared-service-account"))
+	})
+
+	It("returns pooler name when serviceAccountName is nil", func() {
+		pooler := &Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-pooler",
+			},
+			Spec: PoolerSpec{
+				ServiceAccountName: nil,
+			},
+		}
+		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
 	})
 })

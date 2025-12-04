@@ -28,10 +28,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// ServiceAccount creates a service account for a given pooler
+// ServiceAccount creates a service account for a given pooler.
+// This is used when the operator manages the ServiceAccount (no custom serviceAccountName specified).
 func ServiceAccount(pooler *apiv1.Pooler) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
-		Name: pooler.GetServiceAccountName(), Namespace: pooler.Namespace,
+		Name: pooler.Name, Namespace: pooler.Namespace,
 	}}
 }
 
