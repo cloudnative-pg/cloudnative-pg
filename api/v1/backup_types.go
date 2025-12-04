@@ -237,13 +237,21 @@ type BackupStatus struct {
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
 
-	// When the backup was started
+	// When the backup execution was started by the backup tool
 	// +optional
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
 
-	// When the backup was terminated
+	// When the backup execution was terminated by the backup tool
 	// +optional
 	StoppedAt *metav1.Time `json:"stoppedAt,omitempty"`
+
+	// When the backup process was started by the operator
+	// +optional
+	ReconciliationStartedAt *metav1.Time `json:"reconciliationStartedAt,omitempty"`
+
+	// When the reconciliation was terminated by the operator (either successfully or not)
+	// +optional
+	ReconciliationTerminatedAt *metav1.Time `json:"reconciliationTerminatedAt,omitempty"`
 
 	// The starting WAL
 	// +optional
