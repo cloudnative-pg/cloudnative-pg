@@ -129,7 +129,7 @@ var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 
 	It("should fail when specified ServiceAccount does not exist", func() {
 		const (
-			clusterFailFile = fixturesDir + "/shared_service_account/cluster-nonexistent-sa.yaml"
+			clusterFailFile = fixturesDir + "/shared_service_account/cluster_nonexists_sa.yaml"
 			clusterFailName = "cluster-nonexistent-sa"
 		)
 
