@@ -20,8 +20,8 @@ jobs:
     name: Evaluate release tag
     runs-on: ubuntu-24.04
     outputs:
-      is_latest: ${{ env.IS_LATEST }}
-      is_stable: ${{ env.IS_STABLE }}
+      is_latest: ${{ steps.check-release.outputs.is_latest }}
+      is_stable: ${{ steps.check-release.outputs.is_stable }}
       is_rc: ${{ steps.check-release.outputs.is_rc }}
     steps:
       -
@@ -49,8 +49,8 @@ jobs:
           if [[ "$tag" =~ ^.*-rc[0-9]+$ ]]; then
             is_rc="true"
           fi
-          echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
-          echo "IS_STABLE=${is_stable}" >> $GITHUB_ENV
+          echo "is_latest=${is_latest}" >> $GITHUB_OUTPUT
+          echo "is_stable=${is_stable}" >> $GITHUB_OUTPUT
           echo "is_rc=${is_rc}" >> $GITHUB_OUTPUT
 
   release:
@@ -89,7 +89,7 @@ jobs:
           name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
           make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
-          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' }}
+          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' || needs.check-version.outputs.is_rc == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
