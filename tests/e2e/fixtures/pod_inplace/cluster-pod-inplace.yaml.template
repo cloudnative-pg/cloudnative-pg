@@ -1,0 +1,56 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pod-inplace
+spec:
+  instances: 2
+
+  postgresql:
+    parameters:
+      shared_buffers: "64MB"
+      log_statement: "all"
+      log_min_duration_statement: "1000"
+
+  # Container resize policy configuration for in-place updates
+  containerResizePolicy:
+    - resourceName: cpu
+      restartPolicy: NotRequired  # Allows in-place CPU updates
+    - resourceName: memory
+      restartPolicy: NotRequired  # Allows in-place memory updates
+
+  # Initial resource configuration (minimal for faster testing)
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+
+  # Storage configuration (minimal for faster testing)
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: cluster-pod-inplace-credentials
+
+  # Monitoring configuration
+  monitoring:
+    enabled: true
+
+---
+# Secret for database credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-pod-inplace-credentials
+type: kubernetes.io/basic-auth
+stringData:
+  username: app
+  password: "super-secret-password"
