@@ -159,11 +159,21 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Spec.Template.Spec.InitContainers[0].Name).To(Equal(specs.BootstrapControllerContainerName))
 	})
 
-	It("sets the correct service account name", func() {
+	It("sets the correct service account name when not specified", func() {
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 		Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(pooler.Name))
+	})
+
+	It("sets the custom service account name when specified", func() {
+		customPooler := pooler.DeepCopy()
+		customSA := "custom-service-account"
+		customPooler.Spec.ServiceAccountName = &customSA
+		deployment, err := Deployment(customPooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(deployment).ToNot(BeNil())
+		Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal("custom-service-account"))
 	})
 
 	It("sets the correct readiness probe", func() {
