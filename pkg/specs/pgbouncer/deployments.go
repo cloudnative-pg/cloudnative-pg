@@ -120,7 +120,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
 		}, false).
 		WithContainerSecurityContext("pgbouncer", specs.GetSecurityContext(cluster), true).
-		WithServiceAccountName(pooler.Name, true).
+		WithServiceAccountName(pooler.GetServiceAccountName(), true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
 			TimeoutSeconds: 5,
 			ProbeHandler: corev1.ProbeHandler{
