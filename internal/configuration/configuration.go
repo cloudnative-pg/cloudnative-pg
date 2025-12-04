@@ -96,6 +96,10 @@ type Data struct {
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
+	// Namespaced defines if the operator should only access and listen to resources within
+	// its own namespace. Default false
+	Namespaced bool `json:"namespaced" env:"NAMESPACED"`
+
 	// OperatorPullSecretName is the pull secret used to download the
 	// pull secret name
 	OperatorPullSecretName string `json:"operatorPullSecretName" env:"PULL_SECRET_NAME"`
@@ -194,6 +198,7 @@ func newDefaultConfig() *Data {
 		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
+		Namespaced:              false,
 	}
 }
 
