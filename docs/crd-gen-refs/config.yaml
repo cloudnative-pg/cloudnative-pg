@@ -1,0 +1,20 @@
+processor:
+  ignoreGroupVersions:
+    - "GVK"
+  customMarkers:
+    - name: "optional"
+      target: field
+  ignoreFields:
+#    - "status$"
+    - "TypeMeta$"
+  ignoreTypes:
+    - "ObjectStoreList$"
+
+render:
+  # Version of Kubernetes to use when generating links to Kubernetes API documentation.
+  # renovate: datasource=git-refs depName=kubernetes/kubernetes lookupName=https://github.com/kubernetes/kubernetes
+  kubernetesVersion: 1.34
+  knownTypes:
+  - name: BarmanObjectStoreConfiguration
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration
