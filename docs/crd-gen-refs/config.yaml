@@ -27,6 +27,15 @@ render:
   - name: BarmanObjectStoreConfiguration
     package: github.com/cloudnative-pg/cloudnative-pg/api/v1
     link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration
+  - name: GoogleCredentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#S3Credentials
+  - name: S3Credentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#GoogleCredentials
+  - name: AzureCredentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#AzureCredentials
   - name: LocalObjectReference
     package: github.com/cloudnative-pg/cloudnative-pg/api/v1
     link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference
