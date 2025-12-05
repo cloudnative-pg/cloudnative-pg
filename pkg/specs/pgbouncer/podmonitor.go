@@ -39,6 +39,7 @@ func NewPoolerPodMonitorManager(pooler *apiv1.Pooler) *PoolerPodMonitorManager {
 
 // IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
 func (c PoolerPodMonitorManager) IsPodMonitorEnabled() bool {
+	//nolint:staticcheck
 	return c.pooler.Spec.Monitoring != nil && c.pooler.Spec.Monitoring.EnablePodMonitor
 }
 
@@ -48,7 +49,12 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.pooler.Namespace,
 		Name:      c.pooler.Name,
 		Labels: map[string]string{
-			utils.PgbouncerNameLabel: c.pooler.Name,
+			utils.PgbouncerNameLabel:              c.pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  c.pooler.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		},
 	}
 
@@ -59,6 +65,7 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Port: &metricsPort,
 	}
 
+	//nolint:staticcheck // Using deprecated fields during deprecation period
 	if c.pooler.Spec.Monitoring != nil {
 		endpoint.MetricRelabelConfigs = c.pooler.Spec.Monitoring.PodMonitorMetricRelabelConfigs
 		endpoint.RelabelConfigs = c.pooler.Spec.Monitoring.PodMonitorRelabelConfigs

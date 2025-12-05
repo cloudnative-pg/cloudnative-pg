@@ -34,7 +34,8 @@ permissions: read-all
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.24.x"
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.25.5"
 
 jobs:
   duplicate_runs:
@@ -65,17 +66,17 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
 
     - name: Install Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
       with:
         go-version: ${{ env.GOLANG_VERSION }}
         check-latest: true
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4
       with:
         languages: "go"
         build-mode: manual
@@ -92,6 +93,6 @@ jobs:
         make
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+      uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4
       with:
         category: "/language:go"

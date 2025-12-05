@@ -69,7 +69,7 @@ func Reconcile(
 		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
 		return nil, err
 	}
-	if requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
+	if cluster.Status.PGDataImageInfo == nil || requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
 		return nil, nil
 	}
 
@@ -282,7 +282,7 @@ func getPrimarySerial(
 	pvcs []corev1.PersistentVolumeClaim,
 ) (int, error) {
 	for _, pvc := range pvcs {
-		instanceRole, _ := utils.GetInstanceRole(pvc.ObjectMeta.Labels)
+		instanceRole, _ := utils.GetInstanceRole(pvc.Labels)
 		if instanceRole != specs.ClusterRoleLabelPrimary {
 			continue
 		}

@@ -21,6 +21,7 @@ package status
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -39,6 +40,8 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -108,6 +111,7 @@ func Status(
 	clusterName string,
 	verbosity int,
 	format plugin.OutputFormat,
+	timeout time.Duration,
 ) error {
 	var cluster apiv1.Cluster
 	var errs []error
@@ -131,12 +135,12 @@ func Status(
 	}
 	errs = append(errs, status.ErrorList...)
 
-	status.printBasicInfo(ctx, clientInterface)
+	status.printBasicInfo(ctx, clientInterface, timeout)
 	status.printHibernationInfo()
 	status.printDemotionTokenInfo()
 	status.printPromotionTokenInfo()
 	if verbosity > 1 {
-		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
+		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface, timeout)...)
 		status.printCertificatesStatus()
 	}
 	if !hibernated {
@@ -178,6 +182,7 @@ func extractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *Postgr
 	// Get the list of Pods created by this Cluster
 	instancesStatus, errList := resources.ExtractInstancesStatus(
 		ctx,
+		&cluster,
 		plugin.Config,
 		managedPods,
 	)
@@ -212,9 +217,11 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
-func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client kubernetes.Interface) (string, error) {
-	timeout := time.Second * 10
-
+func (fullStatus *PostgresqlStatus) getClusterSize(
+	ctx context.Context,
+	client kubernetes.Interface,
+	timeout time.Duration,
+) (string, error) {
 	// Compute the disk space through `du`
 	output, _, err := utils.ExecCommand(
 		ctx,
@@ -234,10 +241,14 @@ func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client k
 	return size, nil
 }
 
-func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClient kubernetes.Interface) {
+func (fullStatus *PostgresqlStatus) printBasicInfo(
+	ctx context.Context,
+	k8sClient kubernetes.Interface,
+	timeout time.Duration,
+) {
 	summary := tabby.New()
 
-	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, k8sClient)
+	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, k8sClient, timeout)
 
 	cluster := fullStatus.Cluster
 
@@ -277,10 +288,10 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 	case isPrimaryFenced:
 		summary.AddLine("Status:", aurora.Red("Primary instance is fenced"))
 	default:
-		// Avoid printing the start time when hibernated or fenced
-		primaryStartTime := getPrimaryStartTime(cluster)
-		if len(primaryStartTime) > 0 {
-			summary.AddLine("Primary start time:", primaryStartTime)
+		// Avoid printing the promotion time when hibernated or fenced
+		primaryPromotionTime := getPrimaryPromotionTime(cluster)
+		if len(primaryPromotionTime) > 0 {
+			summary.AddLine("Primary promotion time:", primaryPromotionTime)
 		}
 		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
@@ -358,7 +369,7 @@ func (fullStatus *PostgresqlStatus) printHibernationInfo() {
 		hibernationStatus.AddLine("Status", "Active")
 	}
 	hibernationStatus.AddLine("Message", hibernationCondition.Message)
-	hibernationStatus.AddLine("Time", hibernationCondition.LastTransitionTime.Time.UTC())
+	hibernationStatus.AddLine("Time", hibernationCondition.LastTransitionTime.UTC())
 
 	fmt.Println(aurora.Green("Hibernation"))
 	hibernationStatus.Print()
@@ -477,8 +488,8 @@ func (fullStatus *PostgresqlStatus) getStatus(cluster *apiv1.Cluster) string {
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	ctx context.Context,
 	client kubernetes.Interface,
+	timeout time.Duration,
 ) []error {
-	timeout := time.Second * 10
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
@@ -513,19 +524,107 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	cluster := fullStatus.Cluster
 
-	fmt.Println(aurora.Green("Continuous Backup status"))
-	if cluster.Spec.Backup == nil {
-		fmt.Println(aurora.Yellow("Not configured"))
+	// Check if Barman Cloud plugin is configured
+	isBarmanPluginEnabled, pluginParams := isBarmanCloudPluginEnabled(cluster)
+
+	switch {
+	case isBarmanPluginEnabled:
+		fmt.Println(aurora.Green("Continuous Backup status (Barman Cloud Plugin)"))
+	case cluster.Spec.Backup != nil:
+		fmt.Println(aurora.Green("Continuous Backup status"))
+	default:
+		fmt.Println(aurora.Yellow("Continuous Backup not configured"))
 		fmt.Println()
 		return
 	}
-	status := tabby.New()
-	FPoR := cluster.Status.FirstRecoverabilityPoint
-	if FPoR == "" {
-		FPoR = "Not Available"
-	}
-	status.AddLine("First Point of Recoverability:", FPoR)
 
+	status := tabby.New()
+	// If backup is managed by Barman Cloud plugin, fetch and display the ObjectStore CRD
+	// Note: The webhook ensures barmanObjectStore and plugin WAL archiver are mutually exclusive,
+	// so we don't need to check both conditions
+	if isBarmanPluginEnabled {
+		barmanObjectName := pluginParams["barmanObjectName"]
+		if barmanObjectName == "" {
+			fmt.Println(aurora.Red("Backup is managed by the Barman Cloud plugin, " +
+				"but 'barmanObjectName' parameter is not configured."))
+			fmt.Println(aurora.Red("Please configure the 'barmanObjectName' parameter in the plugin configuration."))
+			fmt.Println()
+			return
+		}
+
+		objectStore, err := fullStatus.getBarmanObject(barmanObjectName)
+		if err != nil {
+			fmt.Println(aurora.Red(fmt.Sprintf("Error fetching ObjectStore '%s': %v", barmanObjectName, err)))
+			fmt.Println()
+			return
+		}
+
+		fullStatus.printBarmanObjectStoreStatus(status, objectStore, pluginParams)
+	} else if cluster.Spec.Backup != nil {
+		// FirstRecoverabilityPoint is deprecated and will be removed together
+		// with native Barman Cloud support. It is only shown when the backup
+		// section is not empty.
+		FPoR := cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
+		if FPoR == "" {
+			FPoR = "Not Available"
+		}
+		status.AddLine("First Point of Recoverability:", FPoR)
+	}
+
+	fullStatus.printWALArchivingStatus(status)
+	status.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) getBarmanObject(barmanObjectName string) (*ObjectStore, error) {
+	ctx := context.Background()
+	objectStoreGVR := schema.GroupVersionResource{
+		Group:    "barmancloud.cnpg.io",
+		Version:  "v1",
+		Resource: "objectstores",
+	}
+
+	dynamicClient := dynamic.NewForConfigOrDie(plugin.Config)
+	unstructuredObj, err := dynamicClient.Resource(objectStoreGVR).Namespace(plugin.Namespace).Get(
+		ctx, barmanObjectName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert unstructured to typed ObjectStore
+	var objectStore ObjectStore
+	err = convertUnstructured(unstructuredObj, &objectStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ObjectStore: %w", err)
+	}
+
+	return &objectStore, nil
+}
+
+// convertUnstructured converts an unstructured object to a typed object
+func convertUnstructured(from interface{}, to interface{}) error {
+	data, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, to)
+}
+
+// isBarmanCloudPluginEnabled checks if the barman-cloud plugin is enabled, and the parameters map
+func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string) {
+	for _, plg := range cluster.Spec.Plugins {
+		if plg.Name == "barman-cloud.cloudnative-pg.io" {
+			if plg.IsEnabled() {
+				return true, plg.Parameters
+			}
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
+// printWALArchivingStatus prints the WAL archiving status to the provided tabby table
+func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
 		status.AddLine("No Primary instance found")
@@ -547,9 +646,6 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 		status.AddLine("Last Failed WAL:", primaryInstanceStatus.LastFailedWAL,
 			" @ ", primaryInstanceStatus.LastFailedWALTime)
 	}
-
-	status.Print()
-	fmt.Println()
 }
 
 func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
@@ -686,7 +782,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	}
 
 	if fullStatus.areReplicationSlotsEnabled() {
-		fmt.Println(aurora.Green("Replication Slots Enabled").String())
+		fmt.Println(aurora.Cyan("Replication Slots Enabled").String())
 	}
 
 	status := tabby.New()
@@ -756,7 +852,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		if instance.Error != nil {
 			status.AddLine(
 				instance.Pod.Name,
-				"-",
 				"-",
 				"-",
 				apierrs.ReasonForError(instance.Error),
@@ -1206,6 +1301,8 @@ func (fullStatus *PostgresqlStatus) printPluginStatus(verbosity int) {
 				result[idx] = "Operator Service"
 			case identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE.String():
 				result[idx] = "Lifecycle Service"
+			case identity.PluginCapability_Service_TYPE_POSTGRES.String():
+				result[idx] = "Postgres Service"
 			case identity.PluginCapability_Service_TYPE_UNSPECIFIED.String():
 				continue
 			default:
@@ -1241,11 +1338,11 @@ func (fullStatus *PostgresqlStatus) printPluginStatus(verbosity int) {
 	fmt.Println()
 }
 
-func getPrimaryStartTime(cluster *apiv1.Cluster) string {
-	return getPrimaryStartTimeIdempotent(cluster, time.Now())
+func getPrimaryPromotionTime(cluster *apiv1.Cluster) string {
+	return getPrimaryPromotionTimeIdempotent(cluster, time.Now())
 }
 
-func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
+func getPrimaryPromotionTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
 	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
 		return ""
 	}
@@ -1258,10 +1355,56 @@ func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time
 		return aurora.Red("error: " + err.Error()).String()
 	}
 
-	uptime := currentTime.Sub(primaryInstanceTimestamp)
+	duration := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
-		"%s (uptime %s)",
+		"%s (%s)",
 		primaryInstanceTimestamp.Round(time.Second),
-		uptime.Round(time.Second),
+		duration.Round(time.Second),
 	)
+}
+
+// printBarmanObjectStoreStatus prints the ObjectStore CRD status in a tree-like format
+func (fullStatus *PostgresqlStatus) printBarmanObjectStoreStatus(
+	status *tabby.Tabby,
+	objectStore *ObjectStore,
+	params map[string]string,
+) {
+	serverName := params["serverName"]
+	if serverName == "" {
+		serverName = fullStatus.Cluster.Name
+	}
+
+	// Retrieve server's recovery window information
+	recoveryWindow, ok := objectStore.Status.ServerRecoveryWindow[serverName]
+	if !ok {
+		fmt.Println(aurora.Red(fmt.Sprintf("No recovery window information found in ObjectStore '%s' for server '%s'",
+			objectStore.GetName(), serverName)))
+		return
+	}
+
+	status.AddLine("ObjectStore / Server name:", objectStore.GetName()+"/"+serverName)
+
+	// Format and print first recoverability point
+	if recoveryWindow.FirstRecoverabilityPoint != nil {
+		status.AddLine("First Point of Recoverability:",
+			recoveryWindow.FirstRecoverabilityPoint.Format("2006-01-02 15:04:05 MST"))
+	} else {
+		status.AddLine("First Point of Recoverability:", "-")
+	}
+
+	// Format and print last successful backup time
+	if recoveryWindow.LastSuccessfulBackupTime != nil {
+		status.AddLine("Last Successful Backup:",
+			recoveryWindow.LastSuccessfulBackupTime.Format("2006-01-02 15:04:05 MST"))
+	} else {
+		status.AddLine("Last Successful Backup:", "-")
+	}
+
+	// Format and print last failed backup time (in red if present)
+	if recoveryWindow.LastFailedBackupTime != nil {
+		status.AddLine("Last Failed Backup:",
+			aurora.Red(recoveryWindow.LastFailedBackupTime.Format("2006-01-02 15:04:05 MST")))
+	} else {
+		status.AddLine("Last Failed Backup:", "-")
+	}
 }

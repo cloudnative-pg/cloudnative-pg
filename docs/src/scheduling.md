@@ -1,3 +1,9 @@
+---
+id: scheduling
+sidebar_position: 120
+title: Scheduling
+---
+
 # Scheduling
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -41,7 +47,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.4
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
   affinity:
     enablePodAntiAffinity: true # Default value

@@ -1,3 +1,9 @@
+---
+id: postgresql_conf
+sidebar_position: 220
+title: PostgreSQL Configuration
+---
+
 # PostgreSQL Configuration
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -130,6 +136,30 @@ Since the fixed parameters are added at the end, they can't be overridden by the
 user via the YAML configuration. Those parameters are required for correct WAL
 archiving and replication.
 
+### Write-Ahead Log Level
+
+The [`wal_level`](https://www.postgresql.org/docs/current/runtime-config-wal.html)
+parameter in PostgreSQL determines the amount of information written to the
+Write-Ahead Log (WAL). It accepts the following values:
+
+- `minimal`: Writes only the information required for crash recovery.
+- `replica`: Adds sufficient information to support WAL archiving and streaming
+  replication, including the ability to run read-only queries on standby
+  instances.
+- `logical`: Includes all information from `replica`, plus additional information
+  required for logical decoding and replication.
+
+By default, upstream PostgreSQL sets `wal_level` to `replica`. CloudNativePG,
+instead, sets `wal_level` to `logical` by default to enable logical replication
+out of the box. This makes it easier to support use cases such as migrations
+from external PostgreSQL servers.
+
+If your cluster does not require logical replication, it is recommended to set
+`wal_level` to `replica` to reduce WAL volume and overhead.
+
+Finally, CloudNativePG allows `wal_level` to be set to `minimal` only for
+single-instance clusters with WAL archiving disabled.
+
 ### Replication Settings
 
 The `primary_conninfo`, `restore_command`, and `recovery_target_timeline`
@@ -138,26 +168,27 @@ role within the cluster. These parameters are effectively applied only when the
 instance is operating as a replica.
 
 ```text
-primary_conninfo = 'host=<PRIMARY> user=postgres dbname=postgres'
+primary_conninfo = 'host=<PRIMARY> user=postgres dbname=postgres tcp_user_timeout=5000'
 recovery_target_timeline = 'latest'
 ```
 
-The [`STANDBY_TCP_USER_TIMEOUT` operator configuration setting](operator_conf.md#available-options),
-if specified, sets the `tcp_user_timeout` parameter on all standby instances
-managed by the operator.
-
-The `tcp_user_timeout` parameter determines how long transmitted data can
-remain unacknowledged before the TCP connection is forcibly closed. Adjusting
-this value allows you to fine-tune the responsiveness of standby instances to
-network disruptions. For more details, refer to the
-[PostgreSQL documentation](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT).
+!!! Important
+    By default, every standby sets `tcp_user_timeout` to **5 seconds**, as shown
+    above. This parameter defines how long transmitted data may remain
+    unacknowledged before the TCP connection is forcibly closed. Adjusting it lets
+    you control how quickly a standby reacts to network issues.
+    If the default value does not meet your requirements, you can override it
+    for all standbys managed by the operator using the
+    [`STANDBY_TCP_USER_TIMEOUT` operator configuration option](operator_conf.md#available-options).
+    For additional details on `tcp_user_timeout`, refer to the
+    [PostgreSQL documentation](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-TCP-USER-TIMEOUT).
 
 ### Log control settings
 
 The operator requires PostgreSQL to output its log in CSV format, and the
 instance manager automatically parses it and outputs it in JSON format.
-For this reason, all log settings in PostgreSQL are fixed and cannot be
-changed.
+As a result, certain PostgreSQL log settings, listed in [this section](#fixed-parameters),
+are fixed and cannot be modified.
 
 For further information, please refer to the ["Logging" section](logging.md).
 
@@ -349,9 +380,9 @@ Fixed rules:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 ```
 
 Default rules:
@@ -373,8 +404,9 @@ The resulting `pg_hba.conf` will look like this:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
+hostssl postgres streaming_replica all cert map=cnpg_streaming_replica
+hostssl replication streaming_replica all cert map=cnpg_streaming_replica
+hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 
 <user defined rules>
 <user defined LDAP>

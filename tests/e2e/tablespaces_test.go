@@ -31,7 +31,7 @@ import (
 	"time"
 
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -94,8 +94,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	// Verify that the tablespace exists on the primary pod of a cluster
 	hasTablespaceAndOwner := func(cluster *apiv1.Cluster, tablespace, owner string) (bool, error) {
-		namespace := cluster.ObjectMeta.Namespace
-		clusterName := cluster.ObjectMeta.Name
+		namespace := cluster.Namespace
+		clusterName := cluster.Name
 		primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		if err != nil {
 			return false, err
@@ -224,7 +224,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
 		})
@@ -316,21 +316,21 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.FirstRecoverabilityPoint, err
+					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.LastSuccessfulBackup, err
+					return cluster.Status.LastSuccessfulBackup, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
-					return cluster.Status.LastFailedBackup, err
+					return cluster.Status.LastFailedBackup, err //nolint:staticcheck
 				}, 30).Should(BeEmpty())
 			})
 		})
@@ -915,8 +915,8 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 	numTablespaces int,
 	timeout int,
 ) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	podMountPaths := func(pod corev1.Pod) (bool, []string) {
 		var hasPostgresContainer bool
 		var mountPaths []string
@@ -987,8 +987,8 @@ func getDatabasUserUID(cluster *apiv1.Cluster, dbContainer *corev1.Container) in
 }
 
 func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeout int) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking all the required PVCs were created", func() {
 		Eventually(func(g Gomega) {
 			pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
@@ -1051,8 +1051,8 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 }
 
 func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
 			instances, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -1081,8 +1081,8 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 }
 
 func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content string) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 	By("checking the expected setting in a new PG session", func() {
 		Eventually(func(g Gomega) {
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -1107,8 +1107,8 @@ func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content st
 }
 
 func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespaceName string) {
-	namespace := cluster.ObjectMeta.Namespace
-	clusterName := cluster.ObjectMeta.Name
+	namespace := cluster.Namespace
+	clusterName := cluster.Name
 
 	primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	if err != nil {
@@ -1247,8 +1247,8 @@ func getSnapshots(
 	backupName string,
 	clusterName string,
 	namespace string,
-) (volumesnapshot.VolumeSnapshotList, error) {
-	var snapshotList volumesnapshot.VolumeSnapshotList
+) (volumesnapshotv1.VolumeSnapshotList, error) {
+	var snapshotList volumesnapshotv1.VolumeSnapshotList
 	err := env.Client.List(env.Ctx, &snapshotList, client.InNamespace(namespace),
 		client.MatchingLabels{
 			utils.ClusterLabelName:    clusterName,

@@ -1,3 +1,8 @@
+---
+id: external-secrets
+title: External Secrets
+---
+
 # External Secrets
 
 [External Secrets](https://external-secrets.io/latest/) is a CNCF Sandbox
@@ -91,7 +96,7 @@ uses a `Merge` policy to update only the specified fields (`password`, `pgpass`,
 `jdbc-uri` and `uri`) in the `cluster-example-app` secret.
 
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: cluster-example-app-secret
@@ -149,8 +154,12 @@ password.
 
 ## Example: Integration with an External KMS
 
-A widely used Key Management Service (KMS) provider in the CNCF ecosystem is
-[HashiCorp Vault](https://www.vaultproject.io/).
+One of the most widely used Key Management Service (KMS) providers in the CNCF
+ecosystem is [HashiCorp Vault](https://www.vaultproject.io/). Although Vault is
+licensed under the Business Source License (BUSL), a fully compatible and
+actively maintained open source alternative is available: [OpenBao](https://openbao.org/).
+OpenBao supports all the same interfaces as HashiCorp Vault, making it a true
+drop-in replacement.
 
 In this example, we'll demonstrate how to integrate CloudNativePG,
 External Secrets Operator, and HashiCorp Vault to automatically rotate
@@ -176,7 +185,7 @@ named `vault-token` exists in the same namespace, containing the token used to
 authenticate with Vault.
 
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: SecretStore
 metadata:
   name: vault-backend

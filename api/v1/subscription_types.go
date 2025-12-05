@@ -52,8 +52,11 @@ type SubscriptionSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
 	DBName string `json:"dbname"`
 
-	// Subscription parameters part of the `WITH` clause as expected by
-	// PostgreSQL `CREATE SUBSCRIPTION` command
+	// Subscription parameters included in the `WITH` clause of the PostgreSQL
+	// `CREATE SUBSCRIPTION` command. Most parameters cannot be changed
+	// after the subscription is created and will be ignored if modified
+	// later, except for a limited set documented at:
+	// https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 

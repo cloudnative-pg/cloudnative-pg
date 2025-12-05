@@ -1,3 +1,9 @@
+---
+id: samples
+sidebar_position: 510
+title: Examples
+---
+
 # Examples
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -48,6 +54,13 @@ your PostgreSQL cluster.
 : [`cluster-example-projected-volume.yaml`](samples/cluster-example-projected-volume.yaml)
   A basic cluster with the existing `Secret` and `ConfigMap` mounted into Postgres
   pod using projected volume mount.
+
+## Security
+
+**Sample cluster with custom security contexts**
+: [`cluster-example-security-context.yaml`](samples/cluster-example-security-context.yaml)
+  A cluster demonstrating how to customize both Pod and Container security contexts.
+  This is useful when working with Pod Security Standards or meeting specific security requirements.
 
 ## Backups
 

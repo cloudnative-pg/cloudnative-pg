@@ -22,10 +22,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
@@ -49,7 +51,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // createPostgresClusterObjects ensures that we have the required global objects
@@ -97,6 +98,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	}
 
 	err = createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, specs.NewClusterPodMonitorManager(cluster))
+	if err != nil {
+		return err
+	}
+
+	err = r.reconcileFailoverQuorumObject(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -343,7 +349,7 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 
 	// we delete the old managed services not appearing anymore in the spec
 	var livingServices corev1.ServiceList
-	if err := r.Client.List(ctx, &livingServices, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+	if err := r.List(ctx, &livingServices, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		utils.IsManagedLabelName: "true",
 		utils.ClusterLabelName:   cluster.Name,
 	}); err != nil {
@@ -389,13 +395,13 @@ func (r *ClusterReconciler) serviceReconciler(
 	)
 
 	var livingService corev1.Service
-	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
+	err := r.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
 	if apierrs.IsNotFound(err) {
 		if !enabled {
 			return nil
 		}
 		contextLogger.Info("creating service")
-		return r.Client.Create(ctx, proposed)
+		return r.Create(ctx, proposed)
 	}
 	if err != nil {
 		return err
@@ -412,7 +418,7 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	if !enabled {
 		contextLogger.Info("deleting service, due to not being managed anymore")
-		return r.Client.Delete(ctx, &livingService)
+		return r.Delete(ctx, &livingService)
 	}
 	var shouldUpdate bool
 
@@ -432,12 +438,12 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	// we preserve existing labels/annotation that could be added by third parties
 	if !utils.IsMapSubset(livingService.Labels, proposed.Labels) {
-		utils.MergeMap(livingService.Labels, proposed.Labels)
+		maps.Copy(livingService.Labels, proposed.Labels)
 		shouldUpdate = true
 	}
 
 	if !utils.IsMapSubset(livingService.Annotations, proposed.Annotations) {
-		utils.MergeMap(livingService.Annotations, proposed.Annotations)
+		maps.Copy(livingService.Annotations, proposed.Annotations)
 		shouldUpdate = true
 	}
 
@@ -448,11 +454,11 @@ func (r *ClusterReconciler) serviceReconciler(
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
 		contextLogger.Info("reconciling service")
 		// we update to ensure that we substitute the selectors
-		return r.Client.Update(ctx, &livingService)
+		return r.Update(ctx, &livingService)
 	}
 
 	contextLogger.Info("deleting the service")
-	if err := r.Client.Delete(ctx, &livingService); err != nil {
+	if err := r.Delete(ctx, &livingService); err != nil {
 		return err
 	}
 
@@ -612,6 +618,9 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 	}
 	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount)
@@ -786,7 +795,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.WatchedLabelName:                "true",
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 				},
 			},
 			Data: map[string]string{
@@ -810,7 +820,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 		return nil
 	}
 
-	// The configuration changed, and we need the patch the secret we have
+	// The configuration changed, and we need the patch the configMap we have
 	patchedConfigMap := targetConfigMap.DeepCopy()
 	utils.SetOperatorVersion(&patchedConfigMap.ObjectMeta, versions.Version)
 	patchedConfigMap.Data = sourceConfigmap.Data
@@ -868,20 +878,21 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 			return err
 		}
 		// If the secret does not exist we create it
-		newConfigMap := corev1.Secret{
+		newSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      apiv1.DefaultMonitoringSecretName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.WatchedLabelName:                "true",
+					utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 				},
 			},
 			Data: map[string][]byte{
 				apiv1.DefaultMonitoringKey: sourceSecret.Data[apiv1.DefaultMonitoringKey],
 			},
 		}
-		utils.SetOperatorVersion(&newConfigMap.ObjectMeta, versions.Version)
-		return r.Create(ctx, &newConfigMap)
+		utils.SetOperatorVersion(&newSecret.ObjectMeta, versions.Version)
+		return r.Create(ctx, &newSecret)
 	}
 
 	// We check that we own the existing configmap
@@ -1238,7 +1249,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	var backupList apiv1.BackupList
 	if err := r.List(ctx, &backupList,
-		client.MatchingFields{clusterName: cluster.Name},
+		client.MatchingFields{clusterNameField: cluster.Name},
 		client.InNamespace(cluster.Namespace),
 	); err != nil {
 		contextLogger.Error(err, "Error while getting backup list, when bootstrapping a new replica")
@@ -1257,7 +1268,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"job", job.Name,
 		"primary", false,
 		"storageSource", storageSource,
-		"role", job.Spec.Template.ObjectMeta.Labels[utils.JobRoleLabelName],
+		"role", job.Spec.Template.Labels[utils.JobRoleLabelName],
 	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",

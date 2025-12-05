@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -73,7 +73,7 @@ func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, meth
 }
 
 // SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshotv1.VolumeSnapshot) {
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
@@ -194,7 +194,7 @@ func (list *BackupList) SortByName() {
 func (list *BackupList) SortByReverseCreationTime() {
 	// Sort the list of backups in reverse creation time
 	sort.Slice(list.Items, func(i, j int) bool {
-		return list.Items[i].CreationTimestamp.Time.Compare(list.Items[j].CreationTimestamp.Time) > 0
+		return list.Items[i].CreationTimestamp.Compare(list.Items[j].CreationTimestamp.Time) > 0
 	})
 }
 
@@ -236,6 +236,30 @@ func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client
 	return &previouslyElectedPod, nil
 }
 
+// GetOnlineOrDefault returns the online value for the backup.
+func (backup *Backup) GetOnlineOrDefault(cluster *Cluster) bool {
+	// Offline backups are supported only with the
+	// volume snapshot backup method.
+	if backup.Spec.Method != BackupMethodVolumeSnapshot {
+		return true
+	}
+
+	if backup.Spec.Online != nil {
+		return *backup.Spec.Online
+	}
+
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return true
+	}
+
+	config := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+	if config.Online != nil {
+		return *config.Online
+	}
+
+	return true
+}
+
 // GetVolumeSnapshotConfiguration overrides the  configuration value with the ones specified
 // in the backup, if present.
 func (backup *Backup) GetVolumeSnapshotConfiguration(
@@ -267,4 +291,14 @@ func (backup *Backup) EnsureGVKIsPresent() {
 // IsEmpty checks if the plugin configuration is empty or not
 func (configuration *BackupPluginConfiguration) IsEmpty() bool {
 	return configuration == nil || len(configuration.Name) == 0
+}
+
+// IsManagedByInstance returns true if the backup is managed by the instance manager
+func (b BackupMethod) IsManagedByInstance() bool {
+	return b == BackupMethodPlugin || b == BackupMethodBarmanObjectStore
+}
+
+// IsManagedByOperator returns true if the backup is managed by the operator
+func (b BackupMethod) IsManagedByOperator() bool {
+	return b == BackupMethodVolumeSnapshot
 }

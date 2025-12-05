@@ -27,12 +27,18 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-KIND_NODE_DEFAULT_VERSION=v1.33.0
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.16.1
-EXTERNAL_SNAPSHOTTER_VERSION=v8.2.1
-EXTERNAL_PROVISIONER_VERSION=v5.2.0
-EXTERNAL_RESIZER_VERSION=v1.13.2
-EXTERNAL_ATTACHER_VERSION=v4.8.1
+# renovate: datasource=docker depName=kindest/node
+KIND_NODE_DEFAULT_VERSION=v1.34.0
+# renovate: datasource=github-releases depName=kubernetes-csi/csi-driver-host-path
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
+EXTERNAL_SNAPSHOTTER_VERSION=v8.4.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
+EXTERNAL_PROVISIONER_VERSION=v6.1.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
+EXTERNAL_RESIZER_VERSION=v2.0.0
+# renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
+EXTERNAL_ATTACHER_VERSION=v4.10.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
@@ -64,9 +70,9 @@ case $ARCH in
   aarch64) ARCH="arm64" ;;
 esac
 
-# If arm64 and user did not set it explicitly
-if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
-  DOCKER_DEFAULT_PLATFORM=linux/arm64
+# If user did not set it explicitly
+if [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
+  DOCKER_DEFAULT_PLATFORM="linux/${ARCH}"
 fi
 export DOCKER_DEFAULT_PLATFORM
 
@@ -83,7 +89,7 @@ builder_name=cnpg-builder
 # #########################################################################
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
-PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/specs/pgbouncer/deployments.go" | cut -f 2 -d \")}
+PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go"  | cut -f 2 -d \")}
 APACHE_IMG=${APACHE_IMG:-"httpd"}
 
@@ -172,6 +178,15 @@ EOF
     for ((i = 0; i < NODES; i++)); do
       echo '- role: worker' >>"${config_file}"
     done
+  fi
+
+  # Enable ImageVolume support from kindest/node v1.33.1
+  if [[ "$(printf '%s\n' "1.33.1" "${k8s_version#v}" | sort -V | head -n1)" == "1.33.1" ]]; then
+    cat >>"${config_file}" <<-EOF
+
+featureGates:
+  ImageVolume: true
+EOF
   fi
 
   # Add containerdConfigPatches section
@@ -348,26 +363,7 @@ deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
-
-  service_file="${TEMP_DIR}/pyroscope_service.yaml"
-
-  cat >"${service_file}" <<-EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: cnpg-pprof
-spec:
-  ports:
-  - targetPort: 6060
-    port: 6060
-  selector:
-    app: cnpg-pprof
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: cloudnative-pg
-EOF
-  kubectl -n cnpg-system apply -f "${service_file}"
+  helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
   cat >"${annotations}" <<- EOF
@@ -384,6 +380,14 @@ spec:
 EOF
 
   kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+
+  configMaps="${TEMP_DIR}/cnpg_configmap_config.yaml"
+  cat >"${configMaps}" <<-EOF
+data:
+   INHERITED_ANNOTATIONS: "profiles.grafana.com/*"
+EOF
+  configMapName=$(kubectl -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+  kubectl -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 }
 
 deploy_prometheus_crds() {
@@ -397,7 +401,7 @@ load_image_registry() {
 
   local image_local_name=${image/${registry_name}/127.0.0.1}
   docker tag "${image}" "${image_local_name}"
-  docker push -q "${image_local_name}"
+  docker push --platform "${DOCKER_DEFAULT_PLATFORM}" -q "${image_local_name}"
 }
 
 load_image() {
@@ -426,7 +430,7 @@ Commands:
     export-logs           Export the logs from the cluster inside the directory
                           ${LOG_DIR}
     destroy               Destroy the cluster
-    pyroscope             Deploy Pyroscope inside operator namespace
+    pyroscope             Deploy Pyroscope and enable pprof for the operator
 
 Options:
     -k|--k8s-version

@@ -154,6 +154,26 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}
 			})
 
+			By("verifying the fdw presence in the target database", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, fdwSpec := range database.Spec.FDWs {
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						fdwExistsQuery(fdwSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+				}
+			})
+
+			By("verifying the foreign server presence in the target database", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, serverSpec := range database.Spec.Servers {
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						foreignServerExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+				}
+			})
+
 			By("removing the Database object", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
 			})

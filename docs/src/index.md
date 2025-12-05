@@ -1,3 +1,9 @@
+---
+id: index
+sidebar_position: 10
+title: CloudNativePG
+---
+
 # CloudNativePG
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -69,18 +75,34 @@ provided separately for each architecture.
 
 ### Operands
 
-The PostgreSQL operand container images are available for all
-[PGDG supported versions of PostgreSQL](https://www.postgresql.org/),
-across multiple architectures, directly from the
-[`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
+The CloudNativePG project provides and maintains PostgreSQL operand container
+images, built on top of the official [Debian `slim` base image](https://hub.docker.com/_/debian),
+for both `linux/amd64` and `linux/arm64` architectures.
 
-All container images are signed and include SBOM and provenance attestations,
-provided separately for each architecture.
+Images are published for all [Debian supported releases](https://www.debian.org/releases/)
+([`stable`](https://www.debian.org/releases/stable/),
+[`oldstable`](https://www.debian.org/releases/oldstable/)) and for
+[PostgreSQL versions supported by PGDG](https://www.postgresql.org/).
+They are distributed via the [`postgres-containers` GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
-promptly addressed.
+Three image flavors are available, each extending the previous one:
 
-Additionally, the community provides images for the [PostGIS extension](postgis.md).
+- [`minimal`](https://github.com/cloudnative-pg/postgres-containers#minimal-images)
+- [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
+- [`system`](https://github.com/cloudnative-pg/postgres-containers#system-images) *(deprecated)*
+
+!!! Important
+    The `system` images are deprecated and will be removed once in-core
+    Barman Cloud support is phased out. They remain usable for now, but you may
+    want to plan a future migration to `minimal` or `standard` images with the
+    Barman Cloud plugin, or another supported backup solution.
+
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`.
+
+All images are signed and shipped with SBOM and provenance attestations.
+Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
+
+For details and support, see the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#cnpg-postgresql-container-images).
 
 ## Main features
 
@@ -93,7 +115,8 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
 - Declarative management of key PostgreSQL configurations, including:
     - PostgreSQL settings.
     - Roles, users, and groups.
-    - Databases, extensions, and schemas.
+    - Databases, extensions, schemas, foreign data wrappers (FDW), and foreign
+      servers.
     - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
@@ -110,20 +133,28 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - Support for Local Persistent Volumes with PVC templates.
     - Reuse of Persistent Volumes storage in Pods.
     - Separate volumes for WAL files and tablespaces.
-- Backup and recovery options, including:
-    - Integration with the [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud)
-      for continuous online backup via WAL archiving to AWS S3, S3-compatible
-      services, Azure Blob Storage, and Google Cloud Storage, with support for
-      retention policies based on a configurable recovery window.
-    - Backups using volume snapshots (where supported by storage classes).
-    - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
-    - Backup from standby replicas to reduce primary workload impact.
+- Backup and Recovery via CNPG-I Plugins:
+    - Pluggable architecture for continuous physical backup and recovery.
+    - Hot and cold base backups.
+    - WAL archiving.
+    - Full and Point-In-Time Recovery (PITR).
+    - Scheduled and on-demand backups.
+    - Backup from standbys to reduce primary load.
+- Community-Supported Barman Cloud Plugin:
+    - WAL archiving to object stores with support for full/PITR recovery.
+    - Retention policies based on configurable recovery windows.
+    - Supported as a CNPG-I plugin (recommended approach).
+- Native Backup Methods:
+    - Continuous backup and full/PITR recovery via volume snapshots (if
+      supported by the storage class).
+    - Native integration with Barman Cloud for object store backups via
+      `.spec.backup.barmanObjectStore` (*deprecated since v1.26*).
 - Offline in-place major upgrades of PostgreSQL
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.
     - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
 - High Availability physical replication slots, including synchronization of
-  user-defined replication slots.
+  user-defined replication slots and logical decoding failover.
 - Parallel WAL archiving and restore, ensuring high-performance data
   synchronization in high-write environments.
 - TLS support, including:

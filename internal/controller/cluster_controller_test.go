@@ -266,7 +266,7 @@ var _ = Describe("Updating target primary", func() {
 		By("checking that the third instance exists even if the cluster has two instances", func() {
 			var expectedPod corev1.Pod
 			instanceName := specs.GetInstanceName(cluster.Name, 3)
-			err := env.clusterReconciler.Client.Get(ctx, types.NamespacedName{
+			err := env.clusterReconciler.Get(ctx, types.NamespacedName{
 				Name:      instanceName,
 				Namespace: cluster.Namespace,
 			}, &expectedPod)

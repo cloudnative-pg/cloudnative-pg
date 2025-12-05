@@ -71,9 +71,7 @@ builds:
   - windows
   goarch:
   - amd64
-  - 386
   - arm64
-  - arm
   - ppc64le
   - s390x
   goarm:
@@ -81,8 +79,6 @@ builds:
   - 6
   - 7
   ignore:
-  - goos: darwin
-    goarch: 386
   - goos: windows
     goarch: ppc64le
   - goos: windows
@@ -93,9 +89,8 @@ archives:
     kubectl-cnpg_{{ .Version }}_
     {{- .Os }}_
     {{- if eq .Arch "amd64" }}x86_64
-    {{- else if eq .Arch "386" }}i386
     {{- else }}{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ end }}
-  builds:
+  ids:
   - kubectl-cnpg
 
 nfpms:
@@ -104,12 +99,11 @@ nfpms:
       kubectl-cnpg_{{ .Version }}_
       {{- .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ end }}
     homepage: https://github.com/cloudnative-pg/cloudnative-pg
     bindir: /usr/local/bin
     maintainer: 'Marco Nenciarini <marco.nenciarini@enterprisedb.com>'
-    builds:
+    ids:
       - kubectl-cnpg
     formats:
       - rpm
@@ -131,7 +125,7 @@ changelog:
   disable: true
 
 signs:
-  - artifacts: checksum
+  - artifacts: all
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
 krews:

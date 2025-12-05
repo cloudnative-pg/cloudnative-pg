@@ -1,3 +1,9 @@
+---
+id: database_import
+sidebar_position: 90
+title: Importing Postgres databases
+---
+
 # Importing Postgres databases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -56,14 +62,14 @@ into the destination cluster:
 - **monolith approach**: the destination cluster is designed to host multiple
   databases and different users, imported from the source cluster
 
-The first import method is available via the `microservice` type, while the
-latter by the `monolith` type.
+The first import method is available via the `microservice` type, the
+second via the `monolith` type.
 
 !!! Warning
     It is your responsibility to ensure that the destination cluster can
     access the source cluster with a superuser or a user having enough
     privileges to take a logical backup with `pg_dump`. Please refer to the
-    [PostgreSQL documentation on "SQL Dump"](https://www.postgresql.org/docs/current/app-pgdump.html)
+    [PostgreSQL documentation on `pg_dump`](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
 
 ## The `microservice` type
@@ -81,6 +87,10 @@ performed in 4 steps:
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
 - execution of `ANALYZE VERBOSE` on the imported database
+
+In the figure below, a single PostgreSQL cluster containing *N* databases is
+imported into separate CloudNativePG clusters, with each cluster using a
+microservice import for one of the *N* source databases.
 
 ![Example of microservice import type](./images/microservice-import.png)
 
@@ -135,7 +145,7 @@ spec:
     and unsupported versions of Postgres too, giving you the chance to move your
     legacy data to a better system, inside Kubernetes.
     This is the main reason why we used 9.6 in the examples of this section.
-    We'd be interested to hear from you should you experience any issues in this area.
+    We'd be interested to hear from you, should you experience any issues in this area.
 
 There are a few things you need to be aware of when using the `microservice` type:
 
@@ -153,6 +163,12 @@ There are a few things you need to be aware of when using the `microservice` typ
   folder is automatically deleted by the operator.
 - Only one database can be specified inside the `initdb.import.databases` array
 - Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
+
+!!! Hint
+    The microservice approach adheres to CloudNativePG conventions and defaults
+    for the destination cluster. If you do not set `initdb.database` or
+    `initdb.owner` for the destination cluster, both parameters will default to
+    `app`.
 
 ## The `monolith` type
 
@@ -224,7 +240,8 @@ There are a few things you need to be aware of when using the `monolith` type:
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
 - Currently, the `pg_dump -Fd` result is stored temporarily inside the `dumps`
-  folder in the `PGDATA` volume, so there should be enough available space to
+  folder in the `PGDATA` volume of the destination cluster's instances, so
+  there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
   restored data and indexes. Once the import operation is completed, this
   folder is automatically deleted by the operator.
@@ -236,11 +253,121 @@ There are a few things you need to be aware of when using the `monolith` type:
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
   `roles` arrays to import every object of the kind; When matching databases
-  the wildcard will ignore the `postgres` database, template databases,
+  the wildcard will ignore the `postgres` database, template databases
   and those databases not allowing connections
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
-- `postImportApplicationSQL` field is not supported
+- The `postImportApplicationSQL` field is not supported
+
+!!! Hint
+    The databases and their owners are preserved exactly as they exist in the
+    source cluster—no `app` database or user will be created during import. If your
+    `bootstrap.initdb` stanza specifies custom `database` and `owner` values that
+    do not match any of the databases or users being imported, the instance
+    manager will create a new, empty application database and owner role with those
+    specified names, while leaving the imported databases and owners unchanged.
+
+## A practical example
+
+There is nothing to stop you from using the `monolith` approach to import a
+single database. It is interesting to see how the results of doing so would
+differ from using the `microservice` approach.
+
+Given a source cluster, for example the following, with a database named
+`mydb` owned by role `me`:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 1
+
+  postgresql:
+    pg_hba:
+      - host all all all trust
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: mydb
+      owner: me
+```
+
+We can import it via `microservice`:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-microservice
+spec:
+  instances: 1
+  
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - mydb
+        source:
+          externalCluster: cluster-example
+
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw
+        dbname: postgres
+```
+
+as well as via monolith:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-monolith
+spec:
+  instances: 1
+  
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: monolith
+        databases:
+          - mydb
+        roles:
+          - me
+        source:
+          externalCluster: cluster-example
+
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw
+        dbname: postgres
+```
+
+In both cases, the database's contents will be imported, but:
+
+- In the microservice case, the imported database's name and owner both become
+  `app`, or whichever configuration for the fields `database` and `owner` are
+  set in the `bootstrap.initdb` stanza.
+- In the monolith case, the database and owner are kept exactly as in the source
+  cluster, i.e. `mydb` and `me` respectively. No `app` database nor user will be
+  created. If there are custom settings for `database` and `owner` in the
+  `bootstrap.initdb` stanza that don't match the source databases/owners to
+  import, the instance manager will create a new empty application database and
+  owner role, but will leave the imported databases/owners intact.
 
 ## Import optimizations
 
@@ -269,36 +396,84 @@ unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 `shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
 `Cluster` configuration.
 
-## Customizing `pg_dump` and `pg_restore` Behavior
+## Customizing `pg_dump` and `pg_restore` behavior
 
-You can customize the behavior of `pg_dump` and `pg_restore` by specifying
-additional options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions`
-parameters. For instance, you can enable parallel jobs to speed up data
-import/export processes, as shown in the following example:
+You can customize the behavior of `pg_dump` and `pg_restore` by specifying additional
+options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions` parameters.
+This is especially useful for improving performance or managing import/export complexity.
+
+For example, enabling parallel jobs can significantly speed up data transfer:
 
 ```yaml
-  # <snip>
-  bootstrap:
-    initdb:
-      import:
-        type: microservice
-        databases:
-        - app
-        source:
-          externalCluster: cluster-example
-        pgDumpExtraOptions:
-        - '--jobs=2'
-        pgRestoreExtraOptions:
-        - '--jobs=2'
-  # <snip>
+bootstrap:
+  initdb:
+    import:
+      type: microservice
+      databases:
+      - app
+      source:
+        externalCluster: cluster-example
+      pgDumpExtraOptions:
+      - '--jobs=2'
+      pgRestoreExtraOptions:
+      - '--jobs=2'
 ```
 
+### Stage-Specific `pg_restore` options
+
+For more granular control over the import process, CloudNativePG supports
+stage-specific `pg_restore` options for the following phases:
+
+- `pre-data` – e.g., schema definitions
+- `data` – e.g., table contents
+- `post-data` – e.g., indexes, constraints and triggers
+
+By specifying options for each phase, you can optimize parallelism and apply
+flags tailored to the nature of the objects being restored.
+
+```yaml
+bootstrap:
+  initdb:
+    import:
+      type: microservice
+      schemaOnly: false
+      databases:
+        - mynewdb
+      source:
+        externalCluster: sourcedb-external
+      pgRestorePredataOptions:
+        - '--jobs=1'
+      pgRestoreDataOptions:
+        - '--jobs=4'
+      pgRestorePostdataOptions:
+        - '--jobs=2'
+```
+
+In the example above:
+
+- `--jobs=1` is applied to the `pre-data` stage to preserve the ordering of
+  schema creation.
+- `--jobs=4` increases parallelism during the `data` stage, speeding up large
+  data imports.
+- `--jobs=2` balances performance and dependency handling in the `post-data`
+  stage.
+
+These stage-specific settings are particularly valuable for large databases or
+resource-sensitive environments where tuning concurrency can significantly
+improve performance.
+
+!!! Note
+    When provided, stage-specific options take precedence over the general
+    `pgRestoreExtraOptions`.
+
 !!! Warning
-    Use the `pgDumpExtraOptions` and `pgRestoreExtraOptions` fields with
-    caution and at your own risk. These options are not validated or verified by
-    the operator, and some configurations may conflict with its intended
-    functionality or behavior. Always test thoroughly in a safe and controlled
-    environment before applying them in production.
+    The `pgDumpExtraOptions`, `pgRestoreExtraOptions`, and all stage-specific
+    restore options (`pgRestorePredataOptions`, `pgRestoreDataOptions`,
+    `pgRestorePostdataOptions`) are passed directly to the underlying PostgreSQL
+    tools without validation by the operator. Certain flags may conflict with the
+    operator’s intended functionality or design. Use these options with caution
+    and always test them thoroughly in a safe, controlled environment before
+    applying them in production.
 
 ## Online Import and Upgrades
 

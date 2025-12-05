@@ -1,3 +1,9 @@
+---
+id: use_cases
+sidebar_position: 30
+title: Use cases
+---
+
 # Use cases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 

@@ -1,4 +1,10 @@
-# PostgreSQL Upgrades
+---
+id: postgres_upgrades
+sidebar_position: 380
+title: PostgreSQL upgrades
+---
+
+# PostgreSQL upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 PostgreSQL upgrades fall into two categories:
@@ -17,7 +23,6 @@ version 17.1:
 Minor releases are fully compatible with earlier and later minor releases of
 the same major version. They include bug fixes and security updates but do not
 introduce changes to the internal storage format.
-For example, PostgreSQL 17.1 is compatible with 17.0 and 17.4.
 
 ### Upgrading a Minor Version in CloudNativePG
 
@@ -54,6 +59,20 @@ CloudNativePG performs an **offline in-place major upgrade** when a new operand
 container image with a higher PostgreSQL major version is declaratively
 requested for a cluster.
 
+!!! Important
+    Major upgrades are only supported between images based on the same
+    operating system distribution. For example, if your previous version uses a
+    `bullseye` image, you cannot upgrade to a `bookworm` image.
+
+!!! Warning
+    There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
+    if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
+    The upgrade process will fail with an error related to replication slot configuration.
+    This issue has been [fixed in PostgreSQL 17.6 and 18beta2 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
+    If you are using PostgreSQL 17.0 through 17.5, ensure that you upgrade to at least
+    PostgreSQL 17.6 before attempting a major upgrade, or make sure to temporarily set
+    the `max_slot_wal_keep_size` parameter to `-1` in your cluster configuration.
+
 You can trigger the upgrade in one of two ways:
 
 - By updating the major version in the image tag via the `.spec.imageName`
@@ -74,8 +93,8 @@ For details on supported image tags, see
 ### Upgrade Process
 
 1. Shuts down all cluster pods to ensure data consistency.
-2. Records the previous PostgreSQL version in the cluster’s status under
-   `.status.majorVersionUpgradeFromImage`.
+2. Records the previous PostgreSQL version and image in the cluster’s status under
+   `.status.pgDataImageInfo`.
 3. Initiates a new upgrade job, which:
    - Verifies that the binaries in the image and the data files align with a
      major upgrade request.
@@ -137,7 +156,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-bookworm
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
   instances: 3
   storage:
     size: 1Gi
@@ -164,7 +183,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-bookworm
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
   instances: 3
   storage:
     size: 1Gi

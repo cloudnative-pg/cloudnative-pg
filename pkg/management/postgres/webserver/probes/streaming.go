@@ -77,10 +77,6 @@ func (c pgStreamingChecker) IsHealthy(ctx context.Context, instance *postgres.In
 		`,
 		configuredLag,
 	)
-	if err := row.Err(); err != nil {
-		return fmt.Errorf("streaming replication check failed: %w", err)
-	}
-
 	var status bool
 	var detectedLag uint64
 	var latestEndTime string

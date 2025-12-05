@@ -43,6 +43,9 @@ const (
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
 	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
+
+	// PoolerAuthDBName is the database name used to run the auth_query
+	PoolerAuthDBName = "postgres"
 )
 
 // PgBouncerPoolMode is the mode of PgBouncer
@@ -85,6 +88,9 @@ type PoolerSpec struct {
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this pooler.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
 
@@ -157,10 +163,34 @@ type PgBouncerSpec struct {
 	// +optional
 	PoolMode PgBouncerPoolMode `json:"poolMode,omitempty"`
 
+	// ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+	// `server_tls_key_file` and `server_tls_cert_file`, used when
+	// authenticating against PostgreSQL.
+	// +optional
+	ServerTLSSecret *LocalObjectReference `json:"serverTLSSecret,omitempty"`
+
+	// ServerCASecret provides PgBouncer’s server_tls_ca_file, the root
+	// CA for validating PostgreSQL certificates
+	// +optional
+	ServerCASecret *LocalObjectReference `json:"serverCASecret,omitempty"`
+
+	// ClientCASecret provides PgBouncer’s client_tls_ca_file, the root
+	// CA for validating client certificates
+	// +optional
+	ClientCASecret *LocalObjectReference `json:"clientCASecret,omitempty"`
+
+	// ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)
+	// and client_tls_cert_file (certificate) used to accept client connections
+	// +optional
+	ClientTLSSecret *LocalObjectReference `json:"clientTLSSecret,omitempty"`
+
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
 	// (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
 	// has to be specified and no automatic CNPG Cluster integration will be triggered.
+	//
+	// Deprecated.
+	//
 	// +optional
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 
@@ -202,6 +232,10 @@ type PoolerStatus struct {
 
 // PoolerSecrets contains the versions of all the secrets used
 type PoolerSecrets struct {
+	// The client TLS secret version
+	// +optional
+	ClientTLS SecretVersion `json:"clientTLS,omitempty"`
+
 	// The server TLS secret version
 	// +optional
 	ServerTLS SecretVersion `json:"serverTLS,omitempty"`

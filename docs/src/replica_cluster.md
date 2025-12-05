@@ -1,11 +1,11 @@
+---
+id: replica_cluster
+sidebar_position: 360
+title: Replica clusters
+---
+
 # Replica clusters
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-
-!!! Warning
-    With the deprecation of native Barman Cloud support in CloudNativePG in
-    favor of the Barman Cloud Plugin, this page—and the backup and recovery
-    documentation—may undergo changes before the official release of version
-    1.26.0.
 
 A replica cluster is a CloudNativePG `Cluster` resource designed to
 replicate data from another PostgreSQL instance, ideally also managed by
@@ -95,8 +95,8 @@ recovery. There are three main options:
    seamless data transfer.
 2. **WAL Archive**: Use the WAL (Write-Ahead Logging) archive stored in an
    object store. WAL files are regularly transferred from the source cluster to
-   the object store, from where the `barman-cloud-wal-restore` utility retrieves
-   them for the replica cluster.
+   the object store, from where a CNPG-I plugin like [Barman Cloud](https://cloudnative-pg.io/plugin-barman-cloud/)
+   retrieves them for the replica cluster via the `restore_command`.
 3. **Hybrid Approach**: Combine both streaming replication and WAL archive
    methods. PostgreSQL can manage and switch between these two approaches as
    needed to ensure data consistency and availability.
@@ -105,19 +105,27 @@ recovery. There are three main options:
 
 When configuring the external cluster, you have the following options:
 
-<!-- TODO: Change before 1.26.0 -->
+- **`plugin` section**:
+    - Enables bootstrapping the replica cluster using a [CNPG-I](https://github.com/cloudnative-pg/cnpg-i)
+      plugin that support the
+      [`restore_job`](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md#restore_job-proto)
+      and the [`wal`](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md#wal-proto) protocols.
+    - CloudNativePG supports the [Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster)
+      to allow bootstrapping the replica cluster from an object store.
 
-- **`barmanObjectStore` section**:
-    - Enables use of the WAL archive, with CloudNativePG automatically setting
-      the `restore_command` in the designated primary instance.
-    - Allows bootstrapping the replica cluster from an object store using the
-      `recovery` section if volume snapshots are not feasible.
 - **`connectionParameters` section**:
     - Enables bootstrapping the replica cluster via streaming replication using
       the `pg_basebackup` section.
     - CloudNativePG automatically sets the `primary_conninfo` option in the
       designated primary instance, initiating a WAL receiver process to connect
       to the source cluster and receive data.
+
+You still have access to the **`barmanObjectStore` section**, although deprecated:
+
+- Enables use of the WAL archive, with CloudNativePG automatically setting
+  the `restore_command` in the designated primary instance.
+- Allows bootstrapping the replica cluster from an object store using the
+ `recovery` section if volume snapshots are not feasible.
 
 ### Backup and Symmetric Architectures
 
@@ -171,9 +179,6 @@ continuous recovery are thoroughly explained below.
 
 ## Distributed Topology
 
-!!! Important
-    The Distributed Topology strategy was introduced in CloudNativePG 1.24.
-
 ### Planning for a Distributed PostgreSQL Database
 
 As Dwight Eisenhower famously said, "Planning is everything", and this holds
@@ -197,24 +202,33 @@ local object store. This object store is also accessible by the PostgreSQL
 `Cluster` named `cluster-eu-central`, installed in the Central European
 Kubernetes cluster. Initially, `cluster-eu-central` functions as a replica
 cluster. Following a symmetric approach, it also has a local object store for
-continuous backup, which needs to be read by `cluster-eu-south`. The recovery
-in this setup relies solely on WAL shipping, with no streaming connection
-between the two clusters.
+continuous backup, which needs to be read by `cluster-eu-south`.
+
+In this example, recovery is performed solely through WAL shipping, without any
+streaming replication between the two clusters. However, you can configure the
+setup to use streaming replication alone or adopt a hybrid approach—streaming
+replication with WAL shipping as a fallback—as described in the
+[“Configuring replication”](replica_cluster.md#defining-an-external-cluster)
+section.
 
 Here’s how you would configure the `externalClusters` section for both
-`Cluster` resources:
+`Cluster` resources, relying on Barman Cloud Plugin for the object store:
 
 ```yaml
 # Distributed topology configuration
 externalClusters:
   - name: cluster-eu-south
-    barmanObjectStore:
-      destinationPath: s3://cluster-eu-south/
-      # Additional configuration
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: cluster-eu-south
+        serverName: cluster-eu-south
   - name: cluster-eu-central
-    barmanObjectStore:
-      destinationPath: s3://cluster-eu-central/
-      # Additional configuration
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: cluster-eu-central
+        serverName: cluster-eu-central
 ```
 
 The `.spec.replica` stanza for the `cluster-eu-south` PostgreSQL primary
@@ -506,10 +520,12 @@ a backup of the source cluster has been created already.
 ```yaml
   externalClusters:
   - name: <MAIN-CLUSTER>
-    barmanObjectStore:
-      destinationPath: s3://backups/
-      endpointURL: http://minio:9000
-      s3Credentials:
+    # Example with Barman Cloud Plugin
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: <MAIN-CLUSTER>
+        serverName: <MAIN-CLUSTER>
         …
     connectionParameters:
       host: <MAIN-CLUSTER>-rw.default.svc

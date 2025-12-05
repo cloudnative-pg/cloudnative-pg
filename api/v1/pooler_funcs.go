@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 
 package v1
 
+import corev1 "k8s.io/api/core/v1"
+
 // IsPaused returns whether all database should be paused or not.
 func (in PgBouncerSpec) IsPaused() bool {
 	return in.Paused != nil && *in.Paused
@@ -32,6 +34,46 @@ func (in *Pooler) GetAuthQuerySecretName() string {
 	}
 
 	return in.Spec.Cluster.Name + DefaultPgBouncerPoolerSecretSuffix
+}
+
+// GetServerTLSSecretName returns the specified server TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerTLSSecretName() string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ServerTLSSecret != nil {
+		return in.Spec.PgBouncer.ServerTLSSecret.Name
+	}
+
+	return ""
+}
+
+// GetServerCASecretNameOrDefault returns the specified server CA secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetServerCASecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ServerCASecret != nil {
+		return in.Spec.PgBouncer.ServerCASecret.Name
+	}
+
+	return cluster.GetServerCASecretName()
+}
+
+// GetClientCASecretNameOrDefault returns the specified client CA secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetClientCASecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ClientCASecret != nil {
+		return in.Spec.PgBouncer.ClientCASecret.Name
+	}
+
+	return cluster.GetClientCASecretName()
+}
+
+// GetClientTLSSecretNameOrDefault returns the specified client TLS secret name
+// for PgBouncer if provided or the default name otherwise.
+func (in *Pooler) GetClientTLSSecretNameOrDefault(cluster *Cluster) string {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.ClientTLSSecret != nil {
+		return in.Spec.PgBouncer.ClientTLSSecret.Name
+	}
+
+	return cluster.GetServerTLSSecretName()
 }
 
 // GetAuthQuery returns the specified AuthQuery name for PgBouncer
@@ -52,9 +94,23 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 	}
 	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
 	// is not going to be handled by the operator.
-	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
-		in.Spec.PgBouncer.AuthQuery != "" {
+	if in.Spec.PgBouncer.AuthQuery != "" ||
+		(in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(in.Spec.PgBouncer.ServerTLSSecret != nil && in.Spec.PgBouncer.ServerTLSSecret.Name != "") {
 		return false
 	}
 	return true
+}
+
+// GetResourcesRequirements returns the resource requirements for the Pooler
+func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
+	if in.Spec.Template == nil {
+		return corev1.ResourceRequirements{}
+	}
+
+	if in.Spec.Template.Spec.Resources == nil {
+		return corev1.ResourceRequirements{}
+	}
+
+	return *in.Spec.Template.Spec.Resources
 }

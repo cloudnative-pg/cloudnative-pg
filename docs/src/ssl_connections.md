@@ -1,3 +1,9 @@
+---
+id: ssl_connections
+sidebar_position: 330
+title: Client TLS/SSL connections
+---
+
 # Client TLS/SSL connections
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -174,7 +180,7 @@ Output:
                                         version
 --------------------------------------------------------------------------------------
 ------------------
-PostgreSQL 17.4 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
+PostgreSQL 18.1 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
 8.3.1-5), 64-bit
 (1 row)
 ```

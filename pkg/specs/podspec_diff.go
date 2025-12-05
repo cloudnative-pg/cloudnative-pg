@@ -92,8 +92,9 @@ func ComparePodSpecs(
 			return currentPodSpec.Hostname == targetPodSpec.Hostname
 		},
 		"termination-grace-period": func() bool {
-			return currentPodSpec.TerminationGracePeriodSeconds == nil && targetPodSpec.TerminationGracePeriodSeconds == nil ||
-				*currentPodSpec.TerminationGracePeriodSeconds == *targetPodSpec.TerminationGracePeriodSeconds
+			return (currentPodSpec.TerminationGracePeriodSeconds == nil && targetPodSpec.TerminationGracePeriodSeconds == nil) ||
+				(currentPodSpec.TerminationGracePeriodSeconds != nil && targetPodSpec.TerminationGracePeriodSeconds != nil &&
+					*currentPodSpec.TerminationGracePeriodSeconds == *targetPodSpec.TerminationGracePeriodSeconds)
 		},
 	}
 
@@ -199,7 +200,7 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 		},
 		"resources": func() bool {
 			// semantic equality will compare the two objects semantically, not only numbers
-			return equality.Semantic.Equalities.DeepEqual(
+			return equality.Semantic.DeepEqual(
 				currentContainer.Resources,
 				targetContainer.Resources,
 			)

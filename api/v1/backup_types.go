@@ -119,6 +119,7 @@ const (
 )
 
 // BackupSpec defines the desired state of Backup
+// +kubebuilder:validation:XValidation:rule="oldSelf == self",message="BackupSpec is immutable once set"
 type BackupSpec struct {
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster"`
@@ -193,6 +194,10 @@ type BackupSnapshotElementStatus struct {
 type BackupStatus struct {
 	// The potential credentials for each cloud provider
 	BarmanCredentials `json:",inline"`
+
+	// The PostgreSQL major version that was running when the
+	// backup was taken.
+	MajorVersion int `json:"majorVersion,omitempty"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid

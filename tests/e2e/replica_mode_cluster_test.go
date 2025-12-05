@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -269,7 +269,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("archive mode set to 'always' on designated primary", func() {
+	Context("archive mode set to 'always' on designated primary", Label(tests.LabelBackupRestore), func() {
 		It("verifies replica cluster can archive WALs from the designated primary", func() {
 			const (
 				replicaClusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
@@ -340,7 +340,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("can bootstrap a replica cluster from a backup", Ordered, func() {
+	Context("can bootstrap a replica cluster from a backup", Label(tests.LabelBackupRestore), Ordered, func() {
 		const (
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
@@ -384,14 +384,19 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			By("creating a backup and waiting until it's completed", func() {
 				backupName := fmt.Sprintf("%v-backup", clusterName)
-				backup, err := backups.CreateOnDemand(
-					env.Ctx,
-					env.Client,
-					namespace,
-					clusterName,
-					backupName,
-					apiv1.BackupTargetStandby,
-					apiv1.BackupMethodBarmanObjectStore,
+				backup, err := backups.Create(
+					env.Ctx, env.Client,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      backupName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetStandby,
+							Method:  apiv1.BackupMethodBarmanObjectStore,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
+					},
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -439,14 +444,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("creating a snapshot and waiting until it's completed", func() {
 				var err error
 				snapshotName := fmt.Sprintf("%v-snapshot", clusterName)
-				backup, err = backups.CreateOnDemand(
+				backup, err = backups.Create(
 					env.Ctx,
 					env.Client,
-					namespace,
-					clusterName,
-					snapshotName,
-					apiv1.BackupTargetStandby,
-					apiv1.BackupMethodVolumeSnapshot,
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      snapshotName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetStandby,
+							Method:  apiv1.BackupMethodVolumeSnapshot,
+							Cluster: apiv1.LocalObjectReference{Name: clusterName},
+						},
+					},
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -462,7 +473,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("fetching the volume snapshots", func() {
-				snapshotList := volumesnapshot.VolumeSnapshotList{}
+				snapshotList := volumesnapshotv1.VolumeSnapshotList{}
 				err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
 					utils.ClusterLabelName: clusterName,
 				})
@@ -492,7 +503,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
-var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, func() {
+var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.LabelBackupRestore), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
 		namespacePrefix             = "replica-switchover"

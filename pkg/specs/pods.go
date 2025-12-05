@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -161,12 +162,12 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	}
 	config.EnvVars = append(config.EnvVars, cluster.Spec.Env...)
 
-	if configuration.Current.StandbyTCPUserTimeout != 0 {
+	if configuration.Current.StandbyTCPUserTimeout != nil {
 		config.EnvVars = append(
 			config.EnvVars,
 			corev1.EnvVar{
 				Name:  "CNPG_STANDBY_TCP_USER_TIMEOUT",
-				Value: strconv.Itoa(configuration.Current.StandbyTCPUserTimeout),
+				Value: strconv.Itoa(*configuration.Current.StandbyTCPUserTimeout),
 			},
 		)
 	}
@@ -189,13 +190,10 @@ func createClusterPodSpec(
 		InitContainers: []corev1.Container{
 			createBootstrapContainer(cluster),
 		},
-		SchedulerName: cluster.Spec.SchedulerName,
-		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
-		Volumes:       createPostgresVolumes(&cluster, podName),
-		SecurityContext: CreatePodSecurityContext(
-			cluster.GetSeccompProfile(),
-			cluster.GetPostgresUID(),
-			cluster.GetPostgresGID()),
+		SchedulerName:                 cluster.Spec.SchedulerName,
+		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
+		Volumes:                       createPostgresVolumes(&cluster, podName),
+		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.Name,
@@ -275,14 +273,24 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					Protocol:      "TCP",
 				},
 			},
-			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
+			SecurityContext: GetSecurityContext(&cluster),
 		},
 	}
 
+	if cluster.Annotations[utils.EnableInstancePprofAnnotationName] == "true" {
+		containers[0].Ports = append(containers[0].Ports, corev1.ContainerPort{
+			Name:          "pprof",
+			ContainerPort: 6060,
+			Protocol:      "TCP",
+		})
+
+		containers[0].Command = append(containers[0].Command, "--pprof-server")
+	}
+
 	if enableHTTPS {
-		containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].StartupProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].LivenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].ReadinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
 		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
@@ -433,21 +441,41 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 	return affinity
 }
 
-// CreatePodSecurityContext defines the security context under which the containers are running
-func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group int64) *corev1.PodSecurityContext {
+// GetPodSecurityContext return the proper PodSecurityContext set in the cluster for Pods
+func GetPodSecurityContext(cluster *apiv1.Cluster) *corev1.PodSecurityContext {
 	// Under Openshift we inherit SecurityContext from the restricted security context constraint
 	if utils.HaveSecurityContextConstraints() {
 		return nil
 	}
 
-	trueValue := true
-	return &corev1.PodSecurityContext{
-		RunAsNonRoot:   &trueValue,
-		RunAsUser:      &user,
-		RunAsGroup:     &group,
-		FSGroup:        &group,
-		SeccompProfile: seccompProfile,
+	uid := cluster.GetPostgresUID()
+	gid := cluster.GetPostgresGID()
+	defaultContext := &corev1.PodSecurityContext{
+		SeccompProfile: cluster.GetSeccompProfile(),
+		RunAsUser:      &uid,
+		RunAsGroup:     &gid,
+		RunAsNonRoot:   ptr.To(true),
+		FSGroup:        &gid,
 	}
+
+	if cluster.Spec.PodSecurityContext == nil {
+		return defaultContext
+	}
+
+	// Create a copy to avoid mutating the cluster object
+	definedContext := cluster.Spec.PodSecurityContext.DeepCopy()
+
+	if definedContext.RunAsUser == nil {
+		definedContext.RunAsUser = defaultContext.RunAsUser
+	}
+	if definedContext.RunAsGroup == nil {
+		definedContext.RunAsGroup = defaultContext.RunAsGroup
+	}
+	if definedContext.SeccompProfile == nil {
+		definedContext.SeccompProfile = defaultContext.SeccompProfile
+	}
+
+	return definedContext
 }
 
 // NewInstance creates a new instance Pod with the plugin patches applied
@@ -455,7 +483,7 @@ func NewInstance(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
+	// TODO: remove tlsEnabled when we drop the support for instances created without TLS
 	tlsEnabled bool,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx).WithName("new_instance")
@@ -503,6 +531,7 @@ func buildInstance(
 ) (*corev1.Pod, error) {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
@@ -511,13 +540,19 @@ func buildInstance(
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				utils.ClusterLabelName:      cluster.Name,
-				utils.InstanceNameLabelName: podName,
-				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+				utils.ClusterLabelName:                cluster.Name,
+				utils.InstanceNameLabelName:           podName,
+				utils.PodRoleLabelName:                string(utils.PodRoleInstance),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 			Annotations: map[string]string{
 				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName:    envConfig.Hash,
+				//nolint:staticcheck // still in use for backward compatibility
+				utils.PodEnvHashAnnotationName: envConfig.Hash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,

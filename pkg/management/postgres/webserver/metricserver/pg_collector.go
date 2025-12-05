@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package metricserver
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -54,6 +55,9 @@ type Exporter struct {
 	// - to ensure we are able to unit test
 	// - to make the struct adhere to the composition pattern instead of hardcoding dependencies inside the functions
 	getCluster func() (*apiv1.Cluster, error)
+
+	// pluginCollector is used to collect metrics from plugins
+	pluginCollector m.PluginCollector
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -91,11 +95,13 @@ type PgStatWalMetrics struct {
 }
 
 // NewExporter creates an exporter
-func NewExporter(instance *postgres.Instance) *Exporter {
+func NewExporter(instance *postgres.Instance, pluginCollector m.PluginCollector) *Exporter {
+	clusterGetter := local.NewClient().Cache().GetCluster
 	return &Exporter{
-		instance:   instance,
-		Metrics:    newMetrics(),
-		getCluster: local.NewClient().Cache().GetCluster,
+		instance:        instance,
+		Metrics:         newMetrics(),
+		getCluster:      clusterGetter,
+		pluginCollector: pluginCollector,
 	}
 }
 
@@ -176,19 +182,20 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "first_recoverability_point",
-			Help:      "The first point of recoverability for the cluster as a unix timestamp",
+			Help: "The first point of recoverability for the cluster as a unix timestamp" +
+				" (Deprecated)",
 		}),
 		LastAvailableBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "last_available_backup_timestamp",
-			Help:      "The last available backup as a unix timestamp",
+			Help:      "The last available backup as a unix timestamp (Deprecated)",
 		}),
 		LastFailedBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "last_failed_backup_timestamp",
-			Help:      "The last failed backup as a unix timestamp",
+			Help:      "The last failed backup as a unix timestamp (Deprecated)",
 		}),
 		FencingOn: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -302,13 +309,56 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 			e.Metrics.PgStatWalMetrics.WalSyncTime.Describe(ch)
 		}
 	}
+
+	if cluster, _ := e.getCluster(); cluster != nil {
+		e.pluginCollector.Describe(context.Background(), ch, cluster)
+	}
 }
 
 // Collect implements prometheus.Collector, collecting the Metrics values to
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.collectPgMetrics(ch)
+	log.Debug("collecting Postgres instance metrics")
+	e.updateInstanceMetrics()
+	e.collectInstanceMetrics(ch)
 
+	if e.queries != nil {
+		var defaultClusterForTTL apiv1.Cluster
+		ttl := defaultClusterForTTL.GetMetricsQueriesTTL().Duration
+		if cluster, _ := e.getCluster(); cluster != nil {
+			ttl = cluster.GetMetricsQueriesTTL().Duration
+		}
+
+		if e.queries.ShouldUpdate(ttl) {
+			log.Trace("no cache, updating metrics from queries", "ttlSeconds", ttl.Seconds())
+			e.updateMetricsFromQueries()
+		} else {
+			log.Debug("using cached metrics from queries, as TTL is not exceeded",
+				"ttlSeconds", ttl.Seconds())
+			e.queries.RecordCacheHit()
+		}
+		log.Debug("collecting metrics from queries")
+		e.queries.Collect(ch)
+	}
+}
+
+func (e *Exporter) updateMetricsFromQueries() {
+	// Work on predefined metrics and custom queries
+	label := "Collect." + e.queries.Name()
+	collectionStart := time.Now()
+	log.Debug("updating metrics from queries")
+	if err := e.queries.Update(); err != nil {
+		log.Error(err, "Error during query update", "collector", e.queries.Name())
+		e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
+		e.Metrics.Error.Set(1)
+	}
+	log.Debug("created metrics from user queries",
+		"duration", time.Since(collectionStart).Seconds())
+	e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
+}
+
+// collectInstanceMetrics sends the computed instance metrics to the channel
+func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.CollectionsTotal
 	ch <- e.Metrics.Error
 	e.Metrics.PgCollectionErrors.Collect(ch)
@@ -338,9 +388,18 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			e.Metrics.PgStatWalMetrics.WalSyncTime.Collect(ch)
 		}
 	}
+
+	if cluster, _ := e.getCluster(); cluster != nil {
+		if err := e.pluginCollector.Collect(context.Background(), ch, cluster); err != nil {
+			log.Error(err, "error while collecting plugin metrics")
+			e.Metrics.Error.Set(1)
+			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PluginMetrics").Inc()
+		}
+	}
 }
 
-func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
+// updateInstanceMetrics updates metrics from the instance manager
+func (e *Exporter) updateInstanceMetrics() {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
@@ -375,18 +434,6 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
-
-	// Work on predefined metrics and custom queries
-	if e.queries != nil {
-		label := "Collect." + e.queries.Name()
-		collectionStart := time.Now()
-		if err := e.queries.Collect(ch); err != nil {
-			log.Error(err, "Error during collection", "collector", e.queries.Name())
-			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
-			e.Metrics.Error.Set(1)
-		}
-		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
-	}
 
 	isPrimary, err := e.instance.IsPrimary()
 	if err != nil {
@@ -506,21 +553,21 @@ func (e *Exporter) collectNodesUsed() {
 func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
 	const errorLabel = "Collect.LastFailedBackupTimestamp"
 	e.setTimestampMetric(e.Metrics.LastFailedBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
-		return cluster.Status.LastFailedBackup
+		return cluster.Status.LastFailedBackup //nolint:staticcheck
 	})
 }
 
 func (e *Exporter) collectFromPrimaryLastAvailableBackupTimestamp() {
 	const errorLabel = "Collect.LastAvailableBackupTimestamp"
 	e.setTimestampMetric(e.Metrics.LastAvailableBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
-		return cluster.Status.LastSuccessfulBackup
+		return cluster.Status.LastSuccessfulBackup //nolint:staticcheck
 	})
 }
 
 func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 	const errorLabel = "Collect.FirstRecoverabilityPoint"
 	e.setTimestampMetric(e.Metrics.FirstRecoverabilityPoint, errorLabel, func(cluster *apiv1.Cluster) string {
-		return cluster.Status.FirstRecoverabilityPoint
+		return cluster.Status.FirstRecoverabilityPoint //nolint:staticcheck
 	})
 }
 

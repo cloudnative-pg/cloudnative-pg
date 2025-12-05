@@ -34,7 +34,7 @@ func SecretKeySelectorToCore(selector *SecretKeySelector) *corev1.SecretKeySelec
 
 	return &corev1.SecretKeySelector{
 		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
+			Name: selector.Name,
 		},
 		Key: selector.Key,
 	}

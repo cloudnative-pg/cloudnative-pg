@@ -36,11 +36,15 @@ permissions: read-all
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.24.x"
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.25.5"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.27.0"
-  ROOK_VERSION: "v1.17.1"
-  EXTERNAL_SNAPSHOTTER_VERSION: "v8.2.1"
+  # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
+  KIND_VERSION: "v0.30.0"
+  # renovate: datasource=github-releases depName=rook/rook versioning=loose
+  ROOK_VERSION: "v1.18.7"
+  # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
+  EXTERNAL_SNAPSHOTTER_VERSION: "v8.4.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
@@ -74,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.24, release-1.25]
+        branch: [release-1.25, release-1.26, release-1.27]
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1
@@ -93,6 +97,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
+      issues: read
     runs-on: ubuntu-24.04
     outputs:
       github_ref: ${{ steps.refs.outputs.head_sha }}
@@ -158,7 +163,7 @@ jobs:
         id: refs
 
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -275,14 +280,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -346,7 +351,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
           version: v2
@@ -357,22 +362,22 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@76f9fa3a758507623da19f6092dc4089a7e61592 # v6
+        uses: docker/bake-action@3acf805d94d93a86cce4ca44798a76464a75b88c # v6
         id: bake-push
         env:
           environment: "testing"
@@ -388,7 +393,7 @@ jobs:
       -
         name: Install cosign
         if: env.SIGN_IMAGES == 'true'
-        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
@@ -421,7 +426,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -435,7 +440,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         if: |
           always() && !cancelled() &&
           needs.evaluate_options.outputs.test_level == '4'
@@ -457,7 +462,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         id: build-prime
         if: |
           always() && !cancelled() &&
@@ -488,7 +493,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -511,7 +516,7 @@ jobs:
           rm -fr manifests/operator-manifest.yaml
       -
         name: Prepare the operator manifest
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: operator-manifest.yaml
           path: manifests
@@ -530,7 +535,7 @@ jobs:
           git commit -m "${COMMIT_MESSAGE}"
       -
         name: Push changes
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
@@ -571,7 +576,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -629,7 +634,7 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
           android: true
           dotnet: true
@@ -649,26 +654,26 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -726,7 +731,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -752,7 +757,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: kind-logs-${{ matrix.id }}
           path: kind-logs/
@@ -760,7 +765,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -771,7 +776,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
@@ -876,12 +881,12 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -901,11 +906,12 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.2
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -917,7 +923,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
         with:
           version: v${{ env.K8S_VERSION }}
       -
@@ -974,11 +980,13 @@ jobs:
           max_attempts: 1
           command: |
             STORAGECLASSNAME=default
+            # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
             kubectl apply -f ${ROOK_BASE_URL}/common.yaml
             kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/csi-operator.yaml
             curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
               sed '/^ *#/d;/^ *$/d' | \
               yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
@@ -1046,7 +1054,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1071,7 +1079,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1081,7 +1089,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
@@ -1223,19 +1231,19 @@ jobs:
           echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1256,10 +1264,11 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.2
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
+        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1320,8 +1329,10 @@ jobs:
         name: Setup Velero
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
-          VELERO_VERSION: "v1.16.0"
-          VELERO_AWS_PLUGIN_VERSION: "v1.12.0"
+          # renovate: datasource=github-releases depName=vmware-tanzu/velero
+          VELERO_VERSION: "v1.17.1"
+          # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
+          VELERO_AWS_PLUGIN_VERSION: "v1.13.1"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1417,7 +1428,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1442,7 +1453,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1452,7 +1463,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
@@ -1529,7 +1540,7 @@ jobs:
           if [ -n "${CLOUDFORMATION_STATUS_CURRENT}" ] ; then
             echo "::warning file=continuous-delivery.yml::eksctl failed deleting a cluster cleanly"
             # When the status of CloudFormation stack managed by eksctl reports an error, try to delete resources directly with AWS CLI
-            pip install boto3
+            pip install -r .github/workflow-requirements.txt
             for vpc_id in $(aws ec2 describe-vpcs | jq -r '.Vpcs[] | select(.Tags?[]? | .Key == "Name" and (.Value | contains("'"${STACK_NAME}"'"))).VpcId'); do
               python .github/vpc_destroy.py --vpc_id "${vpc_id}" --region "${REGION_NAME}" --services ec2
             done
@@ -1608,19 +1619,19 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1641,7 +1652,8 @@ jobs:
           timeout_seconds: 120
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.2
       -
         name: Set cluster name
         run: |
@@ -1650,16 +1662,16 @@ jobs:
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
           SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
-        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
       -
         name: Set up Cloud SDK and kubectl
-        uses: google-github-actions/setup-gcloud@6189d56e4096ee891640bb02ac264be376592d6a # v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'kubectl,gke-gcloud-auth-plugin'
@@ -1697,6 +1709,19 @@ jobs:
       -
         name: Configure Storage
         run: |
+          # Even if the cluster is ready, it might take some time before the
+          # volumesnapshot CRDs are available
+          attempt=1
+          max_attempts=10
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+            if kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io >/dev/null 2>&1; then
+              echo "VolumeSnapshot CRDs are available."
+              break
+            fi
+            echo "Waiting for snapshot CRDs..."
+            sleep 20
+            attempt=$((attempt+1))
+          done
           # Install volume snapshot class
           kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
           # Change to use standard-rwo as default storage account
@@ -1751,7 +1776,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1776,7 +1801,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1786,7 +1811,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
@@ -1876,6 +1901,9 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -1918,28 +1946,28 @@ jobs:
           echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-ocp-${{ github.run_number}}-$( echo ${{ matrix.k8s_version }} | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1964,7 +1992,7 @@ jobs:
         name: Install OpenShift Cluster ${{ matrix.k8s_version }}
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
-          openshift-install create cluster --dir hack/ --log-level warn
+          openshift-install create cluster --dir hack/ --log-level debug
       -
         name: Install operator-sdk
         run: |
@@ -1978,9 +2006,8 @@ jobs:
         run: |
           export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
           oc create ns cloudnative-pg
-          oc -n cloudnative-pg create secret generic cnpg-pull-secret \
-          --from-file=.dockerconfigjson=$HOME/.docker/config.json \
-          --type=kubernetes.io/dockerconfigjson
+          oc -n cloudnative-pg create secret docker-registry cnpg-pull-secret \
+            --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD"
       -
         name: Run preflight operator test
         env:
@@ -1989,10 +2016,12 @@ jobs:
           PFLT_SCORECARD_WAIT_TIME: "1200"
           PFLT_ARTIFACTS: "preflight_operator_results"
         run: |
-          PATH=$(pwd)/bin/:${PATH} \
-          KUBECONFIG=$(pwd)/hack/auth/kubeconfig \
-          bin/preflight check operator ${BUNDLE_IMG} \
-          --docker-config $HOME/.docker/config.json --loglevel trace
+          export PATH=$(pwd)/bin/:${PATH}
+          export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
+          oc -n cloudnative-pg get secret cnpg-pull-secret \
+            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > docker-config.json
+          preflight check operator ${BUNDLE_IMG} \
+            --docker-config docker-config.json --loglevel trace
       -
         name: Check preflight operator results
         run: |
@@ -2045,7 +2074,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2070,7 +2099,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -2080,7 +2109,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
@@ -2131,7 +2160,7 @@ jobs:
         run: mkdir test-artifacts
 
       - name: Download all artifacts to the directory
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           path: test-artifacts
           pattern: testartifacts-*
@@ -2149,13 +2178,13 @@ jobs:
 
       - name: Compute the E2E test summary
         id: generate-summary
-        uses: cloudnative-pg/ciclops@f5a7b357a09f09052ec0358ac49e020f151f1653 # v1.3.1
+        uses: cloudnative-pg/ciclops@fc1c72c2eb99e10aa437f14cd8563686b4b6e3b1 # v1.3.2
         with:
           artifact_directory: test-artifacts/data
 
       - name: If there is an overflow summary, archive it
         if: steps.generate-summary.outputs.Overflow
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
           path: ${{ steps.generate-summary.outputs.Overflow }}

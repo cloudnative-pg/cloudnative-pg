@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
@@ -213,12 +214,48 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"failoverquorums",
+			},
+			Verbs: []string{
+				"get",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{
+				cluster.Name,
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"failoverquorums/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+				"watch",
+			},
+			ResourceNames: []string{
+				cluster.Name,
+			},
+		},
 	}
 
 	return rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
 		},
 		Rules: rules,
 	}
@@ -296,13 +333,13 @@ func externalClusterSecrets(cluster apiv1.Cluster) []string {
 		if barmanObjStore := server.BarmanObjectStore; barmanObjStore != nil {
 			result = append(
 				result,
-				s3CredentialsSecrets(barmanObjStore.BarmanCredentials.AWS)...)
+				s3CredentialsSecrets(barmanObjStore.AWS)...)
 			result = append(
 				result,
-				azureCredentialsSecrets(barmanObjStore.BarmanCredentials.Azure)...)
+				azureCredentialsSecrets(barmanObjStore.Azure)...)
 			result = append(
 				result,
-				googleCredentialsSecrets(barmanObjStore.BarmanCredentials.Google)...)
+				googleCredentialsSecrets(barmanObjStore.Google)...)
 			if barmanObjStore.EndpointCA != nil {
 				result = append(result, barmanObjStore.EndpointCA.Name)
 			}
@@ -319,13 +356,13 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
 		result = append(
 			result,
-			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS)...)
+			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.AWS)...)
 		result = append(
 			result,
-			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure)...)
+			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Azure)...)
 		result = append(
 			result,
-			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google)...)
+			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Google)...)
 	}
 
 	// Secrets needed by Barman, if set
@@ -338,13 +375,13 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	if backupOrigin != nil {
 		result = append(
 			result,
-			s3CredentialsSecrets(backupOrigin.Status.BarmanCredentials.AWS)...)
+			s3CredentialsSecrets(backupOrigin.Status.AWS)...)
 		result = append(
 			result,
-			azureCredentialsSecrets(backupOrigin.Status.BarmanCredentials.Azure)...)
+			azureCredentialsSecrets(backupOrigin.Status.Azure)...)
 		result = append(
 			result,
-			googleCredentialsSecrets(backupOrigin.Status.BarmanCredentials.Google)...)
+			googleCredentialsSecrets(backupOrigin.Status.Google)...)
 	}
 
 	return result

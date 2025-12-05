@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -73,7 +73,7 @@ func (r *BackupReconciler) mapClustersToBackup() handler.MapFunc {
 			return nil
 		}
 		var backups apiv1.BackupList
-		err := r.Client.List(ctx, &backups,
+		err := r.List(ctx, &backups,
 			client.MatchingFields{
 				backupPhase: apiv1.BackupPhaseRunning,
 			},
@@ -101,7 +101,7 @@ func (r *BackupReconciler) mapClustersToBackup() handler.MapFunc {
 
 var volumeSnapshotsPredicate = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool {
-		volumeSnapshot, ok := e.Object.(*storagesnapshotv1.VolumeSnapshot)
+		volumeSnapshot, ok := e.Object.(*volumesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return false
 		}
@@ -109,21 +109,21 @@ var volumeSnapshotsPredicate = predicate.Funcs{
 		return volumeSnapshotHasBackuplabel(volumeSnapshot)
 	},
 	DeleteFunc: func(e event.DeleteEvent) bool {
-		volumeSnapshot, ok := e.Object.(*storagesnapshotv1.VolumeSnapshot)
+		volumeSnapshot, ok := e.Object.(*volumesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return false
 		}
 		return volumeSnapshotHasBackuplabel(volumeSnapshot)
 	},
 	GenericFunc: func(e event.GenericEvent) bool {
-		volumeSnapshot, ok := e.Object.(*storagesnapshotv1.VolumeSnapshot)
+		volumeSnapshot, ok := e.Object.(*volumesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return false
 		}
 		return volumeSnapshotHasBackuplabel(volumeSnapshot)
 	},
 	UpdateFunc: func(e event.UpdateEvent) bool {
-		volumeSnapshot, ok := e.ObjectNew.(*storagesnapshotv1.VolumeSnapshot)
+		volumeSnapshot, ok := e.ObjectNew.(*volumesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return false
 		}
@@ -133,7 +133,7 @@ var volumeSnapshotsPredicate = predicate.Funcs{
 
 func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
 	return func(_ context.Context, obj client.Object) []reconcile.Request {
-		volumeSnapshot, ok := obj.(*storagesnapshotv1.VolumeSnapshot)
+		volumeSnapshot, ok := obj.(*volumesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return nil
 		}
@@ -153,7 +153,7 @@ func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
 	}
 }
 
-func volumeSnapshotHasBackuplabel(volumeSnapshot *storagesnapshotv1.VolumeSnapshot) bool {
+func volumeSnapshotHasBackuplabel(volumeSnapshot *volumesnapshotv1.VolumeSnapshot) bool {
 	_, ok := volumeSnapshot.Labels[utils.BackupNameLabelName]
 	return ok
 }

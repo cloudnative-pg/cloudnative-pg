@@ -1,3 +1,9 @@
+---
+id: installation_upgrade
+sidebar_position: 50
+title: Installation and upgrades
+---
+
 # Installation and upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -8,12 +14,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.26.0-rc2.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.28.0-rc2.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.26.0-rc2.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.28.0-rc2.yaml
 ```
 
 You can verify that with:
@@ -74,7 +80,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.26/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.28/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -255,68 +261,92 @@ only the operator itself.
 
 
 <!--
-### Upgrading to 1.26.0 or 1.25.2
+### Upgrading to 1.28.0 or 1.27.x
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.26.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.25.x).
-
-- TOD: Mention hibernate command
-- TOD: Mention Barman Cloud
+    1.28.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.27.x).
 
 -->
 
-### Upgrading to 1.25 from a previous minor version
+### Upgrading to 1.27 from a previous minor version
+
+!!! Important
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.27.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.26.1).
+
+Version 1.27 introduces a change in the default behavior of the
+[liveness probe](instance_manager.md#liveness-probe): it now enforces the
+[shutdown of an isolated primary](instance_manager.md#primary-isolation)
+within the `livenessProbeTimeout` (30 seconds).
+
+If this behavior is not suitable for your environment, you can disable the
+*isolation check* in the liveness probe with the following configuration:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: false
+```
+
+### Upgrading to 1.26 from a previous minor version
 
 !!! Warning
-    Every time you are upgrading to a higher minor release, make sure you
-    go through the release notes and upgrade instructions of all the
-    intermediate minor releases. For example, if you want to move
-    from 1.23.x to 1.25, make sure you go through the release notes
-    and upgrade instructions for 1.24 and 1.25.
+    Due to changes in the startup probe for the manager component
+    ([#6623](https://github.com/cloudnative-pg/cloudnative-pg/pull/6623)),
+    upgrading the operator will trigger a restart of your PostgreSQL clusters,
+    even if in-place updates are enabled (`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES=true`).
+    Your applications will need to reconnect to PostgreSQL after the upgrade.
 
-No changes to existing 1.24 cluster configurations are required when upgrading
-to 1.25.
+#### Deprecation of backup metrics and fields in the `Cluster` `.status`
 
-### Upgrading to 1.24 from a previous minor version
+With the transition to a backup and recovery agnostic approach based on CNPG-I
+plugins in CloudNativePG, which began with version 1.26.0 for Barman Cloud, we
+are starting the deprecation period for the following fields in the `.status`
+section of the `Cluster` resource:
 
-#### From Replica Clusters to Distributed Topology
+- `firstRecoverabilityPoint`
+- `firstRecoverabilityPointByMethod`
+- `lastSuccessfulBackup`
+- `lastSuccessfulBackupByMethod`
+- `lastFailedBackup`
 
-One of the key enhancements in CloudNativePG 1.24.0 is the upgrade of the
-replica cluster feature.
+The following Prometheus metrics are also deprecated:
 
-The former replica cluster feature, now referred to as the "Standalone Replica
-Cluster," is no longer recommended for Disaster Recovery (DR) and High
-Availability (HA) scenarios that span multiple Kubernetes clusters. Standalone
-replica clusters are best suited for read-only workloads, such as reporting,
-OLAP, or creating development environments with test data.
+- `cnpg_collector_first_recoverability_point`
+- `cnpg_collector_last_failed_backup_timestamp`
+- `cnpg_collector_last_available_backup_timestamp`
 
-For DR and HA purposes, CloudNativePG now introduces the Distributed Topology
-strategy for replica clusters. This new strategy allows you to build PostgreSQL
-clusters across private, public, hybrid, and multi-cloud environments, spanning
-multiple regions and potentially different cloud providers. It also provides an
-API to control the switchover operation, ensuring that only one cluster acts as
-the primary at any given time.
+!!! Warning
+    If you have migrated to a plugin-based backup and recovery solution such as
+    Barman Cloud, these fields and metrics are no longer synchronized and will
+    not be updated. Users still relying on the in-core support for Barman Cloud
+    and volume snapshots can continue to use these fields for the time being.
 
-This Distributed Topology strategy enhances resilience and scalability, making
-it a robust solution for modern, distributed applications that require high
-availability and disaster recovery capabilities across diverse infrastructure
-setups.
+Under the new plugin-based approach, multiple backup methods can operate
+simultaneously, each with its own timeline for backup and recovery. For
+example, some plugins may provide snapshots without WAL archiving, while others
+support continuous archiving.
 
-You can seamlessly transition from a previous replica cluster configuration to a
-distributed topology by modifying all the `Cluster` resources involved in the
-distributed PostgreSQL setup. Ensure the following steps are taken:
+Because of this flexibility, maintaining centralized status fields in the
+`Cluster` resource could be misleading or confusing, as they would not
+accurately represent the state across all configured backup methods.
+For this reason, these fields are being deprecated.
 
-- Configure the `externalClusters` section to include all the clusters involved
-  in the distributed topology. We strongly suggest using the same configuration
-  across all `Cluster` resources for maintainability and consistency.
-- Configure the `primary` and `source` fields in the `.spec.replica` stanza to
-  reflect the distributed topology. The `primary` field should contain the name
-  of the current primary cluster in the distributed topology, while the `source`
-  field should contain the name of the cluster each `Cluster` resource is
-  replicating from. It is important to note that the `enabled` field, which was
-  previously set to `true` or `false`, should now be unset (default).
+Instead, each plugin is responsible for exposing its own backup status
+information and providing metrics back to the instance manager for monitoring
+and operational awareness.
 
-For more information, please refer to
-the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
+#### Declarative Hibernation in the `cnpg` plugin
+
+In this release, the `cnpg` plugin for `kubectl` transitions from an imperative
+to a [declarative approach for cluster hibernation](declarative_hibernation.md).
+The `hibernate on` and `hibernate off` commands are now convenient shortcuts
+that apply declarative changes to enable or disable hibernation.
+The `hibernate status` command has been removed, as its purpose is now
+fulfilled by the standard `status` command.
+

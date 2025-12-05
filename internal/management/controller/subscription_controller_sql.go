@@ -48,10 +48,6 @@ func (r *SubscriptionReconciler) alignSubscription(
 	    WHERE subname = $1
 		`,
 		obj.Spec.Name)
-	if row.Err() != nil {
-		return fmt.Errorf("while getting subscription status: %w", row.Err())
-	}
-
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return fmt.Errorf("while getting subscription status (scan): %w", err)
@@ -77,7 +73,11 @@ func (r *SubscriptionReconciler) patchSubscription(
 	obj *apiv1.Subscription,
 	connString string,
 ) error {
-	sqls := toSubscriptionAlterSQL(obj, connString)
+	version, err := r.getPostgresMajorVersion()
+	if err != nil {
+		return fmt.Errorf("while getting the PostgreSQL major version: %w", err)
+	}
+	sqls := toSubscriptionAlterSQL(obj, connString, version)
 	for _, sqlQuery := range sqls {
 		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
 			return err
@@ -112,7 +112,7 @@ func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) string 
 	return createQuery
 }
 
-func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string {
+func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string, pgMajorVersion int) []string {
 	result := make([]string, 0, 3)
 
 	setPublicationSQL := fmt.Sprintf(
@@ -133,12 +133,38 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 			fmt.Sprintf(
 				"ALTER SUBSCRIPTION %s SET (%s)",
 				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				toPostgresParameters(obj.Spec.Parameters),
+				toPostgresParameters(filterSubscriptionUpdatableParameters(obj.Spec.Parameters, pgMajorVersion)),
 			),
 		)
 	}
 
 	return result
+}
+
+func filterSubscriptionUpdatableParameters(parameters map[string]string, pgMajorVersion int) map[string]string {
+	// Only a limited set of the parameters can be updated
+	// see https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET
+	allowedParameters := []string{
+		"slot_name",
+		"synchronous_commit",
+		"binary",
+		"streaming",
+		"disable_on_error",
+		"password_required",
+		"run_as_owner",
+		"origin",
+		"failover",
+	}
+	if pgMajorVersion >= 18 {
+		allowedParameters = append(allowedParameters, "two_phase")
+	}
+	filteredParameters := make(map[string]string, len(parameters))
+	for _, key := range allowedParameters {
+		if _, present := parameters[key]; present {
+			filteredParameters[key] = parameters[key]
+		}
+	}
+	return filteredParameters
 }
 
 func executeDropSubscription(ctx context.Context, db *sql.DB, name string) error {

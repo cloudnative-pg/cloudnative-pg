@@ -80,6 +80,10 @@ type Data struct {
 	// need to written. This is different between plain Kubernetes and OpenShift
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
 
+	// MetricsCertDir is the directory where the certificates for the metrics
+	// server are stored. If set, the metrics server will use TLS.
+	MetricsCertDir string `json:"metricsCertDir" env:"METRICS_CERT_DIR"`
+
 	// PluginSocketDir is the directory where the plugins sockets are to be
 	// found
 	PluginSocketDir string `json:"pluginSocketDir" env:"PLUGIN_SOCKET_DIR"`
@@ -103,6 +107,10 @@ type Data struct {
 	// PostgresImageName is the name of the image of PostgreSQL that is
 	// used by default for new clusters
 	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
+
+	// PgbouncerImageName is the name of the image of PgBouncer that is
+	// used by default for new poolers
+	PgbouncerImageName string `json:"pgbouncerImageName" env:"PGBOUNCER_IMAGE_NAME"`
 
 	// InheritedAnnotations is a list of annotations that every resource could inherit from
 	// the owning Cluster
@@ -157,7 +165,9 @@ type Data struct {
 	// added as a tcp_user_timeout option to the primary_conninfo
 	// string, which is used by the standby server to connect to the
 	// primary server in CloudNativePG.
-	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
+	// When nil, the instance manager will use a default value of 5000ms.
+	// Set to 0 explicitly to use the system's default.
+	StandbyTCPUserTimeout *int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
 
 	// KubernetesClusterDomain defines the domain suffix for service FQDNs
 	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
@@ -176,11 +186,12 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName:  DefaultOperatorPullSecretName,
 		OperatorImageName:       versions.DefaultOperatorImageName,
 		PostgresImageName:       versions.DefaultImageName,
+		PgbouncerImageName:      versions.DefaultPgbouncerImage,
 		PluginSocketDir:         DefaultPluginSocketDir,
 		CreateAnyService:        false,
 		CertificateDuration:     CertificateDuration,
 		ExpiringCheckThreshold:  ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:   0,
+		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
 	}
@@ -254,7 +265,7 @@ func cleanNamespaceList(namespaces string) (result []string) {
 		}
 	}
 
-	return
+	return result
 }
 
 func evaluateGlobPatterns(patterns []string, value string) (result bool) {
@@ -269,9 +280,9 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 		}
 
 		if result {
-			return
+			return result
 		}
 	}
 
-	return
+	return result
 }

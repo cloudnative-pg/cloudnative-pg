@@ -1,3 +1,9 @@
+---
+id: applications
+sidebar_position: 340
+title: Connecting from an application
+---
+
 # Connecting from an application
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -72,6 +78,13 @@ Each secret contain the following:
 * a working [`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
 * [uri](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
 * [jdbc-uri](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
+* [fqdn-uri](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
+* [fqdn-jdbc-uri](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
+
+The FQDN to be used in the URIs is calculated using the Kubernetes cluster
+domain specified in the `KUBERNETES_CLUSTER_DOMAIN` configuration parameter.
+See [the operator configuration documentation](operator_conf.md) for more information
+about that.
 
 The `-app` credentials are the ones that should be used by applications
 connecting to the PostgreSQL cluster, and correspond to the user *owning* the

@@ -1,3 +1,9 @@
+---
+id: cloudnative-pg.v1
+sidebar_position: 550
+title: API Reference
+---
+
 # API Reference
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -11,6 +17,7 @@
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 - [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
 - [Database](#postgresql-cnpg-io-v1-Database)
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
 - [Publication](#postgresql-cnpg-io-v1-Publication)
@@ -30,7 +37,7 @@
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Backup</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -59,7 +66,8 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 
 
 
-<p>Cluster is the Schema for the PostgreSQL API</p>
+<p>Cluster defines the API schema for a highly available PostgreSQL database cluster
+managed by CloudNativePG.</p>
 
 
 <table class="table">
@@ -68,7 +76,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Cluster</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -106,7 +114,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ClusterImageCatalog</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -135,7 +143,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Database</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -160,6 +168,40 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## FailoverQuorum     {#postgresql-cnpg-io-v1-FailoverQuorum}
+
+
+**Appears in:**
+
+
+
+<p>FailoverQuorum contains the information about the current failover
+quorum status of a PG cluster. It is updated by the instance manager
+of the primary node and reset to zero by the operator to trigger
+an update.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>FailoverQuorum</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>status</code><br/>
+<a href="#postgresql-cnpg-io-v1-FailoverQuorumStatus"><i>FailoverQuorumStatus</i></a>
+</td>
+<td>
+   <p>Most recently observed status of the failover quorum.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ImageCatalog     {#postgresql-cnpg-io-v1-ImageCatalog}
 
 
@@ -173,7 +215,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ImageCatalog</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -202,7 +244,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Pooler</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -240,7 +282,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Publication</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -273,7 +315,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ScheduledBackup</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -311,7 +353,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
 <tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Subscription</code></td></tr>
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -372,7 +414,7 @@ More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</p
 </td>
 </tr>
 <tr><td><code>nodeAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#nodeaffinity-v1-core"><i>core/v1.NodeAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#nodeaffinity-v1-core"><i>core/v1.NodeAffinity</i></a>
 </td>
 <td>
    <p>NodeAffinity describes node affinity scheduling rules for the pod.
@@ -380,7 +422,7 @@ More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-no
 </td>
 </tr>
 <tr><td><code>tolerations</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#toleration-v1-core"><i>[]core/v1.Toleration</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#toleration-v1-core"><i>[]core/v1.Toleration</i></a>
 </td>
 <td>
    <p>Tolerations is a list of Tolerations that should be set for all the pods, in order to allow them to run
@@ -401,7 +443,7 @@ https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-p
 </td>
 </tr>
 <tr><td><code>additionalPodAntiAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podantiaffinity-v1-core"><i>core/v1.PodAntiAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podantiaffinity-v1-core"><i>core/v1.PodAntiAffinity</i></a>
 </td>
 <td>
    <p>AdditionalPodAntiAffinity allows to specify pod anti-affinity terms to be added to the ones generated
@@ -409,7 +451,7 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </td>
 </tr>
 <tr><td><code>additionalPodAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podaffinity-v1-core"><i>core/v1.PodAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podaffinity-v1-core"><i>core/v1.PodAffinity</i></a>
 </td>
 <td>
    <p>AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods.</p>
@@ -757,6 +799,14 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
    <p>The potential credentials for each cloud provider</p>
 </td>
 </tr>
+<tr><td><code>majorVersion</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The PostgreSQL major version that was running when the
+backup was taken.</p>
+</td>
+</tr>
 <tr><td><code>endpointCA</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
@@ -820,14 +870,14 @@ parameter is omitted</p>
 </td>
 </tr>
 <tr><td><code>startedAt</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>When the backup was started</p>
 </td>
 </tr>
 <tr><td><code>stoppedAt</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>When the backup was terminated</p>
@@ -1039,8 +1089,8 @@ created from scratch</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>The list of options that must be passed to initdb when creating the cluster.
-Deprecated: This could lead to inconsistent configurations,
+   <p>The list of options that must be passed to initdb when creating the cluster.</p>
+<p>Deprecated: This could lead to inconsistent configurations,
 please use the explicit provided parameters instead.
 If defined, explicit values will be ignored.</p>
 </td>
@@ -1522,7 +1572,8 @@ Changing this option will force a rollout of all instances.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterSpec defines the desired state of Cluster</p>
+<p>ClusterSpec defines the desired state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
@@ -1559,7 +1610,7 @@ and digests for deterministic and repeatable deployments
 </td>
 </tr>
 <tr><td><code>imagePullPolicy</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pullpolicy-v1-core"><i>core/v1.PullPolicy</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#pullpolicy-v1-core"><i>core/v1.PullPolicy</i></a>
 </td>
 <td>
    <p>Image pull policy.
@@ -1702,7 +1753,7 @@ user by setting it to <code>NULL</code>. Disabled by default.</p>
 </td>
 </tr>
 <tr><td><code>ephemeralVolumeSource</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#ephemeralvolumesource-v1-core"><i>core/v1.EphemeralVolumeSource</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#ephemeralvolumesource-v1-core"><i>core/v1.EphemeralVolumeSource</i></a>
 </td>
 <td>
    <p>EphemeralVolumeSource allows the user to configure the source of ephemeral volumes.</p>
@@ -1732,7 +1783,7 @@ gracefully shutdown (default 1800)</p>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>).</p>
+(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>). Default is 180 seconds.</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
@@ -1771,7 +1822,7 @@ ceiling(livenessProbe / 10).</p>
 </td>
 </tr>
 <tr><td><code>topologySpreadConstraints</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#topologyspreadconstraint-v1-core"><i>[]core/v1.TopologySpreadConstraint</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#topologyspreadconstraint-v1-core"><i>[]core/v1.TopologySpreadConstraint</i></a>
 </td>
 <td>
    <p>TopologySpreadConstraints specifies how to spread matching pods among the given topology.
@@ -1780,7 +1831,7 @@ https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constrai
 </td>
 </tr>
 <tr><td><code>resources</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#resourcerequirements-v1-core"><i>core/v1.ResourceRequirements</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourcerequirements-v1-core"><i>core/v1.ResourceRequirements</i></a>
 </td>
 <td>
    <p>Resources requirements of every generated Pod. Please refer to
@@ -1860,7 +1911,7 @@ it can be with a switchover (<code>switchover</code>) or in-place (<code>restart
 </td>
 </tr>
 <tr><td><code>projectedVolumeTemplate</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#projectedvolumesource-v1-core"><i>core/v1.ProjectedVolumeSource</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#projectedvolumesource-v1-core"><i>core/v1.ProjectedVolumeSource</i></a>
 </td>
 <td>
    <p>Template to be used to define projected volumes, projected volumes will be mounted
@@ -1868,7 +1919,7 @@ under <code>/projected</code> base folder</p>
 </td>
 </tr>
 <tr><td><code>env</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#envvar-v1-core"><i>[]core/v1.EnvVar</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#envvar-v1-core"><i>[]core/v1.EnvVar</i></a>
 </td>
 <td>
    <p>Env follows the Env format to pass environment variables
@@ -1876,7 +1927,7 @@ to the pods created in the cluster</p>
 </td>
 </tr>
 <tr><td><code>envFrom</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#envfromsource-v1-core"><i>[]core/v1.EnvFromSource</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#envfromsource-v1-core"><i>[]core/v1.EnvFromSource</i></a>
 </td>
 <td>
    <p>EnvFrom follows the EnvFrom format to pass environment variables
@@ -1891,11 +1942,30 @@ sources to the pods to be used by Env</p>
 </td>
 </tr>
 <tr><td><code>seccompProfile</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#seccompprofile-v1-core"><i>core/v1.SeccompProfile</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#seccompprofile-v1-core"><i>core/v1.SeccompProfile</i></a>
 </td>
 <td>
    <p>The SeccompProfile applied to every Pod and Container.
 Defaults to: <code>RuntimeDefault</code></p>
+</td>
+</tr>
+<tr><td><code>podSecurityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podsecuritycontext-v1-core"><i>core/v1.PodSecurityContext</i></a>
+</td>
+<td>
+   <p>Override the PodSecurityContext applied to every Pod of the cluster.
+When set, this overrides the operator's default PodSecurityContext for the cluster.
+If omitted, the operator defaults are used.
+This field doesn't have any effect if SecurityContextConstraints are present.</p>
+</td>
+</tr>
+<tr><td><code>securityContext</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#securitycontext-v1-core"><i>core/v1.SecurityContext</i></a>
+</td>
+<td>
+   <p>Override the SecurityContext applied to every Container in the Pod of the cluster.
+When set, this overrides the operator's default Container SecurityContext.
+If omitted, the operator defaults are used.</p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>
@@ -1946,7 +2016,8 @@ in the PostgreSQL Pods.</p>
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 
 
-<p>ClusterStatus defines the observed state of Cluster</p>
+<p>ClusterStatus defines the observed state of a PostgreSQL cluster managed by
+CloudNativePG.</p>
 
 
 <table class="table">
@@ -2148,36 +2219,41 @@ configmap data</p>
 </td>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format.
-This field is calculated from the content of FirstRecoverabilityPointByMethod</p>
+This field is calculated from the content of FirstRecoverabilityPointByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>firstRecoverabilityPointByMethod</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type</p>
+   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Last successful backup, stored as a date in RFC3339 format
-This field is calculated from the content of LastSuccessfulBackupByMethod</p>
+   <p>Last successful backup, stored as a date in RFC3339 format.
+This field is calculated from the content of LastSuccessfulBackupByMethod.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackupByMethod</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
 </td>
 <td>
-   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type</p>
+   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>lastFailedBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Stored as a date in RFC3339 format</p>
+   <p>Last failed backup, stored as a date in RFC3339 format.</p>
+<p>Deprecated: the field is not set for backup plugins.</p>
 </td>
 </tr>
 <tr><td><code>cloudNativePGCommitHash</code><br/>
@@ -2231,7 +2307,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 </tr>
 <tr><td><code>conditions</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
 </td>
 <td>
    <p>Conditions for cluster object</p>
@@ -2287,6 +2363,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 from pg_controldata such as Database system identifier, Latest checkpoint's
 TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
 WAL file, and Time of latest checkpoint</p>
+</td>
+</tr>
+<tr><td><code>systemID</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>SystemID is the latest detected PostgreSQL SystemID</p>
 </td>
 </tr>
 </tbody>
@@ -2349,21 +2432,21 @@ PostgreSQL cluster from an existing storage</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>storage</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage of the instances</p>
 </td>
 </tr>
 <tr><td><code>walStorage</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)</p>
 </td>
 </tr>
 <tr><td><code>tablespaceStorage</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>map[string]core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#typedlocalobjectreference-v1-core"><i>map[string]core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL tablespaces</p>
@@ -2379,7 +2462,11 @@ PostgreSQL cluster from an existing storage</p>
 
 - [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
 
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
 - [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
+
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
 
 
 <p>DatabaseObjectSpec contains the fields which are common to every
@@ -2393,17 +2480,17 @@ database object</p>
 <i>string</i>
 </td>
 <td>
-   <p>Name of the extension/schema</p>
+   <p>Name of the object (extension, schema, FDW, server)</p>
 </td>
 </tr>
 <tr><td><code>ensure</code><br/>
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
 </td>
 <td>
-   <p>Specifies whether an extension/schema should be present or absent in
-the database. If set to <code>present</code>, the extension/schema will be
-created if it does not exist. If set to <code>absent</code>, the
-extension/schema will be removed if it exists.</p>
+   <p>Specifies whether an object (e.g schema) should be present or absent
+in the database. If set to <code>present</code>, the object will be created if
+it does not exist. If set to <code>absent</code>, the extension/schema will be
+removed if it exists.</p>
 </td>
 </tr>
 </tbody>
@@ -2502,7 +2589,7 @@ PostgreSQL.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The name of the PostgreSQL cluster hosting the database.</p>
@@ -2677,6 +2764,20 @@ tablespace used for objects created in this database.</p>
    <p>The list of extensions to be managed in the database</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-FDWSpec"><i>[]FDWSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign data wrappers to be managed in the database</p>
+</td>
+</tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServerSpec"><i>[]ServerSpec</i></a>
+</td>
+<td>
+   <p>The list of foreign servers to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2730,6 +2831,20 @@ desired state that was synchronized</p>
    <p>Extensions is the status of the managed extensions</p>
 </td>
 </tr>
+<tr><td><code>fdws</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>FDWs is the status of the managed FDWs</p>
+</td>
+</tr>
+<tr><td><code>servers</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>Servers is the status of the managed servers</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2772,6 +2887,8 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
+- [OptionSpec](#postgresql-cnpg-io-v1-OptionSpec)
+
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
 
@@ -2808,6 +2925,61 @@ storage</p>
 </td>
 <td>
    <p>TemporaryData is the size limit of the temporary data volume</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ExtensionConfiguration     {#postgresql-cnpg-io-v1-ExtensionConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>ExtensionConfiguration is the configuration used to add
+PostgreSQL extensions to the Cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the extension, required</p>
+</td>
+</tr>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core"><i>core/v1.ImageVolumeSource</i></a>
+</td>
+<td>
+   <p>The image containing the extension, required</p>
+</td>
+</tr>
+<tr><td><code>extension_control_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to extension_control_path.
+If not defined, defaults to &quot;/share&quot;.</p>
+</td>
+</tr>
+<tr><td><code>dynamic_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to dynamic_library_path.
+If not defined, defaults to &quot;/lib&quot;.</p>
+</td>
+</tr>
+<tr><td><code>ld_library_path</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The list of directories inside the image which should be added to ld_library_path.</p>
 </td>
 </tr>
 </tbody>
@@ -2887,7 +3059,7 @@ external cluster which is used in the other sections of the configuration</p>
 </td>
 </tr>
 <tr><td><code>sslCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL certificate to be used to connect to this
@@ -2895,7 +3067,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>sslKey</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL private key to be used to connect to this
@@ -2903,7 +3075,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>sslRootCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL CA public key to be used to connect to this
@@ -2911,7 +3083,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>password</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to the password to be used to connect to the server.
@@ -2941,6 +3113,119 @@ of WAL archiving and backups for this external cluster</p>
 </tbody>
 </table>
 
+## FDWSpec     {#postgresql-cnpg-io-v1-FDWSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>FDWSpec configures an Foreign Data Wrapper in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>handler</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the handler function (e.g., &quot;postgres_fdw_handler&quot;).
+This will be empty if no handler is specified. In that case,
+the default handler is registered when the FDW extension is created.</p>
+</td>
+</tr>
+<tr><td><code>validator</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the validator function (e.g., &quot;postgres_fdw_validator&quot;).
+This will be empty if no validator is specified. In that case,
+the default validator is registered when the FDW extension is created.</p>
+</td>
+</tr>
+<tr><td><code>owner</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner specifies the database role that will own the Foreign Data Wrapper.
+The role must have superuser privileges in the target database.</p>
+</td>
+</tr>
+<tr><td><code>options</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
+</td>
+<td>
+   <p>Options specifies the configuration options for the FDW.</p>
+</td>
+</tr>
+<tr><td><code>usage</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>List of roles for which <code>USAGE</code> privileges on the FDW are granted or revoked.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## FailoverQuorumStatus     {#postgresql-cnpg-io-v1-FailoverQuorumStatus}
+
+
+**Appears in:**
+
+- [FailoverQuorum](#postgresql-cnpg-io-v1-FailoverQuorum)
+
+
+<p>FailoverQuorumStatus is the latest observed status of the failover
+quorum of the PG cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Contains the latest reported Method value.</p>
+</td>
+</tr>
+<tr><td><code>standbyNames</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>StandbyNames is the list of potentially synchronous
+instance names.</p>
+</td>
+</tr>
+<tr><td><code>standbyNumber</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>StandbyNumber is the number of synchronous standbys that transactions
+need to wait for replies from.</p>
+</td>
+</tr>
+<tr><td><code>primary</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary is the name of the primary instance that updated
+this object the latest time.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
 
 
@@ -2956,7 +3241,7 @@ of WAL archiving and backups for this external cluster</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>TypedLocalObjectReference</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>(Members of <code>TypedLocalObjectReference</code> are embedded into this type.)
    <span class="text-muted">No description provided.</span></td>
@@ -3091,20 +3376,58 @@ database right after is imported - to be used with extreme care
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_dump</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_dump</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 <tr><td><code>pgRestoreExtraOptions</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of custom options to pass to the <code>pg_restore</code> command. IMPORTANT:
-Use these options with caution and at your own risk, as the operator
-does not validate their content. Be aware that certain options may
-conflict with the operator's intended functionality or design.</p>
+   <p>List of custom options to pass to the <code>pg_restore</code> command.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePredataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>pre-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestoreDataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
+</td>
+</tr>
+<tr><td><code>pgRestorePostdataOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Custom options to pass to the <code>pg_restore</code> command during the <code>post-data</code>
+section. This setting overrides the generic <code>pgRestoreExtraOptions</code> value.</p>
+<p>IMPORTANT: Use with caution. The operator does not validate these options,
+and certain flags may interfere with its intended functionality or design.
+You are responsible for ensuring that the provided options are compatible
+with your environment and desired behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -3193,6 +3516,52 @@ conflict with the operator's intended functionality or design.</p>
    <p>indicates on which TimelineId the instance is</p>
 </td>
 </tr>
+<tr><td><code>ip</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>IP address of the instance</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## IsolationCheckConfiguration     {#postgresql-cnpg-io-v1-IsolationCheckConfiguration}
+
+
+**Appears in:**
+
+- [LivenessProbe](#postgresql-cnpg-io-v1-LivenessProbe)
+
+
+<p>IsolationCheckConfiguration contains the configuration for the isolation check
+functionality in the liveness probe</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>enabled</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether primary isolation checking is enabled for the liveness probe</p>
+</td>
+</tr>
+<tr><td><code>requestTimeout</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Timeout in milliseconds for requests during the primary isolation check</p>
+</td>
+</tr>
+<tr><td><code>connectionTimeout</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Timeout in milliseconds for connections during the primary isolation check</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -3258,7 +3627,7 @@ the bind+search LDAP authentication process</p>
 </td>
 </tr>
 <tr><td><code>bindPassword</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>Secret with the password for the user to bind to the directory</p>
@@ -3353,6 +3722,41 @@ the bind+search LDAP authentication process</p>
 
 
 
+
+## LivenessProbe     {#postgresql-cnpg-io-v1-LivenessProbe}
+
+
+**Appears in:**
+
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+
+
+<p>LivenessProbe is the configuration of the liveness probe</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>Probe</code><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>(Members of <code>Probe</code> are embedded into this type.)
+   <p>Probe is the standard probe configuration</p>
+</td>
+</tr>
+<tr><td><code>isolationCheck</code><br/>
+<a href="#postgresql-cnpg-io-v1-IsolationCheckConfiguration"><i>IsolationCheckConfiguration</i></a>
+</td>
+<td>
+   <p>Configure the feature that extends the liveness probe for a primary
+instance. In addition to the basic checks, this verifies whether the
+primary is isolated from the Kubernetes API server and from its
+replicas, ensuring that it can be safely shut down if network
+partition or API unavailability is detected. Enabled by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## ManagedConfiguration     {#postgresql-cnpg-io-v1-ManagedConfiguration}
 
@@ -3591,6 +3995,8 @@ Default: false.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>tls</code><br/>
@@ -3606,6 +4012,8 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of metric relabelings for the <code>PodMonitor</code>. Applied to samples before ingestion.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorRelabelings</code><br/>
@@ -3613,6 +4021,19 @@ Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 <td>
    <p>The list of relabelings for the <code>PodMonitor</code>. Applied to samples before scraping.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
+</td>
+</tr>
+<tr><td><code>metricsQueriesTTL</code><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
+</td>
+<td>
+   <p>The interval during which metrics computed from queries are considered current.
+Once it is exceeded, a new scrape will trigger a rerun
+of the queries.
+If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.
+Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server.</p>
 </td>
 </tr>
 </tbody>
@@ -3695,6 +4116,49 @@ be limited, according to the <code>checkpoint_completion_target</code> setting o
 the PostgreSQL server. If set to true, an immediate checkpoint will be
 used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## OptionSpec     {#postgresql-cnpg-io-v1-OptionSpec}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
+
+<p>OptionSpec holds the name, value and the ensure field for an option</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the option</p>
+</td>
+</tr>
+<tr><td><code>value</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Value of the option</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Specifies whether an option should be present or absent in
+the database. If set to <code>present</code>, the option will be
+created if it does not exist. If set to <code>absent</code>, the
+option will be removed if it exists.</p>
 </td>
 </tr>
 </tbody>
@@ -3814,6 +4278,39 @@ by pgbouncer</p>
    <p>The pool mode. Default: <code>session</code>.</p>
 </td>
 </tr>
+<tr><td><code>serverTLSSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's
+<code>server_tls_key_file</code> and <code>server_tls_cert_file</code>, used when
+authenticating against PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>serverCASecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ServerCASecret provides PgBouncer’s server_tls_ca_file, the root
+CA for validating PostgreSQL certificates</p>
+</td>
+</tr>
+<tr><td><code>clientCASecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ClientCASecret provides PgBouncer’s client_tls_ca_file, the root
+CA for validating client certificates</p>
+</td>
+</tr>
+<tr><td><code>clientTLSSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)
+and client_tls_cert_file (certificate) used to accept client connections</p>
+</td>
+</tr>
 <tr><td><code>authQuerySecret</code><br/>
 <a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
@@ -3822,6 +4319,7 @@ by pgbouncer</p>
 query. In case it is specified, also an AuthQuery
 (e.g. &quot;SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1&quot;)
 has to be specified and no automatic CNPG Cluster integration will be triggered.</p>
+<p>Deprecated.</p>
 </td>
 </tr>
 <tr><td><code>authQuery</code><br/>
@@ -3898,8 +4396,9 @@ cluster to be reconciled</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Only one plugin can be declared as WALArchiver.
-Cannot be active if &quot;.spec.backup.barmanObjectStore&quot; configuration is present.</p>
+   <p>Marks the plugin as the WAL archiver. At most one plugin can be
+designated as a WAL archiver. This cannot be enabled if the
+<code>.spec.backup.barmanObjectStore</code> configuration is present.</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>
@@ -4022,7 +4521,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </td>
 </tr>
 <tr><td><code>spec</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podspec-v1-core"><i>core/v1.PodSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core"><i>core/v1.PodSpec</i></a>
 </td>
 <td>
    <p>Specification of the desired behavior of the pod.
@@ -4124,6 +4623,13 @@ part for now.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>clientTLS</code><br/>
+<a href="#postgresql-cnpg-io-v1-SecretVersion"><i>SecretVersion</i></a>
+</td>
+<td>
+   <p>The client TLS secret version</p>
+</td>
+</tr>
 <tr><td><code>serverTLS</code><br/>
 <a href="#postgresql-cnpg-io-v1-SecretVersion"><i>SecretVersion</i></a>
 </td>
@@ -4206,7 +4712,7 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 </tr>
 <tr><td><code>deploymentStrategy</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deploymentstrategy-v1-apps"><i>apps/v1.DeploymentStrategy</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#deploymentstrategy-v1-apps"><i>apps/v1.DeploymentStrategy</i></a>
 </td>
 <td>
    <p>The deployment strategy to use for pgbouncer to replace existing pods with new ones</p>
@@ -4217,6 +4723,8 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 <td>
    <p>The configuration of the monitoring infrastructure of this pooler.</p>
+<p>Deprecated: This feature will be removed in an upcoming release. If
+you need this functionality, you can create a PodMonitor manually.</p>
 </td>
 </tr>
 <tr><td><code>serviceTemplate</code><br/>
@@ -4360,6 +4868,13 @@ This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
 </td>
 </tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionConfiguration"><i>[]ExtensionConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the extensions to be added</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4398,9 +4913,9 @@ the primary server of the cluster as part of rolling updates</p>
 
 **Appears in:**
 
-- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
+- [LivenessProbe](#postgresql-cnpg-io-v1-LivenessProbe)
 
-- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
 
 
 <p>Probe describes a health check to be performed against a container to determine whether it is
@@ -4546,7 +5061,7 @@ to be injected in the PostgreSQL Pods</p>
 </td>
 </tr>
 <tr><td><code>liveness</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+<a href="#postgresql-cnpg-io-v1-LivenessProbe"><i>LivenessProbe</i></a>
 </td>
 <td>
    <p>The liveness probe configuration</p>
@@ -4591,7 +5106,7 @@ to be injected in the PostgreSQL Pods</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The name of the PostgreSQL cluster that identifies the &quot;publisher&quot;</p>
@@ -5020,6 +5535,19 @@ It may only contain lower case letters, numbers, and the underscore character.
 This can only be set at creation time. By default set to <code>_cnpg_</code>.</p>
 </td>
 </tr>
+<tr><td><code>synchronizeLogicalDecoding</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>When enabled, the operator automatically manages synchronization of logical
+decoding (replication) slots across high-availability clusters.</p>
+<p>Requires one of the following conditions:</p>
+<ul>
+<li>PostgreSQL version 17 or later</li>
+<li>PostgreSQL version &lt; 17 with pg_failover_slots extension enabled</li>
+</ul>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -5079,7 +5607,7 @@ connections the role can make. <code>-1</code> (the default) means no limit.</p>
 </td>
 </tr>
 <tr><td><code>validUntil</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Date and time after which the role's password is no longer valid.
@@ -5324,21 +5852,21 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>lastCheckTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>The latest time the schedule</p>
 </td>
 </tr>
 <tr><td><code>lastScheduleTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Information when was the last time that backup was successfully scheduled.</p>
 </td>
 </tr>
 <tr><td><code>nextScheduleTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Next time we will run a backup</p>
@@ -5509,6 +6037,52 @@ Map keys are the secret names, map values are the versions</p>
 </tbody>
 </table>
 
+## ServerSpec     {#postgresql-cnpg-io-v1-ServerSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>ServerSpec configures a server of a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>fdw</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the Foreign Data Wrapper (FDW)</p>
+</td>
+</tr>
+<tr><td><code>options</code><br/>
+<a href="#postgresql-cnpg-io-v1-OptionSpec"><i>[]OptionSpec</i></a>
+</td>
+<td>
+   <p>Options specifies the configuration options for the server
+(key is the option name, value is the option value).</p>
+</td>
+</tr>
+<tr><td><code>usage</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpec"><i>[]UsageSpec</i></a>
+</td>
+<td>
+   <p>List of roles for which <code>USAGE</code> privileges on the server are granted or revoked.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ServiceAccountTemplate     {#postgresql-cnpg-io-v1-ServiceAccountTemplate}
 
 
@@ -5577,7 +6151,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </td>
 </tr>
 <tr><td><code>spec</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
 </td>
 <td>
    <p>Specification of the desired behavior of the service.
@@ -5674,7 +6248,7 @@ Size cannot be decreased.</p>
 </td>
 </tr>
 <tr><td><code>pvcTemplate</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#persistentvolumeclaimspec-v1-core"><i>core/v1.PersistentVolumeClaimSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#persistentvolumeclaimspec-v1-core"><i>core/v1.PersistentVolumeClaimSpec</i></a>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
@@ -5712,7 +6286,7 @@ Size cannot be decreased.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The name of the PostgreSQL cluster that identifies the &quot;subscriber&quot;</p>
@@ -5737,8 +6311,11 @@ the &quot;subscriber&quot; cluster</p>
 <i>map[string]string</i>
 </td>
 <td>
-   <p>Subscription parameters part of the <code>WITH</code> clause as expected by
-PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
+   <p>Subscription parameters included in the <code>WITH</code> clause of the PostgreSQL
+<code>CREATE SUBSCRIPTION</code> command. Most parameters cannot be changed
+after the subscription is created and will be ignored if modified
+later, except for a limited set documented at:
+https://www.postgresql.org/docs/current/sql-altersubscription.html#SQL-ALTERSUBSCRIPTION-PARAMS-SET</p>
 </td>
 </tr>
 <tr><td><code>publicationName</code> <B>[Required]</B><br/>
@@ -5978,6 +6555,15 @@ to allow for operational continuity. This setting is only applicable if both
 <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
+<tr><td><code>failoverQuorum</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>FailoverQuorum enables a quorum-based check before failover, improving
+data durability and safety during failover events in CloudNativePG-managed
+PostgreSQL clusters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -6146,6 +6732,54 @@ in synchronous replica election in case of failures</p>
 </tr>
 </tbody>
 </table>
+
+## UsageSpec     {#postgresql-cnpg-io-v1-UsageSpec}
+
+
+**Appears in:**
+
+- [FDWSpec](#postgresql-cnpg-io-v1-FDWSpec)
+
+- [ServerSpec](#postgresql-cnpg-io-v1-ServerSpec)
+
+
+<p>UsageSpec configures a usage for a foreign data wrapper</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the usage</p>
+</td>
+</tr>
+<tr><td><code>type</code><br/>
+<a href="#postgresql-cnpg-io-v1-UsageSpecType"><i>UsageSpecType</i></a>
+</td>
+<td>
+   <p>The type of usage</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## UsageSpecType     {#postgresql-cnpg-io-v1-UsageSpecType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [UsageSpec](#postgresql-cnpg-io-v1-UsageSpec)
+
+
+<p>UsageSpecType describes the type of usage specified in the <code>usage</code> field of the
+<code>Database</code> object.</p>
+
+
+
 
 ## VolumeSnapshotConfiguration     {#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration}
 

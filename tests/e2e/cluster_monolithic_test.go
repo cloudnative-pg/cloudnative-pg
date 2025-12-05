@@ -185,6 +185,20 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			}
 		})
 
+		By("verifying that no extra application database or owner were created", func() {
+			stmt, err := connTarget.Prepare("SELECT count(*) FROM pg_catalog.pg_database WHERE datname = $1")
+			Expect(err).ToNot(HaveOccurred())
+			var matchCount int
+			err = stmt.QueryRowContext(env.Ctx, "app").Scan(&matchCount)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(matchCount).To(BeZero(), "app database should not exist")
+			stmt, err = connTarget.Prepare("SELECT count(*) from pg_catalog.pg_user WHERE usename = $1")
+			Expect(err).ToNot(HaveOccurred())
+			err = stmt.QueryRowContext(env.Ctx, "app").Scan(&matchCount)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(matchCount).To(BeZero(), "app user should not exist")
+		})
+
 		By(fmt.Sprintf("verifying that the source superuser '%s' became a normal user in target",
 			databaseSuperUser), func() {
 			row := connTarget.QueryRow(fmt.Sprintf(

@@ -22,11 +22,13 @@ package v1
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
@@ -85,6 +87,50 @@ func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) 
 	return pluginNames
 }
 
+// GetInstanceEnabledPluginNames gets the name of the plugins that are available to the instance container
+func (cluster *Cluster) GetInstanceEnabledPluginNames() (result []string) {
+	var instance []string
+	for _, pluginStatus := range cluster.Status.PluginStatus {
+		if slices.Contains(pluginStatus.Capabilities,
+			identity.PluginCapability_Service_TYPE_INSTANCE_SIDECAR_INJECTION.String()) {
+			instance = append(instance, pluginStatus.Name)
+		}
+	}
+
+	enabled := GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+
+	var instanceEnabled []string
+	for _, pluginName := range instance {
+		if slices.Contains(enabled, pluginName) {
+			instanceEnabled = append(instanceEnabled, pluginName)
+		}
+	}
+
+	return instanceEnabled
+}
+
+// GetJobEnabledPluginNames gets the name of the plugins that are available to the job container
+func (cluster *Cluster) GetJobEnabledPluginNames() (result []string) {
+	var instance []string
+	for _, pluginStatus := range cluster.Status.PluginStatus {
+		if slices.Contains(pluginStatus.Capabilities,
+			identity.PluginCapability_Service_TYPE_INSTANCE_JOB_SIDECAR_INJECTION.String()) {
+			instance = append(instance, pluginStatus.Name)
+		}
+	}
+
+	enabled := GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
+
+	var instanceEnabled []string
+	for _, pluginName := range instance {
+		if slices.Contains(enabled, pluginName) {
+			instanceEnabled = append(instanceEnabled, pluginName)
+		}
+	}
+
+	return instanceEnabled
+}
+
 // GetExternalClustersEnabledPluginNames gets the name of the plugins that are
 // involved in the reconciliation of this external cluster list. This
 // list is usually composed by the plugins that need to be active to
@@ -129,8 +175,8 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 		sa.Annotations = map[string]string{}
 	}
 
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+	maps.Copy(sa.Labels, st.Metadata.Labels)
+	maps.Copy(sa.Annotations, st.Metadata.Annotations)
 }
 
 // MatchesTopology checks if the two topologies have
@@ -154,27 +200,47 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
-func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
-	if r == nil {
-		return nil
+type regexErrors struct {
+	errs []error
+}
+
+func (r regexErrors) Error() string {
+	if len(r.errs) == 0 {
+		return ""
 	}
-	if r.compiled {
-		return r.compileErrors
+	var sb strings.Builder
+	sb.WriteString("failed to compile regex patterns: ")
+	for _, err := range r.errs {
+		sb.WriteString(err.Error())
+		sb.WriteString("; ")
+	}
+	return sb.String()
+}
+
+func (r *SynchronizeReplicasConfiguration) compileRegex() ([]regexp.Regexp, error) {
+	if r == nil {
+		return nil, nil
 	}
 
-	var errs []error
-	for _, pattern := range r.ExcludePatterns {
+	var (
+		compiledPatterns = make([]regexp.Regexp, len(r.ExcludePatterns))
+		compileErrors    []error
+	)
+
+	for idx, pattern := range r.ExcludePatterns {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			errs = append(errs, err)
+			compileErrors = append(compileErrors, err)
 			continue
 		}
-		r.compiledPatterns = append(r.compiledPatterns, *re)
+		compiledPatterns[idx] = *re
 	}
 
-	r.compiled = true
-	r.compileErrors = errs
-	return errs
+	if len(compileErrors) > 0 {
+		return nil, regexErrors{errs: compileErrors}
+	}
+
+	return compiledPatterns, nil
 }
 
 // GetEnabled returns false if synchronized replication slots are disabled, defaults to true
@@ -186,8 +252,9 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 }
 
 // ValidateRegex returns all the errors that happened during the regex compilation
-func (r *SynchronizeReplicasConfiguration) ValidateRegex() []error {
-	return r.compileRegex()
+func (r *SynchronizeReplicasConfiguration) ValidateRegex() error {
+	_, err := r.compileRegex()
+	return err
 }
 
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
@@ -196,12 +263,13 @@ func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bo
 		return false, nil
 	}
 
+	compiledPatterns, err := r.compileRegex()
 	// this is an unexpected issue, validation should happen at webhook level
-	if errs := r.compileRegex(); len(errs) > 0 {
-		return false, errs[0]
+	if err != nil {
+		return false, err
 	}
 
-	for _, re := range r.compiledPatterns {
+	for _, re := range compiledPatterns {
 		if re.MatchString(slotName) {
 			return true, nil
 		}
@@ -600,7 +668,7 @@ func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
 		return meta.Annotations
 	}
 
-	utils.MergeMap(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
+	maps.Copy(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
 
 	return meta.Annotations
 }
@@ -1081,12 +1149,9 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if cluster.Status.PoolerIntegrations != nil {
-		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
-			if pgBouncerSecretName == secret {
-				return true
-			}
-		}
+	if cluster.Status.PoolerIntegrations != nil &&
+		slices.Contains(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets, secret) {
+		return true
 	}
 
 	// watch the secrets defined in external clusters
@@ -1119,6 +1184,19 @@ func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	return false
 }
 
+// GetMetricsQueriesTTL returns the Time To Live of the metrics computed from
+// queries. Once exceeded, a scrape of the metric will trigger a rerun of the queries.
+// Default value is 30 seconds
+func (cluster *Cluster) GetMetricsQueriesTTL() metav1.Duration {
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.MetricsQueriesTTL != nil {
+		return *cluster.Spec.Monitoring.MetricsQueriesTTL
+	}
+
+	return metav1.Duration{
+		Duration: 30 * time.Second,
+	}
+}
+
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not
 func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 	if cluster.Spec.EnableSuperuserAccess != nil {
@@ -1130,15 +1208,14 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
 func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
-	contextLogger := log.FromContext(ctx)
-
 	currentTimestamp := pgTime.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
+
+	contextLogger := log.FromContext(ctx).WithValues(
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
 		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
 		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-	}
+	)
 
 	var errs []string
 
@@ -1147,11 +1224,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceTargetPrimaryTimestamp",
-			diff.Milliseconds(),
-		)
+		contextLogger = contextLogger.WithValues("msPassedSinceTargetPrimaryTimestamp", diff.Milliseconds())
 	} else {
 		errs = append(errs, err.Error())
 	}
@@ -1161,9 +1234,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		currentTimestamp,
 		cluster.Status.CurrentPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceCurrentPrimaryTimestamp",
+		contextLogger = contextLogger.WithValues("msPassedSinceCurrentPrimaryTimestamp",
 			currentPrimaryDifference.Milliseconds(),
 		)
 	} else {
@@ -1178,8 +1249,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 		cluster.Status.CurrentPrimaryTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
+		contextLogger = contextLogger.WithValues(
 			"msDifferenceBetweenCurrentAndTargetPrimary",
 			currentPrimaryTargetDifference.Milliseconds(),
 		)
@@ -1188,10 +1258,10 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	if len(errs) > 0 {
-		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+		contextLogger = contextLogger.WithValues("timestampParsingErrors", errs)
 	}
 
-	contextLogger.Info(logMessage, keysAndValues...)
+	contextLogger.Info(logMessage)
 }
 
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
@@ -1261,7 +1331,7 @@ func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
 	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
-		backupConfiguration.BarmanObjectStore.BarmanCredentials.ArePopulated()
+		backupConfiguration.BarmanObjectStore.ArePopulated()
 }
 
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint
@@ -1492,4 +1562,14 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 	}
 
 	return ""
+}
+
+// IsFailoverQuorumActive check if we should enable the
+// quorum failover protection alpha-feature.
+func (cluster *Cluster) IsFailoverQuorumActive() bool {
+	if cluster.Spec.PostgresConfiguration.Synchronous == nil {
+		return false
+	}
+
+	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }

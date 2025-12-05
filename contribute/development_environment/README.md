@@ -47,6 +47,7 @@ environment variable:
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 - [goreleaser](https://goreleaser.com/)
 - [Operator SDK CLI](https://sdk.operatorframework.io/)
+- [Helm](https://helm.sh/)
 
 In addition, check that the following packages are installed in your system:
 
@@ -57,7 +58,6 @@ In addition, check that the following packages are installed in your system:
 - `gpg`,
 - `jq`,
 - `make`,
-- `pandoc`,
 - `sed`,
 - `tar`,
 - `util-linux`,
@@ -83,7 +83,8 @@ components in your Mac OS X system:
 brew install go \
   kind \
   golangci/tap/golangci-lint \
-  goreleaser
+  goreleaser \
+  helm
 ```
 
 Please note that bash v5.0+ is required, this can be installed with:
@@ -111,7 +112,7 @@ brew install jq \
   gnu-getopt \
   gnu-sed \
   gnu-tar \
-  pandoc \
+  helm \
   zlib
 ```
 

@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -121,6 +122,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 			"cluster", cluster.Name,
 			"namespace", cluster.Namespace)
 
+		//nolint:staticcheck // still in use for backward compatibility
 		options = append(options, config.Options...)
 		initCommand = append(
 			initCommand,
@@ -318,6 +320,7 @@ func (role jobRole) getJobName(instanceName string) string {
 func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
+	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
@@ -326,18 +329,28 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Name:      jobName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.ClusterLabelName:      cluster.Name,
-				utils.JobRoleLabelName:      string(role),
+				utils.InstanceNameLabelName:           instanceName,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.JobRoleLabelName:                string(role),
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.InstanceNameLabelName: instanceName,
-						utils.ClusterLabelName:      cluster.Name,
-						utils.JobRoleLabelName:      string(role),
+						utils.InstanceNameLabelName:           instanceName,
+						utils.ClusterLabelName:                cluster.Name,
+						utils.JobRoleLabelName:                string(role),
+						utils.KubernetesAppLabelName:          utils.AppName,
+						utils.KubernetesAppInstanceLabelName:  cluster.Name,
+						utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
+						utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+						utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -356,14 +369,11 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 							Command:         initCommand,
 							VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
+							SecurityContext: GetSecurityContext(&cluster),
 						},
 					},
-					Volumes: createPostgresVolumes(&cluster, instanceName),
-					SecurityContext: CreatePodSecurityContext(
-						cluster.GetSeccompProfile(),
-						cluster.GetPostgresUID(),
-						cluster.GetPostgresGID()),
+					Volumes:                   createPostgresVolumes(&cluster, instanceName),
+					SecurityContext:           GetPodSecurityContext(&cluster),
 					Affinity:                  CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:               cluster.Spec.Affinity.Tolerations,
 					ServiceAccountName:        cluster.Name,
@@ -383,6 +393,22 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
+	}
+
+	if role == jobRoleInitDB && cluster.ShouldInitDBCreateApplicationDatabase() &&
+		cluster.GetApplicationSecretName() != "" {
+		// The secret is not needed by the initdb job. We do this to ensure that the secret is available
+		// before proceeding with the cluster initialization
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name: "APP_USERNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cluster.GetApplicationSecretName()},
+					Key:                  "username",
+					Optional:             ptr.To(false),
+				},
+			},
+		})
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {

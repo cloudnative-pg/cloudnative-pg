@@ -22,16 +22,24 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/puddle/v2"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 
-// maxConnectionAttempts is the maximum number of connections attempts to a
-// plugin. maxConnectionAttempts should be higher or equal to maxPoolSize
-const maxConnectionAttempts = 5
+// connectionBackoff is the retry policy used to get a plugin
+// connection from a pool.
+var connectionBackoff = wait.Backoff{
+	Steps:    5,
+	Duration: 10 * time.Millisecond,
+	Factor:   5.0,
+	Jitter:   0.1,
+}
 
 type releasingConnection struct {
 	connection.Interface
@@ -48,21 +56,22 @@ func (conn *releasingConnection) Close() error {
 func (r *data) GetConnection(ctx context.Context, name string) (connection.Interface, error) {
 	contextLogger := log.FromContext(ctx).WithValues("pluginName", name)
 
-	pool, ok := r.pluginConnectionPool[name]
-	if !ok {
-		return nil, &ErrUnknownPlugin{Name: name}
-	}
-
-	// Try to get a connection from the pool and test
-	// before returning it
 	var resource *puddle.Resource[connection.Interface]
-	var err error
 
-	for i := 0; i < maxConnectionAttempts; i++ {
+	if err := retry.OnError(connectionBackoff, func(_ error) bool { return true }, func() error {
+		pool, ok := r.pluginConnectionPool[name]
+		if !ok {
+			return &ErrUnknownPlugin{Name: name}
+		}
+
+		// Try to get a connection from the pool and test
+		// before returning it
+		var err error
+
 		contextLogger.Trace("try getting connection")
 		resource, err = pool.Acquire(ctx)
 		if err != nil {
-			break
+			return err
 		}
 
 		err = resource.Value().Ping(ctx)
@@ -72,12 +81,11 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 				"pluginName", name,
 				"err", err)
 			resource.Destroy()
-		} else {
-			break
+			return err
 		}
-	}
 
-	if err != nil {
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("while getting plugin connection: %w", err)
 	}
 
@@ -97,5 +105,5 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 			resource.Release()
 			return nil
 		},
-	}, err
+	}, nil
 }

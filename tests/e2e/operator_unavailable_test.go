@@ -42,7 +42,7 @@ import (
 )
 
 // Set of tests in which we test the concurrent disruption of both the primary
-// and the operator podutils, asserting that the latter is able to perform a pending
+// and the operator pods, asserting that the latter is able to perform a pending
 // failover once a new operator pod comes back available.
 var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), func() {
 	const (
@@ -55,6 +55,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+		if !MustGetEnvProfile().IsLeaderElectionEnabled() {
+			Skip("Leader election is disabled")
 		}
 	})
 
@@ -166,10 +169,8 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("deleting primary and operator pod", func() {
 				// Get operator pod name
-				podList := &corev1.PodList{}
-				err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
+				operatorPodName, err = operator.GetPodName(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
-				operatorPodName = podList.Items[0].ObjectMeta.Name
 
 				// Force-delete the operator and the primary
 				quickDelete := &ctrlclient.DeleteOptions{
@@ -202,17 +203,15 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			})
 
 			By("verifying a new operator pod is now back", func() {
-				timeout := 120
+				timeout := 240
 				Eventually(func(g Gomega) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
+					operatorPod, err := operator.GetPod(env.Ctx, env.Client)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(podList.Items).To(HaveLen(1))
-					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
+					g.Expect(operatorPod.Name).NotTo(BeEquivalentTo(operatorPodName))
+					g.Expect(operator.IsReady(env.Ctx, env.Client, true)).To(BeTrue())
+					g.Expect(operator.PodRestarted(operatorPod)).To(BeFalse(),
+						"operator pod should not have any container restarts")
 				}, timeout).Should(Succeed())
-				Eventually(func() (bool, error) {
-					return operator.IsDeploymentReady(env.Ctx, env.Client)
-				}, timeout).Should(BeTrue())
 			})
 
 			// Expect a new primary to be elected and promoted

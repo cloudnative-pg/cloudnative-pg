@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -31,18 +31,23 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-func getWebhooks(ctx context.Context, stopRedact bool) (
-	*v1.MutatingWebhookConfigurationList, *v1.ValidatingWebhookConfigurationList, error,
+func getWebhooks(
+	ctx context.Context,
+	stopRedact bool,
+) (
+	*admissionregistrationv1.MutatingWebhookConfigurationList,
+	*admissionregistrationv1.ValidatingWebhookConfigurationList,
+	error,
 ) {
 	var (
-		mutatingWebhookConfigList   v1.MutatingWebhookConfigurationList
-		validatingWebhookConfigList v1.ValidatingWebhookConfigurationList
-		mWebhookConfig              v1.MutatingWebhookConfigurationList
-		vWebhookConfig              v1.ValidatingWebhookConfigurationList
+		mutatingWebhookConfigList   admissionregistrationv1.MutatingWebhookConfigurationList
+		validatingWebhookConfigList admissionregistrationv1.ValidatingWebhookConfigurationList
+		mWebhookConfig              admissionregistrationv1.MutatingWebhookConfigurationList
+		vWebhookConfig              admissionregistrationv1.ValidatingWebhookConfigurationList
 	)
 
 	if err := plugin.Client.List(ctx, &mutatingWebhookConfigList); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("insufficient permissions to list mutating webhooks: %w", err)
 	}
 
 	for _, item := range mutatingWebhookConfigList.Items {
@@ -61,7 +66,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 	}
 
 	if err := plugin.Client.List(ctx, &validatingWebhookConfigList); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("insufficient permissions to list validating webhooks: %w", err)
 	}
 
 	for _, item := range validatingWebhookConfigList.Items {
@@ -79,7 +84,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 		}
 	}
 
-	if len(mWebhookConfig.Items) == 0 || len(vWebhookConfig.Items) == 0 {
+	if len(mWebhookConfig.Items) == 0 && len(vWebhookConfig.Items) == 0 {
 		return nil, nil, fmt.Errorf(
 			"can't find the webhooks that targeting resources within the group %s",
 			apiv1.SchemeGroupVersion.Group,
@@ -91,9 +96,10 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 func getWebhookService(
 	ctx context.Context,
-	mutatingWebhookList *v1.MutatingWebhookConfigurationList,
+	mutatingWebhookList *admissionregistrationv1.MutatingWebhookConfigurationList,
 ) (corev1.Service, error) {
-	if len(mutatingWebhookList.Items) == 0 ||
+	if mutatingWebhookList == nil ||
+		len(mutatingWebhookList.Items) == 0 ||
 		len(mutatingWebhookList.Items[0].Webhooks) == 0 {
 		return corev1.Service{}, nil
 	}

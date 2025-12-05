@@ -30,7 +30,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/go-logr/logr"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
@@ -58,19 +58,36 @@ import (
 const (
 	// RetryTimeout retry timeout (in seconds) when a client api call or kubectl cli request get failed
 	RetryTimeout = 60
+
+	// StandardSuffix is the suffix for standard images
+	StandardSuffix = "standard-trixie"
+
+	// MinimalSuffix is the suffix for minimal images
+	MinimalSuffix = "minimal-trixie"
+
+	// PostGISSuffix is the suffix for PostGIS images
+	PostGISSuffix = "3-standard-trixie"
+
+	// Official CloudNativePG image repositories
+	defaultPostgresImageRepository = "ghcr.io/cloudnative-pg/postgresql"
+	defaultPostGISImageRepository  = "ghcr.io/cloudnative-pg/postgis"
 )
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
-	RestClientConfig   *rest.Config
-	Client             client.Client
-	Interface          kubernetes.Interface
-	APIExtensionClient apiextensionsclientset.Interface
-	Ctx                context.Context
-	Scheme             *runtime.Scheme
-	Log                logr.Logger
-	PostgresVersion    uint64
-	createdNamespaces  *uniqueStringSlice
+	RestClientConfig        *rest.Config
+	Client                  client.Client
+	Interface               kubernetes.Interface
+	APIExtensionClient      apiextensionsclientset.Interface
+	Ctx                     context.Context
+	Scheme                  *runtime.Scheme
+	Log                     logr.Logger
+	PostgresImageName       string
+	PostgresImageTag        string
+	PostgresVersion         uint64
+	PostgresImageRepository string
+	PostGISImageRepository  string
+	createdNamespaces       *uniqueStringSlice
 }
 
 type uniqueStringSlice struct {
@@ -102,7 +119,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
 
-	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
+	if err := volumesnapshotv1.AddToScheme(env.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -122,11 +139,26 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 
 	postgresImage := versions.DefaultImageName
 
-	// Fetching postgres image version.
+	// Fetching postgres image.
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
 		postgresImage = postgresImageFromUser
 	}
 	imageReference := reference.New(postgresImage)
+	env.PostgresImageName = imageReference.Name
+	env.PostgresImageTag = imageReference.Tag
+
+	// Set PostgreSQL image repository (can be overridden via env variable)
+	env.PostgresImageRepository = defaultPostgresImageRepository
+	if postgresRepoFromUser, exist := os.LookupEnv("POSTGRES_IMG_REPOSITORY"); exist {
+		env.PostgresImageRepository = postgresRepoFromUser
+	}
+
+	// Set PostGIS image repository (can be overridden via env variable)
+	env.PostGISImageRepository = defaultPostGISImageRepository
+	if postgisRepoFromUser, exist := os.LookupEnv("POSTGIS_IMG_REPOSITORY"); exist {
+		env.PostGISImageRepository = postgisRepoFromUser
+	}
+
 	postgresImageVersion, err := version.FromTag(imageReference.Tag)
 	if err != nil {
 		return nil, err
@@ -185,4 +217,36 @@ func (env TestingEnvironment) CreateUniqueTestNamespace(
 	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
 
 	return name, namespaces.CreateTestNamespace(ctx, crudClient, name, opts...)
+}
+
+// StandardImageName returns the full image name for a standard Postgres image.
+// Example: ghcr.io/cloudnative-pg/postgresql:17-standard-trixie
+func (env *TestingEnvironment) StandardImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, StandardSuffix)
+}
+
+// MinimalImageName returns the full image name for a minimal Postgres image.
+// Example: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+func (env *TestingEnvironment) MinimalImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, MinimalSuffix)
+}
+
+// PostGISImageName returns the full image name for the official CloudNativePG PostGIS image.
+// Example: ghcr.io/cloudnative-pg/postgis:17-3-standard-trixie
+func (env *TestingEnvironment) PostGISImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostGISImageRepository, tag, PostGISSuffix)
+}
+
+// OfficialStandardImageName returns the full image name for the official CloudNativePG standard Postgres image.
+// This is used for major upgrade tests where source images must come from the official registry.
+// Example: ghcr.io/cloudnative-pg/postgresql:16-standard-trixie
+func (env *TestingEnvironment) OfficialStandardImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, StandardSuffix)
+}
+
+// OfficialMinimalImageName returns the full image name for the official CloudNativePG minimal Postgres image.
+// This is used for major upgrade tests where source images must come from the official registry.
+// Example: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
+func (env *TestingEnvironment) OfficialMinimalImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, MinimalSuffix)
 }

@@ -23,10 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	v1 "k8s.io/api/core/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -63,8 +64,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	)
 	var (
 		cluster   *apiv1.Cluster
-		targetPod *v1.Pod
-		pvcs      []v1.PersistentVolumeClaim
+		targetPod *corev1.Pod
+		pvcs      []corev1.PersistentVolumeClaim
 		backup    *apiv1.Backup
 	)
 
@@ -77,6 +78,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Annotations: map[string]string{},
 			},
 			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
 				Backup: &apiv1.BackupConfiguration{
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
@@ -85,13 +87,13 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				},
 			},
 		}
-		targetPod = &v1.Pod{
+		targetPod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      clusterName + "-2",
 			},
 		}
-		pvcs = []v1.PersistentVolumeClaim{
+		pvcs = []corev1.PersistentVolumeClaim{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2",
@@ -120,8 +122,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Name:      backupName,
 			},
 			Status: apiv1.BackupStatus{
-				StartedAt: ptr.To(startedAt),
-				StoppedAt: ptr.To(stoppedAt),
+				StartedAt:    ptr.To(startedAt),
+				StoppedAt:    ptr.To(stoppedAt),
+				MajorVersion: 18,
 			},
 		}
 	})
@@ -150,15 +153,15 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(data.Len()).To(Equal(1))
 		Expect(data.Has(targetPod.Name)).To(BeTrue())
 
-		var snapshotList storagesnapshotv1.VolumeSnapshotList
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
 		err = mockClient.List(ctx, &snapshotList)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(snapshotList.Items).NotTo(BeEmpty())
 	})
 
 	It("should not fence the target pod when there are existing volumesnapshots", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:   namespace,
@@ -209,8 +212,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
@@ -222,7 +225,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						ReadyToUse:                     ptr.To(false),
 						Error:                          nil,
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
@@ -240,7 +243,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						ReadyToUse:                     ptr.To(false),
 						Error:                          nil,
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
@@ -285,8 +288,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	})
 
 	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
-		snapshots := storagesnapshotv1.VolumeSnapshotList{
-			Items: []storagesnapshotv1.VolumeSnapshot{
+		snapshots := volumesnapshotv1.VolumeSnapshotList{
+			Items: []volumesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
@@ -298,7 +301,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
 						ReadyToUse:                     ptr.To(true),
 						Error:                          nil,
@@ -316,7 +319,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 							"avoid": "nil",
 						},
 					},
-					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+					Status: &volumesnapshotv1.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
 						ReadyToUse:                     ptr.To(true),
 						Error:                          nil,
@@ -353,6 +356,41 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(data.Len()).To(Equal(0))
 	})
+
+	It("should properly enrich the backup with labels", func(ctx SpecContext) {
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup, cluster, targetPod).
+			Build()
+
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		var snapshotList volumesnapshotv1.VolumeSnapshotList
+		err = mockClient.List(ctx, &snapshotList)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, snapshot := range snapshotList.Items {
+			// Expected common labels
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppManagedByLabelName, utils.ManagerName))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppLabelName, utils.AppName))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppInstanceLabelName, cluster.Name))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppVersionLabelName, "18"))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.KubernetesAppComponentLabelName, utils.DatabaseComponentName))
+			// Backup specific labels
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupNameLabelName, backup.Name))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupDateLabelName, time.Now().Format("20060102")))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupMonthLabelName, time.Now().Format("200601")))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.BackupYearLabelName, strconv.Itoa(time.Now().Year())))
+			Expect(snapshot.Labels).To(HaveKeyWithValue(utils.MajorVersionLabelName, "18"))
+		}
+	})
 })
 
 var _ = Describe("transferLabelsToAnnotations", func() {
@@ -380,6 +418,7 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 	It("should transfer specified labels to annotations", func() {
 		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
 		labels[utils.InstanceNameLabelName] = exampleValueTwo
+		//nolint:staticcheck
 		labels[utils.ClusterRoleLabelName] = "value3"
 		labels["extraLabel"] = "value4" // This should not be transferred
 
@@ -387,6 +426,7 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 
 		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
 		Expect(annotations[utils.InstanceNameLabelName]).To(Equal(exampleValueTwo))
+		//nolint:staticcheck
 		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
 		Expect(annotations).ToNot(HaveKey("extraLabel"))
 
@@ -398,12 +438,14 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 
 	It("should not modify annotations if label is not present", func() {
 		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
+		//nolint:staticcheck
 		labels[utils.ClusterRoleLabelName] = "value3"
 
 		transferLabelsToAnnotations(labels, annotations)
 
 		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
 		Expect(annotations).ToNot(HaveKey(utils.InstanceNameLabelName))
+		//nolint:staticcheck
 		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
 	})
 
@@ -422,14 +464,14 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 var _ = Describe("annotateSnapshotsWithBackupData", func() {
 	var (
 		fakeClient   k8client.Client
-		snapshots    storagesnapshotv1.VolumeSnapshotList
+		snapshots    volumesnapshotv1.VolumeSnapshotList
 		backupStatus *apiv1.BackupStatus
 		startedAt    metav1.Time
 		stoppedAt    metav1.Time
 	)
 
 	BeforeEach(func() {
-		snapshots = storagesnapshotv1.VolumeSnapshotList{
+		snapshots = volumesnapshotv1.VolumeSnapshotList{
 			Items: slice{
 				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Annotations: map[string]string{"avoid": "nil"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-2", Annotations: map[string]string{"avoid": "nil"}}},

@@ -25,6 +25,7 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BUSL
 BackupCapabilities
 BackupConfiguration
 BackupFrom
@@ -50,6 +51,7 @@ BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
 ByStatus
+CAs
 CIS
 CKA
 CN
@@ -74,10 +76,12 @@ Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+ClientTLSSecret
 CloudNativePG
 CloudNativePG's
 ClusterBinding
@@ -145,7 +149,9 @@ EKS
 EOF
 EOL
 ESO
+EdwinaZhu
 EmbeddedObjectMetadata
+Endevir
 EnablePDB
 EncryptionType
 EndpointCA
@@ -158,11 +164,18 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+FDW
+FDWSpec
+FDWs
 FQDN
 FQDNs
+FailoverQuorum
+FailoverQuorumSpec
+FailoverQuorumStatus
 Fei
 Filesystem
 Fluentd
@@ -178,6 +191,7 @@ GUC
 GUCs
 Gabriele
 GaugeVec
+GeoSpatial
 Gi
 GitOps
 GoArch
@@ -202,14 +216,19 @@ ImageCatalog
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
+ImageVolume
+ImageVolumeSource
 ImportSource
 InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
+IsolationCheckConfiguration
+Isovalent
 Istio
 Istio's
 JSON
+JefeDavis
 Jihyuk
 Jitendra
 KV
@@ -226,6 +245,7 @@ LDAPBindSearchAuth
 LDAPConfig
 LDAPScheme
 LF
+LFX
 LLC
 LPV
 LSN
@@ -266,6 +286,8 @@ NOCREATEROLE
 NOSUPERUSER
 Namespaces
 Nenciarini
+NetworkPolicies
+NetworkPolicy
 Niccolò
 NodeAffinity
 NodeMaintenanceWindow
@@ -285,6 +307,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenBao
 OpenID
 OpenSSL
 OpenShift
@@ -292,6 +315,8 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OptionSpec
+OptionSpecValue
 OwnNamespace
 PDB
 PDBs
@@ -306,6 +331,7 @@ PODNAME
 PPROF
 PV
 PVCs
+PascalBourdier
 PasswordConfiguration
 PasswordState
 PasswordStatus
@@ -329,6 +355,7 @@ PodDisruptionBudget
 PodDisruptionBudgets
 PodMeta
 PodMonitor
+PodSecurityContext
 PodSecurityPolicy
 PodSpec
 PodStatus
@@ -361,6 +388,7 @@ ProbeTerminationGracePeriod
 ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
+Promotable
 PublicationReclaimPolicy
 PublicationSpec
 PublicationStatus
@@ -373,6 +401,7 @@ PushSecret
 QoS
 Quaresima
 QuickStart
+QuorumFailoverProtection
 RBAC
 README
 RHSA
@@ -437,10 +466,12 @@ SecretRefs
 SecretStore
 SecretVersion
 SecretsResourceVersion
+SecurityContextConstraints
 SecurityProfiles
 Seealso
 SelectorType
 ServerCASecret
+ServerSpec
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
@@ -460,6 +491,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StandbyNames
+StandbyNumber
 StartupProbe
 StartupStrategyType
 StatefulSets
@@ -477,7 +510,9 @@ SynchronizeReplicas
 SynchronizeReplicasConfiguration
 SynchronousReplicaConfiguration
 SynchronousReplicaConfigurationMethod
+SynchronousStandbyNamesList
 Synopsys
+SystemID
 TCP
 TLS
 TLSv
@@ -504,7 +539,10 @@ UTF
 Uncomment
 Unrealizable
 UpdateStrategy
+UsageSpec
+UsageSpecType
 VLDB
+VLDBs
 VM
 VMs
 VOLNAME
@@ -524,11 +562,14 @@ WALs
 Wadle
 WalBackupConfiguration
 WalClassName
+Wallner
 XXu
 YXBw
 YY
 YYYY
+Ying
 Zalando
+Zhu
 Zstandard
 abd
 accessKeyId
@@ -608,6 +649,7 @@ balancer
 balancers
 barmanEndpointCA
 barmanObjectStore
+barmancloud
 barmanobjectstore
 barmanobjectstoreconfiguration
 baseDN
@@ -657,6 +699,8 @@ cli
 clientCA
 clientCASecret
 clientCaSecretVersion
+clientTLS
+clientTLSSecret
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -673,6 +717,7 @@ cmd
 cn
 cnp
 cnpg
+codebase
 codeready
 collationVersion
 columnValue
@@ -694,6 +739,7 @@ conn
 connectionLimit
 connectionParameters
 connectionString
+connectionTimeout
 conninfo
 containerImage
 containerPort
@@ -745,6 +791,7 @@ datistemplate
 datname
 dbe
 dbname
+ddf
 ddl
 de
 declaratively
@@ -753,6 +800,7 @@ defaultPoolSize
 demotionToken
 deployer
 deploymentStrategy
+dereference
 destinationPath
 dev
 devel
@@ -762,6 +810,7 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+discoverable
 displayName
 displayName
 distro
@@ -777,10 +826,12 @@ downtimes
 dvcmQ
 dwm
 dx
+eBPF
 ecdsa
 edb
 eks
 enableAlterSystem
+enableInstancePprof
 enableMetricsTLS
 enablePDB
 enablePodAntiAffinity
@@ -809,12 +860,16 @@ externalclusters
 facto
 failover
 failoverDelay
+failoverQuorum
+failoverquorums
 failovers
 failureThreshold
 faq
 fastpath
 fb
 fd
+fdw
+fdws
 ffd
 fieldPath
 fieldref
@@ -825,8 +880,10 @@ fio
 fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
+fqdn
 freddie
 fuzzystrmatch
+gRPC
 gapped
 gc
 gcc
@@ -848,6 +905,8 @@ gosec
 govulncheck
 grafana
 gzip
+hanshal
+hardcoded
 hashicorp
 hba
 hdr
@@ -874,7 +933,9 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imageVolume
 imagecatalogs
+imagevolume
 img
 immediateCheckpoint
 impactful
@@ -906,6 +967,7 @@ ips
 isPrimary
 isTemplate
 isWALArchiver
+isolationCheck
 issuecomment
 italy
 jdbc
@@ -939,6 +1001,7 @@ lastSuccessfulBackupByMethod
 latestGeneratedNode
 latn
 lc
+ld
 ldap
 ldapBindPassword
 ldaps
@@ -969,6 +1032,7 @@ lookups
 lsn
 lt
 lz
+mTLS
 macOS
 majorVersion
 majorVersionUpgradeFromImage
@@ -977,6 +1041,7 @@ mallocs
 managedRoleSecretVersion
 managedRolesStatus
 mario
+mateusoliveira
 matchExpressions
 matchLabels
 maxClientConnections
@@ -993,6 +1058,7 @@ memstats
 metav
 metric's
 metricNameKS
+metricsQueriesTTL
 microservice
 microservices
 microsoft
@@ -1009,6 +1075,7 @@ msg
 mspan
 multinamespace
 mutatingwebhookconfigurations
+mutex
 myAKSCluster
 myResourceGroup
 namespace
@@ -1035,6 +1102,7 @@ num
 oauth
 objectmeta
 objectstore
+objectstores
 objid
 objref
 objsubid
@@ -1072,6 +1140,7 @@ passwordStatus
 pc
 pdf
 periodSeconds
+persistentVolumeClaims
 persistentvolumeclaim
 persistentvolumeclaims
 pgAdmin
@@ -1080,7 +1149,11 @@ pgBouncerIntegration
 pgBouncerSecrets
 pgDataImageInfo
 pgDumpExtraOptions
+pgRestoreDataOptions
 pgRestoreExtraOptions
+pgRestorePostdataOptions
+pgRestorePredataOptions
+pgRouting
 pgSQL
 pgadmin
 pgaudit
@@ -1088,11 +1161,13 @@ pgbarman
 pgbasebackup
 pgbench
 pgbouncer
+pgbouncer's
 pgdata
 pgpass
 pgstatstatements
 phaseReason
 pid
+pinger
 pitr
 plpgsql
 pluggable
@@ -1104,10 +1179,13 @@ podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
 podCount
+podDisruptionBudgets
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
+podMonitors
 podName
+podSecurityContext
 podStatuses
 podmonitor
 podtemplates
@@ -1146,6 +1224,7 @@ programmatically
 proj
 projectedVolumeTemplate
 prometheus
+promotable
 promotionTimeout
 promotionToken
 provisioner
@@ -1161,6 +1240,7 @@ pvcTemplate
 quantile
 queryable
 quickstart
+quorumFailoverProtection
 rbac
 rc
 readService
@@ -1189,6 +1269,7 @@ repmgr
 reportNonRedacted
 reportRedacted
 req
+requestTimeout
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
@@ -1286,8 +1367,10 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNames
 standbyNamesPost
 standbyNamesPre
+standbyNumber
 startDelay
 startedAt
 stateful
@@ -1324,10 +1407,12 @@ switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeLogicalDecoding
 synchronizeReplicas
 synchronizeReplicasCache
 sys
 syslog
+systemID
 systemd
 sysv
 tAc
@@ -1354,6 +1439,7 @@ targetXID
 tbody
 tcp
 td
+templating
 temporaryData
 terminationGracePeriodSeconds
 th
@@ -1401,6 +1487,7 @@ usr
 utils
 validUntil
 validatingwebhookconfigurations
+validator
 valueFrom
 viceversa
 virtualized

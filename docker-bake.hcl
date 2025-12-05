@@ -61,11 +61,13 @@ now = timestamp()
 
 distros = {
   distroless = {
-    baseImage = "gcr.io/distroless/static-debian12:nonroot@sha256:6ec5aa99dc335666e79dc64e4a6c8b89c33a543a1967f20d360922a80dd21f02",
+    # renovate: datasource=docker
+    baseImage = "gcr.io/distroless/static-debian12:nonroot@sha256:e8a4044e0b4ae4257efa45fc026c0bc30ad320d43bd4c1a7d5271bd241e386d0",
     tag = ""
   }
   ubi = {
-    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:7e85855f6925e03f91b5c51f07886ff1c18c6ec69b5fc65491428a899da914a2",
+    # renovate: datasource=docker
+    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:e14a8cbcaa0c26b77140ac85d40a47b5e910a4068686b02ebcad72126e9b5f86",
     tag = "-ubi9"
   }
 }

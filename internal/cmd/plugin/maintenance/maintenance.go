@@ -30,7 +30,7 @@ import (
 	"github.com/cheynewallace/tabby"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
@@ -48,7 +48,7 @@ func Maintenance(ctx context.Context,
 		"Maintenance",
 		"reusePVC")
 
-	var clusterList v1.ClusterList
+	var clusterList apiv1.ClusterList
 	var err error
 	if allNamespaces || clusterName == "" {
 		clusterList, err = getClusters(ctx, allNamespaces)
@@ -107,8 +107,8 @@ func askToProceed() bool {
 	return false
 }
 
-func getClusters(ctx context.Context, allNamespaces bool) (v1.ClusterList, error) {
-	var clusterList v1.ClusterList
+func getClusters(ctx context.Context, allNamespaces bool) (apiv1.ClusterList, error) {
+	var clusterList apiv1.ClusterList
 	var opts []client.ListOption
 	if !allNamespaces {
 		opts = append(opts, client.InNamespace(plugin.Namespace))
@@ -117,9 +117,9 @@ func getClusters(ctx context.Context, allNamespaces bool) (v1.ClusterList, error
 	return clusterList, err
 }
 
-func getCluster(ctx context.Context, clusterName string) (v1.ClusterList, error) {
-	var clusterList v1.ClusterList
-	var cluster v1.Cluster
+func getCluster(ctx context.Context, clusterName string) (apiv1.ClusterList, error) {
+	var clusterList apiv1.ClusterList
+	var cluster apiv1.Cluster
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err == nil {
 		clusterList.Items = append(clusterList.Items, cluster)
@@ -129,13 +129,13 @@ func getCluster(ctx context.Context, clusterName string) (v1.ClusterList, error)
 
 func patchNodeMaintenanceWindow(
 	ctx context.Context,
-	cluster v1.Cluster,
+	cluster apiv1.Cluster,
 	inProgress, reusePVC bool,
 ) error {
 	maintenanceCluster := cluster.DeepCopy()
 
 	if maintenanceCluster.Spec.NodeMaintenanceWindow == nil {
-		maintenanceCluster.Spec.NodeMaintenanceWindow = &v1.NodeMaintenanceWindow{}
+		maintenanceCluster.Spec.NodeMaintenanceWindow = &apiv1.NodeMaintenanceWindow{}
 	}
 	maintenanceCluster.Spec.NodeMaintenanceWindow.InProgress = inProgress
 	maintenanceCluster.Spec.NodeMaintenanceWindow.ReusePVC = &reusePVC

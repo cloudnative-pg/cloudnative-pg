@@ -1,3 +1,9 @@
+---
+id: container_images
+sidebar_position: 460
+title: Container Image Requirements
+---
+
 # Container Image Requirements
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -66,4 +72,4 @@ Examples of accepted image tags:
     `latest` is not considered a valid tag for the image.
 
 !!! Note
-    Image tag requirements do no apply for images defined in a catalog.
+    Image tag requirements do not apply for images defined in a catalog.

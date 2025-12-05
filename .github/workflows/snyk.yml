@@ -18,10 +18,10 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
 
       - name: Static Code Analysis
-        uses: snyk/actions/golang@b98d498629f1c368650224d6d212bf7dfa89e4bf # 0.4.0
+        uses: snyk/actions/golang@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -30,12 +30,12 @@ jobs:
           args: --sarif-file-output=snyk-static.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+        uses: github/codeql-action/upload-sarif@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4
         with:
           sarif_file: snyk-static.sarif
 
       - name: Vulnerability scan
-        uses: snyk/actions/golang@b98d498629f1c368650224d6d212bf7dfa89e4bf # 0.4.0
+        uses: snyk/actions/golang@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -43,6 +43,6 @@ jobs:
           args: --sarif-file-output=snyk-test.sarif
 
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3
+        uses: github/codeql-action/upload-sarif@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4
         with:
           sarif_file: snyk-test.sarif

@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/strings/slices"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -91,6 +92,92 @@ func (s statuses) getSorted(label status) []string {
 	return s[label]
 }
 
+// EnsureHealthyPVCsAnnotation makes sure that all healthy PVCs are marked as ready
+func EnsureHealthyPVCsAnnotation(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	getPVC := func(name string) *corev1.PersistentVolumeClaim {
+		for _, pvc := range pvcs {
+			if name == pvc.Name {
+				return &pvc
+			}
+		}
+
+		return nil
+	}
+
+	// Make sure that all healthy PVCs are marked as ready
+	for _, pvcName := range cluster.Status.HealthyPVC {
+		pvc := getPVC(pvcName)
+		if pvc == nil {
+			return fmt.Errorf(
+				"could not find the pvc: %s, from the list of managed pvc",
+				pvcName,
+			)
+		}
+
+		if pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady {
+			continue
+		}
+
+		contextLogger.Info("PVC is already attached to the pod, marking it as ready",
+			"pvc", pvc.Name)
+		if err := setPVCStatusReady(ctx, cli, pvc); err != nil {
+			contextLogger.Error(err, "can't update PVC annotation as ready")
+			return err
+		}
+	}
+
+	return nil
+}
+
+// MarkPVCReadyForCompletedJobs marks as ready all the PVCs used by completed Jobs
+func MarkPVCReadyForCompletedJobs(
+	ctx context.Context,
+	cli client.Client,
+	pvcs []corev1.PersistentVolumeClaim,
+	jobs []batchv1.Job,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	completeJobs := utils.FilterJobsWithOneCompletion(jobs)
+	if len(completeJobs) == 0 {
+		return nil
+	}
+
+	for _, job := range completeJobs {
+		for _, pvc := range pvcs {
+			if !IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
+				continue
+			}
+
+			if pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady {
+				continue
+			}
+
+			roleName := job.Spec.Template.Labels[utils.JobRoleLabelName]
+			contextLogger.Info(
+				"The job finished, setting PVC as ready",
+				"pvcName", pvc.Name,
+				"role", roleName,
+				"jobName", job.Name,
+			)
+
+			if err := setPVCStatusReady(ctx, cli, &pvc); err != nil {
+				contextLogger.Error(err, "unable to annotate PVC as ready")
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // EnrichStatus obtains and classifies the current status of each managed PVC
 func EnrichStatus(
 	ctx context.Context,
@@ -110,7 +197,7 @@ func EnrichStatus(
 		}
 
 		// There's no point in reattaching ignored PVCs
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
+		if pvc.DeletionTimestamp != nil {
 			continue
 		}
 
@@ -162,7 +249,7 @@ func classifyPVC(
 	instanceName string,
 ) status {
 	// PVC to ignore
-	if pvc.ObjectMeta.DeletionTimestamp != nil || hasUnknownStatus(ctx, pvc) {
+	if pvc.DeletionTimestamp != nil || hasUnknownStatus(ctx, pvc) {
 		return ignored
 	}
 
@@ -250,4 +337,28 @@ func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) boo
 		"status", pvc.Annotations[utils.PVCStatusAnnotationName])
 
 	return true
+}
+
+// setPVCStatusReady annotation to Ready for a PVC
+func setPVCStatusReady(
+	ctx context.Context,
+	cli client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady {
+		return nil
+	}
+
+	contextLogger.Trace("Marking PVC as ready", "pvcName", pvc.Name)
+
+	oldPvc := pvc.DeepCopy()
+
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string, 1)
+	}
+	pvc.Annotations[utils.PVCStatusAnnotationName] = StatusReady
+
+	return cli.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }

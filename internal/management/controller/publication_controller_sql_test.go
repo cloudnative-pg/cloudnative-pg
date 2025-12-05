@@ -173,56 +173,59 @@ var _ = Describe("publication sql", func() {
 	})
 })
 
-var _ = Describe("toPublicationObjectSQL", func() {
-	It("returns correct SQL for tables in schema", func() {
-		obj := &apiv1.PublicationTargetObject{
-			TablesInSchema: "public",
-		}
-		result := toPublicationObjectSQL(obj)
-		Expect(result).To(Equal(`TABLES IN SCHEMA "public"`))
-	})
-
-	It("returns correct SQL for table with schema and columns", func() {
-		obj := &apiv1.PublicationTargetObject{
-			Table: &apiv1.PublicationTargetTable{
-				Name:    "table",
-				Schema:  "test",
-				Columns: []string{"a", "b"},
+var _ = Describe("toPublicationCreateSQL", func() {
+	It("returns correct SQL for multiple tables", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Table: &apiv1.PublicationTargetTable{Name: "crm_employees", Schema: "log_crm"}},
+						{Table: &apiv1.PublicationTargetTable{Name: "crm_user_actions", Schema: "log_crm"}},
+					},
+				},
 			},
 		}
-		result := toPublicationObjectSQL(obj)
-		Expect(result).To(Equal(`TABLE "test"."table" ("a", "b")`))
+
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(
+			`CREATE PUBLICATION "test_pub" FOR TABLE "log_crm"."crm_employees", "log_crm"."crm_user_actions"`))
 	})
 
-	It("returns correct SQL for table with only clause", func() {
-		obj := &apiv1.PublicationTargetObject{
-			Table: &apiv1.PublicationTargetTable{
-				Name: "table",
-				Only: true,
+	It("returns correct SQL for mixed tables and schemas (requires pg15+)", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Table: &apiv1.PublicationTargetTable{Name: "table1"}},
+						{Table: &apiv1.PublicationTargetTable{Name: "table2"}},
+						{TablesInSchema: "public"},
+						{Table: &apiv1.PublicationTargetTable{Name: "table3"}},
+					},
+				},
 			},
 		}
-		result := toPublicationObjectSQL(obj)
-		Expect(result).To(Equal(`TABLE ONLY "table"`))
+
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(
+			`CREATE PUBLICATION "test_pub" FOR TABLE "table1", "table2", TABLES IN SCHEMA "public", TABLE "table3"`))
 	})
 
-	It("returns correct SQL for table without schema and columns", func() {
-		obj := &apiv1.PublicationTargetObject{
-			Table: &apiv1.PublicationTargetTable{
-				Name: "table",
+	It("returns correct SQL for multiple tables with columns", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Table: &apiv1.PublicationTargetTable{Name: "table1", Columns: []string{"a", "b"}}},
+						{Table: &apiv1.PublicationTargetTable{Name: "table2", Columns: []string{"c"}}},
+					},
+				},
 			},
 		}
-		result := toPublicationObjectSQL(obj)
-		Expect(result).To(Equal(`TABLE "table"`))
-	})
 
-	It("returns correct SQL for table with schema but without columns", func() {
-		obj := &apiv1.PublicationTargetObject{
-			Table: &apiv1.PublicationTargetTable{
-				Name:   "table",
-				Schema: "test",
-			},
-		}
-		result := toPublicationObjectSQL(obj)
-		Expect(result).To(Equal(`TABLE "test"."table"`))
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(`CREATE PUBLICATION "test_pub" FOR TABLE "table1" ("a", "b"), "table2" ("c")`))
 	})
 })

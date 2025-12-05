@@ -69,7 +69,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Get the publication object
 	var publication apiv1.Publication
-	if err := r.Client.Get(ctx, client.ObjectKey{
+	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &publication); err != nil {

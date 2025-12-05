@@ -33,7 +33,8 @@ E2E_DIR="${HACK_DIR}/e2e"
 
 export PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 export BUILD_IMAGE=${BUILD_IMAGE:-false}
-KIND_NODE_DEFAULT_VERSION=v1.33.0
+# renovate: datasource=docker depName=kindest/node
+KIND_NODE_DEFAULT_VERSION=v1.34.0
 export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
 export CLUSTER_ENGINE=kind
 export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
@@ -41,6 +42,7 @@ export LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-false}
 
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
 export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
@@ -51,6 +53,7 @@ export CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 export DOCKER_REGISTRY_MIRROR=${DOCKER_REGISTRY_MIRROR:-}
 export TEST_CLOUD_VENDOR="local"
 
+# shellcheck disable=SC2329
 cleanup() {
   if [ "${PRESERVE_CLUSTER}" = false ]; then
     "${HACK_DIR}/setup-cluster.sh" destroy || true

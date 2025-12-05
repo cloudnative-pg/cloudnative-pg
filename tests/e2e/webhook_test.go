@@ -71,7 +71,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 			Expect(err).ToNot(HaveOccurred())
 
-			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsReady(env.Ctx, env.Client, true)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
@@ -124,7 +124,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsReady(env.Ctx, env.Client, false)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})

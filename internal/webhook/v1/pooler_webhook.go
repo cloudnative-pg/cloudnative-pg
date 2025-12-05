@@ -39,10 +39,12 @@ import (
 // AllowedPgbouncerGenericConfigurationParameters is the list of allowed parameters for PgBouncer
 var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"application_name_add_host",
+	"auth_type",
 	"autodb_idle_timeout",
 	"cancel_wait_timeout",
 	"client_idle_timeout",
 	"client_login_timeout",
+	"client_tls_sslmode",
 	"default_pool_size",
 	"disable_pqexec",
 	"dns_max_ttl",
@@ -78,6 +80,7 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"server_round_robin",
 	"server_tls_ciphers",
 	"server_tls_protocols",
+	"server_tls_sslmode",
 	"stats_period",
 	"suspend_timeout",
 	"tcp_defer_accept",
@@ -120,16 +123,11 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 	}
 	poolerLog.Info("Validation for Pooler upon creation", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
-	var warns admission.Warnings
-	if !pooler.IsAutomatedIntegration() {
-		poolerLog.Info("Pooler not automatically configured, manual configuration required",
-			"name", pooler.Name, "namespace", pooler.Namespace, "cluster", pooler.Spec.Cluster.Name)
-		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
-			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
-	}
+	warns := v.getAdmissionWarnings(pooler)
+
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
 	allErrs := v.validate(pooler)
-
 	if len(allErrs) == 0 {
 		return warns, nil
 	}
@@ -137,6 +135,27 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		pooler.Name, allErrs)
+}
+
+// getAdmissionWarnings gets the admission webhook warnings
+func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.Warnings {
+	var warns admission.Warnings
+
+	if !r.IsAutomatedIntegration() {
+		poolerLog.Info("Pooler not automatically configured, manual configuration required",
+			"name", r.Name, "namespace", r.Namespace, "cluster", r.Spec.Cluster.Name)
+		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
+			"Manually configure it as described in the docs.", r.Name, r.Spec.Cluster.Name, r.Namespace))
+	}
+
+	if r.Spec.PgBouncer != nil &&
+		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" { //nolint:staticcheck
+		warns = append(
+			warns,
+			"The .spec.pgbouncer.authQuerySecret field has been deprecated")
+	}
+
+	return warns
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
@@ -149,20 +168,16 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 		return nil, fmt.Errorf("expected a Pooler object for the newObj but got %T", newObj)
 	}
 
-	oldPooler, ok := oldObj.(*apiv1.Pooler)
+	_, ok = oldObj.(*apiv1.Pooler)
 	if !ok {
 		return nil, fmt.Errorf("expected a Pooler object for the oldObj but got %T", oldObj)
 	}
 
 	poolerLog.Info("Validation for Pooler upon update", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
-	var warns admission.Warnings
-	if oldPooler.IsAutomatedIntegration() && !pooler.IsAutomatedIntegration() {
-		poolerLog.Info("Pooler not automatically configured, manual configuration required",
-			"name", pooler.Name, "namespace", pooler.Namespace, "cluster", pooler.Spec.Cluster.Name)
-		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
-			"Manually configure it as described in the docs.", pooler.Name, pooler.Spec.Cluster.Name, pooler.Namespace))
-	}
+	warns := v.getAdmissionWarnings(pooler)
+
+	warns = append(warns, v.validateDeprecatedMonitoringFields(pooler)...)
 
 	allErrs := v.validate(pooler)
 	if len(allErrs) == 0 {
@@ -170,7 +185,7 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 	}
 
 	return warns, apierrors.NewInvalid(
-		schema.GroupKind{Group: "pooler.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
@@ -188,21 +203,27 @@ func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, obj runtime.Ob
 }
 
 func (v *PoolerCustomValidator) validatePgBouncer(r *apiv1.Pooler) field.ErrorList {
-	var result field.ErrorList
-	switch {
-	case r.Spec.PgBouncer == nil:
-		result = append(result,
+	if r.Spec.PgBouncer == nil {
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer"),
-				"", "required pgbouncer configuration"))
-	case r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" &&
-		r.Spec.PgBouncer.AuthQuery == "":
+				"",
+				"required pgbouncer configuration",
+			),
+		}
+	}
+
+	hasPGAuthentication := (r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		(r.Spec.PgBouncer.ServerTLSSecret != nil && r.Spec.PgBouncer.ServerTLSSecret.Name != "")
+
+	var result field.ErrorList
+	switch {
+	case hasPGAuthentication && r.Spec.PgBouncer.AuthQuery == "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuery"),
 				"", "must specify an auth query when providing an auth query secret"))
-	case (r.Spec.PgBouncer.AuthQuerySecret == nil || r.Spec.PgBouncer.AuthQuerySecret.Name == "") &&
-		r.Spec.PgBouncer.AuthQuery != "":
+	case !hasPGAuthentication && r.Spec.PgBouncer.AuthQuery != "":
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "pgbouncer", "authQuerySecret", "name"),
@@ -254,4 +275,21 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 		}
 	}
 	return result
+}
+
+// validateDeprecatedMonitoringFields returns warnings for deprecated monitoring fields
+func (v *PoolerCustomValidator) validateDeprecatedMonitoringFields(r *apiv1.Pooler) admission.Warnings {
+	var warns admission.Warnings
+
+	//nolint:staticcheck // Checking deprecated fields to warn users
+	if r.Spec.Monitoring != nil {
+		if r.Spec.Monitoring.EnablePodMonitor ||
+			len(r.Spec.Monitoring.PodMonitorMetricRelabelConfigs) > 0 ||
+			len(r.Spec.Monitoring.PodMonitorRelabelConfigs) > 0 {
+			warns = append(warns, "spec.monitoring is deprecated and will be removed in a future release. "+
+				"Set this field to false and create a PodMonitor resource for your pooler as described in the documentation")
+		}
+	}
+
+	return warns
 }

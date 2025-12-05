@@ -20,6 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/utils/ptr"
@@ -132,7 +136,14 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultTablespaces()
 	}
 
+	if r.Spec.PostgresConfiguration.Synchronous != nil &&
+		r.Spec.PostgresConfiguration.Synchronous.DataDurability == "" {
+		r.Spec.PostgresConfiguration.Synchronous.DataDurability = DataDurabilityLevelRequired
+	}
+
 	r.setDefaultPlugins(configuration.Current)
+	r.setProbes()
+	r.tryConvertAlphaFailoverQuorum()
 }
 
 func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
@@ -229,7 +240,11 @@ func (r *Cluster) defaultInitDB() {
 	}
 
 	if r.Spec.Bootstrap.InitDB.Database == "" {
-		r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
+		// Set the default only if not executing a monolithic import
+		if r.Spec.Bootstrap.InitDB.Import == nil ||
+			r.Spec.Bootstrap.InitDB.Import.Type != MonolithSnapshotType {
+			r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
+		}
 	}
 	if r.Spec.Bootstrap.InitDB.Owner == "" {
 		r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
@@ -263,4 +278,109 @@ func (r *Cluster) defaultPgBaseBackup() {
 	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
 	}
+}
+
+const (
+	// defaultRequestTimeout is the default value of the request timeout
+	defaultRequestTimeout = 1000
+
+	// defaultConnectionTimeout is the default value of the connection timeout
+	defaultConnectionTimeout = 1000
+)
+
+func (r *Cluster) setProbes() {
+	if r.Spec.Probes == nil {
+		r.Spec.Probes = &ProbesConfiguration{}
+	}
+
+	if r.Spec.Probes.Liveness == nil {
+		r.Spec.Probes.Liveness = &LivenessProbe{}
+	}
+
+	// we don't override the isolation check if it is already set
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 1: check if the alpha annotation is present, in that case convert it to spec
+	r.tryConvertAlphaLivenessPinger()
+
+	if r.Spec.Probes.Liveness.IsolationCheck != nil {
+		return
+	}
+
+	// STEP 2: set defaults.
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           ptr.To(true),
+		RequestTimeout:    defaultRequestTimeout,
+		ConnectionTimeout: defaultConnectionTimeout,
+	}
+}
+
+func (r *Cluster) tryConvertAlphaLivenessPinger() {
+	if _, ok := r.Annotations[utils.LivenessPingerAnnotationName]; !ok {
+		return
+	}
+	v, err := NewLivenessPingerConfigFromAnnotations(r.Annotations)
+	if err != nil || v == nil {
+		// the error will be raised by the validation webhook
+		return
+	}
+
+	r.Spec.Probes.Liveness.IsolationCheck = &IsolationCheckConfiguration{
+		Enabled:           v.Enabled,
+		RequestTimeout:    v.RequestTimeout,
+		ConnectionTimeout: v.ConnectionTimeout,
+	}
+}
+
+func (r *Cluster) tryConvertAlphaFailoverQuorum() {
+	annotationValue, ok := r.Annotations[utils.FailoverQuorumAnnotationName]
+	if !ok {
+		return
+	}
+
+	v, err := strconv.ParseBool(annotationValue)
+	if err != nil {
+		// The validation webhook will catch this
+		// error and notify the user.
+		return
+	}
+
+	// The webhook prevents the user from enabling
+	// failover quorum without synchronous replication.
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return
+	}
+
+	r.Spec.PostgresConfiguration.Synchronous.FailoverQuorum = v
+}
+
+// NewLivenessPingerConfigFromAnnotations creates a new pinger configuration from the annotations
+// in the cluster definition
+func NewLivenessPingerConfigFromAnnotations(
+	annotations map[string]string,
+) (*IsolationCheckConfiguration, error) {
+	v, ok := annotations[utils.LivenessPingerAnnotationName]
+	if !ok {
+		return nil, nil
+	}
+
+	var cfg IsolationCheckConfiguration
+	if err := json.Unmarshal([]byte(v), &cfg); err != nil {
+		return nil, fmt.Errorf("while unmarshalling pinger config: %w", err)
+	}
+
+	if cfg.Enabled == nil {
+		return nil, fmt.Errorf("pinger config is missing the enabled field")
+	}
+
+	if cfg.RequestTimeout == 0 {
+		cfg.RequestTimeout = defaultRequestTimeout
+	}
+	if cfg.ConnectionTimeout == 0 {
+		cfg.ConnectionTimeout = defaultConnectionTimeout
+	}
+
+	return &cfg, nil
 }

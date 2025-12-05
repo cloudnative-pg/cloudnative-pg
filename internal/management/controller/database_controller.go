@@ -67,6 +67,22 @@ var extensionObjectManager = databaseObjectManager[apiv1.ExtensionSpec, extInfo]
 	drop:   dropDatabaseExtension,
 }
 
+// fdwObjectManager is the manager of the fdw objects
+var fdwObjectManager = databaseObjectManager[apiv1.FDWSpec, fdwInfo]{
+	get:    getDatabaseFDWInfo,
+	create: createDatabaseFDW,
+	update: updateDatabaseFDW,
+	drop:   dropDatabaseFDW,
+}
+
+// serverObjectManager is the manager of the server objects
+var serverObjectManager = databaseObjectManager[apiv1.ServerSpec, serverInfo]{
+	get:    getDatabaseForeignServerInfo,
+	create: createDatabaseForeignServer,
+	update: updateDatabaseForeignServer,
+	drop:   dropDatabaseForeignServer,
+}
+
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
 const databaseReconciliationInterval = 30 * time.Second
@@ -82,7 +98,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Get the database object
 	var database apiv1.Database
-	if err := r.Client.Get(ctx, client.ObjectKey{
+	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &database); err != nil {
@@ -243,6 +259,16 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 			return ErrFailedDatabaseObjectReconciliation
 		}
 	}
+	for _, status := range obj.Status.FDWs {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+	for _, status := range obj.Status.Servers {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
 
 	return nil
 }
@@ -251,7 +277,12 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 	ctx context.Context,
 	obj *apiv1.Database,
 ) error {
-	if len(obj.Spec.Schemas) == 0 && len(obj.Spec.Extensions) == 0 {
+	objectCount := len(obj.Spec.Schemas)
+	objectCount += len(obj.Spec.Extensions)
+	objectCount += len(obj.Spec.FDWs)
+	objectCount += len(obj.Spec.Servers)
+
+	if objectCount == 0 {
 		return nil
 	}
 
@@ -262,6 +293,9 @@ func (r *DatabaseReconciler) reconcileDatabaseObjects(
 
 	obj.Status.Schemas = schemaObjectManager.reconcileList(ctx, db, obj.Spec.Schemas)
 	obj.Status.Extensions = extensionObjectManager.reconcileList(ctx, db, obj.Spec.Extensions)
+	obj.Status.FDWs = fdwObjectManager.reconcileList(ctx, db, obj.Spec.FDWs)
+	obj.Status.Servers = serverObjectManager.reconcileList(ctx, db, obj.Spec.Servers)
+
 	return nil
 }
 

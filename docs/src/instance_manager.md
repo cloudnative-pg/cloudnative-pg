@@ -1,3 +1,9 @@
+---
+id: instance_manager
+sidebar_position: 110
+title: Postgres Instance Manager
+---
+
 # Postgres instance manager
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -188,6 +194,47 @@ spec:
       failureThreshold: 10
 ```
 
+### Primary Isolation
+
+CloudNativePG 1.27 introduces an additional behavior for the liveness
+probe of a PostgreSQL primary, which will report a failure if **both** of the
+following conditions are met:
+
+1. The instance manager cannot reach the Kubernetes API server
+2. The instance manager cannot reach **any** other instance via the instance manager’s REST API
+
+The effect of this behavior is to consider an isolated primary to be not alive and subsequently **shut it down** when the liveness probe fails.
+
+It is **enabled by default** and can be disabled by adding the following:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: false
+```
+
+!!! Important
+    Be aware that the default liveness probe settings—automatically derived from `livenessProbeTimeout`—might
+    be aggressive (30 seconds). As such, we recommend explicitly setting the
+    liveness probe configuration to suit your environment.
+
+The spec also accepts two optional network settings: `requestTimeout`
+and `connectionTimeout`, both defaulting to `1000` (in milliseconds).
+In cloud environments, you may need to increase these values.
+For example:
+
+```yaml
+spec:
+  probes:
+    liveness:
+      isolationCheck:
+        enabled: true
+        requestTimeout: "2000"
+        connectionTimeout: "2000"
+```
+
 ## Readiness Probe
 
 The readiness probe starts once the startup probe has successfully completed.
@@ -293,9 +340,9 @@ to 180 and 1800 seconds, respectively.
 
 The shutdown procedure is composed of two steps:
 
-1. The instance manager requests a **smart** shut down, disallowing any
-new connection to PostgreSQL. This step will last for up to
-`.spec.smartShutdownTimeout` seconds.
+1. The instance manager first issues a `CHECKPOINT`, then initiates a **smart**
+shut down, disallowing any new connection to PostgreSQL. This step will last
+for up to `.spec.smartShutdownTimeout` seconds.
 
 2. If PostgreSQL is still up, the instance manager requests a **fast**
 shut down, terminating any existing connection and exiting promptly.
@@ -312,10 +359,11 @@ seconds.
 
 ### Shutdown of the primary during a switchover
 
-During a switchover, the shutdown procedure is slightly different from the
-general case. Indeed, the operator requires the former primary to issue a
-**fast** shut down before the selected new primary can be promoted,
-in order to ensure that all the data are available on the new primary.
+During a switchover, the shutdown procedure slightly differs from the general
+case. The instance manager of the former primary first issues a `CHECKPOINT`,
+then initiates a **fast** shutdown of PostgreSQL before the designated new
+primary is promoted, ensuring that all data are safely available on the new
+primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
 the  time given to the former primary to shut down gracefully and archive all

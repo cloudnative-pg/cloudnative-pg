@@ -1,4 +1,10 @@
-# Labels and annotations
+---
+id: labels_annotations
+sidebar_position: 290
+title: Labels and Annotations
+---
+
+# Labels and Annotations
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Resources in Kubernetes are organized in a flat structure, with no hierarchical
@@ -65,6 +71,10 @@ CloudNativePG manages the following predefined labels:
 `cnpg.io/jobRole`
 : Role of the job (that is, `import`, `initdb`, `join`, ...)
 
+`cnpg.io/majorVersion`
+: Integer PostgreSQL major version of the backup's data directory (for example, `17`).
+This label is available only on `VolumeSnapshot` resources.
+
 `cnpg.io/onlineBackup`
 : Whether the backup is online (hot) or taken when Postgres is down (cold).
   This label is available only on `VolumeSnapshot` resources.
@@ -100,6 +110,27 @@ CloudNativePG manages the following predefined labels:
 `cnpg.io/instanceRole`
 : Whether the instance running in a pod is a `primary` or a `replica`.
 
+`app.kubernetes.io/managed-by`
+: Name of the manager. It will always be `cloudnative-pg`.
+  Available across all CloudNativePG managed resources.
+
+`app.kubernetes.io/name`
+: Name of the application. It will always be `postgresql`.
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/component`
+: Name of the component (`database`, `pooler`, ...).
+  Available on pods, jobs, deployments, services, persistentVolumeClaims, volumeSnapshots,
+  podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/instance`
+: Name of the owning `Cluster` resource.
+  Available on pods, jobs, deployments, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
+
+`app.kubernetes.io/version`
+: Major version of PostgreSQL.
+  Available on pods, jobs, services, volumeSnapshots, podDisruptionBudgets, podMonitors.
 
 ## Predefined annotations
 
@@ -242,6 +273,13 @@ CloudNativePG manages the following predefined annotations:
 
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
+
+`alpha.cnpg.io/unrecoverable`
+:   Experimental annotation applied to a `Pod` running a PostgreSQL instance.
+    It instructs the operator to delete the `Pod` and all its associated PVCs.
+    The instance will then be recreated according to the configured join
+    strategy. This annotation can only be used on instances that are neither the
+    current primary nor the designated target primary.
 
 ## Prerequisites
 

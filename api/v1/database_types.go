@@ -38,6 +38,20 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
+// UsageSpecType describes the type of usage specified in the `usage` field of the
+// `Database` object.
+// +enum
+type UsageSpecType string
+
+const (
+	// GrantUsageSpecType indicates a grant usage permission.
+	// The default usage permission is grant.
+	GrantUsageSpecType UsageSpecType = "grant"
+
+	// RevokeUsageSpecType indicates a revoke usage permission.
+	RevokeUsageSpecType UsageSpecType = "revoke"
+)
+
 // DatabaseSpec is the specification of a Postgresql Database, built around the
 // `CREATE DATABASE`, `ALTER DATABASE`, and `DROP DATABASE` SQL commands of
 // PostgreSQL.
@@ -173,18 +187,26 @@ type DatabaseSpec struct {
 	// The list of extensions to be managed in the database
 	// +optional
 	Extensions []ExtensionSpec `json:"extensions,omitempty"`
+
+	// The list of foreign data wrappers to be managed in the database
+	// +optional
+	FDWs []FDWSpec `json:"fdws,omitempty"`
+
+	// The list of foreign servers to be managed in the database
+	// +optional
+	Servers []ServerSpec `json:"servers,omitempty"`
 }
 
 // DatabaseObjectSpec contains the fields which are common to every
 // database object
 type DatabaseObjectSpec struct {
-	// Name of the extension/schema
+	// Name of the object (extension, schema, FDW, server)
 	Name string `json:"name"`
 
-	// Specifies whether an extension/schema should be present or absent in
-	// the database. If set to `present`, the extension/schema will be
-	// created if it does not exist. If set to `absent`, the
-	// extension/schema will be removed if it exists.
+	// Specifies whether an object (e.g schema) should be present or absent
+	// in the database. If set to `present`, the object will be created if
+	// it does not exist. If set to `absent`, the extension/schema will be
+	// removed if it exists.
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
@@ -220,6 +242,87 @@ type ExtensionSpec struct {
 	Schema string `json:"schema,omitempty"`
 }
 
+// FDWSpec configures an Foreign Data Wrapper in a database
+type FDWSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// Name of the handler function (e.g., "postgres_fdw_handler").
+	// This will be empty if no handler is specified. In that case,
+	// the default handler is registered when the FDW extension is created.
+	// +optional
+	Handler string `json:"handler,omitempty"`
+
+	// Name of the validator function (e.g., "postgres_fdw_validator").
+	// This will be empty if no validator is specified. In that case,
+	// the default validator is registered when the FDW extension is created.
+	// +optional
+	Validator string `json:"validator,omitempty"`
+
+	// Owner specifies the database role that will own the Foreign Data Wrapper.
+	// The role must have superuser privileges in the target database.
+	// +optional
+	Owner string `json:"owner,omitempty"`
+
+	// Options specifies the configuration options for the FDW.
+	// +optional
+	Options []OptionSpec `json:"options,omitempty"`
+
+	// List of roles for which `USAGE` privileges on the FDW are granted or revoked.
+	// +optional
+	Usages []UsageSpec `json:"usage,omitempty"`
+}
+
+// ServerSpec configures a server of a foreign data wrapper
+type ServerSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// The name of the Foreign Data Wrapper (FDW)
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="fdw is required"
+	FdwName string `json:"fdw"`
+
+	// Options specifies the configuration options for the server
+	// (key is the option name, value is the option value).
+	// +optional
+	Options []OptionSpec `json:"options,omitempty"`
+
+	// List of roles for which `USAGE` privileges on the server are granted or revoked.
+	// +optional
+	Usages []UsageSpec `json:"usage,omitempty"`
+}
+
+// OptionSpec holds the name, value and the ensure field for an option
+type OptionSpec struct {
+	// Name of the option
+	Name string `json:"name"`
+
+	// Value of the option
+	Value string `json:"value"`
+
+	// Specifies whether an option should be present or absent in
+	// the database. If set to `present`, the option will be
+	// created if it does not exist. If set to `absent`, the
+	// option will be removed if it exists.
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure,omitempty"`
+}
+
+// UsageSpec configures a usage for a foreign data wrapper
+type UsageSpec struct {
+	// Name of the usage
+	// +kubebuilder:validation:XValidation:rule="self != ''",message="name is required"
+	Name string `json:"name"`
+
+	// The type of usage
+	// +kubebuilder:default:="grant"
+	// +kubebuilder:validation:Enum=grant;revoke
+	// +optional
+	Type UsageSpecType `json:"type,omitempty"`
+}
+
 // DatabaseStatus defines the observed state of Database
 type DatabaseStatus struct {
 	// A sequence number representing the latest
@@ -242,6 +345,14 @@ type DatabaseStatus struct {
 	// Extensions is the status of the managed extensions
 	// +optional
 	Extensions []DatabaseObjectStatus `json:"extensions,omitempty"`
+
+	// FDWs is the status of the managed FDWs
+	// +optional
+	FDWs []DatabaseObjectStatus `json:"fdws,omitempty"`
+
+	// Servers is the status of the managed servers
+	// +optional
+	Servers []DatabaseObjectStatus `json:"servers,omitempty"`
 }
 
 // DatabaseObjectStatus is the status of the managed database objects

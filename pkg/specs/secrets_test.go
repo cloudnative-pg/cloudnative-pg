@@ -32,6 +32,11 @@ var _ = Describe("Secret creation", func() {
 			"thishost", "thisdb", "thisuser", "thispassword", utils.UserTypeApp)
 		Expect(secret.Name).To(Equal("name"))
 		Expect(secret.Namespace).To(Equal("namespace"))
+		Expect(secret.Labels).To(BeEquivalentTo(map[string]string{
+			utils.WatchedLabelName:                "true",
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			utils.UserTypeLabelName:               string(utils.UserTypeApp),
+		}))
 		Expect(secret.StringData["username"]).To(Equal("thisuser"))
 		Expect(secret.StringData["user"]).To(Equal("thisuser"))
 		Expect(secret.StringData["password"]).To(Equal("thispassword"))
@@ -44,6 +49,14 @@ var _ = Describe("Secret creation", func() {
 		Expect(secret.StringData["jdbc-uri"]).To(
 			Equal("jdbc:postgresql://thishost.namespace:5432/thisdb?password=thispassword&user=thisuser"),
 		)
+
+		Expect(secret.StringData["fqdn-uri"]).To(
+			Equal("postgresql://thisuser:thispassword@thishost.namespace.svc.cluster.local:5432/thisdb"),
+		)
+		Expect(secret.StringData["fqdn-jdbc-uri"]).To(
+			Equal("jdbc:postgresql://thishost.namespace.svc.cluster.local:5432/thisdb?password=thispassword&user=thisuser"),
+		)
+
 		Expect(secret.Labels).To(
 			HaveKeyWithValue(utils.UserTypeLabelName, string(utils.UserTypeApp)))
 	})

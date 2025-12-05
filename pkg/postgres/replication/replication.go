@@ -20,25 +20,28 @@ SPDX-License-Identifier: Apache-2.0
 package replication
 
 import (
+	"context"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // GetExpectedSyncReplicasNumber computes the actual number of required synchronous replicas
-func GetExpectedSyncReplicasNumber(cluster *apiv1.Cluster) int {
+func GetExpectedSyncReplicasNumber(ctx context.Context, cluster *apiv1.Cluster) int {
 	if cluster.Spec.PostgresConfiguration.Synchronous != nil {
 		return cluster.Spec.PostgresConfiguration.Synchronous.Number
 	}
 
-	syncReplicas, _ := getSyncReplicasData(cluster)
+	syncReplicas, _ := getSyncReplicasData(ctx, cluster)
 	return syncReplicas
 }
 
 // GetSynchronousStandbyNames gets the value to be applied
 // to synchronous_standby_names
-func GetSynchronousStandbyNames(cluster *apiv1.Cluster) string {
+func GetSynchronousStandbyNames(ctx context.Context, cluster *apiv1.Cluster) postgres.SynchronousStandbyNamesConfig {
 	if cluster.Spec.PostgresConfiguration.Synchronous != nil {
 		return explicitSynchronousStandbyNames(cluster)
 	}
 
-	return legacySynchronousStandbyNames(cluster)
+	return legacySynchronousStandbyNames(ctx, cluster)
 }

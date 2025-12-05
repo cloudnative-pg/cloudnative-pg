@@ -110,6 +110,17 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		return "", err
 	}
 
+	// If quorum check is active, ensure we don't failover in unsafe scenarios.
+	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary &&
+		cluster.IsFailoverQuorumActive() {
+		if status, err := r.evaluateQuorumCheck(ctx, cluster, status); err != nil {
+			return "", err
+		} else if !status {
+			// Prevent a failover from happening
+			return "", nil
+		}
+	}
+
 	// The current primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. To make sure they eventually terminate we signal the old primary
@@ -330,7 +341,10 @@ func GetPodsNotOnPrimaryNode(
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
 ) postgres.PostgresqlStatusList {
-	podsOnOtherNodes := postgres.PostgresqlStatusList{}
+	podsOnOtherNodes := postgres.PostgresqlStatusList{
+		IsReplicaCluster: status.IsReplicaCluster,
+		CurrentPrimary:   status.CurrentPrimary,
+	}
 	if primaryPod == nil {
 		return podsOnOtherNodes
 	}

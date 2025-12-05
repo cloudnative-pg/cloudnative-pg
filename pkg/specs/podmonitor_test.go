@@ -66,7 +66,12 @@ var _ = Describe("PodMonitor test", func() {
 			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 			monitor := mgr.BuildPodMonitor()
 			Expect(monitor.Labels).To(BeEquivalentTo(map[string]string{
-				utils.ClusterLabelName: cluster.Name,
+				utils.ClusterLabelName:                cluster.Name,
+				utils.KubernetesAppLabelName:          utils.AppName,
+				utils.KubernetesAppInstanceLabelName:  cluster.Name,
+				utils.KubernetesAppVersionLabelName:   "18",
+				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			}))
 			Expect(monitor.Spec.Selector.MatchLabels).To(BeEquivalentTo(map[string]string{
 				utils.ClusterLabelName: cluster.Name,
@@ -78,6 +83,7 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
@@ -89,6 +95,7 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
@@ -100,7 +107,9 @@ var _ = Describe("PodMonitor test", func() {
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
+			//nolint:staticcheck // Using deprecated fields during deprecation period
 			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
@@ -125,6 +134,7 @@ var _ = Describe("PodMonitor test", func() {
 				Name:      clusterName,
 			},
 			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
 				},
@@ -142,6 +152,7 @@ var _ = Describe("PodMonitor test", func() {
 				Name:      clusterName,
 			},
 			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
 					TLSConfig: &apiv1.ClusterMonitoringTLSConfiguration{
@@ -154,18 +165,20 @@ var _ = Describe("PodMonitor test", func() {
 		expectedEndpoint := monitoringv1.PodMetricsEndpoint{
 			Port:   &metricsPort,
 			Scheme: "https",
-			TLSConfig: &monitoringv1.SafeTLSConfig{
-				CA: monitoringv1.SecretOrConfigMap{
-					Secret: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "test-ca",
+			HTTPConfig: monitoringv1.HTTPConfig{
+				TLSConfig: &monitoringv1.SafeTLSConfig{
+					CA: monitoringv1.SecretOrConfigMap{
+						Secret: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "test-ca",
+							},
+							Key: certs.CACertKey,
 						},
-						Key: certs.CACertKey,
 					},
+					Cert:               monitoringv1.SecretOrConfigMap{},
+					ServerName:         ptr.To(cluster.GetServiceReadWriteName()),
+					InsecureSkipVerify: ptr.To(true),
 				},
-				Cert:               monitoringv1.SecretOrConfigMap{},
-				ServerName:         ptr.To(cluster.GetServiceReadWriteName()),
-				InsecureSkipVerify: ptr.To(true),
 			},
 		}
 

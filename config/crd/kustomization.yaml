@@ -13,6 +13,7 @@ resources:
 - bases/postgresql.cnpg.io_databases.yaml
 - bases/postgresql.cnpg.io_publications.yaml
 - bases/postgresql.cnpg.io_subscriptions.yaml
+- bases/postgresql.cnpg.io_failoverquorums.yaml
 
 # +kubebuilder:scaffold:crdkustomizeresource
 patches:

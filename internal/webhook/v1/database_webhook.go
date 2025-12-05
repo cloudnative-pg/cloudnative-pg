@@ -154,6 +154,8 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 	validations := []validationFunc{
 		v.validateExtensions,
 		v.validateSchemas,
+		v.validateFDWs,
+		v.validateForeignServers,
 	}
 
 	for _, validate := range validations {
@@ -195,8 +197,8 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 	var result field.ErrorList
 
 	schemaNames := stringset.New()
-	for i, schema := range d.Spec.Schemas {
-		name := schema.Name
+	for i, schemaSpec := range d.Spec.Schemas {
+		name := schemaSpec.Name
 		if schemaNames.Has(name) {
 			result = append(
 				result,
@@ -211,4 +213,93 @@ func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.Error
 	}
 
 	return result
+}
+
+// validateFDWs validates the database Foreign Data Wrappers
+// FDWs must be unique in .spec.fdws
+func (v *DatabaseCustomValidator) validateFDWs(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+	nameSet := stringset.New()
+	basePath := field.NewPath("spec", "fdws")
+	for i, fdw := range d.Spec.FDWs {
+		itemPath := basePath.Index(i)
+		errs := validateNameOptionsUsages(itemPath, fdw.Name, fdw.Options, fdw.Usages, nameSet)
+		result = append(result, errs...)
+	}
+	return result
+}
+
+// validateForeignServers validates foreign servers: uniqueness, options/usages duplicates,
+// and that each referenced FDW exists.
+func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) field.ErrorList {
+	basePath := field.NewPath("spec", "servers")
+
+	fdwNames := stringset.New()
+	for _, fdw := range d.Spec.FDWs {
+		fdwNames.Put(fdw.Name)
+	}
+
+	nameSet := stringset.New()
+	var allErrs field.ErrorList
+	for i, server := range d.Spec.Servers {
+		itemPath := basePath.Index(i)
+
+		allErrs = append(allErrs, v.validateServerFDWReference(fdwNames, server, itemPath)...)
+
+		allErrs = append(allErrs,
+			validateNameOptionsUsages(itemPath, server.Name, server.Options, server.Usages, nameSet)...)
+	}
+
+	return allErrs
+}
+
+// validateServerFDWReference ensures the server references an existing FDW (and is non-empty).
+func (v *DatabaseCustomValidator) validateServerFDWReference(
+	fdwNames *stringset.Data,
+	server apiv1.ServerSpec,
+	itemPath *field.Path,
+) field.ErrorList {
+	if server.GetEnsure() == apiv1.EnsureAbsent || fdwNames.Has(server.FdwName) {
+		return nil
+	}
+
+	return field.ErrorList{field.Invalid(
+		itemPath.Child("fdw"),
+		server.FdwName,
+		"referenced fdw not defined in spec.fdws",
+	)}
+}
+
+// validateNameOptionsUsages validates a single named object with options and usages, tracking duplicates.
+func validateNameOptionsUsages(
+	itemPath *field.Path,
+	name string,
+	options []apiv1.OptionSpec,
+	usages []apiv1.UsageSpec,
+	existingNames *stringset.Data,
+) field.ErrorList {
+	var errs field.ErrorList
+
+	if existingNames.Has(name) {
+		errs = append(errs, field.Duplicate(itemPath.Child("name"), name))
+	}
+	existingNames.Put(name)
+
+	optionNames := stringset.New()
+	for i, option := range options {
+		if optionNames.Has(option.Name) {
+			errs = append(errs, field.Duplicate(itemPath.Child("options").Index(i).Child("name"), option.Name))
+		}
+		optionNames.Put(option.Name)
+	}
+
+	usageNames := stringset.New()
+	for i, usage := range usages {
+		if usageNames.Has(usage.Name) {
+			errs = append(errs, field.Duplicate(itemPath.Child("usages").Index(i).Child("name"), usage.Name))
+		}
+		usageNames.Put(usage.Name)
+	}
+
+	return errs
 }

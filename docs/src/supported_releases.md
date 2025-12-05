@@ -1,3 +1,9 @@
+---
+id: supported_releases
+sidebar_position: 560
+title: Supported releases
+---
+
 # Supported releases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -8,7 +14,7 @@
 releases of CloudNativePG*.
 
 We are committed to providing support for the latest minor release, with a
-dedication to launching a new minor release every two months. Each release
+dedication to launching a new minor release every three months. Each release
 remains fully supported until reaching its designated "End of Life" date, as
 outlined in the [support status table for CloudNativePG releases](#support-status-of-cloudnativepg-releases).
 This includes an additional 3-month assistance window to facilitate seamless
@@ -83,11 +89,12 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.25.x          | Yes                  | Dec 23, 2024 | ~ Jun/July 2025 | 1.29, 1.30, 1.31, 1.32        | 1.27, 1.28                | 13 - 17                     |
-| 1.24.x          | Yes                  | Aug 22, 2024 | Mar 23, 2025    | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 13 - 17                     |
+| 1.28.x          | No                   |    Nov 2025  | ~  May 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
+| 1.27.x          | Yes                  | 12 Aug 2025  | ~  Feb 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 17                     |
+| 1.26.x          | Yes                  | May 23, 2025 | 12 Nov 2025     | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
 
-<!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
+<sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -122,10 +129,9 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.26.0  | ~ Mar, 2025  | ~ Dec, 2025 |
-| 1.27.0  | ~ Jun, 2025  | ~ Mar, 2026 |
-| 1.28.0  | ~ Sep, 2025  | ~ Jun, 2026 |
-| 1.29.0  | ~ Dec, 2025  | ~ Sep, 2026 |
+| 1.28.0  | ~ Nov, 2025  | ~ May, 2026 |
+| 1.29.0  | ~ Feb, 2026  | ~ Aug, 2026 |
+| 1.30.0  | ~ May, 2026  | ~ Nov, 2026 |
 
 !!! Note
     Feature freeze occurs 1-2 weeks before the release, at which point a
@@ -142,6 +148,8 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date      | End of life         | Compatible Kubernetes versions |
 |-----------------|-------------------|---------------------|--------------------------------|
+| 1.25.x          | Dec 23, 2024      | 22 Aug 2025         | 1.29, 1.30, 1.31, 1.32         |
+| 1.24.x          | Aug 22, 2024      | May 23, 2025        | 1.28, 1.29, 1.30, 1.31         |
 | 1.23.x          | April 24, 2024    | November 24, 2024   | 1.27, 1.28, 1.29               |
 | 1.22.x          | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28               |
 | 1.21.x          | October 12, 2023  | Jun 12, 2024        | 1.25, 1.26, 1.27, 1.28         |
@@ -154,29 +162,29 @@ version of PostgreSQL, we might not be able to help you.
 
 ## What we mean by support
 
-Our support window is roughly five months for each release branch (latest
+Our support window is roughly five/six months for each release branch (latest
 minor release, plus 3 additional months), given that we produce a new final
-release every two months.
+release every two/three months.
 
-In the following diagram, `release-1.23` is an example of a release branch.
+In the following diagram, `release-1.27` is an example of a release branch.
 
-For example, if the latest release is `v1.23.0`, you can expect a supplementary
-3-month support period for the preceding release, `v1.22.x`.
+For example, if the latest release is `v1.27.0`, you can expect a supplementary
+3-month support period for the preceding release, `v1.26.x`.
 
-Only the last patch release of each branch is supported.
+**Only the last patch release of each branch is supported.**
 
 ```diagram
 ------+---------------------------------------------> main (trunk development)
        \             \
         \             \
-         \             \             v1.23.0
-          \             \            Apr 24, 2024                   ^
-           \             \----------+---------------> release-1.23  |
+         \             \             v1.27.0
+          \             \            Aug 12, 2025                   ^
+           \             \----------+---------------> release-1.27  |
             \                                                       | SUPPORTED
              \                                                      | RELEASES
-              \   v1.22.0                                           | = last minor
-               \  Dec 21, 2023                                      |   release +
-                +-------------------+---------------> release-1.22  |   3 months
+              \   v1.26.0                                           | = last minor
+               \  May 23, 2025                                      |   release +
+                +-------------------+---------------> release-1.26  |   3 months
                                                                     v
 ```
 

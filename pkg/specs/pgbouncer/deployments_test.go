@@ -21,6 +21,8 @@ package pgbouncer
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -60,6 +62,7 @@ var _ = Describe("Deployment", func() {
 				DeploymentStrategy: &appsv1.DeploymentStrategy{
 					Type: appsv1.RollingUpdateDeploymentStrategyType,
 				},
+				//nolint:staticcheck // Using deprecated type during deprecation period
 				Monitoring: &apiv1.PoolerMonitoringConfiguration{
 					EnablePodMonitor: true,
 				},
@@ -88,10 +91,15 @@ var _ = Describe("Deployment", func() {
 		// Check the metadata
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
-		Expect(deployment.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-		Expect(deployment.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(deployment.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
-
+		Expect(deployment.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.PgbouncerNameLabel:              pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 		// Check the DeploymentSpec
 		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
@@ -99,13 +107,20 @@ var _ = Describe("Deployment", func() {
 		// Check the PodTemplateSpec
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
+		Expect(podTemplate.Labels).To(BeEquivalentTo(map[string]string{
+			utils.ClusterLabelName:                cluster.Name,
+			utils.PgbouncerNameLabel:              pooler.Name,
+			utils.PodRoleLabelName:                string(utils.PodRolePooler),
+			utils.KubernetesAppLabelName:          utils.AppName,
+			utils.KubernetesAppInstanceLabelName:  cluster.Name,
+			utils.KubernetesAppComponentLabelName: utils.PoolerComponentName,
+			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+		}))
 
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())
 		Expect(podTemplate.Spec.Containers[0].Name).To(Equal("pgbouncer"))
-		Expect(podTemplate.Spec.Containers[0].Image).To(Equal(DefaultPgbouncerImage))
+		Expect(podTemplate.Spec.Containers[0].Image).To(Equal(config.Current.PgbouncerImageName))
 	})
 
 	It("sets the correct number of replicas", func() {
@@ -158,5 +173,71 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds).To(Equal(int32(5)))
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TCPSocket.Port).
 			To(Equal(intstr.FromInt32(pgBouncerConfig.PgBouncerPort)))
+	})
+
+	It("should correctly set pod resources to the bootstrap init container", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				Template: &apiv1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Resources: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dep, err := Deployment(pooler, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		// check that the init container has the correct resources
+		Expect(dep.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+		initResources := dep.Spec.Template.Spec.InitContainers[0].Resources
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
+		Expect(initResources.Requests).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("128Mi")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("200m")))
+		Expect(initResources.Limits).To(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("256Mi")))
+	})
+
+	It("retains user-defined bootstrap-controller resources", func() {
+		pooler.Spec.Template = &apiv1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name: specs.BootstrapControllerContainerName,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2m"),
+							corev1.ResourceMemory: resource.MustParse("30Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				}},
+			},
+		}
+
+		deployment, err := Deployment(pooler, cluster)
+		Expect(err).ShouldNot(HaveOccurred())
+		var found *corev1.Container
+		for i := range deployment.Spec.Template.Spec.InitContainers {
+			if deployment.Spec.Template.Spec.InitContainers[i].Name == specs.BootstrapControllerContainerName {
+				found = &deployment.Spec.Template.Spec.InitContainers[i]
+				break
+			}
+		}
+		Expect(found).ToNot(BeNil())
+		Expect(found.Resources.Requests.Cpu().String()).To(Equal("2m"))
+		Expect(found.Resources.Requests.Memory().String()).To(Equal("30Mi"))
+		Expect(found.Resources.Limits.Cpu().String()).To(Equal("1"))
+		Expect(found.Resources.Limits.Memory().String()).To(Equal("100Mi"))
 	})
 })

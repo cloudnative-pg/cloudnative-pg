@@ -42,8 +42,7 @@ import (
 // reconcileImage processes the image request, executes it, and stores
 // the result in the .status.image field. If the user requested a
 // major version upgrade, the current image is saved in the
-// .status.majorVersionUpgradeFromImage field. This allows for
-// reverting the upgrade if it doesn't complete successfully.
+// .status.pgDataImageInfo field.
 func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.Cluster) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -154,7 +153,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	// Get the referenced catalog
 	catalogName := cluster.Spec.ImageCatalogRef.Name
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
+	err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
@@ -163,6 +162,10 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 			return apiv1.ImageInfo{}, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
 		}
 
+		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Error getting %v/%v: %v",
+			catalogKind, catalogName, err)
+		contextLogger.Error(err, "while getting imageCatalog",
+			"catalogKind", catalogKind, "catalogName", catalogName)
 		return apiv1.ImageInfo{}, err
 	}
 

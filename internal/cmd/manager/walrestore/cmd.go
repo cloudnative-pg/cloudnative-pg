@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -123,7 +122,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
 		//
@@ -262,6 +261,7 @@ func restoreWALViaPlugins(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walName string,
+	pgData string,
 	destinationPathName string,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
@@ -282,7 +282,7 @@ func restoreWALViaPlugins(
 	}
 	defer client.Close(ctx)
 
-	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
+	return client.RestoreWAL(ctx, cluster, walName, postgres.BuildWALPath(pgData, destinationPathName))
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
@@ -353,9 +353,9 @@ func GetRecoverConfiguration(
 			return "", nil, nil, ErrNoBackupConfigured
 		}
 		configuration := externalCluster.BarmanObjectStore
-		if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
+		if configuration.EndpointCA != nil && configuration.AWS != nil {
 			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
-		} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
+		} else if configuration.EndpointCA != nil && configuration.Azure != nil {
 			env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
 		}
 		return externalCluster.Name, env, externalCluster.BarmanObjectStore, nil
@@ -365,9 +365,9 @@ func GetRecoverConfiguration(
 	// back up this cluster
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
 		configuration := cluster.Spec.Backup.BarmanObjectStore
-		if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
+		if configuration.EndpointCA != nil && configuration.AWS != nil {
 			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
-		} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
+		} else if configuration.EndpointCA != nil && configuration.Azure != nil {
 			env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
 		}
 		return cluster.Name, env, cluster.Spec.Backup.BarmanObjectStore, nil
@@ -406,7 +406,14 @@ func isStreamingAvailable(cluster *apiv1.Cluster, podName string) bool {
 		return false
 	}
 
-	// Easy case: If this pod is a replica, the streaming is always available
+	// Easy case take 1: we are helping PostgreSQL to create the first
+	// instance of a Cluster. No streaming connection is possible.
+	if cluster.Status.CurrentPrimary == "" {
+		return false
+	}
+
+	// Easy case take 2: If this pod is a replica, the streaming is always
+	// available
 	if cluster.Status.CurrentPrimary != podName {
 		return true
 	}

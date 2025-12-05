@@ -1,83 +1,57 @@
+---
+id: wal_archiving
+sidebar_position: 190
+title: WAL archiving
+---
+
 # WAL archiving
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Warning
-    With the deprecation of native Barman Cloud support in CloudNativePG in
-    favor of the Barman Cloud Plugin, this page—and the backup and recovery
-    documentation—may undergo changes before the official release of version
-    1.26.0.
+Write-Ahead Log (WAL) archiving in CloudNativePG is the process of continuously
+shipping WAL files to a designated object store from the PostgreSQL primary.
+These archives are essential for enabling Point-In-Time Recovery (PITR) and are
+a foundational component for both object store and volume snapshot-based backup
+strategies.
 
-WAL archiving is the process that feeds a [WAL archive](backup.md#wal-archive)
-in CloudNativePG.
+## Plugin-Based Architecture
 
-!!! Important
-    CloudNativePG currently only supports WAL archives on object stores. Such
-    WAL archives serve for both object store backups and volume snapshot backups.
+CloudNativePG supports WAL archiving through a **plugin-based mechanism**,
+defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec)
+section of the `Cluster` resource.
 
-The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
-a `Cluster` resource. Please proceed with the same instructions you find in
-the ["Backup on object stores" section](backup_barmanobjectstore.md) to set up
-the WAL archive.
+Only **one plugin at a time** can be responsible for WAL archiving. This is
+configured by setting the `isWALArchiver` field to `true` within the plugin
+configuration.
 
-!!! Info
-    Please refer to [`BarmanObjectStoreConfiguration`](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)
-    in the barman-cloud API for a full list of options.
+## Supported Plugins
 
-If required, you can choose to compress WAL files as soon as they
-are uploaded and/or encrypt them:
+Currently, the **Barman Cloud Plugin** is the only officially supported WAL
+archiving plugin maintained by the CloudNativePG Community.
+For full documentation, configuration options, and best practices, see the
+[Barman Cloud Plugin documentation](https://cloudnative-pg.io/plugin-barman-cloud/docs/intro/).
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      [...]
-      wal:
-        compression: gzip
-        encryption: AES256
-```
+## Deprecation Notice: Native Barman Cloud
 
-You can configure the encryption directly in your bucket, and the operator
-will use it unless you override it in the cluster configuration.
-
-PostgreSQL implements a sequential archiving scheme, where the
-`archive_command` will be executed sequentially for every WAL
-segment to be archived.
+CloudNativePG still supports WAL archiving natively through the
+`.spec.backup.barmanObjectStore` field. While still functional, **this
+interface is deprecated** and will be removed in a future release.
 
 !!! Important
-    By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
-    that WAL files, even in case of low workloads, are closed and archived
-    at least every 5 minutes, providing a deterministic time-based value for
-    your Recovery Point Objective ([RPO](before_you_start.md#rpo)). Even though you change the value
-    of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
-    our experience suggests that the default value set by the operator is
-    suitable for most use cases.
+    All new deployments are strongly encouraged to adopt the plugin-based
+    architecture, which offers a more flexible and maintainable approach.
 
-When the bandwidth between the PostgreSQL instance and the object
-store allows archiving more than one WAL file in parallel, you
-can use the parallel WAL archiving feature of the instance manager
-like in the following example:
+If you are currently using the native `.spec.backup.barmanObjectStore`
+approach, refer to the official guide for a smooth transition:
+[Migrating from Built-in CloudNativePG Backup](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      [...]
-      wal:
-        compression: gzip
-        maxParallel: 8
-        encryption: AES256
-```
+## About the archive timeout
 
-In the previous example, the instance manager optimizes the WAL
-archiving process by archiving in parallel at most eight ready
-WALs, including the one requested by PostgreSQL.
+By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
+that WAL files, even in case of low workloads, are closed and archived
+at least every 5 minutes, providing a deterministic time-based value for
+your Recovery Point Objective ([RPO](before_you_start.md#rpo)).
 
-When PostgreSQL will request the archiving of a WAL that has
-already been archived by the instance manager as an optimization,
-that archival request will be just dismissed with a positive status.
+Even though you change the value of the
+[`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
+our experience suggests that the default value set by the operator is suitable
+for most use cases.

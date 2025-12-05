@@ -25,12 +25,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"go.uber.org/atomic"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
@@ -41,8 +43,9 @@ import (
 // the one of this PostgreSQL instance. Also, the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client   ctrl.Client
-	instance *postgres.Instance
+	client        ctrl.Client
+	instance      *postgres.Instance
+	runningImages *stringset.Data
 
 	secretVersions  map[string]string
 	extensionStatus map[string]bool
@@ -52,6 +55,7 @@ type InstanceReconciler struct {
 	metricsServerExporter *metricserver.Exporter
 
 	certificateReconciler *instancecertificate.Reconciler
+	pluginRepository      repository.Interface
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -59,6 +63,7 @@ func NewInstanceReconciler(
 	instance *postgres.Instance,
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
+	pluginRepository repository.Interface,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -68,6 +73,7 @@ func NewInstanceReconciler(
 		systemInitialization:  concurrency.NewExecuted(),
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
+		pluginRepository:      pluginRepository,
 	}
 }
 

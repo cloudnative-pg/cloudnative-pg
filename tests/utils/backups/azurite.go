@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -124,7 +124,7 @@ func InstallAzurite(
 		Namespace: namespace,
 		Name:      "azurite",
 	}
-	deployment := &apiv1.Deployment{}
+	deployment := &appsv1.Deployment{}
 	err = crudClient.Get(ctx, deploymentNamespacedName, deployment)
 	if err != nil {
 		return err
@@ -262,19 +262,19 @@ func getAzuriteService(namespace string) corev1.Service {
 }
 
 // getAzuriteDeployment get the deployment for Azurite
-func getAzuriteDeployment(namespace string) apiv1.Deployment {
+func getAzuriteDeployment(namespace string) appsv1.Deployment {
 	replicas := int32(1)
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
 
-	azuriteDeployment := apiv1.Deployment{
+	azuriteDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "azurite",
 			Namespace: namespace,
 			Labels:    map[string]string{"app": "azurite"},
 		},
-		Spec: apiv1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "azurite"},
@@ -290,6 +290,7 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 							Name:    "azurite",
 							Command: []string{"azurite"},
 							Args: []string{
+								"--skipApiVersionCheck",
 								"-l", "/data", "--cert", "/etc/ssl/certs/azurite.pem",
 								"--key", "/etc/ssl/certs/azurite-key.pem",
 								"--oauth", "basic", "--blobHost", "0.0.0.0",
@@ -392,25 +393,25 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	storageCredentialsSecretName,
 	azStorageAccount,
 	azBlobContainer string,
-) (*v1.Cluster, error) {
+) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
 		azStorageAccount, azBlobContainer)
 
-	restoreCluster := &v1.Cluster{
+	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
-		Spec: v1.ClusterSpec{
+		Spec: apiv1.ClusterSpec{
 			Instances: 3,
 
-			StorageConfiguration: v1.StorageConfiguration{
+			StorageConfiguration: apiv1.StorageConfiguration{
 				Size:         "1Gi",
 				StorageClass: &storageClassName,
 			},
 
-			PostgresConfiguration: v1.PostgresConfiguration{
+			PostgresConfiguration: apiv1.PostgresConfiguration{
 				Parameters: map[string]string{
 					"log_checkpoints":             "on",
 					"log_lock_waits":              "on",
@@ -422,30 +423,30 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 				},
 			},
 
-			Bootstrap: &v1.BootstrapConfiguration{
-				Recovery: &v1.BootstrapRecovery{
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
 					Source: sourceClusterName,
-					RecoveryTarget: &v1.RecoveryTarget{
+					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,
 					},
 				},
 			},
 
-			ExternalClusters: []v1.ExternalCluster{
+			ExternalClusters: []apiv1.ExternalCluster{
 				{
 					Name: sourceClusterName,
-					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: destinationPath,
-						BarmanCredentials: v1.BarmanCredentials{
-							Azure: &v1.AzureCredentials{
-								StorageAccount: &v1.SecretKeySelector{
-									LocalObjectReference: v1.LocalObjectReference{
+						BarmanCredentials: apiv1.BarmanCredentials{
+							Azure: &apiv1.AzureCredentials{
+								StorageAccount: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
 										Name: storageCredentialsSecretName,
 									},
 									Key: "ID",
 								},
-								StorageKey: &v1.SecretKeySelector{
-									LocalObjectReference: v1.LocalObjectReference{
+								StorageKey: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
 										Name: storageCredentialsSecretName,
 									},
 									Key: "KEY",
@@ -461,7 +462,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	if err != nil {
 		return nil, err
 	}
-	cluster, ok := obj.(*v1.Cluster)
+	cluster, ok := obj.(*apiv1.Cluster)
 	if !ok {
 		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
 	}
@@ -477,24 +478,24 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	externalClusterName,
 	sourceClusterName,
 	targetTime string,
-) (*v1.Cluster, error) {
+) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
-	restoreCluster := &v1.Cluster{
+	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
-		Spec: v1.ClusterSpec{
+		Spec: apiv1.ClusterSpec{
 			Instances: 3,
 
-			StorageConfiguration: v1.StorageConfiguration{
+			StorageConfiguration: apiv1.StorageConfiguration{
 				Size:         "1Gi",
 				StorageClass: &storageClassName,
 			},
 
-			PostgresConfiguration: v1.PostgresConfiguration{
+			PostgresConfiguration: apiv1.PostgresConfiguration{
 				Parameters: map[string]string{
 					"log_checkpoints":             "on",
 					"log_lock_waits":              "on",
@@ -506,30 +507,30 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 				},
 			},
 
-			Bootstrap: &v1.BootstrapConfiguration{
-				Recovery: &v1.BootstrapRecovery{
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
 					Source: sourceClusterName,
-					RecoveryTarget: &v1.RecoveryTarget{
+					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,
 					},
 				},
 			},
 
-			ExternalClusters: []v1.ExternalCluster{
+			ExternalClusters: []apiv1.ExternalCluster{
 				{
 					Name: sourceClusterName,
-					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: DestinationPath,
-						EndpointCA: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
+						EndpointCA: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "azurite-ca-secret",
 							},
 							Key: "ca.crt",
 						},
-						BarmanCredentials: v1.BarmanCredentials{
-							Azure: &v1.AzureCredentials{
-								ConnectionString: &v1.SecretKeySelector{
-									LocalObjectReference: v1.LocalObjectReference{
+						BarmanCredentials: apiv1.BarmanCredentials{
+							Azure: &apiv1.AzureCredentials{
+								ConnectionString: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
 										Name: "azurite",
 									},
 									Key: "AZURE_CONNECTION_STRING",
@@ -545,7 +546,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	if err != nil {
 		return nil, err
 	}
-	cluster, ok := obj.(*v1.Cluster)
+	cluster, ok := obj.(*apiv1.Cluster)
 	if !ok {
 		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
 	}

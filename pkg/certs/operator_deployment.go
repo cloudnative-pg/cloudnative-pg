@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,7 +63,7 @@ func GetOperatorDeployment(
 	ctx context.Context,
 	kubeClient client.Client,
 	namespace, operatorLabelSelector string,
-) (*v1.Deployment, error) {
+) (*appsv1.Deployment, error) {
 	labelMap, err := labels.ConvertSelectorToLabelsMap(operatorLabelSelector)
 	if err != nil {
 		return nil, err
@@ -99,10 +99,10 @@ func findOperatorDeploymentByFilter(ctx context.Context,
 	kubeClient client.Client,
 	namespace string,
 	filter client.ListOption,
-) (*v1.Deployment, error) {
+) (*appsv1.Deployment, error) {
 	logger := log.FromContext(ctx)
 
-	deploymentList := &v1.DeploymentList{}
+	deploymentList := &appsv1.DeploymentList{}
 	err := kubeClient.List(
 		ctx,
 		deploymentList,

@@ -10,7 +10,8 @@ on:
 permissions: read-all
 
 env:
-  GOLANG_VERSION: "1.24.x"
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.25.5"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -19,17 +20,19 @@ jobs:
     name: Evaluate release tag
     runs-on: ubuntu-24.04
     outputs:
-      is_latest: ${{ env.IS_LATEST }}
-      is_stable: ${{ env.IS_STABLE }}
+      is_latest: ${{ steps.check-release.outputs.is_latest }}
+      is_stable: ${{ steps.check-release.outputs.is_stable }}
+      is_rc: ${{ steps.check-release.outputs.is_rc }}
     steps:
       -
         name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Check release version
+        id: check-release
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
           latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
@@ -42,8 +45,13 @@ jobs:
           if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             is_stable="true"
           fi
-          echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
-          echo "IS_STABLE=${is_stable}" >> $GITHUB_ENV
+          is_rc="false"
+          if [[ "$tag" =~ ^.*-rc[0-9]+$ ]]; then
+            is_rc="true"
+          fi
+          echo "is_latest=${is_latest}" >> $GITHUB_OUTPUT
+          echo "is_stable=${is_stable}" >> $GITHUB_OUTPUT
+          echo "is_rc=${is_rc}" >> $GITHUB_OUTPUT
 
   release:
     name: Create Github release
@@ -55,7 +63,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
       -
         name: Get tag
         run: |
@@ -74,14 +82,14 @@ jobs:
             /src/docs/src/${{ env.FILE }}
       -
         name: Release
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2
         with:
           body_path: release_notes.md
           draft: false
           name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
           make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
-          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' }}
+          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' || needs.check-version.outputs.is_rc == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,7 +98,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       packages: write
-      contents: read
+      contents: write
       id-token: write
     needs:
       - check-version
@@ -103,13 +111,13 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -153,7 +161,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
           version: v2
@@ -182,22 +190,22 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
       -
         name: Login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@76f9fa3a758507623da19f6092dc4089a7e61592 # v6
+        uses: docker/bake-action@3acf805d94d93a86cce4ca44798a76464a75b88c # v6
         id: bake-push
         env:
           environment: "production"
@@ -213,7 +221,7 @@ jobs:
           targets: "default"
       -
         name: Install cosign
-        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
@@ -239,7 +247,7 @@ jobs:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     needs:
       - check-version
@@ -247,30 +255,32 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.release-binaries.result == 'success' &&
-      needs.check-version.outputs.is_latest == 'true' &&
-      needs.check-version.outputs.is_stable == 'true'
+      (
+        needs.check-version.outputs.is_latest == 'true' ||
+        needs.check-version.outputs.is_rc == 'true'
+      )
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -293,7 +303,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: bundle
           path: |
@@ -314,14 +324,14 @@ jobs:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     steps:
       - name: Checkout community-operators
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           repository: k8s-operatorhub/community-operators
           fetch-depth: 0
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: bundle
 
@@ -332,7 +342,7 @@ jobs:
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
+        uses: peter-evans/create-pull-request@84ae59a2cdc2258d6fa0732dd66352dddae2a412 # v7
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
@@ -391,7 +401,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -404,7 +414,7 @@ jobs:
           git config user.name "${{ needs.release-binaries.outputs.author_name }}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: bundle
       -
@@ -426,7 +436,7 @@ jobs:
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
