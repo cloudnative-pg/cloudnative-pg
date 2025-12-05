@@ -304,6 +304,7 @@ apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 	$(CRDREFDOCS) --source-path api/v1 \
 		--config docs/crd-gen-refs/config.yaml \
 		--renderer markdown \
+		--max-depth 15 \
 		--templates-dir docs/crd-gen-refs/markdown \
 		--output-path docs/src/cloudnative-pg.v1.md
 
