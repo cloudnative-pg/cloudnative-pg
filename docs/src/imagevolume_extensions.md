@@ -16,12 +16,11 @@ This feature allows you to mount a [PostgreSQL extension](https://www.postgresql
 packaged as an OCI-compliant container image, as a read-only and immutable
 volume inside a running pod at a known filesystem path.
 
-You can make the extension available either globally, using the
-[`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries),
-or at the database level through the `CREATE EXTENSION` command. For the
-latter, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database)
-to ensure consistent, automated extension setup within your PostgreSQL
-databases.
+If the extension requires one or more shared libraries to be pre-loaded at server
+start, you can add them via the [`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries).
+Also, if your extension requires being created at the database level through
+the `CREATE EXTENSION` command, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database)
+to ensure consistent, automated extension setup within your PostgreSQL databases.
 
 ## Benefits
 
@@ -295,7 +294,7 @@ spec:
       - name: postgis
         # ...
         ld_library_path:
-          - syslib
+          - system
         image:
           reference: # registry path for your PostGIS image
       # ...
@@ -304,7 +303,7 @@ spec:
 ```
 
 CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
-`/extensions/postgis/syslib`, allowing PostgreSQL to locate and load these
+`/extensions/postgis/system`, allowing PostgreSQL to locate and load these
 system libraries at runtime.
 
 !!! Important

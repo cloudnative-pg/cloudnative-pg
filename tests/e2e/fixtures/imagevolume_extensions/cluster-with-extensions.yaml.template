@@ -18,9 +18,9 @@ spec:
     extensions:
       - name: postgis
         ld_library_path:
-          - syslib
+          - system
         image:
-          reference: ghcr.io/niccolofei/postgis:18rc1-master-trixie # wokeignore:rule=master
+          reference: "ghcr.io/cloudnative-pg/postgis-extension:3.6.1-${PG_MAJOR}-trixie"
 
   bootstrap:
     initdb:

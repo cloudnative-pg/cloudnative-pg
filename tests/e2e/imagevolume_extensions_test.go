@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -40,7 +41,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguration), func() {
+var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtensions), func() {
 	const (
 		clusterManifest  = fixturesDir + "/imagevolume_extensions/cluster-with-extensions.yaml.template"
 		databaseManifest = fixturesDir + "/imagevolume_extensions/database.yaml.template"
@@ -197,7 +198,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelPostgresConfiguratio
 					apiv1.ExtensionConfiguration{
 						Name: "pgvector",
 						ImageVolumeSource: corev1.ImageVolumeSource{
-							Reference: "ghcr.io/niccolofei/pgvector:18rc1-master-trixie", // wokeignore:rule=master
+							Reference: fmt.Sprintf("ghcr.io/cloudnative-pg/pgvector:0.8.1-%d-trixie", env.PostgresVersion),
 						},
 					})
 				// Setting some pgvector GUCs

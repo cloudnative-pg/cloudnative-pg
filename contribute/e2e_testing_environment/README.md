@@ -208,6 +208,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `publication-subscription`        |
 | `declarative-databases`           |
 | `postgres-major-upgrade`          |
+| `image-volume-extensions`         |
 
 ex:
 ```shell
