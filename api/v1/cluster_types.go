@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1962,8 +1963,7 @@ type DataSource struct {
 // BackupSource contains the backup we need to restore from, plus some
 // information that could be needed to correctly restore it.
 type BackupSource struct {
-	// TODO: aliased inline types don't get documented by crd-gen-ref
-	LocalObjectReference `json:",inline"`
+	machineryapi.LocalObjectReference `json:",inline"`
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid
 	// errors with certificate issuer and barman-cloud-wal-archive.

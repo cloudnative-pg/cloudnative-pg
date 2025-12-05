@@ -208,6 +208,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the referent. | True |  |  |
 | `endpointCA` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
 
 
@@ -245,6 +246,9 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
+| `googleCredentials` _[GoogleCredentials](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#S3Credentials)_ | The credentials to use to upload data to Google Cloud Storage |  |  |  |
+| `s3Credentials` _[S3Credentials](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#GoogleCredentials)_ | The credentials to use to upload data to S3 |  |  |  |
+| `azureCredentials` _[AzureCredentials](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#AzureCredentials)_ | The credentials to use to upload data to Azure Blob Storage |  |  |  |
 | `majorVersion` _integer_ | The PostgreSQL major version that was running when the<br />backup was taken. | True |  |  |
 | `endpointCA` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
 | `endpointURL` _string_ | Endpoint to be used to upload data to the cloud,<br />overriding the automatic endpoint discovery |  |  |  |
