@@ -192,6 +192,7 @@ type BackupSnapshotElementStatus struct {
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
+	// TODO: aliased inline types don't get documented by crd-gen-ref
 	// The potential credentials for each cloud provider
 	BarmanCredentials `json:",inline"`
 
