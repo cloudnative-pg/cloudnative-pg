@@ -25,5 +25,17 @@ render:
   kubernetesVersion: 1.34
   knownTypes:
   - name: BarmanObjectStoreConfiguration
-    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
     link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration
+  - name: LocalObjectReference
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference
+  - name: SecretKeySelector
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector
+  - name: ConfigMapKeySelector
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#ConfigMapKeySelector
+  - name: RelabelConfig
+    package: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
+    link: https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig
