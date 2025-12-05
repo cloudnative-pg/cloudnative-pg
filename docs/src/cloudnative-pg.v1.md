@@ -10,25 +10,15 @@ Package v1 contains API Schema definitions for the postgresql v1 API group
 
 ### Resource Types
 - [Backup](#backup)
-- [BackupList](#backuplist)
 - [Cluster](#cluster)
 - [ClusterImageCatalog](#clusterimagecatalog)
-- [ClusterImageCatalogList](#clusterimagecataloglist)
-- [ClusterList](#clusterlist)
 - [Database](#database)
-- [DatabaseList](#databaselist)
 - [FailoverQuorum](#failoverquorum)
-- [FailoverQuorumList](#failoverquorumlist)
 - [ImageCatalog](#imagecatalog)
-- [ImageCatalogList](#imagecataloglist)
 - [Pooler](#pooler)
-- [PoolerList](#poolerlist)
 - [Publication](#publication)
-- [PublicationList](#publicationlist)
 - [ScheduledBackup](#scheduledbackup)
-- [ScheduledBackupList](#scheduledbackuplist)
 - [Subscription](#subscription)
-- [SubscriptionList](#subscriptionlist)
 
 
 
@@ -83,8 +73,7 @@ A Backup resource is a request for a PostgreSQL backup by the user.
 
 
 
-_Appears in:_
-- [BackupList](#backuplist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -112,27 +101,9 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `volumeSnapshot` _[VolumeSnapshotConfiguration](#volumesnapshotconfiguration)_ | VolumeSnapshot provides the configuration for the execution of volume snapshot backups. |  |  |  |
-| `barmanObjectStore` _[BarmanObjectStoreConfiguration](#barmanobjectstoreconfiguration)_ | The configuration for the barman-cloud tool suite |  |  |  |
+| `barmanObjectStore` _[BarmanObjectStoreConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)_ | The configuration for the barman-cloud tool suite |  |  |  |
 | `retentionPolicy` _string_ | RetentionPolicy is the retention policy to be used for backups<br />and WALs (i.e. '60d'). The retention policy is expressed in the form<br />of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` -<br />days, weeks, months.<br />It's currently only applicable when using the BarmanObjectStore method. |  |  | Pattern: `^[1-9][0-9]*[dwm]$` <br /> |
 | `target` _[BackupTarget](#backuptarget)_ | The policy to decide which instance should perform backups. Available<br />options are empty string, which will default to `prefer-standby` policy,<br />`primary` to have backups run always on primary instances, `prefer-standby`<br />to have backups run preferably on the most updated standby, if available. |  | prefer-standby | Enum: [primary prefer-standby] <br /> |
-
-
-#### BackupList
-
-
-
-BackupList contains a list of Backup
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `BackupList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |  |
-| `items` _[Backup](#backup) array_ | List of backups | True |  |  |
 
 
 #### BackupMethod
@@ -237,7 +208,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `endpointCA` _[SecretKeySelector](#secretkeyselector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
+| `endpointCA` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
 
 
 #### BackupSpec
@@ -253,7 +224,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](#localobjectreference)_ | The cluster to backup | True |  |  |
+| `cluster` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | The cluster to backup | True |  |  |
 | `target` _[BackupTarget](#backuptarget)_ | The policy to decide which instance should perform this backup. If empty,<br />it defaults to `cluster.spec.backup.target`.<br />Available options are empty string, `primary` and `prefer-standby`.<br />`primary` to have backups run always on primary instances,<br />`prefer-standby` to have backups run preferably on the most updated<br />standby, if available. |  |  | Enum: [primary prefer-standby] <br /> |
 | `method` _[BackupMethod](#backupmethod)_ | The backup method to be used, possible options are `barmanObjectStore`,<br />`volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`. |  | barmanObjectStore | Enum: [barmanObjectStore volumeSnapshot plugin] <br /> |
 | `pluginConfiguration` _[BackupPluginConfiguration](#backuppluginconfiguration)_ | Configuration parameters passed to the plugin managing this backup |  |  |  |
@@ -275,7 +246,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `majorVersion` _integer_ | The PostgreSQL major version that was running when the<br />backup was taken. | True |  |  |
-| `endpointCA` _[SecretKeySelector](#secretkeyselector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
+| `endpointCA` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector)_ | EndpointCA store the CA bundle of the barman endpoint.<br />Useful when using self-signed certificates to avoid<br />errors with certificate issuer and barman-cloud-wal-archive. |  |  |  |
 | `endpointURL` _string_ | Endpoint to be used to upload data to the cloud,<br />overriding the automatic endpoint discovery |  |  |  |
 | `destinationPath` _string_ | The path where to store the backup (i.e. s3://bucket/path/to/folder)<br />this path, with different destination folders, will be used for WALs<br />and for data. This may not be populated in case of errors. |  |  |  |
 | `serverName` _string_ | The server name on S3, the cluster name is used if this<br />parameter is omitted |  |  |  |
@@ -359,7 +330,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
-| `secret` _[LocalObjectReference](#localobjectreference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 | `options` _string array_ | The list of options that must be passed to initdb when creating the cluster.<br />Deprecated: This could lead to inconsistent configurations,<br />please use the explicit provided parameters instead.<br />If defined, explicit values will be ignored. |  |  |  |
 | `dataChecksums` _boolean_ | Whether the `-k` option should be passed to initdb,<br />enabling checksums on data pages (default: `false`) |  |  |  |
 | `encoding` _string_ | The value to be passed as option `--encoding` for initdb (default:`UTF8`) |  |  |  |
@@ -397,7 +368,7 @@ _Appears in:_
 | `source` _string_ | The name of the server of which we need to take a physical backup | True |  | MinLength: 1 <br /> |
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
-| `secret` _[LocalObjectReference](#localobjectreference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
 #### BootstrapRecovery
@@ -427,7 +398,7 @@ _Appears in:_
 | `recoveryTarget` _[RecoveryTarget](#recoverytarget)_ | By default, the recovery process applies all the available<br />WAL files in the archive (full recovery). However, you can also<br />end the recovery as soon as a consistent state is reached or<br />recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object,<br />as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...).<br />More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET |  |  |  |
 | `database` _string_ | Name of the database used by the application. Default: `app`. |  |  |  |
 | `owner` _string_ | Name of the owner of the database in the instance to be used<br />by applications. Defaults to the value of the `database` key. |  |  |  |
-| `secret` _[LocalObjectReference](#localobjectreference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
+| `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
 #### CatalogImage
@@ -498,8 +469,7 @@ managed by CloudNativePG.
 
 
 
-_Appears in:_
-- [ClusterList](#clusterlist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -520,8 +490,7 @@ ClusterImageCatalog is the Schema for the clusterimagecatalogs API
 
 
 
-_Appears in:_
-- [ClusterImageCatalogList](#clusterimagecataloglist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -529,42 +498,6 @@ _Appears in:_
 | `kind` _string_ | `ClusterImageCatalog` | True | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[ImageCatalogSpec](#imagecatalogspec)_ | Specification of the desired behavior of the ClusterImageCatalog.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
-
-
-#### ClusterImageCatalogList
-
-
-
-ClusterImageCatalogList contains a list of ClusterImageCatalog
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `ClusterImageCatalogList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[ClusterImageCatalog](#clusterimagecatalog) array_ | List of ClusterImageCatalogs | True |  |  |
-
-
-#### ClusterList
-
-
-
-ClusterList contains a list of Cluster
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `ClusterList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |  |
-| `items` _[Cluster](#cluster) array_ | List of clusters | True |  |  |
 
 
 #### ClusterMonitoringTLSConfiguration
@@ -613,10 +546,10 @@ _Appears in:_
 | `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability:map[enabled:true] \} |  |
 | `bootstrap` _[BootstrapConfiguration](#bootstrapconfiguration)_ | Instructions to bootstrap this cluster |  |  |  |
 | `replica` _[ReplicaClusterConfiguration](#replicaclusterconfiguration)_ | Replica cluster configuration |  |  |  |
-| `superuserSecret` _[LocalObjectReference](#localobjectreference)_ | The secret containing the superuser password. If not defined a new<br />secret will be created with a randomly generated password |  |  |  |
+| `superuserSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | The secret containing the superuser password. If not defined a new<br />secret will be created with a randomly generated password |  |  |  |
 | `enableSuperuserAccess` _boolean_ | When this option is enabled, the operator will use the `SuperuserSecret`<br />to update the `postgres` user password (if the secret is<br />not present, the operator will automatically create one). When this<br />option is disabled, the operator will ignore the `SuperuserSecret` content, delete<br />it when automatically created, and then blank the password of the `postgres`<br />user by setting it to `NULL`. Disabled by default. |  | false |  |
 | `certificates` _[CertificatesConfiguration](#certificatesconfiguration)_ | The configuration for the CA and related certificates |  |  |  |
-| `imagePullSecrets` _[LocalObjectReference](#localobjectreference) array_ | The list of pull secrets to be used to pull the images |  |  |  |
+| `imagePullSecrets` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference) array_ | The list of pull secrets to be used to pull the images |  |  |  |
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage of the instances |  |  |  |
 | `serviceAccountTemplate` _[ServiceAccountTemplate](#serviceaccounttemplate)_ | Configure the generation of the service account |  |  |  |
 | `walStorage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage for PostgreSQL WAL (Write-Ahead Log) |  |  |  |
@@ -785,8 +718,7 @@ Database is the Schema for the databases API
 
 
 
-_Appears in:_
-- [DatabaseList](#databaselist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -795,24 +727,6 @@ _Appears in:_
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[DatabaseSpec](#databasespec)_ | Specification of the desired Database.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
 | `status` _[DatabaseStatus](#databasestatus)_ | Most recently observed status of the Database. This data may not be up to<br />date. Populated by the system. Read-only.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status |  |  |  |
-
-
-#### DatabaseList
-
-
-
-DatabaseList contains a list of Database
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `DatabaseList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[Database](#database) array_ |  | True |  |  |
 
 
 #### DatabaseObjectSpec
@@ -1069,7 +983,7 @@ _Appears in:_
 | `sslKey` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core)_ | The reference to an SSL private key to be used to connect to this<br />instance |  |  |  |
 | `sslRootCert` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core)_ | The reference to an SSL CA public key to be used to connect to this<br />instance |  |  |  |
 | `password` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#secretkeyselector-v1-core)_ | The reference to the password to be used to connect to the server.<br />If a password is provided, CloudNativePG creates a PostgreSQL<br />passfile at `/controller/external/NAME/pass` (where "NAME" is the<br />cluster's name). This passfile is automatically referenced in the<br />connection string when establishing a connection to the remote<br />PostgreSQL server from the current PostgreSQL `Cluster`. This ensures<br />secure and efficient password management for external clusters. |  |  |  |
-| `barmanObjectStore` _[BarmanObjectStoreConfiguration](#barmanobjectstoreconfiguration)_ | The configuration for the barman-cloud tool suite |  |  |  |
+| `barmanObjectStore` _[BarmanObjectStoreConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)_ | The configuration for the barman-cloud tool suite |  |  |  |
 | `plugin` _[PluginConfiguration](#pluginconfiguration)_ | The configuration of the plugin that is taking care<br />of WAL archiving and backups for this external cluster | True |  |  |
 
 
@@ -1106,8 +1020,7 @@ an update.
 
 
 
-_Appears in:_
-- [FailoverQuorumList](#failoverquorumlist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -1115,24 +1028,6 @@ _Appears in:_
 | `kind` _string_ | `FailoverQuorum` | True | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `status` _[FailoverQuorumStatus](#failoverquorumstatus)_ | Most recently observed status of the failover quorum. |  |  |  |
-
-
-#### FailoverQuorumList
-
-
-
-FailoverQuorumList contains a list of FailoverQuorum
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `FailoverQuorumList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |  |
-| `items` _[FailoverQuorum](#failoverquorum) array_ | List of failoverquorums | True |  |  |
 
 
 #### FailoverQuorumStatus
@@ -1167,8 +1062,7 @@ ImageCatalog is the Schema for the imagecatalogs API
 
 
 
-_Appears in:_
-- [ImageCatalogList](#imagecataloglist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -1176,24 +1070,6 @@ _Appears in:_
 | `kind` _string_ | `ImageCatalog` | True | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[ImageCatalogSpec](#imagecatalogspec)_ | Specification of the desired behavior of the ImageCatalog.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
-
-
-#### ImageCatalogList
-
-
-
-ImageCatalogList contains a list of ImageCatalog
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `ImageCatalogList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[ImageCatalog](#imagecatalog) array_ | List of ImageCatalogs | True |  |  |
 
 
 #### ImageCatalogRef
@@ -1558,12 +1434,12 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `disableDefaultQueries` _boolean_ | Whether the default queries should be injected.<br />Set it to `true` if you don't want to inject default queries into the cluster.<br />Default: false. |  | false |  |
-| `customQueriesConfigMap` _[ConfigMapKeySelector](#configmapkeyselector) array_ | The list of config maps containing the custom queries |  |  |  |
-| `customQueriesSecret` _[SecretKeySelector](#secretkeyselector) array_ | The list of secrets containing the custom queries |  |  |  |
+| `customQueriesConfigMap` _[ConfigMapKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#ConfigMapKeySelector) array_ | The list of config maps containing the custom queries |  |  |  |
+| `customQueriesSecret` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector) array_ | The list of secrets containing the custom queries |  |  |  |
 | `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor`<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  | false |  |
 | `tls` _[ClusterMonitoringTLSConfiguration](#clustermonitoringtlsconfiguration)_ | Configure TLS communication for the metrics endpoint.<br />Changing tls.enabled option will force a rollout of all instances. |  |  |  |
-| `podMonitorMetricRelabelings` _RelabelConfig array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
-| `podMonitorRelabelings` _RelabelConfig array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
 | `metricsQueriesTTL` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | The interval during which metrics computed from queries are considered current.<br />Once it is exceeded, a new scrape will trigger a rerun<br />of the queries.<br />If not set, defaults to 30 seconds, in line with Prometheus scraping defaults.<br />Setting this to zero disables the caching mechanism and can cause heavy load on the PostgreSQL server. |  |  |  |
 
 
@@ -1704,11 +1580,11 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `poolMode` _[PgBouncerPoolMode](#pgbouncerpoolmode)_ | The pool mode. Default: `session`. |  | session | Enum: [session transaction] <br /> |
-| `serverTLSSecret` _[LocalObjectReference](#localobjectreference)_ | ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's<br />`server_tls_key_file` and `server_tls_cert_file`, used when<br />authenticating against PostgreSQL. |  |  |  |
-| `serverCASecret` _[LocalObjectReference](#localobjectreference)_ | ServerCASecret provides PgBouncer’s server_tls_ca_file, the root<br />CA for validating PostgreSQL certificates |  |  |  |
-| `clientCASecret` _[LocalObjectReference](#localobjectreference)_ | ClientCASecret provides PgBouncer’s client_tls_ca_file, the root<br />CA for validating client certificates |  |  |  |
-| `clientTLSSecret` _[LocalObjectReference](#localobjectreference)_ | ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)<br />and client_tls_cert_file (certificate) used to accept client connections |  |  |  |
-| `authQuerySecret` _[LocalObjectReference](#localobjectreference)_ | The credentials of the user that need to be used for the authentication<br />query. In case it is specified, also an AuthQuery<br />(e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")<br />has to be specified and no automatic CNPG Cluster integration will be triggered.<br />Deprecated. |  |  |  |
+| `serverTLSSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | ServerTLSSecret, when pointing to a TLS secret, provides pgbouncer's<br />`server_tls_key_file` and `server_tls_cert_file`, used when<br />authenticating against PostgreSQL. |  |  |  |
+| `serverCASecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | ServerCASecret provides PgBouncer’s server_tls_ca_file, the root<br />CA for validating PostgreSQL certificates |  |  |  |
+| `clientCASecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | ClientCASecret provides PgBouncer’s client_tls_ca_file, the root<br />CA for validating client certificates |  |  |  |
+| `clientTLSSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | ClientTLSSecret provides PgBouncer’s client_tls_key_file (private key)<br />and client_tls_cert_file (certificate) used to accept client connections |  |  |  |
+| `authQuerySecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | The credentials of the user that need to be used for the authentication<br />query. In case it is specified, also an AuthQuery<br />(e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")<br />has to be specified and no automatic CNPG Cluster integration will be triggered.<br />Deprecated. |  |  |  |
 | `authQuery` _string_ | The query that will be used to download the hash of the password<br />of a certain user. Default: "SELECT usename, passwd FROM public.user_search($1)".<br />In case it is specified, also an AuthQuerySecret has to be specified and<br />no automatic CNPG Cluster integration will be triggered. |  |  |  |
 | `parameters` _object (keys:string, values:string)_ | Additional parameters to be passed to PgBouncer - please check<br />the CNPG documentation for a list of options you can configure |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
@@ -1834,8 +1710,7 @@ Pooler is the Schema for the poolers API
 
 
 
-_Appears in:_
-- [PoolerList](#poolerlist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -1862,24 +1737,6 @@ _Appears in:_
 | `pgBouncerIntegration` _[PgBouncerIntegrationStatus](#pgbouncerintegrationstatus)_ |  |  |  |  |
 
 
-#### PoolerList
-
-
-
-PoolerList contains a list of Pooler
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `PoolerList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |  |
-| `items` _[Pooler](#pooler) array_ |  | True |  |  |
-
-
 #### PoolerMonitoringConfiguration
 
 
@@ -1898,8 +1755,8 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor` |  | false |  |
-| `podMonitorMetricRelabelings` _RelabelConfig array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion. |  |  |  |
-| `podMonitorRelabelings` _RelabelConfig array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping. |  |  |  |
+| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion. |  |  |  |
+| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping. |  |  |  |
 
 
 #### PoolerSecrets
@@ -1935,7 +1792,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](#localobjectreference)_ | This is the cluster reference on which the Pooler will work.<br />Pooler name should never match with any cluster name within the same namespace. | True |  |  |
+| `cluster` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | This is the cluster reference on which the Pooler will work.<br />Pooler name should never match with any cluster name within the same namespace. | True |  |  |
 | `type` _[PoolerType](#poolertype)_ | Type of service to forward traffic to. Default: `rw`. |  | rw | Enum: [rw ro r] <br /> |
 | `instances` _integer_ | The number of replicas we want. Default: 1. |  | 1 |  |
 | `template` _[PodTemplateSpec](#podtemplatespec)_ | The template of the Pod to be created |  |  |  |
@@ -2130,8 +1987,7 @@ Publication is the Schema for the publications API
 
 
 
-_Appears in:_
-- [PublicationList](#publicationlist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2140,24 +1996,6 @@ _Appears in:_
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[PublicationSpec](#publicationspec)_ |  | True |  |  |
 | `status` _[PublicationStatus](#publicationstatus)_ |  | True |  |  |
-
-
-#### PublicationList
-
-
-
-PublicationList contains a list of Publication
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `PublicationList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[Publication](#publication) array_ |  | True |  |  |
 
 
 #### PublicationReclaimPolicy
@@ -2380,7 +2218,7 @@ _Appears in:_
 | `name` _string_ | Name of the role | True |  |  |
 | `comment` _string_ | Description of the role |  |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
-| `passwordSecret` _[LocalObjectReference](#localobjectreference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
+| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
 | `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
@@ -2432,8 +2270,8 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `secretRefs` _[SecretKeySelector](#secretkeyselector) array_ | SecretRefs holds a list of references to Secrets |  |  |  |
-| `configMapRefs` _[ConfigMapKeySelector](#configmapkeyselector) array_ | ConfigMapRefs holds a list of references to ConfigMaps |  |  |  |
+| `secretRefs` _[SecretKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector) array_ | SecretRefs holds a list of references to Secrets |  |  |  |
+| `configMapRefs` _[ConfigMapKeySelector](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#ConfigMapKeySelector) array_ | ConfigMapRefs holds a list of references to ConfigMaps |  |  |  |
 
 
 #### ScheduledBackup
@@ -2444,8 +2282,7 @@ ScheduledBackup is the Schema for the scheduledbackups API
 
 
 
-_Appears in:_
-- [ScheduledBackupList](#scheduledbackuplist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2454,24 +2291,6 @@ _Appears in:_
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[ScheduledBackupSpec](#scheduledbackupspec)_ | Specification of the desired behavior of the ScheduledBackup.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
 | `status` _[ScheduledBackupStatus](#scheduledbackupstatus)_ | Most recently observed status of the ScheduledBackup. This data may not be up<br />to date. Populated by the system. Read-only.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status |  |  |  |
-
-
-#### ScheduledBackupList
-
-
-
-ScheduledBackupList contains a list of ScheduledBackup
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `ScheduledBackupList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |  |
-| `items` _[ScheduledBackup](#scheduledbackup) array_ | List of clusters | True |  |  |
 
 
 #### ScheduledBackupSpec
@@ -2490,7 +2309,7 @@ _Appears in:_
 | `suspend` _boolean_ | If this backup is suspended or not |  |  |  |
 | `immediate` _boolean_ | If the first backup has to be immediately start after creation or not |  |  |  |
 | `schedule` _string_ | The schedule does not follow the same format used in Kubernetes CronJobs<br />as it includes an additional seconds specifier,<br />see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format | True |  |  |
-| `cluster` _[LocalObjectReference](#localobjectreference)_ | The cluster to backup | True |  |  |
+| `cluster` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | The cluster to backup | True |  |  |
 | `backupOwnerReference` _string_ | Indicates which ownerReference should be put inside the created backup resources.<br />- none: no owner reference for created backup objects (same behavior as before the field was introduced)<br />- self: sets the Scheduled backup object as owner of the backup<br />- cluster: set the cluster as owner of the backup<br /> |  | none | Enum: [none self cluster] <br /> |
 | `target` _[BackupTarget](#backuptarget)_ | The policy to decide which instance should perform this backup. If empty,<br />it defaults to `cluster.spec.backup.target`.<br />Available options are empty string, `primary` and `prefer-standby`.<br />`primary` to have backups run always on primary instances,<br />`prefer-standby` to have backups run preferably on the most updated<br />standby, if available. |  |  | Enum: [primary prefer-standby] <br /> |
 | `method` _[BackupMethod](#backupmethod)_ | The backup method to be used, possible options are `barmanObjectStore`,<br />`volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`. |  | barmanObjectStore | Enum: [barmanObjectStore volumeSnapshot plugin] <br /> |
@@ -2737,8 +2556,7 @@ Subscription is the Schema for the subscriptions API
 
 
 
-_Appears in:_
-- [SubscriptionList](#subscriptionlist)
+
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2747,24 +2565,6 @@ _Appears in:_
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[SubscriptionSpec](#subscriptionspec)_ |  | True |  |  |
 | `status` _[SubscriptionStatus](#subscriptionstatus)_ |  | True |  |  |
-
-
-#### SubscriptionList
-
-
-
-SubscriptionList contains a list of Subscription
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `SubscriptionList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[Subscription](#subscription) array_ |  | True |  |  |
 
 
 #### SubscriptionReclaimPolicy
