@@ -79,7 +79,7 @@ CloudNativePG also creates a secret with the same name as the pooler containing
 the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
-    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PgBouncerSpec)
+    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#pgbouncerspec)
     in the API reference.
 
 
@@ -217,7 +217,7 @@ replicate similar behavior to the default setup.
 
 You can take advantage of pod templates specification in the `template`
 section of a `Pooler` resource. For details, see
-[`PoolerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
+[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) in the API reference.
 
 Using templates, you can configure pods as you like, including fine control
 over affinity and anti-affinity rules for pods and nodes. By default,

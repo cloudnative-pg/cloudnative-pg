@@ -64,7 +64,7 @@ the PostgreSQL cluster.
 
 !!! Info
     For field-level details, see the
-    [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExtensionConfiguration).
+    [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
 
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 

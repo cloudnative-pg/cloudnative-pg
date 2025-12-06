@@ -62,7 +62,7 @@ When managing `Cluster` objects with **CloudNativePG**, PostgreSQL publications
 can be defined declaratively through the `Publication` resource.
 
 !!! Info
-    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Publication)
+    Please refer to the [API reference](cloudnative-pg.v1.md#publication)
     for the full list of attributes you can define for each `Publication` object.
 
 Suppose you have a cluster named `freddie` and want to replicate all tables in
@@ -106,7 +106,7 @@ of data changes, should be included in a publication.
 For complex or tailored replication setups, refer to the
 [PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html).
 
-Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
+Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#publicationtarget)
 for details on declaratively customizing replication targets.
 
 The following example defines a publication that replicates all tables in the
@@ -204,7 +204,7 @@ CloudNativePG simplifies subscription management by enabling you to define them
 declaratively using the `Subscription` resource.
 
 !!! Info
-    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Subscription)
+    Please refer to the [API reference](cloudnative-pg.v1.md#subscription)
     for the full list of attributes you can define for each `Subscription` object.
 
 Suppose you want to replicate changes from the `publisher` publication on the
