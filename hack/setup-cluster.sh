@@ -207,6 +207,9 @@ EOF
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${registry_name}:5000"]
     endpoint = ["http://${registry_name}:5000"]
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.configs."${registry_name}:5000".tls]
+    insecure_skip_verify = true
 EOF
 
   # Create the cluster
@@ -250,7 +253,7 @@ ensure_registry() {
   fi
 
   if ! docker inspect "${registry_name}" &>/dev/null; then
-    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p 5000:5000 registry:2
+    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p 5001:5000 registry:2
   fi
 }
 
@@ -399,7 +402,8 @@ deploy_prometheus_crds() {
 load_image_registry() {
   local image=$1
 
-  local image_local_name=${image/${registry_name}/127.0.0.1}
+  local image_local_name=${image/${registry_name}:5000/127.0.0.1:5001}
+  local image_local_name=${image_local_name/${registry_name}:5001/127.0.0.1:5001}
   docker tag "${image}" "${image_local_name}"
   docker push --platform "${DOCKER_DEFAULT_PLATFORM}" -q "${image_local_name}"
 }
