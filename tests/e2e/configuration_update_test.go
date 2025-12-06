@@ -465,6 +465,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		})
 
 		It("2. restarting (in place) the primary after increasing max_connection", func() {
+			// Ensure cluster is fully ready after previous test configuration change
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
 			var oldPrimaryPodName string
 			var newMaxConnectionsValue int
 			var primaryStartTime time.Time
