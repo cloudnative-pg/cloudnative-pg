@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-shared-sa
+  annotations:
+    # Example cloud IAM annotation (works for AWS IRSA)
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/PostgresRole
