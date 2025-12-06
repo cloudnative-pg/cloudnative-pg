@@ -128,7 +128,7 @@ CloudNativePG supports both
     section.
 
 !!! Important
-    The [*failover quorum* feature](failover.md#failover-quorum-quorum-based-failover) (experimental)
+    The [*failover quorum* feature](failover.md#failover-quorum-quorum-based-failover)
     can be used alongside synchronous replication to improve data durability
     and safety during failover events.
 

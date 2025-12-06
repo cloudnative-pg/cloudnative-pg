@@ -101,10 +101,6 @@ prevent premature failover for short-lived network or node instability.
 
 ## Failover Quorum (Quorum-based Failover)
 
-!!! Warning
-    *Failover quorum* is an experimental feature introduced in version 1.27.0.
-    Use with caution in production environments.
-
 Failover quorum is a mechanism that enhances data durability and safety during
 failover events in CloudNativePG-managed PostgreSQL clusters.
 
