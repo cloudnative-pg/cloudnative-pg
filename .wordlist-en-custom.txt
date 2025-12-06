@@ -151,9 +151,9 @@ EOL
 ESO
 EdwinaZhu
 EmbeddedObjectMetadata
-Endevir
 EnablePDB
 EncryptionType
+Endevir
 EndpointCA
 EnsureOption
 EnterpriseDB
@@ -1041,9 +1041,9 @@ mallocs
 managedRoleSecretVersion
 managedRolesStatus
 mario
-mateusoliveira
 matchExpressions
 matchLabels
+mateusoliveira
 maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster
