@@ -462,6 +462,8 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("1. reloading PG when a GUC requiring reload is modified", func() {
 			assertReloadGucs(namespace)
+			// Ensure cluster is fully ready after configuration change before next test
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 		})
 
 		It("2. restarting (in place) the primary after increasing max_connection", func() {
@@ -491,20 +493,25 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 					forward.Close()
 				}()
 
-				query := "SELECT TO_CHAR(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
 				var startTime string
-				row := conn.QueryRow(query)
-				err = row.Scan(&startTime)
-				Expect(err).ToNot(HaveOccurred())
+				// Retry query execution to handle transient connection issues
+				Eventually(func(g Gomega) {
+					query := "SELECT TO_CHAR(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
+					row := conn.QueryRow(query)
+					err = row.Scan(&startTime)
+					g.Expect(err).ToNot(HaveOccurred())
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 
 				primaryStartTime, err = cnpgTypes.ParseTargetTime(nil, startTime)
 				Expect(err).NotTo(HaveOccurred())
 
-				query = "show max_connections"
-				row = conn.QueryRow(query)
 				var maxConnections int
-				err = row.Scan(&maxConnections)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func(g Gomega) {
+					query := "show max_connections"
+					row := conn.QueryRow(query)
+					err = row.Scan(&maxConnections)
+					g.Expect(err).ToNot(HaveOccurred())
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 				newMaxConnectionsValue = maxConnections + 10
 			})
 
