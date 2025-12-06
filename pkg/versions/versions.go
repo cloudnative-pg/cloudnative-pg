@@ -32,7 +32,7 @@ const (
 	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.26.2"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.24.1"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.25.1"
 )
 
 // BuildInfo is a struct containing all the info about the build
