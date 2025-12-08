@@ -260,15 +260,12 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
-<!--
 ### Upgrading to 1.28.0 or 1.27.x
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
     1.28.0, or at least to the latest stable version of your current minor release
     (e.g., 1.27.x).
-
--->
 
 ### Upgrading to 1.27 from a previous minor version
 
