@@ -90,8 +90,8 @@ Git tags for versions are prefixed with `v`.
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
 | 1.28.x          | Yes                  |  9 Dec 2025  | ~  Jun 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
-| 1.27.x          | Yes                  | 12 Aug 2025  |  9 Mar 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 17                     |
-| main            | No, development only |              |                 |                               |                           | 13 - 17                     |
+| 1.27.x          | Yes                  | 12 Aug 2025  |  9 Mar 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 18                     |
+| main            | No, development only |              |                 |                               |                           | 13 - 18                     |
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
