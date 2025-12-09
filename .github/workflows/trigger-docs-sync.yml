@@ -1,0 +1,31 @@
+name: Manual Trigger for Docs Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Simulated Release Tag (e.g., 1.30.0)'
+        required: true
+        default: '1.28.0'
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    
+    permissions: {}
+
+    steps:
+      - name: Extract Clean Version
+        id: version
+        run: echo "CLEAN_VERSION=$(echo ${{ github.event.inputs.version }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+
+      - name: Dispatch Docs Repository Workflow
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          repository: cloudnative-pg/docs
+          
+          token: ${{ secrets.DOCS_SYNC_PAT }} # PAT with repo permissions for docs repo
+          
+          event-type: cnpg-docs-release
+          
+          client-payload: '{"tag": "${{ steps.version.outputs.CLEAN_VERSION }}"}'
