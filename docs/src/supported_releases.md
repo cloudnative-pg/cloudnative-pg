@@ -89,8 +89,9 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.26.x          | Yes                  | May 23, 2025 | ~ Nov 2025      | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
-| 1.25.x          | Yes                  | Dec 23, 2024 | 22 Aug 2025     | 1.29, 1.30, 1.31, 1.32        | 1.33                      | 13 - 17                     |
+| 1.28.x          | Yes                  |  9 Dec 2025  | ~  Jun 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
+| 1.27.x          | Yes                  | 12 Aug 2025  |  9 Mar 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 18                     |
+| 1.26.x          | No                   | May 23, 2025 | ~ Nov 2025      | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 17                     |
 
 <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._
