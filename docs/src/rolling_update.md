@@ -60,6 +60,17 @@ The `primaryUpdateMethod` option accepts one of the following values:
   most aligned replica as the new target primary, and shutting down the former
   primary pod.
 
+!!! Warning
+    When `primaryUpdateMethod` is set to `switchover`, you cannot change the
+    image name and PostgreSQL configuration parameters at the same time. The
+    operator will reject such updates with a validation error. If you need to
+    update both the image and the configuration, you must perform these changes
+    sequentially: update the image first, wait for the rolling update to
+    complete, then update the configuration (or vice versa). This restriction
+    exists because configuration changes tied to a new image version could cause
+    PostgreSQL to fail if applied to pods still running the old image during the
+    switchover process.
+
 There's no one-size-fits-all configuration for the update method, as that
 depends on several factors like the actual workload of your database, the
 requirements in terms of [RPO](before_you_start.md#rpo) and
