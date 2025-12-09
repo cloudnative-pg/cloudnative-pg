@@ -151,6 +151,7 @@ ESO
 EmbeddedObjectMetadata
 EnablePDB
 EncryptionType
+Endevir
 EndpointCA
 EnsureOption
 EnterpriseDB
@@ -224,6 +225,7 @@ Istio's
 JSON
 Jihyuk
 Jitendra
+Joda
 KV
 Karpenter
 KinD
@@ -1019,6 +1021,7 @@ managedRolesStatus
 mario
 matchExpressions
 matchLabels
+mateusoliveira
 maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster

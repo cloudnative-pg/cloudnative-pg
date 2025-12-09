@@ -5,16 +5,10 @@ CloudNativePG, which should be done by one of the project's maintainers.
 It is a semi-automated process that requires human supervision.
 
 You can only release stable versions from a release branch, that is a branch
-in the Git repository called `release-X.Y`, e.g., `release-1.16`, which
+in the Git repository called `release-X.Y`, e.g., `release-1.28`, which
 corresponds to a minor release.
 
-The release procedure must be repeated for all the supported minor releases,
-usually 3:
-
-- the current one (`release-X.Y`)
-- the previous one (`release-X.Y` -1)
-- the *"End of Life"* one (`release-X.Y` -2) - normally for an additional month
-  after the first release of the current minor.
+The release procedure must be repeated for all the supported minor releases.
 
 ```diagram
 ------+---------------------------------------------> main (trunk development)
@@ -25,9 +19,9 @@ usually 3:
            \             \----------+---------------> release-X.Y   |
             \                                                       | SUPPORTED
              \                                                      | RELEASES
-              \                                                     | = the two
-               \                                                    |   last
-                +-------------------+---------------> release-X.Y-1 |   releases
+              \                                                     | = the minor
+               \                                                    |   release +
+                +-------------------+---------------> release-X.Y-1 |   3 months
                                                                     v
 ```
 
@@ -77,7 +71,9 @@ activities:
 - **Capabilities page:** in case of a new minor release, ensure that the
   operator capability levels page in
   [`docs/src/operator_capability_levels.md`](../docs/src/operator_capability_levels.md)
-  is up-to-date and approved by the maintainers.
+  is up-to-date and approved by the maintainers. This also applies to the
+  [`docs/src/index.md`](../docs/src/index.md) page, and the OLM CSV file
+  [`config/olm-manifests/bases/cloudnative-pg.clusterserviceversion.yaml`](config/olm-manifests/bases/cloudnative-pg.clusterserviceversion.yaml).
 
 - **Documentation on website:** Remember that after the release, you will
   need to update the documentation in the
