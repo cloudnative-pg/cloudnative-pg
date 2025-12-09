@@ -1872,7 +1872,10 @@ it can be automated (<code>unsupervised</code> - default) or manual (<code>super
 <td>
    <p>Method to follow to upgrade the primary server during a rolling
 update procedure, after all replicas have been successfully updated:
-it can be with a switchover (<code>switchover</code>) or in-place (<code>restart</code> - default)</p>
+it can be with a switchover (<code>switchover</code>) or in-place (<code>restart</code> - default).
+Note: when using <code>switchover</code>, the operator will reject updates that change both
+the image name and PostgreSQL configuration parameters simultaneously to avoid
+configuration mismatches during the switchover process.</p>
 </td>
 </tr>
 <tr><td><code>backup</code><br/>

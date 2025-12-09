@@ -408,7 +408,10 @@ type ClusterSpec struct {
 
 	// Method to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
-	// it can be with a switchover (`switchover`) or in-place (`restart` - default)
+	// it can be with a switchover (`switchover`) or in-place (`restart` - default).
+	// Note: when using `switchover`, the operator will reject updates that change both
+	// the image name and PostgreSQL configuration parameters simultaneously to avoid
+	// configuration mismatches during the switchover process.
 	// +kubebuilder:default:=restart
 	// +kubebuilder:validation:Enum:=switchover;restart
 	// +optional
@@ -1310,7 +1313,10 @@ const (
 	PrimaryUpdateStrategyUnsupervised PrimaryUpdateStrategy = "unsupervised"
 
 	// PrimaryUpdateMethodSwitchover means that the operator will switchover to another updated
-	// replica when it needs to upgrade the primary instance
+	// replica when it needs to upgrade the primary instance.
+	// Note: when using this method, the operator will reject updates that change both
+	// the image name and PostgreSQL configuration parameters simultaneously to avoid
+	// configuration mismatches during the switchover process.
 	PrimaryUpdateMethodSwitchover PrimaryUpdateMethod = "switchover"
 
 	// PrimaryUpdateMethodRestart means that the operator will restart the primary instance in-place
