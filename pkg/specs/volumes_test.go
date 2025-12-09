@@ -571,6 +571,20 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumes[1].Name).To(Equal("bar"))
 				Expect(extensionVolumes[1].VolumeSource.Image.Reference).To(Equal("bar:dev"))
 			})
+			It("should sanitize extension names with underscores for volume names", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+					{
+						Name: "pg_ivm",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "pg_ivm:latest",
+						},
+					},
+				}
+				extensionVolumes := createExtensionVolumes(&cluster)
+				Expect(len(extensionVolumes)).To(BeEquivalentTo(1))
+				Expect(extensionVolumes[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("pg_ivm:latest"))
+			})
 		})
 	})
 
@@ -594,6 +608,20 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
 				Expect(extensionVolumeMounts[1].Name).To(Equal("bar"))
 				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
+			})
+			It("should sanitize extension names with underscores for volume mount names", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+					{
+						Name: "pg_ivm",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "pg_ivm:latest",
+						},
+					},
+				}
+				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(1))
+				Expect(extensionVolumeMounts[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumeMounts[0].MountPath).To(Equal(postgres.ExtensionsBaseDirectory + "/pg_ivm"))
 			})
 		})
 	})
