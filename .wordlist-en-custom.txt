@@ -151,9 +151,9 @@ EOL
 ESO
 EdwinaZhu
 EmbeddedObjectMetadata
-Endevir
 EnablePDB
 EncryptionType
+Endevir
 EndpointCA
 EnsureOption
 EnterpriseDB
@@ -231,6 +231,7 @@ JSON
 JefeDavis
 Jihyuk
 Jitendra
+Joda
 KV
 Karpenter
 KinD
@@ -1041,9 +1042,9 @@ mallocs
 managedRoleSecretVersion
 managedRolesStatus
 mario
-mateusoliveira
 matchExpressions
 matchLabels
+mateusoliveira
 maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster

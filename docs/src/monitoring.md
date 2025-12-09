@@ -902,7 +902,7 @@ metadata:
 spec:
   containers:
   - name: curl
-    image: curlimages/curl:8.16.0
+    image: curlimages/curl:8.17.0
     command: ['sleep', '3600']
 EOF
 ```
