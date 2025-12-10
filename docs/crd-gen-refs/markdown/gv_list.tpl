@@ -1,5 +1,10 @@
 {{- define "gvList" -}}
 {{- $groupVersions := . -}}
+---
+id: cloudnative-pg.v1
+sidebar_position: 550
+title: API Reference
+---
 
 # API Reference
 
