@@ -850,6 +850,7 @@ ephemeralVolumeSource
 ephemeralVolumesSizeLimit
 eu
 excludePatterns
+executableHash
 executables
 expirations
 extensibility

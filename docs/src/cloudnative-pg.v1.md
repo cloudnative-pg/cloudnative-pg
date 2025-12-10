@@ -3488,6 +3488,15 @@ with your environment and desired behavior.</p>
    <p>The container ID</p>
 </td>
 </tr>
+<tr><td><code>executableHash</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The instance manager executable hash. This is used to detect if the instance
+manager binary was upgraded (e.g., during a release) which would terminate
+any running backup process.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
