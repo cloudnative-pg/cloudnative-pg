@@ -10,6 +10,7 @@
 
 {{ if $type.Validation -}}
 _Validation:_
+
 {{- range $type.Validation }}
 - {{ . }}
 {{- end }}
@@ -17,6 +18,7 @@ _Validation:_
 
 {{ if $type.References -}}
 _Appears in:_
+
 {{- range $type.SortedReferences }}
 - {{ markdownRenderTypeLink . }}
 {{- end }}

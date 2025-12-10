@@ -4,6 +4,7 @@
 # API Reference
 
 ## Packages
+
 {{- range $groupVersions }}
 - {{ markdownRenderGVLink . }}
 {{- end }}
