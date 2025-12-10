@@ -126,8 +126,8 @@ type SnapshotOwnerReference string
 
 // Constants to represent the allowed types for SnapshotOwnerReference.
 const (
-	// ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
-	ShapshotOwnerReferenceNone SnapshotOwnerReference = "none"
+	// SnapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
+	SnapshotOwnerReferenceNone SnapshotOwnerReference = "none"
 	// SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.
 	SnapshotOwnerReferenceBackup SnapshotOwnerReference = "backup"
 	// SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.

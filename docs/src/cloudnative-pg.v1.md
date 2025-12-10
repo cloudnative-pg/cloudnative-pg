@@ -2515,7 +2515,7 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `none` | ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.<br /> |
+| `none` | SnapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.<br /> |
 | `backup` | SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.<br /> |
 | `cluster` | SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.<br /> |
 
