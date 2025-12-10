@@ -75,6 +75,9 @@ func (r *PoolerReconciler) updatePoolerStatus(
 			Name:    resources.ServerTLSSecret.Name,
 			Version: resources.ServerTLSSecret.ResourceVersion,
 		}
+	} else {
+		// Clear ServerTLS for migration from v1.27
+		updatedStatus.Secrets.ServerTLS = apiv1.SecretVersion{}
 	}
 
 	if resources.Deployment != nil {
