@@ -93,4 +93,55 @@ var _ = Describe("PodSpecDiff", func() {
 		Expect(status).To(BeFalse())
 		Expect(diff).To(Equal("readiness-probe"))
 	})
+
+	It("detects differences in container resize policy", func() {
+		containerPre := corev1.Container{
+			ResizePolicy: []corev1.ContainerResizePolicy{
+				{
+					ResourceName:  corev1.ResourceCPU,
+					RestartPolicy: corev1.NotRequired,
+				},
+			},
+		}
+		containerPost := corev1.Container{
+			ResizePolicy: []corev1.ContainerResizePolicy{
+				{
+					ResourceName:  corev1.ResourceCPU,
+					RestartPolicy: corev1.RestartContainer,
+				},
+			},
+		}
+
+		// Should match when resize policies are identical
+		Expect(doContainersMatch(containerPre, containerPre)).To(BeTrue())
+
+		// Should not match when resize policies differ
+		status, diff := doContainersMatch(containerPre, containerPost)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("resize-policy"))
+	})
+
+	It("detects when resize policy is added or removed", func() {
+		containerWithoutPolicy := corev1.Container{
+			ResizePolicy: nil,
+		}
+		containerWithPolicy := corev1.Container{
+			ResizePolicy: []corev1.ContainerResizePolicy{
+				{
+					ResourceName:  corev1.ResourceMemory,
+					RestartPolicy: corev1.RestartContainer,
+				},
+			},
+		}
+
+		// Should not match when one has policy and other doesn't
+		status, diff := doContainersMatch(containerWithoutPolicy, containerWithPolicy)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("resize-policy"))
+
+		// Should not match when policy is removed
+		status, diff = doContainersMatch(containerWithPolicy, containerWithoutPolicy)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("resize-policy"))
+	})
 })
