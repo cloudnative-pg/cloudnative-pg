@@ -873,14 +873,28 @@ parameter is omitted</p>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
-   <p>When the backup was started</p>
+   <p>When the backup execution was started by the backup tool</p>
 </td>
 </tr>
 <tr><td><code>stoppedAt</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
-   <p>When the backup was terminated</p>
+   <p>When the backup execution was terminated by the backup tool</p>
+</td>
+</tr>
+<tr><td><code>reconciliationStartedAt</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
+</td>
+<td>
+   <p>When the backup process was started by the operator</p>
+</td>
+</tr>
+<tr><td><code>reconciliationTerminatedAt</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta"><i>meta/v1.Time</i></a>
+</td>
+<td>
+   <p>When the reconciliation was terminated by the operator (either successfully or not)</p>
 </td>
 </tr>
 <tr><td><code>beginWal</code><br/>

@@ -1250,6 +1250,8 @@ readthedocs
 readyInstances
 reconciler
 reconciliationLoop
+reconciliationStartedAt
+reconciliationTerminatedAt
 reconnection
 recoverability
 recoveredCluster
