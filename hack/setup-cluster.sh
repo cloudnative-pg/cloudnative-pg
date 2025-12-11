@@ -45,6 +45,7 @@ CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PA
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
+NAMESPACED=${NAMESPACED:-false}
 NODES=${NODES:-3}
 # This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
@@ -413,7 +414,7 @@ load_image() {
 deploy_operator() {
   kubectl delete ns cnpg-system 2> /dev/null || :
 
-  make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
+  make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}" "NAMESPACED=${NAMESPACED}"
 }
 
 usage() {
@@ -441,6 +442,9 @@ Options:
         <NODES>           Create a cluster with the required number of nodes.
                           Used only during "create" command. Default: 3
                           Env: NODES
+
+    --namespaced          Deploy operator in namespaced mode. Default: false
+                          Env: NAMESPACED
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -566,7 +570,7 @@ pyroscope() {
 main() {
   if ! getopt -T > /dev/null; then
     # GNU enhanced getopt is available
-    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry,namespaced" -- "$@") || usage
   else
     # Original getopt is available
     parsed_opts=$(getopt e:k:n:r "$@") || usage
@@ -601,6 +605,10 @@ main() {
     -r | --registry)
       shift
       # no-op, kept for compatibility
+      ;;
+    --namespaced)
+      shift
+      NAMESPACED=true
       ;;
     --)
       shift

@@ -29,12 +29,15 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
@@ -130,7 +133,26 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
-	if conf.WatchNamespace != "" {
+	if conf.Namespaced {
+		// In namespaced deployment only monitor the operator namespace.
+		// By default the
+		managerOptions.Cache.DefaultNamespaces = map[string]cache.Config{
+			conf.OperatorNamespace: {},
+		}
+		managerOptions.Cache.ByObject = map[client.Object]cache.ByObject{
+			&corev1.Node{}: {
+				Transform: func(obj interface{}) (interface{}, error) {
+					return nil, nil
+				},
+			},
+			&apiv1.ClusterImageCatalog{}: {
+				Transform: func(obj interface{}) (interface{}, error) {
+					return nil, nil
+				},
+			},
+		}
+		setupLog.Info("Namespaced mode enabled, watching operator namespace only", "namespace", conf.OperatorNamespace)
+	} else if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
 			namespaces,
@@ -179,6 +201,12 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
+	// Validate namespaced configuration constraints
+	if err := utils.ValidateNamespacedConfiguration(conf); err != nil {
+		setupLog.Error(err, "invalid namespaced configuration")
+		return err
+	}
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err
@@ -225,6 +253,7 @@ func RunController(
 		discoveryClient,
 		pluginRepository,
 		conf.DrainTaints,
+		conf.Namespaced,
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err

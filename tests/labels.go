@@ -103,4 +103,6 @@ const (
 
 	// LabelImageVolumeExtensions is a label for imageVolume extensions tests
 	LabelImageVolumeExtensions = "image-volume-extensions"
+
+	LabelNamespacedOperator = "namespaced-operator"
 )

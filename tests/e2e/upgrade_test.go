@@ -85,12 +85,13 @@ To check the soundness of the upgrade, on each of the four scenarios:
 
 var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
-		operatorNamespace       = "cnpg-system"
-		configName              = "cnpg-controller-manager-config"
-		currentOperatorManifest = fixturesDir + "/upgrade/current-manifest.yaml"
-		primeOperatorManifest   = fixturesDir + "/upgrade/current-manifest-prime.yaml"
-		rollingUpgradeNamespace = "rolling-upgrade"
-		onlineUpgradeNamespace  = "online-upgrade"
+		operatorNamespace          = "cnpg-system"
+		configName                 = "cnpg-controller-manager-config"
+		currentOperatorManifest    = fixturesDir + "/upgrade/current-manifest.yaml"
+		primeOperatorManifest      = fixturesDir + "/upgrade/current-manifest-prime.yaml"
+		namespacedOperatorManifest = fixturesDir + "/upgrade/current-namespaced-manifest.yaml"
+		rollingUpgradeNamespace    = "rolling-upgrade"
+		onlineUpgradeNamespace     = "online-upgrade"
 
 		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
 
@@ -844,6 +845,78 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
+		})
+	})
+
+	When("upgrading to namespaced deployment", func() {
+		const testClusterName = "postgresql-storage-class"
+		const testClusterFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
+
+		JustBeforeEach(func() {
+			assertManifestPresent(currentOperatorManifest)
+			assertManifestPresent(namespacedOperatorManifest)
+		})
+
+		It("can upgrade to namespaced mode and reconcile clusters", func() {
+			By("deploying the current cluster-wide operator", func() {
+				deployOperator(currentOperatorManifest)
+			})
+			DeferCleanup(cleanupOperatorAndMinio)
+
+			By("upgrading to namespaced operator", func() {
+				deployOperator(namespacedOperatorManifest)
+			})
+
+			By("creating a cluster in the operator namespace", func() {
+				CreateResourceFromFile(operatorNamespace, testClusterFile)
+			})
+
+			By("verifying cluster becomes ready", func() {
+				AssertClusterIsReady(operatorNamespace, testClusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			})
+
+			By("verifying cluster can be reconciled", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, testClusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.PostgresConfiguration.Parameters["max_connections"] = "150"
+				err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+				Expect(err).ToNot(HaveOccurred())
+
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, testClusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func() (string, error) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: primary.Namespace,
+							PodName:   primary.Name,
+						},
+						postgres.PostgresDBName,
+						"show max_connections")
+					return strings.Trim(stdout, "\n"), err
+				}, 300).Should(BeEquivalentTo("150"))
+			})
+
+			By("deleting the cluster", func() {
+				cluster := &apiv1.Cluster{}
+				err := env.Client.Get(env.Ctx,
+					types.NamespacedName{Namespace: operatorNamespace, Name: testClusterName},
+					cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = env.Client.Delete(env.Ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func() bool {
+					err := env.Client.Get(env.Ctx,
+						types.NamespacedName{Namespace: operatorNamespace, Name: testClusterName},
+						cluster)
+					return err != nil
+				}, 120).Should(BeTrue())
+			})
 		})
 	})
 })

@@ -93,6 +93,7 @@ type ClusterReconciler struct {
 
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
+	namespaced     bool
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -101,6 +102,7 @@ func NewClusterReconciler(
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
 	drainTaints []string,
+	namespaced bool,
 ) *ClusterReconciler {
 	return &ClusterReconciler{
 		InstanceClient:  remote.NewClient().Instance(),
@@ -114,6 +116,7 @@ func NewClusterReconciler(
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
 		drainTaints: drainTaints,
+		namespaced:  namespaced,
 	}
 }
 
@@ -1146,7 +1149,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1172,21 +1175,26 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters()),
 		).
 		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+
+	// Only monitor cluster wide resources if not namespaced
+	if !r.namespaced {
+		b = b.Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
 		).
-		Watches(
-			&apiv1.ImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Watches(
-			&apiv1.ClusterImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+			Watches(
+				&apiv1.ClusterImageCatalog{},
+				handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
+				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+			)
+	}
+
+	return b.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and
@@ -1241,6 +1249,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
+	// Is this needed to be optional as well? Although its a pod resource
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&corev1.Pod{},

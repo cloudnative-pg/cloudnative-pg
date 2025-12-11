@@ -129,7 +129,12 @@ func (r *ClusterReconciler) getManagedResources(
 	}, nil
 }
 
+// If operator is configured in namespaced mode, return empty list and nil.
 func (r *ClusterReconciler) getNodes(ctx context.Context) (map[string]corev1.Node, error) {
+	if r.namespaced {
+		return map[string]corev1.Node{}, nil
+	}
+
 	var nodes corev1.NodeList
 	if err := r.List(ctx, &nodes); err != nil {
 		return nil, err

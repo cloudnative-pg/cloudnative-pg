@@ -33,7 +33,7 @@ CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-
+NAMESPACED=${NAMESPACED:-false}
 # variable need export otherwise be invisible in e2e test case
 export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
 export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
@@ -95,6 +95,15 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
    CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST}" \
    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
    generate-manifest
+
+  # Generate a manifest for the operator in a namespaced deployment
+  # This manifest is used in the namespaced deployment tests
+  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMG="${POSTGRES_IMG}" \
+   PGBOUNCER_IMG="${PGBOUNCER_IMG}" \
+   NAMESPACED="true" \
+   CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST}" \
+   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-namespaced-manifest.yaml" \
+   generate-manifest
   # In order to test the case of upgrading from the current operator
   # to a future one, we build and push an image with a different VERSION
   # to force a different hash for the manager binary.
@@ -135,6 +144,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   CONTROLLER_IMG="${CONTROLLER_IMG}" \
     POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
     PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+    NAMESPACED="${NAMESPACED}" \
     make -C "${ROOT_DIR}" deploy
   kubectl wait --for=condition=Available --timeout=2m \
     -n cnpg-system deployments \
