@@ -10,16 +10,14 @@
 
 {{ if $type.Validation -}}
 _Validation:_
-
-{{- range $type.Validation }}
+{{ range $type.Validation }}
 - {{ . }}
 {{- end }}
 {{- end }}
 
 {{ if $type.References -}}
 _Appears in:_
-
-{{- range $type.SortedReferences }}
+{{ range $type.SortedReferences }}
 - {{ markdownRenderTypeLink . }}
 {{- end }}
 {{- end }}

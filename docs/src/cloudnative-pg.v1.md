@@ -38,6 +38,7 @@ affinity rules for Pods
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -61,6 +62,7 @@ AvailableArchitecture represents the state of a cluster's architecture
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -102,6 +104,7 @@ documentation
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -122,6 +125,7 @@ the selected PostgreSQL instance
 
 
 _Appears in:_
+
 - [BackupSpec](#backupspec)
 - [BackupStatus](#backupstatus)
 - [ClusterStatus](#clusterstatus)
@@ -143,6 +147,7 @@ BackupPhase is the phase of the backup
 
 
 _Appears in:_
+
 - [BackupStatus](#backupstatus)
 
 
@@ -157,6 +162,7 @@ the backup plugin
 
 
 _Appears in:_
+
 - [BackupSpec](#backupspec)
 - [ScheduledBackupSpec](#scheduledbackupspec)
 
@@ -175,6 +181,7 @@ BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapsh
 
 
 _Appears in:_
+
 - [BackupSnapshotStatus](#backupsnapshotstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -193,6 +200,7 @@ BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 
 
 _Appears in:_
+
 - [BackupStatus](#backupstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -210,6 +218,7 @@ information that could be needed to correctly restore it.
 
 
 _Appears in:_
+
 - [BootstrapRecovery](#bootstraprecovery)
 
 | Field | Description | Required | Default | Validation |
@@ -227,6 +236,7 @@ BackupSpec defines the desired state of Backup
 
 
 _Appears in:_
+
 - [Backup](#backup)
 
 | Field | Description | Required | Default | Validation |
@@ -248,6 +258,7 @@ BackupStatus defines the observed state of Backup
 
 
 _Appears in:_
+
 - [Backup](#backup)
 
 | Field | Description | Required | Default | Validation |
@@ -291,6 +302,7 @@ BackupTarget describes the preferred targets for a backup
 
 
 _Appears in:_
+
 - [BackupConfiguration](#backupconfiguration)
 - [BackupSpec](#backupspec)
 - [ScheduledBackupSpec](#scheduledbackupspec)
@@ -314,6 +326,7 @@ information.
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -334,6 +347,7 @@ Refer to the Bootstrap page of the documentation for more information.
 
 
 _Appears in:_
+
 - [BootstrapConfiguration](#bootstrapconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -371,6 +385,7 @@ a physical backup of an existing PostgreSQL cluster
 
 
 _Appears in:_
+
 - [BootstrapConfiguration](#bootstrapconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -398,6 +413,7 @@ Refer to the Bootstrap page of the documentation for more information.
 
 
 _Appears in:_
+
 - [BootstrapConfiguration](#bootstrapconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -420,6 +436,7 @@ CatalogImage defines the image and major version
 
 
 _Appears in:_
+
 - [ImageCatalogSpec](#imagecatalogspec)
 
 | Field | Description | Required | Default | Validation |
@@ -437,6 +454,7 @@ CertificatesConfiguration contains the needed configurations to handle server ce
 
 
 _Appears in:_
+
 - [CertificatesStatus](#certificatesstatus)
 - [ClusterSpec](#clusterspec)
 
@@ -458,6 +476,7 @@ CertificatesStatus contains configuration certificates and related expiration da
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -520,6 +539,7 @@ for the cluster's monitoring
 
 
 _Appears in:_
+
 - [MonitoringConfiguration](#monitoringconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -537,6 +557,7 @@ CloudNativePG.
 
 
 _Appears in:_
+
 - [Cluster](#cluster)
 
 | Field | Description | Required | Default | Validation |
@@ -605,6 +626,7 @@ CloudNativePG.
 
 
 _Appears in:_
+
 - [Cluster](#cluster)
 
 | Field | Description | Required | Default | Validation |
@@ -674,6 +696,7 @@ managed by the operator
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -693,6 +716,7 @@ when cluster instances are unavailable. Options are `required` or `preferred`.
 
 
 _Appears in:_
+
 - [SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)
 
 | Field | Description |
@@ -711,6 +735,7 @@ PostgreSQL cluster from an existing storage
 
 
 _Appears in:_
+
 - [BootstrapRecovery](#bootstraprecovery)
 
 | Field | Description | Required | Default | Validation |
@@ -749,6 +774,7 @@ database object
 
 
 _Appears in:_
+
 - [ExtensionSpec](#extensionspec)
 - [FDWSpec](#fdwspec)
 - [SchemaSpec](#schemaspec)
@@ -769,6 +795,7 @@ DatabaseObjectStatus is the status of the managed database objects
 
 
 _Appears in:_
+
 - [DatabaseStatus](#databasestatus)
 
 | Field | Description | Required | Default | Validation |
@@ -787,6 +814,7 @@ DatabaseReclaimPolicy describes a policy for end-of-life maintenance of database
 
 
 _Appears in:_
+
 - [DatabaseSpec](#databasespec)
 
 | Field | Description |
@@ -804,6 +832,7 @@ DatabaseRoleRef is a reference an a role available inside PostgreSQL
 
 
 _Appears in:_
+
 - [TablespaceConfiguration](#tablespaceconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -822,6 +851,7 @@ PostgreSQL.
 
 
 _Appears in:_
+
 - [Database](#database)
 
 | Field | Description | Required | Default | Validation |
@@ -860,6 +890,7 @@ DatabaseStatus defines the observed state of Database
 
 
 _Appears in:_
+
 - [Database](#database)
 
 | Field | Description | Required | Default | Validation |
@@ -882,6 +913,7 @@ EmbeddedObjectMetadata contains metadata to be inherited by all resources relate
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -900,6 +932,7 @@ a Role in a PostgreSQL instance
 
 
 _Appears in:_
+
 - [DatabaseObjectSpec](#databaseobjectspec)
 - [DatabaseSpec](#databasespec)
 - [ExtensionSpec](#extensionspec)
@@ -925,6 +958,7 @@ storage
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -943,6 +977,7 @@ PostgreSQL extensions to the Cluster.
 
 
 _Appears in:_
+
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -963,6 +998,7 @@ ExtensionSpec configures an extension in a database
 
 
 _Appears in:_
+
 - [DatabaseSpec](#databasespec)
 
 | Field | Description | Required | Default | Validation |
@@ -983,6 +1019,7 @@ external cluster which is used in the other sections of the configuration
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1006,6 +1043,7 @@ FDWSpec configures an Foreign Data Wrapper in a database
 
 
 _Appears in:_
+
 - [DatabaseSpec](#databasespec)
 
 | Field | Description | Required | Default | Validation |
@@ -1050,6 +1088,7 @@ quorum of the PG cluster.
 
 
 _Appears in:_
+
 - [FailoverQuorum](#failoverquorum)
 
 | Field | Description | Required | Default | Validation |
@@ -1091,6 +1130,7 @@ ImageCatalogRef defines the reference to a major version in an ImageCatalog
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1110,6 +1150,7 @@ ImageCatalogSpec defines the desired ImageCatalog
 
 
 _Appears in:_
+
 - [ClusterImageCatalog](#clusterimagecatalog)
 - [ImageCatalog](#imagecatalog)
 
@@ -1127,6 +1168,7 @@ ImageInfo contains the information about a PostgreSQL image
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1144,6 +1186,7 @@ Import contains the configuration to init a database from a logic snapshot of an
 
 
 _Appears in:_
+
 - [BootstrapInitDB](#bootstrapinitdb)
 
 | Field | Description | Required | Default | Validation |
@@ -1170,6 +1213,7 @@ ImportSource describes the source for the logical snapshot
 
 
 _Appears in:_
+
 - [Import](#import)
 
 | Field | Description | Required | Default | Validation |
@@ -1186,6 +1230,7 @@ InstanceID contains the information to identify an instance
 
 
 _Appears in:_
+
 - [BackupStatus](#backupstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1203,6 +1248,7 @@ InstanceReportedState describes the last reported state of an instance during a 
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1222,6 +1268,7 @@ functionality in the liveness probe
 
 
 _Appears in:_
+
 - [LivenessProbe](#livenessprobe)
 
 | Field | Description | Required | Default | Validation |
@@ -1243,6 +1290,7 @@ bind authentication for LDAP
 
 
 _Appears in:_
+
 - [LDAPConfig](#ldapconfig)
 
 | Field | Description | Required | Default | Validation |
@@ -1261,6 +1309,7 @@ the bind+search LDAP authentication process
 
 
 _Appears in:_
+
 - [LDAPConfig](#ldapconfig)
 
 | Field | Description | Required | Default | Validation |
@@ -1281,6 +1330,7 @@ LDAPConfig contains the parameters needed for LDAP authentication
 
 
 _Appears in:_
+
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -1302,6 +1352,7 @@ LDAPScheme defines the possible schemes for LDAP
 
 
 _Appears in:_
+
 - [LDAPConfig](#ldapconfig)
 
 | Field | Description |
@@ -1319,6 +1370,7 @@ LivenessProbe is the configuration of the liveness probe
 
 
 _Appears in:_
+
 - [ProbesConfiguration](#probesconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -1344,6 +1396,7 @@ by the instance manager
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1361,6 +1414,7 @@ ManagedRoles tracks the status of a cluster's managed roles
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1380,6 +1434,7 @@ It includes the type of service and its associated template specification.
 
 
 _Appears in:_
+
 - [ManagedServices](#managedservices)
 
 | Field | Description | Required | Default | Validation |
@@ -1398,6 +1453,7 @@ ManagedServices represents the services managed by the cluster.
 
 
 _Appears in:_
+
 - [ManagedConfiguration](#managedconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -1418,6 +1474,7 @@ not using the core data types.
 
 
 _Appears in:_
+
 - [PodTemplateSpec](#podtemplatespec)
 - [ServiceAccountTemplate](#serviceaccounttemplate)
 - [ServiceTemplateSpec](#servicetemplatespec)
@@ -1439,6 +1496,7 @@ configuration for a certain cluster
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1466,6 +1524,7 @@ from being freely moved across nodes.
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1483,6 +1542,7 @@ OnlineConfiguration contains the configuration parameters for the online volume 
 
 
 _Appears in:_
+
 - [BackupSpec](#backupspec)
 - [ScheduledBackupSpec](#scheduledbackupspec)
 - [VolumeSnapshotConfiguration](#volumesnapshotconfiguration)
@@ -1502,6 +1562,7 @@ OptionSpec holds the name, value and the ensure field for an option
 
 
 _Appears in:_
+
 - [FDWSpec](#fdwspec)
 - [ServerSpec](#serverspec)
 
@@ -1521,6 +1582,7 @@ PasswordState represents the state of the password of a managed RoleConfiguratio
 
 
 _Appears in:_
+
 - [ManagedRoles](#managedroles)
 
 | Field | Description | Required | Default | Validation |
@@ -1538,6 +1600,7 @@ PgBouncerIntegrationStatus encapsulates the needed integration for the pgbouncer
 
 
 _Appears in:_
+
 - [PoolerIntegrations](#poolerintegrations)
 
 | Field | Description | Required | Default | Validation |
@@ -1552,9 +1615,11 @@ _Underlying type:_ _string_
 PgBouncerPoolMode is the mode of PgBouncer
 
 _Validation:_
+
 - Enum: [session transaction]
 
 _Appears in:_
+
 - [PgBouncerSpec](#pgbouncerspec)
 
 
@@ -1569,6 +1634,7 @@ by pgbouncer
 
 
 _Appears in:_
+
 - [PoolerSecrets](#poolersecrets)
 
 | Field | Description | Required | Default | Validation |
@@ -1585,6 +1651,7 @@ PgBouncerSpec defines how to configure PgBouncer
 
 
 _Appears in:_
+
 - [PoolerSpec](#poolerspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1611,6 +1678,7 @@ cluster to be reconciled
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 - [ExternalCluster](#externalcluster)
 
@@ -1631,6 +1699,7 @@ PluginStatus is the status of a loaded plugin
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1654,6 +1723,7 @@ PodName is the name of a Pod
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 - [Topology](#topology)
 
@@ -1668,6 +1738,7 @@ PodStatus represent the possible status of pods
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 
@@ -1691,6 +1762,7 @@ https://github.com/prometheus-operator/prometheus-operator/issues/3041
 
 
 _Appears in:_
+
 - [PoolerSpec](#poolerspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1708,6 +1780,7 @@ PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 
 
 _Appears in:_
+
 - [Topology](#topology)
 
 
@@ -1740,6 +1813,7 @@ PoolerIntegrations encapsulates the needed integration for the poolers referenci
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1760,6 +1834,7 @@ part for now.
 
 
 _Appears in:_
+
 - [PoolerSpec](#poolerspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1778,6 +1853,7 @@ PoolerSecrets contains the versions of all the secrets used
 
 
 _Appears in:_
+
 - [PoolerStatus](#poolerstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -1798,6 +1874,7 @@ PoolerSpec defines the desired state of Pooler
 
 
 _Appears in:_
+
 - [Pooler](#pooler)
 
 | Field | Description | Required | Default | Validation |
@@ -1821,6 +1898,7 @@ PoolerStatus defines the observed state of Pooler
 
 
 _Appears in:_
+
 - [Pooler](#pooler)
 
 | Field | Description | Required | Default | Validation |
@@ -1837,9 +1915,11 @@ PoolerType is the type of the connection pool, meaning the service
 we are targeting. Allowed values are `rw` and `ro`.
 
 _Validation:_
+
 - Enum: [rw ro r]
 
 _Appears in:_
+
 - [PoolerSpec](#poolerspec)
 
 
@@ -1853,6 +1933,7 @@ PostgresConfiguration defines the PostgreSQL configuration
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -1879,6 +1960,7 @@ the primary server of the cluster as part of rolling updates
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description |
@@ -1897,6 +1979,7 @@ the primary server of the cluster as part of rolling updates
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description |
@@ -1915,6 +1998,7 @@ alive or ready to receive traffic.
 
 
 _Appears in:_
+
 - [LivenessProbe](#livenessprobe)
 - [ProbeWithStrategy](#probewithstrategy)
 
@@ -1938,6 +2022,7 @@ ready
 
 
 _Appears in:_
+
 - [ProbeWithStrategy](#probewithstrategy)
 
 | Field | Description |
@@ -1956,6 +2041,7 @@ ProbeWithStrategy is the configuration of the startup probe
 
 
 _Appears in:_
+
 - [ProbesConfiguration](#probesconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -1980,6 +2066,7 @@ to be injected in the PostgreSQL Pods
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2017,6 +2104,7 @@ PublicationReclaimPolicy defines a policy for end-of-life maintenance of Publica
 
 
 _Appears in:_
+
 - [PublicationSpec](#publicationspec)
 
 | Field | Description |
@@ -2034,6 +2122,7 @@ PublicationSpec defines the desired state of Publication
 
 
 _Appears in:_
+
 - [Publication](#publication)
 
 | Field | Description | Required | Default | Validation |
@@ -2055,6 +2144,7 @@ PublicationStatus defines the observed state of Publication
 
 
 _Appears in:_
+
 - [Publication](#publication)
 
 | Field | Description | Required | Default | Validation |
@@ -2073,6 +2163,7 @@ PublicationTarget is what this publication should publish
 
 
 _Appears in:_
+
 - [PublicationSpec](#publicationspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2090,6 +2181,7 @@ PublicationTargetObject is an object to publish
 
 
 _Appears in:_
+
 - [PublicationTarget](#publicationtarget)
 
 | Field | Description | Required | Default | Validation |
@@ -2107,6 +2199,7 @@ PublicationTargetTable is a table to publish
 
 
 _Appears in:_
+
 - [PublicationTargetObject](#publicationtargetobject)
 
 | Field | Description | Required | Default | Validation |
@@ -2127,6 +2220,7 @@ will stop. All the target options except TargetTLI are mutually exclusive.
 
 
 _Appears in:_
+
 - [BootstrapRecovery](#bootstraprecovery)
 
 | Field | Description | Required | Default | Validation |
@@ -2151,6 +2245,7 @@ cluster
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2173,6 +2268,7 @@ of replication slots
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2198,6 +2294,7 @@ is part of the HA cluster) gets disconnected.
 
 
 _Appears in:_
+
 - [ReplicationSlotsConfiguration](#replicationslotsconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2221,6 +2318,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 
 
 _Appears in:_
+
 - [ManagedConfiguration](#managedconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2251,6 +2349,7 @@ RoleStatus represents the status of a managed role in the cluster
 
 
 _Appears in:_
+
 - [ManagedRoles](#managedroles)
 
 | Field | Description |
@@ -2276,6 +2375,7 @@ in their respective arrays.
 
 
 _Appears in:_
+
 - [BootstrapInitDB](#bootstrapinitdb)
 
 | Field | Description | Required | Default | Validation |
@@ -2312,6 +2412,7 @@ ScheduledBackupSpec defines the desired state of ScheduledBackup
 
 
 _Appears in:_
+
 - [ScheduledBackup](#scheduledbackup)
 
 | Field | Description | Required | Default | Validation |
@@ -2337,6 +2438,7 @@ ScheduledBackupStatus defines the observed state of ScheduledBackup
 
 
 _Appears in:_
+
 - [ScheduledBackup](#scheduledbackup)
 
 | Field | Description | Required | Default | Validation |
@@ -2355,6 +2457,7 @@ SchemaSpec configures a schema in a database
 
 
 _Appears in:_
+
 - [DatabaseSpec](#databasespec)
 
 | Field | Description | Required | Default | Validation |
@@ -2375,6 +2478,7 @@ SecretVersion contains a secret name and its ResourceVersion
 
 
 _Appears in:_
+
 - [PgBouncerSecrets](#pgbouncersecrets)
 - [PoolerSecrets](#poolersecrets)
 
@@ -2394,6 +2498,7 @@ managed by the operator
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -2420,6 +2525,7 @@ ServerSpec configures a server of a foreign data wrapper
 
 
 _Appears in:_
+
 - [DatabaseSpec](#databasespec)
 
 | Field | Description | Required | Default | Validation |
@@ -2440,6 +2546,7 @@ ServiceAccountTemplate contains the template needed to generate the service acco
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2455,9 +2562,11 @@ ServiceSelectorType describes a valid value for generating the service selectors
 It indicates which type of service the selector applies to, such as read-write, read, or read-only
 
 _Validation:_
+
 - Enum: [rw r ro]
 
 _Appears in:_
+
 - [ManagedService](#managedservice)
 - [ManagedServices](#managedservices)
 
@@ -2478,6 +2587,7 @@ a template for Service generation.
 
 
 _Appears in:_
+
 - [ManagedService](#managedservice)
 - [PoolerSpec](#poolerspec)
 
@@ -2494,9 +2604,11 @@ _Underlying type:_ _string_
 ServiceUpdateStrategy describes how the changes to the managed service should be handled
 
 _Validation:_
+
 - Enum: [patch replace]
 
 _Appears in:_
+
 - [ManagedService](#managedservice)
 
 
@@ -2511,6 +2623,7 @@ This specifies which owner the processed resources should relate to.
 
 
 _Appears in:_
+
 - [VolumeSnapshotConfiguration](#volumesnapshotconfiguration)
 
 | Field | Description |
@@ -2529,6 +2642,7 @@ SnapshotType is a type of allowed import
 
 
 _Appears in:_
+
 - [Import](#import)
 
 | Field | Description |
@@ -2547,6 +2661,7 @@ usable for WAL volumes, PGDATA volumes, or tablespaces
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 - [TablespaceConfiguration](#tablespaceconfiguration)
 
@@ -2586,6 +2701,7 @@ SubscriptionReclaimPolicy describes a policy for end-of-life maintenance of Subs
 
 
 _Appears in:_
+
 - [SubscriptionSpec](#subscriptionspec)
 
 | Field | Description |
@@ -2603,6 +2719,7 @@ SubscriptionSpec defines the desired state of Subscription
 
 
 _Appears in:_
+
 - [Subscription](#subscription)
 
 | Field | Description | Required | Default | Validation |
@@ -2626,6 +2743,7 @@ SubscriptionStatus defines the observed state of Subscription
 
 
 _Appears in:_
+
 - [Subscription](#subscription)
 
 | Field | Description | Required | Default | Validation |
@@ -2644,6 +2762,7 @@ SwitchReplicaClusterStatus contains all the statuses regarding the switch of a c
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -2665,6 +2784,7 @@ In future synchronous replica election restriction by name will be supported.
 
 
 _Appears in:_
+
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2683,6 +2803,7 @@ physical replication slots
 
 
 _Appears in:_
+
 - [ReplicationSlotsConfiguration](#replicationslotsconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2703,6 +2824,7 @@ need to be considered.
 
 
 _Appears in:_
+
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
@@ -2726,6 +2848,7 @@ quorum based replication or a priority list
 
 
 _Appears in:_
+
 - [SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)
 
 
@@ -2740,6 +2863,7 @@ the storage specification for the tablespace
 
 
 _Appears in:_
+
 - [ClusterSpec](#clusterspec)
 
 | Field | Description | Required | Default | Validation |
@@ -2759,6 +2883,7 @@ TablespaceState represents the state of a tablespace in a cluster
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -2778,6 +2903,7 @@ TablespaceStatus represents the status of a tablespace in the cluster
 
 
 _Appears in:_
+
 - [TablespaceState](#tablespacestate)
 
 | Field | Description |
@@ -2795,6 +2921,7 @@ Topology contains the cluster topology
 
 
 _Appears in:_
+
 - [ClusterStatus](#clusterstatus)
 
 | Field | Description | Required | Default | Validation |
@@ -2813,6 +2940,7 @@ UsageSpec configures a usage for a foreign data wrapper
 
 
 _Appears in:_
+
 - [FDWSpec](#fdwspec)
 - [ServerSpec](#serverspec)
 
@@ -2832,6 +2960,7 @@ UsageSpecType describes the type of usage specified in the `usage` field of the
 
 
 _Appears in:_
+
 - [UsageSpec](#usagespec)
 
 | Field | Description |
@@ -2849,6 +2978,7 @@ VolumeSnapshotConfiguration represents the configuration for the execution of sn
 
 
 _Appears in:_
+
 - [BackupConfiguration](#backupconfiguration)
 
 | Field | Description | Required | Default | Validation |
