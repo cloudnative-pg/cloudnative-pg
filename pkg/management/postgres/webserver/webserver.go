@@ -21,9 +21,11 @@ package webserver
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -90,11 +92,20 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	go func() {
 		contextLogger.Info("Starting webserver", "address", ws.server.Addr, "hasTLS", ws.server.TLSConfig != nil)
 
+		// Bind explicitly to surface any socket errors immediately and provide clearer logs
+		ln, listenErr := net.Listen("tcp", ws.server.Addr)
+		if listenErr != nil {
+			errChan <- fmt.Errorf("failed to bind webserver on %s: %w", ws.server.Addr, listenErr)
+			return
+		}
+
+		// Wrap listener for TLS when configured
 		var err error
 		if ws.server.TLSConfig != nil {
-			err = ws.server.ListenAndServeTLS("", "")
+			tl := tls.NewListener(ln, ws.server.TLSConfig)
+			err = ws.server.Serve(tl)
 		} else {
-			err = ws.server.ListenAndServe()
+			err = ws.server.Serve(ln)
 		}
 		if err != nil {
 			errChan <- err
