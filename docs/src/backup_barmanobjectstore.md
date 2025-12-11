@@ -26,12 +26,13 @@ You can use the image `ghcr.io/cloudnative-pg/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
-!!! Important
+:::info[Important]
     Always ensure that you are running the latest version of the operands
     in your system to take advantage of the improvements introduced in
     Barman cloud (as well as improve the security aspects of your cluster).
+:::
 
-!!! Warning "Changes in Barman Cloud 3.16+ and Bucket Creation"
+:::warning[Changes in Barman Cloud 3.16+ and Bucket Creation]
     Starting with Barman Cloud 3.16, most Barman Cloud commands no longer
     automatically create the target bucket, assuming it already exists. Only the
     `barman-cloud-check-wal-archive` command creates the bucket now. Whenever this
@@ -39,6 +40,7 @@ as it is composed of a community PostgreSQL image and the latest
     error. As a result, to ensure reliable, future-proof operations and avoid
     potential issues, we strongly recommend that you create and configure your
     object store bucket *before* creating a `Cluster` resource that references it.
+:::
 
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
@@ -57,8 +59,9 @@ provider, please refer to [Appendix A - Common object stores](appendixes/object_
 
 ## Retention policies
 
-!!! Important
+:::info[Important]
     Retention policies are not currently available on volume snapshots.
+:::
 
 CloudNativePG can manage the automated deletion of backup files from
 the backup object store, using **retention policies** based on the recovery
@@ -88,7 +91,7 @@ spec:
     retentionPolicy: "30d"
 ```
 
-!!! Note "There's more ..."
+:::note[There's more ...]
     The **recovery window retention policy** is focused on the concept of
     *Point of Recoverability* (`PoR`), a moving point in time determined by
     `current time - recovery window`. The *first valid backup* is the first
@@ -98,6 +101,7 @@ spec:
     file, starting from the first valid backup. Base backups that are older
     than the first valid backup will be marked as *obsolete* and permanently
     removed after the next backup is completed.
+:::
 
 ## Compression algorithms
 

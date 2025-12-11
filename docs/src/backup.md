@@ -13,13 +13,14 @@ more than 15 years in mission critical production databases, helping
 organizations all over the world achieve their disaster recovery goals with
 Postgres.
 
-!!! Note
+:::note
     There's another way to backup databases in PostgreSQL, through the
     `pg_dump` utility - which relies on logical backups instead of physical ones.
     However, logical backups are not suitable for business continuity use cases
     and as such are not covered by CloudNativePG (yet, at least).
     If you want to use the `pg_dump` utility, let yourself be inspired by the
     ["Troubleshooting / Emergency backup" section](troubleshooting.md#emergency-backup).
+:::
 
 In CloudNativePG, the backup infrastructure for each PostgreSQL cluster is made
 up of the following resources:
@@ -38,20 +39,23 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
 - on [Kubernetes Volume Snapshots](backup_volumesnapshot.md), if supported by
   the underlying storage class
 
-!!! Important
+:::info[Important]
     Before choosing your backup strategy with CloudNativePG, it is important that
     you take some time to familiarize with some basic concepts, like WAL archive,
     hot and cold backups.
+:::
 
-!!! Important
+:::info[Important]
     Please refer to the official Kubernetes documentation for a list of all
     the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
     that provide snapshotting capabilities.
+:::
 
-!!! Info
+:::info
     Starting with version 1.25, CloudNativePG includes experimental support for
     backup and recovery using plugins, such as the
     [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
+:::
 
 ## WAL archive
 
@@ -64,9 +68,10 @@ is fundamental for the following reasons:
 - **Point in Time recovery** (PITR): to possibility to recover at any point in
   time from the first available base backup in your system
 
-!!! Warning
+:::warning
     WAL archive alone is useless. Without a physical base backup, you cannot
     restore a PostgreSQL cluster.
+:::
 
 In general, the presence of a WAL archive enhances the resilience of a
 PostgreSQL cluster, allowing each instance to fetch any required WAL file from
@@ -81,12 +86,13 @@ When you [configure a WAL archive](wal_archiving.md), CloudNativePG provides
 out-of-the-box an [RPO](before_you_start.md#rpo) ≤ 5 minutes for disaster
 recovery, even across regions.
 
-!!! Important
+:::info[Important]
     Our recommendation is to always setup the WAL archive in production.
     There are known use cases - normally involving staging and development
     environments - where none of the above benefits are needed and the WAL
     archive is not necessary. RPO in this case can be any value, such as
     24 hours (daily backups) or infinite (no backup at all).
+:::
 
 ## Cold and Hot backups
 
@@ -167,18 +173,20 @@ available methods for storing physical base backups.
 Scheduled backups are the recommended way to configure your backup strategy in
 CloudNativePG. They are managed by the `ScheduledBackup` resource.
 
-!!! Info
+:::info
     For a complete list of configuration options, refer to the
     [`ScheduledBackupSpec`](cloudnative-pg.v1.md#scheduledbackupspec)
     in the API reference.
+:::
 
 The `schedule` field allows you to define a *six-term cron schedule* specification,
 which includes seconds, as expressed in
 the [Go `cron` package format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
-!!! Warning
+:::warning
     Beware that this format accepts also the `seconds` field, and it is
     different from the `crontab` format in Unix/Linux systems.
+:::
 
 This is an example of a scheduled backup:
 
@@ -201,7 +209,7 @@ for day of the month, month, and day of the week.
 In Kubernetes CronJobs, the equivalent expression is `0 0 * * *` because seconds
 are not included.
 
-!!! Hint
+:::tip[Hint]
     Backup frequency might impact your recovery time objective ([RTO](before_you_start.md#rto)) after a
     disaster which requires a full or Point-In-Time recovery operation. Our
     advice is that you regularly test your backups by recovering them, and then
@@ -213,6 +221,7 @@ are not included.
     Based on our experience, a weekly base backup is more than enough for most
     cases - while it is extremely rare to schedule backups more frequently than once
     a day.
+:::
 
 You can choose whether to schedule a backup on a defined object store or a
 volume snapshot via the `.spec.method` attribute, by default set to
@@ -228,20 +237,22 @@ or set back to `false`.
 In case you want to issue a backup as soon as the ScheduledBackup resource is created
 you can set `.spec.immediate: true`.
 
-!!! Note
+:::note
     `.spec.backupOwnerReference` indicates which ownerReference should be put inside
     the created backup resources.
 
     - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
     - *self:* sets the Scheduled backup object as owner of the backup
     - *cluster:* set the cluster as owner of the backup
+:::
 
 ## On-demand backups
 
-!!! Info
+:::info
     For a full list of available options, see the
     [`BackupSpec`](cloudnative-pg.v1.md#backupspec) in the
     API reference.
+:::
 
 To request a new backup, you need to create a new `Backup` resource
 like the following one:
@@ -332,7 +343,7 @@ feature which is directly available in PostgreSQL: **backup from a standby**.
 By default, backups will run on the most aligned replica of a `Cluster`. If
 no replicas are available, backups will run on the primary instance.
 
-!!! Info
+:::info
     Although the standby might not always be up to date with the primary,
     in the time continuum from the first available backup to the last
     archived WAL this is normally irrelevant. The base backup indeed
@@ -342,6 +353,7 @@ no replicas are available, backups will run on the primary instance.
     when backing up from an online standby we do not force a switch of the WAL on the
     primary. This might produce unexpected results in the short term (before
     `archive_timeout` kicks in) in deployments with low write activity.
+:::
 
 If you prefer to always run backups on the primary, you can set the backup
 target to `primary` as outlined in the example below:
@@ -356,12 +368,13 @@ spec:
     target: "primary"
 ```
 
-!!! Warning
+:::warning
     Beware of setting the target to primary when performing a cold backup
     with volume snapshots, as this will shut down the primary for
     the time needed to take the snapshot, impacting write operations.
     This also applies to taking a cold backup in a single-instance cluster, even
     if you did not explicitly set the primary as the target.
+:::
 
 When the backup target is set to `prefer-standby`, such policy will ensure
 backups are run on the most up-to-date available secondary instance, or if no

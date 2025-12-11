@@ -24,11 +24,12 @@ automated, and consistent approach to managing PostgreSQL databases.
 
 ### Scope of Management
 
-!!! Important
+:::info[Important]
     CloudNativePG manages **global objects** in PostgreSQL clusters, such as
     databases, roles, and tablespaces. However, it does **not** manage the content
     of databases (e.g., schemas and tables). For database content, specialized
     tools or the applications themselves should be used.
+:::
 
 ### Declarative `Database` Manifest
 
@@ -51,9 +52,10 @@ When applied, this manifest creates a `Database` object called
 `cluster-example-one` requesting a database named `one`, owned by the `app`
 role, in the `cluster-example` PostgreSQL cluster.
 
-!!! Info
+:::info
     Please refer to the [API reference](cloudnative-pg.v1.md#databasespec)
     the full list of attributes you can define for each `Database` object.
+:::
 
 ### Required Fields in the `Database` Manifest
 
@@ -66,10 +68,11 @@ The `Database` object must reference a specific `Cluster`, determining where
 the database will be created. It is managed by the cluster's primary instance,
 ensuring the database is created or updated as needed.
 
-!!! Info
+:::info
     The distinction between `metadata.name` and `spec.name` allows multiple
     `Database` resources to reference databases with the same name across different
     CloudNativePG clusters in the same Kubernetes namespace.
+:::
 
 ## Reserved Database Names
 
@@ -77,9 +80,10 @@ PostgreSQL automatically creates databases such as `postgres`, `template0`, and
 `template1`. These names are reserved and cannot be used for new `Database`
 objects in CloudNativePG.
 
-!!! Important
+:::info[Important]
     Creating a `Database` with `spec.name` set to `postgres`, `template0`, or
     `template1` is not allowed.
+:::
 
 ## Reconciliation and Status
 
@@ -184,10 +188,11 @@ It is important to note that there are some differences between these two
 Postgres commands: in particular, the options accepted by `ALTER` are a subset
 of those accepted by `CREATE`.
 
-!!! Warning
+:::warning
     Some fields, such as encoding and collation settings, are immutable in
     PostgreSQL. Attempts to modify these fields on existing databases will be
     ignored.
+:::
 
 ### Replica Clusters
 

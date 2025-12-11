@@ -45,7 +45,7 @@ kubectl cnpg install generate \
 Please refer to ["`cnpg` plugin"](./kubectl-plugin.md#generation-of-installation-manifests) documentation
 for a more comprehensive example. 
 
-!!! Warning
+:::warning
     If you are deploying CloudNativePG on GKE and get an error (`... failed to
     call webhook...`), be aware that by default traffic between worker nodes
     and control plane is blocked by the firewall except for a few specific
@@ -56,6 +56,7 @@ for a more comprehensive example.
     You'll need to either change the `targetPort` in the webhook service, to be
     one of the allowed ones, or open the webhooks' port (`9443`) on the
     firewall.
+:::
 
 ### Testing the latest development snapshot
 
@@ -83,9 +84,10 @@ curl -sSfL \
   kubectl apply --server-side -f -
 ```
 
-!!! Important
+:::info[Important]
     Snapshots are not supported by the CloudNativePG Community, and are not
     intended for use in production.
+:::
 
 ### Using the Helm Chart
 
@@ -109,9 +111,10 @@ When installed through the manifest or the `cnpg` plugin, it is called
 `cnpg-controller-manager` by default. When installed via Helm, the default name
 is `cnpg-cloudnative-pg`.
 
-!!! Note
+:::note
     With Helm you can customize the name of the deployment via the
     `fullnameOverride` field in the [*"values.yaml"* file](https://helm.sh/docs/chart_template_guide/values_files/).
+:::
 
 You can get more information using the `describe` command in `kubectl`:
 
@@ -140,17 +143,19 @@ tolerations to make sure that the operator does not run on the same nodes where
 the actual PostgreSQL clusters are running (this might even include the control
 plane for self-managed Kubernetes installations).
 
-!!! Seealso "Operator configuration"
+:::note[Operator configuration]
     You can change the default behavior of the operator by overriding
     some default options. For more information, please refer to the
     ["Operator configuration"](operator_conf.md) section.
+:::
 
 ## Upgrades
 
-!!! Important
+:::info[Important]
     Please carefully read the [release notes](release_notes.md)
     before performing an upgrade as some versions might require
     extra steps.
+:::
 
 Upgrading CloudNativePG operator is a two-step process:
 
@@ -171,16 +176,18 @@ update concludes with a switchover, which is governed by the
 the switchover automatically. If set to `supervised`, the user must manually
 promote the new primary instance using the `cnpg` plugin for `kubectl`.
 
-!!! Seealso "Rolling updates"
+:::note[Rolling updates]
     This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
+:::
 
-!!! Important
+:::info[Important]
     In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
     causing a (normally negligible) downtime. If your PostgreSQL Cluster has only one
     instance, the instance will be automatically restarted as `supervised` value is
     not supported for `primaryUpdateStrategy`. In either case, your applications will
     have to reconnect to PostgreSQL.
+:::
 
 The default rolling update behavior can be replaced with in-place updates of
 the instance manager. This approach does not require a restart of the
@@ -260,17 +267,19 @@ only the operator itself.
 
 ### Upgrading to 1.25 from a previous minor version
 
-!!! Important
+:::info[Important]
     We strongly recommend that all CloudNativePG users upgrade to version
     1.25.1 or at least to the latest stable version of the minor release you are
     currently using (namely 1.24.x).
+:::
 
-!!! Warning
+:::warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
     from 1.23.x to 1.25, make sure you go through the release notes
     and upgrade instructions for 1.24 and 1.25.
+:::
 
 No changes to existing 1.24 cluster configurations are required when upgrading
 to 1.25.

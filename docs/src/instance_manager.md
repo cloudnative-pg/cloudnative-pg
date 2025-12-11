@@ -44,10 +44,11 @@ By default, the `startDelay` is set to `3600` seconds. It is recommended to
 adjust this setting based on the time PostgreSQL needs to fully initialize in
 your specific environment.
 
-!!! Warning
+:::warning
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
     prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL
     hasn’t fully initialized.
+:::
 
 CloudNativePG configures the startup probe with the following default parameters:
 
@@ -64,13 +65,15 @@ The `failureThreshold` value is automatically calculated by dividing
 You can customize any of the probe settings in the `.spec.probes.startup`
 section of your configuration.
 
-!!! Warning
+:::warning
     Be sure that any custom probe settings are tailored to your cluster's
     operational requirements to avoid unintended disruptions.
+:::
 
-!!! Info
+:::info
     For more details on probe configuration, refer to the
     [probe API documentation](cloudnative-pg.v1.md#probe).
+:::
 
 If you manually specify `.spec.probes.startup.failureThreshold`, it will
 override the default behavior and disable the automatic use of `startDelay`.
@@ -122,13 +125,15 @@ failures, with a 10-second interval between each check.
 You can customize any of the probe settings in the `.spec.probes.liveness`
 section of your configuration.
 
-!!! Warning
+:::warning
     Be sure that any custom probe settings are tailored to your cluster's
     operational requirements to avoid unintended disruptions.
+:::
 
-!!! Info
+:::info
     For more details on probe configuration, refer to the
     [probe API documentation](cloudnative-pg.v1.md#probe).
+:::
 
 If you manually specify `.spec.probes.liveness.failureThreshold`, it will
 override the default behavior and disable the automatic use of
@@ -179,13 +184,15 @@ spec:
       failureThreshold: 10
 ```
 
-!!! Warning
+:::warning
     Ensure that any custom probe settings are aligned with your cluster’s
     operational requirements to prevent unintended disruptions.
+:::
 
-!!! Info
+:::info
     For more information on configuring probes, see the
     [probe API](cloudnative-pg.v1.md#probe).
+:::
 
 ## Shutdown control
 
@@ -210,11 +217,12 @@ will wait for up to the remaining time set in `.spec.stopDelay` to complete the
 operation and then forcibly shut down. Such a timeout needs to be at least 15
 seconds.
 
-!!! Important
+:::info[Important]
     In order to avoid any data loss in the Postgres cluster, which impacts
     the database [RPO](before_you_start.md#rpo), don't delete the Pod where
     the primary instance is running. In this case, perform a switchover to
     another instance first.
+:::
 
 ### Shutdown of the primary during a switchover
 
@@ -228,13 +236,14 @@ For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
 the  time given to the former primary to shut down gracefully and archive all
 the WAL files. By default it is set to `3600` (1 hour).
 
-!!! Warning
+:::warning
     The `.spec.switchoverDelay` option affects the [RPO](before_you_start.md#rpo)
     and [RTO](before_you_start.md#rto) of your PostgreSQL database. Setting it to
     a low value, might favor RTO over RPO but lead to data loss at cluster level
     and/or backup level. On the contrary, setting it to a high value, might remove
     the risk of data loss while leaving the cluster without an active primary for a
     longer time during the switchover.
+:::
 
 ## Failover
 
@@ -253,15 +262,17 @@ The same applies to CloudNativePG and Kubernetes as well: the
 provides details on checking the disk space used by WAL segments and standard
 metrics on disk usage exported to Prometheus.
 
-!!! Important
+:::info[Important]
     In a production system, it is critical to monitor the database
     continuously. Exhausted disk storage can lead to a database server shutdown.
+:::
 
-!!! Note
+:::note
     The detection of exhausted storage relies on a storage class that
     accurately reports disk size and usage. This may not be the case in simulated
     Kubernetes environments like Kind or with test storage class implementations
     such as `csi-driver-host-path`.
+:::
 
 If the disk containing the WALs becomes full and no more WAL segments can be
 stored, PostgreSQL will stop working. CloudNativePG correctly detects this issue

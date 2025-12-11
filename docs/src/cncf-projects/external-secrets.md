@@ -48,9 +48,10 @@ Let’s walk through how to automatically rotate the password of the `app` user
 every 24 hours in the `cluster-example` Postgres cluster from the
 [quickstart guide](../quickstart.md#part-3-deploy-a-postgresql-cluster).
 
-!!! Important
+:::info[Important]
     Before proceeding, ensure that the `cluster-example` Postgres cluster is up
     and running in your environment.
+:::
 
 By default, CloudNativePG generates and manages a Kubernetes `Secret` named
 `cluster-example-app`, which contains the credentials for the `app` user in the
@@ -165,13 +166,14 @@ In this example, we'll demonstrate how to integrate CloudNativePG,
 External Secrets Operator, and HashiCorp Vault to automatically rotate
 a PostgreSQL password and securely store it in Vault.
 
-!!! Important
+:::info[Important]
     This example assumes that HashiCorp Vault is already installed and properly
     configured in your environment, and that your team has the necessary expertise
     to operate it. There are various ways to deploy Vault, and detailing them is
     outside the scope of CloudNativePG. While it's possible to run Vault inside
     Kubernetes, it is more commonly deployed externally. For detailed instructions,
     consult the [HashiCorp Vault documentation](https://www.vaultproject.io/docs).
+:::
 
 Continuing from the previous example, we will now create the necessary
 `SecretStore` and `PushSecret` resources to complete the integration with
@@ -214,18 +216,20 @@ data:
 
 This configuration creates a `SecretStore` resource named `vault-backend`.
 
-!!! Important
+:::info[Important]
     This example uses basic token-based authentication, which is suitable for
     testing API, and CLI use cases. While it is the default method enabled in
     Vault, it is not recommended for production environments. For production,
     consider using more secure authentication methods.
     Refer to the [External Secrets Operator documentation](https://external-secrets.io/latest/provider/hashicorp-vault/)
     for a full list of supported authentication mechanisms.
+:::
 
-!!! Info
+:::info
     HashiCorp Vault must have a KV secrets engine enabled at the `secrets` path
     with version `v2`. If your Vault instance uses a different path or
     version, be sure to update the `path` and `version` fields accordingly.
+:::
 
 ### Creating the `PushSecret`
 
