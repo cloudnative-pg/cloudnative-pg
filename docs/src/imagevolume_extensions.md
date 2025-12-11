@@ -62,9 +62,10 @@ Extension images are defined in the `.spec.postgresql.extensions` stanza of a
 `Cluster` resource, which accepts an ordered list of extensions to be added to
 the PostgreSQL cluster.
 
-!!! Info
+:::info
     For field-level details, see the
     [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
+:::
 
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 
@@ -79,16 +80,18 @@ the `extensions` list, ensuring deterministic path resolution within
 PostgreSQL. This allows PostgreSQL to discover and load the extension without
 requiring manual configuration inside the pod.
 
-!!! Info
+:::info
     Depending on how your extension container images are built and their layout,
     you may need to adjust the default `extension_control_path` and
     `dynamic_library_path` values to match the image structure.
+:::
 
-!!! Important
+:::info[Important]
     If the extension image includes shared libraries, they must be compiled
     with the same PostgreSQL major version, operating system distribution, and CPU
     architecture as the PostgreSQL container image used by your cluster, to ensure
     compatibility and prevent runtime issues.
+:::
 
 ## How to add a new extension
 
@@ -101,12 +104,13 @@ Adding an extension to a database in CloudNativePG involves a few steps:
 3. Declare the extension in the `Database` resource where you want it
    installed, if the extension supports `CREATE EXTENSION`.
 
-!!! Warning
+:::warning
     Avoid making changes to extension images and PostgreSQL configuration
     settings (such as `shared_preload_libraries`) simultaneously.
     First, allow the pod to roll out with the new extension image, then update
     the PostgreSQL configuration.
     This limitation will be addressed in a future release of CloudNativePG.
+:::
 
 For illustration purposes, this guide uses a simple, fictitious extension named
 `foo` that supports `CREATE EXTENSION`.
@@ -140,13 +144,14 @@ The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes
 The `reference` must point to a valid container registry path for the extension
 image.
 
-!!! Important
+:::info[Important]
     When a new extension is added to a running `Cluster`, CloudNativePG will
     automatically trigger a [rolling update](rolling_update.md) to attach the new
     image volume to each pod. Before adding a new extension in production,
     ensure you have thoroughly tested it in a staging environment to prevent
     configuration issues that could leave your PostgreSQL cluster in an unhealthy
     state.
+:::
 
 Once mounted, CloudNativePG will automatically configure PostgreSQL by appending:
 
@@ -309,11 +314,12 @@ CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
 `/extensions/postgis/system`, allowing PostgreSQL to locate and load these
 system libraries at runtime.
 
-!!! Important
+:::info[Important]
     Since `ld_library_path` must be set when the PostgreSQL process starts,
     changing this value requires a **cluster restart** for the new value to take effect.
     CloudNativePG does not currently trigger this restart automatically; you will need to
     manually restart the cluster (e.g., using `cnpg restart`) after modifying `ld_library_path`.
+:::
 
 ## Image Specifications
 
@@ -329,7 +335,7 @@ Following this structure ensures that the extension will be automatically
 discoverable and usable by PostgreSQL within CloudNativePG without requiring
 manual configuration.
 
-!!! Important
+:::info[Important]
     We encourage PostgreSQL extension developers to publish OCI-compliant extension
     images following this layout as part of their artifact distribution, making
     their extensions easily consumable within Kubernetes environments.
@@ -338,6 +344,7 @@ manual configuration.
     be built using the distribution’s native packaging system (for example, using
     Debian or RPM packages). This approach ensures consistency, security, and
     compatibility with the PostgreSQL images used in your clusters.
+:::
 
 ## Caveats
 

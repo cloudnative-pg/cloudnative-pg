@@ -24,11 +24,12 @@ automated, and consistent approach to managing PostgreSQL databases.
 
 ### Scope of Management
 
-!!! Important
+:::info[Important]
     CloudNativePG manages **global objects** in PostgreSQL clusters, including
     databases, roles, and tablespaces. However, it does **not** manage database content
     beyond extensions and schemas (e.g., tables). To manage database content, use specialized
     tools or rely on the applications themselves.
+:::
 
 ### Declarative `Database` Manifest
 
@@ -54,9 +55,10 @@ When applied, this manifest creates a `Database` object called
 `cluster-example-one` requesting a database named `one`, owned by the `app`
 role, in the `cluster-example` PostgreSQL cluster.
 
-!!! Info
+:::info
     Please refer to the [API reference](cloudnative-pg.v1.md#databasespec)
     the full list of attributes you can define for each `Database` object.
+:::
 
 ### Required Fields in the `Database` Manifest
 
@@ -69,10 +71,11 @@ The `Database` object must reference a specific `Cluster`, determining where
 the database will be created. It is managed by the cluster's primary instance,
 ensuring the database is created or updated as needed.
 
-!!! Info
+:::info
     The distinction between `metadata.name` and `spec.name` allows multiple
     `Database` resources to reference databases with the same name across different
     CloudNativePG clusters in the same Kubernetes namespace.
+:::
 
 ## Reserved Database Names
 
@@ -80,9 +83,10 @@ PostgreSQL automatically creates databases such as `postgres`, `template0`, and
 `template1`. These names are reserved and cannot be used for new `Database`
 objects in CloudNativePG.
 
-!!! Important
+:::info[Important]
     Creating a `Database` with `spec.name` set to `postgres`, `template0`, or
     `template1` is not allowed.
+:::
 
 ## Reconciliation and Status
 
@@ -169,13 +173,14 @@ This manifest ensures that the `database-to-drop` database is removed from the
 
 ## Managing Extensions in a Database
 
-!!! Info
+:::info
     While extensions are database-scoped rather than global objects,
     CloudNativePG provides a declarative interface for managing them. This approach
     is necessary because installing certain extensions may require superuser
     privileges, which CloudNativePG recommends disabling by default. By leveraging
     this API, users can efficiently manage extensions in a scalable and controlled
     manner without requiring elevated privileges.
+:::
 
 CloudNativePG simplifies and automates the management of PostgreSQL extensions within the
 target database.
@@ -203,18 +208,19 @@ Each extension entry supports the following properties:
   upgrade to.
 - `schema`: The schema in which the extension should be installed.
 
-!!! Info
+:::info
     CloudNativePG manages extensions using the following PostgreSQL’s SQL commands:
     [`CREATE EXTENSION`](https://www.postgresql.org/docs/current/sql-createextension.html),
     [`DROP EXTENSION`](https://www.postgresql.org/docs/current/sql-dropextension.html),
     [`ALTER EXTENSION`](https://www.postgresql.org/docs/current/sql-alterextension.html)
     (limited to `UPDATE TO` and `SET SCHEMA`).
+:::
 
 The operator reconciles only the extensions explicitly listed in
 `spec.extensions`. Any existing extensions not specified in this list remain
 unchanged.
 
-!!! Warning
+:::warning
     Before the introduction of declarative extension management, CloudNativePG
     did not offer a straightforward way to create extensions through configuration.
     To address this, the ["managed extensions"](postgresql_conf.md#managed-extensions)
@@ -222,15 +228,17 @@ unchanged.
     of key extensions like `pg_stat_statements`. Currently, it is your
     responsibility to ensure there are no conflicts between extension support in
     the `Database` CRD and the managed extensions feature.
+:::
 
 ## Managing Schemas in a Database
 
-!!! Info
+:::info
     Schema management in PostgreSQL is an exception to CloudNativePG's primary
     focus on managing global objects. Since schemas exist within a database, they
     are typically managed as part of the application development process. However,
     CloudNativePG provides a declarative interface for schema management, primarily
     to complete the support of extensions deployment within schemas.
+:::
 
 CloudNativePG simplifies and automates the management of PostgreSQL schemas within the
 target database.
@@ -256,20 +264,22 @@ Each schema entry supports the following properties:
     - `present`: Ensures that the schema is installed (default).
     - `absent`: Ensures that the schema is removed.
 
-!!! Info
+:::info
     CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
     [`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
     [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
     [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
+:::
 
 ## Managing Foreign Data Wrappers (FDWs) in a Database
 
-!!! Info
+:::info
     Foreign Data Wrappers (FDWs) are database-scoped objects that typically
     require superuser privileges to create or modify. CloudNativePG provides a
     declarative API for managing FDWs, enabling users to define and maintain them
     in a controlled, Kubernetes-native way without directly executing SQL commands
     or escalating privileges.
+:::
 
 CloudNativePG enables seamless and automated management of PostgreSQL foreign
 data wrappers in the target database using declarative configuration.
@@ -309,29 +319,32 @@ Each FDW entry supports the following properties:
     - `value`: The string value of the option.
     - `ensure`: Indicates whether the option should be `present` or `absent`.
 
-!!! Info
+:::info
     Both `handler` and `validator` are optional, and if not specified, the
     default handler and validator defined by the FDW extension (if any) will be
     used. Setting `handler` or `validator` to `"-"` will remove the handler or
     validator from the FDW respectively. This follows the PostgreSQL convention,
     where "-" denotes the absence of a handler or validator.
+:::
 
-!!! Warning
+:::warning
     PostgreSQL restricts ownership of foreign data wrappers to **roles with
     superuser privileges only**. Attempting to assign ownership to a non-superuser
     (e.g., an app role) will be ignored or rejected, as PostgreSQL does not allow
     non-superuser ownership of foreign data wrappers. By default, they are
     owned by the `postgres` user.
+:::
 
 The operator reconciles only the FDWs explicitly listed in `spec.fdws`. Any
 existing FDWs not declared in this list are left untouched.
 
-!!! Info
+:::info
      CloudNativePG manages FDWs using PostgreSQL's native SQL commands:
      [`CREATE FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-createforeigndatawrapper.html),
      [`ALTER FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-alterforeigndatawrapper.html),
      and [`DROP FOREIGN DATA WRAPPER`](https://www.postgresql.org/docs/current/sql-dropforeigndatawrapper.html).
      The `ALTER` command supports option updates.
+:::
 
 ### Managing Foreign Servers in a Database
 
@@ -342,11 +355,12 @@ A **foreign server** encapsulates the connection details that a foreign data
 wrapper (FDW) uses to access an external data source. For user-specific
 connection details, you can define [user mappings](https://www.postgresql.org/docs/current/sql-createusermapping.html).
 
-!!! Important
+:::info[Important]
     CloudNativePG does not currently support declarative configuration of user mappings.
     However, once an FDW and its foreign server are defined, you can grant
     usage privileges to a standard database role. This allows you to manage user
     mappings as part of your SQL schema, without requiring superuser privileges.
+:::
 
 To enable this feature, declare the `spec.servers` field in a `Database`
 resource with a list of foreign server specifications, for example:
@@ -387,11 +401,15 @@ Each foreign server entry supports the following properties:
     - `value`: The string value of the option.
     - `ensure`: Indicates whether the option should be `present` or `absent`.
 
-!!! Important
+:::info[Important]
+:::
+
 The `fdw` field must reference an existing foreign data wrapper already defined in the database.
 If the specified FDW does not exist, the foreign server will not be created.
 
-!!! Info
+:::info
+:::
+
 CloudNativePG manages foreign servers using PostgreSQL’s native SQL commands:
 [`CREATE SERVER`](https://www.postgresql.org/docs/current/sql-createserver.html),
 [`ALTER SERVER`](https://www.postgresql.org/docs/current/sql-alterserver.html), and
@@ -422,10 +440,11 @@ It is important to note that there are some differences between these two
 Postgres commands: in particular, the options accepted by `ALTER` are a subset
 of those accepted by `CREATE`.
 
-!!! Warning
+:::warning
     Some fields, such as encoding and collation settings, are immutable in
     PostgreSQL. Attempts to modify these fields on existing databases will be
     ignored.
+:::
 
 ### Replica Clusters
 
