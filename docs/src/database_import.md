@@ -27,21 +27,23 @@ As a result, the instructions in this section are suitable for both:
   same or newer, enabling *major upgrades* of PostgreSQL (e.g. from version 13.x
   to version 17.x)
 
-!!! Warning
+:::warning
     When performing major upgrades of PostgreSQL you are responsible for making
     sure that applications are compatible with the new version and that the
     upgrade path of the objects contained in the database (including extensions) is
     feasible.
+:::
 
 In both cases, the operation is performed on a consistent **snapshot** of the
 origin database.
 
-!!! Important
+:::info[Important]
     For this reason we suggest to stop write operations on the source before
     the final import in the `Cluster` resource, as changes done to the source
     database after the start of the backup will not be in the destination cluster -
     hence why this feature is referred to as "offline import" or "offline major
     upgrade".
+:::
 
 ## How it works
 
@@ -65,12 +67,13 @@ into the destination cluster:
 The first import method is available via the `microservice` type, the
 second via the `monolith` type.
 
-!!! Warning
+:::warning
     It is your responsibility to ensure that the destination cluster can
     access the source cluster with a superuser or a user having enough
     privileges to take a logical backup with `pg_dump`. Please refer to the
     [PostgreSQL documentation on `pg_dump`](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
+:::
 
 ## The `microservice` type
 
@@ -134,7 +137,7 @@ spec:
         key: password
 ```
 
-!!! Warning
+:::warning
     The example above deliberately uses a source database running a version of
     PostgreSQL that is not supported anymore by the Community, and consequently by
     CloudNativePG.
@@ -146,6 +149,7 @@ spec:
     legacy data to a better system, inside Kubernetes.
     This is the main reason why we used 9.6 in the examples of this section.
     We'd be interested to hear from you, should you experience any issues in this area.
+:::
 
 There are a few things you need to be aware of when using the `microservice` type:
 
@@ -164,11 +168,12 @@ There are a few things you need to be aware of when using the `microservice` typ
 - Only one database can be specified inside the `initdb.import.databases` array
 - Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
 
-!!! Hint
+:::tip[Hint]
     The microservice approach adheres to CloudNativePG conventions and defaults
     for the destination cluster. If you do not set `initdb.database` or
     `initdb.owner` for the destination cluster, both parameters will default to
     `app`.
+:::
 
 ## The `monolith` type
 
@@ -259,13 +264,14 @@ There are a few things you need to be aware of when using the `monolith` type:
   database.
 - The `postImportApplicationSQL` field is not supported
 
-!!! Hint
+:::tip[Hint]
     The databases and their owners are preserved exactly as they exist in the
     source cluster—no `app` database or user will be created during import. If your
     `bootstrap.initdb` stanza specifies custom `database` and `owner` values that
     do not match any of the databases or users being imported, the instance
     manager will create a new, empty application database and owner role with those
     specified names, while leaving the imported databases and owners unchanged.
+:::
 
 ## A practical example
 
@@ -385,10 +391,11 @@ Before completing the import job, CloudNativePG restores the expected
 configuration, then runs `initdb --sync-only` to ensure that data is
 permanently written on disk.
 
-!!! Important
+:::info[Important]
     WAL archiving, if requested, and WAL level will be honored after the
     database import process has completed. Similarly, replicas will be cloned
     after the bootstrap phase, when the actual cluster resource starts.
+:::
 
 There are other optimizations you can do during the import phase. Although this
 topic is beyond the scope of CloudNativePG, we recommend that you reduce
@@ -420,12 +427,33 @@ import/export processes, as shown in the following example:
   # <snip>
 ```
 
-!!! Warning
-    Use the `pgDumpExtraOptions` and `pgRestoreExtraOptions` fields with
-    caution and at your own risk. These options are not validated or verified by
-    the operator, and some configurations may conflict with its intended
-    functionality or behavior. Always test thoroughly in a safe and controlled
-    environment before applying them in production.
+In the example above:
+
+- `--jobs=1` is applied to the `pre-data` stage to preserve the ordering of
+  schema creation.
+- `--jobs=4` increases parallelism during the `data` stage, speeding up large
+  data imports.
+- `--jobs=2` balances performance and dependency handling in the `post-data`
+  stage.
+
+These stage-specific settings are particularly valuable for large databases or
+resource-sensitive environments where tuning concurrency can significantly
+improve performance.
+
+:::note
+    When provided, stage-specific options take precedence over the general
+    `pgRestoreExtraOptions`.
+:::
+
+:::warning
+    The `pgDumpExtraOptions`, `pgRestoreExtraOptions`, and all stage-specific
+    restore options (`pgRestorePredataOptions`, `pgRestoreDataOptions`,
+    `pgRestorePostdataOptions`) are passed directly to the underlying PostgreSQL
+    tools without validation by the operator. Certain flags may conflict with the
+    operator’s intended functionality or design. Use these options with caution
+    and always test them thoroughly in a safe, controlled environment before
+    applying them in production.
+:::
 
 ## Online Import and Upgrades
 

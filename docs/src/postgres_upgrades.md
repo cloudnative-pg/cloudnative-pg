@@ -49,9 +49,10 @@ Each method has trade-offs in terms of downtime, complexity, and data volume
 handling. The best approach depends on your upgrade strategy and operational
 constraints.
 
-!!! Important
+:::info[Important]
     We strongly recommend testing all methods in a controlled environment
     before proceeding with a production upgrade.
+:::
 
 ## Offline In-Place Major Upgrades
 
@@ -59,12 +60,13 @@ CloudNativePG performs an **offline in-place major upgrade** when a new operand
 container image with a higher PostgreSQL major version is declaratively
 requested for a cluster.
 
-!!! Important
+:::info[Important]
     Major upgrades are only supported between images based on the same
     operating system distribution. For example, if your previous version uses a
     `bullseye` image, you cannot upgrade to a `bookworm` image.
+:::
 
-!!! Warning
+:::warning
     There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
     if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
     The upgrade process will fail with an error related to replication slot configuration.
@@ -72,6 +74,7 @@ requested for a cluster.
     If you are using PostgreSQL 17.0 through 17.5, ensure that you upgrade to at least
     PostgreSQL 17.6 before attempting a major upgrade, or make sure to temporarily set
     the `max_slot_wal_keep_size` parameter to `-1` in your cluster configuration.
+:::
 
 You can trigger the upgrade in one of two ways:
 
@@ -82,13 +85,14 @@ You can trigger the upgrade in one of two ways:
 For details on supported image tags, see
 ["Image Tag Requirements"](container_images.md#image-tag-requirements).
 
-!!! Warning
+:::warning
     CloudNativePG is not responsible for PostgreSQL extensions. You must ensure
     that extensions in the source PostgreSQL image are compatible with those in the
     target image and that upgrade paths are supported. Thoroughly test the upgrade
     process in advance to avoid unexpected issues.
     The [extensions management feature](declarative_database_management.md#managing-extensions-in-a-database)
     can help manage extension upgrades declaratively.
+:::
 
 ### Upgrade Process
 
@@ -104,19 +108,22 @@ For details on supported image tags, see
    - Upon successful completion, replaces the original directories with their
      upgraded counterparts.
 
-!!! Warning
+:::warning
     During the upgrade process, the entire PostgreSQL cluster, including
     replicas, is unavailable to applications. Ensure that your system can
     tolerate this downtime before proceeding.
+:::
 
-!!! Warning
+:::warning
     Performing an in-place upgrade is an exceptional operation that carries inherent
     risks. It is strongly recommended to take a full backup of the cluster before
     initiating the upgrade process.
+:::
 
-!!! Info
+:::info
     For detailed guidance on `pg_upgrade`, refer to the official
     [PostgreSQL documentation](https://www.postgresql.org/docs/current/pgupgrade.html).
+:::
 
 ### Post-Upgrade Actions
 
@@ -125,26 +132,29 @@ If the upgrade is successful, CloudNativePG:
 - Destroys the PVCs of replicas (if available).
 - Scales up replicas as required.
 
-!!! Warning
+:::warning
     Re-cloning replicas can be time-consuming, especially for very large
     databases. Plan accordingly to accommodate potential delays. After completing
     the upgrade, it is strongly recommended to take a full backup. Existing backup
     data (namely base backups and WAL files) is only available for the previous
     minor PostgreSQL release.
+:::
 
-!!! Warning
+:::warning
     `pg_upgrade` doesn't transfer optimizer statistics. After the upgrade, you
     may want to run `ANALYZE` on your databases to update them.
+:::
 
 If the upgrade fails, you must manually revert the major version change in the
 cluster's configuration and delete the upgrade job, as CloudNativePG cannot
 automatically decide the rollback.
 
-!!! Important
+:::info[Important]
     This process **protects your existing database from data loss**, as no data
     is modified during the upgrade. If the upgrade fails, a rollback is
     usually possible, without having to perform a full recovery from a backup.
     Ensure you monitor the process closely and take corrective action if needed.
+:::
 
 ### Example: Performing a Major Upgrade
 

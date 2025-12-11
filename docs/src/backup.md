@@ -7,21 +7,23 @@ title: Backup
 # Backup
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Info
+:::info
     This section covers **physical backups** in PostgreSQL.
     While PostgreSQL also supports logical backups using the `pg_dump` utility,
     these are **not suitable for business continuity** and are **not managed** by
     CloudNativePG. If you still wish to use `pg_dump`, refer to the
     [*Troubleshooting / Emergency backup* section](troubleshooting.md#emergency-backup)
     for guidance.
+:::
 
-!!! Important
+:::info[Important]
     Starting with version 1.26, native backup and recovery capabilities are
     being **progressively phased out** of the core operator and moved to official
     CNPG-I plugins. This transition aligns with CloudNativePG's shift towards a
     **backup-agnostic architecture**, enabled by its extensible
     interface—**CNPG-I**—which standardizes the management of **WAL archiving**,
     **physical base backups**, and corresponding **recovery processes**.
+:::
 
 CloudNativePG currently supports **physical backups of PostgreSQL clusters** in
 two main ways:
@@ -73,9 +75,10 @@ is fundamental for the following reasons:
 - **Point in Time recovery** (PITR): the possibility to recover at any point in
   time from the first available base backup in your system
 
-!!! Warning
+:::warning
     WAL archive alone is useless. Without a physical base backup, you cannot
     restore a PostgreSQL cluster.
+:::
 
 In general, the presence of a WAL archive enhances the resilience of a
 PostgreSQL cluster, allowing each instance to fetch any required WAL file from
@@ -90,12 +93,13 @@ When you [configure a WAL archive](wal_archiving.md), CloudNativePG provides
 out-of-the-box an [RPO](before_you_start.md#rpo) ≤ 5 minutes for disaster
 recovery, even across regions.
 
-!!! Important
+:::info[Important]
     Our recommendation is to always setup the WAL archive in production.
     There are known use cases — normally involving staging and development
     environments — where none of the above benefits are needed and the WAL
     archive is not necessary. RPO in this case can be any value, such as
     24 hours (daily backups) or infinite (no backup at all).
+:::
 
 ### Cold and Hot backups
 
@@ -127,10 +131,11 @@ CloudNativePG currently supports two main approaches for physical backups:
 - [**Volume Snapshots**](appendixes/backup_volumesnapshot.md), using the
   Kubernetes CSI interface and supported storage classes
 
-!!! Important
+:::info[Important]
     CNPG-I is designed to enable third parties to build and integrate their own
     backup plugins. Over time, we expect the ecosystem of supported backup
     solutions to grow.
+:::
 
 ### Object Store–Based Backups
 
@@ -202,10 +207,11 @@ Scheduled backups are the recommended way to implement a reliable backup
 strategy in CloudNativePG. They are defined using the `ScheduledBackup` custom
 resource.
 
-!!! Info
+:::info
     For a complete list of configuration options, refer to the
     [`ScheduledBackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ScheduledBackupSpec)
     in the API reference.
+:::
 
 ### Cron Schedule
 
@@ -213,9 +219,10 @@ The `schedule` field defines **when** the backup should occur, using a
 *six-field cron expression* that includes seconds. This format follows the
 [Go `cron` package specification](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
-!!! Warning
+:::warning
     This format differs from the traditional Unix/Linux `crontab`—it includes a
     **seconds** field as the first entry.
+:::
 
 Example of a daily scheduled backup:
 
@@ -238,9 +245,10 @@ since seconds are not supported.
 
 ### Backup Frequency and RTO
 
-!!! Hint
+:::tip[Hint]
     The frequency of your backups directly impacts your **Recovery Time Objective**
     ([RTO](before_you_start.md#rto)).
+:::
 
 To optimize your disaster recovery strategy based on continuous backup:
 
@@ -283,10 +291,11 @@ Controls which Kubernetes object is set as the owner of the backup resource:
 On-demand backups allow you to manually trigger a backup operation at any time
 by creating a `Backup` resource.
 
-!!! Info
+:::info
     For a full list of available options, see the
     [`BackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BackupSpec) in the
     API reference.
+:::
 
 ### Example: Requesting an On-Demand Backup
 
@@ -356,10 +365,11 @@ Status:
 
 ---
 
-!!! Important
+:::info[Important]
     On-demand backups do **not** include Kubernetes secrets for the PostgreSQL
     superuser or application user. You should ensure these secrets are included in
     your broader Kubernetes cluster backup strategy.
+:::
 
 ## Backup Methods
 
@@ -402,10 +412,11 @@ By default, backups are performed on the **most up-to-date replica** in the
 cluster. If no replicas are available, the backup will fall back to the
 **primary instance**.
 
-!!! Note
+:::note
     The examples in this section are focused on backup target selection and do not
     take the backup method (`spec.method`) into account, as it is not relevant to
     the scope being discussed.
+:::
 
 ### How It Works
 
@@ -418,7 +429,7 @@ attempt to:
 
 This strategy minimizes interference with the primary’s workload.
 
-!!! Warning
+:::warning
     Although the standby might not always be up to date with the primary,
     in the time continuum from the first available backup to the last
     archived WAL this is normally irrelevant. The base backup indeed
@@ -428,6 +439,7 @@ This strategy minimizes interference with the primary’s workload.
     when backing up from an online standby we do not force a switch of the WAL on the
     primary. This might produce unexpected results in the short term (before
     `archive_timeout` kicks in) in deployments with low write activity.
+:::
 
 ### Forcing Backup on the Primary
 
@@ -444,11 +456,12 @@ spec:
     target: "primary"
 ```
 
-!!! Warning
+:::warning
     Be cautious when using `primary` as the target for **cold backups using
     volume snapshots**, as this will require shutting down the primary instance
     temporarily—interrupting all write operations. The same caution applies to
     single-instance clusters, even if you haven't explicitly set the target.
+:::
 
 ### Overriding the Cluster-Wide Target
 
@@ -484,7 +497,8 @@ As part of this transition, the `spec.backup.retentionPolicy` field in the
 For more details on available retention features, refer to your chosen plugin’s documentation.
 For example: ["Retention Policies" with Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/docs/retention/).
 
-!!! Important
+:::info[Important]
     Users are encouraged to rely on the retention mechanisms provided by the
     backup plugin they are using. This ensures better flexibility and consistency
     with the backup method in use.
+:::

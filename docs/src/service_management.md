@@ -23,8 +23,9 @@ resource, with the following conventions:
 - The name of the service follows this format: `<CLUSTER_NAME>-<SERVICE_NAME>`.
 - All services are of type `ClusterIP`.
 
-!!! Important
+:::info[Important]
     Default service names are reserved for CloudNativePG usage.
+:::
 
 While this setup covers most use cases for accessing PostgreSQL within the same
 Kubernetes cluster, CloudNativePG offers flexibility to:
@@ -45,9 +46,10 @@ cluster is required. In such cases, you can create your own service of type
 You can disable any or all of the `ro` and `r` default services through the
 [`managed.services.disabledDefaultServices` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedServices).
 
-!!! Important
+:::info[Important]
     The `rw` service is essential and cannot be disabled because CloudNativePG
     relies on it to ensure PostgreSQL replication.
+:::
 
 For example, if you want to remove both the `ro` (read-only) and `r` (read)
 services, you can use this configuration:
@@ -61,11 +63,12 @@ managed:
 
 ## Adding Your Own Services
 
-!!! Important
+:::info[Important]
     When defining your own services, you cannot use any of the default reserved
     service names that follow the convention `<CLUSTER_NAME>-<SERVICE_NAME>`. It is
     your responsibility to pick a unique name for the service in the Kubernetes
     namespace.
+:::
 
 You can define a list of additional services through the
 [`managed.services.additional` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedService)
@@ -79,12 +82,13 @@ the `spec` sections as you like.
 You must provide a `name` to the service and avoid defining the `selector`
 field, as it is managed by the operator.
 
-!!! Warning
+:::warning
     Service templates give you unlimited possibilities in terms of configuring
     network access to your PostgreSQL database. This translates into greater
     responsibility on your end to ensure that services work as expected.
     CloudNativePG has no control over the service configuration, except honoring
     the selector.
+:::
 
 The `updateStrategy` field allows you to control how the operator
 updates a service definition. By default, the operator uses the `patch`
@@ -92,10 +96,11 @@ strategy, applying changes directly to the service.
 Alternatively, the `replace` strategy deletes the existing service and
 recreates it from the template.
 
-!!! Warning
+:::warning
     The `replace` strategy will cause a service disruption with every
     change.  However, it may be necessary for modifying certain
     parameters that can only be set during service creation.
+:::
 
 For example, if you want to have a single `LoadBalancer` service for your
 PostgreSQL database primary, you can use the following excerpt:
@@ -134,6 +139,7 @@ or physical machine outside Kubernetes. This use case is very similar to DBaaS.
 Be aware that allowing access to a database from the public network could
 expose your database to potential attacks from malicious users.
 
-!!! Warning
+:::warning
     Ensure you secure your database before granting external access, or make
     sure your Kubernetes cluster is only reachable from a private network.
+:::

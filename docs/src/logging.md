@@ -13,12 +13,13 @@ design facilitates seamless integration with most Kubernetes-compatible log
 management tools, including command line ones like
 [stern](https://github.com/stern/stern).
 
-!!! Important
+:::info[Important]
     Long-term storage and management of logs are outside the scope of the
     operator and should be handled at the Kubernetes infrastructure level.
     For more information, see the
     [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
     documentation.
+:::
 
 Each log entry includes the following fields:
 
@@ -31,11 +32,12 @@ Each log entry includes the following fields:
   `logger` type.
 - `logging_pod` – The name of the pod where the log was generated.
 
-!!! Info
+:::info
     If your log ingestion system requires custom field names, you can rename
     the `level` and `ts` fields using the `log-field-level` and
     `log-field-timestamp` flags in the operator controller. This can be configured
     by editing the `Deployment` definition of the `cloudnative-pg` operator.
+:::
 
 ## Cluster Logs
 
@@ -43,10 +45,11 @@ You can configure the log level for the instance pods in the cluster
 specification using the `logLevel` option. Available log levels are: `error`,
 `warning`, `info` (default), `debug`, and `trace`.
 
-!!! Important
+:::info[Important]
     Currently, the log level can only be set at the time the instance starts.
     Changes to the log level in the cluster specification after the cluster has
     started will only apply to new pods, not existing ones.
+:::
 
 ## Operator Logs
 
@@ -99,9 +102,10 @@ Each PostgreSQL log entry is a JSON object with the `logger` key set to
 }
 ```
 
-!!! Info
+:::info
     Internally, the operator uses PostgreSQL's CSV log format. For more details,
     refer to the [PostgreSQL documentation on CSV log format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
+:::
 
 ## PGAudit Logs
 
@@ -111,18 +115,20 @@ CloudNativePG offers seamless and native support for
 To enable PGAudit, add the necessary `pgaudit` parameters in the `postgresql`
 section of the cluster configuration.
 
-!!! Important
+:::info[Important]
     The PGAudit library must be added to `shared_preload_libraries`.
     CloudNativePG automatically manages this based on the presence of `pgaudit.*`
     parameters in the PostgreSQL configuration. The operator handles both the
     addition and removal of the library from `shared_preload_libraries`.
+:::
 
 Additionally, the operator manages the creation and removal of the PGAudit
 extension across all databases within the cluster.
 
-!!! Important
+:::info[Important]
     CloudNativePG executes the `CREATE EXTENSION` and `DROP EXTENSION` commands
     in all databases within the cluster that accept connections.
+:::
 
 The following example demonstrates a PostgreSQL `Cluster` deployment with
 PGAudit enabled and configured:

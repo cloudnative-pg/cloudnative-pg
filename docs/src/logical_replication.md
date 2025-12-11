@@ -18,6 +18,15 @@ connect to publications on a publisher node. Subscribers pull data changes from
 these publications and can re-publish them, enabling cascading replication and
 complex topologies.
 
+:::info[Important]
+    To protect your logical replication subscribers after a failover of the
+    publisher cluster in CloudNativePG, ensure that replication slot
+    synchronization for logical decoding is enabled. Without this, your logical
+    replication clients may lose data and fail to continue seamlessly after a
+    failover. For configuration details, see
+    ["Replication: Logical Decoding Slot Synchronization"](replication.md#logical-decoding-slot-synchronization).
+:::
+
 This flexible model is particularly useful for:
 
 - Online data migrations
@@ -26,9 +35,10 @@ This flexible model is particularly useful for:
 - Real-time analytics
 - Integration with external applications
 
-!!! Info
+:::info
     For more details, examples, and limitations, please refer to the
     [official PostgreSQL documentation on Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
+:::
 
 **CloudNativePG** enhances this capability by providing declarative support for
 key PostgreSQL logical replication objects:
@@ -53,9 +63,10 @@ or leverage the [`cnpg publication create` plugin command](kubectl-plugin.md#log
 When managing `Cluster` objects with **CloudNativePG**, PostgreSQL publications
 can be defined declaratively through the `Publication` resource.
 
-!!! Info
-    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Publication)
+:::info
+    Please refer to the [API reference](cloudnative-pg.v1.md#publication)
     for the full list of attributes you can define for each `Publication` object.
+:::
 
 Suppose you have a cluster named `freddie` and want to replicate all tables in
 the `app` database. Here's a `Publication` manifest:
@@ -90,10 +101,11 @@ through the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-c
 command. This allows you to precisely define which tables, or even which types
 of data changes, should be included in a publication.
 
-!!! Important
+:::info[Important]
     If you are using PostgreSQL versions earlier than 15, review the syntax and
     options available for `CREATE PUBLICATION` in your specific release. Some
     parameters and features may not be supported.
+:::
 
 For complex or tailored replication setups, refer to the
 [PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html).
@@ -188,16 +200,18 @@ A subscription establishes the connection to a publisher's database and
 specifies the set of publications (one or more) it subscribes to. Subscriptions
 can be created on any supported PostgreSQL instance acting as the *subscriber*.
 
-!!! Important
+:::info[Important]
     Since schema definitions are not replicated, the subscriber must have the
     corresponding tables already defined before data replication begins.
+:::
 
 CloudNativePG simplifies subscription management by enabling you to define them
 declaratively using the `Subscription` resource.
 
-!!! Info
-    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Subscription)
+:::info
+    Please refer to the [API reference](cloudnative-pg.v1.md#subscription)
     for the full list of attributes you can define for each `Subscription` object.
+:::
 
 Suppose you want to replicate changes from the `publisher` publication on the
 `app` database of the `freddie` cluster (*publisher*) to the `app` database of
@@ -239,10 +253,11 @@ externalClusters:
       dbname: app
 ```
 
-!!! Info
+:::info
     For more details on configuring the `externalClusters` section, see the
     ["Bootstrap" section](bootstrap.md#the-externalclusters-section) of the
     documentation.
+:::
 
 As you can see, a subscription can connect to any PostgreSQL database
 accessible over the network. This flexibility allows you to seamlessly migrate

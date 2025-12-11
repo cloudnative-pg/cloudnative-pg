@@ -6,10 +6,11 @@ title: Appendix A - Backup on volume snapshots
 # Appendix A - Backup on volume snapshots
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Important
+:::info[Important]
     Please refer to the official Kubernetes documentation for a list of all
     the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
     that provide snapshotting capabilities.
+:::
 
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
@@ -53,20 +54,22 @@ that is responsible to ensure that snapshots can be taken from persistent
 volumes of a given storage class, and managed as `VolumeSnapshot` and
 `VolumeSnapshotContent` resources.
 
-!!! Important
+:::info[Important]
     It is your responsibility to verify with the third party vendor
     that volume snapshots are supported. CloudNativePG only interacts
     with the Kubernetes API on this matter, and we cannot support issues
     at the storage level for each specific CSI driver.
+:::
 
 ## How to configure Volume Snapshot backups
 
 CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
 
-!!! Info
-    Please refer to [`VolumeSnapshotConfiguration`](../cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+:::info
+    Please refer to [`VolumeSnapshotConfiguration`](../cloudnative-pg.v1.md#volumesnapshotconfiguration)
     in the API reference for a full list of options.
+:::
 
 A generic example with volume snapshots (assuming that PGDATA and WALs share
 the same storage class) is the following:
@@ -102,32 +105,35 @@ As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 (controlling physical base backups on volume snapshots) and the
 `plugins` one (controlling the [WAL archive](../wal_archiving.md)).
 
-!!! Info
+:::info
     Once you have defined the `plugin`, you can decide to use
     both volume snapshot and plugin backup strategies simultaneously
     to take physical backups.
+:::
 
 The `volumeSnapshot.className` option allows you to reference the default
 `VolumeSnapshotClass` object used for all the storage volumes you have
 defined in your PostgreSQL cluster.
 
-!!! Info
+:::info
     In case you are using a different storage class for `PGDATA` and
     WAL files, you can specify a separate `VolumeSnapshotClass` for
     that volume through the `walClassName` option (which defaults to
     the same value as `className`).
+:::
 
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
 
 ## Hot and cold backups
 
-!!! Warning
+:::warning
     As noted in the [backup document](../backup.md), a cold snapshot explicitly
     set to target the primary will result in the primary being fenced for
     the duration of the backup, making the cluster read-only during this
     period. For safety, in a cluster already containing fenced instances, a cold
     snapshot is rejected.
+:::
 
 By default, CloudNativePG requests an online/hot backup on volume snapshots, using the
 [PostgreSQL defaults of the low-level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP):
@@ -136,12 +142,13 @@ By default, CloudNativePG requests an online/hot backup on volume snapshots, usi
 - it waits for the WAL archiver to archive the last segment of the backup when
   terminating the backup procedure
 
-!!! Important
+:::info[Important]
     The default values are suitable for most production environments. Hot
     backups are consistent and can be used to perform snapshot recovery, as we
     ensure WAL retention from the start of the backup through a temporary
     replication slot. However, our recommendation is to rely on cold backups for
     that purpose.
+:::
 
 You can explicitly change the default behavior through the following options in
 the `.spec.backup.volumeSnapshot` stanza of the `Cluster` resource:
@@ -241,13 +248,14 @@ In case a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
 - if set to `Retain`, the `VolumeSnapshotContent` object is kept
 - if set to `Delete`, the `VolumeSnapshotContent` object is removed as well
 
-!!! Warning
+:::warning
     `VolumeSnapshotContent` objects do not keep all the information regarding the
     backup and the cluster they refer to (like the annotations and labels that
     are contained in the `VolumeSnapshot` object). Although possible, restoring
     from just this kind of object might not be straightforward. For this reason,
     our recommendation is to always backup the `VolumeSnapshot` definitions,
     even using a Kubernetes level data protection solution.
+:::
 
 The value in `VolumeSnapshotContent` is determined by the `deletionPolicy` set
 in the corresponding `VolumeSnapshotClass` definition, which is
@@ -350,11 +358,11 @@ The following example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`
 volume snapshot class.
 
-!!! Important
+:::info[Important]
     If you are interested in testing the example, please read
     ["Volume Snapshots" for the Amazon Elastic Block Store (EBS) CSI driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/tree/master/examples/kubernetes/snapshot) <!-- wokeignore:rule=master -->
     for detailed instructions on the installation process for the storage class and the snapshot class.
-
+:::
 
 The following manifest creates a `Cluster` that is ready to be used for volume
 snapshots and that stores the WAL archive in a S3 bucket via IAM role for the

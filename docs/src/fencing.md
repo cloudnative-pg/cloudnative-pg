@@ -100,13 +100,14 @@ This consists of an initial fast shutdown with a timeout set to
 - metrics will not be collected, except `cnpg_collector_fencing_on` which will be
   set to 1
 
-!!! Warning
+:::warning
     If a **primary instance** is fenced, its postmaster process
     is shut down but no failover is performed, interrupting the operativity of
     the applications. When the fence will be lifted, the primary instance will be
     started up again without performing a failover.
 
     Given that, we advise users to fence primary instances only if strictly required.
+:::
 
 If a fenced instance is deleted, the pod will be recreated normally, but the
 postmaster won't be started. This can be extremely helpful when instances

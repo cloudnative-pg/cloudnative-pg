@@ -12,10 +12,11 @@ information or relationship between them. However, such resources and objects
 can be linked together and put in relationship through *labels* and
 *annotations*.
 
-!!! info
+:::info
     For more information, see the Kubernetes documentation on
     [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) and
     [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
+:::
 
 In brief:
 
@@ -29,9 +30,10 @@ in your CloudNativePG deployments. Then you need to configure the operator
 so that when you define these labels or annotations in a cluster's metadata,
 they're inherited by all resources created by it (including pods).
 
-!!! Note
+:::note
     Label and annotation inheritance is the technique adopted by CloudNativePG
     instead of alternative approaches such as pod templates.
+:::
 
 ## Predefined labels
 
@@ -265,11 +267,12 @@ The following continues from that example and limits it to the following:
 - Annotations: `categories`
 - Labels: `app`, `environment`, and `workload`
 
-!!! Note
+:::note
     Feel free to select the names that most suit your context for both
     annotations and labels. You can also use wildcards
     in naming and adopt strategies like using `mycompany/*` for all labels
     or setting annotations starting with `mycompany/` to be inherited.
+:::
 
 ## Defining cluster's metadata
 

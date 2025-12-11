@@ -117,8 +117,9 @@ version of CloudNativePG was released.
 See the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
 page for more information about supported versions.
 
-!!! Info
-    Starting from November 14, 2024, [Postgres 12 is no longer supported](https://www.postgresql.org/about/news/postgresql-164-158-1413-1316-1220-and-17-beta-3-released-2910/).
+:::info
+    Starting from November 13, 2025, [Postgres 13 is no longer supported](https://www.postgresql.org/about/news/postgresql-181-177-1611-1515-1420-and-1323-released-3171/).
+:::
 
 We also recommend that you regularly update your PostgreSQL operand images and
 use the latest minor release for the major version you have in use, as not upgrading
@@ -133,16 +134,18 @@ version of PostgreSQL, we might not be able to help you.
 | 1.28.0  | ~ Nov, 2025  | ~ May, 2026 |
 | 1.29.0  | ~ Feb, 2025  | ~ Aug, 2026 |
 
-!!! Note
+:::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
     release candidate version is built and distributed for testing, as described
     earlier.
+:::
 
-!!! Important
+:::info[Important]
     Dates in the future are uncertain and might change. This applies to Kubernetes versions, too.
     Updates and changes on the release schedule will be communicated in the
     [Release updates](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/release-updates)
     discussion in the main GitHub repository.
+:::
 
 ## Old releases
 
