@@ -30,11 +30,12 @@ controller will initiate the failover process, in two steps:
    Meanwhile, the former primary pod will restart, detect that it is no longer
    the primary, and become a replica node.
 
-!!! Important
+:::info[Important]
     The two-phase procedure helps ensure the WAL receivers can stop in an orderly
     fashion, and that the failing primary will not start streaming WALs again upon
     restart. These safeguards prevent timeline discrepancies between the new primary
     and the replicas.
+:::
 
 During the time the failing primary is being shut down:
 
@@ -44,12 +45,13 @@ During the time the failing primary is being shut down:
 2. If the fast shutdown fails, or its timeout is exceeded, a PostgreSQL's
    *immediate shutdown* is initiated.
 
-!!! Info
+:::info
     "Fast" mode does not wait for PostgreSQL clients to disconnect and will
     terminate an online backup in progress. All active transactions are rolled back
     and clients are forcibly disconnected, then the server is shut down.
     "Immediate" mode will abort all PostgreSQL server processes immediately,
     without a clean shutdown.
+:::
 
 ## RTO and RPO impact
 
@@ -68,13 +70,14 @@ and/or data being lost ([RPO](before_you_start.md#rpo)):
    started, the cluster will operate without a primary and thus be impaired - but
    with no data loss.
 
-!!! Note
+:::note
     The timeout that controls fast shutdown is set by `.spec.switchoverDelay`,
     as in the case of a switchover. Increasing the time for fast shutdown is safer
     from an RPO point of view, but possibly delays the return to normal operation -
     negatively affecting RTO.
+:::
 
-!!! Warning
+:::warning
     As already mentioned in the ["Instance Manager" section](instance_manager.md)
     when explaining the switchover process, the `.spec.switchoverDelay` option
     affects the RPO and RTO of your PostgreSQL database. Setting it to a low value,
@@ -82,6 +85,7 @@ and/or data being lost ([RPO](before_you_start.md#rpo)):
     level. On the contrary, setting it to a high value, might remove the risk of
     data loss while leaving the cluster without an active primary for a longer time
     during the switchover.
+:::
 
 ## Delayed failover
 

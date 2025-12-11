@@ -30,16 +30,18 @@ with the following requirements:
 - Appropriate locale settings
 - `du` (optional, for `kubectl cnpg status`)
 
-!!! Important
+:::info[Important]
     Only [PostgreSQL versions supported by the PGDG](https://postgresql.org/) are allowed.
+:::
 
 No entry point and/or command is required in the image definition, as
 CloudNativePG overrides it with its instance manager.
 
-!!! Warning
+:::warning
     Application Container Images will be used by CloudNativePG
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
+:::
 
 The CloudNativePG community provides and supports
 [public PostgreSQL container images](https://github.com/cloudnative-pg/postgres-containers)
@@ -71,8 +73,10 @@ Examples of accepted image tags:
 - `15.5-10`
 - `16.0`
 
-!!! Warning
+:::warning
     `latest` is not considered a valid tag for the image.
+:::
 
-!!! Note
+:::note
     Image tag requirements do not apply for images defined in a catalog.
+:::

@@ -175,10 +175,11 @@ spec:
         key: ca.crt
 ```
 
-!!! Note
+:::note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
     add a label with key `cnpg.io/reload` to the Secrets/ConfigMaps. Otherwise, you will have to reload
     the instances using the `kubectl cnpg reload` subcommand.
+:::
 
 ## Azure Blob Storage
 
@@ -343,10 +344,11 @@ spec:
 
 Now the operator will use the credentials to authenticate against Google Cloud Storage.
 
-!!! Important
+:::info[Important]
     This way of authentication will create a JSON file inside the container with all the needed
     information to access your Google Cloud Storage bucket, meaning that if someone gets access to the pod
     will also have write permissions to the bucket.
+:::
 
 ## MinIO Gateway
 
@@ -366,12 +368,14 @@ kubectl create secret generic minio-creds \
   --from-literal=MINIO_SECRET_KEY=<minio secret key here>
 ```
 
-!!! Note
+:::note
     Cloud Object Storage credentials will be used only by MinIO Gateway in this case.
+:::
 
-!!! Important
+:::info[Important]
     In order to allow PostgreSQL to reach MinIO Gateway, it is necessary to create a
     `ClusterIP` service on port `9000` bound to the MinIO Gateway instance.
+:::
 
 For example:
 
@@ -390,11 +394,12 @@ spec:
     app: minio
 ```
 
-!!! Warning
+:::warning
     At the time of writing this documentation, the official
     [MinIO Operator](https://github.com/minio/minio-operator/issues/71)
     for Kubernetes does not support the gateway feature. As such, we will use a
     `deployment` instead.
+:::
 
 The MinIO deployment will use cloud storage credentials to upload objects to the
 remote bucket and relay backup files to different locations.
