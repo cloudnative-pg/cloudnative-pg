@@ -1771,11 +1771,11 @@ func (v *ClusterCustomValidator) validateName(r *apiv1.Cluster) field.ErrorList 
 			"cluster name must be a valid DNS label"))
 	}
 
-	if len(r.Name) > 50 {
+	if len(r.Name) > 40 {
 		result = append(result, field.Invalid(
 			field.NewPath("metadata", "name"),
 			r.Name,
-			"the maximum length of a cluster name is 50 characters"))
+			"the maximum length of a cluster name is 40 characters"))
 	}
 
 	return result
