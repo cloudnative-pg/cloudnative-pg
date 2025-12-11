@@ -10,8 +10,9 @@ title: Rolling updates
 The operator allows changing the PostgreSQL version used in a cluster while
 applications are running against it.
 
-!!! Important
+:::info[Important]
     Only upgrades for PostgreSQL minor releases are supported.
+:::
 
 Rolling upgrades are started when:
 
