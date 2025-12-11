@@ -67,7 +67,7 @@ CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
 
 !!! Info
-    Please refer to [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+    Please refer to [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#volumesnapshotconfiguration)
     in the API reference for a full list of options.
 
 A generic example with volume snapshots (assuming that PGDATA and WALs share
