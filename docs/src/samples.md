@@ -10,13 +10,15 @@ title: Examples
 The examples show configuration files for setting up
 your PostgreSQL cluster.
 
-!!! Important
+:::info[Important]
     These examples are for demonstration and experimentation
     purposes. You can execute them on a personal Kubernetes cluster with Minikube
     or Kind, as described in [Quick start](quickstart.md).
+:::
 
-!!! Seealso "Reference"
+:::note[Reference]
     For a list of available options, see [API reference](cloudnative-pg.v1.md).
+:::
 
 ## Basics
 
