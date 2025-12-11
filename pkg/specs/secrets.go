@@ -83,8 +83,7 @@ func CreateSecret(
 			"host":     hostname,
 			"port":     fmt.Sprintf("%d", postgres.ServerPort),
 			"pgpass": fmt.Sprintf(
-				"%v:%v:%v:%v:%v\n",
-				hostname,
+				"*:%v:%v:%v:%v\n",
 				postgres.ServerPort,
 				dbname,
 				username,
