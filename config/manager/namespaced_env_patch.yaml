@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-manager-env
+data:
+  NAMESPACED: "true"
+  OPERATOR_NAMESPACE: "cnpg-system"
+  WATCH_NAMESPACE: "cnpg-system"

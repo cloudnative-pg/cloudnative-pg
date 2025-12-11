@@ -237,6 +237,11 @@ generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 		$(KUSTOMIZE) edit add configmap controller-manager-env \
 			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" \
 			--from-literal="PGBOUNCER_IMAGE_NAME=${PGBOUNCER_IMAGE_NAME}" ;\
+		if [ "${NAMESPACED}" = "true" ]; then \
+			$(KUSTOMIZE) edit add patch --path namespaced_env_patch.yaml ;\
+			cat $$CONFIG_TMP_DIR/namespaced/namespaced_rbac.yaml > $$CONFIG_TMP_DIR/rbac/role.yaml ;\
+		fi ;\
+		$(KUSTOMIZE) edit add resource ../rbac ;\
 	} ;\
 	mkdir -p ${DIST_PATH} ;\
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default > ${OPERATOR_MANIFEST_PATH} ;\
