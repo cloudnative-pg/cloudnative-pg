@@ -420,6 +420,13 @@ spec:
                           queryable and should be preserved when modifying objects.
                           More info: http://kubernetes.io/docs/user-guide/annotations
                         type: object
+                        x-kubernetes-validations:
+                        - message: Annotations with 'cnpg.io/' or 'k8s.io/' prefixes
+                            are reserved for the operator
+                          rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))
+                        - message: Annotation 'cloudnative-pg.io/managed-by' is reserved
+                            for the operator
+                          rule: '!self.has(''cloudnative-pg.io/managed-by'')'
                       labels:
                         additionalProperties:
                           type: string
@@ -429,6 +436,10 @@ spec:
                           and services.
                           More info: http://kubernetes.io/docs/user-guide/labels
                         type: object
+                        x-kubernetes-validations:
+                        - message: Labels with 'cnpg.io/' or 'k8s.io/' prefixes are
+                            reserved
+                          rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))
                       name:
                         description: The name of the resource. Only supported for
                           certain types
@@ -796,6 +807,13 @@ spec:
                           queryable and should be preserved when modifying objects.
                           More info: http://kubernetes.io/docs/user-guide/annotations
                         type: object
+                        x-kubernetes-validations:
+                        - message: Annotations with 'cnpg.io/' or 'k8s.io/' prefixes
+                            are reserved for the operator
+                          rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))
+                        - message: Annotation 'cloudnative-pg.io/managed-by' is reserved
+                            for the operator
+                          rule: '!self.has(''cloudnative-pg.io/managed-by'')'
                       labels:
                         additionalProperties:
                           type: string
@@ -805,6 +823,10 @@ spec:
                           and services.
                           More info: http://kubernetes.io/docs/user-guide/labels
                         type: object
+                        x-kubernetes-validations:
+                        - message: Labels with 'cnpg.io/' or 'k8s.io/' prefixes are
+                            reserved
+                          rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))
                       name:
                         description: The name of the resource. Only supported for
                           certain types
