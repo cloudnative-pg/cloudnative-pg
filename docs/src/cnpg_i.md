@@ -200,7 +200,7 @@ must include this DNS name in its Subject Alternative Names (SAN).
 
 To enable a plugin, configure the `.spec.plugins` section in your `Cluster`
 resource. Refer to the CloudNativePG API Reference for the full
-[PluginConfiguration](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PluginConfiguration)
+[PluginConfiguration](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/docs/src/cloudnative-pg.v1.md#pluginconfiguration-----postgresql-cnpg-io-v1-pluginconfiguration)
 specification.
 
 Example:
