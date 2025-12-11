@@ -11,8 +11,8 @@
   baseBranches: [
     'main',
     'release-1.25',
-    'release-1.26',
     'release-1.27',
+    'release-1.28',
   ],
   ignorePaths: [
     'docs/**',
