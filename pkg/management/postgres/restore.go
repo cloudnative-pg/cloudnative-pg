@@ -90,7 +90,7 @@ var (
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
-	cluster, err := info.loadCluster(ctx, cli)
+	cluster, err := info.LoadCluster(ctx, cli)
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	contextLogger := log.FromContext(ctx)
 
-	cluster, err := info.loadCluster(ctx, cli)
+	cluster, err := info.LoadCluster(ctx, cli)
 	if err != nil {
 		return err
 	}
@@ -472,8 +472,8 @@ func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, e
 	return nil
 }
 
-// loadCluster loads the cluster definition from the API server
-func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client) (*apiv1.Cluster, error) {
+// LoadCluster loads the cluster definition from the API server
+func (info InitInfo) LoadCluster(ctx context.Context, typedClient client.Client) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := typedClient.Get(ctx, client.ObjectKey{Namespace: info.Namespace, Name: info.ClusterName}, &cluster)
 	if err != nil {
@@ -840,7 +840,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *ap
 		Temporary: true,
 	}
 
-	if err = temporaryInitInfo.CreateDataDirectory(); err != nil {
+	if err = temporaryInitInfo.CreateDataDirectory(false); err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}
 
