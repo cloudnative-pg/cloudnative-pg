@@ -49,17 +49,30 @@ func Build(
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
 	calculator := configuration.Calculator
-	builder := resources.NewPersistentVolumeClaimBuilder().
+
+	var pvcSpec *corev1.PersistentVolumeClaimSpec
+	if configuration.Storage.PersistentVolumeClaimTemplate != nil {
+		pvcSpec = &configuration.Storage.PersistentVolumeClaimTemplate.PersistentVolumeClaimSpec
+	}
+
+	metadataBuilder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
 		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace).
 		WithAnnotations(map[string]string{
 			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
 			utils.PVCStatusAnnotationName:     configuration.Status,
 		}).
-		WithLabels(calculator.GetLabels(instanceName)).
-		WithClusterInheritance(cluster).
+		WithLabels(calculator.GetLabels(instanceName))
+
+	if configuration.Storage.PersistentVolumeClaimTemplate != nil {
+		metadataBuilder.
+			WithLabels(configuration.Storage.PersistentVolumeClaimTemplate.Metadata.Labels).
+			WithAnnotations(configuration.Storage.PersistentVolumeClaimTemplate.Metadata.Annotations)
+	}
+
+	builder := metadataBuilder.WithClusterInheritance(cluster).
 		EndMetadata().
-		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).
+		WithSpec(pvcSpec).
 		WithSource(configuration.Source).
 		WithDefaultAccessMode(corev1.ReadWriteOnce)
 
