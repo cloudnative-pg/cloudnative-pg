@@ -3587,7 +3587,50 @@ var _ = Describe("validation of replication slots configuration", func() {
 		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(HaveLen(1))
 	})
 
-	It("prevents removing the replication slot section when replication slots are enabled", func() {
+	It("prevents removing the replication slot section when highAvailability is enabled", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:    ptr.To(true),
+						SlotPrefix: "_test_",
+					},
+					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
+						Enabled: ptr.To(false),
+					},
+				},
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots = nil
+		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(HaveLen(1))
+	})
+
+	It("prevents removing the replication slot section when synchronizeReplicas is enabled", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled: ptr.To(false),
+					},
+					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
+						Enabled: ptr.To(true),
+					},
+				},
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots = nil
+		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(HaveLen(1))
+	})
+
+	It("prevents removing the replication slot section when both features are enabled", func() {
 		oldCluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				ImageName: versions.DefaultImageName,
@@ -3606,7 +3649,6 @@ var _ = Describe("validation of replication slots configuration", func() {
 
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = nil
-		// Expect 2 errors: one for highAvailability, one for synchronizeReplicas
 		Expect(v.validateReplicationSlotsChange(newCluster, oldCluster)).To(HaveLen(2))
 	})
 
@@ -3695,30 +3737,6 @@ var _ = Describe("validation of replication slots configuration", func() {
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Error()).To(ContainSubstring("Cannot remove"))
 		Expect(errs[0].Error()).To(ContainSubstring("synchronizeReplicas"))
-	})
-
-	It("prevents removing the replicationSlots section when synchronizeReplicas is enabled", func() {
-		oldCluster := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: versions.DefaultImageName,
-				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
-					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(false),
-					},
-					SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
-						Enabled: ptr.To(true),
-					},
-				},
-			},
-		}
-		oldCluster.Default()
-
-		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots = nil
-		errs := v.validateReplicationSlotsChange(newCluster, oldCluster)
-		Expect(errs).To(HaveLen(1))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot remove"))
-		Expect(errs[0].Error()).To(ContainSubstring("replicationSlots"))
 	})
 
 	It("allows disabling the synchronizeReplicas feature", func() {
