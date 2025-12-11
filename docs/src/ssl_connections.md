@@ -7,9 +7,10 @@ title: Client TLS/SSL connections
 # Client TLS/SSL connections
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Seealso "Certificates"
+:::note[Certificates]
     See [Certificates](certificates.md)
     for more details on how CloudNativePG supports TLS certificates.
+:::
 
 The CloudNativePG operator was designed to work with TLS/SSL for both
 encryption in transit and authentication on the server and client sides.
@@ -27,9 +28,10 @@ convention by way of the `initdb` configuration in the `bootstrap` section.)
 
 ## Issuing a new certificate
 
-!!! Seealso "About CNPG plugin for kubectl"
+:::note[About CNPG plugin for kubectl]
     See the [Certificates in the CloudNativePG plugin](kubectl-plugin.md#certificates)
     content for details on how to use the plugin for kubectl.
+:::
 
 You can create a certificate for the app user in the `cluster-example`
 PostgreSQL cluster as follows:

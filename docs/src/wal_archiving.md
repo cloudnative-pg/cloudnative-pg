@@ -36,9 +36,10 @@ CloudNativePG still supports WAL archiving natively through the
 `.spec.backup.barmanObjectStore` field. While still functional, **this
 interface is deprecated** and will be removed in a future release.
 
-!!! Important
+:::info[Important]
     All new deployments are strongly encouraged to adopt the plugin-based
     architecture, which offers a more flexible and maintainable approach.
+:::
 
 If you are currently using the native `.spec.backup.barmanObjectStore`
 approach, refer to the official guide for a smooth transition:

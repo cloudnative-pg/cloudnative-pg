@@ -12,9 +12,10 @@ deploying CloudNativePG on a local Kubernetes cluster
 using either [Kind](https://kind.sigs.k8s.io/) or
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
-!!! Warning
+:::warning
     The instructions contained in this section are for demonstration,
     testing, and practice purposes only and must not be used in production.
+:::
 
 Like any other Kubernetes application, CloudNativePG is deployed using
 regular manifests written in YAML.
@@ -22,10 +23,11 @@ regular manifests written in YAML.
 By following the instructions on this page you should be able to start a PostgreSQL
 cluster on your local Kubernetes installation and experiment with it.
 
-!!! Important
+:::info[Important]
     Make sure that you have `kubectl` installed on your machine in order
     to connect to the Kubernetes cluster. Please follow the Kubernetes documentation
     on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
+:::
 
 ## Part 1: Setup the local Kubernetes playground
 
@@ -101,9 +103,10 @@ spec:
     size: 1Gi
 ```
 
-!!! Note "There's more"
+:::note[There's more]
     For more detailed information about the available options, please refer
     to the ["API Reference" section](cloudnative-pg.v1.md).
+:::
 
 In order to create the 3-node PostgreSQL cluster, you need to run the following command:
 
@@ -127,10 +130,11 @@ label on all objects relevant to a particular cluster. For example:
 kubectl get pods -l cnpg.io/cluster=<CLUSTER>
 ```
 
-!!! Important
+:::info[Important]
     Note that we are using `cnpg.io/cluster` as the label. In the past you may
     have seen or used `postgresql`. This label is being deprecated, and
     will be dropped in the future. Please use `cnpg.io/cluster`.
+:::
 
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
@@ -148,7 +152,7 @@ spec:
    #[...]
 ```
 
-!!! Important
+:::info[Important]
     The immutable infrastructure paradigm requires that you always
     point to a specific version of the container image.
     Never use tags like `latest` or `13` in a production environment
@@ -156,17 +160,20 @@ spec:
     policies and version consistency in the cluster.
     For strict deterministic and repeatable deployments, you can add the digests
     to the image name, through the `<image>:<tag>@sha256:<digestValue>` format.
+:::
 
-!!! Note "There's more"
+:::note[There's more]
     There are some examples cluster configurations bundled with the operator.
     Please refer to the ["Examples" section](samples.md).
+:::
 
 ## Part 4: Monitor clusters with Prometheus and Grafana
 
-!!! Important
+:::info[Important]
     Installing Prometheus and Grafana is beyond the scope of this project.
     The instructions in this section are provided for experimentation and
     illustration only.
+:::
 
 In this section we show how to deploy Prometheus and Grafana for observability,
 and how to create a Grafana Dashboard to monitor CloudNativePG clusters, and a
@@ -212,10 +219,11 @@ configured with the `kube-stack-config.yaml` file:
   watching for **any** `PodMonitor` (see [*monitoring*](monitoring.md)).
 - Alert Manager and Grafana are both enabled.
 
-!!! Seealso
+:::note[Seealso]
     For further information about the above helm commands, refer to the [helm
     install](https://helm.sh/docs/helm/helm_install/)
     documentation.
+:::
 
 You can see several Custom Resources have been created:
 
@@ -332,10 +340,11 @@ You can now click on the `CloudNativePG` dashboard just created:
 
 ![local grafana](images/grafana-local.png)
 
-!!! Warning
+:::warning
     Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time
     this was created, like `kubelet_volume_stats_available_bytes` and `kubelet_volume_stats_capacity_bytes`
     producing some graphs to show `No data`.
+:::
 
 Note that in our local setup, Prometheus and Grafana are configured to
 automatically discover and monitor any CloudNativePG clusters deployed with the
