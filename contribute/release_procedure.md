@@ -66,7 +66,9 @@ activities:
   and [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml).
   These changes should go in a PR against `main`, and get maintainer approval.
   Look at the template file to get an idea of how to start a new minor release
-  version document.
+  version document. As a token of appreciation for the Community’s efforts, make sure to
+  include the contributor’s GitHub handle alongside their PRs, if mentioned.
+  First-time contributors should also be highlighted in the dedicated "New Contributors" section.
 
 - **Capabilities page:** in case of a new minor release, ensure that the
   operator capability levels page in

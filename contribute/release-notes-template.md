@@ -25,6 +25,10 @@ on the release branch in GitHub.
 
 **Release date:** Mon DD, 20YY
 
+<!--
+If individual PRs are mentioned, make sure to include the contributor's GitHub handle alongside it.
+-->
+
 ### Important changes:
 
 - OPTIONAL
@@ -68,3 +72,7 @@ on the release branch in GitHub.
 - PostgreSQL 17, 16, 15, 14, and 13
     - PostgreSQL 17.X is the default image
     - PostgreSQL 13 support ends on November 12, 2025
+
+### New Contributors
+
+- @github-user-handle made their first contribution in #123
