@@ -44,7 +44,7 @@ cluster is required. In such cases, you can create your own service of type
 ## Disabling Default Services
 
 You can disable any or all of the `ro` and `r` default services through the
-[`managed.services.disabledDefaultServices` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedServices).
+[`managed.services.disabledDefaultServices` option](cloudnative-pg.v1.md#managedservices).
 
 :::info[Important]
     The `rw` service is essential and cannot be disabled because CloudNativePG
@@ -71,7 +71,7 @@ managed:
 :::
 
 You can define a list of additional services through the
-[`managed.services.additional` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedService)
+[`managed.services.additional` stanza](cloudnative-pg.v1.md#managedservice)
 by specifying the service type (e.g., `rw`) in the `selectorType` field
 and optionally the `updateStrategy`.
 

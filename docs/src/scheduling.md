@@ -19,7 +19,7 @@ the best node possible, based on several criteria.
 :::
 
 You can control how the CloudNativePG cluster's instances should be
-scheduled through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
+scheduled through the [`affinity`](cloudnative-pg.v1.md#affinityconfiguration)
 section in the definition of the cluster, which supports:
 
 - pod affinity/anti-affinity

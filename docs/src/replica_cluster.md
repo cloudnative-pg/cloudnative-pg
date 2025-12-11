@@ -575,7 +575,7 @@ See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
 ## Delayed replicas
 
 CloudNativePG supports the creation of **delayed replicas** through the
-[`.spec.replica.minApplyDelay` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicaClusterConfiguration),
+[`.spec.replica.minApplyDelay` option](cloudnative-pg.v1.md#replicaclusterconfiguration),
 leveraging PostgreSQL's
 [`recovery_min_apply_delay`](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-RECOVERY-MIN-APPLY-DELAY).
 

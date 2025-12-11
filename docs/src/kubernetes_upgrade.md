@@ -72,7 +72,7 @@ resources - you can easily confirm it with the `kubectl get pdb` command.
 Our recommendation is to leave pod disruption budgets enabled for every
 production Postgres cluster. This can be effortlessly managed by toggling the
 `.spec.enablePDB` option, as detailed in the
-[API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec).
+[API reference](cloudnative-pg.v1.md#clusterspec).
 
 ## PostgreSQL Clusters used for Development or Testing
 

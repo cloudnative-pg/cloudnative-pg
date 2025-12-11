@@ -16,7 +16,7 @@ strategies.
 ## Plugin-Based Architecture
 
 CloudNativePG supports WAL archiving through a **plugin-based mechanism**,
-defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec)
+defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#clusterspec)
 section of the `Cluster` resource.
 
 Only **one plugin at a time** can be responsible for WAL archiving. This is

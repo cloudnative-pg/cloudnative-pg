@@ -192,7 +192,7 @@ type BackupSnapshotElementStatus struct {
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
 	// The potential credentials for each cloud provider
-	BarmanCredentials `json:",inline"`
+	barmanApi.BarmanCredentials `json:",inline"`
 
 	// The PostgreSQL major version that was running when the
 	// backup was taken.

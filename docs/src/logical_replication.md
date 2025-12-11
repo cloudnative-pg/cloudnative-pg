@@ -110,7 +110,7 @@ of data changes, should be included in a publication.
 For complex or tailored replication setups, refer to the
 [PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html).
 
-Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
+Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#publicationtarget)
 for details on declaratively customizing replication targets.
 
 The following example defines a publication that replicates all tables in the

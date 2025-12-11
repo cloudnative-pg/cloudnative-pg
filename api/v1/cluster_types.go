@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -120,8 +121,8 @@ type SnapshotOwnerReference string
 
 // Constants to represent the allowed types for SnapshotOwnerReference.
 const (
-	// ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
-	ShapshotOwnerReferenceNone SnapshotOwnerReference = "none"
+	// SnapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
+	SnapshotOwnerReferenceNone SnapshotOwnerReference = "none"
 	// SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.
 	SnapshotOwnerReferenceBackup SnapshotOwnerReference = "backup"
 	// SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.
@@ -1816,7 +1817,7 @@ type DataSource struct {
 // BackupSource contains the backup we need to restore from, plus some
 // information that could be needed to correctly restore it.
 type BackupSource struct {
-	LocalObjectReference `json:",inline"`
+	machineryapi.LocalObjectReference `json:",inline"`
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid
 	// errors with certificate issuer and barman-cloud-wal-archive.

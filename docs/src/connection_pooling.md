@@ -204,8 +204,8 @@ GRANT EXECUTE ON FUNCTION public.user_search(text)
 ## Pod templates
 
 You can take advantage of pod templates specification in the `template`
-section of a `Pooler` resource. For details, see 
-[`PoolerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
+section of a `Pooler` resource. For details, see
+[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) in the API reference.
 
 Using templates, you can configure pods as you like, including fine control
 over affinity and anti-affinity rules for pods and nodes. By default,

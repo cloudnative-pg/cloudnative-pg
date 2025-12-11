@@ -136,7 +136,7 @@ permitted. However, CloudNativePG automatically populates this option with the
 names of local pods, while also allowing customization to extend synchronous
 replication beyond the `Cluster` resource.
 This can be achieved through the
-[`.spec.postgresql.synchronous` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration).
+[`.spec.postgresql.synchronous` stanza](cloudnative-pg.v1.md#synchronousreplicaconfiguration).
 
 Synchronous replication is disabled by default (the `synchronous` stanza is not
 defined). When defined, two options are mandatory:
@@ -644,7 +644,7 @@ In CloudNativePG, we use the terms:
 
 This feature is enabled by default and can be disabled via configuration. For
 details, please refer to the
-["replicationSlots" section in the API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration).
+["replicationSlots" section in the API reference](cloudnative-pg.v1.md#replicationslotsconfiguration).
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
@@ -719,7 +719,7 @@ spec:
 ```
 
 For details, please refer to the
-["replicationSlots" section in the API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration).
+["replicationSlots" section in the API reference](cloudnative-pg.v1.md#replicationslotsconfiguration).
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.synchronizeReplicas.enabled`

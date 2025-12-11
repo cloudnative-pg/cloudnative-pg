@@ -71,7 +71,7 @@ while creating a cluster:
    in a VM or physical machine scenario - see below).
 -  Set up database server pods on a dedicated node using nodeSelector.
    See the "nodeSelector" and "tolerations" fields of the
-   [“affinityconfiguration"](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration) resource on the API reference page.
+   [“affinityconfiguration"](cloudnative-pg.v1.md#affinityconfiguration) resource on the API reference page.
 
 You can refer to the following example manifest:
 

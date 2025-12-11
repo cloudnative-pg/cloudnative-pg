@@ -56,7 +56,8 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
-GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
+# renovate: datasource=go depName=github.com/elastic/crd-ref-docs
+CRDREFDOCS_VERSION ?= v0.2.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.12.7
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
@@ -300,11 +301,13 @@ licenses: go-licenses ## Generate the licenses folder.
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
-apidoc: genref ## Update the API Reference section of the documentation.
-	cd ./docs && \
-	$(GENREF) -c config.yaml \
-      -include cloudnative-pg \
-      -o src
+apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
+	$(CRDREFDOCS) --source-path api/v1 \
+		--config docs/crd-gen-refs/config.yaml \
+		--renderer markdown \
+		--max-depth 15 \
+		--templates-dir docs/crd-gen-refs/markdown \
+		--output-path docs/src/cloudnative-pg.v1.md
 
 ##@ Cleanup
 
@@ -339,9 +342,9 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-GENREF = $(LOCALBIN)/genref
-genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
-	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@$(GENREF_VERSION))
+CRDREFDOCS = $(LOCALBIN)/crd-ref-docs
+crd-ref-docs: ## Download github.com/elastic/crd-ref-docs locally if necessary.
+	$(call go-install-tool,$(CRDREFDOCS),github.com/elastic/crd-ref-docs@$(CRDREFDOCS_VERSION))
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
