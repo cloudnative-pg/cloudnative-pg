@@ -70,7 +70,7 @@ section of your configuration.
 
 !!! Info
     For more details on probe configuration, refer to the
-    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
+    [probe API documentation](cloudnative-pg.v1.md#probewithstrategy).
 
 If you manually specify `.spec.probes.startup.failureThreshold`, it will
 override the default behavior and disable the automatic use of `startDelay`.
@@ -175,7 +175,7 @@ section of your configuration.
 
 !!! Info
     For more details on probe configuration, refer to the
-    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    [probe API documentation](cloudnative-pg.v1.md#probe).
 
 If you manually specify `.spec.probes.liveness.failureThreshold`, it will
 override the default behavior and disable the automatic use of
@@ -280,7 +280,7 @@ spec:
 
 !!! Info
     For more information on configuring probes, see the
-    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
+    [probe API](cloudnative-pg.v1.md#probewithstrategy).
 
 ### Readiness Probe Strategy
 

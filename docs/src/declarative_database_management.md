@@ -55,7 +55,7 @@ When applied, this manifest creates a `Database` object called
 role, in the `cluster-example` PostgreSQL cluster.
 
 !!! Info
-    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-DatabaseSpec)
+    Please refer to the [API reference](cloudnative-pg.v1.md#databasespec)
     the full list of attributes you can define for each `Database` object.
 
 ### Required Fields in the `Database` Manifest
