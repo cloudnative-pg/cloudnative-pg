@@ -204,7 +204,7 @@ resource.
 
 !!! Info
     For a complete list of configuration options, refer to the
-    [`ScheduledBackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ScheduledBackupSpec)
+    [`ScheduledBackupSpec`](cloudnative-pg.v1.md#scheduledbackupspec)
     in the API reference.
 
 ### Cron Schedule
@@ -285,7 +285,7 @@ by creating a `Backup` resource.
 
 !!! Info
     For a full list of available options, see the
-    [`BackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BackupSpec) in the
+    [`BackupSpec`](cloudnative-pg.v1.md#backupspec) in the
     API reference.
 
 ### Example: Requesting an On-Demand Backup
