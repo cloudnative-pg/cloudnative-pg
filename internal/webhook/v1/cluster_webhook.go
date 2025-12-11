@@ -2281,8 +2281,8 @@ func (v *ClusterCustomValidator) validateReplicationSlotsChange(r, old *apiv1.Cl
 
 	// Validate HighAvailability changes
 	if oldReplicationSlots.HighAvailability.GetEnabled() {
-		// when disabling we should check that the prefix it's not removed, and it doesn't change to
-		// properly execute the cleanup logic
+		// When disabling, we should check that the prefix is not removed and doesn't change
+		// to properly execute the cleanup logic
 		if newReplicationSlots == nil || newReplicationSlots.HighAvailability == nil {
 			path := field.NewPath("spec", "replicationSlots")
 			if newReplicationSlots != nil {
