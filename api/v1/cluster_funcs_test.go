@@ -1788,3 +1788,39 @@ var _ = Describe("Failover quorum", func() {
 		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
 })
+
+var _ = Describe("GetServiceAccountName", func() {
+	It("returns cluster name when serviceAccountName is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("my-cluster"))
+	})
+
+	It("returns custom serviceAccountName when specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{
+				ServiceAccountName: "shared-service-account",
+			},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("shared-service-account"))
+	})
+
+	It("returns cluster name when serviceAccountName is empty string", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-cluster",
+			},
+			Spec: ClusterSpec{
+				ServiceAccountName: "",
+			},
+		}
+		Expect(cluster.GetServiceAccountName()).To(Equal("my-cluster"))
+	})
+})
