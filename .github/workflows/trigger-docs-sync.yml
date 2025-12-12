@@ -20,12 +20,9 @@ jobs:
         run: echo "CLEAN_VERSION=$(echo ${{ github.event.inputs.version }} | sed 's/^v//')" >> $GITHUB_OUTPUT
 
       - name: Dispatch Docs Repository Workflow
-        uses: peter-evans/repository-dispatch@v4
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
         with:
           repository: cloudnative-pg/docs
-          
-          token: ${{ secrets.DOCS_SYNC_PAT }} # PAT with repo permissions for docs repo
-          
+          token: ${{ secrets.REPO_GHA_PAT }}
           event-type: cnpg-docs-release
-          
           client-payload: '{"tag": "${{ steps.version.outputs.CLEAN_VERSION }}"}'
