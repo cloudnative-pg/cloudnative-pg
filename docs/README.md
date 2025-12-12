@@ -29,7 +29,7 @@ docker run --rm -ti -p 3000:3000 \
 ```
 
 Once the server is running, open your browser and navigate to the local
-documentation preview at: `http://127.0.0.1:3000/docs/`.
+documentation preview at: `http://127.0.0.1:3000/docs/next/`.
 
 Thoroughly check your changes—put yourself in the end user's shoes to verify
 clarity and accuracy. Complete a final spell check, and then proceed with
