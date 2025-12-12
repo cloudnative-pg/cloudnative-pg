@@ -132,8 +132,40 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	contextLogger = contextLogger.WithValues("catalogRef", cluster.Spec.ImageCatalogRef)
 
-	catalog, err := r.getCatalog(ctx, cluster)
+	// Ensure the catalog has a correct type
+	catalogKind := cluster.Spec.ImageCatalogRef.Kind
+	var catalog apiv1.GenericImageCatalog
+	switch catalogKind {
+	case apiv1.ClusterImageCatalogKind:
+		catalog = &apiv1.ClusterImageCatalog{}
+	case apiv1.ImageCatalogKind:
+		catalog = &apiv1.ImageCatalog{}
+	default:
+		contextLogger.Info("Unknown catalog kind")
+		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog type")
+	}
+
+	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
+	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
+		contextLogger.Info("Unknown catalog group")
+		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog group")
+	}
+
+	// Get the referenced catalog
+	catalogName := cluster.Spec.ImageCatalogRef.Name
+	err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
 	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
+				catalogKind, catalogName)
+			contextLogger.Info("catalog not found", "catalogKind", catalogKind, "catalogName", catalogName)
+			return apiv1.ImageInfo{}, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
+		}
+
+		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Error getting %v/%v: %v",
+			catalogKind, catalogName, err)
+		contextLogger.Error(err, "while getting imageCatalog",
+			"catalogKind", catalogKind, "catalogName", catalogName)
 		return apiv1.ImageInfo{}, err
 	}
 
@@ -146,62 +178,33 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 			"Warning",
 			"DiscoverImage", "Cannot find major %v in %v/%v",
 			cluster.Spec.ImageCatalogRef.Major,
-			cluster.Spec.ImageCatalogRef.Kind,
-			cluster.Spec.ImageCatalogRef.Name)
+			catalogKind,
+			catalogName)
 		contextLogger.Info("cannot find requested major version",
 			"requestedMajorVersion", requestedMajorVersion)
 		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
 	}
+	imageInfo := apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}
 
-	return apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}, nil
-}
-
-// getCatalog retrieves the catalog of a given a Cluster
-func (r *ClusterReconciler) getCatalog(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-) (apiv1.GenericImageCatalog, error) {
-	contextLogger := log.FromContext(ctx)
-
-	catalogName := cluster.Spec.ImageCatalogRef.Name
-	catalogKind := cluster.Spec.ImageCatalogRef.Kind
-	catalogAPIGroup := cluster.Spec.ImageCatalogRef.APIGroup
-
-	// Ensure the catalog has a correct type
-	var catalog apiv1.GenericImageCatalog
-	switch catalogKind {
-	case apiv1.ClusterImageCatalogKind:
-		catalog = &apiv1.ClusterImageCatalog{}
-	case apiv1.ImageCatalogKind:
-		catalog = &apiv1.ImageCatalog{}
-	default:
-		contextLogger.Info("Unknown catalog kind")
-		return nil, fmt.Errorf("invalid image catalog type")
-	}
-
-	// Ensure the catalog has a correct API group
-	if catalogAPIGroup == nil || *catalogAPIGroup != apiv1.SchemeGroupVersion.Group {
-		contextLogger.Info("Unknown catalog group")
-		return nil, fmt.Errorf("invalid image catalog group")
-	}
-
-	// Get the referenced catalog
-	err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
-				catalogKind, catalogName)
-			contextLogger.Info("catalog not found", "catalogKind", catalogKind, "catalogName", catalogName)
-			return nil, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
+	extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion)
+	if ok {
+		extensionsMap := make(map[string]apiv1.ExtensionConfiguration)
+		// Extract extensions from the catalog
+		for _, extension := range extensions {
+			extensionsMap[extension.Name] = extension
 		}
-
-		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Error getting %v/%v: %v",
-			catalogKind, catalogName, err)
-		contextLogger.Error(err, "while getting imageCatalog", "catalogKind", catalogKind, "catalogName", catalogName)
-		return nil, err
+		// Extract extensions from the cluster spec
+		for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+			extensionsMap[extension.Name] = extension
+		}
+		resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(extensionsMap))
+		for _, extension := range extensionsMap {
+			resolvedExtensions = append(resolvedExtensions, extension)
+		}
+		imageInfo.Extensions = resolvedExtensions
 	}
 
-	return catalog, nil
+	return imageInfo, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
