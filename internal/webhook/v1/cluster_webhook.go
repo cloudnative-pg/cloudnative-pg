@@ -2273,33 +2273,54 @@ func (v *ClusterCustomValidator) validateReplicationSlotsChange(r, old *apiv1.Cl
 	newReplicationSlots := r.Spec.ReplicationSlots
 	oldReplicationSlots := old.Spec.ReplicationSlots
 
-	if oldReplicationSlots == nil || oldReplicationSlots.HighAvailability == nil ||
-		!oldReplicationSlots.HighAvailability.GetEnabled() {
+	var errs field.ErrorList
+
+	if oldReplicationSlots == nil {
 		return nil
 	}
 
-	var errs field.ErrorList
-
-	// when disabling we should check that the prefix it's not removed, and it doesn't change to
-	// properly execute the cleanup logic
-	if newReplicationSlots == nil || newReplicationSlots.HighAvailability == nil {
-		path := field.NewPath("spec", "replicationSlots")
-		if newReplicationSlots != nil {
-			path = path.Child("highAvailability")
+	// Validate HighAvailability changes
+	if oldReplicationSlots.HighAvailability.GetEnabled() {
+		// When disabling, we should check that the prefix is not removed and doesn't change
+		// to properly execute the cleanup logic
+		if newReplicationSlots == nil || newReplicationSlots.HighAvailability == nil {
+			path := field.NewPath("spec", "replicationSlots")
+			if newReplicationSlots != nil {
+				path = path.Child("highAvailability")
+			}
+			errs = append(errs,
+				field.Invalid(
+					path,
+					nil,
+					fmt.Sprintf("Cannot remove %v section while highAvailability is enabled", path)),
+			)
+		} else if oldReplicationSlots.HighAvailability.SlotPrefix != newReplicationSlots.HighAvailability.SlotPrefix {
+			errs = append(errs,
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "highAvailability", "slotPrefix"),
+					newReplicationSlots.HighAvailability.SlotPrefix,
+					"Cannot change replication slot prefix while highAvailability is enabled"),
+			)
 		}
-		errs = append(errs,
-			field.Invalid(
-				path,
-				nil,
-				fmt.Sprintf("Cannot remove %v section while highAvailability is enabled", path)),
-		)
-	} else if oldReplicationSlots.HighAvailability.SlotPrefix != newReplicationSlots.HighAvailability.SlotPrefix {
-		errs = append(errs,
-			field.Invalid(
-				field.NewPath("spec", "replicationSlots", "highAvailability", "slotPrefix"),
-				newReplicationSlots.HighAvailability.SlotPrefix,
-				"Cannot change replication slot prefix while highAvailability is enabled"),
-		)
+	}
+
+	// Validate SynchronizeReplicas changes
+	// When synchronizeReplicas is enabled, we need to ensure users disable it before removing the configuration
+	// to allow the cleanup logic to properly remove user-defined replication slots from replicas
+	if oldReplicationSlots.SynchronizeReplicas.GetEnabled() {
+		if newReplicationSlots == nil || newReplicationSlots.SynchronizeReplicas == nil {
+			path := field.NewPath("spec", "replicationSlots")
+			if newReplicationSlots != nil {
+				path = path.Child("synchronizeReplicas")
+			}
+			errs = append(errs,
+				field.Invalid(
+					path,
+					nil,
+					fmt.Sprintf("Cannot remove %v section while synchronizeReplicas is enabled. "+
+						"Disable synchronizeReplicas first to allow cleanup of user-defined replication slots on replicas", path)),
+			)
+		}
 	}
 
 	return errs
