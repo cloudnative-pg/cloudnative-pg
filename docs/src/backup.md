@@ -137,7 +137,7 @@ including:
 - availability of a trusted storage class that supports volume snapshots
 - size of the database: with object stores, the larger your database, the
   longer backup and, most importantly, recovery procedures take (the latter
-  impacts [RTO](before_you_start.md#rto)); in presence of Very Large Databases
+  impacts [RTO](before_you_start.md#postgresql-terminology)); in presence of Very Large Databases
   (VLDB), the general advice is to rely on Volume Snapshots as, thanks to
   copy-on-write, they provide faster recovery
 - data mobility and possibility to store or relay backup files on a
