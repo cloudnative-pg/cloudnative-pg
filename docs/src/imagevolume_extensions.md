@@ -19,7 +19,7 @@ volume inside a running pod at a known filesystem path.
 You can make the extension available either globally, using the
 [`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries),
 or at the database level through the `CREATE EXTENSION` command. For the
-latter, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md/#managing-extensions-in-a-database)
+latter, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md#managing-extensions-in-a-database)
 to ensure consistent, automated extension setup within your PostgreSQL
 databases.
 
@@ -162,7 +162,7 @@ Once mounted, CloudNativePG will automatically configure PostgreSQL by appending
 This ensures that the PostgreSQL container is ready to serve the `foo`
 extension when requested by a database, as described in the next section. The
 `CREATE EXTENSION foo` command, triggered automatically during the
-[reconciliation of the `Database` resource](declarative_database_management.md/#managing-extensions-in-a-database),
+[reconciliation of the `Database` resource](declarative_database_management.md#managing-extensions-in-a-database),
 will work without additional configuration, as PostgreSQL will locate:
 
 - the extension control file at `/extensions/foo/share/extension/foo.control`
