@@ -1,12 +1,12 @@
-name: Manual Trigger for Docs Sync
+name: Sync Docs
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release Tag (e.g., 1.28.0)'
+        description: 'Release Tag (e.g., "v1.28.0") or "main"'
         required: true
-        default: '1.28.0'
+        default: 'main'
 
 jobs:
   dispatch:
