@@ -3,43 +3,37 @@
 CloudNativePG documentation is written in Markdown from the `docs` folder. The
 `src` folder contains the sources with the `.md` extension.
 
-We have adopted [MkDocs](https://www.mkdocs.org/) as an open source solution to
-build the documentation starting from Markdown format.
+We have adopted [Docusaurus](https://docusaurus.io/) as an open
+source solution to build the documentation starting from Markdown
+format.
 
-Before you submit a pull request for the documentation, you must have gone through the following steps:
+Before you submit a pull request for the documentation, you must have
+gone through the following steps:
 
 1. local test of the documentation
 2. run through the spell checker
 
 ## How to locally test the documentation
 
-You can locally test the documentation in two ways:
+To ensure your documentation changes look correct before creating a Pull
+Request, you can build and view the documentation locally using Docker.
 
-- using Docker
-- using `mkdocs` directly
+Execute the following command in your terminal. This command uses the same
+infrastructure as the official CloudNativePG documentation website, mounting
+your local files for preview:
 
-In both cases, you should issue the commands inside the `docs` folder.
-
-With Docker, you just need to execute the following command and point your
-browser to `http://127.0.0.1:8000/`:
-
-``` bash
-docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" -p 8000:8000 \
-    minidocks/mkdocs \
-    mkdocs serve -a 0.0.0.0:8000
+```bash
+docker run --rm -ti -p 3000:3000 \
+    -v ./src:/website/docs \
+    ghcr.io/cloudnative-pg/docs:latest
 ```
 
-If you have installed `mkdocs` directly in your workstation, you can simply run:
+Once the server is running, open your browser and navigate to the local
+documentation preview at: `http://127.0.0.1:3000/docs/`.
 
-``` bash
-mkdocs serve
-```
-
-Even in this case, point your browser to `http://127.0.0.1:8000/`.
-
-Make sure you review what you have written by putting yourself in the end
-user's shoes. Once you are ready, proceed with the spell check and then with
-the pull request.
+Thoroughly check your changes—put yourself in the end user's shoes to verify
+clarity and accuracy. Complete a final spell check, and then proceed with
+submitting your pull request.
 
 ## How to run the spell checker
 
@@ -51,17 +45,6 @@ make spellcheck
 
 This will run a spell checker and highlight all the words that need to be
 either fixed or added to the `.wordlist-en-custom.txt` file.
-
-## How to build the documentation in HTML
-
-From the `docs` folder, run the following command to build the documentation
-and place it in the `dist` directory:
-
-``` bash
-docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" \
-    minidocks/mkdocs \
-    mkdocs build -v -d dist
-```
 
 ## Reminders
 
