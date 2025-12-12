@@ -3,39 +3,32 @@
 CloudNativePG documentation is written in Markdown from the `docs` folder. The
 `src` folder contains the sources with the `.md` extension.
 
-We have adopted [MkDocs](https://www.mkdocs.org/) as an open source solution to
-build the documentation starting from Markdown format.
+We have adopted [Docusaurus](https://docusaurus.io/) as an open
+source solution to build the documentation starting from Markdown
+format.
 
-Before you submit a pull request for the documentation, you must have gone through the following steps:
+Before you submit a pull request for the documentation, you must have
+gone through the following steps:
 
 1. local test of the documentation
 2. run through the spell checker
 
 ## How to locally test the documentation
 
-You can locally test the documentation in two ways:
-
-- using Docker
-- using `mkdocs` directly
-
-In both cases, you should issue the commands inside the `docs` folder.
-
-With Docker, you just need to execute the following command and point your
-browser to `http://127.0.0.1:8000/`:
+You can locally test the documentation using Docker executing the following
+command and point your browser to `http://127.0.0.1:3000/docs/`:
 
 ``` bash
-docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" -p 8000:8000 \
-    minidocks/mkdocs \
-    mkdocs serve -a 0.0.0.0:8000
+docker run --rm -ti -p 3000:3000 \
+    -v ./src:/website/docs \
+    ghcr.io/cloudnative-pg/docs:latest
 ```
 
-If you have installed `mkdocs` directly in your workstation, you can simply run:
-
-``` bash
-mkdocs serve
-```
-
-Even in this case, point your browser to `http://127.0.0.1:8000/`.
+The previous uses the infrastructure we use to build the
+[CloudNativePG documentation
+website](https://cloudnative-pg.github.io/docs) but using your local
+Markdown files to compile the documentation of the development version
+of the operator.
 
 Make sure you review what you have written by putting yourself in the end
 user's shoes. Once you are ready, proceed with the spell check and then with
