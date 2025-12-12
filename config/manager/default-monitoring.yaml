@@ -173,6 +173,9 @@ data:
           , COALESCE(CAST(CAST('x'||pg_catalog.right(pg_catalog.split_part(last_failed_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_failed_wal_start_lsn
           , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
         FROM pg_catalog.pg_stat_archiver
+      predicate_query: |
+        SELECT NOT pg_catalog.pg_is_in_recovery()
+          OR pg_catalog.current_setting('archive_mode') = 'always'
       metrics:
         - archived_count:
             usage: "COUNTER"
