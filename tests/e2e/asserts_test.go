@@ -2123,13 +2123,22 @@ func assertReadWriteConnectionUsingPgBouncerService(
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Get the database name from the cluster configuration
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+
+	dbName := cluster.GetApplicationDatabaseName()
+	if dbName == "" {
+		dbName = apiv1.DefaultApplicationDatabaseName
+	}
+
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
 	if isPoolerRW {
-		AssertWritesToPrimarySucceeds(namespace, poolerService, "app", appUser,
+		AssertWritesToPrimarySucceeds(namespace, poolerService, dbName, appUser,
 			generatedAppUserPassword, connectionParams...)
 	} else {
-		AssertWritesToReplicaFails(namespace, poolerService, "app", appUser,
+		AssertWritesToReplicaFails(namespace, poolerService, dbName, appUser,
 			generatedAppUserPassword, connectionParams...)
 	}
 }
