@@ -13,26 +13,27 @@ gone through the following steps:
 1. local test of the documentation
 2. run through the spell checker
 
-## How to locally test the documentation
+## How to Locally Test the Documentation
 
-You can locally test the documentation using Docker executing the following
-command and point your browser to `http://127.0.0.1:3000/docs/`:
+To ensure your documentation changes look correct before creating a Pull
+Request, you can build and view the documentation locally using Docker.
 
-``` bash
+Execute the following command in your terminal. This command uses the same
+infrastructure as the official CloudNativePG documentation website, mounting
+your local files for preview:
+
+```bash
 docker run --rm -ti -p 3000:3000 \
     -v ./src:/website/docs \
     ghcr.io/cloudnative-pg/docs:latest
 ```
 
-The previous uses the infrastructure we use to build the
-[CloudNativePG documentation
-website](https://cloudnative-pg.github.io/docs) but using your local
-Markdown files to compile the documentation of the development version
-of the operator.
+Once the server is running, open your browser and navigate to the local
+documentation preview at: `http://127.0.0.1:3000/docs/`.
 
-Make sure you review what you have written by putting yourself in the end
-user's shoes. Once you are ready, proceed with the spell check and then with
-the pull request.
+Thoroughly check your changes—put yourself in the end user's shoes to verify
+clarity and accuracy. Complete a final spell check, and then proceed with
+submitting your pull request.
 
 ## How to run the spell checker
 
