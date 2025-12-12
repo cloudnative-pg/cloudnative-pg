@@ -243,7 +243,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
@@ -261,7 +261,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
 		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
@@ -402,6 +402,12 @@ func (r *BackupReconciler) getCluster(
 	if apierrs.IsNotFound(err) {
 		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 			"Unknown cluster %v, will retry in 30 seconds", clusterName)
+		origBackup := backup.DeepCopy()
+		backup.Status.SetAsPending()
+		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
+			contextLogger.Error(patchErr, "while setting backup as pending")
+			return nil, patchErr
+		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -522,7 +528,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		)
 		// TODO: shouldn't this be a failed backup?
 		origBackup := backup.DeepCopy()
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		if err := r.Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
@@ -949,6 +955,12 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
+		origBackup := backup.DeepCopy()
+		backup.Status.SetAsPending()
+		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
+			contextLogger.Error(patchErr, "while setting backup as pending")
+			return ctrl.Result{}, patchErr
+		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
