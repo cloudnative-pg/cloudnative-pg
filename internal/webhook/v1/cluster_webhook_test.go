@@ -3868,9 +3868,11 @@ var _ = Describe("Storage configuration validation", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					StorageConfiguration: apiv1.StorageConfiguration{
-						PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.VolumeResourceRequirements{
-								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+							PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+								Resources: corev1.VolumeResourceRequirements{
+									Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+								},
 							},
 						},
 					},
@@ -5600,10 +5602,12 @@ var _ = Describe("getStorageWarnings", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
 							},
 						},
 					},
@@ -5619,8 +5623,10 @@ var _ = Describe("getStorageWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						StorageClassName: &storageClass,
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: &storageClass,
+						},
 					},
 				},
 			},
@@ -5637,10 +5643,12 @@ var _ = Describe("getStorageWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size: "1Gi",
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("2Gi"),
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("2Gi"),
+								},
 							},
 						},
 					},
@@ -5661,11 +5669,13 @@ var _ = Describe("getStorageWarnings", func() {
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size:         "1Gi",
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						StorageClassName: &storageClass,
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("2Gi"),
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: &storageClass,
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("2Gi"),
+								},
 							},
 						},
 					},
@@ -5685,11 +5695,13 @@ var _ = Describe("getStorageWarnings", func() {
 				WalStorage: &apiv1.StorageConfiguration{
 					Size:         "500Mi",
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						StorageClassName: &storageClass,
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: &storageClass,
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
 							},
 						},
 					},
@@ -5709,16 +5721,20 @@ var _ = Describe("getStorageWarnings", func() {
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size:         "1Gi",
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						StorageClassName: &storageClass,
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: &storageClass,
+						},
 					},
 				},
 				WalStorage: &apiv1.StorageConfiguration{
 					Size: "500Mi",
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
 							},
 						},
 					},
@@ -5760,15 +5776,129 @@ var _ = Describe("getStorageWarnings", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size: "1Gi",
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{},
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{},
+							},
 						},
 					},
 				},
 			},
 		}
 		Expect(getStorageWarnings(cluster)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validatePVCTemplateMetadata", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("should not complain with a valid PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.Metadata{
+							Labels: map[string]string{
+								"test-label": "test-value",
+							},
+							Annotations: map[string]string{
+								"test-annotation": "test-value",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(v.validatePVCTemplateMetadata(cluster)).To(BeEmpty())
+	})
+
+	It("should complain with a forbidden label in PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.Metadata{
+							Labels: map[string]string{
+								utils.ClusterLabelName: "forbidden",
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.storage.pvcTemplate.metadata.labels.cnpg.io/cluster"))
+	})
+
+	It("should complain with a forbidden annotation in PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.Metadata{
+							Annotations: map[string]string{
+								utils.OperatorVersionAnnotationName: "forbidden",
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.storage.pvcTemplate.metadata.annotations.cnpg.io/operatorVersion"))
+	})
+
+	It("should complain with an AppArmor annotation prefix in PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.Metadata{
+							Annotations: map[string]string{
+								"container.apparmor.security.beta.kubernetes.io/test": "forbidden",
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.storage.pvcTemplate.metadata.annotations.container.apparmor.security.beta.kubernetes.io/test"))
 	})
 })
 

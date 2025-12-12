@@ -2058,7 +2058,13 @@ type StorageConfiguration struct {
 
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
-	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+	PersistentVolumeClaimTemplate *PVCTemplate `json:"pvcTemplate,omitempty"`
+}
+
+// PVCTemplate is the template used to generate a PersistentVolumeClaim
+type PVCTemplate struct {
+	corev1.PersistentVolumeClaimSpec `json:",inline"`
+	Metadata                         Metadata `json:"metadata,omitempty"`
 }
 
 // TablespaceConfiguration is the configuration of a tablespace, and includes
