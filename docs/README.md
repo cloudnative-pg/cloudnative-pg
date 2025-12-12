@@ -13,7 +13,7 @@ gone through the following steps:
 1. local test of the documentation
 2. run through the spell checker
 
-## How to Locally Test the Documentation
+## How to locally test the documentation
 
 To ensure your documentation changes look correct before creating a Pull
 Request, you can build and view the documentation locally using Docker.
@@ -45,17 +45,6 @@ make spellcheck
 
 This will run a spell checker and highlight all the words that need to be
 either fixed or added to the `.wordlist-en-custom.txt` file.
-
-## How to build the documentation in HTML
-
-From the `docs` folder, run the following command to build the documentation
-and place it in the `dist` directory:
-
-``` bash
-docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" \
-    minidocks/mkdocs \
-    mkdocs build -v -d dist
-```
 
 ## Reminders
 
