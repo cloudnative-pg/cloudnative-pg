@@ -334,13 +334,6 @@ func (r *ClusterReconciler) updateResourceStatus(
 		cluster.Status.DemotionToken = ""
 	}
 
-	// Extensions
-	extensions, err := r.getClusterExtensions(ctx, cluster)
-	if err != nil {
-		return err
-	}
-	cluster.Status.Extensions = extensions
-
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -874,43 +867,4 @@ func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *c
 	}
 
 	return true
-}
-
-func (r *ClusterReconciler) getClusterExtensions(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-) ([]apiv1.ExtensionConfiguration, error) {
-	extensionsMap := make(map[string]apiv1.ExtensionConfiguration)
-
-	// Extract extensions from the image catalog
-	if cluster.Spec.ImageCatalogRef != nil {
-		catalog, err := r.getCatalog(ctx, cluster)
-		if err != nil {
-			return nil, err
-		}
-
-		extensions, ok := catalog.GetSpec().FindExtensionsForMajor(cluster.Spec.ImageCatalogRef.Major)
-		if ok {
-			for _, extension := range extensions {
-				extensionsMap[extension.Name] = extension
-			}
-		}
-	}
-
-	// Extract extensions from the cluster spec
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		extensionsMap[extension.Name] = extension
-	}
-
-	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(extensionsMap))
-	for _, extension := range extensionsMap {
-		resolvedExtensions = append(resolvedExtensions, extension)
-	}
-
-	// Sort by name
-	sort.Slice(resolvedExtensions, func(i, j int) bool {
-		return resolvedExtensions[i].Name < resolvedExtensions[j].Name
-	})
-
-	return resolvedExtensions, nil
 }

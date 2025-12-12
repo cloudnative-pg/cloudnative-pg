@@ -1030,9 +1030,6 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
-
-	// Extensions rules hue hue hue!
-	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
@@ -1041,6 +1038,8 @@ type ImageInfo struct {
 	Image string `json:"image"`
 	// MajorVersion is the major version of the image
 	MajorVersion int `json:"majorVersion"`
+	// Extensions
+	Extensions []ExtensionConfiguration `json:"extensions"`
 }
 
 // SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
