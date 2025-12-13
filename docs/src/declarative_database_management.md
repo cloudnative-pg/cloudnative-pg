@@ -402,12 +402,8 @@ Each foreign server entry supports the following properties:
     - `ensure`: Indicates whether the option should be `present` or `absent`.
 
 :::info[Important]
-:::
-
-The `fdw` field must reference an existing foreign data wrapper already defined in the database.
-If the specified FDW does not exist, the foreign server will not be created.
-
-:::info
+    The `fdw` field must reference an existing foreign data wrapper already defined in the database.
+    If the specified FDW does not exist, the foreign server will not be created.
 :::
 
 CloudNativePG manages foreign servers using PostgreSQL’s native SQL commands:

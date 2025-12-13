@@ -497,9 +497,7 @@ the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` con
 `container.apparmor.security.beta.kubernetes.io` annotation.
 
 :::note[Example of cluster annotations]
-:::
-
-```
+    ```yaml
 	kind: Cluster
 	metadata:
 		name: cluster-apparmor
@@ -507,7 +505,8 @@ the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` con
 			container.apparmor.security.beta.kubernetes.io/postgres: runtime/default
 			container.apparmor.security.beta.kubernetes.io/initdb: runtime/default
 			container.apparmor.security.beta.kubernetes.io/join: runtime/default
-```
+    ```
+:::
 
 :::warning
     Using this kind of annotations can result in your cluster to stop working.
