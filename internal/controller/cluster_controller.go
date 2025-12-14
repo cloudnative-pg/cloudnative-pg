@@ -163,6 +163,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil {
+		var errs []error
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
@@ -170,6 +171,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"configMapName", apiv1.DefaultMonitoringConfigMapName,
 				"namespace", req.Namespace,
 			)
+			errs = append(errs, err)
 		}
 		if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
 			contextLogger.Error(
@@ -178,8 +180,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"clusterName", req.Name,
 				"namespace", req.Namespace,
 			)
+			errs = append(errs, err)
 		}
-		return ctrl.Result{}, err
+		if len(errs) > 0 {
+			return ctrl.Result{}, errors.Join(errs...)
+		}
+		return ctrl.Result{}, nil
 	}
 
 	ctx = cluster.SetInContext(ctx)
