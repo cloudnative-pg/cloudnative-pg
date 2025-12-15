@@ -112,10 +112,6 @@ func RunController(
 		LeaseDuration:    &leaderConfig.leaseDuration,
 		RenewDeadline:    &leaderConfig.renewDeadline,
 		LeaderElectionID: LeaderElectionID,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    port,
-			CertDir: defaultWebhookCertDir,
-		}),
 		PprofBindAddress: getPprofServerAddress(pprofDebug),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -140,26 +136,12 @@ func RunController(
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
-	if conf.WebhookCertDir != "" {
-		// If OLM will generate certificates for us, let's just
-		// use those
-		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = conf.WebhookCertDir
-	}
+	addWebhookToManagerOptions(&managerOptions, port, conf)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		return err
-	}
-
-	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
-	if conf.WebhookCertDir != "" {
-		// Use certificate names compatible with OLM
-		webhookServer.Options.CertName = "apiserver.crt"
-		webhookServer.Options.KeyName = "apiserver.key"
-	} else {
-		webhookServer.Options.CertName = "tls.crt"
-		webhookServer.Options.KeyName = "tls.key"
 	}
 
 	// kubeClient is the kubernetes client set with
@@ -207,10 +189,6 @@ func RunController(
 		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
-
-	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
-		return err
-	}
 
 	pluginRepository := repository.New()
 	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(
@@ -264,27 +242,70 @@ func RunController(
 		return err
 	}
 
-	if err = webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
+	if err = setupWebhooks(ctx, mgr, kubeClient, conf); err != nil {
+		return err
+	}
+
+	// +kubebuilder:scaffold:builder
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		return err
+	}
+
+	return nil
+}
+
+func addWebhookToManagerOptions(managerOptions *ctrl.Options, port int, conf *configuration.Data) {
+	managerOptions.WebhookServer = webhook.NewServer(webhook.Options{
+		Port:    port,
+		CertDir: defaultWebhookCertDir,
+	})
+
+	if conf.WebhookCertDir != "" {
+		// If OLM will generate certificates for us, let's just
+		// use those
+		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = conf.WebhookCertDir
+	}
+}
+
+// setupWebhooks sets up PKI and registers all webhooks with the manager
+func setupWebhooks(ctx context.Context, mgr ctrl.Manager, kubeClient client.Client, conf *configuration.Data) error {
+	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
+	if conf.WebhookCertDir != "" {
+		webhookServer.Options.CertName = "apiserver.crt"
+		webhookServer.Options.KeyName = "apiserver.key"
+	} else {
+		webhookServer.Options.CertName = "tls.crt"
+		webhookServer.Options.KeyName = "tls.key"
+	}
+
+	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
+		return err
+	}
+
+	if err := webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
 		return err
 	}
 
-	if err = webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
+	if err := webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
 		return err
 	}
@@ -301,14 +322,6 @@ func RunController(
 	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
 	//    deleted. In that case we could get a "Connection refused" error message.
 	webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
-
-	// +kubebuilder:scaffold:builder
-
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		return err
-	}
 
 	return nil
 }
