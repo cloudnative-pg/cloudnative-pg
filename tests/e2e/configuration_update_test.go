@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -502,6 +503,10 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			const (
 				maxConnectionParamKey = "max_connections"
 			)
+
+			// Ensure cluster is fully ready after previous test configuration change
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
 			var oldPrimaryPodName string
 			var newMaxConnectionsValue int
 			var primaryStartTime time.Time
