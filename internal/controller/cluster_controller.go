@@ -164,6 +164,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"configMapName", apiv1.DefaultMonitoringConfigMapName,
 				"namespace", req.Namespace,
 			)
+			return ctrl.Result{}, err
 		}
 		if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
 			contextLogger.Error(
@@ -172,8 +173,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"clusterName", req.Name,
 				"namespace", req.Namespace,
 			)
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	ctx = cluster.SetInContext(ctx)
