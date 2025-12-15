@@ -186,4 +186,47 @@ var _ = Describe("pooler_status unit tests", func() {
 			Expect(poolerBefore.Status).To(BeEquivalentTo(poolerAfter.Status))
 		})
 	})
+
+	It("should clear ServerTLS status when not using manual TLS authentication (migration to v1.28)", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+
+		// Simulate a pre v1.28 Pooler with ServerTLS populated
+		pooler.Status.Secrets = &apiv1.PoolerSecrets{
+			ServerTLS: apiv1.SecretVersion{
+				Name:    cluster.GetServerTLSSecretName(),
+				Version: "stale-version-from-v127",
+			},
+		}
+
+		res := &poolerManagedResources{
+			Deployment: nil,
+			Cluster:    cluster,
+			ClientCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientCASecretNameOrDefault(cluster),
+				},
+			},
+			ClientTLSSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetClientTLSSecretNameOrDefault(cluster),
+				},
+			},
+			ServerCASecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pooler.GetServerCASecretNameOrDefault(cluster),
+				},
+			},
+			ServerTLSSecret: nil,
+		}
+
+		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(pooler.Status.Secrets.ServerTLS.Name).To(BeEmpty())
+		Expect(pooler.Status.Secrets.ServerTLS.Version).To(BeEmpty())
+		assertClusterInheritedStatus(pooler, cluster)
+	})
 })

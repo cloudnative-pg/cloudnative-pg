@@ -674,6 +674,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
+		By("verifying connection through pooler after upgrade", func() {
+			assertReadWriteConnectionUsingPgBouncerService(upgradeNamespace, clusterName1, pgBouncerSampleFile, true)
+		})
+
 		By("installing a second Cluster on the upgraded operator", func() {
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName2)
