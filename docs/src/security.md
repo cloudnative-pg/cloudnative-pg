@@ -495,18 +495,16 @@ You can assign an
 [AppArmor](https://kubernetes.io/docs/tutorials/security/apparmor/) profile to
 the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` containers inside every `Cluster` pod through the
 `container.apparmor.security.beta.kubernetes.io` annotation.
+For example:
 
-:::note[Example of cluster annotations]
-:::
-
-```
-	kind: Cluster
-	metadata:
-		name: cluster-apparmor
-		annotations:
-			container.apparmor.security.beta.kubernetes.io/postgres: runtime/default
-			container.apparmor.security.beta.kubernetes.io/initdb: runtime/default
-			container.apparmor.security.beta.kubernetes.io/join: runtime/default
+```yaml
+kind: Cluster
+metadata:
+  name: cluster-apparmor
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/postgres: runtime/default
+    container.apparmor.security.beta.kubernetes.io/initdb: runtime/default
+    container.apparmor.security.beta.kubernetes.io/join: runtime/default
 ```
 
 :::warning
