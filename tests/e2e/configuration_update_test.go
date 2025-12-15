@@ -38,8 +38,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
-        "github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
