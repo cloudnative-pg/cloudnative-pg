@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
@@ -118,7 +119,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		if apierrs.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, reconcile.TerminalError(err)
 		}
 		return ctrl.Result{}, err
 	}
@@ -254,7 +255,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
@@ -282,7 +283,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 			fmt.Errorf("encountered an error while taking the backup: %w", err))
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 	return nil, nil
 }
@@ -416,7 +417,7 @@ func (r *BackupReconciler) getCluster(
 	r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 		"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 
-	return &ctrl.Result{}, nil
+	return &ctrl.Result{}, reconcile.TerminalError(err)
 }
 
 func (r *BackupReconciler) isValidBackupRunning(
@@ -536,7 +537,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		}
 		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPodName", targetPod.Name))
