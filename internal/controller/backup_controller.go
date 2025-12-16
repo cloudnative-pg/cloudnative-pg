@@ -423,7 +423,7 @@ func (r *BackupReconciler) getCluster(
 	r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 		"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 
-	return &ctrl.Result{}, nil
+	return &ctrl.Result{}, reconcile.TerminalError(err)
 }
 
 func (r *BackupReconciler) isValidBackupRunning(
