@@ -66,8 +66,9 @@ type BarmanCredentials = barmanApi.BarmanCredentials
 //
 // - storageKey
 // - storageSasToken
+// - inheritFromAzureAD: inheriting the credentials from the pod environment
+// - useDefaultAzureCredentials: using the default Azure authentication flow, which includes DefaultAzureCredential
 //
-// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
 // +kubebuilder:object:generate:=false
 type AzureCredentials = barmanApi.AzureCredentials
 
