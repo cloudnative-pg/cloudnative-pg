@@ -2443,7 +2443,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 		return nil
 	}
 
-	managedRoles := make(map[string]interface{})
+	managedRoles := make(map[string]any)
 	for _, role := range r.Spec.Managed.Roles {
 		_, found := managedRoles[role.Name]
 		if found {

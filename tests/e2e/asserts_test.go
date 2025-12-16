@@ -23,6 +23,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -2678,9 +2679,7 @@ func buildTemplateEnvs(additionalEnvs map[string]string) map[string]string {
 		envs[keyValue[0]] = keyValue[1]
 	}
 
-	for key, value := range additionalEnvs {
-		envs[key] = value
-	}
+	maps.Copy(envs, additionalEnvs)
 
 	return envs
 }

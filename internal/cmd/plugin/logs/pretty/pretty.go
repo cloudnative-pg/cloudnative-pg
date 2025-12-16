@@ -69,23 +69,17 @@ func NewCmd() *cobra.Command {
 
 			var wait sync.WaitGroup
 
-			wait.Add(1)
-			go func() {
+			wait.Go(func() {
 				bf.decode(cmd.Context(), os.Stdin, recordChannel)
-				wait.Done()
-			}()
+			})
 
-			wait.Add(1)
-			go func() {
+			wait.Go(func() {
 				bf.group(cmd.Context(), recordChannel, recordGroupsChannel)
-				wait.Done()
-			}()
+			})
 
-			wait.Add(1)
-			go func() {
+			wait.Go(func() {
 				bf.write(cmd.Context(), recordGroupsChannel, os.Stdout)
-				wait.Done()
-			}()
+			})
 
 			wait.Wait()
 			return nil

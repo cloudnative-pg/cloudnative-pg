@@ -602,7 +602,7 @@ func (fullStatus *PostgresqlStatus) getBarmanObject(barmanObjectName string) (*O
 }
 
 // convertUnstructured converts an unstructured object to a typed object
-func convertUnstructured(from interface{}, to interface{}) error {
+func convertUnstructured(from any, to any) error {
 	data, err := json.Marshal(from)
 	if err != nil {
 		return err
@@ -720,7 +720,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 // addReplicationSlotsColumns append the column data for replication slot
 func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	applicationName string,
-	columns *[]interface{},
+	columns *[]any,
 	verbosity int,
 ) {
 	printSlotActivity := func(isActive bool) string {
@@ -789,9 +789,9 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	fullStatus.printReplicaStatusTableHeader(status, verbosity)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
-	addReplicationSlotsColumns := func(_ string, _ *[]interface{}) {}
+	addReplicationSlotsColumns := func(_ string, _ *[]any) {}
 	if fullStatus.areReplicationSlotsEnabled() {
-		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
+		addReplicationSlotsColumns = func(applicationName string, columns *[]any) {
 			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbosity)
 		}
 	}
@@ -799,7 +799,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	replicationInfo := primaryInstanceStatus.ReplicationInfo
 	sort.Sort(replicationInfo)
 	for _, replication := range replicationInfo {
-		columns := []interface{}{
+		columns := []any{
 			replication.ApplicationName,
 			replication.SentLsn,
 			replication.WriteLsn,
@@ -1157,7 +1157,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbosity int) {
 			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal)*100)
 		}
 
-		columns := []interface{}{
+		columns := []any{
 			bb.ApplicationName,
 			bb.Phase,
 			bb.BackendStart,

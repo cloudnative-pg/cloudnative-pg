@@ -49,7 +49,7 @@ type Value struct {
 
 // NewFromRawData load data from the raw database row into
 // an histogram value
-func NewFromRawData(values []interface{}, columns []string, name string) (*Value, error) {
+func NewFromRawData(values []any, columns []string, name string) (*Value, error) {
 	var ok bool
 
 	histogramValue := &Value{}
