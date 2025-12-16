@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/atomic"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -180,6 +181,12 @@ type Instance struct {
 
 	// instanceCommandChan is a channel for requesting actions on the instance
 	instanceCommandChan chan InstanceCommand
+
+	// SessionID is a unique identifier generated at instance manager startup.
+	// This ID changes on every instance manager restart, including reboots that don't
+	// change the container ID. Used to detect if the instance manager was restarted
+	// during long-running operations like backups.
+	SessionID string
 
 	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
 	InstanceManagerIsUpgrading atomic.Bool
@@ -402,6 +409,7 @@ func NewInstance() *Instance {
 		slotsReplicatorChan:        make(chan *apiv1.ReplicationSlotsConfiguration),
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
+		SessionID:                  string(uuid.NewUUID()),
 	}
 }
 

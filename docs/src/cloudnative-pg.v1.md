@@ -1239,6 +1239,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `podName` _string_ | The pod name |  |  |  |
 | `ContainerID` _string_ | The container ID |  |  |  |
+| `sessionID` _string_ | The instance manager session ID. This is a unique identifier generated at instance manager<br />startup and changes on every restart (including container reboots). Used to detect if<br />the instance manager was restarted during long-running operations like backups, which<br />would terminate any running backup process. |  |  |  |
 
 
 #### InstanceReportedState
