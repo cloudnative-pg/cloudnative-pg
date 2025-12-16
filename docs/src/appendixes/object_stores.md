@@ -203,7 +203,9 @@ combinations of credentials:
 - Storage account name and [Storage account access key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
 - Storage account name and [Storage account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
 - Storage account name and [Azure AD Workload Identity](https://azure.github.io/azure-workload-identity/docs/introduction.html)
-properly configured.
+properly configured
+- [DefaultAzureCredential](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python)
+authentication mechanism (which supports environment variables, managed identities, and other Azure authentication methods)
 
 Using **Azure AD Workload Identity**, you can avoid saving the credentials into a Kubernetes Secret,
 and have a Cluster configuration adding the `inheritFromAzureAD` as follows:
@@ -218,6 +220,23 @@ spec:
       destinationPath: "<destination path here>"
       azureCredentials:
         inheritFromAzureAD: true
+```
+
+Alternatively, you can use the **DefaultAzureCredential** authentication mechanism, which provides
+a seamless authentication experience by supporting multiple authentication methods including environment
+variables, managed identities, and Azure CLI credentials. Add the `useDefaultAzureCredentials` flag
+as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      azureCredentials:
+        useDefaultAzureCredentials: true
 ```
 
 On the other side, using both **Storage account access key** or **Storage account SAS Token**,
