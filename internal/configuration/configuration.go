@@ -76,6 +76,10 @@ const DefaultPluginSocketDir = "/plugins"
 // Data is the struct containing the configuration of the operator.
 // Usually the operator code will use the "Current" configuration.
 type Data struct {
+	// EnableWebhooks checks if webhooks should be enabled.
+	// Webhooks are enabled by default unless explicitly set to "false".
+	EnableWebhooks bool `json:"enableWebhooks" env:"ENABLE_WEBHOOKS"`
+
 	// WebhookCertDir is the directory where the certificates for the webhooks
 	// need to written. This is different between plain Kubernetes and OpenShift
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
@@ -183,6 +187,7 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
+		EnableWebhooks:          true,
 		OperatorPullSecretName:  DefaultOperatorPullSecretName,
 		OperatorImageName:       versions.DefaultOperatorImageName,
 		PostgresImageName:       versions.DefaultImageName,

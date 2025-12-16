@@ -50,6 +50,8 @@ spec:
             name: metrics
             protocol: TCP
         env:
+        - name: ENABLE_WEBHOOKS
+          value: "false"
         - name: OPERATOR_IMAGE_NAME
           value: $(OPERATOR_IMAGE_NAME)
         - name: OPERATOR_NAMESPACE
@@ -67,20 +69,20 @@ spec:
             memory: 100Mi
         livenessProbe:
           httpGet:
-            port: 9443
-            scheme: HTTPS
+            port: 8081
+            scheme: HTTP
             path: /readyz
         startupProbe:
           failureThreshold: 6
           periodSeconds: 5
           httpGet:
-            port: 9443
-            scheme: HTTPS
+            port: 8081
+            scheme: HTTP
             path: /readyz
         readinessProbe:
           httpGet:
-            port: 9443
-            scheme: HTTPS
+            port: 8081
+            scheme: HTTP
             path: /readyz
         volumeMounts:
           - mountPath: /controller

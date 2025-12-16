@@ -38,6 +38,7 @@ func NewCmd() *cobra.Command {
 	var leaderLeaseDuration int
 	var leaderRenewDeadline int
 	var maxConcurrentReconciles int
+	var healthProbeAddr string
 
 	cmd := cobra.Command{
 		Use:           "controller [flags]",
@@ -55,12 +56,14 @@ func NewCmd() *cobra.Command {
 				pprofHTTPServer,
 				port,
 				maxConcurrentReconciles,
+				healthProbeAddr,
 				configuration.Current,
 			)
 		},
 	}
 
 	cmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	cmd.Flags().StringVar(&healthProbeAddr, "health-probe-bind-address", ":8081", "The address the health probe endpoint binds to.")
 
 	cmd.Flags().BoolVar(&leaderElectionEnable, "leader-elect", false,
 		"Enable leader election for controller manager. "+

@@ -22,7 +22,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -98,6 +97,7 @@ func RunController(
 	pprofDebug bool,
 	port int,
 	maxConcurrentReconciles int,
+	healthProbeAddr string,
 	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
@@ -124,6 +124,7 @@ func RunController(
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+		HealthProbeBindAddress:        healthProbeAddr,
 	}
 
 	if conf.WatchNamespace != "" {
@@ -136,7 +137,9 @@ func RunController(
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
-	addWebhookToManagerOptions(&managerOptions, port, conf)
+	if conf.EnableWebhooks {
+		addWebhookToManagerOptions(&managerOptions, port, conf)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
 	if err != nil {
@@ -242,9 +245,12 @@ func RunController(
 		return err
 	}
 
-	if err = setupWebhooks(ctx, mgr, kubeClient, conf); err != nil {
-		return err
+	if conf.EnableWebhooks {
+		if err = setupWebhooks(ctx, mgr, kubeClient, conf); err != nil {
+			return err
+		}
 	}
+	addReadinessProbe(mgr)
 
 	// +kubebuilder:scaffold:builder
 
@@ -255,6 +261,13 @@ func RunController(
 	}
 
 	return nil
+}
+
+func addReadinessProbe(mgr ctrl.Manager) {
+	check := func(req *http.Request) error {
+		return nil
+	}
+	mgr.AddReadyzCheck("/readyz", check)
 }
 
 func addWebhookToManagerOptions(managerOptions *ctrl.Options, port int, conf *configuration.Data) {
@@ -309,19 +322,6 @@ func setupWebhooks(ctx context.Context, mgr ctrl.Manager, kubeClient client.Clie
 		setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
 		return err
 	}
-
-	// Setup the handler used by the readiness and liveliness probe.
-	//
-	// Unfortunately the readiness of the probe is not sufficient for the operator to be
-	// working correctly. The probe may be positive even when:
-	//
-	// 1. the CA is not yet updated inside the CRD and/or in the validating/mutating
-	//    webhook configuration. In that case we have a timeout error after trying
-	//    to send a POST message and getting no response message.
-	//
-	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
-	//    deleted. In that case we could get a "Connection refused" error message.
-	webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
 
 	return nil
 }
@@ -389,11 +389,6 @@ func loadConfiguration(
 	}
 
 	return nil
-}
-
-// readinessProbeHandler is used to implement the readiness probe handler
-func readinessProbeHandler(w http.ResponseWriter, _ *http.Request) {
-	_, _ = fmt.Fprint(w, "OK")
 }
 
 // ensurePKI ensures that we have the required PKI infrastructure to make
