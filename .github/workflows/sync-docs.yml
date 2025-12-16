@@ -8,12 +8,11 @@ on:
         required: true
         default: 'main'
 
+permissions: {}
+
 jobs:
   dispatch:
     runs-on: ubuntu-latest
-    
-    permissions: {}
-
     steps:
       - name: Dispatch Docs Repository Workflow
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4
