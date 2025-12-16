@@ -21,6 +21,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
   labels:
     operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.arm64: supported
   name: cloudnative-pg.v0.0.0
   namespace: placeholder
 spec:
