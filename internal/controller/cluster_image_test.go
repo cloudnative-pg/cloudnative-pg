@@ -282,3 +282,18 @@ var _ = Describe("Cluster image detection with errors", func() {
 			"Warning DiscoverImage Error getting ImageCatalog/catalog")))
 	})
 })
+
+// TODO: test reconciling of image with extensions
+// 0. When extensions are not defined anywhere
+// 1. When extensions are defined in the Cluster spec.
+// 2. When extensions are defined in the Catalog
+// 3. When extensions are defined in both places (override)
+// 4. When an extension is defined in the catalog but not requested
+// 5. When an extension is defined in the catalog and requested
+// 6. When an extension is defined in the catalog and requested but it's incomplete (e.g. missing reference)
+
+// TODO: test for getExtensionsFromCatalog
+// 1. Extensions defined only in the Cluster spec
+// 2. Extensions defined only in the Catalog
+// 3. Extensions are defined in both places (override)
+// 4. Missing reference for an extension (failure)

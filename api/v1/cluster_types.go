@@ -1038,7 +1038,7 @@ type ImageInfo struct {
 	Image string `json:"image"`
 	// MajorVersion is the major version of the image
 	MajorVersion int `json:"majorVersion"`
-	// Extensions
+	// Extensions contains the container image extensions available for the current Image
 	Extensions []ExtensionConfiguration `json:"extensions"`
 }
 
@@ -1479,7 +1479,7 @@ type ExtensionConfiguration struct {
 	Name string `json:"name"`
 
 	// The image containing the extension, required
-	// +kubebuilder:validation:XValidation:rule="has(self.reference)",message="An image reference is required"
+	// +optional
 	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 
 	// The list of directories inside the image which should be added to extension_control_path.

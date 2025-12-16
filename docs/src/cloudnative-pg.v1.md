@@ -988,7 +988,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ | The name of the extension, required | True |  | MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
-| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension, required | True |  |  |
+| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension, required |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
 | `ld_library_path` _string array_ | The list of directories inside the image which should be added to ld_library_path. |  |  |  |
@@ -1180,7 +1180,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | Image is the image name | True |  |  |
 | `majorVersion` _integer_ | MajorVersion is the major version of the image | True |  |  |
-| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | Extensions | True |  |  |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | Extensions contains the container image extensions available for the current Image | True |  |  |
 
 
 #### Import
