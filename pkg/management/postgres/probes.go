@@ -122,6 +122,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
+	result.SessionID = instance.SessionID
 
 	return result, nil
 }

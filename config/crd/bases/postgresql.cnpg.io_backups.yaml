@@ -313,14 +313,15 @@ spec:
                   ContainerID:
                     description: The container ID
                     type: string
-                  executableHash:
-                    description: |-
-                      The instance manager executable hash. This is used to detect if the instance
-                      manager binary was upgraded (e.g., during a release) which would terminate
-                      any running backup process.
-                    type: string
                   podName:
                     description: The pod name
+                    type: string
+                  sessionID:
+                    description: |-
+                      The instance manager session ID. This is a unique identifier generated at instance manager
+                      startup and changes on every restart (including container reboots). Used to detect if
+                      the instance manager was restarted during long-running operations like backups, which
+                      would terminate any running backup process.
                     type: string
                 type: object
               majorVersion:

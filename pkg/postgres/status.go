@@ -87,6 +87,10 @@ type PostgresqlStatus struct {
 	InstanceManagerVersion     string `json:"instanceManagerVersion"`
 	InstanceArch               string `json:"instanceArch"`
 	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
+	// SessionID is a unique identifier generated at instance manager startup.
+	// This ID changes on every instance manager restart (including container reboots),
+	// allowing detection of restarts that don't change the container ID or executable hash.
+	SessionID string `json:"sessionID"`
 
 	// This field represents the Kubelet point-of-view of the readiness
 	// status of this instance and may be slightly stale when the Kubelet has

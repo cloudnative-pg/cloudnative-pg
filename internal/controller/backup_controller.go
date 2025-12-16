@@ -278,9 +278,9 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	r.Recorder.Eventf(&backup, "Normal", "Starting",
 		"Starting backup for cluster %v", cluster.Name)
 
-	// This backup can be started. The ExecutableHash from podStatus is used to detect if the
-	// instance manager was upgraded during the backup, which would kill the backup process.
-	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster, podStatus.ExecutableHash); err != nil {
+	// This backup can be started. The SessionID from podStatus is used to detect if the
+	// instance manager was restarted during the backup, which would kill the backup process.
+	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster, podStatus.SessionID); err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 			fmt.Errorf("encountered an error while taking the backup: %w", err))
@@ -486,13 +486,13 @@ func (r *BackupReconciler) isValidBackupRunning(
 		backup.Status.InstanceID.ContainerID == pgContainerStatus.ContainerID
 	isPodActive := utils.IsPodActive(pod)
 
-	// For instance-managed backups, check if the instance manager was restarted/upgraded
-	// by comparing the ExecutableHash stored when the backup started with the current hash.
-	// If the hash changed, the instance manager binary was replaced (e.g., during an operator
-	// upgrade), which means any running backup goroutine was killed and the backup needs restart.
+	// For instance-managed backups, check if the instance manager was restarted
+	// by comparing the SessionID stored when the backup started with the current session ID.
+	// If the session ID changed, the instance manager was restarted (e.g., during an operator
+	// upgrade or container reboot), which means any running backup goroutine was killed.
 	instanceManagerRestarted := false
-	if backup.Spec.Method.IsManagedByInstance() && backup.Status.InstanceID.ExecutableHash != "" {
-		instanceManagerRestarted = r.isInstanceManagerRestarted(ctx, &pod, backup.Status.InstanceID.ExecutableHash)
+	if backup.Spec.Method.IsManagedByInstance() && backup.Status.InstanceID.SessionID != "" {
+		instanceManagerRestarted = r.isInstanceManagerRestarted(ctx, &pod, backup.Status.InstanceID.SessionID)
 	}
 
 	if isCorrectPodElected && containerIsNotRestarted && isPodActive && !instanceManagerRestarted {
@@ -509,15 +509,15 @@ func (r *BackupReconciler) isValidBackupRunning(
 	// This is a deterministic check that catches the case where the operator was upgraded
 	// while a backup was in progress, killing the backup goroutine in the instance manager.
 	if instanceManagerRestarted {
-		failureReason := fmt.Errorf("instance manager was upgraded during backup on pod %s", pod.Name)
-		contextLogger.Info("Instance manager was restarted/upgraded, marking backup as failed",
+		failureReason := fmt.Errorf("instance manager was restarted during backup on pod %s", pod.Name)
+		contextLogger.Info("Instance manager was restarted, marking backup as failed",
 			"cluster", cluster.Name,
 			"pod", pod.Name,
-			"storedHash", backup.Status.InstanceID.ExecutableHash)
+			"storedSessionID", backup.Status.InstanceID.SessionID)
 		if err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, failureReason); err != nil {
 			return false, fmt.Errorf("while marking backup as failed: %w", err)
 		}
-		return false, reconcile.TerminalError(errors.New("instance manager was upgrade during backup"))
+		return false, reconcile.TerminalError(errors.New("instance manager was restarted during backup"))
 	}
 
 	// For other cases (container restarted, pod inactive, wrong pod elected),
@@ -534,24 +534,24 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-// isInstanceManagerRestarted checks if the instance manager binary was replaced since
-// the backup started. This is done by comparing the ExecutableHash stored when the
-// backup started with the current hash from the instance manager.
-// This is a deterministic check that detects instance manager upgrades that would
-// kill any running backup goroutine.
+// isInstanceManagerRestarted checks if the instance manager was restarted since
+// the backup started. This is done by comparing the SessionID stored when the
+// backup started with the current session ID from the instance manager.
+// This check detects instance manager restarts including container reboots and
+// binary upgrades that would kill any running backup goroutine.
 func (r *BackupReconciler) isInstanceManagerRestarted(
 	ctx context.Context,
 	pod *corev1.Pod,
-	storedHash string,
+	storedSessionID string,
 ) bool {
 	contextLogger := log.FromContext(ctx)
 
-	// If no stored hash, we can't make a comparison - assume backup is still running
-	if storedHash == "" {
+	// If no stored session ID, we can't make a comparison - assume backup is still running
+	if storedSessionID == "" {
 		return false
 	}
 
-	// Get the current status of the pod to retrieve the ExecutableHash
+	// Get the current status of the pod to retrieve the SessionID
 	pods := corev1.PodList{Items: []corev1.Pod{*pod}}
 	statusList := r.instanceStatusClient.GetStatusFromInstances(ctx, pods)
 
@@ -563,19 +563,19 @@ func (r *BackupReconciler) isInstanceManagerRestarted(
 		return false
 	}
 
-	currentHash := statusList.Items[0].ExecutableHash
-	if currentHash == "" {
-		// If the current hash is empty, the instance manager may not have reported yet
-		contextLogger.Debug("Current ExecutableHash is empty, assuming backup still running",
+	currentSessionID := statusList.Items[0].SessionID
+	if currentSessionID == "" {
+		// If the current session ID is empty, the instance manager may not have reported yet
+		contextLogger.Debug("Current SessionID is empty, assuming backup still running",
 			"pod", pod.Name)
 		return false
 	}
 
-	if currentHash != storedHash {
-		contextLogger.Info("Instance manager ExecutableHash changed",
+	if currentSessionID != storedSessionID {
+		contextLogger.Info("Instance manager SessionID changed",
 			"pod", pod.Name,
-			"storedHash", storedHash,
-			"currentHash", currentHash)
+			"storedSessionID", storedSessionID,
+			"currentSessionID", currentSessionID)
 		return true
 	}
 
@@ -634,12 +634,12 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 			return nil, fmt.Errorf("cannot get postgres container status: %w", err)
 		}
 
-		// For volume snapshot backups, ExecutableHash is not relevant since the backup
+		// For volume snapshot backups, SessionID is not relevant since the backup
 		// is managed by the operator, not the instance manager
 		backup.Status.SetAsStarted(
 			targetPod.Name,
 			pgContainerStatus.ContainerID,
-			"", // ExecutableHash not used for operator-managed backups
+			"", // SessionID not used for operator-managed backups
 			apiv1.BackupMethodVolumeSnapshot,
 		)
 		// given that we use only kubernetes resources we can use the backup name as ID
@@ -770,7 +770,7 @@ func updateClusterWithSnapshotsBackupTimes(
 
 // getBackupTargetPod returns the PostgresqlStatus for the pod that should run the backup
 // according to the current cluster's target policy. The status includes the Pod reference
-// and the ExecutableHash needed for tracking instance manager identity.
+// and the SessionID needed for tracking instance manager identity.
 func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: gocognit
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -875,7 +875,7 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 	statusResult := r.instanceStatusClient.GetStatusFromInstances(ctx, corev1.PodList{Items: []corev1.Pod{*targetPod}})
 	if len(statusResult.Items) == 0 {
 		// Return a minimal status with just the pod if we couldn't get full status
-		contextLogger.Debug("Could not get instance status, returning pod without ExecutableHash",
+		contextLogger.Debug("Could not get instance status, returning pod without SessionID",
 			"pod", targetPod.Name)
 		return &postgresStatus.PostgresqlStatus{Pod: targetPod}, nil
 	}
@@ -904,15 +904,15 @@ func getPostgresContainer(pod *corev1.Pod) (*corev1.Container, error) {
 }
 
 // startInstanceManagerBackup request a backup in a Pod and marks the backup started
-// or failed if needed. The executableHash parameter is used to track the instance manager
-// binary hash, which allows detecting if the instance manager was upgraded during the backup.
+// or failed if needed. The sessionID parameter is used to track the instance manager
+// identity, which allows detecting if the instance manager was restarted during the backup.
 func startInstanceManagerBackup(
 	ctx context.Context,
 	client client.Client,
 	backup *apiv1.Backup,
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
-	executableHash string,
+	sessionID string,
 ) error {
 	pgContainerStatus, err := getPostgresContainerStatus(pod)
 	if err != nil {
@@ -921,7 +921,7 @@ func startInstanceManagerBackup(
 
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, executableHash, backup.Spec.Method)
+	status.SetAsStarted(pod.Name, pgContainerStatus.ContainerID, sessionID, backup.Spec.Method)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
