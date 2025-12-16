@@ -43,8 +43,6 @@ import (
 )
 
 const (
-	backupOwnerKey = ".metadata.controller"
-
 	// ImmediateBackupLabelName label is applied to backups to tell if a backup
 	// is immediate or not
 	ImmediateBackupLabelName = utils.ImmediateBackupLabelName
@@ -98,29 +96,6 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if scheduledBackup.IsSuspended() {
 		contextLogger.Info("Skipping as backup is suspended")
 		return ctrl.Result{}, nil
-	}
-
-	// We are supposed to start a new backup. Let's extract
-	// the list of backups we have already taken to see if anything
-	// is running now
-	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
-	if err != nil {
-		contextLogger.Error(err,
-			"Cannot extract the list of created backups")
-		return ctrl.Result{}, err
-	}
-
-	// We are supposed to start a new backup. Let's extract
-	// the list of backups we have already taken to see if anything
-	// is running now
-	for _, backup := range childBackups {
-		if !backup.Status.IsDone() {
-			contextLogger.Info(
-				"The system is already taking a scheduledBackup, retrying in 60 seconds",
-				"backupName", backup.GetName(),
-				"backupPhase", backup.Status.Phase)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
-		}
 	}
 
 	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, &scheduledBackup)
@@ -312,54 +287,11 @@ func createBackup(
 	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 
-// GetChildBackups gets all the backups scheduled by a certain scheduler
-func (r *ScheduledBackupReconciler) GetChildBackups(
-	ctx context.Context,
-	scheduledBackup apiv1.ScheduledBackup,
-) ([]apiv1.Backup, error) {
-	var childBackups apiv1.BackupList
-
-	if err := r.List(ctx, &childBackups,
-		client.InNamespace(scheduledBackup.Namespace),
-		client.MatchingFields{backupOwnerKey: scheduledBackup.Name},
-	); err != nil {
-		return nil, fmt.Errorf("unable to list child pods resource: %w", err)
-	}
-
-	return childBackups.Items, nil
-}
-
 // SetupWithManager install this controller in the controller manager
 func (r *ScheduledBackupReconciler) SetupWithManager(
-	ctx context.Context,
 	mgr ctrl.Manager,
 	maxConcurrentReconciles int,
 ) error {
-	// Create a new indexed field on backups. This field will be used to easily
-	// find all the backups created by this controller
-	if err := mgr.GetFieldIndexer().IndexField(
-		ctx,
-		&apiv1.Backup{},
-		backupOwnerKey, func(rawObj client.Object) []string {
-			pod := rawObj.(*apiv1.Backup)
-			owner := metav1.GetControllerOf(pod)
-			if owner == nil {
-				return nil
-			}
-
-			if owner.Kind != apiv1.BackupKind {
-				return nil
-			}
-
-			if owner.APIVersion != apiSGVString {
-				return nil
-			}
-
-			return []string{owner.Name}
-		}); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.ScheduledBackup{}).

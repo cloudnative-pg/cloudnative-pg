@@ -249,7 +249,7 @@ func RunController(
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
-	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
+	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
 	}
