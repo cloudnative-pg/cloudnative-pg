@@ -42,5 +42,6 @@ func (spec *ImageCatalogSpec) FindExtensionsForMajor(major int) ([]ExtensionConf
 			return entry.Extensions, true
 		}
 	}
+
 	return nil, false
 }

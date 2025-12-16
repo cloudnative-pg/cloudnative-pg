@@ -104,16 +104,18 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
-func getImageInfoFromImage(image string) (apiv1.ImageInfo, error) {
+func getImageInfoFromImage(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 	// Parse the version from the tag
-	imageVersion, err := version.FromTag(reference.New(image).Tag)
+	imageVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
 	if err != nil {
-		return apiv1.ImageInfo{}, fmt.Errorf("cannot parse version from image %s: %w", image, err)
+		return apiv1.ImageInfo{},
+			fmt.Errorf("cannot parse version from image %s: %w", cluster.Spec.ImageName, err)
 	}
 
 	return apiv1.ImageInfo{
-		Image:        image,
+		Image:        cluster.Spec.ImageName,
 		MajorVersion: int(imageVersion.Major()), //nolint:gosec
+		Extensions:   cluster.Spec.PostgresConfiguration.Extensions,
 	}, nil
 }
 
@@ -124,7 +126,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	if cluster.Spec.ImageCatalogRef == nil {
 		if cluster.Spec.ImageName != "" {
-			return getImageInfoFromImage(cluster.Spec.ImageName)
+			return getImageInfoFromImage(cluster)
 		}
 
 		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
@@ -184,27 +186,17 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 			"requestedMajorVersion", requestedMajorVersion)
 		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
 	}
-	imageInfo := apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}
 
-	extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion)
-	if ok {
-		extensionsMap := make(map[string]apiv1.ExtensionConfiguration)
-		// Extract extensions from the catalog
-		for _, extension := range extensions {
-			extensionsMap[extension.Name] = extension
-		}
-		// Extract extensions from the cluster spec
-		for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-			extensionsMap[extension.Name] = extension
-		}
-		resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(extensionsMap))
-		for _, extension := range extensionsMap {
-			resolvedExtensions = append(resolvedExtensions, extension)
-		}
-		imageInfo.Extensions = resolvedExtensions
+	extensions, err := getExtensionsFromCatalog(cluster, catalog, requestedMajorVersion)
+	if err != nil {
+		return apiv1.ImageInfo{}, fmt.Errorf("cannot retrieve extensions for image %s: %w", catalogImage, err)
 	}
 
-	return imageInfo, nil
+	return apiv1.ImageInfo{
+		Image:        catalogImage,
+		MajorVersion: requestedMajorVersion,
+		Extensions:   extensions,
+	}, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
@@ -297,4 +289,69 @@ func (r *ClusterReconciler) mapImageCatalogsToClusters() handler.MapFunc {
 		}
 		return requests
 	}
+}
+
+// getExtensionsFromCatalog returns a list of requested Extensions from a Catalog for a given
+// Postgres major version.
+// If present, extension entries present in the catalog are always used as a starting base.
+// If additional configuration is passed via `cluster.Spec.PostgresConfiguration.Extensions`
+// for an extension that's already defined in the catalog, the values defined in the Cluster
+// take precedence.
+func getExtensionsFromCatalog(
+	cluster *apiv1.Cluster,
+	catalog apiv1.GenericImageCatalog,
+	requestedMajorVersion int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	requestedExtensions := cluster.Spec.PostgresConfiguration.Extensions
+	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(requestedExtensions))
+
+	// Build a map of extensions coming from the catalog
+	catalogExtensionsMap := make(map[string]apiv1.ExtensionConfiguration)
+	if extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion); ok {
+		for _, extension := range extensions {
+			catalogExtensionsMap[extension.Name] = extension
+		}
+	}
+
+	// Resolve extensions
+	for _, extension := range requestedExtensions {
+		catalogExtension, found := catalogExtensionsMap[extension.Name]
+		if !found && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q not found in image catalog %s/%s and no reference is defined in the Cluster Spec",
+				extension.Name, catalog.GetNamespace(), catalog.GetName())
+		}
+
+		var resultExtension apiv1.ExtensionConfiguration
+		if found {
+			// Found the extension in the catalog, so let's use the catalog entry as a base
+			// and eventually override it with Cluster Spec values
+			resultExtension = catalogExtension
+		} else {
+			// No catalog entry, rely fully on the Cluster Spec
+			resolvedExtensions = append(resolvedExtensions, extension)
+			continue
+		}
+
+		// Apply the Cluster Spec overrides
+		if extension.ImageVolumeSource.Reference != "" {
+			resultExtension.ImageVolumeSource.Reference = extension.ImageVolumeSource.Reference
+		}
+		if extension.ImageVolumeSource.PullPolicy != "" {
+			resultExtension.ImageVolumeSource.PullPolicy = extension.ImageVolumeSource.PullPolicy
+		}
+		if len(extension.ExtensionControlPath) > 0 {
+			resultExtension.ExtensionControlPath = extension.ExtensionControlPath
+		}
+		if len(extension.DynamicLibraryPath) > 0 {
+			resultExtension.DynamicLibraryPath = extension.DynamicLibraryPath
+		}
+		if len(extension.LdLibraryPath) > 0 {
+			resultExtension.LdLibraryPath = extension.LdLibraryPath
+		}
+
+		resolvedExtensions = append(resolvedExtensions, resultExtension)
+	}
+
+	return resolvedExtensions, nil
 }
