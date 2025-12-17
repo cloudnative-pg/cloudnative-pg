@@ -337,8 +337,9 @@ func (r *BackupReconciler) checkPrerequisites(
 	flagMissingPrerequisite := func(message string, reason string) (*ctrl.Result, error) {
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", reason, message)
-		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}, err
+		err := errors.New(message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, err)
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
