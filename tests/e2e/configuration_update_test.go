@@ -210,7 +210,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		currentVersion, err := version.FromTag(env.PostgresImageTag)
 		Expect(err).NotTo(HaveOccurred())
 		defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
+		// Skip this test for development PostgreSQL versions (newer than default)
+		// because they may not have compatible extensions like pgaudit available.
+		// See https://github.com/cloudnative-pg/cloudnative-pg/issues/9331
 		if currentVersion.Major() > defaultVersion.Major() {
 			Skip("Running on a version newer than the default image, skipping this test")
 		}
