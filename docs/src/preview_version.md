@@ -13,7 +13,7 @@ These versions are feature-frozen, meaning no new features are added, and are
 intended for public testing prior to the final release.
 
 :::warning[Important]
-    CloudNativePG release candidates are **not intended for use in production** systems.
+    CloudNativePG release candidates are **not intended for use in production** systems.
     They should only be deployed in staging or dedicated testing environments.
 :::
 

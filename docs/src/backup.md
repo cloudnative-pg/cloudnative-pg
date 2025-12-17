@@ -269,7 +269,7 @@ spec:
   immediate: true
 ```
 
-### Pause Scheduled Backups
+### Pause Scheduled Backups
 
 To temporarily stop scheduled backups from running:
 
@@ -278,7 +278,7 @@ spec:
   suspend: true
 ```
 
-### Backup Owner Reference (`.spec.backupOwnerReference`)
+### Backup Owner Reference (`.spec.backupOwnerReference`)
 
 Controls which Kubernetes object is set as the owner of the backup resource:
 
