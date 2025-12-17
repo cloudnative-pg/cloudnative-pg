@@ -34,6 +34,14 @@ import (
 )
 
 var _ = Describe("BackupStatus structure", func() {
+	It("can be set as pending", func() {
+		status := BackupStatus{}
+		status.SetAsPending()
+		Expect(status.Phase).To(BeEquivalentTo(BackupPhasePending))
+		Expect(status.IsInProgress()).To(BeTrue())
+		Expect(status.IsDone()).To(BeFalse())
+	})
+
 	It("can be set as started", func() {
 		status := BackupStatus{}
 		pod := corev1.Pod{
