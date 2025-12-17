@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +38,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -204,9 +207,19 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 	}
 
 	assertChangeImageAndGucs := func(namespace string, primaryUpdateMethod apiv1.PrimaryUpdateMethod) {
+		currentVersion, err := version.FromTag(env.PostgresImageTag)
+		Expect(err).NotTo(HaveOccurred())
+		defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
+		Expect(err).NotTo(HaveOccurred())
+		// Skip this test for development PostgreSQL versions (newer than default)
+		// because they may not have compatible extensions like pgaudit available.
+		// See https://github.com/cloudnative-pg/cloudnative-pg/issues/9331
+		if currentVersion.Major() > defaultVersion.Major() {
+			Skip("Running on a version newer than the default image, skipping this test")
+		}
+
 		cluster := &apiv1.Cluster{}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			var err error
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.ImageName = env.StandardImageName(targetTag)
