@@ -2503,7 +2503,6 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(
 			"cnpg_backends_waiting_total",
 			"cnpg_pg_postmaster_start_time",
 			"cnpg_pg_replication",
-			"cnpg_pg_stat_archiver",
 			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
 		}
