@@ -188,6 +188,7 @@ rules:
   - clusters/status
   - failoverquorums/status
   - poolers/status
+  - roles/status
   verbs:
   - get
   - patch
@@ -202,6 +203,15 @@ rules:
   - delete
   - get
   - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - roles
+  verbs:
+  - get
+  - list
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
