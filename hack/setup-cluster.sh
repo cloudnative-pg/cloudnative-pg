@@ -34,7 +34,7 @@ CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
 # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
 EXTERNAL_SNAPSHOTTER_VERSION=v8.4.0
 # renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
-EXTERNAL_PROVISIONER_VERSION=v6.0.0
+EXTERNAL_PROVISIONER_VERSION=v6.1.0
 # renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
 EXTERNAL_RESIZER_VERSION=v2.0.0
 # renovate: datasource=github-releases depName=kubernetes-csi/external-attacher
@@ -89,7 +89,7 @@ builder_name=cnpg-builder
 # #########################################################################
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
-PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/specs/pgbouncer/deployments.go" | cut -f 2 -d \")}
+PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go"  | cut -f 2 -d \")}
 APACHE_IMG=${APACHE_IMG:-"httpd"}
 

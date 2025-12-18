@@ -235,7 +235,7 @@ func (r *PoolerReconciler) updateServiceAccount(
 
 	if resources.ServiceAccount == nil {
 		serviceAccount := pgbouncer.ServiceAccount(pooler)
-		ensureServiceAccountHaveImagePullSecret(resources.ServiceAccount, pullSecretName)
+		ensureServiceAccountHaveImagePullSecret(serviceAccount, pullSecretName)
 		contextLog.Info("Creating service account")
 		if err := ctrl.SetControllerReference(pooler, serviceAccount, r.Scheme); err != nil {
 			return err

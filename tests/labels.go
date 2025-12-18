@@ -100,4 +100,7 @@ const (
 
 	// LabelPostgresMajorUpgrade is a label for Cluster major version upgrade tests
 	LabelPostgresMajorUpgrade = "postgres-major-upgrade"
+
+	// LabelImageVolumeExtensions is a label for imageVolume extensions tests
+	LabelImageVolumeExtensions = "image-volume-extensions"
 )

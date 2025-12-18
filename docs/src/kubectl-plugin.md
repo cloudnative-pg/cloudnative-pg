@@ -1,3 +1,9 @@
+---
+id: kubectl-plugin
+sidebar_position: 390
+title: Kubectl Plugin
+---
+
 # Kubectl Plugin
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -7,9 +13,10 @@ CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
 You can install the `cnpg` plugin using a variety of methods.
 
-!!! Note
+:::note
     For air-gapped systems, installation via package managers, using previously
     downloaded files, may be a good option.
+:::
 
 ### Via the installation script
 
@@ -31,11 +38,11 @@ them in your systems.
 
 #### Debian packages
 
-For example, let's install the 1.27.1 release of the plugin, for an Intel based
+For example, let's install the 1.28.0 release of the plugin, for an Intel based
 64 bit server. First, we download the right `.deb` file.
 
 ```sh
-wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.27.1/kubectl-cnpg_1.27.1_linux_x86_64.deb \
+wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.28.0/kubectl-cnpg_1.28.0_linux_x86_64.deb \
   --output-document kube-plugin.deb
 ```
 
@@ -46,17 +53,17 @@ $ sudo dpkg -i kube-plugin.deb
 Selecting previously unselected package cnpg.
 (Reading database ... 6688 files and directories currently installed.)
 Preparing to unpack kube-plugin.deb ...
-Unpacking cnpg (1.27.1) ...
-Setting up cnpg (1.27.1) ...
+Unpacking cnpg (1.28.0) ...
+Setting up cnpg (1.28.0) ...
 ```
 
 #### RPM packages
 
-As in the example for `.rpm` packages, let's install the 1.27.1 release for an
+As in the example for `.rpm` packages, let's install the 1.28.0 release for an
 Intel 64 bit machine. Note the `--output` flag to provide a file name.
 
 ```sh
-curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.27.1/kubectl-cnpg_1.27.1_linux_x86_64.rpm \
+curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.28.0/kubectl-cnpg_1.28.0_linux_x86_64.rpm \
   --output kube-plugin.rpm
 ```
 
@@ -70,7 +77,7 @@ Dependencies resolved.
  Package            Architecture         Version                   Repository                  Size
 ====================================================================================================
 Installing:
- cnpg               x86_64               1.27.1                  @commandline                20 M
+ cnpg               x86_64               1.28.0                  @commandline                20 M
 
 Transaction Summary
 ====================================================================================================
@@ -116,8 +123,9 @@ kubectl krew upgrade cnpg
 
 ### Using Homebrew
 
-!!! Note
+:::note
     Please note that the Homebrew community manages the availability of the [kubectl-cnpg plugin on Homebrew](https://formulae.brew.sh/formula/kubectl-cnpg).
+:::
 
 If you already have [Homebrew](https://brew.sh/) installed, you can simply
 run:
@@ -134,29 +142,30 @@ brew update
 brew upgrade kubectl-cnpg
 ```
 
-!!! Note
+:::note
     Auto-completion for the kubectl plugin is already managed by Homebrew.
     There's no need to create the `kubectl_complete-cnpg` script mentioned below.
+:::
 
 ### Supported Architectures
 
 CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
-* Linux
-    * amd64
-    * arm 5/6/7
-    * arm64
-    * s390x
-    * ppc64le
-* macOS
-    * amd64
-    * arm64
-* Windows
-    * 386
-    * amd64
-    * arm 5/6/7
-    * arm64
+- Linux
+  - amd64
+  - arm 5/6/7
+  - arm64
+  - s390x
+  - ppc64le
+- macOS
+  - amd64
+  - arm64
+- Windows
+  - 386
+  - amd64
+  - arm 5/6/7
+  - arm64
 
 ### Configuring auto-completion
 
@@ -178,8 +187,9 @@ chmod +x kubectl_complete-cnpg
 sudo mv kubectl_complete-cnpg /usr/local/bin
 ```
 
-!!! Important
+:::info[Important]
     The name of the script needs to be exactly the one provided since it's used by the kubectl auto-complete process
+:::
 
 ## Use
 
@@ -189,10 +199,11 @@ Once the plugin is installed and deployed, you can start using it like this:
 kubectl cnpg COMMAND [ARGS...]
 ```
 
-!!! Note
+:::note
     The plugin automatically detects if the standard output channel is connected to a terminal.
     In such cases, it may add ANSI colors to the command output. To disable colors, use the
     `--color=never` option with the command.
+:::
 
 ### Generation of installation manifests
 
@@ -245,24 +256,25 @@ The flags in the above command have the following meaning:
 The `status` command provides an overview of the current status of your
 cluster, including:
 
-* **general information**: name of the cluster, PostgreSQL's system ID, number of
+- **general information**: name of the cluster, PostgreSQL's system ID, number of
   instances, current timeline and position in the WAL
-* **backup**: point of recoverability, and WAL archiving status as returned by
+- **backup**: point of recoverability, and WAL archiving status as returned by
   the `pg_stat_archiver` view from the primary - or designated primary in the
   case of a replica cluster
-* **streaming replication**: information taken directly from the `pg_stat_replication`
+- **streaming replication**: information taken directly from the `pg_stat_replication`
   view on the primary instance
-* **instances**: information about each Postgres instance, taken directly by each
+- **instances**: information about each Postgres instance, taken directly by each
   instance manager; in the case of a standby, the `Current LSN` field corresponds
   to the latest write-ahead log location that has been replayed during recovery
   (replay LSN).
 
-!!! Important
+:::info[Important]
     The status information above is taken at different times and at different
     locations, resulting in slightly inconsistent returned values. For example,
     the `Current Write LSN` location in the main header, might be different
     from the `Current LSN` field in the instances status as it is taken at
     two different time intervals.
+:::
 
 ```sh
 kubectl cnpg status sandbox
@@ -294,9 +306,9 @@ sandbox-3  0/604DE38  0/604DE38  0/604DE38  0/604DE38   00:00:00   00:00:00   00
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/604DE38    Primary           OK      BestEffort  1.27.1           k8s-eu-worker
-sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.27.1           k8s-eu-worker2
-sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.27.1           k8s-eu-worker
+sandbox-1  0/604DE38    Primary           OK      BestEffort  1.28.0           k8s-eu-worker
+sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.28.0           k8s-eu-worker2
+sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.28.0           k8s-eu-worker
 ```
 
 If you require more detailed status information, use the `--verbose` option (or
@@ -350,15 +362,23 @@ sandbox-primary  primary  1              1                1                     
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/6053720    Primary           OK      BestEffort  1.27.1           k8s-eu-worker
-sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.27.1           k8s-eu-worker2
-sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.27.1           k8s-eu-worker
+sandbox-1  0/6053720    Primary           OK      BestEffort  1.28.0           k8s-eu-worker
+sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.28.0           k8s-eu-worker2
+sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.28.0           k8s-eu-worker
 ```
 
 With an additional `-v` (e.g. `kubectl cnpg status sandbox -v -v`), you can
 also view PostgreSQL configuration, HBA settings, and certificates.
 
 The command also supports output in `yaml` and `json` format.
+
+:::note
+    The `status` command executes operations that access the pod filesystem,
+    such as `du` to calculate cluster size and `cat` to read configuration files.
+    For clusters with large data volumes (e.g., over 1TB), these operations may
+    take longer than the default timeout of 10 seconds. You can adjust the timeout
+    using the `--timeout` flag (e.g., `kubectl cnpg status sandbox --timeout 45s`).
+:::
 
 ### Promote
 
@@ -424,9 +444,10 @@ If the in-place restart is requested but the change cannot be applied without
 a switchover, the switchover will take precedence over the in-place restart. A
 common case for this will be a minor upgrade of PostgreSQL image.
 
-!!! Note
+:::note
     If you want ConfigMaps and Secrets to be **automatically** reloaded
     by instances, you can add a label with key `cnpg.io/reload` to it.
+:::
 
 ### Reload
 
@@ -446,8 +467,8 @@ The `kubectl cnpg maintenance` command helps to modify one or more clusters
 across namespaces and set the maintenance window values, it will change
 the following fields:
 
-* .spec.nodeMaintenanceWindow.inProgress
-* .spec.nodeMaintenanceWindow.reusePVC
+- `.spec.nodeMaintenanceWindow.inProgress`
+- `.spec.nodeMaintenanceWindow.reusePVC`
 
 Accepts as argument `set` and `unset` using this to set the
 `inProgress` to `true` in case `set`and to `false` in case of `unset`.
@@ -491,33 +512,76 @@ It has two sub-commands: `operator` and `cluster`.
 The `operator` sub-command requests the operator to provide information
 regarding the operator deployment, configuration and events.
 
-!!! Important
+:::info[Important]
     All confidential information in Secrets and ConfigMaps is REDACTED.
     The Data map will show the **keys** but the values will be empty.
     The flag `-S` / `--stopRedaction` will defeat the redaction and show the
     values. Use only at your own risk, this will share private data.
+:::
 
-!!! Note
+:::note
     By default, operator logs are not collected, but you can enable operator
     log collection with the `--logs` flag
+:::
 
-* **deployment information**: the operator Deployment and operator Pod
-* **configuration**: the Secrets and ConfigMaps in the operator namespace
-* **events**: the Events in the operator namespace
-* **webhook configuration**: the mutating and validating webhook configurations
-* **webhook service**: the webhook service
-* **logs**: logs for the operator Pod (optional, off by default) in JSON-lines format
+:::info[Least-Privilege Support]
+    The `report operator` command works with minimal permissions. Only the operator
+    deployment is **required** - all other resources are optional and collected on a
+    best-effort basis. If you lack permissions for certain resources (e.g., webhooks,
+    OLM resources), warnings are logged and report generation continues with available
+    data.
+:::
+
+The report includes:
+
+- **deployment information** (required): the operator `Deployment`
+- **operator pods** (optional): the operator `Pod` information
+- **configuration** (optional): `Secrets` and `ConfigMaps` in the operator
+  namespace
+- **events** (optional): `Events` in the operator namespace
+- **webhook configuration** (optional): mutating and validating webhook
+  configurations (cluster-scoped)
+- **webhook service** (optional): the webhook service
+- **OLM resources** (optional): subscriptions, cluster service versions,
+  install plans (if OLM is installed)
+- **logs** (optional): operator `Pod` logs in JSON-lines format (requires
+  `--logs` flag)
+
+:::warning[Minimal permissions]
+    Read access (`get`) to the operator deployment in the operator namespace.
+    This allows namespace-scoped users to generate basic troubleshooting reports.
+:::
+
+:::info[Recommended permissions for full report]
+    Add `list` on pods, events; `get` on secrets, configmaps, services
+    (namespace-scoped); and `list` on webhook configurations (cluster-scoped).
+:::
+
+A user with only namespace-scoped permissions can still generate useful
+reports:
+
+```sh
+# With only deployment read access
+kubectl cnpg report operator -n cnpg-system -f report.zip
+```
+
+:::info
+    The command will log warnings for inaccessible resources but successfully
+    generate a report with the deployment manifest, which is often sufficient for
+    basic troubleshooting.
+:::
 
 The command will generate a ZIP file containing various manifest in YAML format
-(by default, but settable to JSON with the `-o` flag).
-Use the `-f` flag to name a result file explicitly. If the `-f` flag is not used, a
-default time-stamped filename is created for the zip file.
+(by default, but settable to JSON with the `-o` flag). Use the `-f` flag to
+name a result file explicitly. If the `-f` flag is not used, a default
+time-stamped filename is created for the zip file.
 
-!!! Note
-    The report plugin obeys `kubectl` conventions, and will look for objects constrained
-    by namespace. The CNPG Operator will generally not be installed in the same
-    namespace as the clusters.
-    E.g. the default installation namespace is cnpg-system
+:::note
+    The report plugin obeys `kubectl` conventions, and will look for objects
+    constrained by namespace. The CNPG Operator will generally not be installed in
+    the same namespace as the clusters. E.g. the default installation namespace is
+    cnpg-system.
+:::
 
 ```sh
 kubectl cnpg report operator -n cnpg-system
@@ -567,20 +631,21 @@ Archive:  report_operator_<TIMESTAMP>.zip
   inflating: report_operator_<TIMESTAMP>/operator-logs/cnpg-controller-manager-66fb98dbc5-pxkmh-logs.jsonl
 ```
 
-!!! Note
+:::note
     The plugin will try to get the PREVIOUS operator's logs, which is helpful
     when investigating restarted operators.
     In all cases, it will also try to get the CURRENT operator logs. If current
     and previous logs are available, it will show them both.
+:::
 
 ```output
 ====== Beginning of Previous Log =====
-2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.27.1","build":{"Version":"1.27.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.28.0","build":{"Version":"1.28.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
   <snipped …>
 
 ====== End of Previous Log =====
-2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.27.1","build":{"Version":"1.27.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.28.0","build":{"Version":"1.28.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:57:09.854363943Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
 ```
 
@@ -639,21 +704,22 @@ metadata:
 
 The `cluster` sub-command gathers the following:
 
-* **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
-* **cluster pods**: pods in the cluster namespace matching the cluster name
-* **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
-* **events**: events in the cluster namespace
-* **pod logs**: logs for the cluster Pods (optional, off by default) in JSON-lines format
-* **job logs**: logs for the Pods created by jobs (optional, off by default) in JSON-lines format
+- **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
+- **cluster pods**: pods in the cluster namespace matching the cluster name
+- **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
+- **events**: events in the cluster namespace
+- **pod logs**: logs for the cluster Pods (optional, off by default) in JSON-lines format
+- **job logs**: logs for the Pods created by jobs (optional, off by default) in JSON-lines format
 
 The `cluster` sub-command accepts the `-f` and `-o` flags, as the `operator` does.
 If the `-f` flag is not used, a default timestamped report name will be used.
 Note that the cluster information does not contain configuration Secrets / ConfigMaps,
 so the `-S` is disabled.
 
-!!! Note
+:::note
     By default, cluster logs are not collected, but you can enable cluster
     log collection with the `--logs` flag
+:::
 
 Usage:
 
@@ -867,8 +933,9 @@ $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --sorting
 To explore all available options, use the `-h` flag for detailed explanations
 of the supported flags and their usage.
 
-!!! Info
+:::info
     You can also increase the verbosity of the log by adding more `-v` options.
+:::
 
 ### Destroy
 
@@ -905,9 +972,10 @@ This feature is known as **cluster hibernation**.
 Hibernation is managed declaratively using the `cnpg.io/hibernation`
 annotation.
 
-!!! Info
+:::info
     For more details, see the ["Declarative Hibernation"](declarative_hibernation.md)
     documentation page.
+:::
 
 To simplify the process, the `cnpg` plugin for `kubectl` provides a `hibernate`
 command, which acts as a convenient shortcut for applying the annotation.
@@ -993,7 +1061,7 @@ to request an online/hot backup or an offline/cold one: additionally, you can
 also tune online backups by explicitly setting the `--immediate-checkpoint` and
 `--wait-for-archive` options.
 
-The ["Backup" section](./backup.md#backup) contains more information about
+The ["Backup" section](./backup.md) contains more information about
 the configuration settings.
 
 ### Launching psql
@@ -1002,14 +1070,15 @@ The `kubectl cnpg psql CLUSTER` command starts a new PostgreSQL interactive fron
 process (psql) connected to an existing Postgres cluster, as if you were running
 it from the actual pod. This means that you will be using the `postgres` user.
 
-!!! Important
+:::info[Important]
     As you will be connecting as `postgres` user, in production environments this
     method should be used with extreme care, by authorized personnel only.
+:::
 
 ```console
 $ kubectl cnpg psql cluster-example
 
-psql (18.0 (Debian 18.0-1.pgdg110+1))
+psql (18.1 (Debian 18.1-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -1021,7 +1090,7 @@ select to work against a replica by using the `--replica` option:
 ```console
 $ kubectl cnpg psql --replica cluster-example
 
-psql (18.0 (Debian 18.0-1.pgdg110+1))
+psql (18.1 (Debian 18.1-1.pgdg110+1))
 
 Type "help" for help.
 
@@ -1039,10 +1108,11 @@ reachable in your `PATH` variable to correctly work.
 
 ### Snapshotting a Postgres cluster
 
-!!! Warning
+:::warning
     The `kubectl cnpg snapshot` command has been removed.
     Please use the [`backup` command](#requesting-a-new-physical-backup) to request
     backups using volume snapshots.
+:::
 
 ### Using pgAdmin4 for evaluation/demonstration purposes only
 
@@ -1055,9 +1125,10 @@ Given that the pgAdmin Development Team maintains official Docker container
 images, you can install pgAdmin in your environment as a standard
 Kubernetes deployment.
 
-!!! Important
+:::info[Important]
     Deployment of pgAdmin in Kubernetes production environments is beyond the
     scope of this document and, more broadly, of the CloudNativePG project.
+:::
 
 However, **for the purposes of demonstration and evaluation**, CloudNativePG
 offers a suitable solution. The `cnpg` plugin implements the `pgadmin4`
@@ -1115,8 +1186,9 @@ executing:
 kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
 ```
 
-!!! Warning
+:::warning
     Never deploy pgAdmin in production using the plugin.
+:::
 
 ### Logical Replication Publications
 
@@ -1126,11 +1198,12 @@ Be aware that these commands are primarily intended for assisting in the
 creation of logical replication publications, particularly on remote PostgreSQL
 databases.
 
-!!! Warning
+:::warning
     It is crucial to have a solid understanding of both the capabilities and
     limitations of PostgreSQL's native logical replication system before using
     these commands.
     In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
+:::
 
 #### Creating a new publication
 
@@ -1154,9 +1227,10 @@ There are two primary use cases:
 - Without `--external-cluster`: Use this option to create a publication in the
   `LOCAL_CLUSTER` PostgreSQL `Cluster` (by default, the `app` database).
 
-!!! Warning
+:::warning
     When connecting to an external cluster, ensure that the specified user has
     sufficient permissions to execute the `CREATE PUBLICATION` command.
+:::
 
 You have several options, similar to the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
 command, to define the group of tables to replicate. Notable options include:
@@ -1204,10 +1278,11 @@ kubectl cnpg publication create source-cluster \
 which will create a publication named `app` for all the tables in the
 `source-cluster`, running the SQL commands on the source cluster.
 
-!!! Info
+:::info
     There are two sample files that have been provided for illustration and inspiration:
     [logical-source](samples/cluster-example-logical-source.yaml) and
     [logical-destination](samples/cluster-example-logical-destination.yaml).
+:::
 
 #### Dropping a publication
 
@@ -1238,11 +1313,12 @@ These commands are specifically crafted to aid in the establishment of logical
 replication subscriptions, especially when dealing with remote PostgreSQL
 databases.
 
-!!! Warning
+:::warning
     Before using these commands, it is essential to have a comprehensive
     understanding of both the capabilities and limitations of PostgreSQL's
     native logical replication system.
     In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
+:::
 
 In addition to subscription management, we provide a helpful command for
 synchronizing all sequences from the source cluster. While its applicability
@@ -1289,15 +1365,17 @@ kubectl cnpg subscription create destination-cluster \
 
 will create a subscription for `app` on the destination cluster.
 
-!!! Warning
+:::warning
     Prioritize testing subscriptions in a non-production environment to ensure
     their effectiveness and identify any potential issues before implementing them
     in a production setting.
+:::
 
-!!! Info
+:::info
     There are two sample files that have been provided for illustration and inspiration:
     [logical-source](samples/cluster-example-logical-source.yaml) and
     [logical-destination](samples/cluster-example-logical-destination.yaml).
+:::
 
 #### Dropping a subscription
 
@@ -1360,10 +1438,11 @@ kubectl cnpg subscription sync-sequences destination-cluster \
   --subscription=app
 ```
 
-!!! Warning
+:::warning
     Prioritize testing subscriptions in a non-production environment to
     guarantee their effectiveness and detect any potential issues before deploying
     them in a production setting.
+:::
 
 ## Integration with K9s
 
@@ -1397,7 +1476,7 @@ table contains the full details:
 | publication     | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
 | reload          | clusters: get,patch                                                                                                                                                                                                                                                                                                                                   |
 | report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
-| report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
+| report operator | **Required:**<br/>deployments: get<br/>**Optional (for full report):**<br/>configmaps: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/>validatingwebhookconfigurations: list[^1]<br/>**If OLM is present:**<br/>clusterserviceversions: list[^1]<br/>installplans: list[^1]<br/>subscriptions: list[^1] |
 | restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
 | status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list<br/>objectstores.barmancloud.cnpg.io: get                                                                                                                                                                                                                    |
 | subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
@@ -1489,6 +1568,7 @@ rules:
       - objectstores
 ```
 
-!!! Important
+:::info[Important]
     Keeping the verbs restricted per `resources` and per `apiGroups` helps to
     prevent inadvertently granting more than intended permissions.
+:::

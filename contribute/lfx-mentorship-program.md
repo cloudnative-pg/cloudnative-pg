@@ -20,21 +20,26 @@ to classify issues and pull requests.
 
 ## Current Mentorship Programs
 
+We are still planning our proposals for the [next LFX Mentorship Program (2026, term 3 March-May)](https://github.com/cncf/mentoring/tree/main/programs/lfx-mentorship/2026/01-Mar-May).
+
+<!--
 If you’re interested in applying for a future term, we recommend preparing in
 the areas outlined below.
 
-| Year | Term        | Project                                                                                                                              | Mentee                                   |
-| ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| 2025 | 3 (Sep–Nov) | [Chaos Testing](https://mentorship.lfx.linuxfoundation.org/project/0858ce07-0c90-47fa-a1a0-95c6762f00ff) | [Yash Agarwal](https://github.com/xploy04) |
-| 2025 | 3 (Sep–Nov) | [Rebuild documentation for multi-version support with Docusaurus](https://mentorship.lfx.linuxfoundation.org/project/86a647c1-88c7-474f-b093-6abb58197083) | [Anushka Saxena](https://www.linkedin.com/in/-anushka-saxena/) |
+| Year | Term        | Project                                                                                                                                                    | Mentee                                   |
+| ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 2026 | 1 (Mar-May) | TODO |
+-->
 
 ---
 
 ## Past Mentorship Programs
 
-| Year | Term        | Project                                                                                                                              | Mentee                                   |
-| ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| 2025 | 2 (Jun–Aug) | [Declarative Management of PostgreSQL FDWs](https://mentorship.lfx.linuxfoundation.org/project/53fa853e-b5fa-4d68-be71-f005c75aea89) | [Ying Zhu](https://github.com/EdwinaZhu) |
+| Year | Term        | Project                                                                                                                                                    | Mentee                                   |
+| ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 2025 | 3 (Sep–Nov) | [Chaos Testing](https://mentorship.lfx.linuxfoundation.org/project/0858ce07-0c90-47fa-a1a0-95c6762f00ff)                                                   | [Yash Agarwal](https://github.com/xploy04) |
+| 2025 | 3 (Sep–Nov) | [Rebuild documentation for multi-version support with Docusaurus](https://mentorship.lfx.linuxfoundation.org/project/86a647c1-88c7-474f-b093-6abb58197083) | [Anushka Saxena](https://www.linkedin.com/in/-anushka-saxena/) |
+| 2025 | 2 (Jun–Aug) | [Declarative Management of PostgreSQL FDWs](https://mentorship.lfx.linuxfoundation.org/project/53fa853e-b5fa-4d68-be71-f005c75aea89)                       | [Ying Zhu](https://github.com/EdwinaZhu) |
 
 ---
 

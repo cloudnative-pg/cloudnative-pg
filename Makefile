@@ -51,29 +51,32 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
+PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
-GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
+# renovate: datasource=go depName=github.com/elastic/crd-ref-docs
+CRDREFDOCS_VERSION ?= v0.2.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.12.7
+GORELEASER_VERSION ?= v2.13.1
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.53.0
+SPELLCHECK_VERSION ?= 0.54.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.41.1
+OPERATOR_SDK_VERSION ?= v1.42.0
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.60.0
+OPM_VERSION ?= v1.61.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.14.1
+PREFLIGHT_VERSION ?= 1.15.2
 OPENSHIFT_VERSIONS ?= v4.12-v4.19
 ARCH ?= amd64
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
 export POSTGRES_IMAGE_NAME
+export PGBOUNCER_IMAGE_NAME
 export OPERATOR_MANIFEST_PATH
 # We don't need `trivialVersions=true` anymore, with `crd` it's ok for multi versions
 CRD_OPTIONS ?= "crd"
@@ -233,7 +236,8 @@ generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 		$(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG_WITH_DIGEST}" ;\
 		$(KUSTOMIZE) edit add patch --path env_override.yaml ;\
 		$(KUSTOMIZE) edit add configmap controller-manager-env \
-			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" ;\
+			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" \
+			--from-literal="PGBOUNCER_IMAGE_NAME=${PGBOUNCER_IMAGE_NAME}" ;\
 	} ;\
 	mkdir -p ${DIST_PATH} ;\
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default > ${OPERATOR_MANIFEST_PATH} ;\
@@ -297,11 +301,13 @@ licenses: go-licenses ## Generate the licenses folder.
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
-apidoc: genref ## Update the API Reference section of the documentation.
-	cd ./docs && \
-	$(GENREF) -c config.yaml \
-      -include cloudnative-pg \
-      -o src
+apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
+	$(CRDREFDOCS) --source-path api/v1 \
+		--config docs/crd-gen-refs/config.yaml \
+		--renderer markdown \
+		--max-depth 15 \
+		--templates-dir docs/crd-gen-refs/markdown \
+		--output-path docs/src/cloudnative-pg.v1.md
 
 ##@ Cleanup
 
@@ -336,9 +342,9 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-GENREF = $(LOCALBIN)/genref
-genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
-	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@$(GENREF_VERSION))
+CRDREFDOCS = $(LOCALBIN)/crd-ref-docs
+crd-ref-docs: ## Download github.com/elastic/crd-ref-docs locally if necessary.
+	$(call go-install-tool,$(CRDREFDOCS),github.com/elastic/crd-ref-docs@$(CRDREFDOCS_VERSION))
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.

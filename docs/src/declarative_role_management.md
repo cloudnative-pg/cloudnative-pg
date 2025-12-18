@@ -1,4 +1,10 @@
-# PostgreSQL Role Management
+---
+id: declarative_role_management
+sidebar_position: 230
+title: PostgreSQL Role management
+---
+
+# PostgreSQL Role management
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 From its inception, CloudNativePG has managed the creation of specific roles
@@ -40,7 +46,7 @@ spec:
 
 The role specification in `.spec.managed.roles` adheres to the
 [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
-Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-RoleConfiguration) for
+Please refer to the [API reference](cloudnative-pg.v1.md#roleconfiguration) for
 the full list of attributes you can define for each role.
 
 A few points are worth noting:
@@ -150,9 +156,10 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
   UNTIL` was not set to `NULL` in the database (this is due to PostgreSQL not
   allowing `VALID UNTIL NULL` in the `ALTER ROLE` SQL statement)
 
-!!! Warning
+:::warning
     New roles created without `passwordSecret` will have a `NULL` password
     inside PostgreSQL.
+:::
 
 ### Password hashed
 
@@ -247,8 +254,9 @@ Role      Errors
 petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
 ```
 
-!!! Important
+:::info[Important]
     In terms of backward compatibility, declarative role management is designed
     to ignore roles that exist in the database but are not included in the spec.
     The lifecycle of these roles will continue to be managed within PostgreSQL,
     allowing CloudNativePG users to adopt this feature at their convenience.
+:::

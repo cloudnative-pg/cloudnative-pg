@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
@@ -118,7 +119,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		if apierrs.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, reconcile.TerminalError(err)
 		}
 		return ctrl.Result{}, err
 	}
@@ -243,7 +244,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 			cluster.Status.TargetPrimary)
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
@@ -254,14 +255,14 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
 	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
 		if err := r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup)); err != nil {
@@ -282,7 +283,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
 			fmt.Errorf("encountered an error while taking the backup: %w", err))
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 	return nil, nil
 }
@@ -336,8 +337,9 @@ func (r *BackupReconciler) checkPrerequisites(
 	flagMissingPrerequisite := func(message string, reason string) (*ctrl.Result, error) {
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", reason, message)
-		err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, errors.New(message))
-		return &ctrl.Result{}, err
+		err := errors.New(message)
+		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster, err)
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	if hibernation := cluster.Annotations[utils.HibernationAnnotationName]; hibernation ==
@@ -402,6 +404,12 @@ func (r *BackupReconciler) getCluster(
 	if apierrs.IsNotFound(err) {
 		r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 			"Unknown cluster %v, will retry in 30 seconds", clusterName)
+		origBackup := backup.DeepCopy()
+		backup.Status.SetAsPending()
+		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
+			contextLogger.Error(patchErr, "while setting backup as pending")
+			return nil, patchErr
+		}
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -416,7 +424,7 @@ func (r *BackupReconciler) getCluster(
 	r.Recorder.Eventf(backup, "Warning", "FindingCluster",
 		"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 
-	return &ctrl.Result{}, nil
+	return &ctrl.Result{}, reconcile.TerminalError(err)
 }
 
 func (r *BackupReconciler) isValidBackupRunning(
@@ -522,7 +530,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		)
 		// TODO: shouldn't this be a failed backup?
 		origBackup := backup.DeepCopy()
-		backup.Status.Phase = apiv1.BackupPhasePending
+		backup.Status.SetAsPending()
 		if err := r.Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
@@ -536,7 +544,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		}
 		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{}, reconcile.TerminalError(err)
 	}
 
 	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPodName", targetPod.Name))
@@ -949,6 +957,12 @@ func (r *BackupReconciler) waitIfOtherBackupsRunning(
 			"A backup is already in progress or waiting to be started, retrying",
 			"targetBackup", backup.Name,
 		)
+		origBackup := backup.DeepCopy()
+		backup.Status.SetAsPending()
+		if patchErr := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); patchErr != nil {
+			contextLogger.Error(patchErr, "while setting backup as pending")
+			return ctrl.Result{}, patchErr
+		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 

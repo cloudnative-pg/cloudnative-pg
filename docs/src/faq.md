@@ -1,3 +1,9 @@
+---
+id: faq
+sidebar_position: 540
+title: Frequently Asked Questions (FAQ)
+---
+
 # Frequently Asked Questions (FAQ)
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -153,11 +159,12 @@ publication on GitHub:
 
 Feel free to report any relevant missing entry as a PR.
 
-!!! Info
+:::info
     The [Data on Kubernetes Community](https://dok.community)
     (which includes some of our maintainers) is working on an independent and
     vendor neutral project to list the operators called
     [Operator Feature Matrix](https://github.com/dokc/operator-feature-matrix).
+:::
 
 **You say that CloudNativePG is a fully declarative operator.
 What do you mean by that?**
@@ -452,7 +459,7 @@ single cluster, namely:
 - storage: use dedicated storage for each worker node running Postgres
 
 Use at least one standby, preferably at least two, so that you can configure
-synchronous replication in the cluster, introducing [RPO](before_you_start.md#rpo)=0
+synchronous replication in the cluster, introducing [RPO](before_you_start.md#postgresql-terminology)=0
 for high availability.
 
 If you do not have availability zones - normally the case of on-premise

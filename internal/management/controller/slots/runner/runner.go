@@ -72,13 +72,18 @@ func (sr *Replicator) Start(ctx context.Context) error {
 			case <-ticker.C:
 			}
 
-			// If replication is disabled stop the timer,
-			// the process will resume through the wakeUp channel if necessary
+			// If replication is disabled, stop the timer and perform cleanup
 			if config == nil || !config.GetEnabled() {
 				ticker.Stop()
-				// we set updateInterval to 0 to make sure the Ticker will be reset
+				// We set updateInterval to 0 to make sure the Ticker will be reset
 				// if the feature is enabled again
 				updateInterval = 0
+				// Perform cleanup before continuing
+				if config != nil {
+					if err := sr.reconcile(ctx, config); err != nil {
+						contextLog.Warning("cleanup during reconcile when features are disabled", "err", err)
+					}
+				}
 				continue
 			}
 

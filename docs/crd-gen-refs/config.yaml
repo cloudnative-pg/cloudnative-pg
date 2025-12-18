@@ -1,0 +1,50 @@
+processor:
+  ignoreGroupVersions:
+    - "GVK"
+  customMarkers:
+    - name: "optional"
+      target: field
+  ignoreFields:
+#    - "status$"
+    - "TypeMeta$"
+  ignoreTypes:
+    - "BackupList$"
+    - "ClusterImageCatalogList$"
+    - "ClusterList$"
+    - "DatabaseList$"
+    - "FailoverQuorumList$"
+    - "ImageCatalogList$"
+    - "PoolerList$"
+    - "PublicationList$"
+    - "ScheduledBackupList$"
+    - "SubscriptionList$"
+
+render:
+  # Version of Kubernetes to use when generating links to Kubernetes API documentation.
+  # renovate: datasource=git-refs depName=kubernetes/kubernetes lookupName=https://github.com/kubernetes/kubernetes
+  kubernetesVersion: 1.34
+  knownTypes:
+  - name: BarmanObjectStoreConfiguration
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration
+  - name: GoogleCredentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#GoogleCredentials
+  - name: S3Credentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#S3Credentials
+  - name: AzureCredentials
+    package: github.com/cloudnative-pg/barman-cloud/pkg/api
+    link: https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#AzureCredentials
+  - name: LocalObjectReference
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference
+  - name: SecretKeySelector
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#SecretKeySelector
+  - name: ConfigMapKeySelector
+    package: github.com/cloudnative-pg/cloudnative-pg/api/v1
+    link: https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#ConfigMapKeySelector
+  - name: RelabelConfig
+    package: github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
+    link: https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig

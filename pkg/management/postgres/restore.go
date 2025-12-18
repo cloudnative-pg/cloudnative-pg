@@ -186,6 +186,14 @@ func (info InitInfo) concludeRestore(
 	if _, err := info.GetInstance(cluster).migratePostgresAutoConfFile(ctx); err != nil {
 		return err
 	}
+
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path is empty
+	if err := fileutils.CreateEmptyFile(filePath); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
+	}
+
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
@@ -964,7 +972,18 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (info InitInfo) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(info.ClusterName+"-rw", info.PodName)
+	result := buildPrimaryConnInfo(info.ClusterName+"-rw", info.PodName) + " dbname=postgres"
+
+	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+	if len(standbyTCPUserTimeout) == 0 {
+		// Default to 5000ms (5 seconds) if not explicitly set
+		standbyTCPUserTimeout = "5000"
+	}
+
+	result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
+		strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
+
+	return result
 }
 
 func (info *InitInfo) checkBackupDestination(

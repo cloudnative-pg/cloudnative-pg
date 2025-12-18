@@ -1,3 +1,9 @@
+---
+id: cnpg_i
+sidebar_position: 480
+title: CNPG-I
+---
+
 # CNPG-I
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -84,9 +90,10 @@ Running a plugin as its own Deployment decouples its lifecycle from the
 operator’s and allows independent scaling. In this setup, the plugin exposes a
 TCP gRPC endpoint behind a Service, with **mTLS** for secure communication.
 
-!!! Warning
+:::warning
     CloudNativePG does **not** discover plugins dynamically. If you deploy a new
     plugin, you must **restart the operator** to detect it.
+:::
 
 Example Deployment:
 
@@ -158,9 +165,36 @@ spec:
     [...]
 ```
 
-!!! Note
+:::note
     You can provide your own certificate bundles, but the recommended method is
     to use [Cert-manager](https://cert-manager.io).
+:::
+
+#### Customizing the Certificate DNS Name
+
+By default, CloudNativePG uses the Service name as the server name for TLS
+verification when connecting to the plugin. If your environment requires the
+certificate to have a different DNS name (e.g., `barman-cloud.svc`), you can
+customize it using the `cnpg.io/pluginServerName` annotation:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cnpg.io/pluginClientSecret: cnpg-i-plugin-example-client-tls
+    cnpg.io/pluginServerSecret: cnpg-i-plugin-example-server-tls
+    cnpg.io/pluginPort: "9090"
+    cnpg.io/pluginServerName: barman-cloud.svc
+  name: barman-cloud
+  namespace: postgresql-operator-system
+spec:
+    [...]
+```
+
+This allows the operator to verify the plugin's certificate against the
+specified DNS name instead of the default Service name. The server certificate
+must include this DNS name in its Subject Alternative Names (SAN).
 
 ## Using a plugin
 

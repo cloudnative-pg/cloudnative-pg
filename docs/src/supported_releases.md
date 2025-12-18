@@ -1,3 +1,9 @@
+---
+id: supported_releases
+sidebar_position: 560
+title: Supported releases
+---
+
 # Supported releases
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -83,12 +89,9 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.27.x          | Yes                  | 12 Aug 2025  | ~  Feb 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 17                     |
-| 1.26.x          | Yes                  | May 23, 2025 | 12 Nov 2025     | 1.30, 1.31, 1.32, 1.33        | 1.29                      | 13 - 17                     |
-| 1.25.x          | Yes                  | Dec 23, 2024 | 22 Aug 2025     | 1.29, 1.30, 1.31, 1.32        | 1.33                      | 13 - 17                     |
-| main            | No, development only |              |                 |                               |                           | 13 - 17                     |
-
-<sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._
+| 1.28.x          | Yes                  |  9 Dec 2025  | ~  Jun 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
+| 1.27.x          | Yes                  | 12 Aug 2025  |  9 Mar 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 18                     |
+| main            | No, development only |              |                 |                               |                           | 13 - 18                     |
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -111,8 +114,9 @@ version of CloudNativePG was released.
 See the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
 page for more information about supported versions.
 
-!!! Info
-    Starting from November 14, 2024, [Postgres 12 is no longer supported](https://www.postgresql.org/about/news/postgresql-164-158-1413-1316-1220-and-17-beta-3-released-2910/).
+:::info
+    Starting from November 13, 2025, [Postgres 13 is no longer supported](https://www.postgresql.org/about/news/postgresql-181-177-1611-1515-1420-and-1323-released-3171/).
+:::
 
 We also recommend that you regularly update your PostgreSQL operand images and
 use the latest minor release for the major version you have in use, as not upgrading
@@ -123,25 +127,29 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.28.0  | ~ Nov, 2025  | ~ May, 2026 |
-| 1.29.0  | ~ Feb, 2026  | ~ Aug, 2026 |
-| 1.30.0  | ~ May, 2026  | ~ Nov, 2026 |
+| 1.29.0  | ~ Mar, 2026  | ~ Sep, 2026 |
+| 1.30.0  | ~ Jun, 2026  | ~ Dec, 2026 |
+| 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
 
-!!! Note
+:::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
     release candidate version is built and distributed for testing, as described
     earlier.
+:::
 
-!!! Important
+:::info[Important]
     Dates in the future are uncertain and might change. This applies to Kubernetes versions, too.
     Updates and changes on the release schedule will be communicated in the
     [Release updates](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/release-updates)
     discussion in the main GitHub repository.
+:::
 
 ## Old releases
 
 | Version         | Release date      | End of life         | Compatible Kubernetes versions |
 |-----------------|-------------------|---------------------|--------------------------------|
+| 1.26.x          | May 23, 2025      | 12 Nov 2025         | 1.30, 1.31, 1.32, 1.33         |
+| 1.25.x          | Dec 23, 2024      | 22 Aug 2025         | 1.29, 1.30, 1.31, 1.32         |
 | 1.24.x          | Aug 22, 2024      | May 23, 2025        | 1.28, 1.29, 1.30, 1.31         |
 | 1.23.x          | April 24, 2024    | November 24, 2024   | 1.27, 1.28, 1.29               |
 | 1.22.x          | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28               |

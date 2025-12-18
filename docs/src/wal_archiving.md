@@ -1,3 +1,9 @@
+---
+id: wal_archiving
+sidebar_position: 190
+title: WAL archiving
+---
+
 # WAL archiving
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -10,7 +16,7 @@ strategies.
 ## Plugin-Based Architecture
 
 CloudNativePG supports WAL archiving through a **plugin-based mechanism**,
-defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec)
+defined via the [`spec.pluginConfiguration`](cloudnative-pg.v1.md#clusterspec)
 section of the `Cluster` resource.
 
 Only **one plugin at a time** can be responsible for WAL archiving. This is
@@ -30,9 +36,10 @@ CloudNativePG still supports WAL archiving natively through the
 `.spec.backup.barmanObjectStore` field. While still functional, **this
 interface is deprecated** and will be removed in a future release.
 
-!!! Important
+:::info[Important]
     All new deployments are strongly encouraged to adopt the plugin-based
     architecture, which offers a more flexible and maintainable approach.
+:::
 
 If you are currently using the native `.spec.backup.barmanObjectStore`
 approach, refer to the official guide for a smooth transition:
@@ -43,7 +50,7 @@ approach, refer to the official guide for a smooth transition:
 By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
 that WAL files, even in case of low workloads, are closed and archived
 at least every 5 minutes, providing a deterministic time-based value for
-your Recovery Point Objective ([RPO](before_you_start.md#rpo)).
+your Recovery Point Objective ([RPO](before_you_start.md#postgresql-terminology)).
 
 Even though you change the value of the
 [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),

@@ -1,3 +1,9 @@
+---
+id: index
+sidebar_position: 10
+title: CloudNativePG
+---
+
 # CloudNativePG
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -35,10 +41,11 @@ CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
 released open source under Apache License 2.0.
 The [source code repository is in GitHub](https://github.com/cloudnative-pg/cloudnative-pg).
 
-!!! Note
+:::note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     users can expect a "Level V - Auto Pilot" subset of capabilities from the
     CloudNativePG Operator.
+:::
 
 ## Supported Kubernetes distributions
 
@@ -85,13 +92,14 @@ Three image flavors are available, each extending the previous one:
 - [`standard`](https://github.com/cloudnative-pg/postgres-containers#standard-images)
 - [`system`](https://github.com/cloudnative-pg/postgres-containers#system-images) *(deprecated)*
 
-!!! Important
+:::info[Important]
     The `system` images are deprecated and will be removed once in-core
     Barman Cloud support is phased out. They remain usable for now, but you may
     want to plan a future migration to `minimal` or `standard` images with the
     Barman Cloud plugin, or another supported backup solution.
+:::
 
-By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.0-system-trixie`.
+By default, this version of CloudNativePG deploys `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`.
 
 All images are signed and shipped with SBOM and provenance attestations.
 Weekly automated builds ensure that critical vulnerabilities (CVEs) are promptly fixed.
@@ -103,7 +111,9 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Direct integration with the Kubernetes API server for High Availability,
   eliminating the need for external tools.
 - Self-healing capabilities, including:
-    - Automated failover by promoting the most aligned replica.
+    - Automated failover, promoting the replica with the most up-to-date data,
+      with the option to use quorum-based failover and synchronous replication
+      for increased data durability and safety.
     - Automatic recreation of failed replicas.
 - Planned switchover of the primary instance by promoting a selected replica.
 - Declarative management of key PostgreSQL configurations, including:
@@ -173,10 +183,11 @@ For details and support, see the [`postgres-containers` project](https://github.
 - Multi-arch container images, including Software Bill of Materials (SBOM) and
   provenance attestations for security compliance.
 
-!!! Info
+:::info
     CloudNativePG does not use `StatefulSet`s for managing data persistence.
     Instead, it directly manages Persistent Volume Claims (PVCs).
     See ["Custom Pod Controller"](controller.md) for more details.
+:::
 
 ## About this guide
 

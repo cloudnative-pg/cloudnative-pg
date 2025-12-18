@@ -1,3 +1,9 @@
+---
+id: operator_capability_levels
+sidebar_position: 490
+title: Operator capability levels
+---
+
 # Operator capability levels
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
@@ -8,10 +14,11 @@ framework.
 
 ![Operator Capability Levels](./images/operator-capability-level.png)
 
-!!! Important
+:::info[Important]
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     you can expect a "Level V - Auto Pilot" set of capabilities from the
     CloudNativePG operator.
+:::
 
 Each capability level is associated with a certain set of management features the operator offers:
 
@@ -21,8 +28,9 @@ Each capability level is associated with a certain set of management features th
 4. Deep insights
 5. Auto pilot
 
-!!! Note
+:::note
     We consider this framework as a guide for future work and implementations in the operator.
+:::
 
 ## Level 1: Basic install
 
@@ -31,8 +39,9 @@ operator. This category includes usability and user experience
 enhancements, such as improvements in how you interact with the
 operator and a PostgreSQL cluster configuration.
 
-!!! Important
+:::info[Important]
     We consider information security part of this level.
+:::
 
 ### Operator deployment via declarative configuration
 
@@ -239,9 +248,10 @@ The operator enables you to apply changes to the `Cluster` resource YAML
 section of the PostgreSQL configuration. Depending on the configuration option,
 it also makes sure that all instances are properly reloaded or restarted.
 
-!!! Note Current limitation
+:::note
     Changes with `ALTER SYSTEM` aren't detected, meaning
     that the cluster state isn't enforced.
+:::
 
 ### Import of existing PostgreSQL databases
 
@@ -348,7 +358,7 @@ continuity and scalability.
 
 *Disaster recovery* is a business continuity component that requires
 that both backup and recovery of a database work correctly. While as a
-starting point, the goal is to achieve [RPO](before_you_start.md#rpo) < 5
+starting point, the goal is to achieve [RPO](before_you_start.md#postgresql-terminology) < 5
 minutes, the long-term goal is to implement RPO=0 backup solutions. *High
 availability* is the other important component of business continuity. Through
 PostgreSQL native physical replication and hot standby replicas, it allows the
@@ -415,7 +425,7 @@ Both volume snapshots and CNPG-I-based backups support:
 ### Backups from a standby
 
 The operator supports offloading base backups onto a standby without impacting
-the [RPO](before_you_start.md#rpo) of the database. This allows resources to
+the [RPO](before_you_start.md#postgresql-terminology) of the database. This allows resources to
 be preserved on the primary, in particular I/O, for standard database
 operations.
 
@@ -442,11 +452,15 @@ one and supports all the options available in
 
 ### Zero-Data-Loss Clusters Through Synchronous Replication
 
-Achieve *zero data loss* (RPO=0) in your local high-availability CloudNativePG
-cluster with support for both quorum-based and priority-based synchronous
-replication. The operator offers a flexible way to define the number of
-expected synchronous standby replicas available at any time, and allows
-customization of the `synchronous_standby_names` option as needed.
+CloudNativePG enables *zero-data-loss (RPO=0)* high-availability clusters by
+combining synchronous replication with optional [failover quorum](failover.md#failover-quorum-quorum-based-failover):
+you can define how many synchronous standby replicas must be available at any
+given time, ensuring that failover only proceeds when data is safely
+replicated.
+Both quorum-based and priority-based synchronous replication are supported, and
+the operator provides full flexibility in configuring the
+`synchronous_standby_names` setting to match your durability and performance
+requirements.
 
 ### Replica clusters
 
@@ -472,7 +486,7 @@ switchover across data centers remains necessary.)
 
 Additionally, the flexibility extends to creating delayed replica clusters
 intentionally lagging behind the primary cluster. This intentional lag aims to
-minimize the Recovery Time Objective ([RTO](before_you_start.md#rto)) in the
+minimize the Recovery Time Objective ([RTO](before_you_start.md#postgresql-terminology)) in the
 event of unintended errors, such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Distributed Database Topologies

@@ -1,11 +1,18 @@
+---
+id: failure_modes
+sidebar_position: 140
+title: Failure Modes
+---
+
 # Failure Modes
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-!!! Note
+:::note
     In previous versions of CloudNativePG, this page included specific failure
     scenarios. Since these largely follow standard Kubernetes behavior, we have
     streamlined the content to avoid duplication of information that belongs to the
     underlying Kubernetes stack and is not specific to CloudNativePG.
+:::
 
 CloudNativePG adheres to standard Kubernetes principles for self-healing and
 high availability. We assume familiarity with core Kubernetes concepts such as
@@ -14,9 +21,10 @@ refer to the ["Postgres Instance Manager" section](instance_manager.md), which
 covers startup, liveness, and readiness probes, as well as the
 [self-healing](#self-healing) section below.
 
-!!! Important
+:::info[Important]
     If you are running CloudNativePG in production, we strongly recommend
     seeking [professional support](https://cloudnative-pg.io/support/).
+:::
 
 ## Self-Healing
 
@@ -46,8 +54,9 @@ If a standby Pod fails:
 For failure scenarios not covered by automated recovery, manual intervention
 may be required.
 
-!!! Important
+:::info[Important]
     Do not perform manual operations without [professional support](https://cloudnative-pg.io/support/).
+:::
 
 ### Disabling Reconciliation
 
@@ -66,7 +75,8 @@ spec:
 Use this annotation **with extreme caution** and only during emergency
 operations.
 
-!!! Warning
+:::warning
     This annotation should be removed as soon as the issue is resolved. Leaving
     it in place prevents the operator from executing self-healing actions,
     including failover.
+:::

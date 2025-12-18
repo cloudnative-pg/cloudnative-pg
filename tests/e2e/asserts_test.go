@@ -2123,13 +2123,22 @@ func assertReadWriteConnectionUsingPgBouncerService(
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Get the database name from the cluster configuration
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+
+	dbName := cluster.GetApplicationDatabaseName()
+	if dbName == "" {
+		dbName = apiv1.DefaultApplicationDatabaseName
+	}
+
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
 	if isPoolerRW {
-		AssertWritesToPrimarySucceeds(namespace, poolerService, "app", appUser,
+		AssertWritesToPrimarySucceeds(namespace, poolerService, dbName, appUser,
 			generatedAppUserPassword, connectionParams...)
 	} else {
-		AssertWritesToReplicaFails(namespace, poolerService, "app", appUser,
+		AssertWritesToReplicaFails(namespace, poolerService, dbName, appUser,
 			generatedAppUserPassword, connectionParams...)
 	}
 }
@@ -2494,7 +2503,6 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(
 			"cnpg_backends_waiting_total",
 			"cnpg_pg_postmaster_start_time",
 			"cnpg_pg_replication",
-			"cnpg_pg_stat_archiver",
 			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
 		}
@@ -2643,6 +2651,7 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 		envVars := buildTemplateEnvs(map[string]string{
 			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
 			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
+			"PG_MAJOR":                   strconv.FormatUint(env.PostgresVersion, 10),
 		})
 
 		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {

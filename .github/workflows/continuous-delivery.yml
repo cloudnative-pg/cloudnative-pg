@@ -21,9 +21,10 @@ on:
       feature_type:
         description: >
           Feature Type (backup-restore, basic, cluster-metadata, declarative-databases, disruptive,
-          importing-databases, maintenance, no-openshift, observability, operator, performance, plugin,
-          pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription, recovery,
-          replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces, upgrade)
+          image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
+          performance, plugin, pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription,
+          recovery, replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces,
+          upgrade)
         required: false
       log_level:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'
@@ -37,12 +38,12 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.3"
+  GOLANG_VERSION: "1.25.5"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.30.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.18.6"
+  ROOK_VERSION: "v1.18.7"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.4.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -78,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.26, release-1.27]
+        branch: [release-1.25, release-1.27, release-1.28]
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1
@@ -280,14 +281,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -362,7 +363,7 @@ jobs:
           VERSION: ${{ env.VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
@@ -377,7 +378,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@3acf805d94d93a86cce4ca44798a76464a75b88c # v6
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
         id: bake-push
         env:
           environment: "testing"
@@ -493,7 +494,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -576,7 +577,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -654,12 +655,12 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -673,7 +674,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Install Kind
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
@@ -881,12 +882,12 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -906,7 +907,8 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.3
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -979,6 +981,7 @@ jobs:
           max_attempts: 1
           command: |
             STORAGECLASSNAME=default
+            # renovate: datasource=github-releases depName=mikefarah/yq
             go install github.com/mikefarah/yq/v4@v4
             ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/deploy/examples
             kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
@@ -1229,12 +1232,12 @@ jobs:
           echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -1262,10 +1265,11 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.3
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1327,9 +1331,9 @@ jobs:
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.17.0"
+          VELERO_VERSION: "v1.17.1"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.13.0"
+          VELERO_AWS_PLUGIN_VERSION: "v1.13.1"
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1537,7 +1541,7 @@ jobs:
           if [ -n "${CLOUDFORMATION_STATUS_CURRENT}" ] ; then
             echo "::warning file=continuous-delivery.yml::eksctl failed deleting a cluster cleanly"
             # When the status of CloudFormation stack managed by eksctl reports an error, try to delete resources directly with AWS CLI
-            pip install boto3
+            pip install -r .github/workflow-requirements.txt
             for vpc_id in $(aws ec2 describe-vpcs | jq -r '.Vpcs[] | select(.Tags?[]? | .Key == "Name" and (.Value | contains("'"${STACK_NAME}"'"))).VpcId'); do
               python .github/vpc_destroy.py --vpc_id "${vpc_id}" --region "${REGION_NAME}" --services ec2
             done
@@ -1616,12 +1620,12 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -1649,7 +1653,8 @@ jobs:
           timeout_seconds: 120
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
+            # renovate: datasource=github-releases depName=onsi/ginkgo
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.3
       -
         name: Set cluster name
         run: |
@@ -1942,19 +1947,19 @@ jobs:
           echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-ocp-${{ github.run_number}}-$( echo ${{ matrix.k8s_version }} | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: ${{ env.PLATFORMS }}
       -
@@ -2174,7 +2179,7 @@ jobs:
 
       - name: Compute the E2E test summary
         id: generate-summary
-        uses: cloudnative-pg/ciclops@f5a7b357a09f09052ec0358ac49e020f151f1653 # v1.3.1
+        uses: cloudnative-pg/ciclops@fc1c72c2eb99e10aa437f14cd8563686b4b6e3b1 # v1.3.2
         with:
           artifact_directory: test-artifacts/data
 

@@ -1,0 +1,60 @@
+header:
+  schema-version: 2.1.0
+  last-updated: '2025-11-17'
+  last-reviewed: '2025-11-17'
+  url: https://github.com/cloudnative-pg/cloudnative-pg
+
+project:
+  name: CloudNativePG
+  administrators:
+    - name: Gabriele Bartolini
+      primary: true
+    - name: Francesco Canovai
+      primary: false
+    - name: Leonardo Cecchi
+      primary: false
+    - name: Jonathan Gonzalez V.
+      primary: false
+    - name: Marco Nenciarini
+      primary: false
+    - name: Armando Ruocco
+      primary: false
+    - name: Philippe Scorsolini
+      primary: false
+  repositories:
+    - name: CloudNativePG
+      url: https://github.com/cloudnative-pg/cloudnative-pg
+      comment: |
+        Main repository for the CloudNativePG project
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+
+repository:
+  url: https://github.com/cloudnative-pg/cloudnative-pg
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: false
+  core-team:
+    - name: Gabriele Bartolini
+      primary: true
+    - name: Francesco Canovai
+      primary: false
+    - name: Leonardo Cecchi
+      primary: false
+    - name: Jonathan Gonzalez V.
+      primary: false
+    - name: Marco Nenciarini
+      primary: false
+    - name: Armando Ruocco
+      primary: false
+    - name: Philippe Scorsolini
+      primary: false
+  license:
+    url: http://www.apache.org/licenses/LICENSE-2.0
+    expression: Apache-2.0
+  security:
+    assessments:
+      self:
+        comment: |
+          Self assessment has not yet been completed.

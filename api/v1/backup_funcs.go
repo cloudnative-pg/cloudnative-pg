@@ -36,6 +36,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// SetAsPending marks a certain backup as pending
+func (backupStatus *BackupStatus) SetAsPending() {
+	backupStatus.Phase = BackupPhasePending
+}
+
 // SetAsFailed marks a certain backup as invalid
 func (backupStatus *BackupStatus) SetAsFailed(
 	err error,

@@ -54,6 +54,8 @@ func (r *PoolerReconciler) updatePoolerStatus(
 			Name:    resources.ServerCASecret.Name,
 			Version: resources.ServerCASecret.ResourceVersion,
 		}
+	} else {
+		updatedStatus.Secrets.ServerCA = apiv1.SecretVersion{}
 	}
 
 	if resources.ClientCASecret != nil {
@@ -61,6 +63,8 @@ func (r *PoolerReconciler) updatePoolerStatus(
 			Name:    resources.ClientCASecret.Name,
 			Version: resources.ClientCASecret.ResourceVersion,
 		}
+	} else {
+		updatedStatus.Secrets.ClientCA = apiv1.SecretVersion{}
 	}
 
 	if resources.ClientTLSSecret != nil {
@@ -68,6 +72,8 @@ func (r *PoolerReconciler) updatePoolerStatus(
 			Name:    resources.ClientTLSSecret.Name,
 			Version: resources.ClientTLSSecret.ResourceVersion,
 		}
+	} else {
+		updatedStatus.Secrets.ClientTLS = apiv1.SecretVersion{}
 	}
 
 	if resources.ServerTLSSecret != nil {
@@ -75,6 +81,11 @@ func (r *PoolerReconciler) updatePoolerStatus(
 			Name:    resources.ServerTLSSecret.Name,
 			Version: resources.ServerTLSSecret.ResourceVersion,
 		}
+	} else {
+		// Clear ServerTLS when not using manual TLS authentication.
+		// This is particularly important for migration from v1.27, where
+		// ServerTLS was always set to the cluster's server certificate.
+		updatedStatus.Secrets.ServerTLS = apiv1.SecretVersion{}
 	}
 
 	if resources.Deployment != nil {
