@@ -21,10 +21,10 @@ Package v1 contains API Schema definitions for the postgresql v1 API group
 - [Database](#database)
 - [FailoverQuorum](#failoverquorum)
 - [ImageCatalog](#imagecatalog)
-- [PGRole](#pgrole)
-- [PGRoleList](#pgrolelist)
 - [Pooler](#pooler)
 - [Publication](#publication)
+- [Role](#role)
+- [RoleList](#rolelist)
 - [ScheduledBackup](#scheduledbackup)
 - [Subscription](#subscription)
 
@@ -1607,45 +1607,6 @@ _Appears in:_
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an option should be present or absent in<br />the database. If set to `present`, the option will be<br />created if it does not exist. If set to `absent`, the<br />option will be removed if it exists. |  | present | Enum: [present absent] <br /> |
 
 
-#### PGRole
-
-
-
-PGRole is the Schema for the databases API
-
-
-
-_Appears in:_
-
-- [PGRoleList](#pgrolelist)
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `PGRole` | True | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `spec` _[RoleSpec](#rolespec)_ |  | True |  |  |
-| `status` _[RoleState](#rolestate)_ |  | True |  |  |
-
-
-#### PGRoleList
-
-
-
-PGRoleList contains a list of Roles
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `PGRoleList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[PGRole](#pgrole) array_ |  | True |  |  |
-
-
 #### PasswordState
 
 
@@ -2438,6 +2399,27 @@ _Appears in:_
 | `synchronizeLogicalDecoding` _boolean_ | When enabled, the operator automatically manages synchronization of logical<br />decoding (replication) slots across high-availability clusters.<br />Requires one of the following conditions:<br />- PostgreSQL version 17 or later<br />- PostgreSQL version < 17 with pg_failover_slots extension enabled |  |  |  |
 
 
+#### Role
+
+
+
+Role is the Schema for the databases API
+
+
+
+_Appears in:_
+
+- [RoleList](#rolelist)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `Role` | True | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `spec` _[RoleSpec](#rolespec)_ |  | True |  |  |
+| `status` _[RoleState](#rolestate)_ |  | True |  |  |
+
+
 #### RoleConfiguration
 
 
@@ -2474,6 +2456,24 @@ _Appears in:_
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
 
 
+#### RoleList
+
+
+
+RoleList contains a list of Roles
+
+
+
+
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `RoleList` | True | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `items` _[Role](#role) array_ |  | True |  |  |
+
+
 #### RoleReclaimPolicy
 
 _Underlying type:_ _string_
@@ -2488,8 +2488,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `delete` | RoleReclaimDelete means the PGRole will be deleted from Kubernetes on release<br />from its claim.<br /> |
-| `retain` | RoleReclaimRetain means the PGRole will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
+| `delete` | RoleReclaimDelete means the Role will be deleted from Kubernetes on release<br />from its claim.<br /> |
+| `retain` | RoleReclaimRetain means the Role will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
 
 
 #### RoleSpec
@@ -2502,7 +2502,7 @@ RoleSpec represents a role in Postgres
 
 _Appears in:_
 
-- [PGRole](#pgrole)
+- [Role](#role)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2529,13 +2529,13 @@ _Appears in:_
 
 
 
-RoleState defines the observed state of a PGRole
+RoleState defines the observed state of a Role
 
 
 
 _Appears in:_
 
-- [PGRole](#pgrole)
+- [Role](#role)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |

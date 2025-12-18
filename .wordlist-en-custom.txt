@@ -1,3 +1,4 @@
+
 AES
 API's
 APIGroup
@@ -324,7 +325,6 @@ PGDATA
 PGDG
 PGData
 PGDataImageInfo
-PGRole
 PGSQL
 PKI
 PODNAME
@@ -434,6 +434,9 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
+RoleList
+RoleReclaimDelete
+RoleReclaimRetain
 RoleSpec
 RoleState
 RoleStatus
@@ -1370,6 +1373,10 @@ robfig
 roleReclaimPolicy
 roleRef
 roleconfiguration
+rolelist
+rolereclaimpolicy
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
