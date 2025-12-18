@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -78,7 +77,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var sa corev1.ServiceAccount
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: sharedSAName},
+					client.ObjectKey{Namespace: namespace, Name: sharedSAName},
 					&sa)
 			}, 30).Should(Succeed())
 		})
@@ -91,7 +90,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var deployment appsv1.Deployment
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					&deployment)
 			}, 300).Should(Succeed())
 		})
@@ -99,7 +98,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("verifying first pooler deployment uses the shared ServiceAccount", func() {
 			var deployment appsv1.Deployment
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+				client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 				&deployment)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(sharedSAName))
@@ -112,7 +111,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 					client.InNamespace(namespace),
 					client.MatchingLabels{utils.PgbouncerNameLabel: pooler1Name})
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(len(podList.Items)).To(BeNumerically(">", 0))
+				g.Expect(podList.Items).ToNot(BeEmpty())
 
 				for _, pod := range podList.Items {
 					g.Expect(pod.Spec.ServiceAccountName).To(Equal(sharedSAName),
@@ -124,7 +123,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("verifying no ServiceAccount was created with pooler name", func() {
 			var sa corev1.ServiceAccount
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+				client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 				&sa)
 			Expect(err).To(HaveOccurred())
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
@@ -133,7 +132,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("verifying RoleBinding references the shared ServiceAccount", func() {
 			var roleBinding rbacv1.RoleBinding
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+				client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 				&roleBinding)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -152,7 +151,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var deployment appsv1.Deployment
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler2Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler2Name},
 					&deployment)
 			}, 300).Should(Succeed())
 		})
@@ -164,7 +163,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 					client.InNamespace(namespace),
 					client.MatchingLabels{utils.PgbouncerNameLabel: pooler2Name})
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(len(podList.Items)).To(BeNumerically(">", 0))
+				g.Expect(podList.Items).ToNot(BeEmpty())
 
 				for _, pod := range podList.Items {
 					g.Expect(pod.Spec.ServiceAccountName).To(Equal(sharedSAName),
@@ -176,7 +175,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("verifying the shared ServiceAccount still exists", func() {
 			var sa corev1.ServiceAccount
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: sharedSAName},
+				client.ObjectKey{Namespace: namespace, Name: sharedSAName},
 				&sa)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sa.Name).To(Equal(sharedSAName))
@@ -199,7 +198,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				pooler := &apiv1.Pooler{}
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName},
+					client.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName},
 					pooler)
 			}, 60).Should(Succeed())
 		})
@@ -208,7 +207,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Consistently(func() bool {
 				sa := &corev1.ServiceAccount{}
 				err := env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName}, sa)
+					client.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName}, sa)
 				return apierrs.IsNotFound(err)
 			}, 30, 5).Should(BeTrue(), "ServiceAccount should not be created by operator")
 		})
@@ -230,7 +229,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Consistently(func() bool {
 				pooler := &apiv1.Pooler{}
 				err := env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName},
+					client.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName},
 					pooler)
 				if err != nil {
 					return false
@@ -265,7 +264,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var sa corev1.ServiceAccount
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: sharedSAName},
+					client.ObjectKey{Namespace: namespace, Name: sharedSAName},
 					&sa)
 			}, 30).Should(Succeed())
 		})
@@ -278,7 +277,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var deployment appsv1.Deployment
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					&deployment)
 			}, 300).Should(Succeed())
 		})
@@ -287,7 +286,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var rb rbacv1.RoleBinding
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					&rb)
 			}, 30).Should(Succeed())
 		})
@@ -295,7 +294,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("deleting the pooler", func() {
 			pooler := &apiv1.Pooler{}
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+				client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 				pooler)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -307,7 +306,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() bool {
 				pooler := &apiv1.Pooler{}
 				err := env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					pooler)
 				return apierrs.IsNotFound(err)
 			}, 60).Should(BeTrue())
@@ -317,7 +316,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() bool {
 				var rb rbacv1.RoleBinding
 				err := env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					&rb)
 				return apierrs.IsNotFound(err)
 			}, 60).Should(BeTrue())
@@ -326,7 +325,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		By("verifying shared ServiceAccount still exists (not deleted)", func() {
 			var sa corev1.ServiceAccount
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: sharedSAName},
+				client.ObjectKey{Namespace: namespace, Name: sharedSAName},
 				&sa)
 			Expect(err).ToNot(HaveOccurred(),
 				"Shared ServiceAccount should not be deleted when pooler is deleted")
@@ -351,7 +350,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var sa corev1.ServiceAccount
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: sharedSAName},
+					client.ObjectKey{Namespace: namespace, Name: sharedSAName},
 					&sa)
 			}, 30).Should(Succeed())
 		})
@@ -361,8 +360,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		})
 
 		By("creating pooler without serviceAccountName (operator-managed)", func() {
-			var instance *int32
-			instance = new(int32)
+			instance := new(int32)
 			*instance = 1
 			pooler := &apiv1.Pooler{
 				ObjectMeta: metav1.ObjectMeta{
@@ -388,7 +386,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() (string, error) {
 				var deployment appsv1.Deployment
 				err := env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: pooler1Name},
+					client.ObjectKey{Namespace: namespace, Name: pooler1Name},
 					&deployment)
 				if err != nil {
 					return "", err
@@ -401,13 +399,13 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			Eventually(func() error {
 				var sa corev1.ServiceAccount
 				return env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: poolerManagedName},
+					client.ObjectKey{Namespace: namespace, Name: poolerManagedName},
 					&sa)
 			}, 120).Should(Succeed())
 
 			var deployment appsv1.Deployment
 			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: poolerManagedName},
+				client.ObjectKey{Namespace: namespace, Name: poolerManagedName},
 				&deployment)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(poolerManagedName))
