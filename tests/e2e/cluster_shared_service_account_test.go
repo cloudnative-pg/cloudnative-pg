@@ -35,7 +35,7 @@ import (
 
 var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 	const (
-		sharedSAFile    = fixturesDir + "/shared_service_account/shared_sa.yaml"
+		sharedSAFile    = fixturesDir + "/shared_service_account/cluster_shared_sa.yaml"
 		cluster1File    = fixturesDir + "/shared_service_account/cluster_shared_sa_1.yaml"
 		cluster2File    = fixturesDir + "/shared_service_account/cluster_shared_sa_2.yaml"
 		cluster1Name    = "cluster-shared-sa-1"

@@ -76,4 +76,16 @@ var _ = Describe("Pooler GetServiceAccountName", func() {
 		}
 		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
 	})
+
+	It("returns pooler name when serviceAccountName is empty string", func() {
+		pooler := &Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "my-pooler",
+			},
+			Spec: PoolerSpec{
+				ServiceAccountName: ptr.To(""),
+			},
+		}
+		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
+	})
 })
