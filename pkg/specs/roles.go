@@ -250,7 +250,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1
 				"postgresql.cnpg.io",
 			},
 			Resources: []string{
-				"pgroles/status",
+				"roles/status",
 			},
 			Verbs: []string{
 				"get",
