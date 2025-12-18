@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -528,8 +530,9 @@ var _ = Describe("checkPrerequisites for plugin backups", func() {
 		Expect(expectErr).ToNot(HaveOccurred())
 
 		res, err := env.backupReconciler.checkPrerequisites(ctx, *backup, *cluster)
-		// We expect the reconciler to flag failure and return a non-nil result without bubbling an error
-		Expect(err).ToNot(HaveOccurred())
+		// We expect the reconciler to flag failure and return a non-nil result with a terminal error
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
 		Expect(res).ToNot(BeNil())
 
 		var stored apiv1.Backup
