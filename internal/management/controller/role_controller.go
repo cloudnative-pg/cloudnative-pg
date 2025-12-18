@@ -37,7 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// RoleReconciler reconciles a PGRole object defined by apiv1.PGRole (rather than in spec.managed)
+// RoleReconciler reconciles a Role object defined by apiv1.Role (rather than in spec.managed)
 type RoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -73,8 +73,8 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}()
 
 	// Get the role object
-	var role apiv1.PGRole
-	if err := r.Client.Get(ctx, client.ObjectKey{
+	var role apiv1.Role
+	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &role); err != nil {
@@ -188,7 +188,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
 func (r *RoleReconciler) failedReconciliation(
 	ctx context.Context,
-	role *apiv1.PGRole,
+	role *apiv1.Role,
 	err error,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -209,7 +209,7 @@ func (r *RoleReconciler) failedReconciliation(
 // succeededReconciliation marks the reconciliation as succeeded
 func (r *RoleReconciler) succeededReconciliation(
 	ctx context.Context,
-	role *apiv1.PGRole,
+	role *apiv1.Role,
 	passVersion string,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -241,7 +241,7 @@ func NewRoleReconciler(
 // SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.PGRole{}).
+		For(&apiv1.Role{}).
 		Named("instance-role-reconciler").
 		Complete(r)
 }
@@ -249,7 +249,7 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // GetCluster gets the managed cluster through the client
 func (r *RoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err := r.Client.Get(ctx,
+	err := r.Get(ctx,
 		types.NamespacedName{
 			Namespace: r.instance.GetNamespaceName(),
 			Name:      r.instance.GetClusterName(),
@@ -262,7 +262,7 @@ func (r *RoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error)
 	return &cluster, nil
 }
 
-func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.PGRole) (string, error) {
+func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.Role) (string, error) {
 	contextLogger := log.FromContext(ctx)
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
