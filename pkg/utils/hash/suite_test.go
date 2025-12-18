@@ -17,6 +17,7 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
+//nolint:revive
 package hash
 
 import (
