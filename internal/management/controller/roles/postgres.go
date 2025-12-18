@@ -384,7 +384,7 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	case !role.Password.Valid:
 		query.WriteString(" PASSWORD NULL")
 	default:
-		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.Password.String)))
+		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.Password.String))
 	}
 
 	if role.ValidUntil.Valid {

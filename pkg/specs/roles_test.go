@@ -305,7 +305,7 @@ var _ = Describe("Secrets", func() {
 })
 
 var _ = Describe("Roles", func() {
-	crdRoles := []apiv1.PGRole{
+	crdRoles := []apiv1.Role{
 		{
 			Spec: apiv1.RoleSpec{
 				Name: "role5",
@@ -376,7 +376,7 @@ var _ = Describe("Roles", func() {
 
 var _ = Describe("CRD role secret name", func() {
 	It("should be empty when password is disabled", func() {
-		role := apiv1.PGRole{
+		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
 				DisablePassword: true,
 				PasswordSecret:  &apiv1.LocalObjectReference{},
@@ -386,14 +386,14 @@ var _ = Describe("CRD role secret name", func() {
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret is nil", func() {
-		role := apiv1.PGRole{
+		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{},
 		}
 		secrets := crdRoleSecretName(role)
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret name is empty", func() {
-		role := apiv1.PGRole{
+		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
 				PasswordSecret: &apiv1.LocalObjectReference{},
 			},
@@ -402,7 +402,7 @@ var _ = Describe("CRD role secret name", func() {
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should work properly when the password secret name is set", func() {
-		role := apiv1.PGRole{
+		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
 				PasswordSecret: &apiv1.LocalObjectReference{
 					Name: "secret-name",
