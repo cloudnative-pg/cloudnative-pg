@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -528,8 +530,9 @@ var _ = Describe("checkPrerequisites for plugin backups", func() {
 		Expect(expectErr).ToNot(HaveOccurred())
 
 		res, err := env.backupReconciler.checkPrerequisites(ctx, *backup, *cluster)
-		// We expect the reconciler to flag failure and return a non-nil result without bubbling an error
-		Expect(err).ToNot(HaveOccurred())
+		// We expect the reconciler to flag failure and return a non-nil result with a terminal error
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, reconcile.TerminalError(nil))).To(BeTrue())
 		Expect(res).ToNot(BeNil())
 
 		var stored apiv1.Backup
@@ -537,5 +540,135 @@ var _ = Describe("checkPrerequisites for plugin backups", func() {
 		Expect(expectErr).ToNot(HaveOccurred())
 		Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
 		Expect(stored.Status.Method).To(BeEquivalentTo(apiv1.BackupMethodPlugin))
+	})
+})
+
+var _ = Describe("backup pending state", func() {
+	var env *testingEnvironment
+	BeforeEach(func() { env = buildTestEnvironment() })
+
+	Context("getCluster sets pending state", func() {
+		It("sets backup as pending when cluster is not found", func(ctx context.Context) {
+			ns := newFakeNamespace(env.client)
+
+			backup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-backup-pending", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: "non-existent-cluster"},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+			}
+			Expect(env.client.Create(ctx, backup)).To(Succeed())
+
+			var cluster apiv1.Cluster
+			res, err := env.backupReconciler.getCluster(ctx, backup, &cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).ToNot(BeNil())
+			Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+
+			var stored apiv1.Backup
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
+			Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhasePending))
+		})
+	})
+
+	Context("waitIfOtherBackupsRunning sets pending state", func() {
+		It("sets backup as pending when another backup is running", func(ctx context.Context) {
+			ns := newFakeNamespace(env.client)
+
+			cluster := newFakeCNPGCluster(env.client, ns, func(c *apiv1.Cluster) {
+				c.Spec.Backup = &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						BarmanCredentials: apiv1.BarmanCredentials{
+							AWS: &apiv1.S3Credentials{
+								AccessKeyIDReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "ACCESS_KEY_ID",
+								},
+								SecretAccessKeyReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "SECRET_ACCESS_KEY",
+								},
+							},
+						},
+						DestinationPath: "s3://bucket/path",
+					},
+				}
+			})
+
+			// Create a running backup
+			runningBackup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "backup-1-running", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseRunning,
+				},
+			}
+			Expect(env.client.Create(ctx, runningBackup)).To(Succeed())
+
+			// Create a backup that will be pending
+			pendingBackup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "backup-2-pending", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+			}
+			Expect(env.client.Create(ctx, pendingBackup)).To(Succeed())
+
+			res, err := env.backupReconciler.waitIfOtherBackupsRunning(ctx, pendingBackup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(10 * time.Second))
+
+			var stored apiv1.Backup
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(pendingBackup), &stored)).To(Succeed())
+			Expect(stored.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhasePending))
+		})
+
+		It("does not set pending when backup can execute", func(ctx context.Context) {
+			ns := newFakeNamespace(env.client)
+
+			cluster := newFakeCNPGCluster(env.client, ns, func(c *apiv1.Cluster) {
+				c.Spec.Backup = &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						BarmanCredentials: apiv1.BarmanCredentials{
+							AWS: &apiv1.S3Credentials{
+								AccessKeyIDReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "ACCESS_KEY_ID",
+								},
+								SecretAccessKeyReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{Name: "aws-creds"},
+									Key:                  "SECRET_ACCESS_KEY",
+								},
+							},
+						},
+						DestinationPath: "s3://bucket/path",
+					},
+				}
+			})
+
+			// Create a backup that can execute (no other backups running)
+			backup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: "backup-can-execute", Namespace: ns},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{Name: cluster.Name},
+					Method:  apiv1.BackupMethodBarmanObjectStore,
+				},
+			}
+			Expect(env.client.Create(ctx, backup)).To(Succeed())
+
+			res, err := env.backupReconciler.waitIfOtherBackupsRunning(ctx, backup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.IsZero()).To(BeTrue())
+
+			var stored apiv1.Backup
+			Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
+			// Phase should still be empty since we didn't need to set it as pending
+			Expect(stored.Status.Phase).To(BeEmpty())
+		})
 	})
 })

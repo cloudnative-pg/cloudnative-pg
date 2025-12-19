@@ -34,6 +34,12 @@ TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
+# Override pgbouncer image repository if PGBOUNCER_IMG_REPOSITORY is set
+if [ -n "${PGBOUNCER_IMG_REPOSITORY:-}" ]; then
+  PGBOUNCER_VERSION=$(echo "${PGBOUNCER_IMG}" | cut -d: -f2)
+  PGBOUNCER_IMG="${PGBOUNCER_IMG_REPOSITORY}:${PGBOUNCER_VERSION}"
+fi
+
 # variable need export otherwise be invisible in e2e test case
 export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
 export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
@@ -73,7 +79,7 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.2
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.3
 
 
 LABEL_FILTERS=""
@@ -90,8 +96,8 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   # the image has been either:
   #   - built and pushed to nodes or the local registry (by setup-cluster.sh)
   #   - built by the `buildx` step in continuous delivery and pushed to the test registry
-  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMG="${POSTGRES_IMG}" \
-   PGBOUNCER_IMG="${PGBOUNCER_IMG}" \
+  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+   PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
    CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST}" \
    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
    generate-manifest
@@ -106,8 +112,8 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   # Here we build a manifest for the new controller, with the `-prime` suffix
   # added to the tag by convention, which assumes the image is in place.
   # This manifest is used to upgrade into in the upgrade_test E2E.
-  make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMG="${POSTGRES_IMG}" \
-   PGBOUNCER_IMG="${PGBOUNCER_IMG}" \
+  make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+   PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
    CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_PRIME_DIGEST}" \
    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
    generate-manifest
