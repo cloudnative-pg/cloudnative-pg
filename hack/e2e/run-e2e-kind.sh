@@ -34,7 +34,7 @@ E2E_DIR="${HACK_DIR}/e2e"
 export PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 export BUILD_IMAGE=${BUILD_IMAGE:-false}
 # renovate: datasource=docker depName=kindest/node
-KIND_NODE_DEFAULT_VERSION=v1.34.0
+KIND_NODE_DEFAULT_VERSION=v1.35.0
 export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
 export CLUSTER_ENGINE=kind
 export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
