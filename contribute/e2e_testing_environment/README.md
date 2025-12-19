@@ -193,6 +193,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `backup-restore`                  |
 | `snapshot`                        |
 | `operator`                        |
+| `namespaced-operator`             |
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
@@ -244,6 +245,12 @@ We have also provided a shortcut to this script in the main `Makefile`:
 
 ```shell
 make e2e-test-kind
+```
+
+To test the operator in namespaced deployment, you can test it with:
+
+```shell
+FEATURE_TYPE=namespaced-operator make e2e-test-kind
 ```
 
 #### On existing local cluster
@@ -303,7 +310,7 @@ Only users who have `write` permission to the repository can use this command.
 
 **For external contributors:** You can run local e2e tests using:
 - `FEATURE_TYPE=smoke,basic make e2e-test-kind` for smoke and basic tests
-- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only  
+- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only
 - `TEST_DEPTH=1 make e2e-test-kind` for critical and high priority tests
 
 Maintainers will handle comprehensive cloud-based E2E testing during the pull request review process.
