@@ -28,7 +28,7 @@ fi
 
 # Defaults
 # renovate: datasource=docker depName=kindest/node
-KIND_NODE_DEFAULT_VERSION=v1.34.0
+KIND_NODE_DEFAULT_VERSION=v1.35.0
 # renovate: datasource=github-releases depName=kubernetes-csi/csi-driver-host-path
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.17.0
 # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
