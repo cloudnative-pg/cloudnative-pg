@@ -107,6 +107,10 @@ linters:
           - revive
         path: /(utils|common)/[^/]+.go
         text: avoid meaningless package names
+      - linters:
+          - revive
+        path: pkg/utils/(context|hash)/
+        text: avoid package names that conflict with Go standard library package names
     paths:
       - zz_generated.*
       - third_party$

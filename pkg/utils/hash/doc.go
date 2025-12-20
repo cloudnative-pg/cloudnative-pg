@@ -25,6 +25,4 @@ SPDX-License-Identifier: Apache-2.0
 //
 // https://github.com/kubernetes/kubernetes/blob/master/pkg/util/hash/hash.go   // wokeignore:rule=master
 // https://github.com/kubernetes/kubernetes/blob/ea07644/pkg/controller/controller_utils.go#L1189
-//
-//nolint:revive
 package hash
