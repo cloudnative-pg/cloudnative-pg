@@ -214,15 +214,16 @@ func WaitForReady(
 	checkWebhook bool,
 ) error {
 	return retry.New(retry.Delay(time.Second),
-		retry.Attempts(timeoutSeconds)).Do(
-		func() error {
-			ready, err := IsReady(ctx, crudClient, checkWebhook)
-			if err != nil || !ready {
-				return fmt.Errorf("operator deployment is not ready")
-			}
-			return nil
-		},
-	)
+		retry.Attempts(timeoutSeconds)).
+		Do(
+			func() error {
+				ready, err := IsReady(ctx, crudClient, checkWebhook)
+				if err != nil || !ready {
+					return fmt.Errorf("operator deployment is not ready")
+				}
+				return nil
+			},
+		)
 }
 
 // isDeploymentReady returns true if the operator deployment has the expected number
