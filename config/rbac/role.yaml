@@ -140,9 +140,9 @@ rules:
   - backups
   - clusters
   - databases
-  - pgroles
   - poolers
   - publications
+  - roles
   - scheduledbackups
   - subscriptions
   verbs:
@@ -158,7 +158,6 @@ rules:
   resources:
   - backups/status
   - databases/status
-  - pgroles/status
   - publications/status
   - scheduledbackups/status
   - subscriptions/status
@@ -203,15 +202,6 @@ rules:
   - delete
   - get
   - list
-  - watch
-- apiGroups:
-  - postgresql.cnpg.io
-  resources:
-  - roles
-  verbs:
-  - get
-  - list
-  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io

@@ -319,7 +319,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.Password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Create(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
@@ -397,7 +397,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectCommit()
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.Password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Update(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -416,7 +416,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectRollback()
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.Password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Update(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
