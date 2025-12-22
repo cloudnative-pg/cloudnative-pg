@@ -275,8 +275,10 @@ _Appears in:_
 | `backupId` _string_ | The ID of the Barman backup |  |  |  |
 | `backupName` _string_ | The Name of the Barman backup |  |  |  |
 | `phase` _[BackupPhase](#backupphase)_ | The last backup status |  |  |  |
-| `startedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup was started |  |  |  |
-| `stoppedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup was terminated |  |  |  |
+| `startedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup execution was started by the backup tool |  |  |  |
+| `stoppedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup execution was terminated by the backup tool |  |  |  |
+| `reconciliationStartedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup process was started by the operator |  |  |  |
+| `reconciliationTerminatedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the reconciliation was terminated by the operator (either successfully or not) |  |  |  |
 | `beginWal` _string_ | The starting WAL |  |  |  |
 | `endWal` _string_ | The ending WAL |  |  |  |
 | `beginLSN` _string_ | The starting xlog |  |  |  |

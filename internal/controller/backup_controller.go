@@ -31,13 +31,11 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -567,7 +565,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
 		backup.Status.BackupName = backup.Name
-		backup.Status.StartedAt = ptr.To(metav1.Now())
+		backup.Status.StartedAt = backup.Status.ReconciliationStartedAt.DeepCopy()
 		if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
 			return nil, err
 		}
