@@ -241,7 +241,9 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	// If no good running backups are found we elect a pod for the backup
 	podStatus, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) || errors.Is(err, ErrInstanceStatusUnavailable) {
+	if apierrs.IsNotFound(err) ||
+		errors.Is(err, ErrPrimaryImageNeedsUpdate) ||
+		errors.Is(err, ErrInstanceStatusUnavailable) {
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
@@ -517,6 +519,8 @@ func (r *BackupReconciler) isValidBackupRunning(
 			"cluster", cluster.Name,
 			"pod", pod.Name,
 			"storedSessionID", backup.Status.InstanceID.SessionID)
+		r.Recorder.Eventf(backup, "Warning", "InstanceManagerRestarted",
+			"Backup failed: instance manager was restarted on pod %s", pod.Name)
 		if err := resourcestatus.FlagBackupAsFailed(ctx, r.Client, backup, cluster, failureReason); err != nil {
 			return false, fmt.Errorf("while marking backup as failed: %w", err)
 		}
