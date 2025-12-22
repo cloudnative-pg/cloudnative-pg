@@ -529,7 +529,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// TODO: shouldn't this be a failed backup?
 		origBackup := backup.DeepCopy()
 		backup.Status.SetAsPending()
-		if err := r.Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
+		if err := r.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
 			return nil, err
 		}
 
