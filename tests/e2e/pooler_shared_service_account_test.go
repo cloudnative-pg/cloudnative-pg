@@ -39,7 +39,7 @@ import (
 var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func() {
 	const (
 		clusterFile           = fixturesDir + "/shared_service_account/cluster_basic.yaml"
-		sharedSAFile          = fixturesDir + "/shared_service_account/shared_sa.yaml"
+		sharedSAFile          = fixturesDir + "/shared_service_account/pooler_shared_sa.yaml"
 		pooler1File           = fixturesDir + "/shared_service_account/pooler_shared_sa_1.yaml"
 		pooler2File           = fixturesDir + "/shared_service_account/pooler_shared_sa_2.yaml"
 		poolerNonExistsSAFile = fixturesDir + "/shared_service_account/pooler_nonexists_sa.yaml"

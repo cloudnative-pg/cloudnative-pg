@@ -7,7 +7,7 @@ spec:
   instances: 1
   
   # Reference the shared ServiceAccount
-  serviceAccountName: postgres-shared-sa
+  serviceAccountName: cluster-shared-sa
 
   storage:
     size: 1Gi
