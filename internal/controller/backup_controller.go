@@ -69,6 +69,9 @@ const clusterNameField = ".spec.cluster.name"
 // ErrPrimaryImageNeedsUpdate is returned when the primary instance is not running with the latest image
 var ErrPrimaryImageNeedsUpdate = fmt.Errorf("primary instance not having expected image, cannot run backup")
 
+// ErrInstanceStatusUnavailable is returned when instance status cannot be retrieved
+var ErrInstanceStatusUnavailable = fmt.Errorf("instance status unavailable")
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -238,7 +241,7 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 
 	// If no good running backups are found we elect a pod for the backup
 	podStatus, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) {
+	if apierrs.IsNotFound(err) || errors.Is(err, ErrPrimaryImageNeedsUpdate) || errors.Is(err, ErrInstanceStatusUnavailable) {
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 			"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
 		contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
@@ -870,14 +873,10 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, //nolint: goc
 		targetPod = &pod
 	}
 
-	// TODO(armru): if tests pass try to return error instead of this hack
-	// Step 2: Get status for only the elected pod
+	// Get status for the elected pod
 	statusResult := r.instanceStatusClient.GetStatusFromInstances(ctx, corev1.PodList{Items: []corev1.Pod{*targetPod}})
 	if len(statusResult.Items) == 0 {
-		// Return a minimal status with just the pod if we couldn't get full status
-		contextLogger.Debug("Could not get instance status, returning pod without SessionID",
-			"pod", targetPod.Name)
-		return &postgresStatus.PostgresqlStatus{Pod: targetPod}, nil
+		return nil, fmt.Errorf("could not get instance status for pod %s: %w", targetPod.Name, ErrInstanceStatusUnavailable)
 	}
 
 	return &statusResult.Items[0], nil
