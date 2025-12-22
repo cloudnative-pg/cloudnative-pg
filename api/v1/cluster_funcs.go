@@ -412,17 +412,17 @@ func (config *PluginConfiguration) IsEnabled() bool {
 	return *config.Enabled
 }
 
-// GetRoleName gets the name of the role
-func (roleConfiguration *RoleConfiguration) GetRoleName() string {
-	return roleConfiguration.Name
-}
-
 // GetRoleSecretName gets the name of the secret which is used to store the role's password
 func (roleConfiguration *RoleConfiguration) GetRoleSecretName() string {
 	if roleConfiguration.PasswordSecret != nil {
 		return roleConfiguration.PasswordSecret.Name
 	}
 	return ""
+}
+
+// GetRoleName gets the name of the role
+func (roleConfiguration *RoleConfiguration) GetRoleName() string {
+	return roleConfiguration.Name
 }
 
 // ShouldDisablePassword determines if the role password should be dropped in

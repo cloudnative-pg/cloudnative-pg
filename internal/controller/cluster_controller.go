@@ -149,8 +149,6 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusterimagecatalogs,verbs=get;watch;list
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=failoverquorums,verbs=create;get;watch;delete;list
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=failoverquorums/status,verbs=get;patch;update;watch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;update;list;watch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;patch;update;watch
 
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -1469,7 +1467,7 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 
 // mapRolesToClusters returns a function mapping roles to their corresponding cluster
 func (r *ClusterReconciler) mapRolesToClusters() handler.MapFunc {
-	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+	return func(_ context.Context, obj client.Object) []reconcile.Request {
 		role, ok := obj.(*apiv1.Role)
 		if !ok || role.Spec.ClusterRef.Name == "" {
 			return nil

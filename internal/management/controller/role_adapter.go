@@ -17,8 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"database/sql"
-
 	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -66,11 +64,8 @@ func (role roleAdapter) toDatabaseRole() roles.DatabaseRole {
 			InfinityModifier: pgtype.Infinity,
 		}
 	}
-	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
-		dbRole.IgnorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
-		dbRole.Password = sql.NullString{}
+	if role.PasswordSecret == nil && !role.DisablePassword {
+		dbRole.MarkPasswordAsIgnored()
 	}
 	return dbRole
 }
