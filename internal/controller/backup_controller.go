@@ -451,7 +451,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 			"ReStarting",
 			"Could not find the elected backup pod. Restarting backup for cluster %v on instance %v",
 			cluster.Name,
-			pod.Name,
+			backup.Status.InstanceID.PodName,
 		)
 		return false, nil
 	}
