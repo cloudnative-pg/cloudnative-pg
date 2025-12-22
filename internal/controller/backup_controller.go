@@ -283,8 +283,8 @@ func (r *BackupReconciler) startBackupManagedByInstance(
 	r.Recorder.Eventf(&backup, "Normal", "Starting",
 		"Starting backup for cluster %v", cluster.Name)
 
-	// This backup can be started. The SessionID from podStatus is used to detect if the
-	// instance manager was restarted during the backup, which would kill the backup process.
+	// This backup can be started. The SessionID from podStatus is used to detect
+	// if the instance manager was restarted during the backup.
 	if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster, podStatus.SessionID); err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 		_ = resourcestatus.FlagBackupAsFailed(ctx, r.Client, &backup, &cluster,
@@ -510,9 +510,8 @@ func (r *BackupReconciler) isValidBackupRunning(
 		return true, nil
 	}
 
-	// Instance manager was restarted/upgraded - the backup process is dead, mark as failed
-	// This is a deterministic check that catches the case where the operator was upgraded
-	// while a backup was in progress, killing the backup goroutine in the instance manager.
+	// Instance manager was restarted/upgraded - mark the backup as failed.
+	// When the instance manager restarts, any running backup goroutine is terminated.
 	if instanceManagerRestarted {
 		failureReason := fmt.Errorf("instance manager was restarted during backup on pod %s", pod.Name)
 		contextLogger.Info("Instance manager was restarted, marking backup as failed",
@@ -542,10 +541,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 }
 
 // isInstanceManagerRestarted checks if the instance manager was restarted since
-// the backup started. This is done by comparing the SessionID stored when the
-// backup started with the current session ID from the instance manager.
-// This check detects instance manager restarts including container reboots and
-// binary upgrades that would kill any running backup goroutine.
+// the backup started by comparing the stored SessionID with the current one.
 func (r *BackupReconciler) isInstanceManagerRestarted(
 	ctx context.Context,
 	pod *corev1.Pod,
@@ -563,7 +559,6 @@ func (r *BackupReconciler) isInstanceManagerRestarted(
 	statusList := r.instanceStatusClient.GetStatusFromInstances(ctx, pods)
 
 	if len(statusList.Items) == 0 {
-		// If we can't get the status, we can't make a determination
 		// Be conservative and assume the backup is still running
 		contextLogger.Debug("Could not get instance status, assuming backup still running",
 			"pod", pod.Name)
