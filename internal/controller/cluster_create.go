@@ -757,10 +757,15 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	}
 
 	var roleList apiv1.RoleList
-	// TODO: to ensure we only give permissions for the secrets in the Roles that refer
-	// to THIS cluster, we should add cluster labels to the Role objects, then filter with
-	// client.MatchingLabels{utils.ClusterLabelName: clusterName},
-	if err := r.List(ctx, &roleList, client.InNamespace(cluster.Namespace)); err != nil {
+
+	if err := r.List(
+		ctx,
+		&roleList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{
+			roleKey: cluster.Name,
+		},
+	); err != nil {
 		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
 		return r.createRole(ctx, cluster, originBackup)
 	}

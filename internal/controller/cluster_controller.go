@@ -73,6 +73,7 @@ const (
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
+	roleKey                       = ".spec.clusterRef.name"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
@@ -1228,6 +1229,10 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(
+			&apiv1.Role{},
+			handler.EnqueueRequestsFromMapFunc(r.mapRolesToClusters()),
+		).
 		Complete(r)
 }
 
@@ -1344,6 +1349,24 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// Create a new indexed field on Roles. This field will be used to easily
+	// find all the Roles pointing to a cluster.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Role{},
+		roleKey,
+		func(rawObj client.Object) []string {
+			role := rawObj.(*apiv1.Role)
+			if role.Spec.ClusterRef.Name == "" {
+				return nil
+			}
+
+			return []string{role.Spec.ClusterRef.Name}
+		},
+	); err != nil {
+		return err
+	}
+
 	// Create a new indexed field on Jobs.
 	return mgr.GetFieldIndexer().IndexField(
 		ctx,
@@ -1441,6 +1464,25 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 		}
 		// build requests for cluster referring the secret
 		return []reconcile.Request{{NamespacedName: clusterNamespacedName}}
+	}
+}
+
+// mapRolesToClusters returns a function mapping roles to their corresponding cluster
+func (r *ClusterReconciler) mapRolesToClusters() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		role, ok := obj.(*apiv1.Role)
+		if !ok || role.Spec.ClusterRef.Name == "" {
+			return nil
+		}
+
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Namespace: role.GetNamespace(),
+					Name:      role.Spec.ClusterRef.Name,
+				},
+			},
+		}
 	}
 }
 
