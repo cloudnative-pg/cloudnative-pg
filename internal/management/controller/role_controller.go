@@ -147,7 +147,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		if controllerutil.ContainsFinalizer(&role, utils.RoleFinalizerName) {
 			if role.Spec.ReclaimPolicy == apiv1.RoleReclaimDelete {
 				dbRole := roleAdapter{
-					RoleSpec: role.Spec,
+					RoleConfiguration: role.Spec.RoleConfiguration,
 				}.toDatabaseRole()
 				if err := roles.Delete(ctx, db, dbRole); err != nil {
 					return ctrl.Result{}, err
@@ -276,7 +276,7 @@ func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.Role) (s
 	}
 
 	dbRole := roleAdapter{
-		RoleSpec: role.Spec,
+		RoleConfiguration: role.Spec.RoleConfiguration,
 	}.toDatabaseRole()
 	passwordVersion, err := dbRole.ApplyPassword(ctx, r.Client, &role.Spec, r.instance.GetNamespaceName())
 	if err != nil {
