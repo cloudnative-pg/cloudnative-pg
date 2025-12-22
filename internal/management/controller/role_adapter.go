@@ -28,7 +28,7 @@ import (
 // roleAdapter is an intermediary structure used to adapt a apiv1.RoleSpec
 // to a roles.DatabaseRole.
 type roleAdapter struct {
-	apiv1.RoleSpec
+	apiv1.RoleConfiguration
 	// validUntilNullIsInfinity indicates a null `validUntil` on the RoleConfiguration
 	// should be translated in VALID UNTIL 'infinity' in the database.
 	// This is needed because in Postgres you cannot restore a NULL value in the VALID UNTIL

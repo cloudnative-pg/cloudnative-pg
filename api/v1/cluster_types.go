@@ -2553,6 +2553,7 @@ type PluginStatus struct {
 type RoleConfiguration struct {
 	// Name of the role
 	Name string `json:"name"`
+
 	// Description of the role
 	// +optional
 	Comment string `json:"comment,omitempty"`
@@ -2585,7 +2586,7 @@ type RoleConfiguration struct {
 	InRoles []string `json:"inRoles,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
-	// Defaults is `true`.
+	// Default is `true`.
 	// +kubebuilder:default:=true
 	// +optional
 	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT

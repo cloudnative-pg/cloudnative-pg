@@ -2417,6 +2417,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 _Appears in:_
 
 - [ManagedConfiguration](#managedconfiguration)
+- [RoleSpec](#rolespec)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2498,11 +2499,11 @@ _Appears in:_
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
 | `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Defaults is `true`. |  | true |  |
 | `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
-| `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Default is `false`. |  |  |  |
+| `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |
 | `createdb` _boolean_ | When set to `true`, the role being defined will be allowed to create<br />new databases. Specifying `false` (default) will deny a role the<br />ability to create databases. |  |  |  |
 | `createrole` _boolean_ | Whether the role will be permitted to create, alter, drop, comment<br />on, change the security label for, and grant or revoke membership in<br />other roles. Default is `false`. |  |  |  |
-| `login` _boolean_ | Whether the role is allowed to log in.<br />A role having the `login` attribute can be thought of as a user.<br />Roles without this attribute are useful for managing database privileges,<br />but are not users in the usual sense of the word. Default is `false`. |  |  |  |
-| `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication.<br />Default is `false`. |  |  |  |
+| `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
+| `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
 
 
