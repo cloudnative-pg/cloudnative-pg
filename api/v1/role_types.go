@@ -32,6 +32,15 @@ const (
 	RoleReclaimRetain RoleReclaimPolicy = "retain"
 )
 
+// RoleConditionType defines types of role conditions
+type RoleConditionType string
+
+const (
+	// ConditionPasswordSecretChange is true when the all the instances of the
+	// cluster report the same System ID.
+	ConditionPasswordSecretChange RoleConditionType = "PasswordSecretChange"
+)
+
 // RoleSpec represents a role in Postgres
 type RoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
@@ -67,6 +76,10 @@ type RoleState struct {
 	// PasswordState holds the last applied version of the passwordSecret, and
 	// the last transaction ID of the role in postgres
 	PasswordState PasswordState `json:"passwordState,omitempty"`
+
+	// Conditions for cluster object
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

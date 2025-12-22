@@ -45,12 +45,18 @@ type DatabaseRole struct {
 	Login           bool             `json:"login,omitempty"`
 	Replication     bool             `json:"replication,omitempty"`
 	BypassRLS       bool             `json:"bypassrls,omitempty"` // Row-Level Security
-	IgnorePassword  bool             `json:"-"`
+	ignorePassword  bool             `json:"-"`
 	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
-	Password        sql.NullString   `json:"-"`
-	TransactionID   int64            `json:"-"`
+	password        sql.NullString   `json:"-"`
+	transactionID   int64            `json:"-"`
+}
+
+// MarkPasswordAsIgnored marks the password as to be ignored.
+// When this happens, no password will be set in the database.
+func (d *DatabaseRole) MarkPasswordAsIgnored() {
+	d.ignorePassword = true
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -59,7 +65,7 @@ func (d *DatabaseRole) passwordNeedsUpdating(
 	latestSecretResourceVersion map[string]string,
 ) bool {
 	return storedPasswordState[d.Name].SecretResourceVersion != latestSecretResourceVersion[d.Name] ||
-		storedPasswordState[d.Name].TransactionID != d.TransactionID
+		storedPasswordState[d.Name].TransactionID != d.transactionID
 }
 
 func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
@@ -137,10 +143,10 @@ func (d *DatabaseRole) ApplyPassword(
 ) (string, error) {
 	switch {
 	case rolePassword.GetRoleSecretName() == "" && !rolePassword.ShouldDisablePassword():
-		d.IgnorePassword = true
+		d.ignorePassword = true
 		return "", nil
 	case rolePassword.GetRoleSecretName() == "" && rolePassword.ShouldDisablePassword():
-		d.Password = sql.NullString{}
+		d.password = sql.NullString{}
 		return "", nil
 	case rolePassword.GetRoleSecretName() != "" && rolePassword.ShouldDisablePassword():
 		// this case should be prevented by the validation webhook,
@@ -154,7 +160,7 @@ func (d *DatabaseRole) ApplyPassword(
 			return "", err
 		}
 
-		d.Password = sql.NullString{Valid: true, String: passwordSecret.password}
+		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
 		return passwordSecret.version, nil
 	}
 }

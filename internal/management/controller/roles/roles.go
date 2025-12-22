@@ -84,9 +84,9 @@ func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 	}
 	switch {
 	case role.PasswordSecret == nil && !role.DisablePassword:
-		dbRole.IgnorePassword = true
+		dbRole.ignorePassword = true
 	case role.PasswordSecret == nil && role.DisablePassword:
-		dbRole.Password = sql.NullString{}
+		dbRole.password = sql.NullString{}
 	}
 	return dbRole
 }
