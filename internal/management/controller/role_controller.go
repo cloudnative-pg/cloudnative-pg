@@ -60,8 +60,8 @@ type RoleReconciler struct {
 // role reconciliation loop failures
 const roleReconciliationInterval = 30 * time.Second
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=pgroles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=pgroles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;update;patch
 
 // Reconcile is the role reconciliation loop
 func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

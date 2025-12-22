@@ -380,7 +380,7 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 }
 
 func roleHasPassword(role DatabaseRole) bool {
-	return !role.ignorePassword && role.password.Valid
+	return !role.IgnorePassword && role.Password.Valid
 }
 
 // appendPasswordOption appends the PASSWORD and VALID UNTIL clauses of a
