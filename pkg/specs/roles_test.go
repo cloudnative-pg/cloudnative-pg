@@ -308,15 +308,19 @@ var _ = Describe("Roles", func() {
 	crdRoles := []apiv1.Role{
 		{
 			Spec: apiv1.RoleSpec{
-				Name: "role5",
-				PasswordSecret: &apiv1.LocalObjectReference{
-					Name: "my_secret5",
+				RoleConfiguration: apiv1.RoleConfiguration{
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: "my_secret5",
+					},
+					Name: "role5",
 				},
 			},
 		},
 		{
 			Spec: apiv1.RoleSpec{
-				Name: "role6",
+				RoleConfiguration: apiv1.RoleConfiguration{
+					Name: "role6",
+				},
 			},
 		},
 	}
@@ -378,8 +382,10 @@ var _ = Describe("CRD role secret name", func() {
 	It("should be empty when password is disabled", func() {
 		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
-				DisablePassword: true,
-				PasswordSecret:  &apiv1.LocalObjectReference{},
+				RoleConfiguration: apiv1.RoleConfiguration{
+					DisablePassword: true,
+					PasswordSecret:  &apiv1.LocalObjectReference{},
+				},
 			},
 		}
 		secrets := crdRoleSecretName(role)
@@ -395,7 +401,9 @@ var _ = Describe("CRD role secret name", func() {
 	It("should be empty when password secret name is empty", func() {
 		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
-				PasswordSecret: &apiv1.LocalObjectReference{},
+				RoleConfiguration: apiv1.RoleConfiguration{
+					PasswordSecret: &apiv1.LocalObjectReference{},
+				},
 			},
 		}
 		secrets := crdRoleSecretName(role)
@@ -404,8 +412,10 @@ var _ = Describe("CRD role secret name", func() {
 	It("should work properly when the password secret name is set", func() {
 		role := apiv1.Role{
 			Spec: apiv1.RoleSpec{
-				PasswordSecret: &apiv1.LocalObjectReference{
-					Name: "secret-name",
+				RoleConfiguration: apiv1.RoleConfiguration{
+					PasswordSecret: &apiv1.LocalObjectReference{
+						Name: "secret-name",
+					},
 				},
 			},
 		}
