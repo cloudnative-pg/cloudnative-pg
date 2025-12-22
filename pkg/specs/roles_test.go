@@ -31,7 +31,7 @@ import (
 )
 
 var _ = Describe("Roles", func() {
-	cluster := apiv1.Cluster{
+	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "thisTest",
 			Namespace: "default",
@@ -115,7 +115,7 @@ var _ = Describe("Roles", func() {
 		},
 	}
 
-	backupOrigin := apiv1.Backup{
+	backupOrigin := &apiv1.Backup{
 		Status: apiv1.BackupStatus{
 			BarmanCredentials: apiv1.BarmanCredentials{
 				Azure: &apiv1.AzureCredentials{
@@ -165,14 +165,14 @@ var _ = Describe("Roles", func() {
 	}
 
 	It("are created with the cluster name for pure k8s", func() {
-		serviceAccount := CreateRole(cluster, nil, nil)
+		serviceAccount := CreateRole(RoleOptions{Cluster: cluster})
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
-		Expect(serviceAccount.Rules).To(HaveLen(15))
+		Expect(serviceAccount.Rules).To(HaveLen(17))
 	})
 
 	It("should contain every secret of the origin backup and backup configuration of every external cluster", func() {
-		serviceAccount := CreateRole(cluster, &backupOrigin, nil)
+		serviceAccount := CreateRole(RoleOptions{Cluster: cluster, BackupOrigin: backupOrigin})
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
 		Expect(serviceAccount.Rules[0].ResourceNames).To(ConsistOf("thisTest", "testConfigMapKeySelector"))
@@ -202,18 +202,18 @@ var _ = Describe("Roles", func() {
 
 var _ = Describe("Secrets", func() {
 	var (
-		cluster apiv1.Cluster
-		backup  apiv1.Backup
+		cluster *apiv1.Cluster
+		backup  *apiv1.Backup
 	)
 
 	BeforeEach(func() {
-		cluster = apiv1.Cluster{
+		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "thisTest",
 				Namespace: "default",
 			},
 		}
-		backup = apiv1.Backup{
+		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "testBackup",
 				Namespace: "default",
@@ -281,7 +281,7 @@ var _ = Describe("Secrets", func() {
 	})
 
 	It("should contain default secrets only", func() {
-		Expect(getInvolvedSecretNames(cluster, nil, nil)).To(Equal([]string{
+		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster})).To(Equal([]string{
 			"thisTest-app",
 			"thisTest-ca",
 			"thisTest-replication",
@@ -291,7 +291,7 @@ var _ = Describe("Secrets", func() {
 	})
 
 	It("should created an ordered string list with the backup secrets", func() {
-		Expect(getInvolvedSecretNames(cluster, &backup, nil)).To(Equal([]string{
+		Expect(getInvolvedSecretNames(RoleOptions{Cluster: cluster, BackupOrigin: backup})).To(Equal([]string{
 			"aws-status-secret-test",
 			"azure-storage-key-secret-test",
 			"google-application-secret-test",
@@ -324,7 +324,7 @@ var _ = Describe("Roles", func() {
 			},
 		},
 	}
-	cluster := apiv1.Cluster{
+	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "thisTest",
 			Namespace: "default",
@@ -365,7 +365,7 @@ var _ = Describe("Roles", func() {
 	It("gets the list of secrets needed by the managed roles", func() {
 		Expect(managedRolesSecrets(cluster)).
 			To(ConsistOf("my_secret1", "my_secret3"))
-		serviceAccount := CreateRole(cluster, nil, crdRoles)
+		serviceAccount := CreateRole(RoleOptions{Cluster: cluster, Roles: crdRoles})
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
 		var secretsPolicy rbacv1.PolicyRule

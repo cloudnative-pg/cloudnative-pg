@@ -13,7 +13,10 @@
 
 package v1
 
-import "k8s.io/utils/ptr"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+)
 
 // SetAsFailed sets the publication as failed with the given error
 func (r *Role) SetAsFailed(err error) {
@@ -52,4 +55,35 @@ func (roleSpec *RoleSpec) GetRoleName() string {
 // ShouldDisablePassword checks if the password should be disabled in Postgres
 func (roleSpec *RoleSpec) ShouldDisablePassword() bool {
 	return roleSpec.DisablePassword
+}
+
+// HasReconciliations returns true if the role has been reconciled at least once
+func (r *Role) HasReconciliations() bool {
+	return r.Status.ObservedGeneration > 0
+}
+
+// MustHaveManagedResourceExclusivity detects conflicting roles
+func (roleList *RoleList) MustHaveManagedResourceExclusivity(role *Role) error {
+	pointers := toSliceWithPointers(roleList.Items)
+	return ensureManagedResourceExclusivity(role, pointers)
+}
+
+// GetClusterRef returns the cluster reference of the role
+func (r *Role) GetClusterRef() corev1.LocalObjectReference {
+	return r.Spec.ClusterRef
+}
+
+// GetManagedObjectName returns the name of the managed role object
+func (r *Role) GetManagedObjectName() string {
+	return r.Spec.Name
+}
+
+// GetStatusMessage returns the status message of the role
+func (r *Role) GetStatusMessage() string {
+	return r.Status.Message
+}
+
+// SetStatusObservedGeneration sets the observed generation of the role
+func (r *Role) SetStatusObservedGeneration(obsGeneration int64) {
+	r.Status.ObservedGeneration = obsGeneration
 }

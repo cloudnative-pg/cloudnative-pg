@@ -1027,7 +1027,7 @@ var _ = DescribeTable("Role status tests",
 			{
 				Name:          "roleWithChangedPassInSpec",
 				Superuser:     true,
-				TransactionID: 101,
+				transactionID: 101,
 				Inherit:       true,
 			},
 		},

@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -45,23 +46,13 @@ type RoleReconciler struct {
 	instance instanceInterface
 }
 
-// type instanceInterface interface {
-// 	GetSuperUserDB() (*sql.DB, error)
-// 	GetClusterName() string
-// 	GetPodName() string
-// 	GetNamespaceName() string
-// }
-
-// errClusterIsReplica is raised when the role object
-// cannot be reconciled because it belongs to a replica cluster
-// var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary")
+// errClusterIsManagingRole is raised when a certain PostgreSQL role
+// is already managed by the cluster in the cluster.spec.managed.roles section
+var errClusterIsManagingRole = fmt.Errorf("role is already managed by the CNPG cluster")
 
 // roleReconciliationInterval is the time between the
 // role reconciliation loop failures
 const roleReconciliationInterval = 30 * time.Second
-
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;update;patch
 
 // Reconcile is the role reconciliation loop
 func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -86,46 +77,11 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// This is not for me!
-	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
-		return ctrl.Result{}, nil
-	}
-
-	// If everything is reconciled, we're done here
-	if role.Generation == role.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
-	// Fetch the Cluster from the cache
-	cluster, err := r.GetCluster(ctx)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The cluster has been deleted.
-			// We just need to wait for this instance manager to be terminated
-			contextLogger.Debug("Could not find Cluster")
-			return ctrl.Result{}, fmt.Errorf("could not find Cluster: %w", err)
+	if result, err := r.shouldReconcile(ctx, &role); result != nil || err != nil {
+		if result == nil {
+			return ctrl.Result{}, err
 		}
-
-		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
-	}
-
-	// This is not for me, at least now
-	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
-	}
-
-	// Still not for me, we're waiting for a switchover
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		return ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
-	}
-
-	// Cannot do anything on a replica cluster
-	if cluster.IsReplica() {
-		return r.failedReconciliation(
-			ctx,
-			&role,
-			errClusterIsReplica,
-		)
+		return *result, err
 	}
 
 	db, err := r.instance.GetSuperUserDB()
@@ -135,7 +91,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Add the finalizer if we don't have it
-	// nolint:nestif
+	//nolint:nestif
 	if role.DeletionTimestamp.IsZero() {
 		if controllerutil.AddFinalizer(&role, utils.RoleFinalizerName) {
 			if err := r.Update(ctx, &role); err != nil {
@@ -164,15 +120,10 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// TODO: the logic to ensure only one manager can be done after the POC
-	// Make sure the target PG Role is not being managed by another Role Object
-	// if err := r.ensureOnlyOneManager(ctx, role); err != nil {
-	// 	return r.failedReconciliation(
-	// 		ctx,
-	// 		&role,
-	// 		err,
-	// 	)
-	// }
+	if res, err := detectConflictingManagers(ctx, r.Client, &role, &apiv1.RoleList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
+	}
 
 	passVersion, err := r.reconcileRole(
 		ctx,
@@ -183,6 +134,75 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	return r.succeededReconciliation(ctx, &role, passVersion)
+}
+
+// shouldReconcile checks if the role should be reconciled by this instance.
+// Returns nil, nil if reconciliation should proceed.
+// Returns a non-nil result or error if reconciliation should stop.
+func (r *RoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.Role) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// This is not for me!
+	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+		return &ctrl.Result{}, nil
+	}
+
+	// If everything is reconciled and the password did not change, we're done here
+	if r.isAlreadyReconciled(role) {
+		return &ctrl.Result{}, nil
+	}
+
+	// Fetch the Cluster from the cache
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The cluster has been deleted.
+			// We just need to wait for this instance manager to be terminated
+			contextLogger.Debug("Could not find Cluster")
+			return nil, fmt.Errorf("could not find Cluster: %w", err)
+		}
+		return nil, fmt.Errorf("could not fetch Cluster: %w", err)
+	}
+
+	// This is not for me, at least now
+	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
+		return &ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
+	}
+
+	// Still not for me, we're waiting for a switchover
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		return &ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
+	}
+
+	// If the role is already managed by the cluster, we stop the
+	// reconciliation here.
+	if isClusterManagingRole(cluster, role.Spec.Name) {
+		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
+		return &result, err
+	}
+
+	// Cannot do anything on a replica cluster
+	if cluster.IsReplica() {
+		result, err := r.failedReconciliation(ctx, role, errClusterIsReplica)
+		return &result, err
+	}
+
+	return nil, nil
+}
+
+// isAlreadyReconciled checks if the role has already been reconciled
+// and the password secret has not changed
+func (r *RoleReconciler) isAlreadyReconciled(role *apiv1.Role) bool {
+	latestObservedSecretPasswordResourceVersion := ""
+	if latestSecretChange := meta.FindStatusCondition(
+		role.Status.Conditions,
+		string(apiv1.ConditionPasswordSecretChange),
+	); latestSecretChange != nil {
+		latestObservedSecretPasswordResourceVersion = latestSecretChange.Message
+	}
+
+	return role.Generation == role.Status.ObservedGeneration &&
+		role.Status.PasswordState.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
 }
 
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
@@ -260,6 +280,22 @@ func (r *RoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error)
 	}
 
 	return &cluster, nil
+}
+
+// isClusterManagingRole checks if the given role is already managed by the
+// cluster in the cluster.spec.managed.roles section
+func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
+	if cluster.Spec.Managed == nil {
+		return false
+	}
+
+	for _, role := range cluster.Spec.Managed.Roles {
+		if role.Name == roleName {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.Role) (string, error) {
