@@ -162,7 +162,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	if cluster == nil || cluster.DeletionTimestamp != nil {
+	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
