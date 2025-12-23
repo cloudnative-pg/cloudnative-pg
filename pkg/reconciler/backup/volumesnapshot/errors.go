@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -107,10 +108,8 @@ func isExplicitlyRetriableError(msg string) bool {
 func isRetryableHTTPError(msg string) bool {
 	if matches := httpStatusCodeRegex.FindStringSubmatch(msg); len(matches) == 2 {
 		if code, err := strconv.Atoi(matches[1]); err == nil {
-			for _, retryableCode := range retryableStatusCodes {
-				if code == retryableCode {
-					return true
-				}
+			if slices.Contains(retryableStatusCodes, code) {
+				return true
 			}
 		}
 	}

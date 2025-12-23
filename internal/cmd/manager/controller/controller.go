@@ -23,6 +23,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"time"
 
@@ -351,9 +352,7 @@ func loadConfiguration(
 				"name", configMapName)
 			return err
 		}
-		for k, v := range configMapData {
-			configData[k] = v
-		}
+		maps.Copy(configData, configMapData)
 	}
 
 	// Then read the secret if provided and store it in configData, overwriting configmap's values
@@ -365,9 +364,7 @@ func loadConfiguration(
 				"name", secretName)
 			return err
 		}
-		for k, v := range secretData {
-			configData[k] = v
-		}
+		maps.Copy(configData, secretData)
 	}
 
 	// Finally, read the config if it was provided

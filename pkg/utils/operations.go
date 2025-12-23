@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 
 package utils
 
+import "maps"
+
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.
 // Map result values are added when a key is present just in one of the input maps, or if the values are different
 // given the same key
@@ -79,9 +81,7 @@ func IsLabelSubset(
 ) bool {
 	mapToEvaluate := map[string]string{}
 
-	for key, value := range fixedInheritedLabels {
-		mapToEvaluate[key] = value
-	}
+	maps.Copy(mapToEvaluate, fixedInheritedLabels)
 
 	for key, value := range clusterLabels {
 		if controller.IsLabelInherited(key) {
@@ -103,9 +103,7 @@ func IsAnnotationSubset(
 ) bool {
 	mapToEvaluate := map[string]string{}
 
-	for key, value := range fixedInheritedAnnotations {
-		mapToEvaluate[key] = value
-	}
+	maps.Copy(mapToEvaluate, fixedInheritedAnnotations)
 
 	for key, value := range clusterAnnotations {
 		if controller.IsAnnotationInherited(key) {

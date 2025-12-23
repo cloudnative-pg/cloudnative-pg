@@ -94,10 +94,7 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(
 
 	// If data durability is not enforced, we cap the number of synchronous
 	// replicas to be required to the number or available replicas.
-	syncReplicaNumber := config.Number
-	if syncReplicaNumber > len(instancesList) {
-		syncReplicaNumber = len(instancesList)
-	}
+	syncReplicaNumber := min(config.Number, len(instancesList))
 
 	// An empty instances list is not allowed in synchronous_standby_names
 	if len(instancesList) == 0 {

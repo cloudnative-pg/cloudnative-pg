@@ -21,6 +21,7 @@ package client
 
 import (
 	"context"
+	"maps"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"google.golang.org/grpc"
@@ -218,8 +219,6 @@ var _ = Describe("EnrichConfiguration", func() {
 
 func cloneMap(original map[string]string) map[string]string {
 	clone := make(map[string]string, len(original))
-	for k, v := range original {
-		clone[k] = v
-	}
+	maps.Copy(clone, original)
 	return clone
 }

@@ -21,6 +21,7 @@ package syncsequences
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -28,7 +29,7 @@ import (
 // CreateSyncScript creates a SQL script to synchronize the sequences
 // in the destination database with the status of the source database
 func CreateSyncScript(source, destination SequenceMap, offset int) string {
-	script := ""
+	var script strings.Builder
 
 	for name := range destination {
 		targetValue, ok := source[name]
@@ -46,11 +47,11 @@ func CreateSyncScript(source, destination SequenceMap, offset int) string {
 			}
 		}
 
-		script += fmt.Sprintf(
+		script.WriteString(fmt.Sprintf(
 			"SELECT pg_catalog.setval(%s, %v);\n",
 			pq.QuoteLiteral(name),
-			sqlTargetValue)
+			sqlTargetValue))
 	}
 
-	return script
+	return script.String()
 }

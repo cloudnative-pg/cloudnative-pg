@@ -23,6 +23,7 @@ package configfile
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -140,11 +141,8 @@ func ReadLinesFromConfigurationContents(content []string, options ...string) []s
 		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
-		for _, option := range options {
-			if key == option {
-				result = append(result, line)
-				break
-			}
+		if slices.Contains(options, key) {
+			result = append(result, line)
 		}
 	}
 

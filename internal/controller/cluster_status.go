@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	slices0 "slices"
 	"sort"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -87,12 +88,7 @@ func (resources *managedResources) allInstancesAreActive() bool {
 
 // Check if at least one Pod is alive (active and not crash-looping)
 func (resources *managedResources) noInstanceIsAlive() bool {
-	for idx := range resources.instances.Items {
-		if utils.IsPodAlive(resources.instances.Items[idx]) {
-			return false
-		}
-	}
-	return true
+	return !slices0.ContainsFunc(resources.instances.Items, utils.IsPodAlive)
 }
 
 // getManagedResources get the managed resources of various types

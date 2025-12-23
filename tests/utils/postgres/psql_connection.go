@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"io"
+	"maps"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -119,9 +120,7 @@ func startForwardConnection(
 
 	connParameters := createConnectionParameters(userApp, passApp, localPort)
 	for _, params := range extraConnectionParams {
-		for key, value := range params {
-			connParameters[key] = value
-		}
+		maps.Copy(connParameters, params)
 	}
 	pooler := pool.NewPgbouncerConnectionPool(configfile.CreateConnectionString(connParameters))
 
