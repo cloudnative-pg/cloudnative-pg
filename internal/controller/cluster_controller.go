@@ -180,7 +180,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					"clusterName", req.Name,
 					"namespace", req.Namespace,
 				)
-				return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+				return ctrl.Result{RequeueAfter: time.Second}, nil
 			}
 			contextLogger.Error(
 				err,
