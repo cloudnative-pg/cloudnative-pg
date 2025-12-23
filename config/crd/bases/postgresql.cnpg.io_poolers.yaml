@@ -350,6 +350,46 @@ spec:
                     required:
                     - name
                     type: object
+                  databases:
+                    description: |-
+                      Databases allows defining per-database connection settings.
+                      Each entry configures how PgBouncer handles connections to a specific database.
+                      If not specified or empty, a default wildcard (*) entry is used that routes
+                      all databases to the cluster service with the global pool settings.
+                    items:
+                      description: |-
+                        PgBouncerDatabaseConfig defines per-database configuration for PgBouncer.
+                        This allows overriding connection settings on a per-database basis.
+                      properties:
+                        dbname:
+                          description: |-
+                            DBName is the actual database name on the PostgreSQL server.
+                            If not specified, defaults to the value of Name.
+                          type: string
+                        name:
+                          description: |-
+                            Name is the database name as seen by clients connecting to PgBouncer.
+                            Use "*" as a wildcard to match any database.
+                          type: string
+                        parameters:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Parameters contains per-database connection parameters.
+                            Supported parameters include: pool_size, reserve_pool, connect_query,
+                            pool_mode (alternative to PoolMode field), client_encoding, datestyle, timezone, etc.
+                          type: object
+                        poolMode:
+                          description: PoolMode overrides the default pool_mode for
+                            this database.
+                          enum:
+                          - session
+                          - transaction
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
                   parameters:
                     additionalProperties:
                       type: string
