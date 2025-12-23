@@ -128,6 +128,7 @@ DatabaseReclaimRetain
 DatabaseRoleRef
 DatabaseSpec
 DatabaseStatus
+DefaultAzureCredential
 DemotionToken
 DeploymentStrategy
 DevOps
