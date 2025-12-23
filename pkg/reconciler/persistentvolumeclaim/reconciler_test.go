@@ -632,8 +632,10 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
-			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: &className,
+			PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+				PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: &className,
+				},
 			},
 		}
 
@@ -649,8 +651,10 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
-			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: &expectedClassName,
+			PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+				PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: &expectedClassName,
+				},
 			},
 		}
 
@@ -665,8 +669,10 @@ var _ = Describe("Reconcile Volume Attribute Class", func() {
 
 		storage := &apiv1.StorageConfiguration{
 			Size: "1Gi",
-			PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-				VolumeAttributesClassName: nil,
+			PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+				PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: nil,
+				},
 			},
 		}
 
