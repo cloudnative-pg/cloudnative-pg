@@ -191,6 +191,13 @@ func (r *PluginReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	// Validate port range
+	if pluginPort < 1 || pluginPort > 65535 {
+		err := fmt.Errorf("plugin port %d is outside valid range (1-65535)", pluginPort)
+		contextLogger.Error(err, "Invalid plugin port annotation")
+		return ctrl.Result{}, err
+	}
+
 	// Create the plugin TLS configuration
 	clientKeyPair, err := tls.X509KeyPair(
 		clientSecret.Data[corev1.TLSCertKey],
