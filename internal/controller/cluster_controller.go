@@ -162,7 +162,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	if cluster == nil {
+	if cluster == nil || cluster.GetDeletionTimestamp() != nil {
 		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
@@ -173,6 +173,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		if err := r.notifyDeletionToOwnedResources(ctx, req.NamespacedName); err != nil {
+			// Optimistic locking conflict is transient - requeue to retry
+			if apierrs.IsConflict(err) {
+				contextLogger.Info(
+					"Optimistic locking conflict while removing finalizers, requeueing",
+					"clusterName", req.Name,
+					"namespace", req.Namespace,
+				)
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
 			contextLogger.Error(
 				err,
 				"error while deleting finalizers of objects on the cluster",
