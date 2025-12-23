@@ -43,7 +43,8 @@ import (
 )
 
 const (
-	backupOwnerKey = ".metadata.controller"
+	// backupParentScheduledBackupIndex is the field indexer key for the parent ScheduledBackup label
+	backupParentScheduledBackupIndex = "metadata.labels." + utils.ParentScheduledBackupLabelName
 
 	// ImmediateBackupLabelName label is applied to backups to tell if a backup
 	// is immediate or not
@@ -100,9 +101,8 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	// We are supposed to start a new backup. Let's extract
-	// the list of backups we have already taken to see if anything
-	// is running now
+	// Check if any backups created by this ScheduledBackup are still running.
+	// This provides concurrency control at the ScheduledBackup level.
 	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
 	if err != nil {
 		contextLogger.Error(err,
@@ -110,13 +110,10 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// We are supposed to start a new backup. Let's extract
-	// the list of backups we have already taken to see if anything
-	// is running now
 	for _, backup := range childBackups {
 		if !backup.Status.IsDone() {
 			contextLogger.Info(
-				"The system is already taking a scheduledBackup, retrying in 60 seconds",
+				"The system is already taking a backup for this ScheduledBackup, retrying in 60 seconds",
 				"backupName", backup.GetName(),
 				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
@@ -312,7 +309,9 @@ func createBackup(
 	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 
-// GetChildBackups gets all the backups scheduled by a certain scheduler
+// GetChildBackups gets all the backups created by a certain ScheduledBackup
+// by querying the ParentScheduledBackupLabel using an efficient field indexer.
+// This works regardless of the backupOwnerReference configuration.
 func (r *ScheduledBackupReconciler) GetChildBackups(
 	ctx context.Context,
 	scheduledBackup apiv1.ScheduledBackup,
@@ -321,9 +320,9 @@ func (r *ScheduledBackupReconciler) GetChildBackups(
 
 	if err := r.List(ctx, &childBackups,
 		client.InNamespace(scheduledBackup.Namespace),
-		client.MatchingFields{backupOwnerKey: scheduledBackup.Name},
+		client.MatchingFields{backupParentScheduledBackupIndex: scheduledBackup.GetName()},
 	); err != nil {
-		return nil, fmt.Errorf("unable to list child pods resource: %w", err)
+		return nil, fmt.Errorf("unable to list child backups: %w", err)
 	}
 
 	return childBackups.Items, nil
@@ -335,27 +334,22 @@ func (r *ScheduledBackupReconciler) SetupWithManager(
 	mgr ctrl.Manager,
 	maxConcurrentReconciles int,
 ) error {
-	// Create a new indexed field on backups. This field will be used to easily
-	// find all the backups created by this controller
+	// Create a field indexer on the parent ScheduledBackup label to efficiently
+	// find all backups created by a ScheduledBackup, regardless of the
+	// backupOwnerReference configuration.
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&apiv1.Backup{},
-		backupOwnerKey, func(rawObj client.Object) []string {
-			pod := rawObj.(*apiv1.Backup)
-			owner := metav1.GetControllerOf(pod)
-			if owner == nil {
+		backupParentScheduledBackupIndex, func(rawObj client.Object) []string {
+			backup := rawObj.(*apiv1.Backup)
+			if backup.Labels == nil {
 				return nil
 			}
 
-			if owner.Kind != apiv1.BackupKind {
-				return nil
+			if parent, ok := backup.Labels[ParentScheduledBackupLabelName]; ok {
+				return []string{parent}
 			}
-
-			if owner.APIVersion != apiSGVString {
-				return nil
-			}
-
-			return []string{owner.Name}
+			return nil
 		}); err != nil {
 		return err
 	}
