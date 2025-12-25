@@ -28,7 +28,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -92,23 +92,24 @@ func waitForReady(
 	pod *corev1.Pod,
 	timeoutSeconds uint,
 ) error {
-	err := retry.Do(
-		func() error {
-			if err := crudClient.Get(ctx, client.ObjectKey{
-				Namespace: pod.Namespace,
-				Name:      pod.Name,
-			}, pod); err != nil {
-				return err
-			}
-			if !utils.IsPodReady(*pod) {
-				return fmt.Errorf("pod not ready. Namespace: %v, Name: %v", pod.Namespace, pod.Name)
-			}
-			return nil
-		},
+	err := retry.New(
 		retry.Attempts(timeoutSeconds),
 		retry.Delay(time.Second),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				if err := crudClient.Get(ctx, client.ObjectKey{
+					Namespace: pod.Namespace,
+					Name:      pod.Name,
+				}, pod); err != nil {
+					return err
+				}
+				if !utils.IsPodReady(*pod) {
+					return fmt.Errorf("pod not ready. Namespace: %v, Name: %v", pod.Namespace, pod.Name)
+				}
+				return nil
+			},
+		)
 	return err
 }
 
