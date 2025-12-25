@@ -41,7 +41,7 @@ env:
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
-  OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
+  OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/e1de0e6d6ebddc0f4fc6f7f4cec2a6f6cd57c926/ci/scripts/opp.sh"
 
 defaults:
   run:
