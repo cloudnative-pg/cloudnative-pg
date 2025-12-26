@@ -54,6 +54,18 @@
       ],
     },
     {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "OPP_SCRIPT_URL:\\s*\"https://raw\\.githubusercontent\\.com/redhat-openshift-ecosystem/community-operators-pipeline/(?<currentValue>[a-f0-9]{40})/ci/scripts/opp\\.sh\""
+      ],
+      "depNameTemplate": "redhat-openshift-ecosystem/community-operators-pipeline",
+      "datasourceTemplate": "github-commits",
+      "versioningTemplate": "git"
+    },
+    {
       customType: 'regex',
       managerFilePatterns: [
         '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
