@@ -23,19 +23,6 @@ Currently, we provide installation instructions for [GNU/Linux](#gnulinux-system
 [MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
 (feel free to submit a PR for any improvement you might think of).
 
-Once you have followed the instructions for your system, run the following
-command from the main directory to verify that GNU/Make is properly installed
-and view the available tasks you can run:
-
-```
-make help
-```
-
-Normally, the next step after this is to [clone the CloudNativePG repository](#forking-the-repository)
-on your local workstation.
-
-<!-- TODO: We should add an easier way to check that requirements are met -->
-
 ### GNU/Linux systems
 
 Make sure you have the following executables available in the `PATH`
@@ -156,6 +143,20 @@ If you are using Docker Desktop, please make sure you follow the instructions in
 ["Settings for Docker Desktop" section of the `kind` documentation](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop).
 
 MacOS Airplay uses port 5000 and can interfere with docker repository port. Make sure Airplay is off (System Preferences -> Share -> uncheck the Airplay checkbox).
+
+<!-- TODO: We should add an easier way to check that requirements are met -->
+
+Once you have followed the instructions for your system, run the following
+command from the main directory to verify that GNU/Make is properly installed
+and view the available tasks you can run:
+
+```
+make help
+```
+
+Normally, the next step after this is to [clone the CloudNativePG repository](#forking-the-repository)
+on your local workstation.
+
 
 ## Forking the repository
 
