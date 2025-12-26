@@ -23,10 +23,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"text/template"
 
 	"github.com/spf13/cobra"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
