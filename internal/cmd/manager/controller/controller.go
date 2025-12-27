@@ -179,6 +179,12 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
+	// Validate namespaced configuration constraints
+	if err := utils.ValidateNamespacedConfiguration(conf); err != nil {
+		setupLog.Error(err, "invalid namespaced configuration")
+		return err
+	}
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err
