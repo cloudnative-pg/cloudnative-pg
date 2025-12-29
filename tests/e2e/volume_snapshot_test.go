@@ -355,13 +355,11 @@ var _ = Describe("Verify Volume Snapshot",
 					})
 				}
 
-				Context("with recovery time as Postgres timestamp", func() {
-					assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreFile)
-				})
+				By("with recovery time as Postgres timestamp")
+				assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreFile)
 
-				Context("with recovery time in RFC3339 format", func() {
-					assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreRFC3339File)
-				})
+				By("with recovery time in RFC3339 format")
+				assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreRFC3339File)
 			})
 		})
 
