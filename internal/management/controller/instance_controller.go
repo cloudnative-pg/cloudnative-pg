@@ -1212,8 +1212,10 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
-	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.GetPodName() && !r.instance.RequiresDesignatedPrimaryTransition {
+	// Return early if this pod is already the designated primary and
+	// the transition condition is not requested.
+	if cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
+		!externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
 		return false, nil
 	}
 
