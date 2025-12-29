@@ -90,7 +90,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance.SocketDirectory = socketDir
 		err := os.WriteFile(
 			filepath.Join(pgdata, PostgresqlPidFile),
-			[]byte(fmt.Sprintf("%v", myPid)), 0o400)
+			fmt.Appendf(nil, "%v", myPid), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 		myProcess, err := ps.FindProcess(myPid)
 		Expect(err).ShouldNot(HaveOccurred())

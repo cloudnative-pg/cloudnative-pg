@@ -27,7 +27,7 @@ import (
 var cache sync.Map
 
 // Store write an object into the local cache
-func Store(c string, v interface{}) {
+func Store(c string, v any) {
 	cache.Store(c, v)
 }
 

@@ -65,12 +65,12 @@ func (status *ValidationStatus) ContainsWarnings() bool {
 }
 
 // AddError adds an error message to the validation status
-func (status *ValidationStatus) addErrorf(name string, format string, args ...interface{}) {
+func (status *ValidationStatus) addErrorf(name string, format string, args ...any) {
 	status.Errors = append(status.Errors, newValidationMessage(name, fmt.Sprintf(format, args...)))
 }
 
 // AddWarning adds an error message to the validation status
-func (status *ValidationStatus) addWarningf(name string, format string, args ...interface{}) {
+func (status *ValidationStatus) addWarningf(name string, format string, args ...any) {
 	status.Warnings = append(status.Warnings, newValidationMessage(name, fmt.Sprintf(format, args...)))
 }
 

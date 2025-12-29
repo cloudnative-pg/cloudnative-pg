@@ -419,9 +419,7 @@ func InheritAnnotations(
 		object.Annotations = make(map[string]string)
 	}
 
-	for key, value := range fixedAnnotations {
-		object.Annotations[key] = value
-	}
+	maps.Copy(object.Annotations, fixedAnnotations)
 
 	for key, value := range annotations {
 		if controller.IsAnnotationInherited(key) {
@@ -443,9 +441,7 @@ func InheritLabels(
 		object.Labels = make(map[string]string)
 	}
 
-	for key, value := range fixedLabels {
-		object.Labels[key] = value
-	}
+	maps.Copy(object.Labels, fixedLabels)
 
 	for key, value := range labels {
 		if controller.IsLabelInherited(key) {
@@ -505,9 +501,7 @@ func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotatio
 		object.Annotations = make(map[string]string)
 	}
 	appArmorAnnotations := getAnnotationAppArmor(spec, annotations)
-	for annotation, value := range appArmorAnnotations {
-		object.Annotations[annotation] = value
-	}
+	maps.Copy(object.Annotations, appArmorAnnotations)
 }
 
 // IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource

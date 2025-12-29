@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -213,9 +214,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
-	for role, stateInDatabase := range passwordStates {
-		storedPasswordState[role] = stateInDatabase
-	}
+	maps.Copy(storedPasswordState, passwordStates)
 	return storedPasswordState, irreconcilableRoles, nil
 }
 
