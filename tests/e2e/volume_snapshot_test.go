@@ -160,17 +160,19 @@ var _ = Describe("Verify Volume Snapshot",
 		Context("Can restore from a Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
-				namespacePrefix       = "volume-snapshot-recovery"
-				level                 = tests.High
-				filesDir              = fixturesDir + "/volume_snapshot"
-				snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
-				snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
-				recoveryTargetTimeEnv = "SNAPSHOT_PITR"
+				namespacePrefix              = "volume-snapshot-recovery"
+				level                        = tests.High
+				filesDir                     = fixturesDir + "/volume_snapshot"
+				snapshotDataEnv              = "SNAPSHOT_PITR_PGDATA"
+				snapshotWalEnv               = "SNAPSHOT_PITR_PGWAL"
+				recoveryTargetTimeEnv        = "SNAPSHOT_PITR"
+				recoveryTargetTimeRFC3339Env = "SNAPSHOT_PITR_RFC3339"
 			)
 			// file constants
 			const (
-				clusterToSnapshot          = filesDir + "/cluster-pvc-snapshot.yaml.template"
-				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-snapshot-restore.yaml.template"
+				clusterToSnapshot                 = filesDir + "/cluster-pvc-snapshot.yaml.template"
+				clusterSnapshotRestoreFile        = filesDir + "/cluster-pvc-snapshot-restore.yaml.template"
+				clusterSnapshotRestoreRFC3339File = filesDir + "/cluster-pvc-snapshot-restore-rfc3339-pitr.yaml.template"
 			)
 			// database constants
 			const (
@@ -305,6 +307,10 @@ var _ = Describe("Verify Volume Snapshot",
 					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
 					Expect(err).ToNot(HaveOccurred())
 
+					recoveryTargetTimeRFC3339 := time.Now().Format(time.RFC3339)
+					Expect(os.Setenv(recoveryTargetTimeRFC3339Env, recoveryTargetTimeRFC3339)).
+						To(Succeed())
+
 					forward, conn, err := postgres.ForwardPSQLConnection(
 						env.Ctx,
 						env.Client,
@@ -328,23 +334,33 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
 				})
 
-				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterSnapshotRestoreFile)
-				Expect(err).ToNot(HaveOccurred())
+				assertRecoveryIsAtExpectedPointInTime := func(restoreFile string) {
+					clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreFile)
+					Expect(err).ToNot(HaveOccurred())
 
-				By("creating the cluster to be restored through snapshot and PITR", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-						env)
+					By("creating the cluster to be restored through snapshot and PITR", func() {
+						AssertCreateCluster(namespace, clusterToRestoreName, restoreFile, env)
+						AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+							env)
+					})
+
+					By("verifying the correct data exists in the restored cluster", func() {
+						tableLocator := TableLocator{
+							Namespace:    namespace,
+							ClusterName:  clusterToRestoreName,
+							DatabaseName: postgres.AppDBName,
+							TableName:    tableName,
+						}
+						AssertDataExpectedCount(env, tableLocator, 2)
+					})
+				}
+
+				Context("with recovery time as Postgres timestamp", func() {
+					assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreFile)
 				})
 
-				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
-					}
-					AssertDataExpectedCount(env, tableLocator, 2)
+				Context("with recovery time in RFC3339 format", func() {
+					assertRecoveryIsAtExpectedPointInTime(clusterSnapshotRestoreRFC3339File)
 				})
 			})
 		})
