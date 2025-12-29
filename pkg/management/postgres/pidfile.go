@@ -22,13 +22,13 @@ package postgres
 import (
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/mitchellh/go-ps"
-	"k8s.io/utils/strings/slices"
 )
 
 // PostgresqlPidFile is the name of the file which contains
