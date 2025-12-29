@@ -20,7 +20,7 @@ following the next three steps:
 ## Installation
 
 Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems),
-[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
+[MacOS X](#mac-os-x), [Windows Subsystem for Linux](#microsoft-wsl2) and [Dev Container](#dev-container)
 (feel free to submit a PR for any improvement you might think of).
 
 ### GNU/Linux systems
@@ -156,6 +156,27 @@ make help
 
 Normally, the next step after this is to [clone the CloudNativePG repository](#forking-the-repository)
 on your local workstation.
+
+### Dev Container
+
+First, install the following prerequisites to set up the development environment:
+
+- [Docker](https://docs.docker.com/get-docker/) (or Podman)
+- [VS Code](https://code.visualstudio.com/)
+- [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+Steps to Set Up the Development Environment Using Dev Containers
+
+1. Fork and clone the repository
+  Please refer to [Forking the repository](#Forking-the-repository) for details.
+2. Open the project in VS Code
+3. Inside VS Code, run the following from the `Command Palette`(Windows/Linux: `Ctrl + Shift + P`, Mac: `Cmd + Shift + P`) to get started
+    ```
+    > Dev Containers: Open Folder in Container
+    ```
+    This will create an isolated Workspace in vscode.
+
+Then, on your container workstation, follow [Building the operator and deploying it locally](#building-the-operator-and-deploying-it-locally) to build and deploy the operator.
 
 
 ## Forking the repository
