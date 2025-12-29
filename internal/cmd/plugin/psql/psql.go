@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"syscall"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"

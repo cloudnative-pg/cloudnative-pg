@@ -39,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1422,7 +1421,7 @@ func findInstancePodToCreate(
 		}
 
 		instanceName := specs.GetInstanceName(cluster.Name, serial)
-		if k8slices.Contains(instanceThatHavePods, instanceName) {
+		if slices.Contains(instanceThatHavePods, instanceName) {
 			continue
 		}
 
