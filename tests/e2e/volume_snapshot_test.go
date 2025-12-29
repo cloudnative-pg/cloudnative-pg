@@ -297,9 +297,12 @@ var _ = Describe("Verify Volume Snapshot",
 					// including the newly created data within the recovery_target_time
 					time.Sleep(1 * time.Second)
 					// Get the recovery_target_time and pass it to the template engine
-					recoveryTargetTime := time.Now().Format(time.RFC3339)
-					GinkgoWriter.Println("XXX RECOVERY TARGET", recoveryTargetTime)
-					err := os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
+					recoveryTargetTime, err := postgres.GetCurrentTimestamp(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						namespace, clusterToSnapshotName,
+					)
+					Expect(err).ToNot(HaveOccurred())
+					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
 					Expect(err).ToNot(HaveOccurred())
 
 					forward, conn, err := postgres.ForwardPSQLConnection(
