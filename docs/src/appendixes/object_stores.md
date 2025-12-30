@@ -195,17 +195,13 @@ spec:
 [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) is the
 object storage service provided by Microsoft.
 
-In order to access your storage account for backup and recovery of
-CloudNativePG managed databases, you will need one of the following
-combinations of credentials:
+CloudNativePG supports the following authentication methods for Azure Blob Storage:
 
 - [Connection String](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
-- Storage account name and [Storage account access key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
-- Storage account name and [Storage account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
-- Storage account name and [Azure AD Managed Identity](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/overview)
-properly configured
-- [DefaultAzureCredential](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python)
-authentication mechanism (which supports environment variables, managed identities, and other Azure authentication methods)
+- Storage Account Name + [Storage Account Access Key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
+- Storage Account Name + [Storage Account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
+- [Azure AD Managed Identity](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/overview)
+- [Default Azure Credentials](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python)
 
 Using **Azure AD Managed Identity**, you can avoid saving the credentials into a Kubernetes Secret,
 and have a Cluster configuration adding the `inheritFromAzureAD` as follows:
@@ -222,7 +218,7 @@ spec:
         inheritFromAzureAD: true
 ```
 
-Alternatively, you can use the **DefaultAzureCredential** authentication mechanism, which provides
+Alternatively, you can use the **Default Azure Credentials** authentication mechanism, which provides
 a seamless authentication experience by supporting multiple authentication methods including environment
 variables, managed identities, and Azure CLI credentials. Add the `useDefaultAzureCredentials` flag
 as follows:
