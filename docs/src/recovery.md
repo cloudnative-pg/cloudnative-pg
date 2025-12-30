@@ -405,12 +405,19 @@ Here are the recovery target criteria you can use:
 
 targetTime
 :  Time stamp up to which recovery proceeds, expressed in
-   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format, or as a timestamp.
+   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format, or as a
+   [timestamp](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-TIME).
    (The precise stopping point is also influenced by the `exclusive` option.)
 
 :::note
-    RFC 3339 timestamps without an explicit timezone suffix
-    (e.g., `2023-07-06T08:00:39`) are interpreted as UTC.
+    Timestamps without an explicit timezone suffix
+    (e.g., `2023-07-06 08:00:39`) are interpreted as UTC.
+:::
+
+:::warning
+    Always specify an explicit timezone in your timestamp to avoid ambiguity.
+    For example, use `2023-07-06T08:00:39Z` or `2023-07-06T08:00:39+02:00`
+    instead of `2023-07-06 08:00:39`.
 :::
 
 :::warning
