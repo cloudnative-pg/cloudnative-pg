@@ -222,6 +222,16 @@ type SchemaSpec struct {
 	// It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
 	// `OWNER TO` command of `ALTER SCHEMA`.
 	Owner string `json:"owner,omitempty"`
+
+	// List of roles for which `CREATE` privileges on the schema are granted or revoked.
+	// Maps to the `GRANT CREATE ON SCHEMA` and `REVOKE CREATE ON SCHEMA` SQL commands.
+	// +optional
+	Create []UsageSpec `json:"create,omitempty"`
+
+	// List of roles for which `USAGE` privileges on the schema are granted or revoked.
+	// Maps to the `GRANT USAGE ON SCHEMA` and `REVOKE USAGE ON SCHEMA` SQL commands.
+	// +optional
+	Usage []UsageSpec `json:"usage,omitempty"`
 }
 
 // ExtensionSpec configures an extension in a database
