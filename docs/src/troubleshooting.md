@@ -212,6 +212,10 @@ kubectl logs -n cnpg-system \
 
 Get CloudNativePG operator version by using `kubectl-cnpg` plugin:
 
+:::tip
+    You may need to tweak your network policies for this to fully work, see [here](#kubectl-cnpg-status-is-impaired-by-installed-network-policies) for details.
+:::
+
 ```shell
 kubectl-cnpg status <CLUSTER>
 ```
@@ -833,6 +837,44 @@ spec:
 In the [networking page](networking.md) you can find a network policy file
 that you can customize to create a `NetworkPolicy` explicitly allowing the
 operator to connect cross-namespace to cluster pods.
+
+### `kubectl cnpg status` is impaired by installed Network Policies
+
+In some constellations, Kubernetes network policies can prevent `kubectl cnpg status` from extracting the full status of a
+database and you'll see an output like the following:
+
+```sh
+[...]
+Error(s) extracting status
+-----------------------------------
+failed to get status by proxying to the pod, you might lack permissions to get pods/proxy: the server is currently unable to handle the request (get pods https:my-db-1:8000)
+failed to get status by proxying to the pod, you might lack permissions to get pods/proxy: the server is currently unable to handle the request (get pods https:my-db-2:8000)
+```
+
+The `kubectl cnpg status` command uses the Kubernetes API server's proxy functionality to directly reach out to the DB pods so you need
+your network policies to allow traffic from the API server to the DB pods. How this is done heavily depends on your cluster
+setup: Sometimes the API server directly proxies requests to the pods in which case you need to allow traffic directly from the
+API server's pod to the DB pods. In other cases (e.g. with AKS), traffic from the API server is tunneled through a Konnectivity
+service in which case you need to allow traffic from the Konnectivity pods to the DB pods. Here is an example NetworkPolicy for the latter
+case:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cnpg-allow-konnectivity-proxy
+  namespace: <db-cluster-namespace>
+spec:
+ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app: konnectivity-agent
+          component: tunnel
+```
 
 ### Error while bootstrapping the data directory
 
