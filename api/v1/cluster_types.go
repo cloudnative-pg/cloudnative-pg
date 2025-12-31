@@ -2021,7 +2021,8 @@ type RecoveryTarget struct {
 	// +optional
 	TargetLSN string `json:"targetLSN,omitempty"`
 
-	// The target time as a timestamp in the RFC3339 standard
+	// The target time as a timestamp in RFC3339 format or PostgreSQL timestamp format.
+	// Timestamps without an explicit timezone are interpreted as UTC.
 	// +optional
 	TargetTime string `json:"targetTime,omitempty"`
 

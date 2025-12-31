@@ -2232,7 +2232,7 @@ _Appears in:_
 | `targetXID` _string_ | The target transaction ID |  |  |  |
 | `targetName` _string_ | The target name (to be previously created<br />with `pg_create_restore_point`) |  |  |  |
 | `targetLSN` _string_ | The target LSN (Log Sequence Number) |  |  |  |
-| `targetTime` _string_ | The target time as a timestamp in the RFC3339 standard |  |  |  |
+| `targetTime` _string_ | The target time as a timestamp in RFC3339 format or PostgreSQL timestamp format.<br />Timestamps without an explicit timezone are interpreted as UTC. |  |  |  |
 | `targetImmediate` _boolean_ | End recovery as soon as a consistent state is reached |  |  |  |
 | `exclusive` _boolean_ | Set the target to be exclusive. If omitted, defaults to false, so that<br />in Postgres, `recovery_target_inclusive` will be true |  |  |  |
 
