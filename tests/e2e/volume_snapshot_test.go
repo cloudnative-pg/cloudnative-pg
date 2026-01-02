@@ -210,14 +210,17 @@ var _ = Describe("Verify Volume Snapshot",
 
 			It("correctly executes PITR with a cold snapshot", func() {
 				DeferCleanup(func() error {
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
+					for _, envvar := range []string{
+						snapshotDataEnv,
+						snapshotWalEnv,
+						recoveryTargetTimeEnv,
+						recoveryTargetTimeRFC3339Env,
+					} {
+						if err := os.Unsetenv(envvar); err != nil {
+							return err
+						}
 					}
-					if err := os.Unsetenv(snapshotWalEnv); err != nil {
-						return err
-					}
-					err := os.Unsetenv(recoveryTargetTimeEnv)
-					return err
+					return nil
 				})
 
 				By("creating the cluster to snapshot", func() {
