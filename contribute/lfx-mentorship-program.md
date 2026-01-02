@@ -20,7 +20,7 @@ to classify issues and pull requests.
 
 ## Current Mentorship Programs
 
-We are still planning our proposals for the [next LFX Mentorship Program (2026, term 3 March-May)](https://github.com/cncf/mentoring/tree/main/programs/lfx-mentorship/2026/01-Mar-May).
+We are still planning our proposals for the [next LFX Mentorship Program (2026, term 1 March-May)](https://github.com/cncf/mentoring/tree/main/programs/lfx-mentorship/2026/01-Mar-May).
 
 <!--
 If you’re interested in applying for a future term, we recommend preparing in
