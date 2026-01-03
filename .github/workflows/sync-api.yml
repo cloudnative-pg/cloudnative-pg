@@ -9,6 +9,7 @@ permissions: read-all
 
 jobs:
   trigger-sync:
+    if: ${{ github.repository == 'cloudnative-pg/cloudnative-pg' }}
     runs-on: ubuntu-latest
     steps:
       - name: Invoke repository dispatch

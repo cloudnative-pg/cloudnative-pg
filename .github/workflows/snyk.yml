@@ -12,6 +12,7 @@ permissions: read-all
 
 jobs:
   security:
+    if: ${{ github.repository == 'cloudnative-pg/cloudnative-pg' }}
     name: Security scan
     runs-on: ubuntu-24.04
     permissions:
@@ -26,7 +27,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          command: 'code test'
+          command: "code test"
           args: --sarif-file-output=snyk-static.sarif
 
       - name: Upload result to GitHub Code Scanning
