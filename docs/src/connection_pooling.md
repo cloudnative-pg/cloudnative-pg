@@ -221,15 +221,38 @@ replicate similar behavior to the default setup.
 
 ## Pod templates
 
-You can take advantage of pod templates specification in the `template`
-section of a `Pooler` resource. For details, see
-[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) in the API reference.
 
-Using templates, you can configure pods as you like, including fine control
-over affinity and anti-affinity rules for pods and nodes. By default,
-containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
+The `Pooler` resource allows you to customize the underlying pods via the
+`template` section. This provides full access to the Kubernetes `PodSpec` for
+advanced configurations like scheduling constraints, custom security contexts,
+or resource overrides.
 
-This example shows `Pooler` specifying `PodAntiAffinity``:
+For a complete list of supported fields, see the
+[`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) API reference.
+
+### Key requirements
+
+- **The `pgbouncer` container name:** When overriding container settings (like
+  images or resources), the name of the container **must** be set to
+  `pgbouncer`. The operator looks for this specific name to manage the
+  PgBouncer process.
+
+- **Mandatory `containers` field:** Since `template` follows the standard
+  Kubernetes `PodSpec` schema, the `containers` field is mandatory.
+
+- If you aren't modifying container-level settings, you must set it to an empty
+  array: `containers: []`.
+
+- If the `containers` field is missing, the API server will throw a
+  `ValidationError`.
+
+### Examples
+
+#### High availability with pod anti-affinity
+
+This configuration uses `podAntiAffinity` to ensure that PgBouncer pods are
+distributed across different nodes, preventing a single node failure from
+taking down the entire pool.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -260,16 +283,10 @@ spec:
             topologyKey: "kubernetes.io/hostname"
 ```
 
-:::note
-    Explicitly set `.spec.template.spec.containers` to `[]` when not modified,
-    as it's a required field for a `PodSpec`. If `.spec.template.spec.containers`
-    isn't set, the Kubernetes api-server returns the following error when trying to
-    apply the manifest:`error validating "pooler.yaml": error validating data:
-    ValidationError(Pooler.spec.template.spec): missing required field
-    "containers"`
-:::
+#### Custom image and resource limits
 
-This example sets resources and changes the used image:
+You can specify a custom image and define resource requests/limits. Note that
+the container name is explicitly set to `pgbouncer`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -288,6 +305,7 @@ spec:
         app: pooler
     spec:
       containers:
+        # This name MUST be "pgbouncer"
         - name: pgbouncer
           image: my-pgbouncer:latest
           resources:

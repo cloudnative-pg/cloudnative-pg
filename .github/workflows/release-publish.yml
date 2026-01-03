@@ -195,7 +195,7 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       -
         name: Login to ghcr.io
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -277,7 +277,7 @@ jobs:
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Login to ghcr.io
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -303,7 +303,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: bundle
           path: |
@@ -331,7 +331,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: bundle
 
@@ -342,7 +342,7 @@ jobs:
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
@@ -414,7 +414,7 @@ jobs:
           git config user.name "${{ needs.release-binaries.outputs.author_name }}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: bundle
       -

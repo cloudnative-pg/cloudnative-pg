@@ -95,9 +95,6 @@ oc apply -f cloudnative-pg-catalog.yaml
 # create the secret for the index to be pulled in the marketplace
 oc create secret docker-registry -n openshift-marketplace --docker-server="${REGISTRY}" --docker-username="${REGISTRY_USER}" --docker-password="${REGISTRY_PASSWORD}" cnpg-pull-secret || true
 
-# Create the default configmap to set global keepalives on all the tests
-oc create configmap -n openshift-operators --from-literal=STANDBY_TCP_USER_TIMEOUT=5000 cnpg-controller-manager-config
-
 # Install the operator
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -110,6 +107,14 @@ spec:
   name: cloudnative-pg
   source: cloudnative-pg-catalog
   sourceNamespace: openshift-marketplace
+  config:
+    env:
+    - name: POSTGRES_IMAGE_NAME
+      value: ${POSTGRES_IMG}
+    - name: PGBOUNCER_IMAGE_NAME
+      value: ${PGBOUNCER_IMG}
+    - name: STANDBY_TCP_USER_TIMEOUT
+      value: "5000"
 EOF
 
 # The subscription will install the operator, but the service account used
@@ -127,20 +132,13 @@ CSV_NAME=$(oc get csv -n openshift-operators -l 'operators.coreos.com/cloudnativ
 DEPLOYMENT_NAME=$(oc get csv -n openshift-operators "$CSV_NAME" -o jsonpath='{.spec.install.spec.deployments[0].name}')
 wait_for deployment openshift-operators "$DEPLOYMENT_NAME" 5 60
 
-# Force a default postgresql and pgbouncer image in the running operator
-oc patch -n openshift-operators csv "$CSV_NAME" --type='json' -p \
-"[
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"POSTGRES_IMAGE_NAME\", \"value\": \"${POSTGRES_IMG}\"}},
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/1\", \"value\": { \"name\": \"PGBOUNCER_IMAGE_NAME\", \"value\": \"${PGBOUNCER_IMG}\"}}
-]"
-
-# After patching, we need some time to propagate the change to the deployment and the pod.
+# After creating Subscription, OLM needs time to create and start the operator pod with the configured environment
 ITER=0
 while true; do
   ITER=$((ITER + 1))
   sleep 5
   if [[ $ITER -gt 60 ]]; then
-    echo "Patch not propagated to pod, exiting"
+    echo "OLM did not create operator pod with correct environment, exiting"
     oc get -n openshift-operators "$(oc get -n openshift-operators deployments -o name)" -o yaml || true
     oc get -n openshift-operators "$(oc get -n openshift-operators pods -o name)" -o yaml || true
     oc logs -n openshift-operators "$(oc get -n openshift-operators pods -o name)" || true

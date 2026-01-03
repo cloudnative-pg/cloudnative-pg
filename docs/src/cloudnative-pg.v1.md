@@ -275,8 +275,10 @@ _Appears in:_
 | `backupId` _string_ | The ID of the Barman backup |  |  |  |
 | `backupName` _string_ | The Name of the Barman backup |  |  |  |
 | `phase` _[BackupPhase](#backupphase)_ | The last backup status |  |  |  |
-| `startedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup was started |  |  |  |
-| `stoppedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup was terminated |  |  |  |
+| `startedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup execution was started by the backup tool |  |  |  |
+| `stoppedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup execution was terminated by the backup tool |  |  |  |
+| `reconciliationStartedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the backup process was started by the operator |  |  |  |
+| `reconciliationTerminatedAt` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | When the reconciliation was terminated by the operator (either successfully or not) |  |  |  |
 | `beginWal` _string_ | The starting WAL |  |  |  |
 | `endWal` _string_ | The ending WAL |  |  |  |
 | `beginLSN` _string_ | The starting xlog |  |  |  |
@@ -2230,7 +2232,7 @@ _Appears in:_
 | `targetXID` _string_ | The target transaction ID |  |  |  |
 | `targetName` _string_ | The target name (to be previously created<br />with `pg_create_restore_point`) |  |  |  |
 | `targetLSN` _string_ | The target LSN (Log Sequence Number) |  |  |  |
-| `targetTime` _string_ | The target time as a timestamp in the RFC3339 standard |  |  |  |
+| `targetTime` _string_ | The target time as a timestamp in RFC3339 format or PostgreSQL timestamp format.<br />Timestamps without an explicit timezone are interpreted as UTC. |  |  |  |
 | `targetImmediate` _boolean_ | End recovery as soon as a consistent state is reached |  |  |  |
 | `exclusive` _boolean_ | Set the target to be exclusive. If omitted, defaults to false, so that<br />in Postgres, `recovery_target_inclusive` will be true |  |  |  |
 
