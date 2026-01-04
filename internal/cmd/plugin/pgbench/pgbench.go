@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -159,9 +160,25 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 							Env:             cmd.buildEnvVariables(),
 							Command:         []string{pgBenchKeyWord},
 							Args:            cmd.pgBenchCommandArgs,
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To[bool](false),
+								Privileged:               ptr.To[bool](false),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
+								},
+							},
 						},
 					},
 					NodeSelector: cmd.buildNodeSelector(),
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To[bool](true),
+						RunAsUser:    ptr.To[int64](1000),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 				},
 			},
 		},
