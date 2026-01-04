@@ -164,7 +164,7 @@ jobs:
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
-          version: v2
+          version: v2.10.2
           args: release --clean --timeout 60m
         env:
           DATE: ${{ env.DATE }}
