@@ -104,9 +104,10 @@ spec:
 
 #### Deprecation of Automatic `PodMonitor` Creation
 
-!!!warning "Feature Deprecation Notice"
+:::warning[Feature Deprecation Notice]
     The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
     now deprecated and will be removed in a future version of the operator.
+:::
 
 If you are currently using this feature, we strongly recommend you either
 remove or set `.spec.monitoring.enablePodMonitor` to `false` and manually
