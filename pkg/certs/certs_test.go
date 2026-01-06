@@ -21,6 +21,7 @@ package certs
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/pem"
 	"time"
@@ -207,6 +208,15 @@ var _ = Describe("Keypair generation", func() {
 			Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
 
 			Expect(newCert.DNSNames).To(Equal(oldCert.DNSNames))
+
+			By("ensuring the renewed certificate private key uses ECDSA P-384")
+			block, _ := pem.Decode(pair.Private)
+			Expect(block).ToNot(BeNil())
+
+			privKey, err := x509.ParseECPrivateKey(block.Bytes)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(privKey.Curve.Params().Name).To(Equal(elliptic.P384().Params().Name))
 		})
 
 		It("should be able to renew an existing certificate with new DNS names provided", func() {
@@ -248,6 +258,15 @@ var _ = Describe("Keypair generation", func() {
 			Expect(newCert.DNSNames).NotTo(Equal(oldCert.DNSNames))
 
 			Expect(newCert.DNSNames).To(Equal(newDNSNames))
+
+			By("ensuring the renewed certificate private key uses ECDSA P-384")
+			block, _ := pem.Decode(pair.Private)
+			Expect(block).ToNot(BeNil())
+
+			privKey, err := x509.ParseECPrivateKey(block.Bytes)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(privKey.Curve.Params().Name).To(Equal(elliptic.P384().Params().Name))
 		})
 
 		It("should be validated against the right server", func() {
