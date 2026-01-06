@@ -166,6 +166,14 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
+	// Volume snapshots may contain postgresql.auto.conf with read-only (0400)
+	autoConfPath := filepath.Join(info.PgData, "postgresql.auto.conf")
+	if err := os.Chmod(autoConfPath, 0o600); err != nil && !os.IsNotExist(err) {
+		contextLogger.Error(
+			err,"Error while changing mode of postgresql.auto.conf after snapshot restore, skipped",
+		)
+	}
+
 	return info.concludeRestore(ctx, cli, cluster, config, envs)
 }
 
@@ -469,6 +477,15 @@ func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, e
 		return err
 	}
 	contextLogger.Info("Restore completed")
+
+	// Make sures postgresql.auto.conf is writable during restore for PostgreSQL <=16
+	// The reconciler will later re-enforce the intended permissions.
+	autoConfPath := filepath.Join(info.PgData, "postgresql.auto.conf")
+	if err := os.Chmod(autoConfPath, 0o600); err != nil && !os.IsNotExist(err) {
+		contextLogger.Error(
+			err,"Error while changing mode of postgresql.auto.conf after restore, skipped",
+		)
+	}
 	return nil
 }
 
