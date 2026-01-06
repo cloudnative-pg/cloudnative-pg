@@ -259,7 +259,7 @@ var _ = Describe("Keypair generation", func() {
 
 			Expect(newCert.DNSNames).To(Equal(newDNSNames))
 
-			By("ensuring the renewed certificate private key uses ECDSA P-384")
+			By("ensuring the certificate private key uses ECDSA P-384")
 			block, _ := pem.Decode(pair.Private)
 			Expect(block).ToNot(BeNil())
 
