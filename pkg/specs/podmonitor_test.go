@@ -157,7 +157,7 @@ var _ = Describe("PodMonitor test", func() {
 
 		expectedEndpoint := monitoringv1.PodMetricsEndpoint{
 			Port:   &metricsPort,
-			Scheme: "https",
+			Scheme: ptr.To(monitoringv1.SchemeHTTPS),
 			HTTPConfig: monitoringv1.HTTPConfig{
 				TLSConfig: &monitoringv1.SafeTLSConfig{
 					CA: monitoringv1.SecretOrConfigMap{
