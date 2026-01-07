@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -35,7 +36,23 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+// ErrTimelineDivergence is returned when a replica's timeline has diverged from
+// the primary's timeline after a failover. This typically happens when a replica
+// has a checkpoint on an older timeline that is past the fork point of the new timeline.
+// The replica cannot recover normally and needs to be re-cloned.
+type ErrTimelineDivergence struct {
+	LocalTimeline   int
+	PrimaryTimeline int
+}
+
+// Error implements the error interface
+func (e ErrTimelineDivergence) Error() string {
+	return fmt.Sprintf("timeline divergence detected: local timeline %d is behind primary timeline %d",
+		e.LocalTimeline, e.PrimaryTimeline)
+}
 
 // verifyPgDataCoherenceForPrimary will abort the execution if the current server is a primary
 // one from the PGDATA viewpoint, but is not classified as the target nor the
@@ -145,6 +162,108 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		// Now I can demote myself
 		return r.instance.Demote(ctx, cluster)
 	}
+}
+
+// verifyPgDataCoherenceForReplica checks if a replica's timeline has diverged from the primary's
+// timeline and handles recovery by signaling that a re-clone is needed.
+//
+// The scenario this handles:
+// 1. Replica is on timeline N with checkpoint at LSN X
+// 2. A failover occurs creating timeline N+1 which forked from timeline N at LSN Y
+// 3. If X > Y, the replica has data that doesn't exist on the new timeline
+// 4. PostgreSQL will refuse to start with "requested timeline is not a child of this server's history"
+//
+// Unlike a former primary (which can use pg_rewind), a pure replica that was never promoted
+// cannot use pg_rewind because it never generated its own diverged WAL. The only solution
+// is to delete PGDATA and re-clone from the new primary via pg_basebackup.
+func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Only handle replicas, not primaries (primaries use verifyPgDataCoherenceForPrimary)
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		return err
+	}
+	if isPrimary {
+		return nil
+	}
+
+	// Skip if this instance is the target primary (promotion in progress)
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() {
+		return nil
+	}
+
+	// If cluster timeline is not yet set, skip verification
+	clusterTimeline := cluster.Status.TimelineID
+	if clusterTimeline == 0 {
+		contextLogger.Debug("Cluster timeline not available, skipping timeline verification")
+		return nil
+	}
+
+	// Get local timeline from pg_controldata
+	pgControlDataOutput, err := r.instance.GetPgControldata()
+	if err != nil {
+		return fmt.Errorf("while getting pg_controldata: %w", err)
+	}
+
+	pgControlData := utils.ParsePgControldataOutput(pgControlDataOutput)
+	localTimelineStr := pgControlData.GetLatestCheckpointTimelineID()
+	if localTimelineStr == "" {
+		return fmt.Errorf("could not get timeline from pg_controldata output")
+	}
+
+	localTimeline, err := strconv.Atoi(localTimelineStr)
+	if err != nil {
+		return fmt.Errorf("while parsing local timeline %q: %w", localTimelineStr, err)
+	}
+
+	contextLogger.Info("Verifying replica timeline coherence",
+		"localTimeline", localTimeline,
+		"clusterTimeline", clusterTimeline)
+
+	// If local timeline matches or is ahead of cluster timeline, we're OK.
+	// Equal timeline means replica is on the same timeline as primary (normal operation).
+	// Ahead could mean we're the new primary that just promoted (handled by other checks).
+	if localTimeline >= clusterTimeline {
+		contextLogger.Debug("Replica timeline is compatible with cluster",
+			"localTimeline", localTimeline,
+			"clusterTimeline", clusterTimeline)
+		return nil
+	}
+
+	// Timeline mismatch detected - the replica is on an older timeline than the cluster.
+	// This typically happens after a failover when a replica has been down or lagging.
+	//
+	// There are two possible scenarios:
+	// 1. Replica's checkpoint is BEFORE the fork point → PostgreSQL can recover normally
+	// 2. Replica's checkpoint is AFTER the fork point → PostgreSQL cannot recover
+	//
+	// For scenario 2, PostgreSQL would fail with:
+	// "requested timeline X is not a child of this server's history"
+	//
+	// Since we cannot easily determine the fork point LSN without parsing timeline history
+	// files from the WAL archive, we signal this condition to the operator which will
+	// mark this instance as unrecoverable and trigger a re-clone.
+	//
+	// Note: pg_rewind cannot be used here because this is a pure replica that was never
+	// a primary. pg_rewind requires the target to have generated its own diverged WAL.
+	contextLogger.Warning("Detected timeline mismatch on replica, signaling for re-clone",
+		"localTimeline", localTimeline,
+		"clusterTimeline", clusterTimeline,
+		"localCheckpointLocation", pgControlData.GetLatestCheckpointREDOLocation(),
+		"reason", "replica timeline is behind cluster, potential divergence after failover")
+
+	// Create the error and broadcast it to signal this fatal initialization error.
+	// The instance manager will exit with a specific exit code that the operator
+	// will detect and use to mark this instance as unrecoverable, triggering
+	// deletion of the PVC and re-cloning via pg_basebackup.
+	divergenceErr := ErrTimelineDivergence{
+		LocalTimeline:   localTimeline,
+		PrimaryTimeline: clusterTimeline,
+	}
+	r.systemInitialization.BroadcastError(divergenceErr)
+
+	return divergenceErr
 }
 
 // ReconcileTablespaces ensures the mount points created for the tablespaces

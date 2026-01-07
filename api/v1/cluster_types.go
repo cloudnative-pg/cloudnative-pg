@@ -118,6 +118,11 @@ const (
 	// to indicate that it started successfully, but the configured WAL
 	// archiving plugin is not available.
 	MissingWALArchivePlugin = 5
+
+	// TimelineDivergenceExitCode is the exit code used by the instance manager
+	// to indicate that a replica's timeline has diverged from the primary's
+	// timeline after a failover, requiring PGDATA deletion and re-cloning.
+	TimelineDivergenceExitCode = 6
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
