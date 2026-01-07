@@ -215,7 +215,8 @@ Get CloudNativePG operator version by using `kubectl-cnpg` plugin:
 :::tip
     You may need to tweak your network policies for this to fully work, see
     [here](#kubectl-cnpg-status-is-impaired-by-installed-network-policies) for
-    details.  :::
+    details.
+:::
 
 ```shell
 kubectl-cnpg status <CLUSTER>
@@ -839,7 +840,7 @@ In the [networking page](networking.md) you can find a network policy file
 that you can customize to create a `NetworkPolicy` explicitly allowing the
 operator to connect cross-namespace to cluster pods.
 
-### `kubectl cnpg status` is impaired by installed Network Policies
+### `kubectl cnpg status` prints errors and doesn't show the complete cluster status
 
 In some configurations, Kubernetes network policies can prevent `kubectl cnpg
 status` from extracting the full status of a database and you'll see an output
