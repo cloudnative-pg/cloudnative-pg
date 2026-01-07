@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -213,17 +213,17 @@ func WaitForReady(
 	timeoutSeconds uint,
 	checkWebhook bool,
 ) error {
-	return retry.Do(
-		func() error {
-			ready, err := IsReady(ctx, crudClient, checkWebhook)
-			if err != nil || !ready {
-				return fmt.Errorf("operator deployment is not ready")
-			}
-			return nil
-		},
-		retry.Delay(time.Second),
-		retry.Attempts(timeoutSeconds),
-	)
+	return retry.New(retry.Delay(time.Second),
+		retry.Attempts(timeoutSeconds)).
+		Do(
+			func() error {
+				ready, err := IsReady(ctx, crudClient, checkWebhook)
+				if err != nil || !ready {
+					return fmt.Errorf("operator deployment is not ready")
+				}
+				return nil
+			},
+		)
 }
 
 // isDeploymentReady returns true if the operator deployment has the expected number
