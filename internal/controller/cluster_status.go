@@ -837,6 +837,16 @@ func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
 	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
 }
 
+// isTerminatedBecauseOfTimelineDivergence checks if a Pod terminated because
+// the replica's timeline diverged from the primary's timeline after a failover.
+// This condition requires the instance to be re-cloned.
+func isTerminatedBecauseOfTimelineDivergence(pod *corev1.Pod) bool {
+	isTerminatedForTimelineDivergence := func(state *corev1.ContainerState) bool {
+		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.TimelineDivergenceExitCode
+	}
+	return hasPostgresContainerTerminationReason(pod, isTerminatedForTimelineDivergence)
+}
+
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {
 	var pgContainerStatus *corev1.ContainerStatus
 	for i := range pod.Status.ContainerStatuses {

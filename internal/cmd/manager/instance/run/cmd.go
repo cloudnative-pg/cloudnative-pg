@@ -133,6 +133,10 @@ func NewCmd() *cobra.Command {
 			if errors.Is(err, errWALArchivePluginNotAvailable) {
 				os.Exit(apiv1.MissingWALArchivePlugin)
 			}
+			var timelineDivergenceErr controller.ErrTimelineDivergence
+			if errors.As(err, &timelineDivergenceErr) {
+				os.Exit(apiv1.TimelineDivergenceExitCode)
+			}
 
 			return err
 		},
