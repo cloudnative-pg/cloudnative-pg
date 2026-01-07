@@ -54,7 +54,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 
 	if c.cluster.IsMetricsTLSEnabled() {
-		endpoint.Scheme = "https"
+		endpoint.Scheme = ptr.To(monitoringv1.SchemeHTTPS)
 		endpoint.TLSConfig = &monitoringv1.SafeTLSConfig{
 			CA: monitoringv1.SecretOrConfigMap{
 				Secret: &corev1.SecretKeySelector{
