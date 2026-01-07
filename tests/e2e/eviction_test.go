@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -86,26 +86,27 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		}
 
 		// Checking the Pod is actually evicted and resource version changed
-		err = retry.Do(
-			func() error {
-				err = env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: podName},
-					&pod)
-				if err != nil {
-					return err
-				}
-				// Sometimes the eviction status is too short, we can not see if has been changed.
-				// We checked the resource version here
-				if oldPodRV != pod.GetResourceVersion() {
-					GinkgoWriter.Printf("New resource version for %v pod: %v \n",
-						pod.GetName(), pod.GetResourceVersion())
-					return nil
-				}
-				return fmt.Errorf("pod %v has not been evicted", pod.Name)
-			},
+		err = retry.New(
 			retry.Delay(2*time.Second),
-			retry.Attempts(timeoutSeconds),
-		)
+			retry.Attempts(timeoutSeconds)).
+			Do(
+				func() error {
+					err = env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: podName},
+						&pod)
+					if err != nil {
+						return err
+					}
+					// Sometimes the eviction status is too short, we can not see if has been changed.
+					// We checked the resource version here
+					if oldPodRV != pod.GetResourceVersion() {
+						GinkgoWriter.Printf("New resource version for %v pod: %v \n",
+							pod.GetName(), pod.GetResourceVersion())
+						return nil
+					}
+					return fmt.Errorf("pod %v has not been evicted", pod.Name)
+				},
+			)
 		return err
 	}
 
