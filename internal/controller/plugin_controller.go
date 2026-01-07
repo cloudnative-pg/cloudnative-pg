@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -79,9 +81,6 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var service corev1.Service
 	if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
-		// TODO(leonardoce): use a finalizer to detect when a plugin service
-		// is removed, and remove the corresponding plugin from the pool
-
 		// This also happens when you delete a resource in k8s
 		if apierrs.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -101,6 +100,22 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if len(pluginName) == 0 {
 		contextLogger.Info("Detected service whose plugin name label is empty, skipping")
 		return ctrl.Result{}, nil
+	}
+
+	// Handle deletion
+	if !service.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, r.handleDeletion(ctx, &service, pluginName)
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
+		contextLogger.Debug("Adding finalizer to plugin service")
+		controllerutil.AddFinalizer(&service, utils.PluginFinalizerName)
+		if err := r.Update(ctx, &service); err != nil {
+			contextLogger.Error(err, "Error while adding finalizer to plugin service")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	res, err := r.reconcile(ctx, &service, pluginName)
@@ -247,6 +262,28 @@ func (r *PluginReconciler) reconcile(
 	contextLogger.Info("Registered plugin")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *PluginReconciler) handleDeletion(
+	ctx context.Context,
+	service *corev1.Service,
+	pluginName string,
+) error {
+	contextLogger := log.FromContext(ctx).WithValues("pluginName", pluginName)
+
+	if controllerutil.ContainsFinalizer(service, utils.PluginFinalizerName) {
+		contextLogger.Info("Removing plugin from pool due to service deletion")
+		r.Plugins.ForgetPlugin(pluginName)
+
+		contextLogger.Debug("Removing finalizer from plugin service")
+		controllerutil.RemoveFinalizer(service, utils.PluginFinalizerName)
+		if err := r.Update(ctx, service); err != nil {
+			contextLogger.Error(err, "Error while removing finalizer from plugin service")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *PluginReconciler) getSecret(
