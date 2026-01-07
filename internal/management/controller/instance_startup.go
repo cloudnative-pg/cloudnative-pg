@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -200,7 +201,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context
 		return nil
 	}
 
-	// Get local timeline from pg_controldata
+	// Get local timeline and checkpoint LSN from pg_controldata
 	pgControlDataOutput, err := r.instance.GetPgControldata()
 	if err != nil {
 		return fmt.Errorf("while getting pg_controldata: %w", err)
@@ -221,37 +222,71 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context
 		"localTimeline", localTimeline,
 		"clusterTimeline", clusterTimeline)
 
-	// If local timeline matches or is ahead of cluster timeline, we're OK.
-	// Equal timeline means replica is on the same timeline as primary (normal operation).
-	// Ahead could mean we're the new primary that just promoted (handled by other checks).
+	// If replica is on the same or newer timeline, no divergence possible
 	if localTimeline >= clusterTimeline {
-		contextLogger.Debug("Replica timeline is compatible with cluster",
-			"localTimeline", localTimeline,
-			"clusterTimeline", clusterTimeline)
 		return nil
 	}
 
-	// Timeline mismatch detected - the replica is on an older timeline than the cluster.
-	// This typically happens after a failover when a replica has been down or lagging.
+	// Replica is on an older timeline than the cluster. This happens after a failover.
+	// We need to check if the replica's checkpoint is past the fork point.
 	//
-	// There are two possible scenarios:
-	// 1. Replica's checkpoint is BEFORE the fork point → PostgreSQL can recover normally
-	// 2. Replica's checkpoint is AFTER the fork point → PostgreSQL cannot recover
+	// The fork point is recorded in the timeline history file for the cluster's timeline.
+	// For example, if cluster is on timeline 21, pg_wal/00000015.history contains:
+	//   20  18FC/2E000110  no recovery target specified
+	// This means timeline 21 forked from timeline 20 at LSN 18FC/2E000110.
 	//
-	// For scenario 2, PostgreSQL would fail with:
-	// "requested timeline X is not a child of this server's history"
-	//
-	// Since we cannot easily determine the fork point LSN without parsing timeline history
-	// files from the WAL archive, we signal this condition to the operator which will
-	// mark this instance as unrecoverable and trigger a re-clone.
-	//
-	// Note: pg_rewind cannot be used here because this is a pure replica that was never
-	// a primary. pg_rewind requires the target to have generated its own diverged WAL.
-	contextLogger.Warning("Detected timeline mismatch on replica, signaling for re-clone",
+	// If the replica's checkpoint LSN is > fork point LSN, it has diverged data
+	// and cannot recover normally.
+
+	localCheckpointLSN := pgControlData.GetLatestCheckpointLocation()
+	if localCheckpointLSN == "" {
+		contextLogger.Warning("Could not get checkpoint LSN from pg_controldata, skipping divergence check")
+		return nil
+	}
+
+	// Read the timeline history file to get the fork point
+	forkPointLSN, err := r.getForkPointLSN(ctx, clusterTimeline, localTimeline)
+	if err != nil {
+		// If we can't read the history file, let PostgreSQL try to start.
+		// It will fail with a clear error if there's actually a divergence.
+		contextLogger.Warning("Could not determine fork point LSN, letting PostgreSQL attempt recovery",
+			"error", err,
+			"clusterTimeline", clusterTimeline,
+			"localTimeline", localTimeline)
+		return nil
+	}
+
+	contextLogger.Info("Checking for timeline divergence",
 		"localTimeline", localTimeline,
 		"clusterTimeline", clusterTimeline,
-		"localCheckpointLocation", pgControlData.GetLatestCheckpointREDOLocation(),
-		"reason", "replica timeline is behind cluster, potential divergence after failover")
+		"localCheckpointLSN", localCheckpointLSN,
+		"forkPointLSN", forkPointLSN)
+
+	// Compare LSNs to detect divergence
+	diverged, err := isLSNGreaterThan(localCheckpointLSN, forkPointLSN)
+	if err != nil {
+		contextLogger.Warning("Could not compare LSNs, letting PostgreSQL attempt recovery",
+			"error", err,
+			"localCheckpointLSN", localCheckpointLSN,
+			"forkPointLSN", forkPointLSN)
+		return nil
+	}
+
+	if !diverged {
+		// Replica's checkpoint is before the fork point, it can recover normally
+		contextLogger.Info("Replica checkpoint is before fork point, recovery should succeed",
+			"localCheckpointLSN", localCheckpointLSN,
+			"forkPointLSN", forkPointLSN)
+		return nil
+	}
+
+	// Divergence confirmed: replica's checkpoint is past the fork point
+	contextLogger.Warning("Detected timeline divergence on replica, signaling for re-clone",
+		"localTimeline", localTimeline,
+		"clusterTimeline", clusterTimeline,
+		"localCheckpointLSN", localCheckpointLSN,
+		"forkPointLSN", forkPointLSN,
+		"reason", "replica checkpoint is past the fork point, cannot recover")
 
 	// Create the error and broadcast it to signal this fatal initialization error.
 	// The instance manager will exit with a specific exit code that the operator
@@ -264,6 +299,112 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context
 	r.systemInitialization.BroadcastError(divergenceErr)
 
 	return divergenceErr
+}
+
+// getForkPointLSN reads the timeline history file to find the LSN where
+// the cluster timeline forked from the local timeline.
+//
+// Timeline history files are stored in pg_wal/ with the format NNNNNNNN.history
+// where NNNNNNNN is the timeline ID in hex. The file contains lines like:
+//
+//	<parent_tli>  <switchpoint_lsn>  <reason>
+//
+// For example, 00000015.history (timeline 21) might contain:
+//
+//	20  18FC/2E000110  no recovery target specified
+func (r *InstanceReconciler) getForkPointLSN(ctx context.Context, clusterTimeline, localTimeline int) (string, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Build the history file path: pg_wal/NNNNNNNN.history
+	historyFileName := fmt.Sprintf("%08X.history", clusterTimeline)
+	historyFilePath := filepath.Join(r.instance.PgData, "pg_wal", historyFileName)
+
+	contextLogger.Debug("Reading timeline history file",
+		"path", historyFilePath,
+		"clusterTimeline", clusterTimeline,
+		"localTimeline", localTimeline)
+
+	content, err := os.ReadFile(historyFilePath) //nolint: gosec
+	if err != nil {
+		return "", fmt.Errorf("while reading history file %s: %w", historyFilePath, err)
+	}
+
+	// Parse the history file to find the fork point for our timeline
+	return parseTimelineHistoryForForkPoint(string(content), localTimeline)
+}
+
+// parseTimelineHistoryForForkPoint parses a timeline history file content and
+// returns the fork point LSN for the specified parent timeline.
+//
+// The history file format is:
+//
+//	<parent_tli>  <switchpoint_lsn>  <reason>
+//
+// Lines starting with # are comments.
+func parseTimelineHistoryForForkPoint(content string, parentTimeline int) (string, error) {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse: <tli>\t<lsn>\t<reason>
+		// The fields are separated by tabs, and the reason may contain spaces
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) < 2 {
+			// Try space separation as fallback
+			fields = strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+		}
+
+		tli, err := strconv.Atoi(strings.TrimSpace(fields[0]))
+		if err != nil {
+			continue
+		}
+
+		if tli == parentTimeline {
+			return strings.TrimSpace(fields[1]), nil
+		}
+	}
+
+	return "", fmt.Errorf("fork point for timeline %d not found in history", parentTimeline)
+}
+
+// isLSNGreaterThan compares two LSN strings and returns true if lsn1 > lsn2.
+// LSN format is "XXXX/XXXXXXXX" where X is a hex digit.
+func isLSNGreaterThan(lsn1, lsn2 string) (bool, error) {
+	parse := func(lsn string) (uint64, uint64, error) {
+		parts := strings.Split(lsn, "/")
+		if len(parts) != 2 {
+			return 0, 0, fmt.Errorf("invalid LSN format: %s", lsn)
+		}
+		high, err := strconv.ParseUint(parts[0], 16, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid LSN high part: %s", parts[0])
+		}
+		low, err := strconv.ParseUint(parts[1], 16, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid LSN low part: %s", parts[1])
+		}
+		return high, low, nil
+	}
+
+	high1, low1, err := parse(lsn1)
+	if err != nil {
+		return false, err
+	}
+	high2, low2, err := parse(lsn2)
+	if err != nil {
+		return false, err
+	}
+
+	if high1 != high2 {
+		return high1 > high2, nil
+	}
+	return low1 > low2, nil
 }
 
 // ReconcileTablespaces ensures the mount points created for the tablespaces

@@ -479,7 +479,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Handle replicas that terminated due to timeline divergence after failover
-	if res, err := r.markTimelineDivergenceInstancesAsUnrecoverable(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+	if res, err := r.markTimelineDivergenceInstancesAsUnrecoverable(
+		ctx,
+		cluster,
+		instancesStatus,
+	); err != nil || !res.IsZero() {
 		return res, err
 	}
 
