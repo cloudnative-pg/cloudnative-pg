@@ -51,6 +51,10 @@ const (
 	// checkpoint's REDO location pg_controldata entry
 	pgControlDataKeyLatestCheckpointREDOLocation pgControlDataKey = "Latest checkpoint's REDO location"
 
+	// pgControlDataKeyLatestCheckpointLocation is the latest
+	// checkpoint location pg_controldata entry
+	pgControlDataKeyLatestCheckpointLocation pgControlDataKey = "Latest checkpoint location"
+
 	// pgControlDataKeyTimeOfLatestCheckpoint is the time
 	// of latest checkpoint pg_controldata entry
 	pgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
@@ -99,6 +103,11 @@ func (p PgControlData) GetDatabaseSystemIdentifier() string {
 // GetLatestCheckpointREDOLocation returns the latest checkpoint's REDO location
 func (p PgControlData) GetLatestCheckpointREDOLocation() string {
 	return p[pgControlDataKeyLatestCheckpointREDOLocation]
+}
+
+// GetLatestCheckpointLocation returns the latest checkpoint location (the LSN of the checkpoint record)
+func (p PgControlData) GetLatestCheckpointLocation() string {
+	return p[pgControlDataKeyLatestCheckpointLocation]
 }
 
 // GetTimeOfLatestCheckpoint returns the time of latest checkpoint
