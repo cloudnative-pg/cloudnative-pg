@@ -331,6 +331,15 @@ var cleanupAutoConfOptions = []string{
 func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx).WithName("migratePostgresAutoConfFile")
 
+	// Ensure postgresql.auto.conf is writable before attempting to write to it.
+	// On PostgreSQL ≤16, this file may be read-only (0400) to prevent ALTER SYSTEM,
+	// but we need to write to it during migration. The reconciler will reset
+	// permissions later based on the cluster configuration.
+	if err := instance.SetPostgreSQLAutoConfWritable(true); err != nil && !os.IsNotExist(err) {
+		contextLogger.Debug("Could not ensure postgresql.auto.conf is writable, continuing anyway",
+			"error", err)
+	}
+
 	// this is an idempotent operation. Ensures that we always include the override import.
 	// See: #5747
 	if changed, err = configfile.EnsureIncludes(path.Join(instance.PgData, "postgresql.conf"),
