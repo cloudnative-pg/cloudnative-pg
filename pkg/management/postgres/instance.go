@@ -54,6 +54,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -170,12 +171,6 @@ type Instance struct {
 	// adding the PostgreSQL CNPGConfigSha256 parameter
 	ConfigSha256 string
 
-	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
-	PgCtlTimeoutForPromotion int32
-
-	// specifies the maximum number of seconds to wait when shutting down for a switchover
-	MaxSwitchoverDelay int32
-
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
 
@@ -193,16 +188,6 @@ type Instance struct {
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
-
-	// MaxStopDelay is the current MaxStopDelay of the cluster
-	MaxStopDelay int32
-
-	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
-	SmartStopDelay int32
-
-	// RequiresDesignatedPrimaryTransition indicates if this instance is a primary that needs to become
-	// a designatedPrimary
-	RequiresDesignatedPrimaryTransition bool
 
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
@@ -303,6 +288,29 @@ func (instance *Instance) SetFencing(enabled bool) {
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
 func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
+}
+
+// RequiresDesignatedPrimaryTransition checks if this instance is a primary
+// that needs to become a designated primary in a replica cluster
+func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
+	if instance.Cluster == nil {
+		return false
+	}
+
+	if !instance.Cluster.IsReplica() {
+		return false
+	}
+
+	if !conditions.IsDesignatedPrimaryTransitionRequested(instance.Cluster) {
+		return false
+	}
+
+	if !instance.IsFenced() && !instance.MightBeUnavailable() {
+		return false
+	}
+
+	isPrimary, _ := instance.IsPrimary()
+	return isPrimary
 }
 
 // CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
@@ -575,11 +583,12 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	var err error
 
-	smartTimeout := instance.SmartStopDelay
-	if instance.MaxStopDelay <= instance.SmartStopDelay {
+	smartTimeout := instance.Cluster.GetSmartShutdownTimeout()
+	maxStopDelay := instance.Cluster.GetMaxStopDelay()
+	if maxStopDelay <= smartTimeout {
 		contextLogger.Warning("Ignoring maxStopDelay <= smartShutdownTimeout",
-			"smartShutdownTimeout", instance.SmartStopDelay,
-			"maxStopDelay", instance.MaxStopDelay,
+			"smartShutdownTimeout", smartTimeout,
+			"maxStopDelay", maxStopDelay,
 		)
 		smartTimeout = 0
 	}
@@ -625,12 +634,13 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
+	maxSwitchoverDelay := instance.Cluster.GetMaxSwitchoverDelay()
 	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
 			Mode:    shutdownModeFast,
 			Wait:    true,
-			Timeout: &instance.MaxSwitchoverDelay,
+			Timeout: &maxSwitchoverDelay,
 		},
 	)
 	var exitError *exec.ExitError

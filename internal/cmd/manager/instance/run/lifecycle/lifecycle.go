@@ -140,7 +140,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// resulting in a data corruption.
 				contextLogger.Info("Received termination signal",
 					"signal", sig,
-					"smartShutdownTimeout", i.instance.SmartStopDelay,
+					"smartShutdownTimeout", i.instance.Cluster.GetSmartShutdownTimeout(),
 				)
 				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
 					contextLogger.Error(err, "error while shutting down instance, proceeding")
