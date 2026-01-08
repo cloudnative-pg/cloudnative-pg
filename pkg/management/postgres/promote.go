@@ -44,7 +44,7 @@ func (instance *Instance) PromoteAndWait(ctx context.Context) error {
 		instance.PgData,
 		"-w",
 		"promote",
-		"-t " + strconv.Itoa(int(instance.PgCtlTimeoutForPromotion)),
+		"-t " + strconv.Itoa(int(instance.Cluster.GetPgCtlTimeoutForPromotion())),
 	}
 
 	contextLogger.Info("Promoting instance", "pgctl_options", options)
