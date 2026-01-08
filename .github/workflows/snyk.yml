@@ -12,6 +12,7 @@ permissions: read-all
 
 jobs:
   security:
+    if: ${{ github.repository_owner == 'cloudnative-pg' }}
     name: Security scan
     runs-on: ubuntu-24.04
     permissions:
