@@ -844,6 +844,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Replication role",
 		"Status",
 		"QoS",
+		"PostgreSQL Version",
 		"Manager Version",
 		"Node")
 
@@ -856,6 +857,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				"-",
 				apierrs.ReasonForError(instance.Error),
 				instance.Pod.Status.QOSClass,
+				"-",
 				"-",
 				instance.Pod.Spec.NodeName,
 			)
@@ -873,6 +875,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 			replicaRole,
 			statusMsg,
 			instance.Pod.Status.QOSClass,
+			instance.PostgreSQLVersion,
 			instance.InstanceManagerVersion,
 			instance.Pod.Spec.NodeName,
 		)
