@@ -30,8 +30,7 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 
 ## Getting Started
 
-The best way to get started is with the ["Quickstart"](docs/src/quickstart.md)
-section in the documentation.
+The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/docs/devel/quickstart/).
 
 ## Scope
 
