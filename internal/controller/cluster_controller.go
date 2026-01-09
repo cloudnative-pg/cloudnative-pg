@@ -1257,7 +1257,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
-	// Is this needed to be optional as well? Although its a pod resource
+	// This is not used in namespaced mode
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&corev1.Pod{},
