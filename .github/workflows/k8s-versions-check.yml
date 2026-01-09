@@ -110,6 +110,7 @@ jobs:
           # Version 4.15 is excluded as it is EOL
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
           grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
+          grep -v rc | \
           sed -E 's/href="//;s/\/"//;s/(4\.(1[46-9]|[2-9][0-9]))(\..*$)/\1/' | \
           sort -Vru | \
           awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
