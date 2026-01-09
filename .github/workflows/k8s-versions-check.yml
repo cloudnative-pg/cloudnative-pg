@@ -109,13 +109,11 @@ jobs:
           # We limit the range starting on 4 to 9 to skip the 13 version
           # this needs to be updated when the 15 version is also EOL
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
-          grep -Eo 'href.*"4\.(1[46-9]|20)\.[0-9].*"' | \
-          sed -E 's/href="//;s/\/"//;s/(4\.1[46-9]|2[0-9])(\..*$)/\1/' | \
+          grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
+          sed -E 's/href="//;s/\/"//;s/(4\.(1[46-9]|[2-9][0-9]))(\..*$)/\1/' | \
           sort -Vru | \
           awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
           jq -Rn '[inputs]' | tee .github/openshift_versions.json
-
-
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
