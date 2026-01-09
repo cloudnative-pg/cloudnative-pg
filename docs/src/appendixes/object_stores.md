@@ -27,6 +27,16 @@ You can also use any compatible implementation of the supported services.
 The required setup depends on the chosen storage provider and is
 discussed in the following sections.
 
+:::note Authentication Methods
+CloudNativePG does not independently test all authentication methods
+supported by `barman-cloud`. CloudNativePG's responsibility is limited to passing
+the provided credentials to `barman-cloud`, which then handles authentication
+according to its own implementation. Users should refer to the
+[Barman Cloud documentation](https://docs.pgbarman.org/release/latest/) to
+verify that their chosen authentication method is supported and properly
+configured.
+:::
+
 ## AWS S3
 
 [AWS Simple Storage Service (S3)](https://aws.amazon.com/s3/) is
