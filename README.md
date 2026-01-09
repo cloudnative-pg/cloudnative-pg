@@ -27,7 +27,7 @@ ongoing maintenance—through its core component, the CloudNativePG operator.
 
 ## Getting Started
 
-The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/documentation/current/quickstart/).
+The best way to get started is the [Quickstart Guide](/docs/src/quickstart.md).
 
 ## Scope
 
