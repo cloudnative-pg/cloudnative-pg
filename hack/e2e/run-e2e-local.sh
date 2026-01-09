@@ -72,7 +72,7 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.3
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.4
 
 
 # Unset DEBUG to prevent k8s from spamming messages
