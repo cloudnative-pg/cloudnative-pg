@@ -861,9 +861,8 @@ func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *c
 		return true
 	}
 
-	// The Pod is now running but not still ready, and last time it
-	// was terminated with the specified reason. Return true
-	// to indicate the termination reason was found
+	// The container is not ready and was last terminated with the specified reason.
+	// Return true to indicate the termination reason was found
 	if !pgContainerStatus.Ready && reason(&pgContainerStatus.LastTerminationState) {
 		return true
 	}
