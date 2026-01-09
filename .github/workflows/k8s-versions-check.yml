@@ -106,8 +106,8 @@ jobs:
       -
         name: Get updated OpenShift versions
         run: |
-          # We limit the range starting on 4 to 9 to skip the 13 version
-          # this needs to be updated when the 15 version is also EOL
+          # Match OpenShift 4.14, 4.16-4.19, and 4.20+
+          # Version 4.15 is excluded as it is EOL
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
           grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
           sed -E 's/href="//;s/\/"//;s/(4\.(1[46-9]|[2-9][0-9]))(\..*$)/\1/' | \
