@@ -21,7 +21,7 @@ env:
   # renovate: datasource=golang-version depName=golang versioning=loose
   GOLANG_VERSION: "1.25.5"
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
-  GOLANGCI_LINT_VERSION: "v2.7.2"
+  GOLANGCI_LINT_VERSION: "v2.8.0"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.31.0"
