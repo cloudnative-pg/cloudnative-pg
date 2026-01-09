@@ -25,6 +25,8 @@ defaults:
 env:
   MINIMAL_K8S: "1.29"
   MINIMAL_OCP: "4.14"
+  # Space-separated list of EOL OpenShift versions to exclude
+  EXCLUDED_OCP_VERSIONS: "4.15"
 
 jobs:
 
@@ -105,15 +107,19 @@ jobs:
       -
         name: Get updated OpenShift versions
         run: |
-          # Match OpenShift 4.14, 4.16-4.19, and 4.20+
-          # Version 4.15 is excluded as it is EOL
-          curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
-          grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
-          grep -v rc | \
-          sed -E 's/href="//;s/\/"//;s/(4\.(1[46-9]|[2-9][0-9]))(\..*$)/\1/' | \
+          versions=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
+          grep -v -- '-rc' | \
+          grep -Eo 'href="4\.[0-9]+\.[0-9]+' | \
+          sed 's/href="//;s/\.[0-9]*$//' | \
           sort -Vru | \
-          awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
-          jq -Rn '[inputs]' | tee .github/openshift_versions.json
+          awk -F. -vmin="${MINIMAL_OCP#4.}" '$2 >= min {print}')
+
+          # Filter out excluded versions
+          for version in $EXCLUDED_OCP_VERSIONS; do
+            versions=$(echo "$versions" | grep -v "^$version$")
+          done
+
+          echo "$versions" | jq -Rn '[inputs]' | tee .github/openshift_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
