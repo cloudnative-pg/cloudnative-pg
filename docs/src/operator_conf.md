@@ -229,7 +229,11 @@ env:
 ### RBAC Considerations
 
 When deploying in namespaced mode, the operator's default RBAC permissions can be restricted to not access `Nodes` and `ClusterImageCatalog`.
-In namespaced mode, the operator will not have permissions to access cluster-scoped resources or resources in other namespaces. Ensure that:
+In namespaced mode, the operator will not have permissions to access cluster-scoped resources or resources in other namespaces.
+
+### Known Limitations with SyncReplicaElectionConstraint
+
+`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to enforce deployment constraints for synchronous replicas during election. This feature will not work due to restricted rbac of the operator in namespaced mode.
 
 ### Known Limitations with PodDisruptionBudget
 

@@ -81,6 +81,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 			}
 		}
 	}
+
 	// Second step: check if the first element of the sorted list is the primary
 	if cluster.IsReplica() {
 		return r.reconcileTargetPrimaryForReplicaCluster(ctx, cluster, status, resources)

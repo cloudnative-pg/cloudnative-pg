@@ -179,9 +179,9 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
-	// Validate namespaced configuration constraints
-	if err := utils.ValidateNamespacedConfiguration(conf); err != nil {
-		setupLog.Error(err, "invalid namespaced configuration")
+	// Validate configuration combination
+	if err := conf.Validate(); err != nil {
+		setupLog.Error(err, "invalid configuration")
 		return err
 	}
 

@@ -170,14 +170,69 @@ var _ = Describe("Annotation and label inheritance", func() {
 		config := Data{}
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
+})
 
-	It("verifies namespaced mode excludes cluster-wide resources", func() {
-		config := Data{Namespaced: true}
-		Expect(config.Namespaced).To(BeTrue())
+var _ = Describe("Validate namespace parameters combination for namespaced deployment", func() {
+	It("should pass when namespaced is disabled", func() {
+		conf := &Data{
+			Namespaced:        false,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "watch-ns",
+		}
+		Expect(conf.Validate()).To(Succeed())
 	})
 
-	It("verifies namespaced mode excludes cluster-wide resources", func() {
-		config := Data{Namespaced: false}
-		Expect(config.Namespaced).To(BeFalse())
+	It("should pass when namespaced is enabled and namespaces match", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "same-ns",
+			WatchNamespace:    "same-ns",
+		}
+		Expect(conf.Validate()).To(Succeed())
+	})
+
+	It("should fail when namespaced is enabled and namespaces differ", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "watch-ns",
+		}
+		err := conf.Validate()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(
+			"operator namespace (operator-ns) and watch namespace (watch-ns) must be equal"))
+	})
+
+	It("should fail when namespaced is enabled and operator namespace is empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "",
+			WatchNamespace:    "watch-ns",
+		}
+		err := conf.Validate()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("operator namespace cannot be empty"))
+	})
+
+	It("should fail when namespaced is enabled and watch namespace is empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "",
+		}
+		err := conf.Validate()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("watch namespace cannot be empty"))
+	})
+
+	It("should fail when namespaced is enabled and both namespaces are empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "",
+			WatchNamespace:    "",
+		}
+		err := conf.Validate()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("operator namespace cannot be empty"))
 	})
 })

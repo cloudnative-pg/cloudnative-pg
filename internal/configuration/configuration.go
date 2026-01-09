@@ -22,6 +22,7 @@ SPDX-License-Identifier: Apache-2.0
 package configuration
 
 import (
+	"fmt"
 	"path"
 	"strings"
 	"time"
@@ -257,6 +258,43 @@ func (config *Data) GetIncludePlugins() []string {
 	}
 
 	return result
+}
+
+// Validate validates configuration parameters and combinations.
+// This can programatically validate deployment parameters
+// If validation fails it returns an error.
+func (config *Data) Validate() error {
+	if err := config.validateNamespacedConfiguration(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ValidateNamespacedConfiguration validates that when namespaced mode is enabled,
+// the operator namespace and watch namespace must be equal and non-empty
+func (config *Data) validateNamespacedConfiguration() error {
+	if !config.Namespaced {
+		return nil
+	}
+
+	if config.OperatorNamespace == "" {
+		return fmt.Errorf("when namespaced is enabled, operator namespace cannot be empty")
+	}
+
+	if config.WatchNamespace == "" {
+		return fmt.Errorf("when namespaced is enabled, watch namespace cannot be empty")
+	}
+
+	if config.OperatorNamespace != config.WatchNamespace {
+		return fmt.Errorf(
+			"when namespaced is enabled, operator namespace (%s) and watch namespace (%s) must be equal",
+			config.OperatorNamespace,
+			config.WatchNamespace,
+		)
+	}
+
+	return nil
 }
 
 func cleanNamespaceList(namespaces string) (result []string) {
