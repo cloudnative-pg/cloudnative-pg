@@ -27,7 +27,7 @@ ongoing maintenance—through its core component, the CloudNativePG operator.
 
 ## Getting Started
 
-The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/documentation/current/quickstart/).
+The best way to get started is the [Quickstart Guide](https://cloudnative-pg.io/docs/devel/quickstart/).
 
 ## Scope
 
@@ -181,7 +181,7 @@ of Canada, and used with their permission.
 [cncf-landscape]: https://landscape.cncf.io/?item=app-definition-and-development--database--cloudnativepg
 [stackoverflow]: https://stackoverflow.com/questions/tagged/cloudnative-pg
 [latest-release]: https://github.com/cloudnative-pg/cloudnative-pg/releases/latest
-[documentation]: https://cloudnative-pg.io/documentation/current/
+[documentation]: https://cloudnative-pg.io/docs
 [license]: https://github.com/cloudnative-pg/cloudnative-pg?tab=Apache-2.0-1-ov-file#readme
 [openssf]: https://www.bestpractices.dev/projects/9933
 [openssf-scorecard-badge]: https://api.scorecard.dev/projects/github.com/cloudnative-pg/cloudnative-pg/badge

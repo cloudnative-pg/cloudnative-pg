@@ -61,13 +61,14 @@ type BarmanCredentials = barmanApi.BarmanCredentials
 
 // AzureCredentials is the type for the credentials to be used to upload
 // files to Azure Blob Storage. The connection string contains every needed
-// information. If the connection string is not specified, we'll need the
-// storage account name and also one (and only one) of:
+// information. If the connection string is not specified, one (and only one)
+// of the following authentication methods must be specified:
 //
-// - storageKey
-// - storageSasToken
+// - storageKey (requires storageAccount)
+// - storageSasToken (requires storageAccount)
+// - inheritFromAzureAD (inheriting credentials from the pod environment)
+// - useDefaultAzureCredentials (using the default Azure authentication flow)
 //
-// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
 // +kubebuilder:object:generate:=false
 type AzureCredentials = barmanApi.AzureCredentials
 

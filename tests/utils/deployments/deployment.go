@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -65,26 +65,27 @@ func WaitForReady(
 	deployment *appsv1.Deployment,
 	timeoutSeconds uint,
 ) error {
-	err := retry.Do(
-		func() error {
-			if err := crudClient.Get(ctx, client.ObjectKey{
-				Namespace: deployment.Namespace,
-				Name:      deployment.Name,
-			}, deployment); err != nil {
-				return err
-			}
-			if !IsReady(*deployment) {
-				return fmt.Errorf(
-					"deployment not ready. Namespace: %v, Name: %v",
-					deployment.Namespace,
-					deployment.Name,
-				)
-			}
-			return nil
-		},
+	err := retry.New(
 		retry.Attempts(timeoutSeconds),
 		retry.Delay(time.Second),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				if err := crudClient.Get(ctx, client.ObjectKey{
+					Namespace: deployment.Namespace,
+					Name:      deployment.Name,
+				}, deployment); err != nil {
+					return err
+				}
+				if !IsReady(*deployment) {
+					return fmt.Errorf(
+						"deployment not ready. Namespace: %v, Name: %v",
+						deployment.Namespace,
+						deployment.Name,
+					)
+				}
+				return nil
+			},
+		)
 	return err
 }

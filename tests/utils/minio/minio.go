@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -93,28 +93,29 @@ func installMinio(
 	if err := env.Client.Create(env.Ctx, &minioSetup.Deployment); err != nil {
 		return err
 	}
-	err := retry.Do(
-		func() error {
-			deployment := &appsv1.Deployment{}
-			if err := env.Client.Get(
-				env.Ctx,
-				client.ObjectKey{Namespace: minioSetup.Deployment.Namespace, Name: minioSetup.Deployment.Name},
-				deployment,
-			); err != nil {
-				return err
-			}
-			if deployment.Status.ReadyReplicas != *minioSetup.Deployment.Spec.Replicas {
-				return fmt.Errorf("not all replicas are ready. Expected %v, found %v",
-					*minioSetup.Deployment.Spec.Replicas,
-					deployment.Status.ReadyReplicas,
-				)
-			}
-			return nil
-		},
+	err := retry.New(
 		retry.Attempts(timeoutSeconds),
 		retry.Delay(time.Second),
-		retry.DelayType(retry.FixedDelay),
-	)
+		retry.DelayType(retry.FixedDelay)).
+		Do(
+			func() error {
+				deployment := &appsv1.Deployment{}
+				if err := env.Client.Get(
+					env.Ctx,
+					client.ObjectKey{Namespace: minioSetup.Deployment.Namespace, Name: minioSetup.Deployment.Name},
+					deployment,
+				); err != nil {
+					return err
+				}
+				if deployment.Status.ReadyReplicas != *minioSetup.Deployment.Spec.Replicas {
+					return fmt.Errorf("not all replicas are ready. Expected %v, found %v",
+						*minioSetup.Deployment.Spec.Replicas,
+						deployment.Status.ReadyReplicas,
+					)
+				}
+				return nil
+			},
+		)
 	if err != nil {
 		return err
 	}

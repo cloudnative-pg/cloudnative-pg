@@ -27,6 +27,16 @@ You can also use any compatible implementation of the supported services.
 The required setup depends on the chosen storage provider and is
 discussed in the following sections.
 
+:::note Authentication Methods
+CloudNativePG does not independently test all authentication methods
+supported by `barman-cloud`. CloudNativePG's responsibility is limited to passing
+the provided credentials to `barman-cloud`, which then handles authentication
+according to its own implementation. Users should refer to the
+[Barman Cloud documentation](https://docs.pgbarman.org/release/latest/) to
+verify that their chosen authentication method is supported and properly
+configured.
+:::
+
 ## AWS S3
 
 [AWS Simple Storage Service (S3)](https://aws.amazon.com/s3/) is
@@ -195,17 +205,15 @@ spec:
 [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) is the
 object storage service provided by Microsoft.
 
-In order to access your storage account for backup and recovery of
-CloudNativePG managed databases, you will need one of the following
-combinations of credentials:
+CloudNativePG supports the following authentication methods for Azure Blob Storage:
 
 - [Connection String](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
-- Storage account name and [Storage account access key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
-- Storage account name and [Storage account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
-- Storage account name and [Azure AD Workload Identity](https://azure.github.io/azure-workload-identity/docs/introduction.html)
-properly configured.
+- Storage Account Name + [Storage Account Access Key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
+- Storage Account Name + [Storage Account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
+- [Azure AD Managed Identity](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/overview)
+- [Default Azure Credentials](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python)
 
-Using **Azure AD Workload Identity**, you can avoid saving the credentials into a Kubernetes Secret,
+Using **Azure AD Managed Identity**, you can avoid saving the credentials into a Kubernetes Secret,
 and have a Cluster configuration adding the `inheritFromAzureAD` as follows:
 
 ```yaml
@@ -218,6 +226,23 @@ spec:
       destinationPath: "<destination path here>"
       azureCredentials:
         inheritFromAzureAD: true
+```
+
+Alternatively, you can use the **Default Azure Credentials** authentication mechanism, which provides
+a seamless authentication experience by supporting multiple authentication methods including environment
+variables, managed identities, and Azure CLI credentials. Add the `useDefaultAzureCredentials` flag
+as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      azureCredentials:
+        useDefaultAzureCredentials: true
 ```
 
 On the other side, using both **Storage account access key** or **Storage account SAS Token**,
