@@ -986,10 +986,12 @@ func createOrPatchPodMonitor(
 		return nil
 	// Pod monitor disabled and pod monitor present - delete it
 	case !manager.IsPodMonitorEnabled() && podMonitor != nil:
-		contextLogger.Info("Deleting PodMonitor")
-		if err := cli.Delete(ctx, podMonitor); err != nil {
-			if !apierrs.IsNotFound(err) {
-				return err
+		if _, owned := IsOwnedByCluster(podMonitor); owned {
+			contextLogger.Info("Deleting PodMonitor")
+			if err := cli.Delete(ctx, podMonitor); err != nil {
+				if !apierrs.IsNotFound(err) {
+					return err
+				}
 			}
 		}
 		return nil
