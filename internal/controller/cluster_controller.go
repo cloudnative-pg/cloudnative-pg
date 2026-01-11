@@ -478,6 +478,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
+	// Handle replicas that terminated due to timeline divergence after failover
+	if res, err := r.markTimelineDivergenceInstancesAsUnrecoverable(
+		ctx,
+		cluster,
+		instancesStatus,
+	); err != nil || !res.IsZero() {
+		return res, err
+	}
+
 	if res, err := replicaclusterswitch.Reconcile(
 		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
@@ -633,6 +642,66 @@ func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
 
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// markTimelineDivergenceInstancesAsUnrecoverable detects instances that terminated
+// due to timeline divergence and marks them as unrecoverable. The existing
+// reconcileUnrecoverableInstances flow will then delete the PVCs and Pod,
+// triggering a re-clone via pg_basebackup.
+func (r *ClusterReconciler) markTimelineDivergenceInstancesAsUnrecoverable(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instances postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("timeline_divergence_handler")
+
+	for _, state := range instances.Items {
+		if !isTerminatedBecauseOfTimelineDivergence(state.Pod) {
+			continue
+		}
+
+		// Skip if already marked as unrecoverable
+		if state.Pod.Annotations != nil {
+			if _, ok := state.Pod.Annotations[utils.UnrecoverableInstanceAnnotationName]; ok {
+				continue
+			}
+		}
+
+		// Protect the primary from being marked as unrecoverable
+		if state.Pod.Name == cluster.Status.CurrentPrimary ||
+			state.Pod.Name == cluster.Status.TargetPrimary {
+			contextLogger.Warning(
+				"Refusing to mark primary instance as unrecoverable due to timeline divergence",
+				"podName", state.Pod.Name,
+				"currentPrimary", cluster.Status.CurrentPrimary,
+				"targetPrimary", cluster.Status.TargetPrimary)
+			continue
+		}
+
+		contextLogger.Warning(
+			"Detected instance terminated due to timeline divergence, marking as unrecoverable for re-clone",
+			"podName", state.Pod.Name)
+
+		// Set the unrecoverable annotation on the pod
+		oldPod := state.Pod.DeepCopy()
+		if state.Pod.Annotations == nil {
+			state.Pod.Annotations = make(map[string]string)
+		}
+		state.Pod.Annotations[utils.UnrecoverableInstanceAnnotationName] = "true"
+
+		if err := r.Patch(ctx, state.Pod, client.MergeFrom(oldPod)); err != nil {
+			contextLogger.Error(err, "Cannot patch pod with unrecoverable annotation", "pod", state.Pod.Name)
+			return ctrl.Result{}, err
+		}
+
+		contextLogger.Info(
+			"Marked instance as unrecoverable due to timeline divergence, will be re-cloned",
+			"podName", state.Pod.Name)
+
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil
