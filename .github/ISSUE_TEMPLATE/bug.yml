@@ -22,7 +22,7 @@ body:
     id: troubleshooting
     attributes:
       label: I have read the troubleshooting guide
-      description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/documentation/current/troubleshooting/#some-common-issues).
+      description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/docs/1.28/troubleshooting).
       options:
         - label: I have read the troubleshooting guide and I think this is a new bug.
           required: true
@@ -30,7 +30,7 @@ body:
     id: supported
     attributes:
       label: I am running a supported version of CloudNativePG
-      description: Before you submit a bug, make sure you have read ["Supported releases"](https://cloudnative-pg.io/documentation/current/supported_releases/) and that you are running a supported version of CloudNativePG with the latest patch/security fixes, or you are working on the current trunk (`main` branch)
+      description: Before you submit a bug, make sure you have read ["Supported releases"](https://cloudnative-pg.io/docs/1.28/supported_releases) and that you are running a supported version of CloudNativePG with the latest patch/security fixes, or you are working on the current trunk (`main` branch)
       options:
         - label: I have read the troubleshooting guide and I think this is a new bug.
           required: true
