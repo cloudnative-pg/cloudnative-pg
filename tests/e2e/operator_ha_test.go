@@ -122,7 +122,7 @@ var _ = Describe("Operator High Availability", Serial,
 				Eventually(func() []string {
 					podList, err := podutils.List(env.Ctx, env.Client, operatorNamespace)
 					Expect(err).ToNot(HaveOccurred())
-					var podNames []string
+					podNames := make([]string, 0, len(podList.Items))
 					for _, podItem := range podList.Items {
 						podNames = append(podNames, podItem.GetName())
 					}
