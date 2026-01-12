@@ -4663,6 +4663,75 @@ var _ = Describe("validateResources", func() {
 		errors := v.validateResources(cluster)
 		Expect(errors).To(BeEmpty())
 	})
+
+	// InitContainerResources validation tests
+	It("returns no errors when InitContainerResources is not set", func() {
+		cluster.Spec.InitContainerResources = nil
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when InitContainerResources requests are less than limits", func() {
+		cluster.Spec.InitContainerResources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		}
+		errors := v.validateResources(cluster)
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns an error when InitContainerResources CPU request is greater than limit", func() {
+		cluster.Spec.InitContainerResources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("200m"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("100m"),
+			},
+		}
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Field).To(Equal("spec.initContainerResources.requests.cpu"))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+	})
+
+	It("returns an error when InitContainerResources memory request is greater than limit", func() {
+		cluster.Spec.InitContainerResources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		}
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Field).To(Equal("spec.initContainerResources.requests.memory"))
+		Expect(errors[0].Detail).To(Equal("Memory request is greater than the limit"))
+	})
+
+	It("returns two errors when both InitContainerResources CPU and memory requests are greater than limits", func() {
+		cluster.Spec.InitContainerResources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		}
+		errors := v.validateResources(cluster)
+		Expect(errors).To(HaveLen(2))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+		Expect(errors[1].Detail).To(Equal("Memory request is greater than the limit"))
+	})
 })
 
 var _ = Describe("Tablespaces validation", func() {

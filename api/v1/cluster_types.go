@@ -387,6 +387,12 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// InitContainerResources defines the resource requirements for init containers.
+	// If not specified, init containers will use the same resources as the main
+	// PostgreSQL container (Resources field).
+	// +optional
+	InitContainerResources *corev1.ResourceRequirements `json:"initContainerResources,omitempty"`
+
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
 	// +optional

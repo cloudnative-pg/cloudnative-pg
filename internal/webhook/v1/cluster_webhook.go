@@ -924,6 +924,45 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 		}
 	}
 
+	// Validate InitContainerResources if specified
+	if r.Spec.InitContainerResources != nil {
+		result = append(result, validateResourceRequirements(
+			*r.Spec.InitContainerResources,
+			field.NewPath("spec", "initContainerResources"),
+		)...)
+	}
+
+	return result
+}
+
+// validateResourceRequirements validates that requests don't exceed limits for CPU and memory
+func validateResourceRequirements(resources corev1.ResourceRequirements, path *field.Path) field.ErrorList {
+	var result field.ErrorList
+
+	cpuRequests := resources.Requests.Cpu()
+	cpuLimits := resources.Limits.Cpu()
+	if !cpuRequests.IsZero() && !cpuLimits.IsZero() {
+		if cpuRequests.Cmp(*cpuLimits) > 0 {
+			result = append(result, field.Invalid(
+				path.Child("requests", "cpu"),
+				cpuRequests.String(),
+				"CPU request is greater than the limit",
+			))
+		}
+	}
+
+	memoryRequests := resources.Requests.Memory()
+	memoryLimits := resources.Limits.Memory()
+	if !memoryRequests.IsZero() && !memoryLimits.IsZero() {
+		if memoryRequests.Cmp(*memoryLimits) > 0 {
+			result = append(result, field.Invalid(
+				path.Child("requests", "memory"),
+				memoryRequests.String(),
+				"Memory request is greater than the limit",
+			))
+		}
+	}
+
 	return result
 }
 

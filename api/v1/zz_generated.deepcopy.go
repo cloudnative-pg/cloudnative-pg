@@ -777,6 +777,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		}
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
+	if in.InitContainerResources != nil {
+		in, out := &in.InitContainerResources, &out.InitContainerResources
+		*out = new(corev1.ResourceRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.EphemeralVolumesSizeLimit != nil {
 		in, out := &in.EphemeralVolumesSizeLimit, &out.EphemeralVolumesSizeLimit
 		*out = new(EphemeralVolumesSizeLimitConfiguration)
