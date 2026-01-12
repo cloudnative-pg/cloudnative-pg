@@ -225,6 +225,7 @@ func RunController(
 		discoveryClient,
 		pluginRepository,
 		conf.DrainTaints,
+		webhookv1.NewClusterAdmissionGuard(),
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
@@ -234,6 +235,7 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
+		webhookv1.NewBackupAdmissionGuard(),
 	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
@@ -246,9 +248,10 @@ func RunController(
 	}
 
 	if err = (&controller.ScheduledBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
+		Admission: webhookv1.NewScheduledBackupAdmissionGuard(),
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
@@ -259,6 +262,7 @@ func RunController(
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
+		Admission:       webhookv1.NewPoolerAdmissionGuard(),
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
@@ -391,7 +395,7 @@ func ensurePKI(
 	mgrCertDir string,
 	conf *configuration.Data,
 ) error {
-	if conf.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" || !conf.EnableWebhookServer {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
 	}

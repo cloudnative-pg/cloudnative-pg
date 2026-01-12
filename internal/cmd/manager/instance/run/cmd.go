@@ -53,6 +53,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -248,7 +249,13 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	defer pluginRepository.Close()
 
 	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
+	reconciler := controller.NewInstanceReconciler(
+		instance,
+		mgr.GetClient(),
+		metricsExporter,
+		pluginRepository,
+		webhookv1.NewClusterAdmissionGuard(),
+	)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Named("instance-cluster").
@@ -260,7 +267,11 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
 
 	// database reconciler
-	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
+	dbReconciler := controller.NewDatabaseReconciler(
+		mgr,
+		instance,
+		webhookv1.NewDatabaseAdmissionGuard(),
+	)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create database controller")
 		return err

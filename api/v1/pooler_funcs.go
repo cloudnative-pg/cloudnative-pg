@@ -131,3 +131,8 @@ func (in *Pooler) IsMetricsTLSEnabled() bool {
 
 	return false
 }
+
+// SetAdmissionError sets the admission error status on the Pooler resource
+func (in *Pooler) SetAdmissionError(msg string) {
+	in.Status.Error = msg
+}
