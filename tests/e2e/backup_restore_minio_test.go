@@ -322,6 +322,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
 				}, 30).ShouldNot(BeEmpty())
 			})
+
+			By("deleting the standby cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterWithMinioStandbySampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
