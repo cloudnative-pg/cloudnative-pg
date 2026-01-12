@@ -26,15 +26,22 @@ set -eEuo pipefail
 # The Kind-specific loader function, executed by manage.sh
 function load_operator_image_vendor_specific() {
   local cluster_name=${CLUSTER_NAME}
-  local images=()
 
   # 1. Execute the generic build and push to the local registry
   build_and_load_operator_image_from_sources
 
   # 2. Perform cluster-specific loading (Kind requires 'kind load' into nodes)
-  for image in "${images[@]}"; do
-    echo "Loading ${image} into Kind nodes."
-    kind load -v 1 docker-image --name "${cluster_name}" "${image}"
-    echo "Loaded ${image} into Kind nodes."
-  done
+  # Load the primary operator image
+  CONTROLLER_IMG="$(print_image)"
+  echo "Loading ${CONTROLLER_IMG} into Kind nodes."
+  kind load -v 1 docker-image --name "${cluster_name}" "${CONTROLLER_IMG}"
+  echo "Loaded ${CONTROLLER_IMG} into Kind nodes."
+
+  # Load the prime image if upgrade testing is enabled
+  if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
+    echo "Loading ${PRIME_CONTROLLER_IMG} into Kind nodes."
+    kind load -v 1 docker-image --name "${cluster_name}" "${PRIME_CONTROLLER_IMG}"
+    echo "Loaded ${PRIME_CONTROLLER_IMG} into Kind nodes."
+  fi
 }

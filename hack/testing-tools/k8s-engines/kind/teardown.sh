@@ -29,7 +29,7 @@ echo "Tearing down kind cluster '${CLUSTER_NAME}'."
 
 # Note: This function contains the logic formerly in destroy_kind
 destroy_kind() {
-  local cluster_name=${CLUSTER_NAME} # CLUSTER_NAME is expected to be exported
+  local cluster_name=$1
   docker network disconnect "kind" "${registry_name}" &>/dev/null || true
   kind delete cluster --name "${cluster_name}" || true
   docker network rm "kind" &>/dev/null || true

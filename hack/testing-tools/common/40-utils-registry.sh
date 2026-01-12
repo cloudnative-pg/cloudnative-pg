@@ -31,15 +31,15 @@ builder_name=cnpg-builder
 function ensure_registry() {
   echo -e "${bright}Verify local registry${reset}"
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
-    echo "- Create registry volume: {registry_volume}${reset}"
+    echo "- Create registry volume: ${registry_volume}${reset}"
     docker volume create "${registry_volume}"
   fi
   if ! docker network inspect "${registry_net}" &>/dev/null; then
-    echo "- Create registry network: {registry_net}${reset}"
+    echo "- Create registry network: ${registry_net}${reset}"
     docker network create "${registry_net}"
   fi
   if ! docker inspect -f '{{.State.Running}}' "${registry_name}" &>/dev/null; then
-    echo "- Start registry: {registry_name}${reset}"
+    echo "- Start registry: ${registry_name}${reset}"
     docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:2
   fi
   echo -e "${bright}Registry ${registry_name} running${reset}"

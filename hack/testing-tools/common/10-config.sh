@@ -24,8 +24,9 @@
 # --- COMMON IMAGE AND VERSION DEFAULTS ---
 
 # renovate: datasource=docker depName=kindest/node
-KIND_NODE_DEFAULT_VERSION=v1.34.0
+KIND_NODE_DEFAULT_VERSION=v1.35.0
 export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
+export KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
 # Defines the default cluster name based on the Kubernetes version.
 export CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
@@ -51,6 +52,11 @@ export HELPER_IMGS
 # Testing the upgrade will require generating a second operator image, `-prime`
 export TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 
+# Feature flags for enabling optional components
+export ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
+export ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
+export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
+
 # --- GENERIC ADD-ON CONSTANTS (Shared CSI/Snapshotter versions for Renovate) ---
 
 # Define default CSI driver version
@@ -59,7 +65,7 @@ CSI_DRIVER_HOST_PATH_DEFAULT_VERSION="v1.17.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
 EXTERNAL_SNAPSHOTTER_VERSION="v8.4.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-provisioner
-EXTERNAL_PROVISIONER_VERSION="v6.0.0"
+EXTERNAL_PROVISIONER_VERSION="v6.1.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-resizer
 EXTERNAL_RESIZER_VERSION="v2.0.0"
 # renovate: datasource=github-releases depName=kubernetes-csi/external-attacher

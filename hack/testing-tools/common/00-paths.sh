@@ -29,7 +29,7 @@ fi
 ROOT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")/../../../")
 HACK_DIR="${ROOT_DIR}/hack"
 TESTING_TOOLS_DIR="${HACK_DIR}/testing-tools"
-E2E_DIR="${TESTING_TOOLS_DIR}/e2e"
+E2E_DIR="${HACK_DIR}/e2e"
 GO_BIN="$(go env GOPATH)/bin"
 export ROOT_DIR HACK_DIR TESTING_TOOLS_DIR E2E_DIR PATH="${GO_BIN}:${PATH}"
 
