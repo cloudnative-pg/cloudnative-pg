@@ -25,7 +25,7 @@ defaults:
 env:
   # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
   MINIMAL_K8S: "1.27"
-  MINIMAL_OCP: "4.12"
+  MINIMAL_OCP: "4.14"
 
 jobs:
 
@@ -106,17 +106,15 @@ jobs:
       -
         name: Get updated OpenShift versions
         run: |
-          # We limit the range starting on 4 to 9 to skip the 13 version
-          # this needs to be updated when the 15 version is also EOL
+          # Match OpenShift 4.14, 4.16-4.19, and 4.20+
+          # Version 4.15 is excluded as it is EOL
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
-          grep -e 'href.*"4\.1[24-9]\.[0-9].*"' | \
-          sed -e 's/\(.*\)href="\(4\.1[2-9]\)\(.*\)/\2/' | \
+          grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
+          grep -v rc | \
+          sed -E 's/href="//;s/\/"//;s/(4\.(1[46-9]|[2-9][0-9]))(\..*$)/\1/' | \
           sort -Vru | \
           awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
           jq -Rn '[inputs]' | tee .github/openshift_versions.json
-
-          OCP_VERSIONS=`cat .github/openshift_versions.json | jq -r '"v"+.[-1]+"-v"+.[0]'`
-          sed -i -e 's/\(OPENSHIFT_VERSIONS ?= \)\(.*\)/\1'${OCP_VERSIONS}'/g' Makefile
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
