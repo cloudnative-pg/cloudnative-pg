@@ -199,27 +199,13 @@ featureGates:
 EOF
   fi
 
-  # Add containerdConfigPatches section for the local registry mirror
+  # Add containerdConfigPatches section to enable hosts-based registry configuration
   cat >>"${config_file}" <<-EOF
 
 containerdConfigPatches:
-EOF
-
-  # --- DOCKER REGISTRY MIRROR LOGIC (Restored) ---
-  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-    cat >>"${config_file}" <<-EOF
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-    endpoint = ["${DOCKER_REGISTRY_MIRROR}"]
-EOF
-  fi
-  # ---------------------------------------------
-
-  # Local development registry mirror (REQUIRED)
-  cat >>"${config_file}" <<-EOF
-- |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${registry_name}:5000"]
-    endpoint = ["http://${registry_name}:5000"]
+  [plugins."io.containerd.cri.v1.images".registry]
+    config_path = "/etc/containerd/certs.d"
 EOF
 
   if [ "${DEBUG-}" = true ]; then
@@ -232,6 +218,28 @@ EOF
   kind create cluster --name "${cluster_name}" --image "kindest/node:${k8s_version}" --config "${config_file}"
 
   docker network connect "kind" "${registry_name}" &>/dev/null || true
+
+  # Configure registry mirrors using hosts.toml files
+  REGISTRY_DIR="/etc/containerd/certs.d/${registry_name}:5000"
+  for node in $(kind get nodes --name "${cluster_name}"); do
+    docker exec "$node" mkdir -p "${REGISTRY_DIR}"
+    docker exec "$node" bash -c "cat > ${REGISTRY_DIR}/hosts.toml <<EOF
+[host.\"http://${registry_name}:5000\"]
+EOF
+"
+  done
+
+  # Configure docker.io mirror if specified
+  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+    DOCKER_IO_DIR="/etc/containerd/certs.d/docker.io"
+    for node in $(kind get nodes --name "${cluster_name}"); do
+      docker exec "$node" mkdir -p "${DOCKER_IO_DIR}"
+      docker exec "$node" bash -c "cat > ${DOCKER_IO_DIR}/hosts.toml <<EOF
+[host.\"${DOCKER_REGISTRY_MIRROR}\"]
+EOF
+"
+    done
+  fi
 
   # Workaround for https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
   for node in $(kind get nodes --name "${cluster_name}"); do
