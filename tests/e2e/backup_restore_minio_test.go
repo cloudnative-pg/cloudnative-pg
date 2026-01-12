@@ -622,6 +622,16 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				// reject the future timeline file to allow the replica to join successfully.
 				AssertClusterStandbysAreStreaming(namespace, firstClusterName, int32(testTimeouts[timeouts.ClusterIsReadyQuick]))
 			})
+
+			By("deleting the first cluster", func() {
+				err = DeleteResourcesFromFile(namespace, firstClusterFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("deleting the second cluster", func() {
+				err = DeleteResourcesFromFile(namespace, secondClusterFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 	})
 })
