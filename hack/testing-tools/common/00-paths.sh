@@ -7,7 +7,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-20.0
+#      http://www.apache.org/licenses/LICENSE-20.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,8 +55,8 @@ reset='\033[0m'
 
 # Check if stdout is a terminal; if not, clear the codes to prevent output pollution.
 if [ ! -t 1 ]; then
-  bright=''
-  reset=''
+  bright=''
+  reset=''
 fi
 export bright reset
 # -----------------------------------------------
