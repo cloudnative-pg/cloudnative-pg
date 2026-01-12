@@ -355,3 +355,43 @@ func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, er
 
 	return &content, nil
 }
+
+// ParseTimelineHistoryForForkPoint parses a timeline history file content and
+// returns the fork point LSN for the specified parent timeline.
+//
+// The history file format is:
+//
+//	<parent_tli>  <switchpoint_lsn>  <reason>
+//
+// Lines starting with # are comments.
+func ParseTimelineHistoryForForkPoint(content string, parentTimeline int) (string, error) {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse: <tli>\t<lsn>\t<reason>
+		// The fields are separated by tabs, and the reason may contain spaces
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) < 2 {
+			// Try space separation as fallback
+			fields = strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+		}
+
+		tli, err := strconv.Atoi(strings.TrimSpace(fields[0]))
+		if err != nil {
+			continue
+		}
+
+		if tli == parentTimeline {
+			return strings.TrimSpace(fields[1]), nil
+		}
+	}
+
+	return "", fmt.Errorf("fork point for timeline %d not found in history", parentTimeline)
+}

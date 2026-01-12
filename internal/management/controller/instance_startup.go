@@ -26,11 +26,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -263,18 +263,13 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context
 		"forkPointLSN", forkPointLSN)
 
 	// Compare LSNs to detect divergence
-	diverged, err := isLSNGreaterThan(localCheckpointLSN, forkPointLSN)
-	if err != nil {
-		contextLogger.Warning("Could not compare LSNs, letting PostgreSQL attempt recovery",
-			"error", err,
-			"localCheckpointLSN", localCheckpointLSN,
-			"forkPointLSN", forkPointLSN)
-		return nil
-	}
+	localLSN := types.LSN(localCheckpointLSN)
 
-	if !diverged {
-		// Replica's checkpoint is before the fork point, it can recover normally
-		contextLogger.Info("Replica checkpoint is before fork point, recovery should succeed",
+	// If checkpoint LSN <= fork point LSN, no divergence
+	// Use Less() to check if localLSN < forkPointLSN or if they are equal
+	if localLSN.Less(forkPointLSN) || localLSN == forkPointLSN {
+		// Replica's checkpoint is before or at the fork point, it can recover normally
+		contextLogger.Info("Replica checkpoint is before or at fork point, recovery should succeed",
 			"localCheckpointLSN", localCheckpointLSN,
 			"forkPointLSN", forkPointLSN)
 		return nil
@@ -312,7 +307,10 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForReplica(ctx context.Context
 // For example, 00000015.history (timeline 21) might contain:
 //
 //	20  18FC/2E000110  no recovery target specified
-func (r *InstanceReconciler) getForkPointLSN(ctx context.Context, clusterTimeline, localTimeline int) (string, error) {
+func (r *InstanceReconciler) getForkPointLSN(
+	ctx context.Context,
+	clusterTimeline, localTimeline int,
+) (types.LSN, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// Build the history file path: pg_wal/NNNNNNNN.history
@@ -330,81 +328,12 @@ func (r *InstanceReconciler) getForkPointLSN(ctx context.Context, clusterTimelin
 	}
 
 	// Parse the history file to find the fork point for our timeline
-	return parseTimelineHistoryForForkPoint(string(content), localTimeline)
-}
-
-// parseTimelineHistoryForForkPoint parses a timeline history file content and
-// returns the fork point LSN for the specified parent timeline.
-//
-// The history file format is:
-//
-//	<parent_tli>  <switchpoint_lsn>  <reason>
-//
-// Lines starting with # are comments.
-func parseTimelineHistoryForForkPoint(content string, parentTimeline int) (string, error) {
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse: <tli>\t<lsn>\t<reason>
-		// The fields are separated by tabs, and the reason may contain spaces
-		fields := strings.SplitN(line, "\t", 3)
-		if len(fields) < 2 {
-			// Try space separation as fallback
-			fields = strings.Fields(line)
-			if len(fields) < 2 {
-				continue
-			}
-		}
-
-		tli, err := strconv.Atoi(strings.TrimSpace(fields[0]))
-		if err != nil {
-			continue
-		}
-
-		if tli == parentTimeline {
-			return strings.TrimSpace(fields[1]), nil
-		}
-	}
-
-	return "", fmt.Errorf("fork point for timeline %d not found in history", parentTimeline)
-}
-
-// isLSNGreaterThan compares two LSN strings and returns true if lsn1 > lsn2.
-// LSN format is "XXXX/XXXXXXXX" where X is a hex digit.
-func isLSNGreaterThan(lsn1, lsn2 string) (bool, error) {
-	parse := func(lsn string) (uint64, uint64, error) {
-		parts := strings.Split(lsn, "/")
-		if len(parts) != 2 {
-			return 0, 0, fmt.Errorf("invalid LSN format: %s", lsn)
-		}
-		high, err := strconv.ParseUint(parts[0], 16, 32)
-		if err != nil {
-			return 0, 0, fmt.Errorf("invalid LSN high part: %s", parts[0])
-		}
-		low, err := strconv.ParseUint(parts[1], 16, 32)
-		if err != nil {
-			return 0, 0, fmt.Errorf("invalid LSN low part: %s", parts[1])
-		}
-		return high, low, nil
-	}
-
-	high1, low1, err := parse(lsn1)
+	lsnStr, err := utils.ParseTimelineHistoryForForkPoint(string(content), localTimeline)
 	if err != nil {
-		return false, err
-	}
-	high2, low2, err := parse(lsn2)
-	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	if high1 != high2 {
-		return high1 > high2, nil
-	}
-	return low1 > low2, nil
+	return types.LSN(lsnStr), nil
 }
 
 // ReconcileTablespaces ensures the mount points created for the tablespaces
