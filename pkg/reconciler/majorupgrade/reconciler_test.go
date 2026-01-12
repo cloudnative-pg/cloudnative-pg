@@ -75,10 +75,11 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			buildReplicaPVC(3),
 		}
 
-		objects := []runtime.Object{
+		objects := make([]runtime.Object, 0, 2+len(pvcs))
+		objects = append(objects,
 			job,
 			cluster,
-		}
+		)
 		for i := range pvcs {
 			objects = append(objects, &pvcs[i])
 		}
