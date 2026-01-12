@@ -241,14 +241,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
-	if !configuration.Current.Namespaced {
-		cluster.Status.Topology = getPodsTopology(
-			ctx,
-			resources.instances.Items,
-			resources.nodes,
-			cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
-		)
-	}
+	cluster.Status.Topology = getPodsTopology(
+		ctx,
+		resources.instances.Items,
+		resources.nodes,
+		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+	)
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -811,6 +809,7 @@ func getPodsTopology(
 		if !ok {
 			// node not found, it means that:
 			// - the node could have been drained
+			// - operator deployed in namespaced mode
 			// - others
 			contextLogger.Debug("node not found, skipping pod topology matching")
 			return apiv1.Topology{}
