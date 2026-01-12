@@ -22,7 +22,7 @@ SPDX-License-Identifier: Apache-2.0
 package configuration
 
 import (
-	"fmt"
+	"errors"
 	"path"
 	"strings"
 	"time"
@@ -33,7 +33,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var configurationLog = log.WithName("configuration")
+var (
+	configurationLog     = log.WithName("configuration")
+	ErrNamespaceEmpty    = errors.New("namespace can not be empty")
+	ErrNamespaceMismatch = errors.New("provided namespaces does not match")
+)
 
 const (
 	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
@@ -279,19 +283,15 @@ func (config *Data) validateNamespacedConfiguration() error {
 	}
 
 	if config.OperatorNamespace == "" {
-		return fmt.Errorf("when namespaced is enabled, operator namespace cannot be empty")
+		return ErrNamespaceEmpty
 	}
 
 	if config.WatchNamespace == "" {
-		return fmt.Errorf("when namespaced is enabled, watch namespace cannot be empty")
+		return ErrNamespaceEmpty
 	}
 
 	if config.OperatorNamespace != config.WatchNamespace {
-		return fmt.Errorf(
-			"when namespaced is enabled, operator namespace (%s) and watch namespace (%s) must be equal",
-			config.OperatorNamespace,
-			config.WatchNamespace,
-		)
+		return ErrNamespaceMismatch
 	}
 
 	return nil

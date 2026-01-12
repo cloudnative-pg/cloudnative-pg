@@ -198,9 +198,7 @@ var _ = Describe("Validate namespace parameters combination for namespaced deplo
 			WatchNamespace:    "watch-ns",
 		}
 		err := conf.Validate()
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring(
-			"operator namespace (operator-ns) and watch namespace (watch-ns) must be equal"))
+		Expect(err).To(Equal(ErrNamespaceMismatch))
 	})
 
 	It("should fail when namespaced is enabled and operator namespace is empty", func() {
@@ -210,8 +208,7 @@ var _ = Describe("Validate namespace parameters combination for namespaced deplo
 			WatchNamespace:    "watch-ns",
 		}
 		err := conf.Validate()
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("operator namespace cannot be empty"))
+		Expect(err).To(Equal(ErrNamespaceEmpty))
 	})
 
 	It("should fail when namespaced is enabled and watch namespace is empty", func() {
@@ -221,8 +218,7 @@ var _ = Describe("Validate namespace parameters combination for namespaced deplo
 			WatchNamespace:    "",
 		}
 		err := conf.Validate()
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("watch namespace cannot be empty"))
+		Expect(err).To(Equal(ErrNamespaceEmpty))
 	})
 
 	It("should fail when namespaced is enabled and both namespaces are empty", func() {
@@ -232,7 +228,6 @@ var _ = Describe("Validate namespace parameters combination for namespaced deplo
 			WatchNamespace:    "",
 		}
 		err := conf.Validate()
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("operator namespace cannot be empty"))
+		Expect(err).To(Equal(ErrNamespaceEmpty))
 	})
 })
