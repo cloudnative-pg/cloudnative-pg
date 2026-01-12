@@ -34,8 +34,10 @@ import (
 )
 
 var (
-	configurationLog     = log.WithName("configuration")
-	ErrNamespaceEmpty    = errors.New("namespace can not be empty")
+	configurationLog = log.WithName("configuration")
+	// ErrNamespaceEmpty is raised when the namespace is empty in namespaced deployment
+	ErrNamespaceEmpty = errors.New("namespace can not be empty")
+	// ErrNamespaceMismatch is raised when the OperatorNamespace and WatchNamespace is not equal in namespaced deployment
 	ErrNamespaceMismatch = errors.New("provided namespaces does not match")
 )
 
