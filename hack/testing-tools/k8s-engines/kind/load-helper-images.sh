@@ -41,13 +41,19 @@ function load_image_kind() {
 
 # This function is executed by the manage.sh dispatcher.
 function load_helper_images_vendor_specific() {
-    # TODO - we need to load the images locally first
+    echo -e "${bright}Loading helper images for tests on cluster ${CLUSTER_NAME}${reset}"
+
     local cluster_name=${CLUSTER_NAME}
+
+    # Pre-load all the images defined in the HELPER_IMGS variable
+    # with the goal to speed up the runs.
     for IMG in "${HELPER_IMGS[@]}"; do
-        echo -e "${bright}Loading '$IMG' into Kind nodes for ${cluster_name}${reset}"
+        echo -e "${bright}Pulling '${IMG}'${reset}"
+        docker pull "${IMG}"
+
+        echo -e "${bright}Loading '${IMG}' into Kind nodes for ${cluster_name}${reset}"
         load_image_kind "${cluster_name}" "${IMG}"
-        echo -e "${bright}Loaded '$IMG' into Kind nodes for ${cluster_name}${reset}"
     done
 
-    echo "Kind helper image loading complete."
+    echo -e "${bright}Done loading helper images on cluster ${cluster_name}${reset}"
 }

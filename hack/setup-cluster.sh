@@ -74,25 +74,44 @@ main() {
   # --- ARGUMENT PARSING ---
   # Use getopt to capture options like -k and -n, just like the original script.
   if ! getopt -T > /dev/null; then
-    parsed_opts=$(getopt -o k:n: -l "k8s-version:,nodes:" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
   else
-    parsed_opts=$(getopt k:n: "$@") || usage
+    parsed_opts=$(getopt e:k:n:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
 
   for o; do
     case "${o}" in
+      -e | --engine)
+        shift
+        # no-op, kept for compatibility
+        shift
+        ;;
       -k | --k8s-version)
         shift
         # Export K8S_VERSION for the dispatcher
         export K8S_VERSION="v${1#v}"
         shift
+        if ! [[ $K8S_VERSION =~ ^v1\.[0-9]+\.[0-9]+$ ]]; then
+          echo "ERROR: $K8S_VERSION is not a valid k8s version!" >&2
+          echo >&2
+          usage
+        fi
         ;;
       -n | --nodes)
         shift
         # Export NODES for the dispatcher
         export NODES="${1}"
         shift
+        if ! [[ $NODES =~ ^[1-9][0-9]*$ ]]; then
+          echo "ERROR: $NODES is not a positive integer!" >&2
+          echo >&2
+          usage
+        fi
+        ;;
+      -r | --registry)
+        shift
+        # no-op, kept for compatibility
         ;;
       --)
         shift

@@ -107,6 +107,8 @@ case "$ACTION" in
         ;;
 
     export-logs)
+        EXPORT_SCRIPT="${VENDOR_DIR}/export-logs.sh"
+
         if [ -f "${EXPORT_SCRIPT}" ]; then
             "${EXPORT_SCRIPT}"
         else
