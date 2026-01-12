@@ -28,7 +28,9 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -414,5 +416,122 @@ var _ = Describe("GetPrimaryConnInfo", func() {
 		Expect(err).ToNot(HaveOccurred())
 		connInfo := instance.GetPrimaryConnInfo()
 		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='5000\\\\test'"))
+	})
+})
+
+var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
+	var instance *Instance
+	var cluster *apiv1.Cluster
+	var tempDir string
+
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "test-primary")
+		Expect(err).ToNot(HaveOccurred())
+
+		instance = &Instance{
+			PgData: tempDir,
+		}
+
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "external-cluster",
+				},
+			},
+		}
+	})
+
+	AfterEach(func() {
+		err := os.RemoveAll(tempDir)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return false when Cluster is nil", func() {
+		instance.Cluster = nil
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false when cluster is not a replica", func() {
+		cluster.Spec.ReplicaCluster = nil
+		instance.Cluster = cluster
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false when transition is not requested", func() {
+		instance.Cluster = cluster
+		// No condition set means transition is not requested
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false when instance is not fenced and not unavailable", func() {
+		instance.Cluster = cluster
+		instance.SetFencing(false)
+		instance.SetMightBeUnavailable(false)
+
+		// Set the condition to request transition
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   "ReplicaClusterDesignatedPrimaryTransition",
+			Status: metav1.ConditionFalse,
+			Reason: "Test",
+		})
+
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return true when all conditions are met for fenced primary", func(ctx context.Context) {
+		instance.Cluster = cluster
+		instance.SetFencing(true)
+
+		// Set the condition to request transition
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   "ReplicaClusterDesignatedPrimaryTransition",
+			Status: metav1.ConditionFalse,
+			Reason: "Test",
+		})
+
+		// Create a primary instance (no standby.signal file)
+		err := instance.Demote(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Remove standby.signal to make it primary
+		signalPath := filepath.Join(instance.PgData, "standby.signal")
+		err = os.Remove(signalPath)
+		Expect(err).ToNot(HaveOccurred())
+
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return true when all conditions are met for unavailable primary", func(ctx context.Context) {
+		instance.Cluster = cluster
+		instance.SetMightBeUnavailable(true)
+
+		// Set the condition to request transition
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   "ReplicaClusterDesignatedPrimaryTransition",
+			Status: metav1.ConditionFalse,
+			Reason: "Test",
+		})
+
+		// Create a primary instance (no standby.signal file)
+		err := instance.Demote(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Remove standby.signal to make it primary
+		signalPath := filepath.Join(instance.PgData, "standby.signal")
+		err = os.Remove(signalPath)
+		Expect(err).ToNot(HaveOccurred())
+
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeTrue())
 	})
 })
