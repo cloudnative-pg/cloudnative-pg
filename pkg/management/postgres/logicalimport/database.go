@@ -94,21 +94,23 @@ func (ds *databaseSnapshotter) exportDatabases(
 	extraOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	sectionsToExport := []string{}
+	sections := ds.getSectionsToExecute()
+	sectionsToExport := make([]string, 0, len(sections))
 
-	for _, section := range ds.getSectionsToExecute() {
+	for _, section := range sections {
 		sectionsToExport = append(sectionsToExport, fmt.Sprintf("--section=%s", section))
 	}
 
 	for _, database := range databases {
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
-		options := []string{
+		options := make([]string, 0, 6+len(sectionsToExport)+len(extraOptions))
+		options = append(options,
 			"-Fd",
 			"-f", generateFileNameForDatabase(database),
 			"-d", dsn,
 			"-v",
-		}
+		)
 		options = append(options, sectionsToExport...)
 		options = append(options, extraOptions...)
 
@@ -212,8 +214,6 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"section", section,
 		)
 
-		var options []string
-
 		alwaysPresentOptions := []string{
 			"-U", "postgres",
 			"--no-owner",
@@ -224,7 +224,9 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			generateFileNameForDatabase(database),
 		}
 
-		options = append(options, flags.forSection(section)...)
+		sectionFlags := flags.forSection(section)
+		options := make([]string, 0, len(sectionFlags)+len(alwaysPresentOptions))
+		options = append(options, sectionFlags...)
 		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
