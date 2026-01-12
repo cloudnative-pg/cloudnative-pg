@@ -261,14 +261,10 @@ main() {
   fi
 
   # Deploy optional and required add-ons
-  if [ "${ENABLE_FLUENTD}" = "true" ]; then
-    deploy_fluentd
-  else
-    echo "Skipping FluentD deployment (ENABLE_FLUENTD is not set to true)."
-  fi
-
+  deploy_fluentd
   deploy_csi_host_path
-  
+  deploy_prometheus_crds
+
   echo "Kind cluster ${CLUSTER_NAME} setup complete."
 }
 
