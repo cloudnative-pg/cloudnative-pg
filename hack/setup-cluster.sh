@@ -32,8 +32,9 @@ CLUSTER_MGR_SCRIPT="${TESTING_TOOLS_DIR}/k8s-engines/manage.sh"
 COMMON_DIR="${TESTING_TOOLS_DIR}/common"
 
 # Source necessary common files to define paths, constants, and utility functions
-#source "${COMMON_DIR}/00-paths.sh"
+source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
+source "${COMMON_DIR}/40-utils-registry.sh"
 
 NODES=${NODES:-3}
 
@@ -136,16 +137,34 @@ main() {
     usage
   fi
 
-  # --- ALIAS HANDLING FOR BACKWARD COMPATIBILITY ---
-  # If the first argument is 'destroy', change it to 'teardown'.
-  if [ "$1" == "destroy" ]; then
-    set -- "teardown" "${@:2}"
-    echo "NOTE: Command 'destroy' aliased to 'teardown'."
-  fi
+  # Ensure the local registry is set up (needed by most commands)
+  # Call once here instead of before each command
+  ensure_registry
 
-  # --- DELEGATION TO MODULAR SYSTEM ---
-  # Pass all remaining arguments (the command and any subsequent args) to the dispatcher.
-  "${CLUSTER_MGR_SCRIPT}" "$@"
+  # --- COMMAND EXECUTION LOOP ---
+  # Process all commands in sequence (backward compatibility with original behavior)
+  while [ "$#" -gt 0 ]; do
+    command=$1
+    shift
+
+    # Alias handling for backward compatibility
+    if [ "$command" == "destroy" ]; then
+      command="teardown"
+      echo "NOTE: Command 'destroy' aliased to 'teardown'."
+    fi
+
+    # Invoke the command through the dispatcher
+    case "$command" in
+    create | load | load-helper-images | deploy | print-image | export-logs | teardown | pyroscope)
+      "${CLUSTER_MGR_SCRIPT}" "${command}"
+      ;;
+    *)
+      echo "ERROR: unknown command ${command}" >&2
+      echo >&2
+      usage
+      ;;
+    esac
+  done
 }
 
 main "$@"

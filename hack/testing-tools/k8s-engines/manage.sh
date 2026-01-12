@@ -52,8 +52,6 @@ case "$ACTION" in
     create)
         SETUP_SCRIPT="${VENDOR_DIR}/setup.sh"
 
-        ensure_registry
-
         if [ -f "${SETUP_SCRIPT}" ]; then
             "${SETUP_SCRIPT}"
         else
