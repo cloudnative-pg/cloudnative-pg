@@ -309,8 +309,13 @@ func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
 		return false
 	}
 
-	isPrimary, _ := instance.IsPrimary()
-	return isPrimary
+	// Check if this pod was the primary before the transition started.
+	// We use CurrentPrimary instead of IsPrimary() because IsPrimary()
+	// checks for the absence of standby.signal, which gets created during
+	// the transition by RefreshReplicaConfiguration(). Using CurrentPrimary
+	// keeps the sentinel true throughout the transition, allowing retries
+	// if the status update fails due to optimistic locking conflicts.
+	return instance.Cluster.Status.CurrentPrimary == instance.GetPodName()
 }
 
 // CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
