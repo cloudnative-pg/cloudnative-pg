@@ -40,7 +40,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1204,25 +1203,17 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	// I'm the primary, need to inform the operator
 	log.FromContext(ctx).Info("Setting myself as the current designated primary")
 
-	return changed, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var livingCluster apiv1.Cluster
+	cluster.Status.CurrentPrimary = r.instance.GetPodName()
+	cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+	if r.instance.RequiresDesignatedPrimaryTransition() {
+		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
+	}
 
-		err := r.client.Get(ctx, client.ObjectKeyFromObject(cluster), &livingCluster)
-		if err != nil {
-			return err
-		}
+	if err := r.client.Status().Update(ctx, cluster); err != nil {
+		return changed, err
+	}
 
-		updatedCluster := livingCluster.DeepCopy()
-		updatedCluster.Status.CurrentPrimary = r.instance.GetPodName()
-		updatedCluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-		if r.instance.RequiresDesignatedPrimaryTransition() {
-			conditions.SetDesignatedPrimaryTransitionCompleted(updatedCluster)
-		}
-
-		cluster.Status = updatedCluster.Status
-
-		return r.client.Status().Update(ctx, updatedCluster)
-	})
+	return changed, nil
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used

@@ -487,9 +487,13 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 		Expect(result).To(BeFalse())
 	})
 
-	It("should return true when all conditions are met for fenced primary", func(ctx context.Context) {
+	It("should return true when all conditions are met for fenced primary", func() {
 		instance.Cluster = cluster
 		instance.SetFencing(true)
+		instance.WithPodName("test-cluster-1")
+
+		// Set CurrentPrimary to this instance
+		cluster.Status.CurrentPrimary = "test-cluster-1"
 
 		// Set the condition to request transition
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -497,23 +501,18 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 			Status: metav1.ConditionFalse,
 			Reason: "Test",
 		})
-
-		// Create a primary instance (no standby.signal file)
-		err := instance.Demote(ctx, cluster)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Remove standby.signal to make it primary
-		signalPath := filepath.Join(instance.PgData, "standby.signal")
-		err = os.Remove(signalPath)
-		Expect(err).ToNot(HaveOccurred())
 
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeTrue())
 	})
 
-	It("should return true when all conditions are met for unavailable primary", func(ctx context.Context) {
+	It("should return true when all conditions are met for unavailable primary", func() {
 		instance.Cluster = cluster
 		instance.SetMightBeUnavailable(true)
+		instance.WithPodName("test-cluster-1")
+
+		// Set CurrentPrimary to this instance
+		cluster.Status.CurrentPrimary = "test-cluster-1"
 
 		// Set the condition to request transition
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -522,16 +521,26 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 			Reason: "Test",
 		})
 
-		// Create a primary instance (no standby.signal file)
-		err := instance.Demote(ctx, cluster)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Remove standby.signal to make it primary
-		signalPath := filepath.Join(instance.PgData, "standby.signal")
-		err = os.Remove(signalPath)
-		Expect(err).ToNot(HaveOccurred())
-
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeTrue())
+	})
+
+	It("should return false when CurrentPrimary is different", func() {
+		instance.Cluster = cluster
+		instance.SetFencing(true)
+		instance.WithPodName("test-cluster-2")
+
+		// Set CurrentPrimary to a different instance
+		cluster.Status.CurrentPrimary = "test-cluster-1"
+
+		// Set the condition to request transition
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:   "ReplicaClusterDesignatedPrimaryTransition",
+			Status: metav1.ConditionFalse,
+			Reason: "Test",
+		})
+
+		result := instance.RequiresDesignatedPrimaryTransition()
+		Expect(result).To(BeFalse())
 	})
 })
