@@ -446,13 +446,14 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 func (ui upgradeInfo) runPgUpgrade(
 	newDataDir string,
 ) error {
-	args := []string{
+	args := make([]string, 0, 9+len(ui.pgUpgradeArgs))
+	args = append(args,
 		"--link",
 		"--username", "postgres",
 		"--old-bindir", ui.oldBinDir,
 		"--old-datadir", ui.pgData,
 		"--new-datadir", newDataDir,
-	}
+	)
 	args = append(args, ui.pgUpgradeArgs...)
 
 	// Run the pg_upgrade command
