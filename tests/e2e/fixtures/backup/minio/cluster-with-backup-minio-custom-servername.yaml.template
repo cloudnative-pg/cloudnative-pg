@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: pg-backup-minio-custom
 spec:
-  instances: 2
+  instances: 1
 
   postgresql:
     parameters:
