@@ -565,12 +565,14 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		It("protects replicas from downloading future timeline history files", func() {
-			firstClusterName := "cluster-timeline-1"
-			secondClusterName := "cluster-timeline-2"
-
 			firstClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-1.yaml.template"
 			secondClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-2.yaml.template"
 			backupFile := fixturesDir + "/backup/minio/backup-timeline-test.yaml"
+
+			firstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, firstClusterFile)
+			Expect(err).ToNot(HaveOccurred())
+			secondClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, secondClusterFile)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("creating first cluster with 1 instance", func() {
 				AssertCreateCluster(namespace, firstClusterName, firstClusterFile, env)
