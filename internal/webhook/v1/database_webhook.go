@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 )
 
 // databaseLog is for logging in this package.
@@ -42,6 +43,14 @@ func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
+}
+
+// NewDatabaseAdmissionGuard creates a guard to protect a reconciliation loop.
+func NewDatabaseAdmissionGuard() *guard.Admission[*apiv1.Database] {
+	return &guard.Admission[*apiv1.Database]{
+		Defaulter: &DatabaseCustomDefaulter{},
+		Validator: &DatabaseCustomValidator{},
+	}
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.

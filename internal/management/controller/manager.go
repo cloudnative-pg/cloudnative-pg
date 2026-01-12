@@ -34,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
@@ -63,6 +64,8 @@ type InstanceReconciler struct {
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
 	primaryLeaseAcquirer  PrimaryLeaseAcquirer
+
+	admission *guard.Admission[*apiv1.Cluster]
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -72,6 +75,7 @@ func NewInstanceReconciler(
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
 	primaryLeaseAcquirer PrimaryLeaseAcquirer,
+	admission *guard.Admission[*apiv1.Cluster],
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -83,6 +87,7 @@ func NewInstanceReconciler(
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
 		primaryLeaseAcquirer:  primaryLeaseAcquirer,
+		admission:             admission,
 	}
 }
 

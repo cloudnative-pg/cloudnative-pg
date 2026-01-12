@@ -328,6 +328,9 @@ type PoolerStatus struct {
 	// successfully).
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// Error is the latest validation error
+	Error string `json:"error,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used

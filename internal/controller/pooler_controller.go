@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 )
 
 // PoolerReconciler reconciles a Pooler object
@@ -52,6 +53,7 @@ type PoolerReconciler struct {
 	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
+	Admission       *guard.Admission[*apiv1.Pooler]
 }
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
@@ -93,6 +95,17 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			"NameClash",
 			"Name clash between Pooler and Cluster detected, resource reconciliation skipped")
 		return ctrl.Result{}, nil
+	}
+
+	if result, err := r.Admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams[*apiv1.Pooler]{
+			Object:       &pooler,
+			Client:       r.Client,
+			ApplyChanges: true,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// Resolve the referenced Cluster up front: it gates the rest of the

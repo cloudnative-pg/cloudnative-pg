@@ -766,6 +766,9 @@ const (
 
 	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
 	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
+
+	// PhaseDefinitionInvalid is set when the cluster definition is invalid
+	PhaseDefinitionInvalid = "Invalid cluster definition"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral

@@ -1647,3 +1647,11 @@ func (cluster *Cluster) IsInitialized() bool {
 
 	return c.Status == metav1.ConditionTrue
 }
+
+// SetAdmissionError sets the admission error status on the Cluster resource
+func (cluster *Cluster) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		cluster.Status.Phase = PhaseDefinitionInvalid
+		cluster.Status.PhaseReason = msg
+	}
+}

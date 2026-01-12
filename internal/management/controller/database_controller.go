@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -44,6 +45,7 @@ type DatabaseReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	admission           *guard.Admission[*apiv1.Database]
 	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Database]
 
@@ -116,6 +118,17 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			"expected", r.instance.GetClusterName(),
 		)
 		return ctrl.Result{}, nil
+	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams[*apiv1.Database]{
+			Object:       &database,
+			Client:       r.Client,
+			ApplyChanges: true,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// Fetch the Cluster from the cache
@@ -234,10 +247,12 @@ func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1
 func NewDatabaseReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
+	admission *guard.Admission[*apiv1.Database],
 ) *DatabaseReconciler {
 	dr := &DatabaseReconciler{
-		Client:   mgr.GetClient(),
-		instance: instance,
+		Client:    mgr.GetClient(),
+		instance:  instance,
+		admission: admission,
 		getSuperUserDB: func() (*sql.DB, error) {
 			return instance.GetSuperUserDB()
 		},
