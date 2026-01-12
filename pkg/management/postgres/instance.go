@@ -1046,11 +1046,12 @@ func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Ver
 	instance.LogPgControldata(ctx, "before pg_rewind")
 
 	primaryConnInfo := instance.GetPrimaryConnInfo()
-	options := []string{
+	options := make([]string, 0, 6)
+	options = append(options,
 		"-P",
 		"--source-server", primaryConnInfo,
 		"--target-pgdata", instance.PgData,
-	}
+	)
 
 	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
 	// let’s automatically use it, if possible

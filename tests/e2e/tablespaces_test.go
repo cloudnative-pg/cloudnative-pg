@@ -951,7 +951,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 					))
 				}
 
-				var volumeNames []string
+				volumeNames := make([]string, 0, len(pod.Spec.Volumes))
 				var claimNames []string
 				for _, vol := range pod.Spec.Volumes {
 					volumeNames = append(volumeNames, vol.Name)
