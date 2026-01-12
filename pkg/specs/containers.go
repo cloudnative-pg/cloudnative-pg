@@ -32,6 +32,12 @@ import (
 // createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
 func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
+	// Use InitContainerResources if specified, otherwise fall back to main container Resources
+	resources := cluster.Spec.Resources
+	if cluster.Spec.InitContainerResources != nil {
+		resources = *cluster.Spec.InitContainerResources
+	}
+
 	container := corev1.Container{
 		Name:            BootstrapControllerContainerName,
 		Image:           configuration.Current.OperatorImageName,
@@ -42,7 +48,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 			"/controller/manager",
 		},
 		VolumeMounts:    CreatePostgresVolumeMounts(cluster),
-		Resources:       cluster.Spec.Resources,
+		Resources:       resources,
 		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 	}
 

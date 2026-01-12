@@ -1804,6 +1804,15 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
+<tr><td><code>initContainerResources</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#resourcerequirements-v1-core"><i>core/v1.ResourceRequirements</i></a>
+</td>
+<td>
+   <p>InitContainerResources defines the resource requirements for init containers.
+If not specified, init containers will use the same resources as the main
+PostgreSQL container (Resources field).</p>
+</td>
+</tr>
 <tr><td><code>ephemeralVolumesSizeLimit</code><br/>
 <a href="#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration"><i>EphemeralVolumesSizeLimitConfiguration</i></a>
 </td>
