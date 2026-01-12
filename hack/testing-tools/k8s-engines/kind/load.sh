@@ -25,23 +25,15 @@ set -eEuo pipefail
 
 # The Kind-specific loader function, executed by manage.sh
 function load_operator_image_vendor_specific() {
-  local cluster_name=${CLUSTER_NAME}
-
-  # 1. Execute the generic build and push to the local registry
+  # Execute the generic build and push to the local registry
   build_and_load_operator_image_from_sources
 
-  # 2. Perform cluster-specific loading (Kind requires 'kind load' into nodes)
-  # Load the primary operator image
-  CONTROLLER_IMG="$(print_image)"
-  echo "Loading ${CONTROLLER_IMG} into Kind nodes."
-  kind load -v 1 docker-image --name "${cluster_name}" "${CONTROLLER_IMG}"
-  echo "Loaded ${CONTROLLER_IMG} into Kind nodes."
-
-  # Load the prime image if upgrade testing is enabled
-  if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
-    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
-    echo "Loading ${PRIME_CONTROLLER_IMG} into Kind nodes."
-    kind load -v 1 docker-image --name "${cluster_name}" "${PRIME_CONTROLLER_IMG}"
-    echo "Loaded ${PRIME_CONTROLLER_IMG} into Kind nodes."
-  fi
+  # NOTE: For Kind, we don't need to use 'kind load' for operator images.
+  # The docker-build target uses 'docker buildx bake --push' which pushes
+  # directly to the local registry (registry.dev:5000). Kind nodes are
+  # configured via hosts.toml to pull from this registry, so the images
+  # will be pulled automatically when the operator is deployed.
+  #
+  # This is different from helper images (like FluentD) which are explicitly
+  # loaded using 'kind load' because they're not built with buildx.
 }
