@@ -563,6 +563,38 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 		})
+	})
+
+	Context("timeline divergence protection", Ordered, func() {
+		var namespace string
+
+		BeforeAll(func() {
+			if !IsLocal() {
+				Skip("This test is only run on local clusters")
+			}
+			const namespacePrefix = "timeline-divergence"
+			var err error
+
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("create the certificates for MinIO", func() {
+				err := minioEnv.CreateCaSecret(env, namespace)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("creating the credentials for minio", func() {
+				_, err = secrets.CreateObjectStorageSecret(
+					env.Ctx,
+					env.Client,
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
 
 		It("protects replicas from downloading future timeline history files", func() {
 			firstClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-1.yaml.template"
