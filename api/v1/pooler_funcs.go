@@ -114,3 +114,8 @@ func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
 
 	return *in.Spec.Template.Spec.Resources
 }
+
+// SetAdmissionError sets the admission error status on the Pooler resource
+func (in *Pooler) SetAdmissionError(msg string) {
+	in.Status.Error = msg
+}

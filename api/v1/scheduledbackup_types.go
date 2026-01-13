@@ -96,6 +96,10 @@ type ScheduledBackupStatus struct {
 	// Next time we will run a backup
 	// +optional
 	NextScheduleTime *metav1.Time `json:"nextScheduleTime,omitempty"`
+
+	// Error is the latest admission validation error
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 // +genclient
