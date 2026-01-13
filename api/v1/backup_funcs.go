@@ -311,3 +311,11 @@ func (b BackupMethod) IsManagedByInstance() bool {
 func (b BackupMethod) IsManagedByOperator() bool {
 	return b == BackupMethodVolumeSnapshot
 }
+
+// SetAdmissionError sets the admission error status on the Backup resource
+func (backup *Backup) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		backup.Status.Phase = BackupPhaseDefinitionInvalid
+		backup.Status.Error = msg
+	}
+}

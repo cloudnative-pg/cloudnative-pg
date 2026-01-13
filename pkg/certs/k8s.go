@@ -139,17 +139,18 @@ func RenewLeafCertificate(caSecret *corev1.Secret, secret *corev1.Secret, altDNS
 func (pki *PublicKeyInfrastructure) Setup(
 	ctx context.Context,
 	kubeClient client.Client,
+	enableWebhooks bool,
 ) error {
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err) || isSecretsMountNotRefreshedError(err)
 	}, func() error {
-		return pki.ensureCertificatesAreUpToDate(ctx, kubeClient)
+		return pki.ensureCertificatesAreUpToDate(ctx, kubeClient, enableWebhooks)
 	})
 	if err != nil {
 		return err
 	}
 
-	err = pki.schedulePeriodicMaintenance(ctx, kubeClient)
+	err = pki.schedulePeriodicMaintenance(ctx, kubeClient, enableWebhooks)
 	if err != nil {
 		return err
 	}
@@ -237,6 +238,7 @@ func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *c
 func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 	ctx context.Context,
 	kubeClient client.Client,
+	enableWebhooks bool,
 ) error {
 	caSecret, err := pki.ensureRootCACertificate(
 		ctx,
@@ -246,7 +248,7 @@ func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 		return err
 	}
 
-	webhookSecret, err := pki.setupWebhooksCertificate(ctx, kubeClient, caSecret)
+	webhookSecret, err := pki.setupWebhooksCertificate(ctx, kubeClient, caSecret, enableWebhooks)
 	if err != nil {
 		return err
 	}
@@ -265,6 +267,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	ctx context.Context,
 	kubeClient client.Client,
 	caSecret *corev1.Secret,
+	enableWebhooks bool,
 ) (*corev1.Secret, error) {
 	if err := fileutils.EnsureDirectoryExists(pki.CertDir); err != nil {
 		return nil, err
@@ -275,18 +278,20 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		return nil, err
 	}
 
-	if err := pki.injectPublicKeyIntoMutatingWebhook(
-		ctx,
-		kubeClient,
-		webhookSecret); err != nil {
-		return nil, err
-	}
+	if enableWebhooks {
+		if err := pki.injectPublicKeyIntoMutatingWebhook(
+			ctx,
+			kubeClient,
+			webhookSecret); err != nil {
+			return nil, err
+		}
 
-	if err := pki.injectPublicKeyIntoValidatingWebhook(
-		ctx,
-		kubeClient,
-		webhookSecret); err != nil {
-		return nil, err
+		if err := pki.injectPublicKeyIntoValidatingWebhook(
+			ctx,
+			kubeClient,
+			webhookSecret); err != nil {
+			return nil, err
+		}
 	}
 
 	return webhookSecret, nil
@@ -297,10 +302,11 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 	ctx context.Context,
 	kubeClient client.Client,
+	enableWebhooks bool,
 ) error {
 	maintenance := func() {
 		pkiLog.Info("Periodic TLS certificates maintenance")
-		err := pki.ensureCertificatesAreUpToDate(ctx, kubeClient)
+		err := pki.ensureCertificatesAreUpToDate(ctx, kubeClient, enableWebhooks)
 		if err != nil {
 			pkiLog.Error(err, "TLS maintenance failed")
 		}
