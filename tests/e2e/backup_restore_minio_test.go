@@ -112,6 +112,13 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 		})
 
+		AfterAll(func() {
+			// While namespace deletion would handle this implicitly, explicit deletion helps:
+			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
+			err := DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
 		// We back up and restore a cluster, and verify some expected data to
 		// be there
 		It("backs up and restores a cluster using minio", func() {
