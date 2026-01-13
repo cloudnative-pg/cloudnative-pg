@@ -629,7 +629,7 @@ func isSkipWalArchivingEnabled(cluster *apiv1.Cluster) bool {
 		return false
 	}
 
-	value, ok := cluster.Annotations["cnpg.io/skipWalArchiving"]
+	value, ok := cluster.Annotations[utils.SkipWalArchiving]
 	return ok && value == "enabled"
 }
 
