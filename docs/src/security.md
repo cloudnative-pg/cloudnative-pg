@@ -481,6 +481,61 @@ spec:
     security contexts.
 :::
 
+#### User Namespace Isolation
+
+CloudNativePG supports running PostgreSQL pods in isolated user namespaces
+through the `hostUsers` option. This provides an additional layer of security
+by preventing container processes from sharing UIDs/GIDs with the host system.
+
+**How it works:**
+
+The `hostUsers` option controls whether pods run in the host's user namespace
+or in an isolated user namespace:
+
+- **Not set (nil)**: Pod shares the host's user namespace. Container processes
+  run with the same UID/GID as on the host. (Traditional behavior, Kubernetes default)
+
+- **`hostUsers: true`**: Explicitly enables sharing the host's user namespace.
+  Equivalent to the default behavior when unset.
+
+- **`hostUsers: false`**: Creates an isolated user namespace for the pod.
+  Container processes run with different UIDs/GIDs than on the host, even
+  though they retain the same numeric values inside the container.
+
+**Benefits:**
+
+- **Enhanced Security Isolation**: Protects against container escape exploits
+  like CVE-2024-21626 by ensuring container UIDs don't match host UIDs
+- **Reduced Attack Surface**: Compromised containers have limited impact on
+  host filesystem permissions
+- **Compliance**: Helps meet stricter security requirements for workload isolation
+
+**Requirements:**
+
+- Kubernetes 1.25+ with user namespace support enabled
+- Linux kernel 5.18+ recommended for full functionality
+- Node support for user namespaces (verify with your cluster administrator)
+
+**Example:**
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  hostUsers: false  # Enable isolated user namespace
+  storage:
+    size: 10Gi
+```
+
+:::info
+When using an isolated user namespace (`hostUsers: false`), PostgreSQL processes
+inside the container still use the configured UID/GID (default 26), but these
+are mapped to different UIDs on the host through the user namespace.
+:::
+
 #### Security Context Constraints
 
 When running in an environment that is utilizing

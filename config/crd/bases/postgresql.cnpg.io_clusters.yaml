@@ -3144,6 +3144,13 @@ spec:
                   to be unhealthy
                 format: int32
                 type: integer
+              hostUsers:
+                description: |-
+                  Determines if the pod's processes run in the host's user namespace.
+                  If set to `false`, a user namespace is created for the pod and all
+                  the container processes run with a different UID/GID than on the host.
+                  More info: https://kubernetes.io/docs/concepts/workloads/pods/user-namespaces/
+                type: boolean
               imageCatalogRef:
                 description: Defines the major PostgreSQL version we want to use within
                   an ImageCatalog
