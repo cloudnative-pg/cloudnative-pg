@@ -79,3 +79,31 @@ var _ = Describe("getPrimaryPromotionTime", func() {
 		})
 	})
 })
+
+var _ = Describe("getWalArchivingStatus", func() {
+	It("should return 'Disabled' when WAL archiving is disabled", func() {
+		result := getWalArchivingStatus(false, "", true)
+		Expect(result).To(ContainSubstring("Disabled"))
+	})
+
+	It("should return 'OK' when archiving is working", func() {
+		result := getWalArchivingStatus(true, "", false)
+		Expect(result).To(ContainSubstring("OK"))
+	})
+
+	It("should return 'Failing' when there is a failed WAL", func() {
+		result := getWalArchivingStatus(false, "000000010000000000000001", false)
+		Expect(result).To(ContainSubstring("Failing"))
+	})
+
+	It("should return 'Starting Up' when archiving hasn't started yet", func() {
+		result := getWalArchivingStatus(false, "", false)
+		Expect(result).To(ContainSubstring("Starting Up"))
+	})
+
+	It("should prioritize 'Disabled' over other statuses", func() {
+		// Even if archiving is working, disabled should take precedence
+		result := getWalArchivingStatus(true, "", true)
+		Expect(result).To(ContainSubstring("Disabled"))
+	})
+})
