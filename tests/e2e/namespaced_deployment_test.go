@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaced"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -44,11 +45,10 @@ import (
 var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.LabelDisruptive,
 	tests.LabelNamespacedOperator), Ordered, Serial, func() {
 	const (
-		operatorNamespace          = "cnpg-system"
-		namespacedOperatorManifest = fixturesDir + "/namespaced/manifest.yaml"
-		clusterName                = "postgresql-storage-class"
-		sampleFile                 = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		level                      = tests.Highest
+		operatorNamespace = "cnpg-system"
+		clusterName       = "postgresql-storage-class"
+		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		level             = tests.Highest
 	)
 
 	BeforeAll(func() {
@@ -65,7 +65,7 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 			Expect(err).NotTo(HaveOccurred(), "operator must be deployed")
 		})
 
-		ConfigureNamespacedDeployment(env, operatorNamespace)
+		namespaced.ConfigureDeployment(env, operatorNamespace)
 	})
 
 	BeforeEach(func() {
@@ -145,7 +145,7 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 		BeforeEach(func() {
 			nodeList, _ := nodes.List(env.Ctx, env.Client)
 			for _, node := range nodeList.Items {
-				if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
+				if !node.Spec.Unschedulable && len(node.Spec.Taints) == 0 {
 					nodesWithLabels = append(nodesWithLabels, node.Name)
 					cmd := fmt.Sprintf("kubectl label node %v drain=drain --overwrite", node.Name)
 					_, stderr, err := run.Run(cmd)

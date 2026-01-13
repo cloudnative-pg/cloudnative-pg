@@ -36,9 +36,9 @@ import (
 var (
 	configurationLog = log.WithName("configuration")
 	// ErrNamespaceEmpty is raised when the namespace is empty in namespaced deployment
-	ErrNamespaceEmpty = errors.New("namespace can not be empty")
+	ErrNamespaceEmpty = errors.New("namespace cannot be empty")
 	// ErrNamespaceMismatch is raised when the OperatorNamespace and WatchNamespace is not equal in namespaced deployment
-	ErrNamespaceMismatch = errors.New("provided namespaces does not match")
+	ErrNamespaceMismatch = errors.New("provided namespaces do not match")
 )
 
 const (
@@ -267,7 +267,7 @@ func (config *Data) GetIncludePlugins() []string {
 }
 
 // Validate validates configuration parameters and combinations.
-// This can programatically validate deployment parameters
+// This can programmatically validate deployment parameters.
 // If validation fails it returns an error.
 func (config *Data) Validate() error {
 	if err := config.validateNamespacedConfiguration(); err != nil {

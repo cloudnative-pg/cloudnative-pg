@@ -42,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaced"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -865,7 +866,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			})
 			DeferCleanup(cleanupOperatorAndMinio)
 
-			ConfigureNamespacedDeployment(env, operatorNamespace)
+			namespaced.ConfigureDeployment(env, operatorNamespace)
 
 			By("creating a cluster in the operator namespace", func() {
 				CreateResourceFromFile(operatorNamespace, testClusterFile)
