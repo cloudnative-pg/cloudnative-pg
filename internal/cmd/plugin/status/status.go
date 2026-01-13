@@ -623,6 +623,16 @@ func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string
 	return false, nil
 }
 
+// isSkipWalArchivingEnabled checks if the skipWalArchiving annotation is set to "enabled"
+func isSkipWalArchivingEnabled(cluster *apiv1.Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+
+	value, ok := cluster.Annotations["cnpg.io/skipWalArchiving"]
+	return ok && value == "enabled"
+}
+
 // printWALArchivingStatus prints the WAL archiving status to the provided tabby table
 func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
@@ -630,8 +640,11 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 		status.AddLine("No Primary instance found")
 		return
 	}
+	isConfigured := fullStatus.Cluster.Spec.Backup != nil &&
+		fullStatus.Cluster.Spec.Backup.BarmanObjectStore != nil &&
+		!isSkipWalArchivingEnabled(fullStatus.Cluster)
 	status.AddLine("Working WAL archiving:",
-		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL))
+		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL, isConfigured))
 	status.AddLine("WALs waiting to be archived:", primaryInstanceStatus.ReadyWALFiles)
 
 	if primaryInstanceStatus.LastArchivedWAL == "" {
@@ -648,8 +661,10 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 	}
 }
 
-func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
+func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string, isArchivingConfigured bool) string {
 	switch {
+	case !isArchivingConfigured:
+		return aurora.Yellow("Disabled").String()
 	case isArchivingWAL:
 		return aurora.Green("OK").String()
 	case lastFailedWAL != "":
