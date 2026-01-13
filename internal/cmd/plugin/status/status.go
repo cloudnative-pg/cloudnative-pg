@@ -623,16 +623,6 @@ func isBarmanCloudPluginEnabled(cluster *apiv1.Cluster) (bool, map[string]string
 	return false, nil
 }
 
-// isSkipWalArchivingEnabled checks if the skipWalArchiving annotation is set to "enabled"
-func isSkipWalArchivingEnabled(cluster *apiv1.Cluster) bool {
-	if cluster == nil {
-		return false
-	}
-
-	value, ok := cluster.Annotations[utils.SkipWalArchiving]
-	return ok && value == "enabled"
-}
-
 // printWALArchivingStatus prints the WAL archiving status to the provided tabby table
 func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby) {
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
@@ -642,7 +632,7 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 	}
 	isConfigured := fullStatus.Cluster.Spec.Backup != nil &&
 		fullStatus.Cluster.Spec.Backup.BarmanObjectStore != nil &&
-		!isSkipWalArchivingEnabled(fullStatus.Cluster)
+		utils.IsWalArchivingDisabled(&fullStatus.Cluster.ObjectMeta) == false
 	status.AddLine("Working WAL archiving:",
 		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL, isConfigured))
 	status.AddLine("WALs waiting to be archived:", primaryInstanceStatus.ReadyWALFiles)
