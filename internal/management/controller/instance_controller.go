@@ -500,6 +500,11 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 		return err
 	}
 
+	// Check if this replica has diverged from the cluster's timeline and needs re-cloning
+	if err := r.verifyPgDataCoherenceForReplica(ctx, cluster); err != nil {
+		return err
+	}
+
 	if err := system.SetCoredumpFilter(cluster.GetCoredumpFilter()); err != nil {
 		return err
 	}

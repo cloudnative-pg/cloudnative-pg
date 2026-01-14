@@ -49,6 +49,29 @@ If a standby Pod fails:
   created from a backup of the current primary.
 - Once ready, the Pod is re-added to the `-r` and `-ro` services.
 
+### Timeline Divergence Recovery
+
+After a failover, a replica may encounter a timeline divergence error if its
+checkpoint is ahead of the fork point on the new primary's timeline. This can
+occur when:
+
+- Network issues delay replication during a failover
+- WAL archiving lag prevents the replica from receiving all changes
+- The replica was isolated during the failover
+
+When PostgreSQL detects this condition, it fails to start with the error
+"requested timeline X is not a child of this server's history". CloudNativePG
+automatically recovers from this scenario:
+
+1. The instance manager detects the timeline divergence during startup
+2. The Pod exits with a specific exit code
+3. The operator detects this exit code and marks the instance as unrecoverable
+4. The PVC is deleted automatically
+5. A new Pod is created and re-clones from the current primary via `pg_basebackup`
+
+This automated recovery ensures the cluster returns to a healthy state without
+manual intervention.
+
 ## Manual Intervention
 
 For failure scenarios not covered by automated recovery, manual intervention

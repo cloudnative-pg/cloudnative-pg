@@ -179,3 +179,88 @@ var _ = Describe("promotion token validation", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+
+var _ = Describe("ParseTimelineHistoryForForkPoint", func() {
+	It("parses a valid timeline history file with tab separation", func() {
+		content := `1	0/3000000	no recovery target specified
+2	0/5000000	no recovery target specified
+3	0/7000000	no recovery target specified`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/5000000"))
+	})
+
+	It("parses a valid timeline history file with space separation", func() {
+		content := `1  0/3000000  no recovery target specified
+2  0/5000000  no recovery target specified
+3  0/7000000  no recovery target specified`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/5000000"))
+	})
+
+	It("handles comments in timeline history file", func() {
+		content := `# This is a comment
+1	0/3000000	no recovery target specified
+# Another comment
+2	0/5000000	no recovery target specified`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/3000000"))
+	})
+
+	It("handles empty lines in timeline history file", func() {
+		content := `
+1	0/3000000	no recovery target specified
+
+2	0/5000000	no recovery target specified
+
+`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/5000000"))
+	})
+
+	It("returns error when timeline not found", func() {
+		content := `1	0/3000000	no recovery target specified
+2	0/5000000	no recovery target specified`
+		_, err := ParseTimelineHistoryForForkPoint(content, 99)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("fork point for timeline 99 not found"))
+	})
+
+	It("handles LSNs with varying hex digit counts", func() {
+		content := `1	18FC/2E000110	no recovery target specified
+20	1A/B0000200	failover from primary`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 20)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("1A/B0000200"))
+	})
+
+	It("handles reasons with multiple words", func() {
+		content := `1	0/3000000	recovery target PITR at 2024-01-01 12:00:00
+2	0/5000000	failover from primary cluster-1`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/5000000"))
+	})
+
+	It("skips invalid lines", func() {
+		content := `invalid line without tabs
+1	0/3000000	no recovery target specified
+not-a-number	0/5000000	another invalid line
+2	0/6000000	valid entry`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("0/6000000"))
+	})
+
+	It("handles real PostgreSQL timeline history format", func() {
+		// Example from actual PostgreSQL timeline history file
+		content := `20	18FC/2E000110	no recovery target specified
+`
+		lsn, err := ParseTimelineHistoryForForkPoint(content, 20)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lsn).To(Equal("18FC/2E000110"))
+	})
+})

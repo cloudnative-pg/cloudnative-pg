@@ -51,6 +51,10 @@ const (
 	// checkpoint's REDO location pg_controldata entry
 	pgControlDataKeyLatestCheckpointREDOLocation pgControlDataKey = "Latest checkpoint's REDO location"
 
+	// pgControlDataKeyLatestCheckpointLocation is the latest
+	// checkpoint location pg_controldata entry
+	pgControlDataKeyLatestCheckpointLocation pgControlDataKey = "Latest checkpoint location"
+
 	// pgControlDataKeyTimeOfLatestCheckpoint is the time
 	// of latest checkpoint pg_controldata entry
 	pgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
@@ -99,6 +103,11 @@ func (p PgControlData) GetDatabaseSystemIdentifier() string {
 // GetLatestCheckpointREDOLocation returns the latest checkpoint's REDO location
 func (p PgControlData) GetLatestCheckpointREDOLocation() string {
 	return p[pgControlDataKeyLatestCheckpointREDOLocation]
+}
+
+// GetLatestCheckpointLocation returns the latest checkpoint location (the LSN of the checkpoint record)
+func (p PgControlData) GetLatestCheckpointLocation() string {
+	return p[pgControlDataKeyLatestCheckpointLocation]
 }
 
 // GetTimeOfLatestCheckpoint returns the time of latest checkpoint
@@ -345,4 +354,44 @@ func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, er
 	}
 
 	return &content, nil
+}
+
+// ParseTimelineHistoryForForkPoint parses a timeline history file content and
+// returns the fork point LSN for the specified parent timeline.
+//
+// The history file format is:
+//
+//	<parent_tli>  <switchpoint_lsn>  <reason>
+//
+// Lines starting with # are comments.
+func ParseTimelineHistoryForForkPoint(content string, parentTimeline int) (string, error) {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse: <tli>\t<lsn>\t<reason>
+		// The fields are separated by tabs, and the reason may contain spaces
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) < 2 {
+			// Try space separation as fallback
+			fields = strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+		}
+
+		tli, err := strconv.Atoi(strings.TrimSpace(fields[0]))
+		if err != nil {
+			continue
+		}
+
+		if tli == parentTimeline {
+			return strings.TrimSpace(fields[1]), nil
+		}
+	}
+
+	return "", fmt.Errorf("fork point for timeline %d not found in history", parentTimeline)
 }

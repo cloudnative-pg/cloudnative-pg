@@ -387,4 +387,59 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		Expect(state2.TimeLineID).To(Equal(123))
 		Expect(state2.IP).To(Equal("192.168.1.2"))
 	})
+
+	It("should detect timeline divergence termination", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name: "postgres",
+						State: corev1.ContainerState{
+							Terminated: &corev1.ContainerStateTerminated{
+								ExitCode: apiv1.TimelineDivergenceExitCode,
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(isTerminatedBecauseOfTimelineDivergence(pod)).To(BeFalse())
+	})
+
+	It("should not detect timeline divergence for other exit codes", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name: "postgres",
+						State: corev1.ContainerState{
+							Terminated: &corev1.ContainerStateTerminated{
+								ExitCode: 1,
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(isTerminatedBecauseOfTimelineDivergence(pod)).To(BeTrue())
+	})
+
+	It("should not detect timeline divergence for running pods", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name: "postgres",
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{},
+						},
+					},
+				},
+			},
+		}
+		Expect(isTerminatedBecauseOfTimelineDivergence(pod)).To(BeTrue())
+	})
 })
