@@ -734,7 +734,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("checking the primary didn't switch", func() {
-				AssertPrimary(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 
@@ -828,7 +828,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 			initialPrimary, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-
 		})
 
 		It("can update cluster adding tablespaces", func() {
@@ -890,8 +889,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			})
 
-			By("checking the primary didn't switch", func() {
-				AssertPrimary(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+			By("checking the primary did switch", func() {
+				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
 			})
 		})
 	})
