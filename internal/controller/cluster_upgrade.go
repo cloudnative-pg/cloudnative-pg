@@ -155,7 +155,34 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		podRollout.canBeInPlace, podRollout.primaryForceRecreate, podRollout.reason)
+		podRollout.canBeInPlace, podRollout.hasUpdatedPVCs, podRollout.reason)
+}
+
+func (r *ClusterReconciler) switchPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+	primaryPod corev1.Pod,
+	targetInstance postgres.PostgresqlStatus,
+	hasNewPVCs bool,
+	reason rolloutReason,
+) (bool, error) {
+	podList.LogStatus(ctx)
+	r.Recorder.Eventf(cluster, "Normal", "Switchover",
+		"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, reason); err != nil {
+		return false, err
+	}
+	if err := r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name); err != nil {
+		return false, err
+	}
+	if !hasNewPVCs {
+		return true, nil
+	}
+	if err := r.upgradePod(ctx, cluster, &primaryPod, reason); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -164,13 +191,13 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
-	forceRecreate bool,
+	hasNewPVCs bool,
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
 
-	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {
+	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
 		if inPlacePossible {
 			// In-place restart is possible
 			if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
@@ -227,10 +254,8 @@ func (r *ClusterReconciler) updatePrimaryPod(
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetInstance.Pod.Name)
-		podList.LogStatus(ctx)
-		r.Recorder.Eventf(cluster, "Normal", "Switchover",
-			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
-		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
+
+		return r.switchPrimary(ctx, cluster, podList, primaryPod, targetInstance, hasNewPVCs, reason)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
@@ -270,9 +295,9 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
 type rollout struct {
-	required             bool
-	canBeInPlace         bool
-	primaryForceRecreate bool
+	required       bool
+	canBeInPlace   bool
+	hasUpdatedPVCs bool
 
 	needsChangeOperatorImage bool
 	needsChangeOperandImage  bool
@@ -526,9 +551,9 @@ func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster
 func checkHasMissingPVCs(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod) {
 		return rollout{
-			required:             true,
-			primaryForceRecreate: false,
-			reason:               "attaching a new PVC to the instance Pod",
+			required:       true,
+			hasUpdatedPVCs: true,
+			reason:         "attaching a new PVC to the instance Pod",
 		}, nil
 	}
 	return rollout{}, nil
