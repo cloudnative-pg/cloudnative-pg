@@ -81,7 +81,6 @@ var _ = Describe("getPrimaryPromotionTime", func() {
 })
 
 var _ = Describe("getWalArchivingStatus", func() {
-
 	Context("when WAL archiving is not configured", func() {
 		It("should return Disabled", func() {
 			result := getWalArchivingStatus(
