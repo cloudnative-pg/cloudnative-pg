@@ -69,7 +69,7 @@ OPERATOR_SDK_VERSION ?= v1.42.0
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.61.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.15.2
+PREFLIGHT_VERSION ?= 1.16.0
 ARCH ?= amd64
 
 export CONTROLLER_IMG
