@@ -527,7 +527,7 @@ func checkHasMissingPVCs(_ context.Context, pod *corev1.Pod, cluster *apiv1.Clus
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod) {
 		return rollout{
 			required:             true,
-			primaryForceRecreate: true,
+			primaryForceRecreate: false,
 			reason:               "attaching a new PVC to the instance Pod",
 		}, nil
 	}
