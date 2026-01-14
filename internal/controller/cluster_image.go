@@ -316,10 +316,27 @@ func getExtensionsFromCatalog(
 	// Resolve extensions
 	for _, extension := range requestedExtensions {
 		catalogExtension, found := catalogExtensionsMap[extension.Name]
+
+		// Validate that the ImageVolumeSource.Reference is properly defined.
+		// We want to allow overriding each field of an extension defined in a catalog,
+		// meaning that even the ImageVolumeSource.Reference is defined as an optional field,
+		// although it must be defined either in the catalog or in the Cluster Spec.
+
+		// Case 1. This case is also covered by the validateExtensions cluster webhook, but it doesn't
+		// hurt to have it here as well.
 		if !found && extension.ImageVolumeSource.Reference == "" {
 			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q not found in image catalog %s/%s and no reference is defined in the Cluster Spec",
-				extension.Name, catalog.GetNamespace(), catalog.GetName())
+				"extension %q found in the Cluster Spec but no ImageVolumeSource.Reference is defined", extension.Name)
+		}
+
+		// Case 2. This case must be handled here because we don't have a validation webhook for the catalog,
+		// but it could be moved there if we decide to add one.
+		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
+					"in both the image catalog and the Cluster Spec",
+				extension.Name, catalog.GetNamespace(), catalog.GetName(),
+			)
 		}
 
 		var resultExtension apiv1.ExtensionConfiguration

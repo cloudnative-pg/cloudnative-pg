@@ -283,17 +283,195 @@ var _ = Describe("Cluster image detection with errors", func() {
 	})
 })
 
-// TODO: test reconciling of image with extensions
-// 0. When extensions are not defined anywhere
-// 1. When extensions are defined in the Cluster spec.
-// 2. When extensions are defined in the Catalog
-// 3. When extensions are defined in both places (override)
-// 4. When an extension is defined in the catalog but not requested
-// 5. When an extension is defined in the catalog and requested
-// 6. When an extension is defined in the catalog and requested but it's incomplete (e.g. missing reference)
+var _ = Describe("Cluster with container image extensions", func() {
+	var extensionsConfig []apiv1.ExtensionConfiguration
+	var catalog *apiv1.ImageCatalog
 
-// TODO: test for getExtensionsFromCatalog
-// 1. Extensions defined only in the Cluster spec
-// 2. Extensions defined only in the Catalog
-// 3. Extensions are defined in both places (override)
-// 4. Missing reference for an extension (failure)
+	BeforeEach(func() {
+		extensionsConfig = []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+			},
+		}
+		catalog = &apiv1.ImageCatalog{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "catalog",
+				Namespace: "default",
+			},
+			Spec: apiv1.ImageCatalogSpec{
+				Images: []apiv1.CatalogImage{
+					{
+						Image:      "postgres:15.2",
+						Major:      15,
+						Extensions: extensionsConfig,
+					},
+				},
+			},
+		}
+	})
+
+	It("when extensions are not defined", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:15.2",
+			},
+		}
+		r := newFakeReconcilerFor(cluster, nil)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(BeEmpty())
+	})
+
+	It("when extensions are defined in the Cluster spec", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:15.2",
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: extensionsConfig,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, nil)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(Equal(extensionsConfig))
+	})
+
+	It("when extensions are defined in the Catalog", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+						},
+					},
+				},
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(Equal(extensionsConfig))
+	})
+
+	It("when extensions are defined in both places (override)", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "foo:testing",
+							},
+							ExtensionControlPath: []string{"/custom/path/"},
+						},
+					},
+				},
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].Name).To(Equal("foo"))
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].ImageVolumeSource.Reference).To(Equal("foo:testing"))
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].ExtensionControlPath).To(Equal([]string{"/custom/path/"}))
+	})
+
+	It("when an extension is defined in the catalog but not requested", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(BeEmpty())
+	})
+
+	It("when an extension is defined in the catalog and requested but it's incomplete", func(ctx SpecContext) {
+		catalog.Spec.Images[0].Extensions[0].ImageVolumeSource.Reference = ""
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+						},
+					},
+				},
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(Not(BeNil()))
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseImageCatalogError))
+		Expect(cluster.Status.PhaseReason).To(Not(BeEmpty()))
+	})
+})
