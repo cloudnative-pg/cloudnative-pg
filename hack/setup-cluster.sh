@@ -40,7 +40,7 @@ NODES=${NODES:-3}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-r] <command>
+Usage: $0 [-k <version>] [-n <nodes>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -57,7 +57,7 @@ Commands:
 Options:
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
-                          (e.g., v1.27.0). Env: K8S_VERSION
+                          (e.g., v1.35.0). Env: K8S_VERSION
 
     -n|--nodes
         <NODES>           Create a cluster with the required number of nodes.
