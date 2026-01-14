@@ -273,7 +273,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimary(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			AssertPrimaryWasUpdated(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -429,7 +429,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimary(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			AssertPrimaryWasUpdated(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
