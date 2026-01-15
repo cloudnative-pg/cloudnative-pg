@@ -17,6 +17,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# shellcheck disable=SC1090,SC1091
 
 # Kind-specific cluster creation logic.
 set -eEuo pipefail

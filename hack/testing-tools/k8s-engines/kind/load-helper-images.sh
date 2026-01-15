@@ -17,6 +17,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# shellcheck disable=SC1090,SC1091
 
 # Kind-specific helper image loading logic.
 set -eEuo pipefail

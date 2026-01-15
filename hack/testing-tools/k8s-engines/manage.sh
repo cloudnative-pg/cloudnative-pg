@@ -17,6 +17,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# shellcheck disable=SC1090,SC1091
 
 set -eEuo pipefail
 
@@ -25,6 +26,8 @@ DIR="$(dirname "${BASH_SOURCE[0]}")"
 COMMON_DIR="${DIR}/../common"
 
 # Source necessary common files to define paths, constants, and utility functions
+# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
