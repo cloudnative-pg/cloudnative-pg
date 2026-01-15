@@ -26,11 +26,13 @@ set -eEuo pipefail
 source "$(dirname "$0")/../../common/00-paths.sh" 
 source "$(dirname "$0")/../../common/40-utils-registry.sh" # For registry_name
 
+# shellcheck disable=SC2153
 echo "Tearing down kind cluster '${CLUSTER_NAME}'."
 
 # Note: This function contains the logic formerly in destroy_kind
 destroy_kind() {
   local cluster_name=$1
+  # shellcheck disable=SC2154
   docker network disconnect "kind" "${registry_name}" &>/dev/null || true
   kind delete cluster --name "${cluster_name}" || true
   docker network rm "kind" &>/dev/null || true

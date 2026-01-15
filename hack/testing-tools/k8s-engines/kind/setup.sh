@@ -111,11 +111,13 @@ function deploy_csi_host_path() {
 # deploy_fluentd: Pulls the FluentD image and deploys the DaemonSet.
 function deploy_fluentd() {
   local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
+  # shellcheck disable=SC2154
   local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
   
   echo "Starting FluentD deployment..."
   docker pull "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
+  # shellcheck disable=SC2153
   load_image_kind "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
 
   "${K8S_CLI}" apply -f "${E2E_DIR}/local-fluentd.yaml"

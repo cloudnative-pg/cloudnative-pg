@@ -39,6 +39,7 @@ function export_logs_kind() {
 # --- MAIN EXECUTION ---
 
 main() {
+  # shellcheck disable=SC2153
   export_logs_kind "${CLUSTER_NAME}"
 }
 

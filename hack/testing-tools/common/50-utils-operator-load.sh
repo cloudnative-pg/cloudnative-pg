@@ -31,14 +31,16 @@ function build_and_load_operator_image_from_sources() {
   ensure_registry
   create_builder # Create the buildx builder instance
 
+  # shellcheck disable=SC2154
   echo -e "${bright}Building operator from current worktree${reset}"
 
   # Get the target image name (e.g., registry.dev:5000/cloudnative-pg-testing:latest)
   CONTROLLER_IMG="$(print_image)"
 
   # Build the operator image and push it to the local registry
+  # shellcheck disable=SC2154
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" insecure="true" \
-    ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
+    ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
   echo -e "${bright}Done building and loading new operator image on local registry.${reset}"
 

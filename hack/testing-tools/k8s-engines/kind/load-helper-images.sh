@@ -42,6 +42,7 @@ function load_image_kind() {
 
 # This function is executed by the manage.sh dispatcher.
 function load_helper_images_vendor_specific() {
+    # shellcheck disable=SC2154,SC2153
     echo -e "${bright}Loading helper images for tests on cluster ${CLUSTER_NAME}${reset}"
 
     local cluster_name=${CLUSTER_NAME}
