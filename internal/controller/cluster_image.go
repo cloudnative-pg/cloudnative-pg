@@ -63,16 +63,25 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		)
 	}
 
+	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
+	requestedMajorVersion := requestedImageInfo.MajorVersion
+
 	// Case 2: there's a running image. The code checks if the user selected
 	// an image of the same major version or if a change in the major
 	// version has been requested.
 	if requestedImageInfo.Image == cluster.Status.PGDataImageInfo.Image {
+		// In case user rolls back failed major upgrade.
+		if cluster.Status.Image != requestedImageInfo.Image {
+			return nil, status.PatchWithOptimisticLock(
+				ctx,
+				r.Client,
+				cluster,
+				status.SetImage(requestedImageInfo.Image),
+			)
+		}
 		// The requested image is the same as the current one, no action needed
 		return nil, nil
 	}
-
-	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
-	requestedMajorVersion := requestedImageInfo.MajorVersion
 
 	if currentMajorVersion > requestedMajorVersion {
 		// Major version downgrade requested. This is not allowed.
