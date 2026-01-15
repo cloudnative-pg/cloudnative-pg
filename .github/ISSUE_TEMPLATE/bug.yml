@@ -22,7 +22,7 @@ body:
     id: troubleshooting
     attributes:
       label: I have read the troubleshooting guide
-      description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/docs/1.28/troubleshooting).
+      description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/docs/devel/troubleshooting).
       options:
         - label: I have read the troubleshooting guide and I think this is a new bug.
           required: true
