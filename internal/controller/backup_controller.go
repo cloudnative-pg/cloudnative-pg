@@ -496,7 +496,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	// If the session ID changed, the instance manager was restarted (e.g., during an operator
 	// upgrade or container reboot), which means any running backup goroutine was killed.
 	instanceManagerRestarted := false
-	if backup.Spec.Method.IsManagedByInstance() && backup.Status.InstanceID.SessionID != "" {
+	if backup.Spec.Method.IsManagedByInstance() {
 		instanceManagerRestarted = r.isInstanceManagerRestarted(ctx, &pod, backup.Status.InstanceID.SessionID)
 	}
 
