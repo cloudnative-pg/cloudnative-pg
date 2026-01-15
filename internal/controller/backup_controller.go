@@ -549,12 +549,6 @@ func (r *BackupReconciler) isInstanceManagerRestarted(
 ) bool {
 	contextLogger := log.FromContext(ctx)
 
-	// If no stored session ID, we can't make a comparison - assume backup is still running
-	if storedSessionID == "" {
-		return false
-	}
-
-	// Get the current status of the pod to retrieve the SessionID
 	pods := corev1.PodList{Items: []corev1.Pod{*pod}}
 	statusList := r.instanceStatusClient.GetStatusFromInstances(ctx, pods)
 
@@ -566,6 +560,19 @@ func (r *BackupReconciler) isInstanceManagerRestarted(
 	}
 
 	currentSessionID := statusList.Items[0].SessionID
+
+	// If stored SessionID is empty but current is not, the operator was upgraded
+	// while a backup was running. Fail safe by marking as restarted.
+	if storedSessionID == "" {
+		if currentSessionID != "" {
+			contextLogger.Info("Backup started before SessionID support",
+				"pod", pod.Name,
+				"currentSessionID", currentSessionID)
+			return true
+		}
+		return false
+	}
+
 	if currentSessionID == "" {
 		// If the current session ID is empty, the instance manager may not have reported yet
 		contextLogger.Debug("Current SessionID is empty, assuming backup still running",
