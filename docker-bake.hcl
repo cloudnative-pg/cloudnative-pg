@@ -55,7 +55,7 @@ title = "CloudNativePG Operator"
 description = "This Docker image contains CloudNativePG Operator."
 authors = "The CloudNativePG Contributors"
 url = "https://github.com/cloudnative-pg/cloudnative-pg"
-documentation = "https://cloudnative-pg.io/documentation/current/"
+documentation = "https://cloudnative-pg.io/docs/"
 license = "Apache-2.0"
 now = timestamp()
 
