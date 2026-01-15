@@ -762,7 +762,19 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should remove the PodMonitor if it is disabled when the PodMonitor exists", func() {
+	It("should remove the PodMonitor if it is disabled and is owned by a cluster", func() {
+		cluster := apiv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       apiv1.ClusterKind,
+				APIVersion: apiSGVString,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+		cluster.SetInheritedDataAndOwnership(&manager.podMonitor.ObjectMeta)
+
 		// Create the PodMonitor with the fake client
 		err := fakeCli.Create(ctx, manager.podMonitor)
 		Expect(err).ToNot(HaveOccurred())
@@ -783,6 +795,33 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		)
 		Expect(err).To(HaveOccurred())
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should NOT remove the PodMonitor if it is not owned by a cluster", func() {
+		unownedPodMonitor := &monitoringv1.PodMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+			},
+		}
+		err := fakeCli.Create(ctx, unownedPodMonitor)
+		Expect(err).ToNot(HaveOccurred())
+
+		manager.isEnabled = false
+		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
+		Expect(err).ToNot(HaveOccurred())
+
+		podMonitor := &monitoringv1.PodMonitor{}
+		err = fakeCli.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      manager.podMonitor.Name,
+				Namespace: manager.podMonitor.Namespace,
+			},
+			podMonitor,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(podMonitor.Name).To(Equal("test"))
 	})
 
 	It("should patch the PodMonitor with updated labels and annotations", func() {
