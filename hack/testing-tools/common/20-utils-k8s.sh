@@ -130,7 +130,8 @@ data:
 EOF
 
   # Find the name of the ConfigMap currently referenced by the operator deployment
-  local configMapName=$("${K8S_CLI}" -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+  local configMapName
+  configMapName=$("${K8S_CLI}" -n cnpg-system get deployments.apps cnpg-controller-manager -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
 
   # Patch the ConfigMap
   "${K8S_CLI}" -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"

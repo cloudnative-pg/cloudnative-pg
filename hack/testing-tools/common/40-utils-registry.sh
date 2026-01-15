@@ -29,6 +29,7 @@ builder_name=cnpg-builder
 
 # ensure_registry: Sets up the local Docker registry container and network.
 function ensure_registry() {
+  # shellcheck disable=SC2154
   echo -e "${bright}Verify local registry${reset}"
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
     echo "- Create registry volume: ${registry_volume}${reset}"
