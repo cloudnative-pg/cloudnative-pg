@@ -7,7 +7,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-20.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,20 +30,20 @@ builder_name=cnpg-builder
 # ensure_registry: Sets up the local Docker registry container and network.
 function ensure_registry() {
   # shellcheck disable=SC2154
-  echo -e "${bright}Verify local registry${reset}"
+  echo -e "${bright}Verify local registry${reset}" >&2
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
-    echo "- Create registry volume: ${registry_volume}${reset}"
-    docker volume create "${registry_volume}"
+    echo "- Create registry volume: ${registry_volume}${reset}" >&2
+    docker volume create "${registry_volume}" >&2
   fi
   if ! docker network inspect "${registry_net}" &>/dev/null; then
-    echo "- Create registry network: ${registry_net}${reset}"
-    docker network create "${registry_net}"
+    echo "- Create registry network: ${registry_net}${reset}" >&2
+    docker network create "${registry_net}" >&2
   fi
   if ! docker inspect -f '{{.State.Running}}' "${registry_name}" &>/dev/null; then
-    echo "- Start registry: ${registry_name}${reset}"
-    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:2
+    echo "- Start registry: ${registry_name}${reset}" >&2
+    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:2 >&2
   fi
-  echo -e "${bright}Registry ${registry_name} running${reset}"
+  echo -e "${bright}Registry ${registry_name} running${reset}" >&2
 }
 
 # create_builder: Sets up a Docker Buildx builder instance.
