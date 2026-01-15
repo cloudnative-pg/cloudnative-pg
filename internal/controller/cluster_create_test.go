@@ -762,8 +762,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should remove the PodMonitor if it is disabled when the PodMonitor exists", func() {
-		// Create a cluster and set owner reference on the PodMonitor
+	It("should remove the PodMonitor if it is disabled and is owned by a cluster", func() {
 		cluster := apiv1.Cluster{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       apiv1.ClusterKind,
@@ -798,8 +797,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("should NOT remove the PodMonitor if it is not owned by the cluster", func() {
-		// Create a PodMonitor without owner reference (manually created)
+	It("should NOT remove the PodMonitor if it is not owned by a cluster", func() {
 		unownedPodMonitor := &monitoringv1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -813,7 +811,6 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 
-		// Verify the PodMonitor still exists (was not deleted)
 		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
