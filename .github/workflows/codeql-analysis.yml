@@ -35,7 +35,7 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.5"
+  GOLANG_VERSION: "1.25.6"
 
 jobs:
   duplicate_runs:
