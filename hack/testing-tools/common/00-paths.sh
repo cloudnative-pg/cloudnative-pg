@@ -30,8 +30,16 @@ ROOT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")/../../../")
 HACK_DIR="${ROOT_DIR}/hack"
 TESTING_TOOLS_DIR="${HACK_DIR}/testing-tools"
 E2E_DIR="${HACK_DIR}/e2e"
-GO_BIN="$(go env GOPATH)/bin"
-export ROOT_DIR HACK_DIR TESTING_TOOLS_DIR E2E_DIR PATH="${GO_BIN}:${PATH}"
+
+# Add go binaries to PATH if go is installed
+if command -v go &> /dev/null; then
+  GO_BIN="$(go env GOPATH)/bin"
+  export PATH="${GO_BIN}:${PATH}"
+else
+  echo "WARNING: go binary not found in PATH. Some tools may not be available." >&2
+fi
+
+export ROOT_DIR HACK_DIR TESTING_TOOLS_DIR E2E_DIR
 
 TEMP_DIR="$(mktemp -d)"
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
