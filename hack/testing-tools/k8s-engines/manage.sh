@@ -20,6 +20,34 @@
 
 # shellcheck disable=SC1090,SC1091
 
+#
+# Cluster Management Dispatcher
+#
+# This script serves as the main entry point for managing Kubernetes test clusters
+# across different cloud/local environments. It implements a dispatcher pattern that
+# delegates actions to vendor-specific implementations based on the CLUSTER_ENGINE
+# environment variable.
+#
+# Architecture:
+#   - Common utilities are in ../common/ and provide shared functionality
+#   - Vendor-specific implementations are in ./<vendor>/ subdirectories
+#   - Each vendor directory must provide these required scripts:
+#       * setup.sh - Create and configure the cluster
+#       * teardown.sh - Destroy the cluster and cleanup resources
+#       * export-logs.sh - Export cluster logs for debugging
+#   - Optional vendor scripts (with fallback to common implementations):
+#       * load.sh - Vendor-specific image loading (falls back to registry push)
+#       * load-helper-images.sh - Load helper images for testing
+#
+# Usage:
+#   manage.sh <action>
+#   where <action> can be: create, load-from-sources, deploy-from-sources,
+#   load-helper-images, print-image, export-logs, teardown, pyroscope, env
+#
+# Environment Variables:
+#   CLUSTER_ENGINE - Determines the target vendor (default: 'kind')
+#
+
 set -eEuo pipefail
 
 # Load common modules needed for dispatch logic and the fallback function
@@ -27,15 +55,15 @@ DIR="$(dirname "${BASH_SOURCE[0]}")"
 COMMON_DIR="${DIR}/../common"
 
 # Source necessary common files to define paths, constants, and utility functions
-# shellcheck disable=SC1091
-# shellcheck disable=SC1090
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
 source "${COMMON_DIR}/50-utils-operator-load.sh"
 
+# Get the action from the first argument
 ACTION="${1:-}"
-# VENDOR determines the target directory and defaults to 'kind'
+
+# Map CLUSTER_ENGINE env var to k8s-engines/<vendor>/ subdirectory (default: kind)
 VENDOR="${CLUSTER_ENGINE:-kind}"
 
 if [ -z "$ACTION" ]; then
@@ -51,7 +79,6 @@ esac
 
 VENDOR_DIR="${DIR}/${VENDOR}"
 
-# --- Cluster Lifecycle Operations Dispatch ---
 case "$ACTION" in
     create)
         SETUP_SCRIPT="${VENDOR_DIR}/setup.sh"
@@ -70,7 +97,8 @@ case "$ACTION" in
         if [ -f "${TEARDOWN_SCRIPT}" ]; then
             "${TEARDOWN_SCRIPT}"
         else
-            echo "WARNING: Teardown script not found for vendor '$VENDOR' at: ${TEARDOWN_SCRIPT}. Skipping." >&2
+            echo "ERROR: Teardown script not found for vendor '$VENDOR' at: ${TEARDOWN_SCRIPT}" >&2
+            exit 1
         fi
         ;;
 
@@ -88,6 +116,10 @@ case "$ACTION" in
     deploy-from-sources)
         # Ensure CONTROLLER_IMG is defined
         CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
+        if [ -z "$CONTROLLER_IMG" ]; then
+            echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
+            exit 1
+        fi
 
         source "${COMMON_DIR}/20-utils-k8s.sh"
         deploy_operator_from_sources
@@ -114,7 +146,8 @@ case "$ACTION" in
         if [ -f "${EXPORT_SCRIPT}" ]; then
             "${EXPORT_SCRIPT}"
         else
-            echo "WARNING: Log export script not found for vendor '$VENDOR'. Skipping." >&2
+            echo "ERROR: Log export script not found for vendor '$VENDOR' at: ${EXPORT_SCRIPT}" >&2
+            exit 1
         fi
         ;;
 
@@ -138,9 +171,9 @@ case "$ACTION" in
         echo "ARCH:                       ${ARCH}"
         echo "DOCKER_DEFAULT_PLATFORM:    ${DOCKER_DEFAULT_PLATFORM}"
 
-        # --- CLUSTER & KIND CONFIGURATION ---
+        # --- CLUSTER CONFIGURATION ---
         echo ""
-        echo "--- CLUSTER & KIND CONFIGURATION ---"
+        echo "--- CLUSTER CONFIGURATION ---"
         echo "CLUSTER_ENGINE:             ${CLUSTER_ENGINE:-<not explicitly set>}"
         echo "K8S_VERSION:                ${K8S_VERSION}"
         echo "CLUSTER_NAME:               ${CLUSTER_NAME:-<not explicitly set>}"
