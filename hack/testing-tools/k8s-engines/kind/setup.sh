@@ -97,16 +97,35 @@ function deploy_csi_host_path() {
   ## Create VolumeSnapshotClass
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml
 
-  ## Patch VolumeSnapshotClass to ignore failures (crucial for PostgreSQL testing)
+  ## Patch VolumeSnapshotClass to allow snapshots of running PostgreSQL instances
+  ## by ignoring read failures during snapshot creation
   "${K8S_CLI}" patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
   ## Create StorageClass
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
-  
+
   ## Annotate the StorageClass to set the default snapshot class
   "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapshotclass
 
-  echo "CSI plugin deployment initiated. (Requires wait loop from runner script)."
+  # Wait for CSI plugin to be ready
+  echo "CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready..."
+  local ITER=0
+  while true; do
+    if [[ $ITER -ge 300 ]]; then
+      echo "Timeout: The CSI plugin did not become ready within the expected time."
+      exit 1
+    fi
+    local NUM_SPEC
+    local NUM_STATUS
+    NUM_SPEC=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
+    NUM_STATUS=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "")
+    if [[ -n "$NUM_SPEC" && "$NUM_SPEC" == "$NUM_STATUS" ]]; then
+      echo "Success: The CSI plugin is deployed and ready."
+      break
+    fi
+    sleep 1
+    ((++ITER))
+  done
 }
 
 # deploy_fluentd: Pulls the FluentD image and deploys the DaemonSet.
@@ -114,7 +133,7 @@ function deploy_fluentd() {
   local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
   # shellcheck disable=SC2154
   local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
-  
+
   echo "Starting FluentD deployment..."
   docker pull "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
@@ -122,8 +141,26 @@ function deploy_fluentd() {
   load_image_kind "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
 
   "${K8S_CLI}" apply -f "${E2E_DIR}/local-fluentd.yaml"
-  # NOTE: The wait loop for FluentD readiness is typically placed here.
-  echo "FluentD deployment initiated."
+
+  # Wait for FluentD to be ready
+  echo "Waiting for FluentD to become ready..."
+  local ITER=0
+  local NODE
+  NODE=$("${K8S_CLI}" get nodes --no-headers | wc -l | tr -d " ")
+  while true; do
+    if [[ $ITER -ge 300 ]]; then
+      echo "Time out waiting for FluentD readiness"
+      exit 1
+    fi
+    local NUM_READY
+    NUM_READY=$("${K8S_CLI}" get ds fluentd -n kube-system -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "")
+    if [[ -n "$NUM_READY" && "$NUM_READY" == "$NODE" ]]; then
+      echo "FluentD is Ready"
+      break
+    fi
+    sleep 1
+    ((++ITER))
+  done
 }
 
 # create_cluster_kind: Generates the config file and creates the Kind cluster.
@@ -131,7 +168,7 @@ function create_cluster_kind() {
   local k8s_version=$1
   local cluster_name=$2
 
-  # Create kind config (Configuration logic copied from old setup-cluster.sh)
+  # Generate Kind cluster configuration
   config_file="${TEMP_DIR_LOCAL}/kind-config.yaml"
   cat >"${config_file}" <<-EOF
 kind: Cluster
@@ -265,8 +302,12 @@ main() {
   fi
 
   # Deploy optional and required add-ons
-  deploy_fluentd
-  deploy_csi_host_path
+  if [ "${ENABLE_FLUENTD}" = "true" ]; then
+    deploy_fluentd
+  fi
+  if [ "${ENABLE_CSI_DRIVER:-true}" = "true" ]; then
+    deploy_csi_host_path
+  fi
   deploy_prometheus_crds
 
   echo "Kind cluster ${CLUSTER_NAME} setup complete."
