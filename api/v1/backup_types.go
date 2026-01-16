@@ -319,6 +319,12 @@ type InstanceID struct {
 	// The container ID
 	// +optional
 	ContainerID string `json:"ContainerID,omitempty"`
+	// The instance manager session ID. This is a unique identifier generated at instance manager
+	// startup and changes on every restart (including container reboots). Used to detect if
+	// the instance manager was restarted during long-running operations like backups, which
+	// would terminate any running backup process.
+	// +optional
+	SessionID string `json:"sessionID,omitempty"`
 }
 
 // +genclient

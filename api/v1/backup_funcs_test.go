@@ -58,11 +58,13 @@ var _ = Describe("BackupStatus structure", func() {
 			},
 		}
 
-		status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, BackupMethodBarmanObjectStore)
+		status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID,
+			"test-session-id", BackupMethodBarmanObjectStore)
 		Expect(status.Phase).To(BeEquivalentTo(BackupPhaseStarted))
 		Expect(status.InstanceID).ToNot(BeNil())
 		Expect(status.InstanceID.PodName).To(Equal("cluster-example-1"))
 		Expect(status.InstanceID.ContainerID).To(Equal("container-id"))
+		Expect(status.InstanceID.SessionID).To(Equal("test-session-id"))
 		Expect(status.IsDone()).To(BeFalse())
 		Expect(status.ReconciliationStartedAt).ToNot(BeNil())
 	})
