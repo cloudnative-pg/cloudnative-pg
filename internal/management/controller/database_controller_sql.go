@@ -359,18 +359,25 @@ func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaS
 func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
 	contextLogger := log.FromContext(ctx)
 
-	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
+	var sqlCreateSchema strings.Builder
+	sqlCreateSchema.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
 	if len(schema.Owner) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
+		sqlCreateSchema.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
 	}
 
-	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
+	_, err := db.ExecContext(ctx, sqlCreateSchema.String())
 	if err != nil {
-		contextLogger.Error(err, "while creating schema", "query", sqlCreateExtension.String())
+		contextLogger.Error(err, "while creating schema", "query", sqlCreateSchema.String())
 		return err
 	}
 	contextLogger.Info("created schema", "name", schema.Name)
+
+	// Apply CREATE and USAGE privileges
+	if len(schema.Create) > 0 || len(schema.Usage) > 0 {
+		if err := updateDatabaseSchemaPrivileges(ctx, db, &schema); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -391,6 +398,13 @@ func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 		contextLogger.Info("altered schema owner", "name", schema.Name, "owner", schema.Owner)
 	}
 
+	// Apply CREATE and USAGE privileges
+	if len(schema.Create) > 0 || len(schema.Usage) > 0 {
+		if err := updateDatabaseSchemaPrivileges(ctx, db, &schema); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -405,6 +419,65 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 		return err
 	}
 	contextLogger.Info("dropped schema", "name", schema.Name)
+	return nil
+}
+
+// updateDatabaseSchemaPrivileges updates the CREATE and USAGE privileges for a schema
+// based on the provided schema specification.
+func updateDatabaseSchemaPrivileges(ctx context.Context, db *sql.DB, schema *apiv1.SchemaSpec) error {
+	// Apply CREATE privileges
+	if err := applySchemaPrivileges(ctx, db, "CREATE", schema.Name, schema.Create); err != nil {
+		return err
+	}
+
+	// Apply USAGE privileges
+	if err := applySchemaPrivileges(ctx, db, "USAGE", schema.Name, schema.Usage); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// applySchemaPrivileges is a helper to grant or revoke privileges (CREATE or USAGE)
+// on a schema for the specified roles.
+func applySchemaPrivileges(
+	ctx context.Context,
+	db *sql.DB,
+	privilege string,
+	schemaName string,
+	specs []apiv1.UsageSpec,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if len(specs) == 0 {
+		return nil
+	}
+
+	for _, spec := range specs {
+		sanitizedSchema := pgx.Identifier{schemaName}.Sanitize()
+		sanitizedRole := pgx.Identifier{spec.Name}.Sanitize()
+
+		switch spec.Type {
+		case apiv1.GrantUsageSpecType:
+			mutation := fmt.Sprintf("GRANT %s ON SCHEMA %s TO %s", privilege, sanitizedSchema, sanitizedRole)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("granting %s on schema %s to %s: %w", privilege, schemaName, spec.Name, err)
+			}
+			contextLogger.Info("granted privilege", "privilege", privilege, "schema", schemaName, "role", spec.Name)
+
+		case apiv1.RevokeUsageSpecType:
+			mutation := fmt.Sprintf("REVOKE %s ON SCHEMA %s FROM %s", privilege, sanitizedSchema, sanitizedRole) //nolint:gosec
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("revoking %s on schema %s from %s: %w", privilege, schemaName, spec.Name, err)
+			}
+			contextLogger.Info("revoked privilege", "privilege", privilege, "schema", schemaName, "role", spec.Name)
+
+		default:
+			contextLogger.Warning(
+				"unknown privilege type", "type", spec.Type, "privilege", privilege, "schema", schemaName)
+		}
+	}
+
 	return nil
 }
 
