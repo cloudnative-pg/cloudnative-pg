@@ -321,12 +321,18 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
+// sanitizeExtensionNameForVolume converts an extension name to a valid Kubernetes volume name
+// by replacing underscores with hyphens to comply with RFC 1123 DNS label requirements
+func sanitizeExtensionNameForVolume(extensionName string) string {
+	return strings.ReplaceAll(extensionName, "_", "-")
+}
+
 func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
 	extensionVolumes := make([]corev1.Volume, 0, len(cluster.Spec.PostgresConfiguration.Extensions))
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
-				Name: extension.Name,
+				Name: sanitizeExtensionNameForVolume(extension.Name),
 				VolumeSource: corev1.VolumeSource{
 					Image: &extension.ImageVolumeSource,
 				},
@@ -342,7 +348,7 @@ func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
-				Name:      extension.Name,
+				Name:      sanitizeExtensionNameForVolume(extension.Name),
 				MountPath: filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name),
 			},
 		)
