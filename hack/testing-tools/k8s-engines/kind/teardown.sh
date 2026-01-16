@@ -23,14 +23,14 @@
 # Kind-specific cluster teardown logic.
 set -eEuo pipefail
 
-# Load common library to access global vars (registry_name)
-source "$(dirname "$0")/../../common/00-paths.sh" 
+# Load common library to access global vars (registry_name, CLUSTER_NAME)
+source "$(dirname "$0")/../../common/00-paths.sh"
+source "$(dirname "$0")/../../common/10-config.sh" # For CLUSTER_NAME
 source "$(dirname "$0")/../../common/40-utils-registry.sh" # For registry_name
 
 # shellcheck disable=SC2153
 echo "Tearing down kind cluster '${CLUSTER_NAME}'."
 
-# Note: This function contains the logic formerly in destroy_kind
 destroy_kind() {
   local cluster_name=$1
   # shellcheck disable=SC2154
