@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -116,9 +117,13 @@ func (r *ClusterReconciler) getManagedResources(
 		return nil, err
 	}
 
-	nodes, err := r.getNodes(ctx)
-	if err != nil {
-		return nil, err
+	// If operator is configured in namespaced mode, set as empty list.
+	var nodes map[string]corev1.Node
+	if !configuration.Current.Namespaced {
+		nodes, err = r.getNodes(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &managedResources{
@@ -804,6 +809,7 @@ func getPodsTopology(
 		if !ok {
 			// node not found, it means that:
 			// - the node could have been drained
+			// - operator deployed in namespaced mode
 			// - others
 			contextLogger.Debug("node not found, skipping pod topology matching")
 			return apiv1.Topology{}
