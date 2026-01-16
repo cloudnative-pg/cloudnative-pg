@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
-#
-# Copyright © contributors to CloudNativePG, established as
-# CloudNativePG a Series of LF Projects, LLC.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# SPDX-License-Identifier: Apache-2.0
-#
+##
+## Copyright © contributors to CloudNativePG, established as
+## CloudNativePG a Series of LF Projects, LLC.
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
+## SPDX-License-Identifier: Apache-2.0
+##
+
 # shellcheck disable=SC1090,SC1091
 
 # Kind-specific cluster creation logic.
@@ -27,14 +28,14 @@ DIR="$(dirname "${BASH_SOURCE[0]}")"
 COMMON_DIR="${DIR}/../../common"
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
-source "${COMMON_DIR}/20-utils-k8s.sh" 
+source "${COMMON_DIR}/20-utils-k8s.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
 
 # --- KIND SPECIFIC CONSTANTS AND DEFAULTS ---
 K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
 NODES=${NODES:-3}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
-ENABLE_FLUENTD=${ENABLE_FLUENTD:-false} 
+ENABLE_FLUENTD=${ENABLE_FLUENTD:-false}
 
 TEMP_DIR_LOCAL="$(mktemp -d)"
 trap 'rm -fr ${TEMP_DIR_LOCAL}' EXIT
@@ -52,24 +53,24 @@ function load_image_kind() {
 # deploy_csi_host_path: Deploys the host path CSI driver and snapshotter components.
 function deploy_csi_host_path() {
   echo "Deploying CSI Host Path Driver..."
-  
+
   # Base URL for CSI repository manifests
   local CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
-  
+
   # --- 1. Install External Snapshotter CRDs and Controller (Versions sourced from 10-config.sh) ---
-  
+
   ## Apply CRDs
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
-  
+
   ## Apply RBAC and Controller
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
 
   # --- 2. Install External Sidecar Components ---
-  
+
   ## Install external provisioner
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-provisioner/"${EXTERNAL_PROVISIONER_VERSION}"/deploy/kubernetes/rbac.yaml
 
@@ -80,7 +81,7 @@ function deploy_csi_host_path() {
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
 
   # --- 3. Install Driver and Plugin ---
-  
+
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR_LOCAL}/csi-hostpath-plugin.yaml"
   curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
@@ -89,10 +90,10 @@ function deploy_csi_host_path() {
   # Apply driver info and plugin deployment
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml
   "${K8S_CLI}" apply -f "${plugin_file}"
-  rm "${plugin_file}" 
+  rm "${plugin_file}"
 
   # --- 4. Configure Storage Classes ---
-  
+
   ## Create VolumeSnapshotClass
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml
 
