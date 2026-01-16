@@ -40,7 +40,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -60,7 +59,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
-	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
@@ -980,30 +979,8 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	r.metricsServerExporter.SetCustomQueries(queriesCollector)
 }
 
-// reconcileInstance sets PostgreSQL instance parameters to current values
+// reconcileInstance sets the cluster reference in the instance
 func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
-	detectRequiresDesignatedPrimaryTransition := func() bool {
-		if !cluster.IsReplica() {
-			return false
-		}
-
-		if !externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
-			return false
-		}
-
-		if !r.instance.IsFenced() && !r.instance.MightBeUnavailable() {
-			return false
-		}
-
-		isPrimary, _ := r.instance.IsPrimary()
-		return isPrimary
-	}
-
-	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
-	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
-	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
-	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
-	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
 	r.instance.Cluster = cluster
 }
 
@@ -1213,7 +1190,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.GetPodName() && !r.instance.RequiresDesignatedPrimaryTransition {
+	if cluster.Status.CurrentPrimary == r.instance.GetPodName() && !r.instance.RequiresDesignatedPrimaryTransition() {
 		return false, nil
 	}
 
@@ -1226,25 +1203,17 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	// I'm the primary, need to inform the operator
 	log.FromContext(ctx).Info("Setting myself as the current designated primary")
 
-	return changed, retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var livingCluster apiv1.Cluster
+	cluster.Status.CurrentPrimary = r.instance.GetPodName()
+	cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+	if r.instance.RequiresDesignatedPrimaryTransition() {
+		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
+	}
 
-		err := r.client.Get(ctx, client.ObjectKeyFromObject(cluster), &livingCluster)
-		if err != nil {
-			return err
-		}
+	if err := r.client.Status().Update(ctx, cluster); err != nil {
+		return changed, err
+	}
 
-		updatedCluster := livingCluster.DeepCopy()
-		updatedCluster.Status.CurrentPrimary = r.instance.GetPodName()
-		updatedCluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-		if r.instance.RequiresDesignatedPrimaryTransition {
-			externalcluster.SetDesignatedPrimaryTransitionCompleted(updatedCluster)
-		}
-
-		cluster.Status = updatedCluster.Status
-
-		return r.client.Status().Update(ctx, updatedCluster)
-	})
+	return changed, nil
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
