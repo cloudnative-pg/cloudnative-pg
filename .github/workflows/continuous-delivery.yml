@@ -1331,9 +1331,9 @@ jobs:
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
           # renovate: datasource=github-releases depName=vmware-tanzu/velero
-          VELERO_VERSION: "v1.17.1"
+          VELERO_VERSION: "v1.17.2"
           # renovate: datasource=github-releases depName=vmware-tanzu/velero-plugin-for-aws
-          VELERO_AWS_PLUGIN_VERSION: "v1.13.1"
+          VELERO_AWS_PLUGIN_VERSION: "v1.13.2"
         with:
           timeout_minutes: 10
           max_attempts: 3
