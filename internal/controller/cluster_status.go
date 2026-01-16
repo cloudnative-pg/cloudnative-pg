@@ -859,16 +859,18 @@ func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
 	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
 		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
 	}
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+	// Return true if WAL space IS available (i.e., NOT terminated for missing disk space)
+	return !hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
 }
 
 // isTerminatedBecauseOfMissingWALArchivePlugin check if a Pod terminated because the
 // WAL archiving plugin was missing when the Pod started
 func isTerminatedBecauseOfMissingWALArchivePlugin(pod *corev1.Pod) bool {
-	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
+	isTerminatedForMissingWALArchivePlugin := func(state *corev1.ContainerState) bool {
 		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALArchivePlugin
 	}
-	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALDiskSpace)
+	// Return true if the pod IS terminated because of missing WAL archive plugin
+	return hasPostgresContainerTerminationReason(pod, isTerminatedForMissingWALArchivePlugin)
 }
 
 func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *corev1.ContainerState) bool) bool {
@@ -884,21 +886,20 @@ func hasPostgresContainerTerminationReason(pod *corev1.Pod, reason func(state *c
 	// This is not an instance Pod as there's no PostgreSQL
 	// container
 	if pgContainerStatus == nil {
+		return false
+	}
+
+	// If the Pod was terminated with the specified reason,
+	// then return true
+	if reason(&pgContainerStatus.State) {
 		return true
 	}
 
-	// If the Pod was terminated because it didn't have enough disk
-	// space, then we have no disk space
-	if reason(&pgContainerStatus.State) {
-		return false
-	}
-
-	// The Pod is now running but not still ready, and last time it
-	// was terminated for missing disk space. Let's wait for it
-	// to be ready before classifying it as having enough disk space
+	// The container is not ready and was last terminated with the specified reason.
+	// Return true to indicate the termination reason was found
 	if !pgContainerStatus.Ready && reason(&pgContainerStatus.LastTerminationState) {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }

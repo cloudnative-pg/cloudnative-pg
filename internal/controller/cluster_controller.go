@@ -621,7 +621,7 @@ func (r *ClusterReconciler) requireWALArchivingPluginOrDelete(
 	contextLogger := log.FromContext(ctx).WithName("require_wal_archiving_plugin_delete")
 
 	for _, state := range instances.Items {
-		if !isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
+		if isTerminatedBecauseOfMissingWALArchivePlugin(state.Pod) {
 			contextLogger.Warning(
 				"Detected instance manager initialization procedure that failed "+
 					"because the required WAL archive plugin is missing. Deleting it to trigger rollout",
