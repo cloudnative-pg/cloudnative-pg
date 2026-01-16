@@ -32,15 +32,15 @@ function ensure_registry() {
   # shellcheck disable=SC2154
   echo -e "${bright}Verify local registry${reset}" >&2
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
-    echo "- Create registry volume: ${registry_volume}${reset}" >&2
+    echo "- Create registry volume: ${registry_volume}" >&2
     docker volume create "${registry_volume}" >&2
   fi
   if ! docker network inspect "${registry_net}" &>/dev/null; then
-    echo "- Create registry network: ${registry_net}${reset}" >&2
+    echo "- Create registry network: ${registry_net}" >&2
     docker network create "${registry_net}" >&2
   fi
   if ! docker inspect -f '{{.State.Running}}' "${registry_name}" &>/dev/null; then
-    echo "- Start registry: ${registry_name}${reset}" >&2
+    echo "- Start registry: ${registry_name}" >&2
     docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:2 >&2
   fi
   echo -e "${bright}Registry ${registry_name} running${reset}" >&2
