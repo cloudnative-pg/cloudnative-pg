@@ -27,13 +27,16 @@ if [ "${DEBUG-}" = true ]; then
   set -x
 fi
 
-# Define path to the new modular framework root
+# Define paths for the modular testing framework
 ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
 TESTING_TOOLS_DIR="${ROOT_DIR}/hack/testing-tools"
 CLUSTER_MGR_SCRIPT="${TESTING_TOOLS_DIR}/k8s-engines/manage.sh"
 COMMON_DIR="${TESTING_TOOLS_DIR}/common"
 
-# Source necessary common files to define paths, constants, and utility functions
+# Capture if user explicitly set CLUSTER_NAME before loading config
+CLUSTER_NAME_USER_SET="${CLUSTER_NAME:-}"
+
+# Load common configuration: paths, versions, registry settings
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
@@ -75,7 +78,7 @@ EOF
 
 main() {
   # --- ARGUMENT PARSING ---
-  # Use getopt to capture options like -k and -n, just like the original script.
+  # Parse command-line options (-k, -n, etc.) using getopt
   if ! getopt -T > /dev/null; then
     parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
   else
@@ -128,10 +131,11 @@ main() {
     export K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
   fi
 
-  # NOTE: CLUSTER_NAME will be automatically calculated inside manage.sh
-  # when it sources 10-config.sh, which is cleaner than calculating it here.
-  # Unset CLUSTER_NAME so it gets recalculated with the updated K8S_VERSION.
-  unset CLUSTER_NAME
+  # Recalculate CLUSTER_NAME only if user didn't explicitly set it before running this script
+  # User-specified names are preserved, auto-calculated names use the updated K8S_VERSION
+  if [ -z "${CLUSTER_NAME_USER_SET}" ]; then
+    unset CLUSTER_NAME
+  fi
 
   # Ensure command exists
   if [ "$#" -eq 0 ]; then
@@ -139,12 +143,8 @@ main() {
     usage
   fi
 
-  # Ensure the local registry is set up (needed by most commands)
-  # Call once here instead of before each command
-  ensure_registry
-
   # --- COMMAND EXECUTION LOOP ---
-  # Process all commands in sequence (backward compatibility with original behavior)
+  # Process all commands in sequence as provided on command line
   while [ "$#" -gt 0 ]; do
     command=$1
     shift
@@ -154,6 +154,13 @@ main() {
       command="teardown"
       echo "NOTE: Command 'destroy' aliased to 'teardown'."
     fi
+
+    # Ensure registry is set up for commands that need it
+    case "$command" in
+    create | load | load-helper-images | deploy | pyroscope)
+      ensure_registry
+      ;;
+    esac
 
     # Invoke the command through the dispatcher
     case "$command" in
