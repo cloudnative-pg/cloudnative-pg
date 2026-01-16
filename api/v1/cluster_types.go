@@ -346,6 +346,13 @@ type ClusterSpec struct {
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
 	// (that is: `stopDelay` - `smartShutdownTimeout`). Default is 180 seconds.
+	// IMPORTANT: This value must be significantly smaller than `failoverDelay` to prevent premature
+	// failover during controlled shutdown operations. A recommended ratio is at least 1:5, meaning
+	// smartShutdownTimeout should not exceed 20% of failoverDelay.
+	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open transactions
+	// blocking the shutdown, and failoverDelay is too short, the cluster may trigger failover while
+	// the primary is still running but unable to accept new connections, leading to two primaries
+	// operating simultaneously.
 	// +kubebuilder:default:=180
 	// +optional
 	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
@@ -359,7 +366,16 @@ type ClusterSpec struct {
 
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
-	// to be unhealthy
+	// to be unhealthy. This delay helps prevent premature failover during
+	// temporary network issues or short-lived node instability.
+	// IMPORTANT: This value must be significantly larger than `smartShutdownTimeout`
+	// to ensure controlled shutdown operations complete before failover is considered.
+	// A recommended ratio is at least 5:1, meaning failoverDelay should be at least
+	// 5 times larger than smartShutdownTimeout.
+	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open transactions
+	// blocking the shutdown, and failoverDelay is too short, the cluster may trigger failover while
+	// the primary is still running but unable to accept new connections, leading to two primaries
+	// operating simultaneously.
 	// +kubebuilder:default:=0
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
