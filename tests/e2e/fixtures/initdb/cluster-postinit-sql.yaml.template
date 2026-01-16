@@ -4,7 +4,7 @@ kind: Cluster
 metadata:
   name: p-postinit-sql
 spec:
-  instances: 3
+  instances: 1
 
   postgresql:
     parameters:
