@@ -566,6 +566,9 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 			return err
 		}
 		versions.SuperuserSecretVersion = version
+	} else {
+		// Resets the version when superuser access is disabled
+		versions.SuperuserSecretVersion = ""
 	}
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetApplicationSecretName())
