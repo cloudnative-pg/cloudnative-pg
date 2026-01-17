@@ -843,6 +843,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(corev1.SecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Tablespaces != nil {
 		in, out := &in.Tablespaces, &out.Tablespaces
 		*out = make([]TablespaceConfiguration, len(*in))
