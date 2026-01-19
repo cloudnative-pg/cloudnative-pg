@@ -364,12 +364,12 @@ unhealthy and triggers a failover.
 
 This relationship is critical to prevent **split-brain scenarios** that can occur when:
 
-1. **Smart shutdown fails** due to open transactions blocking the shutdown process
-2. **The primary remains running** but is unable to accept new connections during the smart shutdown attempt
+1. **Smart shutdown fails** due to open connections blocking the shutdown process
+2. **The former primary remains running** but is unable to accept new connections during the smart shutdown attempt
 3. **Failover triggers prematurely** because `failoverDelay` is too short
 4. **Two primaries operate simultaneously** - the original primary (still running but blocked) and the newly promoted replica
 
-When smart shutdown fails due to long-running transactions, PostgreSQL waits for those transactions to complete before proceeding. If `failoverDelay` expires during this waiting period, the cluster may incorrectly assume the primary is unhealthy and promote a replica, leading to data inconsistency and potential corruption.
+When smart shutdown fails due to long-running transactions, or connections kept open by a connection pooler, PostgreSQL waits for those transactions to complete before proceeding. If `failoverDelay` expires during this waiting period, the cluster may incorrectly assume the primary is unhealthy and promote a replica, leading to data inconsistency and potential corruption.
 :::
 
 The shutdown procedure is composed of two steps:

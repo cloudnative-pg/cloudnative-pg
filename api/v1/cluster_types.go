@@ -349,9 +349,9 @@ type ClusterSpec struct {
 	// IMPORTANT: This value must be significantly smaller than `failoverDelay` to prevent premature
 	// failover during controlled shutdown operations. A recommended ratio is at least 1:5, meaning
 	// smartShutdownTimeout should not exceed 20% of failoverDelay.
-	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open transactions
+	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open connections
 	// blocking the shutdown, and failoverDelay is too short, the cluster may trigger failover while
-	// the primary is still running but unable to accept new connections, leading to two primaries
+	// the former primary is still running but unable to accept new connections, leading to two primaries
 	// operating simultaneously.
 	// +kubebuilder:default:=180
 	// +optional
@@ -372,9 +372,9 @@ type ClusterSpec struct {
 	// to ensure controlled shutdown operations complete before failover is considered.
 	// A recommended ratio is at least 5:1, meaning failoverDelay should be at least
 	// 5 times larger than smartShutdownTimeout.
-	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open transactions
+	// This is critical to prevent split-brain scenarios: if smart shutdown fails due to open connections
 	// blocking the shutdown, and failoverDelay is too short, the cluster may trigger failover while
-	// the primary is still running but unable to accept new connections, leading to two primaries
+	// the former primary is still running but unable to accept new connections, leading to two primaries
 	// operating simultaneously.
 	// +kubebuilder:default:=0
 	// +optional
