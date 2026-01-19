@@ -258,7 +258,8 @@ var _ = Describe("Major upgrade job definition", func() {
 				},
 			},
 		}
-		job := createMajorUpgradeJobDefinition(cluster, 1, nil)
+		job, err := createMajorUpgradeJobDefinition(cluster, 1, nil)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(job.Spec.BackoffLimit).ToNot(BeNil())
 		Expect(*job.Spec.BackoffLimit).To(Equal(int32(0)))
 	})
