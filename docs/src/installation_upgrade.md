@@ -269,10 +269,11 @@ only the operator itself.
 
 ### Upgrading to 1.26 from a previous minor version
 
-!!! Important
+:::info[Important]
     We strongly recommend that all CloudNativePG users upgrade to version
     1.26.1, or at a minimum, to the latest stable version of your current minor
     release (for example, 1.25.x).
+:::
 
 :::warning
     Due to changes in the startup probe for the manager component
@@ -333,12 +334,13 @@ fulfilled by the standard `status` command.
 
 ### Upgrading to 1.25 from a previous minor version
 
-!!! Warning
+:::warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
     from 1.23.x to 1.25, make sure you go through the release notes
     and upgrade instructions for 1.24 and 1.25.
+:::
 
 No changes to existing 1.24 cluster configurations are required when upgrading
 to 1.25.

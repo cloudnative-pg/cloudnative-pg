@@ -196,10 +196,11 @@ GRANT EXECUTE ON FUNCTION public.user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
 
-!!! Important
+:::info[Important]
     Given that `user_search` is a `SECURITY DEFINER` function, you need to
     create it through a role with `SUPERUSER` privileges, such as the `postgres`
     user.
+:::
 
 ## Pod templates
 
