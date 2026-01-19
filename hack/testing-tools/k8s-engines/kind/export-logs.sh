@@ -33,7 +33,8 @@ source "${COMMON_DIR}/00-paths.sh"
 # export_logs_kind: Executes the Kind log export command.
 function export_logs_kind() {
   local cluster_name=$1
-  echo "Exporting Kind logs for cluster '${cluster_name}' to directory: ${LOG_DIR}"
+  # shellcheck disable=SC2154
+  echo -e "${bright}Exporting Kind logs for cluster '${cluster_name}' to directory: ${LOG_DIR}${reset}"
   kind export logs "${LOG_DIR}" --name "${cluster_name}"
 }
 

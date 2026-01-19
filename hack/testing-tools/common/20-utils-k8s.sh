@@ -74,7 +74,8 @@ function get_default_snapshot_class() {
 
 function deploy_prometheus_crds() {
   # Requires helm to be installed and $K8S_CLI (kubectl/oc) to be functional.
-  echo "Starting deployment of Prometheus CRDs..."
+  # shellcheck disable=SC2154
+  echo -e "${bright}Starting deployment of Prometheus CRDs...${reset}"
 
   # 1. Add Prometheus Community Helm Repository
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -83,13 +84,13 @@ function deploy_prometheus_crds() {
   # We install into kube-system as that namespace is standard and always exists.
   helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 
-  echo "Prometheus CRDs deployed."
+  echo -e "${bright}Prometheus CRDs deployed.${reset}"
 }
 
 function deploy_pyroscope() {
   # Requires helm to be installed and available in the environment.
 
-  echo "Deploying Pyroscope and enabling pprof profiling on the operator..."
+  echo -e "${bright}Deploying Pyroscope and enabling pprof profiling on the operator...${reset}"
 
   # 1. Add Pyroscope Helm Repository
   helm repo add pyroscope-io https://grafana.github.io/helm-charts
@@ -136,5 +137,5 @@ EOF
   # Patch the ConfigMap
   "${K8S_CLI}" -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 
-  echo "Pyroscope deployment successful and operator patched to expose profiling data."
+  echo -e "${bright}Pyroscope deployment successful and operator patched to expose profiling data.${reset}"
 }

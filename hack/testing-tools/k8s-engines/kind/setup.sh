@@ -52,7 +52,8 @@ function load_image_kind() {
 
 # deploy_csi_host_path: Deploys the host path CSI driver and snapshotter components.
 function deploy_csi_host_path() {
-  echo "Deploying CSI Host Path Driver..."
+  # shellcheck disable=SC2154
+  echo -e "${bright}Deploying CSI Host Path Driver...${reset}"
 
   # Base URL for CSI repository manifests
   local CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
@@ -108,11 +109,11 @@ function deploy_csi_host_path() {
   "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapshotclass
 
   # Wait for CSI plugin to be ready
-  echo "CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready..."
+  echo -e "${bright}CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready...${reset}"
   local ITER=0
   while true; do
     if [[ $ITER -ge 300 ]]; then
-      echo "Timeout: The CSI plugin did not become ready within the expected time."
+      echo -e "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
       exit 1
     fi
     local NUM_SPEC
@@ -120,7 +121,7 @@ function deploy_csi_host_path() {
     NUM_SPEC=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
     NUM_STATUS=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "")
     if [[ -n "$NUM_SPEC" && "$NUM_SPEC" == "$NUM_STATUS" ]]; then
-      echo "Success: The CSI plugin is deployed and ready."
+      echo -e "${bright}Success: The CSI plugin is deployed and ready.${reset}"
       break
     fi
     sleep 1
@@ -134,7 +135,7 @@ function deploy_fluentd() {
   # shellcheck disable=SC2154
   local FLUENTD_LOCAL_IMAGE="${registry_name}:${registry_port}/fluentd-kubernetes-daemonset:local"
 
-  echo "Starting FluentD deployment..."
+  echo -e "${bright}Starting FluentD deployment...${reset}"
   docker pull "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
   # shellcheck disable=SC2153
@@ -143,19 +144,19 @@ function deploy_fluentd() {
   "${K8S_CLI}" apply -f "${E2E_DIR}/local-fluentd.yaml"
 
   # Wait for FluentD to be ready
-  echo "Waiting for FluentD to become ready..."
+  echo -e "${bright}Waiting for FluentD to become ready...${reset}"
   local ITER=0
   local NODE
   NODE=$("${K8S_CLI}" get nodes --no-headers | wc -l | tr -d " ")
   while true; do
     if [[ $ITER -ge 300 ]]; then
-      echo "Time out waiting for FluentD readiness"
+      echo -e "${bright}Time out waiting for FluentD readiness${reset}"
       exit 1
     fi
     local NUM_READY
     NUM_READY=$("${K8S_CLI}" get ds fluentd -n kube-system -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "")
     if [[ -n "$NUM_READY" && "$NUM_READY" == "$NODE" ]]; then
-      echo "FluentD is Ready"
+      echo -e "${bright}FluentD is Ready${reset}"
       break
     fi
     sleep 1
@@ -250,12 +251,12 @@ containerdConfigPatches:
 EOF
 
   if [ "${DEBUG-}" = true ]; then
-    echo "Kind configuration file:"
+    echo -e "${bright}Kind configuration file:${reset}"
     cat "${config_file}"
   fi
 
   # Create the cluster
-  echo "Generating Kind configuration and running 'kind create cluster'..."
+  echo -e "${bright}Generating Kind configuration and running 'kind create cluster'...${reset}"
   kind create cluster --name "${cluster_name}" --image "kindest/node:${k8s_version}" --config "${config_file}"
 
   docker network connect "kind" "${registry_name}" &>/dev/null || true
@@ -292,7 +293,7 @@ EOF
 # --- MAIN EXECUTION ---
 
 main() {
-  echo "Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}"
+  echo -e "${bright}Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
   create_cluster_kind "${K8S_VERSION}" "${CLUSTER_NAME}"
 
@@ -310,7 +311,7 @@ main() {
   fi
   deploy_prometheus_crds
 
-  echo "Kind cluster ${CLUSTER_NAME} setup complete."
+  echo -e "${bright}Kind cluster ${CLUSTER_NAME} setup complete.${reset}"
 }
 
 main
