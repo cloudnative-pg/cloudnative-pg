@@ -218,10 +218,9 @@ type Instance struct {
 
 	serverCertificateHandler serverCertificateHandler
 
-	// Cluster is the cluster this instance belongs to.
-	// Guaranteed non-nil: initialized as empty in NewInstance(),
-	// then set to the actual cluster by the reconciler.
-	Cluster *apiv1.Cluster
+	// cluster is the cached cluster this instance belongs to.
+	// Access via GetClusterOrDefault() which returns an empty cluster if nil.
+	cluster *apiv1.Cluster
 }
 
 type serverCertificateHandler struct {
@@ -292,14 +291,31 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
 }
 
+// GetClusterOrDefault returns the cached cluster, or an empty cluster if not set.
+// The empty cluster provides safe defaults via getter methods.
+func (instance *Instance) GetClusterOrDefault() *apiv1.Cluster {
+	if instance.cluster == nil {
+		return &apiv1.Cluster{}
+	}
+	return instance.cluster
+}
+
+// SetCluster updates the cached cluster for use outside the reconciliation
+// cycle when the API client is not available
+func (instance *Instance) SetCluster(cluster *apiv1.Cluster) {
+	instance.cluster = cluster
+}
+
 // RequiresDesignatedPrimaryTransition checks if this instance is a primary
 // that needs to become a designated primary in a replica cluster
 func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
-	if !instance.Cluster.IsReplica() {
+	cluster := instance.GetClusterOrDefault()
+
+	if !cluster.IsReplica() {
 		return false
 	}
 
-	if !conditions.IsDesignatedPrimaryTransitionRequested(instance.Cluster) {
+	if !conditions.IsDesignatedPrimaryTransitionRequested(cluster) {
 		return false
 	}
 
@@ -313,7 +329,7 @@ func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
 	// the transition by RefreshReplicaConfiguration(). Using CurrentPrimary
 	// keeps the sentinel true throughout the transition, allowing retries
 	// if the status update fails due to optimistic locking conflicts.
-	return instance.Cluster.Status.CurrentPrimary == instance.GetPodName()
+	return cluster.Status.CurrentPrimary == instance.GetPodName()
 }
 
 // CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
@@ -421,9 +437,6 @@ func NewInstance() *Instance {
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 		SessionID:                  string(uuid.NewUUID()),
-		// Initialize with an empty cluster to provide safe defaults for
-		// timeout/delay getters before the reconciler sets the real cluster
-		Cluster: &apiv1.Cluster{},
 	}
 }
 
@@ -589,8 +602,9 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	var err error
 
-	smartTimeout := instance.Cluster.GetSmartShutdownTimeout()
-	maxStopDelay := instance.Cluster.GetMaxStopDelay()
+	cluster := instance.GetClusterOrDefault()
+	smartTimeout := cluster.GetSmartShutdownTimeout()
+	maxStopDelay := cluster.GetMaxStopDelay()
 	if maxStopDelay <= smartTimeout {
 		contextLogger.Warning("Ignoring maxStopDelay <= smartShutdownTimeout",
 			"smartShutdownTimeout", smartTimeout,
@@ -640,7 +654,7 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	maxSwitchoverDelay := instance.Cluster.GetMaxSwitchoverDelay()
+	maxSwitchoverDelay := instance.GetClusterOrDefault().GetMaxSwitchoverDelay()
 	err := instance.Shutdown(
 		ctx,
 		shutdownOptions{
@@ -767,7 +781,7 @@ func (instance *Instance) buildPostgresEnv() []string {
 
 	// If there are no additional library paths, we use the environment variables
 	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Spec.PostgresConfiguration.Extensions)
+	additionalLibraryPaths := collectLibraryPaths(instance.GetClusterOrDefault().Spec.PostgresConfiguration.Extensions)
 	if len(additionalLibraryPaths) == 0 {
 		return envMap.StringSlice()
 	}
