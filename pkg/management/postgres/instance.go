@@ -423,6 +423,9 @@ func NewInstance() *Instance {
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 		SessionID:                  string(uuid.NewUUID()),
+		// Initialize with an empty cluster to provide safe defaults for
+		// timeout/delay getters before the reconciler sets the real cluster
+		Cluster: &apiv1.Cluster{},
 	}
 }
 
