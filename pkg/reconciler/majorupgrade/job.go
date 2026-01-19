@@ -53,7 +53,7 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 }
 
 // createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version
-func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) (*batchv1.Job, error) {
 	prepareCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -78,8 +78,11 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand)
+	job, err := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand)
+	if err != nil {
+		return nil, err
+	}
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 
-	return job
+	return job, nil
 }

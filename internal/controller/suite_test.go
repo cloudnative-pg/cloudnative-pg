@@ -357,10 +357,11 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
 		idx++
-		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+		job, err := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+		Expect(err).ToNot(HaveOccurred())
 		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
-		err := c.Create(context.Background(), job)
+		err = c.Create(context.Background(), job)
 		Expect(err).ToNot(HaveOccurred())
 		jobs = append(jobs, *job)
 	}
