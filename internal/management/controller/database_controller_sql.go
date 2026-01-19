@@ -426,56 +426,13 @@ func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec
 // based on the provided schema specification.
 func updateDatabaseSchemaPrivileges(ctx context.Context, db *sql.DB, schema *apiv1.SchemaSpec) error {
 	// Apply CREATE privileges
-	if err := applySchemaPrivileges(ctx, db, "CREATE", schema.Name, schema.Create); err != nil {
+	if err := applyPrivileges(ctx, db, "CREATE", "SCHEMA", schema.Name, schema.Create); err != nil {
 		return err
 	}
 
 	// Apply USAGE privileges
-	if err := applySchemaPrivileges(ctx, db, "USAGE", schema.Name, schema.Usage); err != nil {
+	if err := applyPrivileges(ctx, db, "USAGE", "SCHEMA", schema.Name, schema.Usage); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// applySchemaPrivileges is a helper to grant or revoke privileges (CREATE or USAGE)
-// on a schema for the specified roles.
-func applySchemaPrivileges(
-	ctx context.Context,
-	db *sql.DB,
-	privilege string,
-	schemaName string,
-	specs []apiv1.UsageSpec,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	if len(specs) == 0 {
-		return nil
-	}
-
-	for _, spec := range specs {
-		sanitizedSchema := pgx.Identifier{schemaName}.Sanitize()
-		sanitizedRole := pgx.Identifier{spec.Name}.Sanitize()
-
-		switch spec.Type {
-		case apiv1.GrantUsageSpecType:
-			mutation := fmt.Sprintf("GRANT %s ON SCHEMA %s TO %s", privilege, sanitizedSchema, sanitizedRole)
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("granting %s on schema %s to %s: %w", privilege, schemaName, spec.Name, err)
-			}
-			contextLogger.Info("granted privilege", "privilege", privilege, "schema", schemaName, "role", spec.Name)
-
-		case apiv1.RevokeUsageSpecType:
-			mutation := fmt.Sprintf("REVOKE %s ON SCHEMA %s FROM %s", privilege, sanitizedSchema, sanitizedRole) //nolint:gosec
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("revoking %s on schema %s from %s: %w", privilege, schemaName, spec.Name, err)
-			}
-			contextLogger.Info("revoked privilege", "privilege", privilege, "schema", schemaName, "role", spec.Name)
-
-		default:
-			contextLogger.Warning(
-				"unknown privilege type", "type", spec.Type, "privilege", privilege, "schema", schemaName)
-		}
 	}
 
 	return nil
@@ -564,21 +521,22 @@ func getDatabaseFDWInfo(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) (*fd
 // based on the provided FDW specification.
 func updateDatabaseFDWUsage(ctx context.Context, db *sql.DB, fdw *apiv1.FDWSpec) error {
 	const objectTypeForeignDataWrapper = "FOREIGN DATA WRAPPER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
+	return applyPrivileges(ctx, db, "USAGE", objectTypeForeignDataWrapper, fdw.Name, fdw.Usages)
 }
 
 // updateDatabaseForeignServerUsage updates the usage permissions of a foreign server in the database.
 // It supports granting or revoking usage permissions for specified users.
 func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *apiv1.ServerSpec) error {
 	const objectTypeForeignServer = "FOREIGN SERVER"
-	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
+	return applyPrivileges(ctx, db, "USAGE", objectTypeForeignServer, server.Name, server.Usages)
 }
 
-// applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
-// for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
-func applyUsagePermissions(
+// applyPrivileges is a generic helper to grant or revoke privileges
+// for various database objects, avoiding duplicated logic.
+func applyPrivileges(
 	ctx context.Context,
 	db *sql.DB,
+	privilege string,
 	objectType string,
 	objectName string,
 	usages []apiv1.UsageSpec,
@@ -595,18 +553,18 @@ func applyUsagePermissions(
 
 		switch usageSpec.Type {
 		case apiv1.GrantUsageSpecType:
-			mutation := fmt.Sprintf("GRANT USAGE ON %s %s TO %s", objectType, sanitizedObject, sanitizedUser)
+			mutation := fmt.Sprintf("GRANT %s ON %s %s TO %s", privilege, objectType, sanitizedObject, sanitizedUser)
 			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("granting usage of %s: %w", objectType, err)
+				return fmt.Errorf("granting %s on %s %s: %w", privilege, objectType, objectName, err)
 			}
-			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
+			contextLogger.Info("granted privilege", "privilege", privilege, "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		case apiv1.RevokeUsageSpecType:
-			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) // nolint:gosec
+			mutation := fmt.Sprintf("REVOKE %s ON %s %s FROM %s", privilege, objectType, sanitizedObject, sanitizedUser) // nolint:gosec
 			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
+				return fmt.Errorf("revoking %s on %s %s: %w", privilege, objectType, objectName, err)
 			}
-			contextLogger.Info("revoked usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
+			contextLogger.Info("revoked privilege", "privilege", privilege, "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		default:
 			contextLogger.Warning(
