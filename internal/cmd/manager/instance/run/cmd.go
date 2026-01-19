@@ -420,7 +420,7 @@ func runSubCommand( //nolint:gocognit,gocyclo
 		return makeUnretryableError(errNoFreeWALSpace)
 	}
 
-	enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
+	enabledArchiverPluginName := instance.GetClusterOrDefault().GetEnabledWALArchivePluginName()
 	if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
 		contextLogger.Info(
 			"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",

@@ -304,7 +304,7 @@ var _ = Describe("buildPostgresEnv", func() {
 				},
 			},
 		}
-		instance.Cluster = &cluster
+		instance.SetCluster(&cluster)
 	})
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
@@ -368,13 +368,12 @@ var _ = Describe("GetPrimaryConnInfo", func() {
 	var instance *Instance
 
 	BeforeEach(func() {
-		instance = &Instance{
-			Cluster: &apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
-				},
+		instance = &Instance{}
+		instance.SetCluster(&apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
 			},
-		}
+		})
 		instance.WithPodName("test-cluster-1").WithClusterName("test-cluster")
 	})
 
@@ -420,14 +419,38 @@ var _ = Describe("GetPrimaryConnInfo", func() {
 })
 
 var _ = Describe("NewInstance", func() {
-	It("should initialize Cluster as non-nil", func() {
+	It("should return empty cluster when cluster is not set", func() {
 		instance := NewInstance()
-		Expect(instance.Cluster).ToNot(BeNil())
+		cluster := instance.GetClusterOrDefault()
+		Expect(cluster).ToNot(BeNil())
+		Expect(cluster.Name).To(BeEmpty())
 	})
 
 	It("should generate a non-empty SessionID", func() {
 		instance := NewInstance()
 		Expect(instance.SessionID).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("GetClusterOrDefault and SetCluster", func() {
+	It("should return the set cluster after SetCluster is called", func() {
+		instance := NewInstance()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		}
+		instance.SetCluster(cluster)
+		result := instance.GetClusterOrDefault()
+		Expect(result).To(Equal(cluster))
+		Expect(result.Name).To(Equal("test-cluster"))
+	})
+
+	It("should return empty cluster when cluster is nil", func() {
+		instance := &Instance{}
+		cluster := instance.GetClusterOrDefault()
+		Expect(cluster).ToNot(BeNil())
+		Expect(cluster.Name).To(BeEmpty())
 	})
 })
 
@@ -464,20 +487,20 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 
 	It("should return false when cluster is not a replica", func() {
 		cluster.Spec.ReplicaCluster = nil
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeFalse())
 	})
 
 	It("should return false when transition is not requested", func() {
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		// No condition set means transition is not requested
 		result := instance.RequiresDesignatedPrimaryTransition()
 		Expect(result).To(BeFalse())
 	})
 
 	It("should return false when instance is not fenced and not unavailable", func() {
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		instance.SetFencing(false)
 		instance.SetMightBeUnavailable(false)
 
@@ -493,7 +516,7 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 	})
 
 	It("should return true when all conditions are met for fenced primary", func() {
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		instance.SetFencing(true)
 		instance.WithPodName("test-cluster-1")
 
@@ -512,7 +535,7 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 	})
 
 	It("should return true when all conditions are met for unavailable primary", func() {
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		instance.SetMightBeUnavailable(true)
 		instance.WithPodName("test-cluster-1")
 
@@ -531,7 +554,7 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 	})
 
 	It("should return false when CurrentPrimary is different", func() {
-		instance.Cluster = cluster
+		instance.SetCluster(cluster)
 		instance.SetFencing(true)
 		instance.WithPodName("test-cluster-2")
 
