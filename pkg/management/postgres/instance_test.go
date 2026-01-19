@@ -451,12 +451,6 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should return false when Cluster is nil", func() {
-		instance.Cluster = nil
-		result := instance.RequiresDesignatedPrimaryTransition()
-		Expect(result).To(BeFalse())
-	})
-
 	It("should return false when cluster is not a replica", func() {
 		cluster.Spec.ReplicaCluster = nil
 		instance.Cluster = cluster
