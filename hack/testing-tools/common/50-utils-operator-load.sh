@@ -42,7 +42,7 @@ function build_and_load_operator_image_from_sources() {
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" insecure="true" \
     ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
-  echo -e "${bright}Done building and loading new operator image on local registry.${reset}"
+  echo -e "${bright}Done building and pushing new operator image on local registry.${reset}"
 
   if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
     # Building the 'prime' version for upgrade testing
@@ -57,7 +57,7 @@ function build_and_load_operator_image_from_sources() {
     make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}" VERSION="${PRIME_VERSION}" insecure="true" \
       ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
-    echo -e "${bright}Done building and loading 'prime' operator image on local registry.${reset}"
+    echo -e "${bright}Done building and pushing 'prime' operator image on local registry.${reset}"
   fi
 
   docker buildx rm "${builder_name}"

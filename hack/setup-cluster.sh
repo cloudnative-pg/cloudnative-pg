@@ -52,8 +52,7 @@ Commands:
     load                  Build and load the operator image in the local registry
     deploy                Deploy the operator manifests in the cluster
     load-helper-images    Load the catalog of helper images in the local registry
-    print-image           Print the CONTROLLER_IMG name to be used inside
-                          the cluster
+    print-image           Print the CONTROLLER_IMG name to be used inside the cluster
     export-logs           Export the logs from the cluster
     teardown              Tear down the cluster
     destroy               alias of teardown
