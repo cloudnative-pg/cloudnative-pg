@@ -424,6 +424,11 @@ var _ = Describe("NewInstance", func() {
 		instance := NewInstance()
 		Expect(instance.Cluster).ToNot(BeNil())
 	})
+
+	It("should generate a non-empty SessionID", func() {
+		instance := NewInstance()
+		Expect(instance.SessionID).ToNot(BeEmpty())
+	})
 })
 
 var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
