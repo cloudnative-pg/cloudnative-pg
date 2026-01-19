@@ -1148,19 +1148,31 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return ctrl.Result{}, err
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
+		job, err = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
+		job, err = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
-		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+		job, err = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
-		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
+		job, err = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
@@ -1251,12 +1263,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
-
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+
+	var job *batchv1.Job
+	var err error
 	if storageSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+		job, err = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+	} else {
+		job, err = specs.JoinReplicaInstance(*cluster, nodeSerial)
+	}
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	contextLogger.Info("Creating new Job",

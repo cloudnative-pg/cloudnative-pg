@@ -162,7 +162,10 @@ func createMajorUpgradeJob(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
+	job, err := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
