@@ -139,8 +139,8 @@ func (r *InstanceReconciler) Reconcile(
 	ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginClient)
 	ctx = cluster.SetInContext(ctx)
 
-	// Reconcile PostgreSQL instance parameters
-	r.reconcileInstance(cluster)
+	// Update the cached cluster for use outside the reconciliation cycle
+	r.updateClusterCache(cluster)
 
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
@@ -979,8 +979,9 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	r.metricsServerExporter.SetCustomQueries(queriesCollector)
 }
 
-// reconcileInstance sets the cluster reference in the instance
-func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
+// updateClusterCache updates the cached cluster in the instance for use
+// outside the reconciliation cycle when the API client is not available
+func (r *InstanceReconciler) updateClusterCache(cluster *apiv1.Cluster) {
 	r.instance.Cluster = cluster
 }
 

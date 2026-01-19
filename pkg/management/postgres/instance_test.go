@@ -419,6 +419,13 @@ var _ = Describe("GetPrimaryConnInfo", func() {
 	})
 })
 
+var _ = Describe("NewInstance", func() {
+	It("should initialize Cluster as non-nil", func() {
+		instance := NewInstance()
+		Expect(instance.Cluster).ToNot(BeNil())
+	})
+})
+
 var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 	var instance *Instance
 	var cluster *apiv1.Cluster
@@ -429,9 +436,8 @@ var _ = Describe("RequiresDesignatedPrimaryTransition", func() {
 		tempDir, err = os.MkdirTemp("", "test-primary")
 		Expect(err).ToNot(HaveOccurred())
 
-		instance = &Instance{
-			PgData: tempDir,
-		}
+		instance = NewInstance()
+		instance.PgData = tempDir
 
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
