@@ -299,6 +299,10 @@ const (
 	// patch to apply to the pod
 	PodPatchAnnotationName = MetadataNamespace + "/podPatch"
 
+	// JobPatchAnnotationName is the name of the annotation containing the
+	// patch to apply to the job
+	JobPatchAnnotationName = MetadataNamespace + "/jobPatch"
+
 	// WebhookValidationAnnotationName is the name of the annotation describing if
 	// the validation webhook should be enabled or disabled
 	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
