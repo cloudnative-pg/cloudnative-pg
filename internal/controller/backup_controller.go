@@ -113,7 +113,6 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
-// nolint: gocognito
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
