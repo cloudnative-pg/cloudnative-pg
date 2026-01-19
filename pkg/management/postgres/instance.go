@@ -218,7 +218,9 @@ type Instance struct {
 
 	serverCertificateHandler serverCertificateHandler
 
-	// Cluster is the cluster this instance belongs to
+	// Cluster is the cluster this instance belongs to.
+	// Guaranteed non-nil: initialized as empty in NewInstance(),
+	// then set to the actual cluster by the reconciler.
 	Cluster *apiv1.Cluster
 }
 
@@ -293,10 +295,6 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 // RequiresDesignatedPrimaryTransition checks if this instance is a primary
 // that needs to become a designated primary in a replica cluster
 func (instance *Instance) RequiresDesignatedPrimaryTransition() bool {
-	if instance.Cluster == nil {
-		return false
-	}
-
 	if !instance.Cluster.IsReplica() {
 		return false
 	}
@@ -766,10 +764,6 @@ func (instance *Instance) buildPostgresEnv() []string {
 	envMap, _ := envmap.Parse(env)
 	envMap["PG_OOM_ADJUST_FILE"] = "/proc/self/oom_score_adj"
 	envMap["PG_OOM_ADJUST_VALUE"] = "0"
-
-	if instance.Cluster == nil {
-		return envMap.StringSlice()
-	}
 
 	// If there are no additional library paths, we use the environment variables
 	// of the current process
