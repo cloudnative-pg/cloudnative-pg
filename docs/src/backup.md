@@ -325,10 +325,11 @@ Status:
 Events:         <none>
 ```
 
-!!!Important
+:::info[Important]
     This feature will not backup the secrets for the superuser and the
     application user. The secrets are supposed to be backed up as part of
     the standard backup procedures for the Kubernetes cluster.
+:::
 
 ## Backup from a standby
 
