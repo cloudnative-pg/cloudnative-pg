@@ -68,6 +68,10 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 		ConfigureNamespacedDeployment(env, operatorNamespace)
 	})
 
+	AfterAll(func() {
+		RevertNamespacedDeployment(env, operatorNamespace)
+	})
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")

@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -128,6 +129,95 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 		err = env.Client.Create(env.Ctx, roleBinding)
 		if err != nil {
 			err = env.Client.Update(env.Ctx, roleBinding)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+
+	By("waiting for operator to restart", func() {
+		_, stderr, err := run.Run(fmt.Sprintf(
+			"kubectl rollout status -n %s deployment/cnpg-controller-manager --timeout=120s",
+			namespace))
+		Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+	})
+}
+
+// RevertNamespacedDeployment reverts the operator deployment to cluster-wide mode
+func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace string) {
+	By("removing namespaced environment variables", func() {
+		var deployment appsv1.Deployment
+		err := env.Client.Get(env.Ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      "cnpg-controller-manager",
+		}, &deployment)
+		Expect(err).NotTo(HaveOccurred())
+
+		for i := range deployment.Spec.Template.Spec.Containers {
+			var filteredEnv []corev1.EnvVar
+			for _, env := range deployment.Spec.Template.Spec.Containers[i].Env {
+				if env.Name != "WATCH_NAMESPACE" && env.Name != "NAMESPACED" {
+					filteredEnv = append(filteredEnv, env)
+				}
+			}
+			deployment.Spec.Template.Spec.Containers[i].Env = filteredEnv
+		}
+		err = env.Client.Update(env.Ctx, &deployment)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	By("restoring cluster-wide RBAC", func() {
+		var clusterRole rbacv1.ClusterRole
+		err := env.Client.Get(env.Ctx, types.NamespacedName{Name: "cnpg-manager"}, &clusterRole)
+		Expect(err).NotTo(HaveOccurred())
+
+		var role rbacv1.Role
+		err = env.Client.Get(env.Ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      "cnpg-manager",
+		}, &role)
+		if err == nil {
+			clusterRole.Rules = append(clusterRole.Rules, role.Rules...)
+		}
+
+		err = env.Client.Update(env.Ctx, &clusterRole)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = env.Client.Delete(env.Ctx, &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-manager-rolebinding"},
+		})
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		crb := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-manager-rolebinding"},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "cnpg-manager",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "cnpg-manager",
+					Namespace: namespace,
+				},
+			},
+		}
+		err = env.Client.Create(env.Ctx, crb)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = env.Client.Delete(env.Ctx, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cnpg-manager-rolebinding",
+				Namespace: namespace,
+			},
+		})
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err = env.Client.Delete(env.Ctx, &role)
+		if err != nil && !strings.Contains(err.Error(), "not found") {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})

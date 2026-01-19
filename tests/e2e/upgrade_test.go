@@ -850,34 +850,4 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
 		})
 	})
-
-	When("upgrading to namespaced deployment", func() {
-		const testClusterName = "postgresql-storage-class"
-		const testClusterFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
-
-		JustBeforeEach(func() {
-			assertManifestPresent(currentOperatorManifest)
-		})
-
-		It("can upgrade to namespaced mode and reconcile clusters", func() {
-			By("deploying the current cluster-wide operator", func() {
-				deployOperator(currentOperatorManifest)
-			})
-			DeferCleanup(cleanupOperatorAndMinio)
-
-			ConfigureNamespacedDeployment(env, operatorNamespace)
-
-			By("creating a cluster in the operator namespace", func() {
-				CreateResourceFromFile(operatorNamespace, testClusterFile)
-			})
-
-			By("verifying cluster becomes ready", func() {
-				AssertClusterIsReady(operatorNamespace, testClusterName, testTimeouts[timeouts.ClusterIsReady], env)
-			})
-
-			By("verifying cluster can be reconciled", func() {
-				AssertConfUpgrade(operatorNamespace, testClusterName)
-			})
-		})
-	})
 })
