@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: source-cluster-minio
 spec:
-  instances: 2
+  instances: 1
 
   postgresql:
     parameters:
