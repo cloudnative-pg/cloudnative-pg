@@ -370,6 +370,7 @@ ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
 PublicationReclaimPolicy
+PublicationReclaimDelete
 PublicationReclaimRetain
 PublicationSpec
 PublicationStatus
@@ -906,6 +907,8 @@ imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imagecatalog
+imagecatalogref
 imagecatalogs
 imagecatalogspec
 imageinfo
@@ -942,6 +945,7 @@ ip
 ipcs
 ips
 isPrimary
+isready
 isTemplate
 isWALArchiver
 issuecomment
@@ -1128,6 +1132,10 @@ pgbarman
 pgbasebackup
 pgbench
 pgbouncer
+pgbouncerintegrationstatus
+pgbouncerpoolmode
+pgbouncersecrets
+pgbouncerspec
 pgdata
 pgpass
 pgstatstatements
