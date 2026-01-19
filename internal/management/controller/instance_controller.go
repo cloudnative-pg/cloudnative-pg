@@ -1209,12 +1209,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	if r.instance.RequiresDesignatedPrimaryTransition() {
 		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
 	}
-
-	if err := r.client.Status().Update(ctx, cluster); err != nil {
-		return changed, err
-	}
-
-	return changed, nil
+	return changed, r.client.Status().Update(ctx, cluster)
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
