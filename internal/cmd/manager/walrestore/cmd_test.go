@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package walrestore
 
 import (
+	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -111,5 +112,116 @@ var _ = Describe("Function isStreamingAvailable", func() {
 			},
 		}
 		Expect(isStreamingAvailable(&cluster, "primaryPod")).To(BeTrue())
+	})
+})
+
+var _ = Describe("validateTimelineHistoryFile", func() {
+	It("should allow regular WAL files to pass through", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     5,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "000000010000000000000001", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow invalid history filenames to pass through", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     5,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "invalid.history", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow primary to download any timeline", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     5,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000064.history", cluster, "primary-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow target primary (being promoted) to download any timeline", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "old-primary",
+				TargetPrimary:  "new-primary",
+				TimelineID:     5,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000064.history", cluster, "new-primary")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow replica to download current timeline", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     33,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000021.history", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow replica to download past timeline", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     33,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000010.history", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should reject future timeline for replica", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     33,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000022.history", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should reject future timeline for replica with large timeline difference", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     5,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000064.history", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should reject any timeline when cluster timeline is not yet set", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     0,
+			},
+		}
+
+		err := validateTimelineHistoryFile(ctx, "00000001.history", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 	})
 })
