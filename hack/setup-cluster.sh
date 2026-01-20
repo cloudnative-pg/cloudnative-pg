@@ -154,13 +154,6 @@ main() {
       echo "NOTE: Command 'destroy' aliased to 'teardown'."
     fi
 
-    # Ensure registry is set up for commands that need it
-    case "$command" in
-    create | load | load-helper-images | deploy | pyroscope)
-      ensure_registry
-      ;;
-    esac
-
     # Invoke the command through the dispatcher
     case "$command" in
     create | load | load-helper-images | deploy | print-image | export-logs | teardown | pyroscope)

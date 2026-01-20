@@ -28,7 +28,6 @@ function build_and_load_operator_image_from_sources() {
   # NOTE: This function only builds and pushes to the local registry.
   # Cluster-specific loading (e.g., Kind's 'kind load') must be done separately.
 
-  ensure_registry
   create_builder # Create the buildx builder instance
 
   # shellcheck disable=SC2154

@@ -77,6 +77,13 @@ case "$ACTION" in
     deploy) ACTION="deploy-from-sources" ;;
 esac
 
+# Ensure registry exists for actions that need it
+case "$ACTION" in
+    create|load-from-sources|deploy-from-sources|load-helper-images|pyroscope)
+        ensure_registry
+        ;;
+esac
+
 VENDOR_DIR="${DIR}/${VENDOR}"
 
 case "$ACTION" in
