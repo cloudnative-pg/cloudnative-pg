@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -561,6 +562,108 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			tags, err = minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
+		})
+	})
+
+	Context("timeline divergence protection", Ordered, func() {
+		var namespace string
+
+		BeforeAll(func() {
+			if !IsLocal() {
+				Skip("This test is only run on local clusters")
+			}
+			const namespacePrefix = "timeline-divergence"
+			var err error
+
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("create the certificates for MinIO", func() {
+				err := minioEnv.CreateCaSecret(env, namespace)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("creating the credentials for minio", func() {
+				_, err = secrets.CreateObjectStorageSecret(
+					env.Ctx,
+					env.Client,
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+		It("protects replicas from downloading future timeline history files", func() {
+			firstClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-1.yaml.template"
+			secondClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-2.yaml.template"
+			backupFile := fixturesDir + "/backup/minio/backup-timeline-test.yaml"
+
+			firstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, firstClusterFile)
+			Expect(err).ToNot(HaveOccurred())
+			secondClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, secondClusterFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating first cluster with 1 instance", func() {
+				AssertCreateCluster(namespace, firstClusterName, firstClusterFile, env)
+			})
+
+			By("creating backup", func() {
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
+					testTimeouts[timeouts.BackupIsReady])
+			})
+
+			By("creating second cluster from backup", func() {
+				AssertCreateCluster(namespace, secondClusterName, secondClusterFile, env)
+			})
+
+			By("verifying second cluster is on timeline 2", func() {
+				Eventually(func() (int, error) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, secondClusterName)
+					return cluster.Status.TimelineID, err
+				}, 60).Should(BeEquivalentTo(2))
+			})
+
+			By("verifying timeline 2 history file is archived", func() {
+				AssertArchiveWalOnMinio(namespace, secondClusterName, "shared-timeline-test")
+				Eventually(func() (int, error) {
+					return minio.CountFiles(minioEnv, minio.GetFilePath("shared-timeline-test", "00000002.history*"))
+				}, 60).Should(BeNumerically(">", 0))
+			})
+
+			By("scaling first cluster to 2 instances", func() {
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, firstClusterName)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.Instances = 2
+					return env.Client.Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("verifying new replica is streaming", func() {
+				// Critical: This verifies the replica successfully joins despite timeline 2
+				// history file existing in the shared archive. If the replica were to download
+				// the incompatible timeline 2 history file, PostgreSQL would crash with
+				// "requested timeline 2 is not a child of this server's history" and enter
+				// a crash-loop, causing this assertion to timeout. The validation logic must
+				// reject the future timeline file to allow the replica to join successfully.
+				AssertClusterStandbysAreStreaming(namespace, firstClusterName, int32(testTimeouts[timeouts.ClusterIsReadyQuick]))
+			})
+
+			By("deleting the first cluster", func() {
+				err = DeleteResourcesFromFile(namespace, firstClusterFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("deleting the second cluster", func() {
+				err = DeleteResourcesFromFile(namespace, secondClusterFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 	})
 })
