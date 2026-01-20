@@ -452,7 +452,7 @@ Go runtime (with the prefix `go_*`).
 
 :::info
     You can inspect the exported metrics on a pod running PgBouncer. For instructions, see
-    [How to inspect the exported metrics](monitoring.md#how-to-inspect-the-exported-metrics).
+    [How to inspect the exported metrics](monitoring#how-to-inspect-the-exported-metrics).
     Make sure that you use the correct IP and the `9127` port.
 :::
 
