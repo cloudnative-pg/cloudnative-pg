@@ -55,8 +55,8 @@ During the time the failing primary is being shut down:
 
 ## RTO and RPO impact
 
-Failover may result in the service being impacted ([RTO](before_you_start.md#rto))
-and/or data being lost ([RPO](before_you_start.md#rpo)):
+Failover may result in the service being impacted ([RTO](before_you_start.md#postgresql-terminology))
+and/or data being lost ([RPO](before_you_start.md#postgresql-terminology)):
 
 1. During the time when the primary has started to fail, and before the controller
    starts failover procedures, queries in transit, WAL writes, checkpoints and

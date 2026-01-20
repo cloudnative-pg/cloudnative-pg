@@ -24,7 +24,7 @@ complex topologies.
     synchronization for logical decoding is enabled. Without this, your logical
     replication clients may lose data and fail to continue seamlessly after a
     failover. For configuration details, see
-    ["Replication: Logical Decoding Slot Synchronization"](replication.md#logical-decoding-slot-synchronization).
+    ["Replication: Logical Decoding Slot Synchronization"](replication.md#user-defined-replication-slots).
 :::
 
 This flexible model is particularly useful for:

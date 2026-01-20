@@ -90,7 +90,7 @@ as they can simply rely on the WAL archive to synchronize across long
 distances, extending disaster recovery goals across different regions.
 
 When you [configure a WAL archive](wal_archiving.md), CloudNativePG provides
-out-of-the-box an [RPO](before_you_start.md#rpo) ≤ 5 minutes for disaster
+out-of-the-box an [RPO](before_you_start.md#postgresql-terminology) ≤ 5 minutes for disaster
 recovery, even across regions.
 
 :::info[Important]
@@ -169,7 +169,7 @@ Consider the following factors:
 - **Database size**: For very large databases (VLDBs), **volume snapshots are
   generally preferred** as they enable faster recovery due to copy-on-write
   technology—this significantly improves your
-  [Recovery Time Objective (RTO)](before_you_start.md#rto).
+  [Recovery Time Objective (RTO)](before_you_start.md#postgresql-terminology).
 - **Data mobility**: Object store–based backups may offer greater flexibility
   for replicating or storing backups across regions or environments.
 - **Operational familiarity**: Choose the method that aligns best with your
@@ -247,7 +247,7 @@ since seconds are not supported.
 
 :::tip[Hint]
     The frequency of your backups directly impacts your **Recovery Time Objective**
-    ([RTO](before_you_start.md#rto)).
+    ([RTO](before_you_start.md#postgresql-terminology)).
 :::
 
 To optimize your disaster recovery strategy based on continuous backup:

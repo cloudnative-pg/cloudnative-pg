@@ -44,7 +44,7 @@ recovery.
 
 PostgreSQL 9.0 (2010) introduced WAL streaming and read-only replicas through
 *hot standby*. In 2011, PostgreSQL 9.1 brought synchronous replication at the
-transaction level, supporting [RPO](before_you_start.md#rpo)=0 clusters. Cascading
+transaction level, supporting [RPO](before_you_start.md#postgresql-terminology)=0 clusters. Cascading
 replication was added in PostgreSQL 9.2 (2012). The foundations for
 [logical replication](logical_replication.md) were established in PostgreSQL
 9.4 (2014), and version 10 (2017) introduced native support for the
@@ -561,7 +561,7 @@ the `topology.kubernetes.io/zone`
 [label on a node](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone).
 This would increase the robustness of the cluster in case of an outage in a
 single availability zone, especially in terms of recovery point objective
-([RPO](before_you_start.md#rpo)).
+([RPO](before_you_start.md#postgresql-terminology)).
 
 The idea of anti-affinity is to ensure that sync replicas that participate in
 the quorum are chosen from pods running on nodes that have different values for

@@ -1061,7 +1061,7 @@ to request an online/hot backup or an offline/cold one: additionally, you can
 also tune online backups by explicitly setting the `--immediate-checkpoint` and
 `--wait-for-archive` options.
 
-The ["Backup" section](./backup.md#backup) contains more information about
+The ["Backup" section](./backup.md) contains more information about
 the configuration settings.
 
 ### Launching psql

@@ -375,10 +375,10 @@ only write inside a single Kubernetes cluster, at any time.
 
 However, for business continuity objectives it is fundamental to:
 
-- reduce global **recovery point objectives** ([RPO](before_you_start.md#rpo))
+- reduce global **recovery point objectives** ([RPO](before_you_start.md#postgresql-terminology))
   by storing PostgreSQL backup data in multiple locations, regions and possibly
   using different providers (Disaster Recovery)
-- reduce global **recovery time objectives** ([RTO](before_you_start.md#rto))
+- reduce global **recovery time objectives** ([RTO](before_you_start.md#postgresql-terminology))
   by taking advantage of PostgreSQL replication beyond the primary Kubernetes
   cluster (High Availability)
 
