@@ -39,9 +39,14 @@ function ensure_registry() {
     echo "- Create registry network: ${registry_net}" >&2
     docker network create "${registry_net}" >&2
   fi
-  if [ "$(docker inspect -f '{{.State.Running}}' "${registry_name}" 2>/dev/null)" != "true" ]; then
-    echo "- Start registry: ${registry_name}" >&2
+  if ! docker inspect "${registry_name}" &>/dev/null; then
+    # Container doesn't exist, create it
+    echo "- Create registry: ${registry_name}" >&2
     docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:2 >&2
+  elif [ "$(docker inspect -f '{{.State.Running}}' "${registry_name}")" != "true" ]; then
+    # Container exists but is not running, start it
+    echo "- Start registry: ${registry_name}" >&2
+    docker start "${registry_name}" >&2
   fi
   echo -e "${bright}Registry ${registry_name} running${reset}" >&2
 }
