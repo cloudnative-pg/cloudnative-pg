@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-minio-custom
+  name: cluster-timeline-1
 spec:
   instances: 1
 
@@ -15,38 +15,15 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
-
-  # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
-  walStorage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    size: 1Gi
-
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
-
-  monitoring:
-    customQueriesConfigMap:
-      - name: monitoring-01
-        key: additional-queries
-    customQueriesSecret:
-      - name: monitoring-01
-        key: additional-queries
 
   backup:
     target: primary
     barmanObjectStore:
-        destinationPath: s3://pg-backup-minio-custom/
+        destinationPath: s3://cluster-timeline-shared/
+        serverName: shared-timeline-test
         endpointURL: https://minio-service.minio:9000
         endpointCA:
           key: ca.crt
@@ -62,9 +39,4 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
-        tags:
-          retention: "30days"
-        historyTags:
-          retention: "30days"
-        serverName: pg-backup-minio-Custom-Name
     retentionPolicy: "30d"
