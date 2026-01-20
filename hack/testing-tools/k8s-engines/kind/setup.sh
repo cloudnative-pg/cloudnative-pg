@@ -133,7 +133,7 @@ function deploy_csi_host_path() {
 function deploy_fluentd() {
   local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
   # shellcheck disable=SC2154
-  local FLUENTD_LOCAL_IMAGE="${registry_name}:${registry_port}/fluentd-kubernetes-daemonset:local"
+  local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
 
   echo -e "${bright}Starting FluentD deployment...${reset}"
   docker pull "${FLUENTD_IMAGE}"
@@ -262,11 +262,13 @@ EOF
   docker network connect "kind" "${registry_name}" &>/dev/null || true
 
   # Configure registry mirrors using hosts.toml files
-  REGISTRY_DIR="/etc/containerd/certs.d/${registry_name}:${registry_port}"
+  # Note: Kind nodes access the registry via docker network using the container's
+  # internal port (5000), not the host-exposed port (registry_port).
+  REGISTRY_DIR="/etc/containerd/certs.d/${registry_name}:5000"
   while IFS= read -r node; do
     docker exec "$node" mkdir -p "${REGISTRY_DIR}"
     docker exec "$node" bash -c "cat > ${REGISTRY_DIR}/hosts.toml <<EOF
-[host.\"http://${registry_name}:${registry_port}\"]
+[host.\"http://${registry_name}:5000\"]
 EOF
 "
   done < <(kind get nodes --name "${cluster_name}")

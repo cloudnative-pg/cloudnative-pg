@@ -65,5 +65,5 @@ function load_image_registry() {
 
 # print_image: Prints the controller image name used inside the cluster.
 function print_image() {
-  echo "${registry_name}:${registry_port}/cloudnative-pg-testing:latest"
+  echo "${registry_name}:5000/cloudnative-pg-testing:latest"
 }
