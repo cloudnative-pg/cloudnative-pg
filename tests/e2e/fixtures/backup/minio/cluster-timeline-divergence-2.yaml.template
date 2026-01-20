@@ -1,0 +1,52 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-timeline-2
+  annotations:
+    cnpg.io/skipEmptyWalArchiveCheck: enabled
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      backup:
+        name: backup-timeline-test
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+
+  backup:
+    target: primary
+    barmanObjectStore:
+        destinationPath: s3://cluster-timeline-shared/
+        serverName: shared-timeline-test
+        endpointURL: https://minio-service.minio:9000
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY
+        wal:
+          compression: gzip
+        data:
+          immediateCheckpoint: true
+    retentionPolicy: "30d"

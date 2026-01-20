@@ -310,3 +310,79 @@ var _ = Describe("BuildWALPath", func() {
 		})
 	})
 })
+
+var _ = Describe("Timeline history filename parsing", func() {
+	It("can parse timeline from history filenames", func() {
+		tests := []struct {
+			name             string
+			expectedTimeline int
+			expectError      bool
+		}{
+			{
+				name:             "00000001.history",
+				expectedTimeline: 1,
+				expectError:      false,
+			},
+			{
+				name:             "00000021.history", // 0x21 = 33 decimal
+				expectedTimeline: 33,
+				expectError:      false,
+			},
+			{
+				name:             "0000002A.history", // 0x2A = 42 decimal
+				expectedTimeline: 42,
+				expectError:      false,
+			},
+			{
+				name:             "000000FF.history", // 0xFF = 255 decimal
+				expectedTimeline: 255,
+				expectError:      false,
+			},
+			{
+				name:             "0000000A.history", // 0x0A = 10 decimal
+				expectedTimeline: 10,
+				expectError:      false,
+			},
+			{
+				name:             "/var/lib/postgresql/00000021.history", // with path
+				expectedTimeline: 33,
+				expectError:      false,
+			},
+			// Error cases
+			{
+				name:        "00000001", // missing .history extension
+				expectError: true,
+			},
+			{
+				name:        "0000001.history", // wrong length (7 digits instead of 8)
+				expectError: true,
+			},
+			{
+				name:        "000000001.history", // wrong length (9 digits instead of 8)
+				expectError: true,
+			},
+			{
+				name:        "0000000X.history", // invalid hex character
+				expectError: true,
+			},
+			{
+				name:        "000000010000000000000001", // regular WAL file, not history
+				expectError: true,
+			},
+			{
+				name:        ".history", // no timeline digits
+				expectError: true,
+			},
+		}
+
+		for _, test := range tests {
+			timeline, err := ParseTimelineFromHistoryFilename(test.name)
+			if test.expectError {
+				Expect(err).To(HaveOccurred(), "Expected error for name: %s", test.name)
+			} else {
+				Expect(err).NotTo(HaveOccurred(), "Unexpected error for name: %s", test.name)
+				Expect(timeline).To(Equal(test.expectedTimeline), "Timeline mismatch for name: %s", test.name)
+			}
+		}
+	})
+})
