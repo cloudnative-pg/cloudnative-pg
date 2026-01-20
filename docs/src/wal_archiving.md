@@ -52,7 +52,7 @@ segment to be archived.
     By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
     that WAL files, even in case of low workloads, are closed and archived
     at least every 5 minutes, providing a deterministic time-based value for
-    your Recovery Point Objective ([RPO](before_you_start.md#rpo)). Even though you change the value
+    your Recovery Point Objective ([RPO](before_you_start.md#postgresql-terminology)). Even though you change the value
     of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
     our experience suggests that the default value set by the operator is
     suitable for most use cases.
