@@ -74,3 +74,27 @@ export K8S_CLI="kubectl"
 if [ "${CLUSTER_ENGINE:-}" == "ocp" ]; then
     export K8S_CLI="oc"
 fi
+
+# --- TOOL VALIDATION ---
+
+# validate_required_tools: Checks that all required tools are installed
+# Usage: validate_required_tools tool1 tool2 tool3...
+function validate_required_tools() {
+  local missing_tools=()
+  for tool in "$@"; do
+    if ! command -v "$tool" &>/dev/null; then
+      missing_tools+=("$tool")
+    fi
+  done
+
+  if [ ${#missing_tools[@]} -gt 0 ]; then
+    echo "ERROR: The following required tools are not installed:" >&2
+    for tool in "${missing_tools[@]}"; do
+      echo "  - $tool" >&2
+    done
+    echo "" >&2
+    echo "Please install the missing tools and try again." >&2
+    return 1
+  fi
+  return 0
+}

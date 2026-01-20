@@ -263,36 +263,44 @@ EOF
 
   # Configure registry mirrors using hosts.toml files
   REGISTRY_DIR="/etc/containerd/certs.d/${registry_name}:${registry_port}"
-  for node in $(kind get nodes --name "${cluster_name}"); do
+  while IFS= read -r node; do
     docker exec "$node" mkdir -p "${REGISTRY_DIR}"
     docker exec "$node" bash -c "cat > ${REGISTRY_DIR}/hosts.toml <<EOF
 [host.\"http://${registry_name}:${registry_port}\"]
 EOF
 "
-  done
+  done < <(kind get nodes --name "${cluster_name}")
 
   # Configure docker.io mirror if specified
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+    # Validate that DOCKER_REGISTRY_MIRROR is a valid URL
+    if [[ ! "${DOCKER_REGISTRY_MIRROR}" =~ ^https?:// ]]; then
+      echo "ERROR: DOCKER_REGISTRY_MIRROR must be a valid HTTP(S) URL, got: ${DOCKER_REGISTRY_MIRROR}" >&2
+      exit 1
+    fi
     DOCKER_IO_DIR="/etc/containerd/certs.d/docker.io"
-    for node in $(kind get nodes --name "${cluster_name}"); do
+    while IFS= read -r node; do
       docker exec "$node" mkdir -p "${DOCKER_IO_DIR}"
       docker exec "$node" bash -c "cat > ${DOCKER_IO_DIR}/hosts.toml <<EOF
 [host.\"${DOCKER_REGISTRY_MIRROR}\"]
 EOF
 "
-    done
+    done < <(kind get nodes --name "${cluster_name}")
   fi
 
   # Workaround for https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
-  for node in $(kind get nodes --name "${cluster_name}"); do
+  while IFS= read -r node; do
     docker exec "$node" sysctl fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512
-  done
+  done < <(kind get nodes --name "${cluster_name}")
 }
 # ---------------------------------------------------------------------------------
 
 # --- MAIN EXECUTION ---
 
 main() {
+  # Validate required tools are installed
+  validate_required_tools kind docker kubectl helm
+
   echo -e "${bright}Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
   create_cluster_kind "${K8S_VERSION}" "${CLUSTER_NAME}"
