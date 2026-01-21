@@ -17,12 +17,14 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package e2e
+package namespaced
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -31,20 +33,17 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 // ConfigureNamespacedDeployment configures an existing operator deployment for namespaced mode
 func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespace string) {
-	By("patching deployment for namespaced mode", func() {
+	ginkgo.By("patching deployment for namespaced mode", func() {
 		var deployment appsv1.Deployment
 		err := env.Client.Get(env.Ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      "cnpg-controller-manager",
 		}, &deployment)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		for i := range deployment.Spec.Template.Spec.Containers {
 			deployment.Spec.Template.Spec.Containers[i].Env = append(
@@ -54,13 +53,13 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 			)
 		}
 		err = env.Client.Update(env.Ctx, &deployment)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	By("updating RBAC for namespaced mode", func() {
+	ginkgo.By("updating RBAC for namespaced mode", func() {
 		var clusterRole rbacv1.ClusterRole
 		err := env.Client.Get(env.Ctx, types.NamespacedName{Name: "cnpg-manager"}, &clusterRole)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var roleRules, admissionRules []rbacv1.PolicyRule
 		for _, rule := range clusterRole.Rules {
@@ -87,7 +86,7 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 
 		clusterRole.Rules = admissionRules
 		err = env.Client.Update(env.Ctx, &clusterRole)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
@@ -99,12 +98,12 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 		err = env.Client.Create(env.Ctx, role)
 		if err != nil {
 			err = env.Client.Update(env.Ctx, role)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 
 		var originalCRB rbacv1.ClusterRoleBinding
 		err = env.Client.Get(env.Ctx, types.NamespacedName{Name: "cnpg-manager-rolebinding"}, &originalCRB)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		for idx := range originalCRB.Subjects {
 			originalCRB.Subjects[idx].Namespace = namespace
@@ -112,7 +111,7 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 
 		originalCRB.RoleRef.Kind = "ClusterRole"
 		err = env.Client.Update(env.Ctx, &originalCRB)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
@@ -129,27 +128,27 @@ func ConfigureNamespacedDeployment(env *environment.TestingEnvironment, namespac
 		err = env.Client.Create(env.Ctx, roleBinding)
 		if err != nil {
 			err = env.Client.Update(env.Ctx, roleBinding)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 	})
 
-	By("waiting for operator to restart", func() {
+	ginkgo.By("waiting for operator to restart", func() {
 		_, stderr, err := run.Run(fmt.Sprintf(
 			"kubectl rollout status -n %s deployment/cnpg-controller-manager --timeout=120s",
 			namespace))
-		Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "stderr: "+stderr)
 	})
 }
 
 // RevertNamespacedDeployment reverts the operator deployment to cluster-wide mode
 func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace string) {
-	By("removing namespaced environment variables", func() {
+	ginkgo.By("removing namespaced environment variables", func() {
 		var deployment appsv1.Deployment
 		err := env.Client.Get(env.Ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      "cnpg-controller-manager",
 		}, &deployment)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		for i := range deployment.Spec.Template.Spec.Containers {
 			var filteredEnv []corev1.EnvVar
@@ -161,13 +160,13 @@ func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace s
 			deployment.Spec.Template.Spec.Containers[i].Env = filteredEnv
 		}
 		err = env.Client.Update(env.Ctx, &deployment)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	By("restoring cluster-wide RBAC", func() {
+	ginkgo.By("restoring cluster-wide RBAC", func() {
 		var clusterRole rbacv1.ClusterRole
 		err := env.Client.Get(env.Ctx, types.NamespacedName{Name: "cnpg-manager"}, &clusterRole)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var role rbacv1.Role
 		err = env.Client.Get(env.Ctx, types.NamespacedName{
@@ -179,13 +178,13 @@ func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace s
 		}
 
 		err = env.Client.Update(env.Ctx, &clusterRole)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		err = env.Client.Delete(env.Ctx, &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-manager-rolebinding"},
 		})
 		if err != nil && !strings.Contains(err.Error(), "not found") {
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 
 		crb := &rbacv1.ClusterRoleBinding{
@@ -204,7 +203,7 @@ func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace s
 			},
 		}
 		err = env.Client.Create(env.Ctx, crb)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		err = env.Client.Delete(env.Ctx, &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
@@ -213,19 +212,19 @@ func RevertNamespacedDeployment(env *environment.TestingEnvironment, namespace s
 			},
 		})
 		if err != nil && !strings.Contains(err.Error(), "not found") {
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 
 		err = env.Client.Delete(env.Ctx, &role)
 		if err != nil && !strings.Contains(err.Error(), "not found") {
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 	})
 
-	By("waiting for operator to restart", func() {
+	ginkgo.By("waiting for operator to restart", func() {
 		_, stderr, err := run.Run(fmt.Sprintf(
 			"kubectl rollout status -n %s deployment/cnpg-controller-manager --timeout=120s",
 			namespace))
-		Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "stderr: "+stderr)
 	})
 }

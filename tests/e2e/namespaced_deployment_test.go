@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaced"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -65,11 +66,11 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 			Expect(err).NotTo(HaveOccurred(), "operator must be deployed")
 		})
 
-		ConfigureNamespacedDeployment(env, operatorNamespace)
+		namespaced.ConfigureNamespacedDeployment(env, operatorNamespace)
 	})
 
 	AfterAll(func() {
-		RevertNamespacedDeployment(env, operatorNamespace)
+		namespaced.RevertNamespacedDeployment(env, operatorNamespace)
 	})
 
 	BeforeEach(func() {
