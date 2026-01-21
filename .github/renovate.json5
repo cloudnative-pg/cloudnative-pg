@@ -236,7 +236,7 @@
     {
       groupName: 'operator framework',
       separateMajorMinor: false,
-      pinDigests: false,
+      pinDigests: true,
       matchPackageNames: [
         'operator-framework{/,}**',
         'redhat-openshift-ecosystem{/,}**',
