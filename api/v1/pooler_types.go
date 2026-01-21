@@ -228,6 +228,9 @@ type PoolerStatus struct {
 	// The number of pods trying to be scheduled
 	// +optional
 	Instances int32 `json:"instances,omitempty"`
+	// The load balancer status of the pooler service
+	// +optional
+	LoadBalancer *corev1.LoadBalancerStatus `json:"loadBalancer,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used

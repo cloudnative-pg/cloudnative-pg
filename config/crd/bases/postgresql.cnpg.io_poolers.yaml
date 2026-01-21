@@ -9296,6 +9296,77 @@ spec:
                 description: The number of pods trying to be scheduled
                 format: int32
                 type: integer
+              loadBalancer:
+                description: The load balancer status of the pooler service
+                properties:
+                  ingress:
+                    description: |-
+                      Ingress is a list containing ingress points for the load-balancer.
+                      Traffic intended for the service should be sent to these ingress points.
+                    items:
+                      description: |-
+                        LoadBalancerIngress represents the status of a load-balancer ingress point:
+                        traffic intended for the service should be sent to an ingress point.
+                      properties:
+                        hostname:
+                          description: |-
+                            Hostname is set for load-balancer ingress points that are DNS based
+                            (typically AWS load-balancers)
+                          type: string
+                        ip:
+                          description: |-
+                            IP is set for load-balancer ingress points that are IP based
+                            (typically GCE or OpenStack load-balancers)
+                          type: string
+                        ipMode:
+                          description: |-
+                            IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+                            Setting this to "VIP" indicates that traffic is delivered to the node with
+                            the destination set to the load-balancer's IP and port.
+                            Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+                            the destination set to the node's IP and node port or the pod's IP and port.
+                            Service implementations may use this information to adjust traffic routing.
+                          type: string
+                        ports:
+                          description: |-
+                            Ports is a list of records of service ports
+                            If used, every port defined in the service should have an entry in it
+                          items:
+                            description: PortStatus represents the error condition
+                              of a service port
+                            properties:
+                              error:
+                                description: |-
+                                  Error is to record the problem with the service port
+                                  The format of the error shall comply with the following rules:
+                                  - built-in error values shall be specified in this file and those shall use
+                                    CamelCase names
+                                  - cloud provider specific error values must have names that comply with the
+                                    format foo.example.com/CamelCase.
+                                maxLength: 316
+                                pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                                type: string
+                              port:
+                                description: Port is the port number of the service
+                                  port of which status is recorded here
+                                format: int32
+                                type: integer
+                              protocol:
+                                description: |-
+                                  Protocol is the protocol of the service port of which status is recorded here
+                                  The supported values are: "TCP", "UDP", "SCTP"
+                                type: string
+                            required:
+                            - error
+                            - port
+                            - protocol
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                type: object
               secrets:
                 description: The resource version of the config object
                 properties:

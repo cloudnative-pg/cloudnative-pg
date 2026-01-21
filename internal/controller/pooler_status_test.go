@@ -52,6 +52,10 @@ var _ = Describe("pooler_status unit tests", func() {
 		Expect(pooler.Status.Secrets.PgBouncerSecrets.AuthQuery.Name).To(Equal(authUserSecret.Name))
 		Expect(pooler.Status.Secrets.PgBouncerSecrets.AuthQuery.Version).To(Equal(authUserSecret.ResourceVersion))
 	}
+	assertLoadBalancerStatus := func(pooler *v1.Pooler, service *corev1.Service) {
+		Expect(pooler.Status.LoadBalancer.Ingress).To(HaveLen(1))
+		Expect(pooler.Status.LoadBalancer.Ingress[0].IP).To(Equal(service.Status.LoadBalancer.Ingress[0].IP))
+	}
 
 	It("should correctly deduce the status inherited from the cluster resource", func() {
 		ctx := context.Background()
@@ -115,6 +119,30 @@ var _ = Describe("pooler_status unit tests", func() {
 		err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
+	})
+
+	It("should correctly set the load balancer status", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		serviceTemplate := &v1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+			},
+		}
+		pooler.Spec.ServiceTemplate = serviceTemplate
+		svc, err := pgbouncer.Service(pooler, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		res := &poolerManagedResources{Service: svc, Cluster: cluster}
+		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{
+			{
+				IP: "1.2.3.4",
+			},
+		}
+		err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+		Expect(err).ToNot(HaveOccurred())
+		assertLoadBalancerStatus(pooler, svc)
 	})
 
 	It("should correctly interact with the api server", func() {
