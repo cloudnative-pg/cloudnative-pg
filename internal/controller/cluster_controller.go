@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -191,6 +192,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
+	}
+	if configuration.Current.WatchNamespace == "cnpg-system" && cluster.Namespace != configuration.Current.OperatorNamespace {
+		return r.handleOutsideWatchScope(ctx, cluster)
 	}
 
 	ctx = cluster.SetInContext(ctx)
@@ -577,6 +581,20 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+}
+
+func (r *ClusterReconciler) handleOutsideWatchScope(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	log := log.FromContext(ctx)
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, apiv1.OutsideWatchScopeCondition)
+
+	if err := r.Status().Update(ctx, cluster); err != nil {
+		log.Error(err, "unable to set OutsideWatchScope condition")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Cluster resource is in an unwatched namespace. Skipping reconciliation.")
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
