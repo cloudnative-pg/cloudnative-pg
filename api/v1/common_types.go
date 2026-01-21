@@ -36,6 +36,7 @@ type Metadata struct {
 	// and services.
 	// More info: http://kubernetes.io/docs/user-guide/labels
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))",message="Labels with 'cnpg.io/' or 'k8s.io/' prefixes are reserved"
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
@@ -43,5 +44,7 @@ type Metadata struct {
 	// queryable and should be preserved when modifying objects.
 	// More info: http://kubernetes.io/docs/user-guide/annotations
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))",message="Annotations with 'cnpg.io/' or 'k8s.io/' prefixes are reserved for the operator"
+	// +kubebuilder:validation:XValidation:rule="!self.has('cloudnative-pg.io/managed-by')",message="Annotation 'cloudnative-pg.io/managed-by' is reserved for the operator"
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
