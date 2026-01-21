@@ -36,9 +36,14 @@ import (
 var (
 	configurationLog = log.WithName("configuration")
 	// ErrNamespaceEmpty is raised when the namespace is empty in namespaced deployment
-	ErrNamespaceEmpty = errors.New("namespace can not be empty")
+	ErrNamespaceEmpty = errors.New(
+		"NAMESPACED mode requires both OPERATOR_NAMESPACE and WATCH_NAMESPACE to be set to the same non-empty value. " +
+			"Please ensure both environment variables are configured correctly")
 	// ErrNamespaceMismatch is raised when the OperatorNamespace and WatchNamespace is not equal in namespaced deployment
-	ErrNamespaceMismatch = errors.New("provided namespaces does not match")
+	ErrNamespaceMismatch = errors.New(
+		"NAMESPACED mode requires OPERATOR_NAMESPACE and WATCH_NAMESPACE to be equal. " +
+			"Currently they are set to different values. " +
+			"Please set both to the same namespace where the operator is deployed")
 )
 
 const (

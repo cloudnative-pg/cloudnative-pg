@@ -246,6 +246,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.instances.Items,
 		resources.nodes,
 		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+		configuration.Current.Namespaced,
 	)
 
 	// Services
@@ -791,16 +792,38 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	return nil
 }
 
-// getPodsTopology returns a map with all the information about the pods topology
+// getPodsTopology returns a map with all the information about the pods topology.
+// When namespaced is true, the operator doesn't have access to node information,
+// so topology extraction is limited or disabled depending on sync replica constraints.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
 	topology apiv1.SyncReplicaElectionConstraints,
+	namespaced bool,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
 	nodesMap := make(map[string][]apiv1.PodName)
+
+	// In namespaced mode, the operator doesn't have access to node information
+	if namespaced {
+		if topology.Enabled {
+			// Can't extract topology for sync replica constraints without node access
+			contextLogger.Debug("namespaced deployment mode: " +
+				"topology cannot be extracted with sync replica constraints enabled")
+			return apiv1.Topology{SuccessfullyExtracted: false}
+		}
+		// Without constraints, we can still provide basic topology information
+		contextLogger.Debug("namespaced deployment mode: " +
+			"returning basic topology without node labels")
+		for _, pod := range pods {
+			podName := apiv1.PodName(pod.Name)
+			data[podName] = make(map[string]string, 0)
+		}
+		// We can't determine the exact number of nodes, so we indicate success without NodesUsed count
+		return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: 0}
+	}
 
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
@@ -809,10 +832,9 @@ func getPodsTopology(
 		if !ok {
 			// node not found, it means that:
 			// - the node could have been drained
-			// - operator deployed in namespaced mode
 			// - others
 			contextLogger.Debug("node not found, skipping pod topology matching")
-			return apiv1.Topology{}
+			return apiv1.Topology{SuccessfullyExtracted: false}
 		}
 
 		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
