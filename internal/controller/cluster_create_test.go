@@ -1315,20 +1315,22 @@ var _ = Describe("Service Reconciling", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should not create the default services", func() {
-			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{
-				apiv1.ServiceSelectorTypeRW,
-				apiv1.ServiceSelectorTypeRO,
-				apiv1.ServiceSelectorTypeR,
+		It("should not create the default services when r and ro are disabled", func() {
+			// Only r and ro can be disabled; rw cannot be disabled.
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.DisabledDefaultServiceSelectorType{
+				apiv1.DisabledDefaultServiceSelectorTypeRO,
+				apiv1.DisabledDefaultServiceSelectorTypeR,
 			}
 			err := reconciler.reconcilePostgresServices(ctx, &cluster)
 			Expect(err).NotTo(HaveOccurred())
+			// Read-write service is always created (it cannot be disabled).
 			err = reconciler.Get(
 				ctx,
 				types.NamespacedName{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
 				&corev1.Service{},
 			)
-			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+			// Read and read-only services are not created when disabled.
 			err = reconciler.Get(
 				ctx,
 				types.NamespacedName{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},

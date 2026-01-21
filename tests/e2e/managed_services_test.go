@@ -131,7 +131,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 			Eventually(func(g Gomega) error {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
+				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.DisabledDefaultServiceSelectorType{}
 				return env.Client.Update(ctx, cluster)
 			}, RetryTimeout, PollingTime).Should(Succeed())
 

@@ -2369,14 +2369,6 @@ func (v *ClusterCustomValidator) validateManagedServices(r *apiv1.Cluster) field
 	basePath := field.NewPath("spec", "managed", "services")
 	var errs field.ErrorList
 
-	if slices.Contains(managedServices.DisabledDefaultServices, apiv1.ServiceSelectorTypeRW) {
-		errs = append(errs, field.Invalid(
-			basePath.Child("disabledDefaultServices"),
-			apiv1.ServiceSelectorTypeRW,
-			"service of type RW cannot be disabled.",
-		))
-	}
-
 	names := make([]string, len(managedServices.Additional))
 	for idx := range managedServices.Additional {
 		additionalService := &managedServices.Additional[idx]
