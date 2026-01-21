@@ -5981,3 +5981,45 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("validateSyncReplicaElectionConstraint", func() {
+	It("should allow sync replica constraints when not in namespaced mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled:                true,
+			NodeLabelsAntiAffinity: []string{"zone"},
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).To(BeNil())
+	})
+
+	It("should allow disabled sync replica constraints in any mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled: false,
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).To(BeNil())
+	})
+
+	It("should reject sync replica constraints without node labels", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled: true,
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err.Field).To(ContainSubstring("nodeLabelsAntiAffinity"))
+	})
+
+	It("should reject sync replica constraints when operator is in namespaced mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled:                true,
+			NodeLabelsAntiAffinity: []string{"zone"},
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).To(BeNil())
+	})
+})

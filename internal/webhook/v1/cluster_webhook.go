@@ -49,6 +49,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1359,6 +1360,18 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 	if !constraints.Enabled {
 		return nil
 	}
+
+	if configuration.Current.Namespaced {
+		return field.Forbidden(
+			field.NewPath(
+				"spec", "postgresql", "syncReplicaElectionConstraint", "enabled",
+			),
+			"syncReplicaElectionConstraint cannot be enabled when the operator is running in namespaced mode. "+
+				"This feature requires access to Node resources which are not available in namespaced deployments. "+
+				"Please deploy the operator in cluster-wide mode to use this feature",
+		)
+	}
+
 	if len(constraints.NodeLabelsAntiAffinity) > 0 {
 		return nil
 	}
