@@ -435,6 +435,7 @@ are the ones directly set by PgBouncer.
 - [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
 - [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
+- [`stats_users`](https://www.pgbouncer.org/config.html#stats_users)
 - [`suspend_timeout`](https://www.pgbouncer.org/config.html#suspend_timeout)
 - [`tcp_defer_accept`](https://www.pgbouncer.org/config.html#tcp_defer_accept)
 - [`tcp_keepalive`](https://www.pgbouncer.org/config.html#tcp_keepalive)
