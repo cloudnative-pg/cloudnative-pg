@@ -30,6 +30,9 @@ const (
 
 	// BackupKind is the kind name of Backups
 	BackupKind = "Backup"
+	
+	// ScheduledBackupKind is the kind name of ScheduledBackups
+	ScheduledBackupKind = "ScheduledBackup"
 
 	// PoolerKind is the kind name of Poolers
 	PoolerKind = "Pooler"
