@@ -1194,6 +1194,10 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		result = append(result, err)
 	}
 
+	if err := validateImageCatalogRef(r.Spec.ImageCatalogRef); err != nil {
+		result = append(result, err)
+	}
+
 	return result
 }
 
@@ -1383,6 +1387,24 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 		nil,
 		"Can't enable syncReplicaConstraints without passing labels for comparison inside nodeLabelsAntiAffinity",
 	)
+}
+
+func validateImageCatalogRef(ref *apiv1.ImageCatalogRef) *field.Error {
+	if ref == nil {
+		return nil
+	}
+
+	// In namespaced mode, ClusterImageCatalog (cluster-scoped) cannot be accessed
+	if configuration.Current.Namespaced && ref.Kind == "ClusterImageCatalog" {
+		return field.Forbidden(
+			field.NewPath("spec", "imageCatalogRef", "kind"),
+			"ClusterImageCatalog cannot be used when the operator is running in namespaced mode. "+
+				"This resource is cluster-scoped and not available in namespaced deployments. "+
+				"Please use ImageCatalog (namespaced) instead, or deploy the operator in cluster-wide mode",
+		)
+	}
+
+	return nil
 }
 
 // validateImageChange validate the change from a certain image name
