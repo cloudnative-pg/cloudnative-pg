@@ -1,3 +1,17 @@
+## Validating CloudNativePG on your Kubernetes cluster
+
+This section is for users and platform teams who want to validate CloudNativePG on their Kubernetes cluster. Validation here means running a series of non-destructive checks that verify your cluster's compatibility with CloudNativePG, including available storage classes, volume snapshot capabilities, and other requirements. These tests help answer the question: “These checks help determine whether CloudNativePG can run correctly on a given Kubernetes cluster.” without making any changes to your existing workloads or configuration.
+
+### What is guaranteed / supported
+
+CloudNativePG is tested and validated on specific versions of Kubernetes and PostgreSQL. The E2E test suite validates core behaviors including cluster creation and management, failover and switchover operations, backup and restore functionality, replication, scaling, and operator upgrades.
+
+For detailed information on supported Kubernetes versions, PostgreSQL versions, and the complete support policy, please refer to the [Supported releases](../../docs/src/supported_releases.md) documentation.
+
+## Contributor and CI E2E testing (advanced)
+
+The following sections document the E2E testing framework used by contributors and in continuous integration. This content focuses on tooling and CI implementation details, rather than end-user validation guidance.
+
 # Running E2E tests on your environment
 
 [Continuous Integration](https://cloud.google.com/architecture/devops/devops-tech-continuous-integration)
