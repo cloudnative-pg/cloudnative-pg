@@ -661,7 +661,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(topology.SuccessfullyExtracted).To(BeFalse())
 		})
 
-		It("should return successful topology in namespaced mode without constraints", func() {
+		It("should return unsuccessful topology in namespaced mode", func() {
 			ctx := context.Background()
 			pods := []corev1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
@@ -672,28 +672,10 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			topology := getPodsTopology(ctx, pods, nodes, constraints, true)
 
-			Expect(topology.SuccessfullyExtracted).To(BeTrue())
-			Expect(topology.Instances).To(HaveLen(2))
-			Expect(topology.NodesUsed).To(BeEquivalentTo(0))
-		})
-
-		It("should fail in namespaced mode when sync replica constraints are enabled", func() {
-			ctx := context.Background()
-			pods := []corev1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
-			}
-			nodes := map[string]corev1.Node{} // Empty nodes map (namespaced deployment)
-			constraints := apiv1.SyncReplicaElectionConstraints{
-				Enabled:                true,
-				NodeLabelsAntiAffinity: []string{"zone"},
-			}
-
-			topology := getPodsTopology(ctx, pods, nodes, constraints, true)
-
 			Expect(topology.SuccessfullyExtracted).To(BeFalse())
 		})
 
-		It("should handle nil nodes map in namespaced mode without constraints", func() {
+		It("should handle nil nodes map in namespaced mode", func() {
 			ctx := context.Background()
 			pods := []corev1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
@@ -703,8 +685,7 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			topology := getPodsTopology(ctx, pods, nodes, constraints, true)
 
-			Expect(topology.SuccessfullyExtracted).To(BeTrue())
-			Expect(topology.Instances).To(HaveLen(1))
+			Expect(topology.SuccessfullyExtracted).To(BeFalse())
 		})
 	})
 })

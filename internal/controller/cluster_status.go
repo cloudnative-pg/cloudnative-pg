@@ -794,7 +794,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 
 // getPodsTopology returns a map with all the information about the pods topology.
 // When namespaced is true, the operator doesn't have access to node information,
-// so topology extraction is limited or disabled depending on sync replica constraints.
+// so topology extraction fails and returns an empty topology.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
@@ -806,23 +806,12 @@ func getPodsTopology(
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
 	nodesMap := make(map[string][]apiv1.PodName)
 
-	// In namespaced mode, the operator doesn't have access to node information
+	// In namespaced mode, the operator doesn't have access to node information,
+	// so we cannot extract topology. Return empty topology with SuccessfullyExtracted=false.
+	// Note: syncReplicaElectionConstraint is blocked by webhook validation in namespaced mode.
 	if namespaced {
-		if topology.Enabled {
-			// Can't extract topology for sync replica constraints without node access
-			contextLogger.Debug("namespaced deployment mode: " +
-				"topology cannot be extracted with sync replica constraints enabled")
-			return apiv1.Topology{SuccessfullyExtracted: false}
-		}
-		// Without constraints, we can still provide basic topology information
-		contextLogger.Debug("namespaced deployment mode: " +
-			"returning basic topology without node labels")
-		for _, pod := range pods {
-			podName := apiv1.PodName(pod.Name)
-			data[podName] = make(map[string]string, 0)
-		}
-		// We can't determine the exact number of nodes, so we indicate success without NodesUsed count
-		return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: 0}
+		contextLogger.Debug("namespaced deployment mode: topology extraction not available without node access")
+		return apiv1.Topology{SuccessfullyExtracted: false}
 	}
 
 	for _, pod := range pods {
