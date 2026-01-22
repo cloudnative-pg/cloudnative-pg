@@ -91,6 +91,37 @@ Clusters utilizing these catalogs maintain continuous monitoring.
 Any alterations to the images within a catalog trigger automatic updates for
 **all associated clusters** referencing that specific entry.
 
+## Image Catalog with Image Volume Extensions
+
+[Image Volume Extensions](imagevolume_extensions.md) can be defined for each
+`.spec.images` entry of a Catalog using the `extensions` field. For example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: postgresql
+spec:
+  images:
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
+      extensions:
+        - name: foo
+          image:
+            reference: # registry path for your `foo` extension image
+```
+
+The `extensions` section follows the same API schema of the Cluster's `.spec.postgresql.extensions` field.
+For a complete field overview of the available
+fields, refer to the [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
+
+As a result, the [Image volume Extensions - Advanced Topics](imagevolume_extensions.md#advanced-topics) section also apply
+here in case you need to finely control the configuration of an extension.
+
+A `Cluster` that references a Catalog image for a given major version can
+request any extensions associated with that image to be loaded into the `Cluster`.
+For details, see [Adding a new extension defined via `Image Catalog` to a `Cluster` resource](imagevolume_extensions.md#adding-a-new-extension-defined-via-image-catalog-to-a-cluster-resource).
+
 ## CloudNativePG Catalogs
 
 The CloudNativePG project maintains `ClusterImageCatalog` manifests for all

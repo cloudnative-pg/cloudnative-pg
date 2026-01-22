@@ -58,9 +58,13 @@ To use image volume extensions with CloudNativePG, you need:
 
 ## How it works
 
-Extension images are defined in the `.spec.postgresql.extensions` stanza of a
-`Cluster` resource, which accepts an ordered list of extensions to be added to
-the PostgreSQL cluster.
+Extension images can be defined:
+
+* in the `.spec.postgresql.extensions` stanza of a `Cluster` resource
+* in the `.spec.images[].extensions` stanza of an `ImageCatalog/ClusterImageCatalog` resource
+* or using a combination of both
+
+The `extensions` stanza accepts a list of extensions to be added to the PostgreSQL cluster.
 
 :::info
     For field-level details, see the
@@ -174,6 +178,130 @@ will work without additional configuration, as PostgreSQL will locate:
 
 - the extension control file at `/extensions/foo/share/extension/foo.control`
 - the shared library at `/extensions/foo/lib/foo.so`
+
+### Adding a new extension defined via `Image Catalog` to a `Cluster` resource
+
+`ImageVolume` extension can also be defined in the `.spec.images[].extensions` stanza
+of an `ImageCatalog` or `ClusterImageCatalog`.
+To add extensions to a catalog, please refer to [## Image Catalog with Image Volume Extensions](image_catalog.md#image-catalog-with-image-volume-extensions).
+
+Clusters that reference a catalog image for which extensions are defined can request any of
+those extensions to be loaded into the `Cluster`.
+
+**Example: enabling catalog-defined extensions:**
+Given an `ImageCatalog` that defines the extensions `foo` and `bar`
+for the PostgreSQL major version `18`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: postgresql
+spec:
+  images:
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
+      extensions:
+        - name: foo
+          image:
+            reference: # registry path for your `foo` extension image
+        - name: bar
+          image:
+            reference: # registry path for your `bar` extension image
+```
+
+You can enable one or more of these extensions inside a `Cluster` by referencing the extension's `name`
+under `.spec.postgresql.extensions`.
+For example, to enable only the `foo` extension:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: postgresql
+    major: 18
+
+  postgresql:
+    extensions:
+      - name: foo
+```
+
+**Example: combining catalog-defined and cluster-defined extensions:**
+You can define additional extensions directly at the `Cluster` level alongside extensions coming
+from the referenced catalog. For example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: postgresql
+    major: 18
+
+  postgresql:
+    extensions:
+      - name: foo
+      - name: baz
+        image:
+          reference: # registry path for your `baz` extension image
+```
+
+In this case:
+* `foo` is loaded from the catalog definition
+* `baz` is defined entirely at the Cluster level
+
+**Example: overriding catalog-defined extensions:**
+
+Any configuration field of an extension defined in the catalog can be overridden directly
+in the `Cluster` object.
+
+When both the catalog and the `Cluster` define an extension with the same `name`, the
+`Cluster` configuration takes precedence.
+This allows the catalog to act as a base layer
+of configuration that can be selectively overridden by individual clusters.
+
+For example, you can request the `bar` extension from the catalog while overriding its
+configuration to set a custom `extension_control_path`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: postgresql
+    major: 18
+
+  postgresql:
+    extensions:
+      - name: foo
+      - name: baz
+        image:
+          reference: # registry path for your `baz` extension image
+      - name: bar
+        extension_control_path:
+          - my/bar/custom/path
+```
+
+In this example, the bar extension is loaded using the `image.reference` defined in the catalog, while
+its `extension_control_path` is overridden at the Cluster level with a custom value.
+
+Any field of an [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration) can be
+overridden at `Cluster` level, with the exception of `name`.
+Changing the `name` results in defining a separate extension rather than overriding an
+existing one.
 
 ### Adding a new extension to a `Database` resource
 
@@ -328,6 +456,34 @@ system libraries at runtime.
     CloudNativePG does not currently trigger this restart automatically; you will need to
     manually restart the cluster (e.g., using `cnpg restart`) after modifying `ld_library_path`.
 :::
+
+## Inspecting the Cluster's Extensions Status
+
+The `Cluster` status includes a dedicated section for `ImageVolume` Extensions:
+
+```yaml
+status:
+
+  <- snipped ->
+  pgDataImageInfo:
+    image: # registry path for your PostgreSQL image
+    majorVersion: 18
+    extensions:
+    - name: foo
+      image:
+        reference: # registry path for your `foo` extension image
+    - name: bar
+      image:
+        reference: # registry path for your `bar` extension image
+```
+
+This section is particularly useful when extensions are defined through an image
+catalog, when catalog-defined and Cluster-defined extensions are combined, or
+when catalog-defined extensions are overridden at the Cluster level.
+
+The `pgDataImageInfo.extensions` field shows the fully resolved configuration of
+all `ImageVolume` Extensions. This is the effective configuration that the operator
+uses to provision and configure extensions for the Cluster's instances.
 
 ## Image Specifications
 
