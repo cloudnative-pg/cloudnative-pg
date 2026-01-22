@@ -71,6 +71,10 @@ type PoolerSpec struct {
 	// +optional
 	Type PoolerType `json:"type,omitempty"`
 
+	// The name of the service that the pooler should point to. If not specified, the
+	// pooler will point to the default service of the cluster specified in the `type` field.
+	CustomServiceName string `json:"customServiceName,omitempty"`
+
 	// The number of replicas we want. Default: 1.
 	// +kubebuilder:default:=1
 	// +optional
