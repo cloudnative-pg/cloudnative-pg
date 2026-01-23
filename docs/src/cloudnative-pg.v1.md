@@ -1957,8 +1957,9 @@ _Appears in:_
 
 _Underlying type:_ _string_
 
-PrimaryUpdateMethod contains the method to use when upgrading
-the primary server of the cluster as part of rolling updates
+PrimaryUpdateMethod defines the method to use when upgrading
+the primary instance of the cluster as part of rolling updates.
+The default method is "restart"
 
 
 

@@ -884,7 +884,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 		})
 
-		It("gets cluster ready without a primary switchover", func() {
+		It("gets cluster ready with primary switchover", func() {
 			By("waiting for the cluster to be ready again", func() {
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			})
