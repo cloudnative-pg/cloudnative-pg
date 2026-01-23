@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/logrusorgru/aurora/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -77,5 +78,32 @@ var _ = Describe("getPrimaryPromotionTime", func() {
 		It("should return the error message", func() {
 			Expect(getPrimaryPromotionTime(cluster)).To(ContainSubstring("error"))
 		})
+	})
+})
+
+var _ = Describe("getWalArchivingStatus", func() {
+	It("should return 'Disabled' when WAL archiving is disabled", func() {
+		result := getWalArchivingStatus(false, "", true)
+		Expect(result).To(Equal(aurora.Yellow("Disabled").String()))
+	})
+
+	It("should return 'OK' when archiving is working", func() {
+		result := getWalArchivingStatus(true, "", false)
+		Expect(result).To(Equal(aurora.Green("OK").String()))
+	})
+
+	It("should return 'Failing' when there is a failed WAL", func() {
+		result := getWalArchivingStatus(false, "000000010000000000000001", false)
+		Expect(result).To(Equal(aurora.Red("Failing").String()))
+	})
+
+	It("should return 'Starting Up' when archiving hasn't started yet", func() {
+		result := getWalArchivingStatus(false, "", false)
+		Expect(result).To(Equal(aurora.Yellow("Starting Up").String()))
+	})
+
+	It("should prioritize 'Disabled' over other states", func() {
+		result := getWalArchivingStatus(true, "000000010000000000000001", true)
+		Expect(result).To(Equal(aurora.Yellow("Disabled").String()))
 	})
 })
