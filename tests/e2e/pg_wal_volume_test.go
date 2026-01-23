@@ -43,11 +43,12 @@ import (
 
 var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	const (
-		sampleFileWithPgWal    = fixturesDir + "/pg_wal_volume/cluster-with-pg-wal-volume.yaml.template"
-		sampleFileWithoutPgWal = fixturesDir + "/pg_wal_volume/cluster-without-pg-wal-volume.yaml.template"
-		clusterName            = "cluster-pg-wal-volume"
-		level                  = tests.High
-		expectedPvcCount       = 6
+		sampleFileWithPgWal      = fixturesDir + "/pg_wal_volume/cluster-with-pg-wal-volume.yaml.template"
+		sampleFileWithoutPgWal   = fixturesDir + "/pg_wal_volume/cluster-without-pg-wal-volume.yaml.template"
+		sampleFileWithSwitchover = fixturesDir + "/pg_wal_volume/cluster-no-pg-wal-switchover-volume.yaml.template"
+		clusterName              = "cluster-pg-wal-volume"
+		level                    = tests.High
+		expectedPvcCount         = 6
 	)
 	var namespace string
 	verifyPgWal := func(namespace string) {
@@ -130,13 +131,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		verifyPgWal(namespace)
 	})
 
-	It("adding a dedicated WAL volume after cluster is created", func() {
-		const namespacePrefix = "add-pg-wal-volume-e2e"
-		var err error
-		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
+	assertAddWALVolume := func() {
 		By(fmt.Sprintf("adding pg_wal volume in existing cluster: %v", clusterName), func() {
 			updateWalStorage(namespace, clusterName)
 		})
@@ -146,5 +141,36 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 		AssertClusterPhaseIsConsistent(namespace, clusterName, []string{apiv1.PhaseHealthy}, 30)
 		verifyPgWal(namespace)
+	}
+
+	Context("on a plain cluster with primaryUpdateMethod defaulting to restart", func() {
+		It("can add a dedicated WAL volume after cluster is created", func() {
+			const namespacePrefix = "add-pg-wal-volume-e2e"
+			var err error
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
+			initialPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			assertAddWALVolume()
+
+			AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+		})
+	})
+
+	Context("on a plain cluster with primaryUpdateMethod defaulting to switchover", func() {
+		It("can add a dedicated WAL volume after cluster is created", func() {
+			const namespacePrefix = "add-pg-wal-volume-e2e"
+			var err error
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, clusterName, sampleFileWithSwitchover, env)
+			initialPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			assertAddWALVolume()
+			AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+		})
 	})
 })
