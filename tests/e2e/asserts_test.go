@@ -243,6 +243,13 @@ func AssertCreateCluster(
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+
+	// Verify pod sequentiality on fresh cluster creation
+	// This should only be checked here, not in AssertClusterIsReady,
+	// because after scale operations or pod deletions, gaps are expected
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	AssertClusterHasSequentialPods(namespace, clusterName, cluster.Spec.Instances, env)
 }
 
 // AssertClusterIsReady checks the cluster has as many pods as in spec, that
@@ -318,6 +325,67 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		}
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
+}
+
+// AssertClusterHasSequentialPods verifies that pod serial numbers are sequential starting from 1.
+// Non-sequential numbering indicates pods were recreated during cluster lifecycle,
+// which may suggest issues with cloud provider, resource constraints, or operator bugs.
+func AssertClusterHasSequentialPods(
+	namespace string,
+	clusterName string,
+	expectedInstances int,
+	env *environment.TestingEnvironment,
+) {
+	podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred(), "failed to list cluster pods")
+	Expect(podList.Items).To(HaveLen(expectedInstances),
+		"cluster should have exactly %d pods", expectedInstances)
+
+	// Extract pod serial numbers
+	podSerials := make([]int, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		var serial int
+		_, err := fmt.Sscanf(pod.Name, clusterName+"-%d", &serial)
+		Expect(err).ToNot(HaveOccurred(),
+			"pod name %s should match expected format %s-<number>", pod.Name, clusterName)
+		podSerials = append(podSerials, serial)
+	}
+
+	// Build expected sequential serials [1, 2, 3, ..., expectedInstances]
+	expectedSerials := make([]int, expectedInstances)
+	for i := 0; i < expectedInstances; i++ {
+		expectedSerials[i] = i + 1
+	}
+
+	// Sort actual serials for comparison
+	slices.Sort(podSerials)
+
+	// Check if serials are sequential
+	if !slices.Equal(podSerials, expectedSerials) {
+		// Calculate which serials were skipped
+		maxSerial := podSerials[len(podSerials)-1]
+		skippedSerials := make([]int, 0)
+		for i := 1; i <= maxSerial; i++ {
+			if !slices.Contains(podSerials, i) {
+				skippedSerials = append(skippedSerials, i)
+			}
+		}
+
+		// Build detailed error message
+		errorMsg := fmt.Sprintf(
+			"Pod serial numbers are non-sequential on a freshly created cluster.\n"+
+				"Expected: %v\n"+
+				"Actual:   %v\n",
+			expectedSerials, podSerials)
+
+		if len(skippedSerials) > 0 {
+			errorMsg += fmt.Sprintf("Skipped serial number(s): %v\n", skippedSerials)
+		}
+
+		errorMsg += "\nThis requires investigation to determine the root cause.\n"
+
+		Fail(errorMsg)
+	}
 }
 
 func AssertClusterDefault(

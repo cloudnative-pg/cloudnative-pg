@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 
@@ -58,15 +59,17 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 
 		// Reuse the same pvc after a deletion
 		By("recreating a pod with the same PVC after it's deleted", func() {
-			// Get a pod we want to delete
-			podName := clusterName + "-3"
-			pod := &corev1.Pod{}
+			// Get a replica pod to delete (not the primary)
+			replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(replicas.Items).ToNot(BeEmpty(), "cluster should have at least one replica")
+
+			pod := &replicas.Items[0]
+			podName := pod.Name
 			podNamespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      podName,
 			}
-			err := env.Client.Get(env.Ctx, podNamespacedName, pod)
-			Expect(err).ToNot(HaveOccurred())
 
 			// Get the UID of the pod
 			pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
@@ -104,15 +107,13 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 		})
 
 		By("removing a PVC and delete the Pod", func() {
-			// Get a pod we want to delete
-			podName := clusterName + "-3"
-			pod := &corev1.Pod{}
-			podNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      podName,
-			}
-			err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+			// Get a replica pod to delete (not the primary)
+			replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(replicas.Items).ToNot(BeEmpty(), "cluster should have at least one replica")
+
+			pod := &replicas.Items[0]
+			podName := pod.Name
 
 			// Get the UID of the PVC
 			pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
@@ -159,21 +160,30 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			err = podutils.Delete(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			// A new pod should be created
+			// A new pod should be created (find it by listing all pods and checking for one not in the original list)
 			timeout := 300
-			newPodName := clusterName + "-4"
-			newPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      newPodName,
-			}
+			var newPodName string
 			Eventually(func() (bool, error) {
-				newPod := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
-				return utils.IsPodActive(*newPod) && utils.IsPodReady(*newPod), err
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				if err != nil {
+					return false, err
+				}
+				// Check if there's a new pod that wasn't the one we deleted
+				for _, newPod := range podList.Items {
+					if newPod.Name != podName && utils.IsPodActive(newPod) && utils.IsPodReady(newPod) {
+						newPodName = newPod.Name
+						return true, nil
+					}
+				}
+				return false, nil
 			}, timeout).Should(BeTrue())
 
 			// The pod should have a different PVC
 			newPod := &corev1.Pod{}
+			newPodNamespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      newPodName,
+			}
 			err = env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
 			Expect(err).ToNot(HaveOccurred())
 			newPvcName := newPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
