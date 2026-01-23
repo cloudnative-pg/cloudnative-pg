@@ -188,19 +188,17 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		})
 
 		By("verifying new pod should join as standby", func() {
-			newPodName := clusterName + "-4"
-			newPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      newPodName,
-			}
 			Eventually(func() (bool, error) {
-				pod := corev1.Pod{}
-				err := env.Client.Get(env.Ctx, newPodNamespacedName, &pod)
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					return false, err
 				}
-				if utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod) {
-					return true, nil
+				// Find a pod that wasn't the deleted primary and is a standby
+				for _, pod := range podList.Items {
+					if pod.Name != oldPrimaryPodName && utils.IsPodActive(pod) &&
+						utils.IsPodReady(pod) && specs.IsPodStandby(pod) {
+						return true, nil
+					}
 				}
 				return false, nil
 			}, 300).Should(BeTrue())
