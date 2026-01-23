@@ -155,11 +155,13 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			Expect(err).ToNot(HaveOccurred())
 			assertAddWALVolume()
 
-			AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+			By("verifying the primary did not switch", func() {
+				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+			})
 		})
 	})
 
-	Context("on a plain cluster with primaryUpdateMethod defaulting to switchover", func() {
+	Context("on a plain cluster with primaryUpdateMethod set to switchover", func() {
 		It("can add a dedicated WAL volume after cluster is created", func() {
 			const namespacePrefix = "add-pg-wal-volume-e2e"
 			var err error
@@ -170,7 +172,10 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			initialPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			assertAddWALVolume()
-			AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+
+			By("verifying the primary did switch", func() {
+				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+			})
 		})
 	})
 })
