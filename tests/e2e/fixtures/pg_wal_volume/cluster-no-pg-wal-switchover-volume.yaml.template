@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pg-wal-volume-switchover
+  name: cluster-pg-wal-volume
 spec:
   instances: 3
   primaryUpdateMethod: switchover

@@ -40,12 +40,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// errLogShippingReplicaElected is raised when the pod update process need
+// errLogShippingReplicaElected is raised when the pod update process needs
 // to select a new primary before upgrading the old primary, but the chosen
 // instance is not connected via streaming replication
 var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
 
-// errRolloutDelayed is raised the a pod rollout have been delayed because
+// errRolloutDelayed is raised when a pod rollout has been delayed because
 // of the operator configuration
 var errRolloutDelayed = errors.New("pod rollout delayed")
 
@@ -241,8 +241,8 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// is not active.
 		if !targetInstance.IsWalReceiverActive {
 			contextLogger.Info(
-				"chosen new primary is still not connected via streaming replication, "+
-					"interrupting the primaryPodUpdate",
+				"chosen new primary is still not connected via streaming replication. "+
+					"Delaying the switchover",
 				"updateReason", reason,
 				"currentPrimary", primaryPod.Name,
 				"targetPrimary", targetInstance.Pod.Name,
