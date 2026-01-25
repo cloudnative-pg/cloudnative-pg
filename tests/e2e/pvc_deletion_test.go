@@ -60,11 +60,8 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 		// Reuse the same pvc after a deletion
 		By("recreating a pod with the same PVC after it's deleted", func() {
 			// Get a replica pod to delete (not the primary)
-			replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
+			pod, err := clusterutils.GetFirstReplica(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(replicas.Items).ToNot(BeEmpty(), "cluster should have at least one replica")
-
-			pod := &replicas.Items[0]
 			podName := pod.Name
 			podNamespacedName := types.NamespacedName{
 				Namespace: namespace,
@@ -108,11 +105,8 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 
 		By("removing a PVC and delete the Pod", func() {
 			// Get a replica pod to delete (not the primary)
-			replicas, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
+			pod, err := clusterutils.GetFirstReplica(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(replicas.Items).ToNot(BeEmpty(), "cluster should have at least one replica")
-
-			pod := &replicas.Items[0]
 			podName := pod.Name
 
 			// Get the UID of the PVC
@@ -160,7 +154,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			err = podutils.Delete(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			// A new pod should be created (find it by listing all pods and checking for one not in the original list)
+			// A new pod should be created
 			timeout := 300
 			var newPodName string
 			Eventually(func() (bool, error) {

@@ -328,8 +328,8 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 }
 
 // AssertClusterHasSequentialPods verifies that pod serial numbers are sequential starting from 1.
-// Non-sequential numbering indicates pods were recreated during cluster lifecycle,
-// which may suggest issues with cloud provider, resource constraints, or operator bugs.
+// Non-sequential numbering on a freshly created cluster suggests pods were recreated during
+// initial creation, indicating a potential issue requiring investigation.
 func AssertClusterHasSequentialPods(
 	namespace string,
 	clusterName string,
@@ -363,10 +363,16 @@ func AssertClusterHasSequentialPods(
 	// Check if serials are sequential
 	if !slices.Equal(podSerials, expectedSerials) {
 		// Calculate which serials were skipped
+		if len(podSerials) == 0 {
+			Fail("No pods found for cluster")
+		}
 		maxSerial := podSerials[len(podSerials)-1]
-		skippedSerials := make([]int, 0)
+		var skippedSerials []int
+		serialIdx := 0
 		for i := 1; i <= maxSerial; i++ {
-			if !slices.Contains(podSerials, i) {
+			if serialIdx < len(podSerials) && podSerials[serialIdx] == i {
+				serialIdx++
+			} else {
 				skippedSerials = append(skippedSerials, i)
 			}
 		}

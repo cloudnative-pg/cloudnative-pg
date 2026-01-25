@@ -135,6 +135,14 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		})
 
 		By("removing the old primary pod and its pvc", func() {
+			// Capture existing pod UIDs before deletion
+			existingPods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			existingPodUIDs := make(map[types.UID]bool, len(existingPods.Items))
+			for _, pod := range existingPods.Items {
+				existingPodUIDs[pod.UID] = true
+			}
+
 			// Check if walStorage is enabled
 			walStorageEnabled, err := storage.IsWalStorageEnabled(
 				env.Ctx, env.Client,
@@ -185,23 +193,23 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				err := env.Client.Get(env.Ctx, namespacedName, &corev1.Pod{})
 				return apierrs.IsNotFound(err)
 			}, 300).Should(BeTrue())
-		})
 
-		By("verifying new pod should join as standby", func() {
-			Eventually(func() (bool, error) {
-				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-				if err != nil {
-					return false, err
-				}
-				// Find a pod that wasn't the deleted primary and is a standby
-				for _, pod := range podList.Items {
-					if pod.Name != oldPrimaryPodName && utils.IsPodActive(pod) &&
-						utils.IsPodReady(pod) && specs.IsPodStandby(pod) {
-						return true, nil
+			By("verifying new pod should join as standby", func() {
+				Eventually(func() (bool, error) {
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+					if err != nil {
+						return false, err
 					}
-				}
-				return false, nil
-			}, 300).Should(BeTrue())
+					// Find a pod that wasn't in the list before deletion and is now a ready standby
+					for _, pod := range podList.Items {
+						if !existingPodUIDs[pod.UID] && utils.IsPodActive(pod) &&
+							utils.IsPodReady(pod) && specs.IsPodStandby(pod) {
+							return true, nil
+						}
+					}
+					return false, nil
+				}, 300).Should(BeTrue())
+			})
 		})
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 		AssertDataExpectedCount(env, tableLocator, 2)

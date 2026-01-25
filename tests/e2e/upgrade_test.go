@@ -272,7 +272,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Get all pods in the cluster dynamically instead of assuming sequential numbering
+			// Get all pods in the cluster dynamically
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
