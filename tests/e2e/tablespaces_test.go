@@ -871,21 +871,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
-		})
 
-		It("can verify tablespaces and PVC were created", func() {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(cluster.ContainsTablespaces()).To(BeTrue())
+			By("verifying tablespaces and PVC were created", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
-			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
-			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
-			AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-		})
-
-		It("gets cluster ready with primary switchover", func() {
-			By("waiting for the cluster to be ready again", func() {
+				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
+				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
+				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			})
 
