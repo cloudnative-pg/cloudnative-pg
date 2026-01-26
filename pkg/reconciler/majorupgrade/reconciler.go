@@ -247,7 +247,8 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
-			// TODO: are extensions relevant here??
+			// Extensions will be populated by the next reconcileImage() call
+			// which will properly merge catalog-defined and cluster-defined extensions
 		}),
 		status.SetTimelineID(1),
 	); err != nil {

@@ -183,7 +183,7 @@ will work without additional configuration, as PostgreSQL will locate:
 
 `ImageVolume` extension can also be defined in the `.spec.images[].extensions` stanza
 of an `ImageCatalog` or `ClusterImageCatalog`.
-To add extensions to a catalog, please refer to [## Image Catalog with Image Volume Extensions](image_catalog.md#image-catalog-with-image-volume-extensions).
+To add extensions to a catalog, please refer to [Image Catalog with Image Volume Extensions](image_catalog.md#image-catalog-with-image-volume-extensions).
 
 Clusters that reference a catalog image for which extensions are defined can request any of
 those extensions to be loaded into the `Cluster`.
