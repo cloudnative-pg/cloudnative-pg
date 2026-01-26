@@ -33,7 +33,6 @@ func evaluateNextSteps(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
 	tablespaceInSpecSlice []apiv1.TablespaceConfiguration,
-	pvcHealthChecker func(tablespace string) bool,
 ) []tablespaceReconcilerStep {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 	contextLog.Debug("evaluating tablespace actions")
@@ -51,9 +50,6 @@ func evaluateNextSteps(
 		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpec.Name]
 
 		switch {
-		case !isTbsInDB && !pvcHealthChecker(tbsInSpec.Name):
-			result[idx] = &noopTablespaceAction{}
-
 		case !isTbsInDB:
 			result[idx] = &createTablespaceAction{
 				tablespace: tbsInSpec,
