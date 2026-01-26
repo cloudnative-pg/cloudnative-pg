@@ -70,6 +70,7 @@ OPERATOR_SDK_VERSION ?= v1.42.0
 OPM_VERSION ?= v1.61.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.16.0
+OPENSHIFT_VERSIONS ?= v4.12-v4.19
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -182,6 +183,8 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
