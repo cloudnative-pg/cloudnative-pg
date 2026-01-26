@@ -138,11 +138,12 @@ func (r *TablespaceReconciler) reconcile(
 		return arePVCsForTablespaceHealthy(ctx, cluster, tablespace)
 	}
 
-	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces, pvcChecker)
+	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	result := r.applySteps(
 		ctx,
 		superUserDB,
 		steps,
+		pvcChecker,
 	)
 
 	// update the cluster status
@@ -168,11 +169,12 @@ func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	db *sql.DB,
 	actions []tablespaceReconcilerStep,
+	pvcChecker func(tablespace string) bool,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		result[idx] = step.execute(ctx, db, r.storageManager)
+		result[idx] = step.execute(ctx, db, r.storageManager, pvcChecker)
 	}
 
 	return result
