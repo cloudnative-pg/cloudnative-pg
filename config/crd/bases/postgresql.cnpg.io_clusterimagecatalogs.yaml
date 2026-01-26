@@ -73,7 +73,7 @@ spec:
                               type: string
                             type: array
                           image:
-                            description: The image containing the extension, required
+                            description: The image containing the extension.
                             properties:
                               pullPolicy:
                                 description: |-
