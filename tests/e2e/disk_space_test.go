@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -175,15 +176,18 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {
+			// After crash recovery on network storage, PostgreSQL may need
+			// more time to complete CHECKPOINT operations.
 			query := "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
-			_, _, err := exec.QueryInInstancePod(
+			_, _, err := exec.QueryInInstancePodWithTimeout(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
 				postgres.PostgresDBName,
-				query)
+				query,
+				time.Duration(testTimeouts[timeouts.ClusterIsReadyQuick])*time.Second)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	}
