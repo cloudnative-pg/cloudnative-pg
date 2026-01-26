@@ -33,6 +33,18 @@ replacing each instance one by one, starting with the replicas. Once all
 replicas have been updated, it will perform either a switchover or a restart of
 the primary to complete the process.
 
+CloudNativePG supports switching the container image to one based on a different
+operating system distribution (e.g., from Debian Bullseye to Trixie) during a
+minor upgrade.
+
+:::warning
+    While the operator supports changing the OS distribution during a minor upgrade,
+    this can introduce compatibility risks, especially with PostgreSQL extensions
+    and system libraries. We strongly recommend testing the upgrade in a
+    controlled environment to validate all extensions and dependencies before
+    applying it to production.
+:::
+
 ## Major Version Upgrades
 
 Major PostgreSQL releases introduce changes to the internal data storage
