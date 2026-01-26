@@ -1480,7 +1480,7 @@ type ExtensionConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// The image containing the extension, required
+	// The image containing the extension.
 	// +optional
 	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 
