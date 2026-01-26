@@ -155,7 +155,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		podRollout.canBeInPlace, podRollout.hasUpdatedPVCs, podRollout.reason)
+		podRollout.canBeInPlace, podRollout.reason)
 }
 
 func (r *ClusterReconciler) switchPrimary(
@@ -164,7 +164,6 @@ func (r *ClusterReconciler) switchPrimary(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	targetInstance postgres.PostgresqlStatus,
-	hasNewPVCs bool,
 	reason rolloutReason,
 ) (bool, error) {
 	podList.LogStatus(ctx)
@@ -176,9 +175,8 @@ func (r *ClusterReconciler) switchPrimary(
 	if err := r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name); err != nil {
 		return false, err
 	}
-	if !hasNewPVCs {
-		return true, nil
-	}
+	// since we need rollout, we can do the pod upgrade rather than wait for
+	// the old primary to restart, and then the outdated PodSpec to trigger pod upgrade
 	if err := r.upgradePod(ctx, cluster, &primaryPod, reason); err != nil {
 		return false, err
 	}
@@ -191,7 +189,6 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
-	hasNewPVCs bool,
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
@@ -255,7 +252,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetInstance.Pod.Name)
 
-		return r.switchPrimary(ctx, cluster, podList, primaryPod, targetInstance, hasNewPVCs, reason)
+		return r.switchPrimary(ctx, cluster, podList, primaryPod, targetInstance, reason)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
@@ -295,12 +292,11 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
 type rollout struct {
-	required       bool
-	canBeInPlace   bool
-	hasUpdatedPVCs bool
+	required     bool
+	canBeInPlace bool
 
-	needsChangeOperatorImage bool
-	needsChangeOperandImage  bool
+	needsToChangeOperatorImage bool
+	needsToChangeOperandImage  bool
 
 	reason string
 }
@@ -327,7 +323,7 @@ func isInstanceNeedingRollout(
 			required: true,
 			reason: fmt.Sprintf("pod '%s' is not reporting the executable hash",
 				status.Pod.Name),
-			needsChangeOperatorImage: true,
+			needsToChangeOperatorImage: true,
 		}
 	}
 
@@ -521,7 +517,7 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 		required: true,
 		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
-		needsChangeOperandImage: true,
+		needsToChangeOperandImage: true,
 	}, nil
 }
 
@@ -544,16 +540,15 @@ func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster
 		required: true,
 		reason: fmt.Sprintf("the instance is using an old bootstrap container image: %s -> %s",
 			opCurrentImageName, configuration.Current.OperatorImageName),
-		needsChangeOperatorImage: true,
+		needsToChangeOperatorImage: true,
 	}, nil
 }
 
 func checkHasMissingPVCs(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod) {
 		return rollout{
-			required:       true,
-			hasUpdatedPVCs: true,
-			reason:         "attaching a new PVC to the instance Pod",
+			required: true,
+			reason:   "attaching a new PVC to the instance Pod",
 		}, nil
 	}
 	return rollout{}, nil
@@ -569,9 +564,8 @@ func checkClusterHasDifferentRestartAnnotation(
 		podRestart := pod.Annotations[utils.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return rollout{
-				required:     true,
-				reason:       "cluster has been explicitly restarted via annotation",
-				canBeInPlace: false,
+				required: true,
+				reason:   "cluster has been explicitly restarted via annotation",
 			}, nil
 		}
 	}
@@ -667,7 +661,7 @@ func checkPodSpecIsOutdated(
 			required: true,
 			reason: fmt.Sprintf("the instance is using an old bootstrap container image: %s -> %s",
 				opCurrentImageName, configuration.Current.OperatorImageName),
-			needsChangeOperatorImage: true,
+			needsToChangeOperatorImage: true,
 		}, nil
 	}
 
