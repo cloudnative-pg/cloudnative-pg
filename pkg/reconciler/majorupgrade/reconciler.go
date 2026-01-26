@@ -244,7 +244,8 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
-			// TODO: are extensions relevant here??
+			// Extensions will be populated by the next reconcileImage() call
+			// which will properly merge catalog-defined and cluster-defined extensions
 		}),
 	); err != nil {
 		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
