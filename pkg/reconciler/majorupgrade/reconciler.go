@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -322,16 +323,16 @@ func resolveExtensionsForMajorVersion(
 			return nil, fmt.Errorf("cannot get catalog: %w", err)
 		}
 
-		extensions, err := getExtensionsFromCatalog(cluster, catalog, requestedMajor)
+		exts, err := extensions.ResolveFromCatalog(cluster, catalog, requestedMajor)
 		if err != nil {
 			return nil, fmt.Errorf("cannot resolve extensions from catalog: %w", err)
 		}
 
-		return extensions, nil
+		return exts, nil
 	}
 
 	// If using imageName directly, extensions must be fully specified in cluster spec
-	return getExtensionsFromImageName(cluster)
+	return extensions.ValidateWithoutCatalog(cluster)
 }
 
 // getCatalog retrieves the image catalog referenced by the cluster
@@ -367,93 +368,6 @@ func getCatalog(
 	}
 
 	return catalog, nil
-}
-
-// getExtensionsFromCatalog merges catalog-defined extensions with cluster-defined extensions.
-// Cluster spec extensions take precedence over catalog extensions for fields that are specified.
-func getExtensionsFromCatalog(
-	cluster *apiv1.Cluster,
-	catalog apiv1.GenericImageCatalog,
-	requestedMajorVersion int,
-) ([]apiv1.ExtensionConfiguration, error) {
-	requestedExtensions := cluster.Spec.PostgresConfiguration.Extensions
-	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(requestedExtensions))
-
-	// Build a map of extensions coming from the catalog
-	catalogExtensionsMap := make(map[string]apiv1.ExtensionConfiguration)
-	if extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion); ok {
-		for _, extension := range extensions {
-			catalogExtensionsMap[extension.Name] = extension
-		}
-	}
-
-	// Resolve extensions
-	for _, extension := range requestedExtensions {
-		catalogExtension, found := catalogExtensionsMap[extension.Name]
-
-		// Validate that the ImageVolumeSource.Reference is properly defined
-		if !found && extension.ImageVolumeSource.Reference == "" {
-			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q found in the Cluster Spec but no ImageVolumeSource.Reference is defined", extension.Name)
-		}
-
-		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
-			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
-					"in both the image catalog and the Cluster Spec",
-				extension.Name, catalog.GetNamespace(), catalog.GetName(),
-			)
-		}
-
-		var resultExtension apiv1.ExtensionConfiguration
-		if found {
-			// Found the extension in the catalog, use catalog entry as base
-			// and override with Cluster Spec values
-			resultExtension = catalogExtension
-		} else {
-			// No catalog entry, rely fully on the Cluster Spec
-			resolvedExtensions = append(resolvedExtensions, extension)
-			continue
-		}
-
-		// Apply the Cluster Spec overrides
-		if extension.ImageVolumeSource.Reference != "" {
-			resultExtension.ImageVolumeSource.Reference = extension.ImageVolumeSource.Reference
-		}
-		if extension.ImageVolumeSource.PullPolicy != "" {
-			resultExtension.ImageVolumeSource.PullPolicy = extension.ImageVolumeSource.PullPolicy
-		}
-		if len(extension.ExtensionControlPath) > 0 {
-			resultExtension.ExtensionControlPath = extension.ExtensionControlPath
-		}
-		if len(extension.DynamicLibraryPath) > 0 {
-			resultExtension.DynamicLibraryPath = extension.DynamicLibraryPath
-		}
-		if len(extension.LdLibraryPath) > 0 {
-			resultExtension.LdLibraryPath = extension.LdLibraryPath
-		}
-
-		resolvedExtensions = append(resolvedExtensions, resultExtension)
-	}
-
-	return resolvedExtensions, nil
-}
-
-// getExtensionsFromImageName returns extensions when cluster uses imageName directly.
-// In this case, all extensions must be fully specified in the cluster spec.
-func getExtensionsFromImageName(cluster *apiv1.Cluster) ([]apiv1.ExtensionConfiguration, error) {
-	extensions := cluster.Spec.PostgresConfiguration.Extensions
-
-	// Validate that all extensions have ImageVolumeSource.Reference defined
-	for _, extension := range extensions {
-		if extension.ImageVolumeSource.Reference == "" {
-			return nil, fmt.Errorf(
-				"extension %q requires ImageVolumeSource.Reference when not using image catalog",
-				extension.Name)
-		}
-	}
-
-	return extensions, nil
 }
 
 // getPrimarySerial tries to obtain the primary serial from a group of PVCs
