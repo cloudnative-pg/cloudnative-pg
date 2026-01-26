@@ -27,8 +27,9 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -185,7 +186,7 @@ func createMajorUpgradeJob(
 		"primary", true)
 
 	if err := c.Create(ctx, job); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
@@ -220,7 +221,7 @@ func majorVersionUpgradeHandleCompletion(
 
 		if err := c.Delete(ctx, &pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
-			if !errors.IsNotFound(err) {
+			if !apierrs.IsNotFound(err) {
 				return nil, err
 			}
 		}
@@ -237,6 +238,30 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
+	// Resolve extensions for the new major version.
+	// This ensures that extension images match the upgraded PostgreSQL version.
+	// If extension resolution fails (e.g., catalog doesn't have extensions for new version),
+	// we fail the major upgrade completion to avoid leaving the cluster in an inconsistent state.
+	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
+			"requestedMajor", requestedMajor)
+
+		// Set the cluster phase to indicate image catalog error
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions after major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions after major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
 	// Reset timeline ID to 1 after major upgrade to match pg_upgrade behavior.
 	// This prevents replicas from restoring incompatible timeline history files
 	// from the pre-upgrade cluster in object storage.
@@ -247,8 +272,7 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
-			// Extensions will be populated by the next reconcileImage() call
-			// which will properly merge catalog-defined and cluster-defined extensions
+			Extensions:   extensions,
 		}),
 		status.SetTimelineID(1),
 	); err != nil {
@@ -281,6 +305,155 @@ func registerPhase(
 		status.SetPhase(phase, reason),
 		status.SetClusterReadyCondition,
 	)
+}
+
+// resolveExtensionsForMajorVersion resolves the extension configuration for the upgraded major version.
+// This function handles both image catalog references and direct image name specifications.
+func resolveExtensionsForMajorVersion(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	requestedMajor int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	// If using imageCatalogRef, resolve extensions from the catalog
+	if cluster.Spec.ImageCatalogRef != nil {
+		catalog, err := getCatalog(ctx, c, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get catalog: %w", err)
+		}
+
+		extensions, err := getExtensionsFromCatalog(cluster, catalog, requestedMajor)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve extensions from catalog: %w", err)
+		}
+
+		return extensions, nil
+	}
+
+	// If using imageName directly, extensions must be fully specified in cluster spec
+	return getExtensionsFromImageName(cluster)
+}
+
+// getCatalog retrieves the image catalog referenced by the cluster
+func getCatalog(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+) (apiv1.GenericImageCatalog, error) {
+	catalogKind := cluster.Spec.ImageCatalogRef.Kind
+	var catalog apiv1.GenericImageCatalog
+
+	switch catalogKind {
+	case apiv1.ClusterImageCatalogKind:
+		catalog = &apiv1.ClusterImageCatalog{}
+	case apiv1.ImageCatalogKind:
+		catalog = &apiv1.ImageCatalog{}
+	default:
+		return nil, fmt.Errorf("invalid image catalog type: %s", catalogKind)
+	}
+
+	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
+	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
+		return nil, fmt.Errorf("invalid image catalog group")
+	}
+
+	catalogName := cluster.Spec.ImageCatalogRef.Name
+	err := c.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return nil, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
+		}
+		return nil, fmt.Errorf("error getting catalog: %w", err)
+	}
+
+	return catalog, nil
+}
+
+// getExtensionsFromCatalog merges catalog-defined extensions with cluster-defined extensions.
+// Cluster spec extensions take precedence over catalog extensions for fields that are specified.
+func getExtensionsFromCatalog(
+	cluster *apiv1.Cluster,
+	catalog apiv1.GenericImageCatalog,
+	requestedMajorVersion int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	requestedExtensions := cluster.Spec.PostgresConfiguration.Extensions
+	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(requestedExtensions))
+
+	// Build a map of extensions coming from the catalog
+	catalogExtensionsMap := make(map[string]apiv1.ExtensionConfiguration)
+	if extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion); ok {
+		for _, extension := range extensions {
+			catalogExtensionsMap[extension.Name] = extension
+		}
+	}
+
+	// Resolve extensions
+	for _, extension := range requestedExtensions {
+		catalogExtension, found := catalogExtensionsMap[extension.Name]
+
+		// Validate that the ImageVolumeSource.Reference is properly defined
+		if !found && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q found in the Cluster Spec but no ImageVolumeSource.Reference is defined", extension.Name)
+		}
+
+		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
+			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
+				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
+					"in both the image catalog and the Cluster Spec",
+				extension.Name, catalog.GetNamespace(), catalog.GetName(),
+			)
+		}
+
+		var resultExtension apiv1.ExtensionConfiguration
+		if found {
+			// Found the extension in the catalog, use catalog entry as base
+			// and override with Cluster Spec values
+			resultExtension = catalogExtension
+		} else {
+			// No catalog entry, rely fully on the Cluster Spec
+			resolvedExtensions = append(resolvedExtensions, extension)
+			continue
+		}
+
+		// Apply the Cluster Spec overrides
+		if extension.ImageVolumeSource.Reference != "" {
+			resultExtension.ImageVolumeSource.Reference = extension.ImageVolumeSource.Reference
+		}
+		if extension.ImageVolumeSource.PullPolicy != "" {
+			resultExtension.ImageVolumeSource.PullPolicy = extension.ImageVolumeSource.PullPolicy
+		}
+		if len(extension.ExtensionControlPath) > 0 {
+			resultExtension.ExtensionControlPath = extension.ExtensionControlPath
+		}
+		if len(extension.DynamicLibraryPath) > 0 {
+			resultExtension.DynamicLibraryPath = extension.DynamicLibraryPath
+		}
+		if len(extension.LdLibraryPath) > 0 {
+			resultExtension.LdLibraryPath = extension.LdLibraryPath
+		}
+
+		resolvedExtensions = append(resolvedExtensions, resultExtension)
+	}
+
+	return resolvedExtensions, nil
+}
+
+// getExtensionsFromImageName returns extensions when cluster uses imageName directly.
+// In this case, all extensions must be fully specified in the cluster spec.
+func getExtensionsFromImageName(cluster *apiv1.Cluster) ([]apiv1.ExtensionConfiguration, error) {
+	extensions := cluster.Spec.PostgresConfiguration.Extensions
+
+	// Validate that all extensions have ImageVolumeSource.Reference defined
+	for _, extension := range extensions {
+		if extension.ImageVolumeSource.Reference == "" {
+			return nil, fmt.Errorf(
+				"extension %q requires ImageVolumeSource.Reference when not using image catalog",
+				extension.Name)
+		}
+	}
+
+	return extensions, nil
 }
 
 // getPrimarySerial tries to obtain the primary serial from a group of PVCs
