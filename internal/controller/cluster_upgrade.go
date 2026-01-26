@@ -177,9 +177,9 @@ func (r *ClusterReconciler) switchPrimary(
 	}
 	// since we need rollout, we can do the pod upgrade rather than wait for
 	// the old primary to restart, and then the outdated PodSpec to trigger pod upgrade
-	if err := r.upgradePod(ctx, cluster, &primaryPod, reason); err != nil {
-		return false, err
-	}
+	// if err := r.upgradePod(ctx, cluster, &primaryPod, reason); err != nil {
+	// 	return false, err
+	// }
 	return true, nil
 }
 
