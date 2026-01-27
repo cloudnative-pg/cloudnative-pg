@@ -176,9 +176,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {
-			// After crash recovery on network storage, PostgreSQL may need
-			// more time to complete CHECKPOINT operations.
 			query := "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
+			checkpointGracePeriod := time.Duration(testTimeouts[timeouts.ClusterIsReadyQuick]) * time.Second
 			_, _, err := exec.QueryInInstancePodWithTimeout(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
@@ -187,7 +186,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				},
 				postgres.PostgresDBName,
 				query,
-				time.Duration(testTimeouts[timeouts.ClusterIsReadyQuick])*time.Second)
+				checkpointGracePeriod)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	}
