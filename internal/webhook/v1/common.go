@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -60,14 +59,14 @@ func isValidationEnabled(obj client.Object) (bool, error) {
 
 // bypassableValidator implements a custom validator that enables an
 // existing custom validator to be enabled or disabled via an annotation.
-type bypassableValidator struct {
-	validator admission.CustomValidator
+type bypassableValidator[T client.Object] struct {
+	validator admission.Validator[T]
 }
 
 // newBypassableValidator creates a new custom validator that enables an
 // existing custom validator to be enabled or disabled via an annotation.
-func newBypassableValidator(validator admission.CustomValidator) *bypassableValidator {
-	return &bypassableValidator{
+func newBypassableValidator[T client.Object](validator admission.Validator[T]) *bypassableValidator[T] {
+	return &bypassableValidator[T]{
 		validator: validator,
 	}
 }
@@ -75,9 +74,9 @@ func newBypassableValidator(validator admission.CustomValidator) *bypassableVali
 // ValidateCreate validates the object on creation.
 // The optional warnings will be added to the response as warning messages.
 // Return an error if the object is invalid.
-func (b bypassableValidator) ValidateCreate(
+func (b bypassableValidator[T]) ValidateCreate(
 	ctx context.Context,
-	obj runtime.Object,
+	obj T,
 ) (admission.Warnings, error) {
 	return validate(obj, func() (admission.Warnings, error) {
 		return b.validator.ValidateCreate(ctx, obj)
@@ -87,10 +86,10 @@ func (b bypassableValidator) ValidateCreate(
 // ValidateUpdate validates the object on update.
 // The optional warnings will be added to the response as warning messages.
 // Return an error if the object is invalid.
-func (b bypassableValidator) ValidateUpdate(
+func (b bypassableValidator[T]) ValidateUpdate(
 	ctx context.Context,
-	oldObj runtime.Object,
-	newObj runtime.Object,
+	oldObj T,
+	newObj T,
 ) (admission.Warnings, error) {
 	return validate(newObj, func() (admission.Warnings, error) {
 		return b.validator.ValidateUpdate(ctx, oldObj, newObj)
@@ -100,9 +99,9 @@ func (b bypassableValidator) ValidateUpdate(
 // ValidateDelete validates the object on deletion.
 // The optional warnings will be added to the response as warning messages.
 // Return an error if the object is invalid.
-func (b bypassableValidator) ValidateDelete(
+func (b bypassableValidator[T]) ValidateDelete(
 	ctx context.Context,
-	obj runtime.Object,
+	obj T,
 ) (admission.Warnings, error) {
 	return validate(obj, func() (admission.Warnings, error) {
 		return b.validator.ValidateDelete(ctx, obj)
@@ -112,10 +111,10 @@ func (b bypassableValidator) ValidateDelete(
 const validationDisabledWarning = "validation webhook is disabled — all changes are accepted without validation. " +
 	"This may lead to unsafe or destructive operations. Proceed with extreme caution."
 
-func validate(obj runtime.Object, validator func() (admission.Warnings, error)) (admission.Warnings, error) {
+func validate(obj client.Object, validator func() (admission.Warnings, error)) (admission.Warnings, error) {
 	var warnings admission.Warnings
 
-	validationEnabled, err := isValidationEnabled(obj.(client.Object))
+	validationEnabled, err := isValidationEnabled(obj)
 	if err != nil {
 		// If the validation annotation value is unexpected, we continue validating
 		// the object but we warn the user that the value was wrong
