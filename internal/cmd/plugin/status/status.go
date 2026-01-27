@@ -630,8 +630,9 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 		status.AddLine("No Primary instance found")
 		return
 	}
+	isWalArchivingDisabled := utils.IsWalArchivingDisabled(&fullStatus.Cluster.ObjectMeta)
 	status.AddLine("Working WAL archiving:",
-		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL))
+		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL, isWalArchivingDisabled))
 	status.AddLine("WALs waiting to be archived:", primaryInstanceStatus.ReadyWALFiles)
 
 	if primaryInstanceStatus.LastArchivedWAL == "" {
@@ -648,8 +649,10 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 	}
 }
 
-func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
+func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string, isDisabled bool) string {
 	switch {
+	case isDisabled:
+		return aurora.Yellow("Disabled").String()
 	case isArchivingWAL:
 		return aurora.Green("OK").String()
 	case lastFailedWAL != "":
