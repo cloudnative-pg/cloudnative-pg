@@ -138,4 +138,43 @@ var _ = Describe("Pooler validation", func() {
 		}
 		Expect(v.validatePgbouncerGenericParameters(pooler)).To(BeEmpty())
 	})
+
+	It("does not allow wildcard in databases list", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					Databases: []apiv1.PgBouncerDatabaseConfig{
+						{Name: "mydb"},
+						{Name: "*"},
+					},
+				},
+			},
+		}
+		Expect(v.validatePgbouncerDatabases(pooler)).NotTo(BeEmpty())
+	})
+
+	It("allows databases without wildcard", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					Databases: []apiv1.PgBouncerDatabaseConfig{
+						{Name: "mydb"},
+						{Name: "otherdb"},
+					},
+				},
+			},
+		}
+		Expect(v.validatePgbouncerDatabases(pooler)).To(BeEmpty())
+	})
+
+	It("allows empty databases list", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					Databases: []apiv1.PgBouncerDatabaseConfig{},
+				},
+			},
+		}
+		Expect(v.validatePgbouncerDatabases(pooler)).To(BeEmpty())
+	})
 })
