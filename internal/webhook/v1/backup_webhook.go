@@ -21,16 +21,13 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -42,8 +39,8 @@ var backupLog = log.WithName("backup-resource").WithValues("version", "v1")
 
 // SetupBackupWebhookWithManager registers the webhook for Backup in the manager.
 func SetupBackupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Backup{}).
-		WithValidator(newBypassableValidator(&BackupCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Backup{}).
+		WithValidator(newBypassableValidator[*apiv1.Backup](&BackupCustomValidator{})).
 		WithDefaulter(&BackupCustomDefaulter{}).
 		Complete()
 }
@@ -56,14 +53,8 @@ func SetupBackupWebhookWithManager(mgr ctrl.Manager) error {
 // Kind Backup when those are created or updated.
 type BackupCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &BackupCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Backup.
-func (d *BackupCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	backup, ok := obj.(*apiv1.Backup)
-	if !ok {
-		return fmt.Errorf("expected an Backup object but got %T", obj)
-	}
+func (d *BackupCustomDefaulter) Default(_ context.Context, backup *apiv1.Backup) error {
 	backupLog.Info("Defaulting for Backup", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
 	// TODO(user): fill in your defaulting logic.
@@ -80,14 +71,8 @@ func (d *BackupCustomDefaulter) Default(_ context.Context, obj runtime.Object) e
 // when it is created, updated, or deleted.
 type BackupCustomValidator struct{}
 
-var _ webhook.CustomValidator = &BackupCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Backup.
-func (v *BackupCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	backup, ok := obj.(*apiv1.Backup)
-	if !ok {
-		return nil, fmt.Errorf("expected a Backup object but got %T", obj)
-	}
+func (v *BackupCustomValidator) ValidateCreate(_ context.Context, backup *apiv1.Backup) (admission.Warnings, error) {
 	backupLog.Info("Validation for Backup upon creation", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
 	allErrs := v.validate(backup)
@@ -103,12 +88,8 @@ func (v *BackupCustomValidator) ValidateCreate(_ context.Context, obj runtime.Ob
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Backup.
 func (v *BackupCustomValidator) ValidateUpdate(
 	_ context.Context,
-	_, newObj runtime.Object,
+	_ *apiv1.Backup, backup *apiv1.Backup,
 ) (admission.Warnings, error) {
-	backup, ok := newObj.(*apiv1.Backup)
-	if !ok {
-		return nil, fmt.Errorf("expected a Backup object for the newObj but got %T", newObj)
-	}
 	backupLog.Info("Validation for Backup upon update", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
 	allErrs := v.validate(backup)
@@ -122,11 +103,7 @@ func (v *BackupCustomValidator) ValidateUpdate(
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Backup.
-func (v *BackupCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	backup, ok := obj.(*apiv1.Backup)
-	if !ok {
-		return nil, fmt.Errorf("expected a Backup object but got %T", obj)
-	}
+func (v *BackupCustomValidator) ValidateDelete(_ context.Context, backup *apiv1.Backup) (admission.Warnings, error) {
 	backupLog.Info("Validation for Backup upon deletion", "name", backup.GetName(), "namespace", backup.GetNamespace())
 
 	// TODO(user): fill in your validation logic upon object deletion.
