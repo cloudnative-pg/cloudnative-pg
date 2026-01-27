@@ -21,17 +21,14 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/robfig/cron"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -43,7 +40,7 @@ var scheduledBackupLog = log.WithName("scheduledbackup-resource").WithValues("ve
 
 // SetupScheduledBackupWebhookWithManager registers the webhook for ScheduledBackup in the manager.
 func SetupScheduledBackupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.ScheduledBackup{}).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.ScheduledBackup{}).
 		WithValidator(&ScheduledBackupCustomValidator{}).
 		WithDefaulter(&ScheduledBackupCustomDefaulter{}).
 		Complete()
@@ -55,14 +52,8 @@ func SetupScheduledBackupWebhookWithManager(mgr ctrl.Manager) error {
 // Kind ScheduledBackup when those are created or updated.
 type ScheduledBackupCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &ScheduledBackupCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind ScheduledBackup.
-func (d *ScheduledBackupCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	scheduledBackup, ok := obj.(*apiv1.ScheduledBackup)
-	if !ok {
-		return fmt.Errorf("expected an ScheduledBackup object but got %T", obj)
-	}
+func (d *ScheduledBackupCustomDefaulter) Default(_ context.Context, scheduledBackup *apiv1.ScheduledBackup) error {
 	scheduledBackupLog.Info("Defaulting for ScheduledBackup",
 		"name", scheduledBackup.GetName(), "namespace", scheduledBackup.GetNamespace())
 
@@ -82,17 +73,11 @@ type ScheduledBackupCustomValidator struct {
 	// TODO(user): Add more fields as needed for validation
 }
 
-var _ webhook.CustomValidator = &ScheduledBackupCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type ScheduledBackup.
 func (v *ScheduledBackupCustomValidator) ValidateCreate(
 	_ context.Context,
-	obj runtime.Object,
+	scheduledBackup *apiv1.ScheduledBackup,
 ) (admission.Warnings, error) {
-	scheduledBackup, ok := obj.(*apiv1.ScheduledBackup)
-	if !ok {
-		return nil, fmt.Errorf("expected a ScheduledBackup object but got %T", obj)
-	}
 	scheduledBackupLog.Info("Validation for ScheduledBackup upon creation",
 		"name", scheduledBackup.GetName(), "namespace", scheduledBackup.GetNamespace())
 
@@ -109,12 +94,8 @@ func (v *ScheduledBackupCustomValidator) ValidateCreate(
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type ScheduledBackup.
 func (v *ScheduledBackupCustomValidator) ValidateUpdate(
 	_ context.Context,
-	_, newObj runtime.Object,
+	_ *apiv1.ScheduledBackup, scheduledBackup *apiv1.ScheduledBackup,
 ) (admission.Warnings, error) {
-	scheduledBackup, ok := newObj.(*apiv1.ScheduledBackup)
-	if !ok {
-		return nil, fmt.Errorf("expected a ScheduledBackup object for the newObj but got %T", newObj)
-	}
 	scheduledBackupLog.Info("Validation for ScheduledBackup upon update",
 		"name", scheduledBackup.GetName(), "namespace", scheduledBackup.GetNamespace())
 
@@ -131,12 +112,8 @@ func (v *ScheduledBackupCustomValidator) ValidateUpdate(
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type ScheduledBackup.
 func (v *ScheduledBackupCustomValidator) ValidateDelete(
 	_ context.Context,
-	obj runtime.Object,
+	scheduledBackup *apiv1.ScheduledBackup,
 ) (admission.Warnings, error) {
-	scheduledBackup, ok := obj.(*apiv1.ScheduledBackup)
-	if !ok {
-		return nil, fmt.Errorf("expected a ScheduledBackup object but got %T", obj)
-	}
 	scheduledBackupLog.Info("Validation for ScheduledBackup upon deletion",
 		"name", scheduledBackup.GetName(), "namespace", scheduledBackup.GetNamespace())
 

@@ -347,7 +347,7 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	localSrv, err := webserver.NewLocalWebServer(
 		instance,
 		mgr.GetClient(),
-		mgr.GetEventRecorderFor("local-webserver"),
+		mgr.GetEventRecorderFor("local-webserver"), //nolint:staticcheck
 	)
 	if err != nil {
 		contextLogger.Error(err, "unable to create local webserver runnable")
