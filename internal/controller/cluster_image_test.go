@@ -514,4 +514,77 @@ var _ = Describe("Cluster with container image extensions", func() {
 		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseImageCatalogError))
 		Expect(cluster.Status.PhaseReason).To(Not(BeEmpty()))
 	})
+
+	It("when an extension requested doesn't exist in the catalog", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "bar",
+						},
+					},
+				},
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(Not(BeNil()))
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseImageCatalogError))
+		Expect(cluster.Status.PhaseReason).To(Not(BeEmpty()))
+	})
+
+	It("when an extension gets removed from a catalog but it's still requested by a Cluster", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "foo",
+						},
+					},
+				},
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name:     "catalog",
+						Kind:     "ImageCatalog",
+						APIGroup: &apiv1.SchemeGroupVersion.Group,
+					},
+					Major: 15,
+				},
+			},
+		}
+		r := newFakeReconcilerFor(cluster, catalog)
+		result, err := r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].Name).To(Equal("foo"))
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].ImageVolumeSource.Reference).To(Equal("foo:dev"))
+
+		// Remove the extension from the catalog
+		catalog.Spec.Images[0].Extensions = nil
+		r = newFakeReconcilerFor(cluster, catalog)
+		result, err = r.reconcileImage(ctx, cluster)
+		Expect(err).Error().ShouldNot(HaveOccurred())
+		Expect(result).To(Not(BeNil()))
+		Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseImageCatalogError))
+		Expect(cluster.Status.PhaseReason).To(Not(BeEmpty()))
+	})
 })

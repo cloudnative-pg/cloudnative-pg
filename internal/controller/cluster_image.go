@@ -332,14 +332,15 @@ func getExtensionsFromCatalog(
 		// hurt to have it here as well.
 		if !found && extension.ImageVolumeSource.Reference == "" {
 			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q found in the Cluster Spec but no ImageVolumeSource.Reference is defined", extension.Name)
+				"extension `%q` defined exclusively in the Cluster Spec but no `ImageVolumeSource.Reference` is present",
+				extension.Name)
 		}
 
 		// Case 2. This case must be handled here because we don't have a validation webhook for the catalog,
 		// but it could be moved there if we decide to add one.
 		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
 			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
+				"extension `%q` defined in image catalog %s/%s but no `ImageVolumeSource.Reference` is present "+
 					"in both the image catalog and the Cluster Spec",
 				extension.Name, catalog.GetNamespace(), catalog.GetName(),
 			)
