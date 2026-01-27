@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cnpg-i-plugin-mock
+  labels:
+    app: cnpg-i-plugin-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cnpg-i-plugin-mock
+  template:
+    metadata:
+      labels:
+        app: cnpg-i-plugin-mock
+    spec:
+      containers:
+      - name: plugin
+        image: cnpg-i-plugin-mock:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9090
+          name: grpc
+        env:
+        - name: PLUGIN_PORT
+          value: "9090"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnpg-i-plugin-mock
+  labels:
+    app: cnpg-i-plugin-mock
+    cnpg.io/pluginName: cnpg-i-plugin-mock.test
+  annotations:
+    cnpg.io/pluginPort: "9090"
+    cnpg.io/pluginClientSecret: cnpg-i-plugin-mock-client-tls
+    cnpg.io/pluginServerSecret: cnpg-i-plugin-mock-server-tls
+    cnpg.io/pluginServerName: cnpg-i-plugin-mock-service
+spec:
+  selector:
+    app: cnpg-i-plugin-mock
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: grpc

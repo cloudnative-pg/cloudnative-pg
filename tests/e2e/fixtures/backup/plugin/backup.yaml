@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: backup-with-plugin
+spec:
+  cluster:
+    name: cluster-with-plugin
+  method: plugin
+  pluginConfiguration:
+    name: cnpg-i-plugin-mock.test
