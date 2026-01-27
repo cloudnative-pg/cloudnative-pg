@@ -630,8 +630,13 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 		status.AddLine("No Primary instance found")
 		return
 	}
+	pluginEnabled, _ := isBarmanCloudPluginEnabled(fullStatus.Cluster)
+	isConfigured := !utils.IsWalArchivingDisabled(&fullStatus.Cluster.ObjectMeta) &&
+		((fullStatus.Cluster.Spec.Backup != nil &&
+			fullStatus.Cluster.Spec.Backup.BarmanObjectStore != nil) ||
+			pluginEnabled)
 	status.AddLine("Working WAL archiving:",
-		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL))
+		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL, isConfigured))
 	status.AddLine("WALs waiting to be archived:", primaryInstanceStatus.ReadyWALFiles)
 
 	if primaryInstanceStatus.LastArchivedWAL == "" {
@@ -648,8 +653,10 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 	}
 }
 
-func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
+func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string, isArchivingConfigured bool) string {
 	switch {
+	case !isArchivingConfigured:
+		return aurora.Yellow("Disabled").String()
 	case isArchivingWAL:
 		return aurora.Green("OK").String()
 	case lastFailedWAL != "":
