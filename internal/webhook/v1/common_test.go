@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -83,7 +82,7 @@ type fakeCustomValidator struct {
 
 func (f *fakeCustomValidator) ValidateCreate(
 	_ context.Context,
-	_ runtime.Object,
+	_ *apiv1.Cluster,
 ) (admission.Warnings, error) {
 	f.calls = append(f.calls, "create")
 	return f.createWarnings, f.createError
@@ -91,8 +90,8 @@ func (f *fakeCustomValidator) ValidateCreate(
 
 func (f *fakeCustomValidator) ValidateUpdate(
 	_ context.Context,
-	_ runtime.Object,
-	_ runtime.Object,
+	_ *apiv1.Cluster,
+	_ *apiv1.Cluster,
 ) (admission.Warnings, error) {
 	f.calls = append(f.calls, "update")
 	return f.updateWarnings, f.updateError
@@ -100,7 +99,7 @@ func (f *fakeCustomValidator) ValidateUpdate(
 
 func (f *fakeCustomValidator) ValidateDelete(
 	_ context.Context,
-	_ runtime.Object,
+	_ *apiv1.Cluster,
 ) (admission.Warnings, error) {
 	f.calls = append(f.calls, "delete")
 	return f.deleteWarnings, f.deleteError
@@ -124,7 +123,7 @@ var _ = Describe("Bypassable validator", func() {
 	DescribeTable(
 		"validator callbacks",
 		func(ctx SpecContext, c *apiv1.Cluster, expectedError, withWarnings bool) {
-			b := newBypassableValidator(fakeErrorValidator)
+			b := newBypassableValidator[*apiv1.Cluster](fakeErrorValidator)
 
 			By("creation entrypoint", func() {
 				result, err := b.ValidateCreate(ctx, c)
