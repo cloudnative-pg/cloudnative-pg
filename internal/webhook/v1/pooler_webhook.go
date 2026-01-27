@@ -26,11 +26,9 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -99,8 +97,8 @@ var poolerLog = log.WithName("pooler-resource").WithValues("version", "v1")
 
 // SetupPoolerWebhookWithManager registers the webhook for Pooler in the manager.
 func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Pooler{}).
-		WithValidator(newBypassableValidator(&PoolerCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Pooler{}).
+		WithValidator(newBypassableValidator[*apiv1.Pooler](&PoolerCustomValidator{})).
 		Complete()
 }
 
@@ -113,14 +111,8 @@ func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
 // when it is created, updated, or deleted.
 type PoolerCustomValidator struct{}
 
-var _ webhook.CustomValidator = &PoolerCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
-func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pooler, ok := obj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object but got %T", obj)
-	}
+func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, pooler *apiv1.Pooler) (admission.Warnings, error) {
 	poolerLog.Info("Validation for Pooler upon creation", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	warns := v.getAdmissionWarnings(pooler)
@@ -161,18 +153,8 @@ func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
 func (v *PoolerCustomValidator) ValidateUpdate(
 	_ context.Context,
-	oldObj, newObj runtime.Object,
+	_ *apiv1.Pooler, pooler *apiv1.Pooler,
 ) (admission.Warnings, error) {
-	pooler, ok := newObj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object for the newObj but got %T", newObj)
-	}
-
-	_, ok = oldObj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object for the oldObj but got %T", oldObj)
-	}
-
 	poolerLog.Info("Validation for Pooler upon update", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	warns := v.getAdmissionWarnings(pooler)
@@ -190,11 +172,7 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pooler.
-func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pooler, ok := obj.(*apiv1.Pooler)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pooler object but got %T", obj)
-	}
+func (v *PoolerCustomValidator) ValidateDelete(_ context.Context, pooler *apiv1.Pooler) (admission.Warnings, error) {
 	poolerLog.Info("Validation for Pooler upon deletion", "name", pooler.GetName(), "namespace", pooler.GetNamespace())
 
 	// TODO(user): fill in your validation logic upon object deletion.
