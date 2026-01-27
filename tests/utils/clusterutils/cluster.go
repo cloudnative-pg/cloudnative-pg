@@ -209,6 +209,22 @@ func GetReplicas(
 	return podList, err
 }
 
+// GetFirstReplica gets the first replica pod from a cluster
+func GetFirstReplica(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace, clusterName string,
+) (*corev1.Pod, error) {
+	podList, err := GetReplicas(ctx, crudClient, namespace, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	if len(podList.Items) == 0 {
+		return nil, fmt.Errorf("no replicas found")
+	}
+	return &podList.Items[0], nil
+}
+
 // ScaleSize scales a cluster to the requested size
 func ScaleSize(
 	ctx context.Context,
