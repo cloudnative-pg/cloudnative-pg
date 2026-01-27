@@ -1920,7 +1920,7 @@ func (in *ManagedServices) DeepCopyInto(out *ManagedServices) {
 	*out = *in
 	if in.DisabledDefaultServices != nil {
 		in, out := &in.DisabledDefaultServices, &out.DisabledDefaultServices
-		*out = make([]ServiceSelectorType, len(*in))
+		*out = make([]DisabledDefaultServiceSelectorType, len(*in))
 		copy(*out, *in)
 	}
 	if in.Additional != nil {
