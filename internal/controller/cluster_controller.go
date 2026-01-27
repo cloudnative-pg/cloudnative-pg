@@ -53,6 +53,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -93,6 +95,7 @@ type ClusterReconciler struct {
 
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
+	admission      *guard.Admission
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -114,6 +117,10 @@ func NewClusterReconciler(
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
 		drainTaints: drainTaints,
+		admission: &guard.Admission{
+			Defaulter: &webhookv1.ClusterCustomDefaulter{},
+			Validator: &webhookv1.ClusterCustomValidator{},
+		},
 	}
 }
 
@@ -290,6 +297,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	err := r.removeConditionsWithInvalidReason(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Apply defaults and validation (provides resilience when webhooks fail)
+	if result, err := r.admission.EnsureResourceIsAdmitted(ctx, guard.AdmissionParams{
+		Object:       cluster,
+		Client:       r.Client,
+		ApplyChanges: true,
+	}); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// Make sure default values are populated.

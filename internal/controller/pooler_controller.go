@@ -43,6 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 )
 
 // PoolerReconciler reconciles a Pooler object
@@ -51,6 +53,7 @@ type PoolerReconciler struct {
 	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
+	admission       *guard.Admission
 }
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
@@ -78,6 +81,18 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
 	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams{
+			Object:       &pooler,
+			Client:       r.Client,
+			ApplyChanges: true,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
+	}
+
 
 	// We make sure that there isn't a cluster with the same name as the pooler
 	conflictingCluster, err := getClusterOrNil(ctx, r.Client, req.NamespacedName)
@@ -329,4 +344,22 @@ func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (req
 		}
 	}
 	return requests
+}
+
+// NewPoolerReconciler creates a new PoolerReconciler
+func NewPoolerReconciler(
+	client client.Client,
+	discoveryClient discovery.DiscoveryInterface,
+	scheme *runtime.Scheme,
+	recorder record.EventRecorder,
+) *PoolerReconciler {
+	return &PoolerReconciler{
+		Client:          client,
+		DiscoveryClient: discoveryClient,
+		Scheme:          scheme,
+		Recorder:        recorder,
+		admission: &guard.Admission{
+			Validator: &webhookv1.PoolerCustomValidator{},
+		},
+	}
 }

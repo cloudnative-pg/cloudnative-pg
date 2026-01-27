@@ -245,21 +245,21 @@ func RunController(
 		return err
 	}
 
-	if err = (&controller.ScheduledBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
-	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
+	if err = controller.NewScheduledBackupReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
+	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
 	}
 
-	if err = (&controller.PoolerReconciler{
-		Client:          mgr.GetClient(),
-		DiscoveryClient: discoveryClient,
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
-	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+	if err = controller.NewPoolerReconciler(
+		mgr.GetClient(),
+		discoveryClient,
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
+	).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}
@@ -408,7 +408,7 @@ func ensurePKI(
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
 	}
-	err := pkiConfig.Setup(ctx, kubeClient)
+	err := pkiConfig.Setup(ctx, kubeClient, conf.EnableWebhooks)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
