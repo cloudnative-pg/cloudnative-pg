@@ -118,7 +118,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
-        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8
+        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: Public Cloud K8S versions update"
