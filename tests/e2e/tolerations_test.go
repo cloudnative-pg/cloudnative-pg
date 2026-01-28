@@ -30,8 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Set of tests in which we check that the operator is able to failover primary and brings back
-// replicas when we drain node
+// Set of tests in which we verify that Cluster's pods can be scheduled on tainted nodes
+// when proper tolerations are configured
 var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, tests.LabelPodScheduling), func() {
 	var taintedNodes []string
 	var namespace string
