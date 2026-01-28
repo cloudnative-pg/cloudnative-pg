@@ -749,13 +749,13 @@ func (instance *Instance) buildPostgresEnv() []string {
 	envMap["PG_OOM_ADJUST_FILE"] = "/proc/self/oom_score_adj"
 	envMap["PG_OOM_ADJUST_VALUE"] = "0"
 
-	if instance.Cluster == nil {
+	if instance.Cluster == nil || instance.Cluster.Status.PGDataImageInfo == nil {
 		return envMap.StringSlice()
 	}
 
 	// If there are no additional library paths, we use the environment variables
 	// of the current process
-	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Spec.PostgresConfiguration.Extensions)
+	additionalLibraryPaths := collectLibraryPaths(instance.Cluster.Status.PGDataImageInfo.Extensions)
 	if len(additionalLibraryPaths) == 0 {
 		return envMap.StringSlice()
 	}

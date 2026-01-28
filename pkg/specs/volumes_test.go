@@ -528,6 +528,21 @@ var _ = Describe("ImageVolume Extensions", func() {
 	var cluster apiv1.Cluster
 
 	BeforeEach(func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+			},
+			{
+				Name: "bar",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "bar:dev",
+				},
+			},
+		}
+
 		cluster = apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster-example",
@@ -535,20 +550,12 @@ var _ = Describe("ImageVolume Extensions", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Extensions: []apiv1.ExtensionConfiguration{
-						{
-							Name: "foo",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "foo:dev",
-							},
-						},
-						{
-							Name: "bar",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "bar:dev",
-							},
-						},
-					},
+					Extensions: extensionsConfig,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Extensions: extensionsConfig,
 				},
 			},
 		}
@@ -558,6 +565,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 		When("Extensions are disabled", func() {
 			It("shouldn't create Volumes", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 				extensionVolumes := createExtensionVolumes(&cluster)
 				Expect(extensionVolumes).To(BeEmpty())
 			})
@@ -578,6 +586,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 		When("Extensions are disabled", func() {
 			It("shouldn't create VolumeMounts", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
 				Expect(extensionVolumeMounts).To(BeEmpty())
 			})
