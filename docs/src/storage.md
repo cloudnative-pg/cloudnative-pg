@@ -346,7 +346,7 @@ cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
 
-For recreating the PVC's on a new storageClass edit the cluster definition to include it:
+For recreating the PVCs on a new storageClass, edit the cluster definition to include it:
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
