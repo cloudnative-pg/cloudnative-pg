@@ -153,7 +153,7 @@ spec:
     storageClass: standard
     size: 1Gi
 ```
-You can update the storageClass by [Re-creating the PVC's](#Re-creating-storage)
+You can update the storageClass by [Re-creating the PVCs](#Re-creating-storage)
 
 
 ## Configuration via a PVC template
