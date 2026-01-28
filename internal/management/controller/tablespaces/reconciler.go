@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // Reconcile is the main reconciliation loop for the instance
@@ -91,13 +92,41 @@ func (r *TablespaceReconciler) Reconcile(
 	return reconcile.Result{}, nil
 }
 
+func arePVCsForTablespaceHealthy(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	tablespaceName string,
+) bool {
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
+
+	healthyPVCs := cluster.Status.HealthyPVC
+	isPVCHealthy := make(map[string]bool)
+	for _, pvc := range healthyPVCs {
+		isPVCHealthy[pvc] = true
+	}
+	instanceNames := cluster.Status.InstanceNames
+
+	for _, instance := range instanceNames {
+		pvcNameForTablespace := specs.PvcNameForTablespace(instance, tablespaceName)
+		if !isPVCHealthy[pvcNameForTablespace] {
+			contextLog.Warning("pvc unhealthy for tablespace",
+				"pvcName", pvcNameForTablespace,
+				"instance", instance,
+				"tablespace", tablespaceName)
+			return false
+		}
+	}
+
+	return true
+}
+
 func (r *TablespaceReconciler) reconcile(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (*reconcile.Result, error) {
 	superUserDB, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		return nil, fmt.Errorf("while reconcile tablespaces: %w", err)
+		return nil, fmt.Errorf("while reconciling tablespaces: %w", err)
 	}
 
 	tbsInDatabase, err := infrastructure.List(ctx, superUserDB)
@@ -105,11 +134,16 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
 
+	pvcChecker := func(tablespace string) bool {
+		return arePVCsForTablespaceHealthy(ctx, cluster, tablespace)
+	}
+
 	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	result := r.applySteps(
 		ctx,
 		superUserDB,
 		steps,
+		pvcChecker,
 	)
 
 	// update the cluster status
@@ -135,11 +169,12 @@ func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	db *sql.DB,
 	actions []tablespaceReconcilerStep,
+	pvcChecker func(tablespace string) bool,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		result[idx] = step.execute(ctx, db, r.storageManager)
+		result[idx] = step.execute(ctx, db, r.storageManager, pvcChecker)
 	}
 
 	return result
