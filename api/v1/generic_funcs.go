@@ -21,14 +21,13 @@ package v1
 
 import (
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 type managedResourceComparer interface {
 	GetName() string
 	GetManagedObjectName() string
-	GetClusterRef() corev1.LocalObjectReference
+	GetClusterRef() ClusterObjectReference
+	GetClusterNamespace() string
 	HasReconciliations() bool
 }
 
@@ -38,7 +37,12 @@ func ensureManagedResourceExclusivity[T managedResourceComparer](t1 T, list []T)
 			continue
 		}
 
+		// Check if both resources reference the same cluster (name and namespace)
 		if t1.GetClusterRef().Name != t2.GetClusterRef().Name {
+			continue
+		}
+
+		if t1.GetClusterNamespace() != t2.GetClusterNamespace() {
 			continue
 		}
 
