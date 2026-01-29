@@ -22,6 +22,16 @@ package v1
 // VolumeSnapshotKind this is a strongly typed reference to the kind used by the volumesnapshot package
 const VolumeSnapshotKind = "VolumeSnapshot"
 
+// ClusterObjectReference references a Cluster, optionally in a different namespace.
+type ClusterObjectReference struct {
+	// Name of the Cluster.
+	Name string `json:"name"`
+
+	// Namespace of the Cluster. Defaults to the Database's namespace if empty.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // Metadata is a structure similar to the metav1.ObjectMeta, but still
 // parseable by controller-gen to create a suitable CRD for the user.
 // The comment of PodTemplateSpec has an explanation of why we are

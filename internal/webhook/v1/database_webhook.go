@@ -111,8 +111,20 @@ func (v *DatabaseCustomValidator) ValidateUpdate(
 		database.Name, allErrs)
 }
 
-func (v *DatabaseCustomValidator) validateDatabaseChanges(_ *apiv1.Database, _ *apiv1.Database) field.ErrorList {
-	return nil
+func (v *DatabaseCustomValidator) validateDatabaseChanges(newDB, oldDB *apiv1.Database) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Prevent changing cluster.namespace after creation
+	if oldDB.Spec.ClusterRef.Namespace != "" &&
+		newDB.Spec.ClusterRef.Namespace != oldDB.Spec.ClusterRef.Namespace {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "cluster", "namespace"),
+			newDB.Spec.ClusterRef.Namespace,
+			"cluster.namespace is immutable once set",
+		))
+	}
+
+	return allErrs
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Database .

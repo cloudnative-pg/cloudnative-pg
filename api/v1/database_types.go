@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -60,7 +59,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type DatabaseSpec struct {
 	// The name of the PostgreSQL cluster hosting the database.
-	ClusterRef corev1.LocalObjectReference `json:"cluster"`
+	ClusterRef ClusterObjectReference `json:"cluster"`
 
 	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present".
 	// +kubebuilder:default:="present"
