@@ -25,7 +25,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -52,7 +51,7 @@ var _ = Describe("Managed Database SQL", func() {
 				Name: "db-one",
 			},
 			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
+				ClusterRef: apiv1.ClusterObjectReference{
 					Name: "cluster-example",
 				},
 				Name:  "db-one",
