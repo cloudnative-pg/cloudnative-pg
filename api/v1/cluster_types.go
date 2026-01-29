@@ -504,6 +504,13 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
+
+	// EnableCrossNamespaceDatabases enables this cluster to manage Database
+	// resources from other namespaces. When enabled, a ClusterRole and
+	// ClusterRoleBinding are created to grant cross-namespace access.
+	// +kubebuilder:default:=false
+	// +optional
+	EnableCrossNamespaceDatabases bool `json:"enableCrossNamespaceDatabases,omitempty"`
 }
 
 // ProbesConfiguration represent the configuration for the probes
