@@ -2146,6 +2146,13 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              enableCrossNamespaceDatabases:
+                default: false
+                description: |-
+                  EnableCrossNamespaceDatabases enables this cluster to manage Database
+                  resources from other namespaces. When enabled, a ClusterRole and
+                  ClusterRoleBinding are created to grant cross-namespace access.
+                type: boolean
               enablePDB:
                 default: true
                 description: |-
