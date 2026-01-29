@@ -606,6 +606,24 @@ _Appears in:_
 | `enabled` _boolean_ | Enable TLS for the monitoring endpoint.<br />Changing this option will force a rollout of all instances. |  | false |  |
 
 
+#### ClusterObjectReference
+
+
+
+ClusterObjectReference references a Cluster, optionally in a different namespace.
+
+
+
+_Appears in:_
+
+- [DatabaseSpec](#databasespec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the Cluster. | True |  |  |
+| `namespace` _string_ | Namespace of the Cluster. Defaults to the Database's namespace if empty. |  |  |  |
+
+
 #### ClusterSpec
 
 
@@ -676,6 +694,7 @@ _Appears in:_
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
 | `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
+| `enableCrossNamespaceDatabases` _boolean_ | EnableCrossNamespaceDatabases enables this cluster to manage Database<br />resources from other namespaces. When enabled, a ClusterRole and<br />ClusterRoleBinding are created to grant cross-namespace access. |  | false |  |
 
 
 #### ClusterStatus
@@ -1037,7 +1056,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The name of the PostgreSQL cluster hosting the database. | True |  |  |
+| `cluster` _[ClusterObjectReference](#clusterobjectreference)_ | The name of the PostgreSQL cluster hosting the database. | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the PostgreSQL database is `present` or `absent` - defaults to "present". |  | present | Enum: [present absent] <br /> |
 | `name` _string_ | The name of the database to create inside PostgreSQL. This setting cannot be changed. | True |  |  |
 | `owner` _string_ | Maps to the `OWNER` parameter of `CREATE DATABASE`.<br />Maps to the `OWNER TO` command of `ALTER DATABASE`.<br />The role name of the user who owns the database inside PostgreSQL. | True |  |  |
