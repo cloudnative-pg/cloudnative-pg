@@ -21,6 +21,9 @@ spec:
     - jsonPath: .spec.cluster.name
       name: Cluster
       type: string
+    - jsonPath: .spec.cluster.namespace
+      name: Cluster Namespace
+      type: string
     - jsonPath: .spec.name
       name: PG Name
       type: string

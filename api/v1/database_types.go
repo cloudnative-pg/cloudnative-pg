@@ -374,6 +374,7 @@ type DatabaseObjectStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
+// +kubebuilder:printcolumn:name="Cluster Namespace",type="string",JSONPath=".spec.cluster.namespace"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
