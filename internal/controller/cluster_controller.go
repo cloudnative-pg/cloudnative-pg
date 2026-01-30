@@ -1620,7 +1620,8 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 // It resolves the cluster reference by name instead of through an owner reference.
 func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []reconcile.Request {
 	owned, ok := obj.(interface {
-		GetClusterRef() corev1.LocalObjectReference
+		GetClusterRef() apiv1.ClusterObjectReference
+		GetClusterNamespace() string
 	})
 	if !ok {
 		return nil
@@ -1633,7 +1634,7 @@ func mapClusterOwnedResourceToCluster(_ context.Context, obj client.Object) []re
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
+				Namespace: owned.GetClusterNamespace(),
 				Name:      clusterName,
 			},
 		},

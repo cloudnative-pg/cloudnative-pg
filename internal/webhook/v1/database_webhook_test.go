@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -318,5 +319,130 @@ var _ = Describe("Database validation", func() {
 			"spec.servers[0].usages[1].name":  "dup_usage",
 			"spec.servers[1].name":            "server1",
 		})
+	})
+})
+
+var _ = Describe("Database namespace immutability validation", func() {
+	var v *DatabaseCustomValidator
+
+	BeforeEach(func() {
+		v = &DatabaseCustomValidator{}
+	})
+
+	It("allows update when cluster.namespace is unchanged", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.Owner = "new-owner" // Change something else
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows update when cluster.namespace was empty and remains empty", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.Owner = "new-owner"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows setting cluster.namespace when it was previously empty", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = "cluster-namespace"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("rejects changing cluster.namespace once it is set", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "original-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = "different-namespace"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(errs[0].Detail).To(ContainSubstring("immutable"))
+	})
+
+	It("rejects clearing cluster.namespace once it is set", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "original-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = ""
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
 	})
 })
