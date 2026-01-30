@@ -20,10 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -444,5 +448,154 @@ var _ = Describe("Database namespace immutability validation", func() {
 		errs := v.validateDatabaseChanges(newDB, oldDB)
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+	})
+})
+
+var _ = Describe("Database cross-namespace validation", func() {
+	var ctx context.Context
+
+	BeforeEach(func() {
+		ctx = context.Background()
+	})
+
+	It("allows same-namespace Database without checking cluster", func() {
+		v := &DatabaseCustomValidator{}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+					// No namespace specified, defaults to same namespace
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows cross-namespace Database when cluster has EnableCrossNamespaceDatabases=true", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:                     1,
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("rejects cross-namespace Database when cluster has EnableCrossNamespaceDatabases=false", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:                     1,
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(errs[0].Detail).To(ContainSubstring("enableCrossNamespaceDatabases"))
+	})
+
+	It("rejects cross-namespace Database when cluster does not exist", func() {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "non-existent-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeNotFound))
+	})
+
+	It("skips validation when client is nil (unit test mode)", func() {
+		v := &DatabaseCustomValidator{client: nil}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
 	})
 })
