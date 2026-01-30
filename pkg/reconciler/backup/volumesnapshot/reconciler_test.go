@@ -716,3 +716,94 @@ var _ = Describe("unmarshalMetadata", func() {
 		Expect(data).To(BeNil())
 	})
 })
+
+var _ = Describe("createSnapshot AlreadyExists handling", func() {
+	var (
+		ctx       context.Context
+		backup    *apiv1.Backup
+		cluster   *apiv1.Cluster
+		targetPod *corev1.Pod
+		pvc       *corev1.PersistentVolumeClaim
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-backup",
+			},
+			Status: apiv1.BackupStatus{
+				StartedAt: ptr.To(metav1.Now()),
+			},
+		}
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
+						ClassName: "csi-hostpath-snapclass",
+					},
+				},
+			},
+		}
+		targetPod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-pod",
+			},
+		}
+		pvc = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-pvc",
+				Labels: map[string]string{
+					utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+				},
+			},
+		}
+	})
+
+	buildClient := func(createErr error) k8client.Client {
+		return fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(
+					ctx context.Context,
+					c k8client.WithWatch,
+					obj k8client.Object,
+					opts ...k8client.CreateOption,
+				) error {
+					if _, ok := obj.(*volumesnapshotv1.VolumeSnapshot); ok && createErr != nil {
+						return createErr
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+			}).
+			Build()
+	}
+
+	It("should succeed when Create returns AlreadyExists", func() {
+		gr := schema.GroupResource{Group: volumesnapshotv1.GroupName, Resource: "volumesnapshots"}
+		snapName := persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name)
+		alreadyExistsErr := apierrs.NewAlreadyExists(gr, snapName)
+
+		cli := buildClient(alreadyExistsErr)
+		reconciler := NewReconcilerBuilder(cli, record.NewFakeRecorder(3)).Build()
+
+		err := reconciler.createSnapshot(ctx, cluster, backup, targetPod, pvc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should fail when Create returns a non-AlreadyExists error", func() {
+		cli := buildClient(fmt.Errorf("simulated transient error"))
+		reconciler := NewReconcilerBuilder(cli, record.NewFakeRecorder(3)).Build()
+
+		err := reconciler.createSnapshot(ctx, cluster, backup, targetPod, pvc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("simulated transient error"))
+	})
+})
