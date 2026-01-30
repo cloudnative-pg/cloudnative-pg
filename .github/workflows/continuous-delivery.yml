@@ -381,6 +381,7 @@ jobs:
         uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
         id: bake-push
         env:
+          BUILDX_METADATA_PROVENANCE: disabled
           environment: "testing"
           buildVersion: ${{ env.VERSION }}
           tag: ${{ env.IMAGE_TAG }}
