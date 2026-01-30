@@ -32,7 +32,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
-	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -158,7 +157,7 @@ func markAsReady(
 // object reference.
 type clusterScopedResource interface {
 	client.Object
-	GetClusterRef() corev1.LocalObjectReference
+	GetClusterRef() apiv1.ClusterObjectReference
 }
 
 // mapClusterToManagedResources builds a watch mapper that enqueues every item
