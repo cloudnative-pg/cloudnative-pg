@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -502,7 +503,22 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	if err := se.cli.Create(ctx, &snapshot); err != nil {
-		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+		// If creation fails, check whether the snapshot was actually created.
+		// Some CSI drivers (e.g. OCI) may return transient errors (like 409 Conflict)
+		// even though the underlying operation succeeded.
+		var existingSnapshot volumesnapshotv1.VolumeSnapshot
+		if errGet := se.cli.Get(ctx, client.ObjectKeyFromObject(&snapshot), &existingSnapshot); errGet != nil {
+			if apierrs.IsNotFound(errGet) {
+				return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+			}
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w (and while getting it: %v)", snapshot.Name, err, errGet)
+		}
+
+		if len(existingSnapshot.UID) == 0 {
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w (snapshot exists but has no UID)", snapshot.Name, err)
+		}
+
+		// The snapshot exists and has a UID, so we consider it created
 	}
 
 	return nil
