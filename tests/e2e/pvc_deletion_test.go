@@ -150,7 +150,6 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 				Expect(err).ToNot(HaveOccurred())
 			}
 
-			// Deleting primary pod
 			err = podutils.Delete(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
