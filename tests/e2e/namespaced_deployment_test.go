@@ -23,8 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -53,30 +51,27 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 	)
 
 	BeforeAll(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+
 		if IsOpenshift() {
 			Skip("This test case is not applicable on OpenShift clusters")
 		}
 
-		By("verifying operator is deployed", func() {
-			var deployment appsv1.Deployment
-			err := env.Client.Get(env.Ctx, types.NamespacedName{
-				Namespace: operatorNamespace,
-				Name:      "cnpg-controller-manager",
-			}, &deployment)
-			Expect(err).NotTo(HaveOccurred(), "operator must be deployed")
-		})
-
-		namespaced.ConfigureNamespacedDeployment(env, operatorNamespace)
+		namespaced.ConfigureNamespacedDeployment(env, operatorNamespace, uint(testTimeouts[timeouts.OperatorIsReady]))
 	})
 
 	AfterAll(func() {
-		namespaced.RevertNamespacedDeployment(env, operatorNamespace)
-	})
+		By("deleting cluster", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
+			if err == nil {
+				err = env.Client.Delete(env.Ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
 
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
+		namespaced.RevertNamespacedDeployment(env, operatorNamespace, uint(testTimeouts[timeouts.OperatorIsReady]))
 	})
 
 	AfterEach(func() {
