@@ -96,6 +96,11 @@ var _ = Describe("getWalArchivingStatus", func() {
 		Expect(result).To(ContainSubstring("Failing"))
 	})
 
+	It("should return 'OK' even when there is a failed WAL if archiving is working", func() {
+		result := getWalArchivingStatus(true, "000000010000000000000001", false)
+		Expect(result).To(ContainSubstring("OK"))
+	})
+
 	It("should return 'Starting Up' when archiving hasn't started yet", func() {
 		result := getWalArchivingStatus(false, "", false)
 		Expect(result).To(ContainSubstring("Starting Up"))

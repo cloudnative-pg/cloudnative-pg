@@ -630,7 +630,6 @@ func (fullStatus *PostgresqlStatus) printWALArchivingStatus(status *tabby.Tabby)
 		status.AddLine("No Primary instance found")
 		return
 	}
-	// Check if WAL archiving is disabled via annotation
 	isWalArchivingDisabled := fullStatus.Cluster != nil &&
 		utils.IsWalArchivingDisabled(&fullStatus.Cluster.ObjectMeta)
 
