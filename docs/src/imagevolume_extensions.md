@@ -137,7 +137,7 @@ spec:
 
 The `name` field is **mandatory** and **must be unique within the cluster**, as
 it determines the mount path (`/extensions/foo` in this example). It must
-consist of *lowercase alphanumeric characters or hyphens (`-`)* and must start
+consist of *lowercase alphanumeric characters, underscores (`_`) or hyphens (`-`)* and must start
 and end with an alphanumeric character.
 
 The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).
