@@ -135,9 +135,10 @@ If the upgrade is successful, CloudNativePG:
 :::warning
     Re-cloning replicas can be time-consuming, especially for very large
     databases. Plan accordingly to accommodate potential delays. After completing
-    the upgrade, it is strongly recommended to take a full backup. Existing backup
-    data (namely base backups and WAL files) is only available for the previous
-    minor PostgreSQL release.
+    the upgrade, take a new base backup as soon as possible. Pre-upgrade backups
+    and WAL files cannot be used for point-in-time recovery (PITR) across major
+    version boundaries. See [Backup and WAL Archive Considerations](#backup-and-wal-archive-considerations)
+    for more details.
 :::
 
 :::warning
@@ -154,6 +155,72 @@ automatically decide the rollback.
     is modified during the upgrade. If the upgrade fails, a rollback is
     usually possible, without having to perform a full recovery from a backup.
     Ensure you monitor the process closely and take corrective action if needed.
+:::
+
+### Backup and WAL Archive Considerations
+
+When performing a major upgrade, `pg_upgrade` creates a new database system
+with a new System ID and resets the PostgreSQL timeline to 1. This has
+implications for backup and WAL archiving:
+
+- **Timeline file conflicts**: New timeline 1 files may overwrite timeline 1
+  files from the original cluster.
+- **Mixed version archives**: Without intervention, the archive will contain
+  WAL files and backups from both PostgreSQL versions.
+
+:::warning
+Point-in-time recovery (PITR) is not supported across major PostgreSQL version
+boundaries. You cannot use pre-upgrade backups to recover to a point in time
+after the upgrade. Take a new base backup as soon as possible after upgrading
+to establish a recovery baseline for the new major version.
+:::
+
+How backup systems handle major upgrades depends on the plugin implementation.
+Some plugins may automatically manage archive separation during upgrades, while
+others require manual configuration to use different archive paths for each
+major version. Consult your backup plugin documentation for its specific
+behavior during major upgrades.
+
+**Example: Manual archive path separation with plugin-barman-cloud**
+
+The `plugin-barman-cloud` backup plugin does not automatically separate
+archives during major upgrades. To preserve pre-upgrade backups and keep
+archives clean, change the `serverName` parameter when you trigger the upgrade.
+
+Before upgrade (PostgreSQL 16):
+
+```yaml
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
+  plugins:
+    - name: plugin-barman-cloud
+      enabled: true
+      parameters:
+        destinationPath: s3://my-bucket/
+        serverName: cluster-example-pg16
+```
+
+To trigger the upgrade, change both `imageName` and `serverName` together:
+
+```yaml
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+  plugins:
+    - name: plugin-barman-cloud
+      enabled: true
+      parameters:
+        destinationPath: s3://my-bucket/
+        serverName: cluster-example-pg17
+```
+
+With this configuration, the old archive at `cluster-example-pg16` remains
+intact for pre-upgrade recovery, while the upgraded cluster writes to
+`cluster-example-pg17`.
+
+:::info
+The deprecated in-tree `barmanObjectStore` implementation also requires manual
+`serverName` changes to separate archives during major upgrades. Consider
+migrating to backup plugins for better flexibility and ongoing support.
 :::
 
 ### Example: Performing a Major Upgrade
