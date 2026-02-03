@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Limit to the specified engines list (eks, aks, gke, kind, ocp)'
+        description: 'Limit to the specified engines list (eks, aks, gke, kind, k3d, ocp)'
         required: false
 
 permissions: read-all
@@ -103,6 +103,20 @@ jobs:
             echo "${v}"
           done | jq -Rs 'split("\n") | map(select(length>0)) | sort | reverse' | tee .github/kind_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'kind'
+      -
+        name: Get updated k3d versions
+        run: |
+          # Get the latest valid k3d image versions from Docker Hub
+          # k3d uses rancher/k3s images, extract Kubernetes version only
+          for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
+            URL="https://registry.hub.docker.com/v2/repositories/rancher/k3s/tags?name=${baseversion}&ordering=last_updated"
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+-k3s[0-9]+$" | sort -Vr | head -n1 | sed 's/-k3s.*//' ) || RC=$?
+            if [[ -z "${v}" ]]; then
+               break
+            fi
+            echo "${v}"
+          done | jq -Rs 'split("\n") | map(select(length>0)) | sort | reverse' | tee .github/k3d_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'k3d'
       -
         name: Get updated OpenShift versions
         run: |
