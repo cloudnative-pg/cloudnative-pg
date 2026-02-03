@@ -1,9 +1,6 @@
 processor:
   ignoreGroupVersions:
     - "GVK"
-  customMarkers:
-    - name: "optional"
-      target: field
   ignoreFields:
 #    - "status$"
     - "TypeMeta$"
