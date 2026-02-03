@@ -134,6 +134,9 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
 
+e2e-test-k3d: ## Run e2e tests locally using K3D.
+	hack/e2e/run-e2e-k3d.sh
+
 e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
 	hack/e2e/run-e2e-local.sh
 
