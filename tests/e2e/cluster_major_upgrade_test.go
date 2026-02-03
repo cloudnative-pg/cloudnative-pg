@@ -326,6 +326,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		}
 	}
 
+	verifyTimelineResetAfterUpgrade := func(ctx context.Context, client client.Client, cluster *apiv1.Cluster) {
+		currentCluster, err := clusterutils.Get(ctx, client, cluster.Namespace, cluster.Name)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(currentCluster.Status.TimelineID).To(Equal(1))
+	}
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -352,6 +358,17 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		Expect(err).NotTo(HaveOccurred())
 		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady],
 			env)
+
+		By("Performing switchover to move to timeline 2")
+		AssertSwitchover(cluster.Namespace, cluster.Name, env)
+
+		By("Verifying cluster is on timeline 2 before upgrade")
+		Eventually(func(g Gomega) {
+			currentCluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(currentCluster.Status.TimelineID).To(Equal(2))
+		}).WithTimeout(time.Duration(testTimeouts[timeouts.NewPrimaryAfterSwitchover]) * time.Second).
+			WithPolling(5 * time.Second).Should(Succeed())
 
 		By("Collecting the pods UUIDs")
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, cluster.Name, cluster.Namespace)
@@ -419,6 +436,9 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		// Check that the version has been updated
 		By("Verifying the cluster is running the target version")
 		verifyPostgresVersion(env, primary, oldStdOut, scenario.targetMajor)
+
+		By("Verifying timeline ID is reset to 1 after major upgrade")
+		verifyTimelineResetAfterUpgrade(env.Ctx, env.Client, cluster)
 
 		// Expect temporary files to be deleted
 		By("Checking no leftovers exist from the upgrade")
