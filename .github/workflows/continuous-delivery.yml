@@ -908,7 +908,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.5
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
@@ -1266,7 +1266,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.5
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
@@ -1654,7 +1654,7 @@ jobs:
           max_attempts: 3
           command: |
             # renovate: datasource=github-releases depName=onsi/ginkgo
-            go install github.com/onsi/ginkgo/v2/ginkgo@v2.27.5
+            go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         name: Set cluster name
         run: |
