@@ -33,6 +33,7 @@ EKS_VERSIONS_FILE = ".github/eks_versions.json"
 GKE_VERSIONS_FILE = ".github/gke_versions.json"
 OPENSHIFT_VERSIONS_FILE = ".github/openshift_versions.json"
 KIND_VERSIONS_FILE = ".github/kind_versions.json"
+K3D_VERSIONS_FILE = ".github/k3d_versions.json"
 VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
 
@@ -113,6 +114,17 @@ try:
 except:
     print(f"Failed opening file: {KIND_VERSIONS_FILE}")
     exit(1)
+
+# Kubernetes versions on k3d to use during the tests
+try:
+    with open(K3D_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        k3d_versions = filter_version(version_list, SUPPORT_K8S_VERSION["K3D"])
+    K3D_K8S = VersionList(k3d_versions)
+except:
+    print(f"Failed opening file: {K3D_VERSIONS_FILE}")
+    exit(1)
+
 
 # Kubernetes versions on EKS to use during the tests
 try:
@@ -283,6 +295,14 @@ ENGINE_MODES = {
         "workflow_dispatch": build_pull_request_include_local,
         "main": build_main_include_local,
         "schedule": build_schedule_include_local,
+    },
+    "k3d": {
+        "push": lambda: build_push_include_cloud(K3D_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(K3D_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(K3D_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(K3D_K8S),
+        "main": lambda: build_main_include_cloud(K3D_K8S),
+        "schedule": lambda: build_schedule_include_cloud(K3D_K8S),
     },
     "eks": {
         "push": lambda: build_push_include_cloud(EKS_K8S),
