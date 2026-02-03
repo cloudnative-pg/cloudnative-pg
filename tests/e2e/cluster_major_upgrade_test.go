@@ -44,8 +44,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -60,17 +62,20 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		postgisEntry           = "postgis"
 		postgresqlEntry        = "postgresql"
 		postgresqlMinimalEntry = "postgresql-minimal"
+		postgresqlSystemEntry  = "postgresql-system"
 
 		// custom registry envs
 		customPostgresImageRegistryEnvVar       = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
 		customPostgresImageStandardSuffixEnvVar = "POSTGRES_MAJOR_UPGRADE_STANDARD_SUFFIX"
 		customPostgresImageMinimalSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_MINIMAL_SUFFIX"
+		customPostgresImageSystemSuffixEnvVar   = "POSTGRES_MAJOR_UPGRADE_SYSTEM_SUFFIX"
 		customPostgresImagePostGISSuffixEnvVar  = "POSTGRES_MAJOR_UPGRADE_POSTGIS_SUFFIX"
 
 		// default suffixes used when overriding registry via env vars
 		// as defined by postgres-trunk-containers tests
 		defaultStandardSuffix = "-standard-trixie"
 		defaultMinimalSuffix  = "-minimal-trixie"
+		defaultSystemSuffix   = "-system-trixie"
 		defaultPostGISSuffix  = "-postgis-trixie"
 	)
 
@@ -82,8 +87,8 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	}
 	scenarios := map[string]*scenario{}
 
-	generateBaseCluster := func(namespace string, storageClass string) *apiv1.Cluster {
-		return &apiv1.Cluster{
+	generateBaseCluster := func(namespace string, storageClass string, enableBackup bool) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pg-major-upgrade",
 				Namespace: namespace,
@@ -117,10 +122,48 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 				},
 			},
 		}
+		if enableBackup {
+			cluster.Spec.Backup = &apiv1.BackupConfiguration{
+				Target: apiv1.BackupTargetPrimary,
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanCredentials: apiv1.BarmanCredentials{
+						AWS: &apiv1.S3Credentials{
+							AccessKeyIDReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "ID",
+							},
+							SecretAccessKeyReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "KEY",
+							},
+						},
+					},
+					DestinationPath: "s3://pg-major-upgrade/",
+					EndpointURL:     "https://minio-service.minio:9000",
+					EndpointCA: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "minio-server-ca-secret",
+						},
+						Key: "ca.crt",
+					},
+					Wal: &apiv1.WalBackupConfiguration{
+						Compression: "gzip",
+					},
+				},
+				RetentionPolicy: "30d",
+			}
+		}
+		return cluster
 	}
 
-	generatePostgreSQLCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
-		cluster := generateBaseCluster(namespace, storageClass)
+	generatePostgreSQLCluster := func(
+		namespace string, storageClass string, tagVersion string, enableBackup bool,
+	) *apiv1.Cluster {
+		cluster := generateBaseCluster(namespace, storageClass, enableBackup)
 		cluster.Spec.ImageName = env.OfficialStandardImageName(tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitSQL = []string{
 			"CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
@@ -130,14 +173,26 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		return cluster
 	}
 
-	generatePostgreSQLMinimalCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
-		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion)
+	generatePostgreSQLMinimalCluster := func(
+		namespace string, storageClass string, tagVersion string, enableBackup bool,
+	) *apiv1.Cluster {
+		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion, enableBackup)
 		cluster.Spec.ImageName = env.OfficialMinimalImageName(tagVersion)
 		return cluster
 	}
 
-	generatePostGISCluster := func(namespace string, storageClass string, tagVersion string) *apiv1.Cluster {
-		cluster := generateBaseCluster(namespace, storageClass)
+	generatePostgreSQLSystemCluster := func(
+		namespace string, storageClass string, tagVersion string, enableBackup bool,
+	) *apiv1.Cluster {
+		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion, enableBackup)
+		cluster.Spec.ImageName = env.OfficialSystemImageName(tagVersion)
+		return cluster
+	}
+
+	generatePostGISCluster := func(
+		namespace string, storageClass string, tagVersion string, enableBackup bool,
+	) *apiv1.Cluster {
+		cluster := generateBaseCluster(namespace, storageClass, enableBackup)
 		cluster.Spec.ImageName = env.PostGISImageName(tagVersion)
 		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
 			"CREATE EXTENSION postgis",
@@ -210,6 +265,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			postgisEntry:           env.PostGISImageName(targetTag),
 			postgresqlEntry:        env.StandardImageName(targetTag),
 			postgresqlMinimalEntry: env.MinimalImageName(targetTag),
+			postgresqlSystemEntry:  env.SystemImageName(targetTag),
 		}
 
 		// Set custom targets when detecting env variables (used by postgres-trunk-containers tests)
@@ -222,6 +278,10 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			if minimalSuffix == "" {
 				minimalSuffix = defaultMinimalSuffix
 			}
+			systemSuffix := os.Getenv(customPostgresImageSystemSuffixEnvVar)
+			if systemSuffix == "" {
+				systemSuffix = defaultSystemSuffix
+			}
 			postgisSuffix := os.Getenv(customPostgresImagePostGISSuffixEnvVar)
 			if postgisSuffix == "" {
 				postgisSuffix = defaultPostGISSuffix
@@ -229,6 +289,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 			targetImages[postgresqlEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, standardSuffix)
 			targetImages[postgresqlMinimalEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, minimalSuffix)
+			targetImages[postgresqlSystemEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, systemSuffix)
 			targetImages[postgisEntry] = fmt.Sprintf("%v:%v%s", envValue, targetTag, postgisSuffix)
 		}
 
@@ -242,23 +303,30 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 		return map[string]*scenario{
 			postgisEntry: {
-				startingCluster: generatePostGISCluster(namespace, storageClass, strconv.FormatUint(info.currentMajor, 10)),
+				startingCluster: generatePostGISCluster(namespace, storageClass, strconv.FormatUint(info.currentMajor, 10), false),
 				startingMajor:   int(info.currentMajor),
 				targetImage:     targetImages[postgisEntry],
 				targetMajor:     int(info.targetMajor),
 			},
 			postgresqlEntry: {
 				startingCluster: generatePostgreSQLCluster(namespace, storageClass,
-					strconv.FormatUint(info.currentMajor, 10)),
+					strconv.FormatUint(info.currentMajor, 10), false),
 				startingMajor: int(info.currentMajor),
 				targetImage:   targetImages[postgresqlEntry],
 				targetMajor:   int(info.targetMajor),
 			},
 			postgresqlMinimalEntry: {
 				startingCluster: generatePostgreSQLMinimalCluster(namespace, storageClass,
-					strconv.FormatUint(info.currentMajor, 10)),
+					strconv.FormatUint(info.currentMajor, 10), false),
 				startingMajor: int(info.currentMajor),
 				targetImage:   targetImages[postgresqlMinimalEntry],
+				targetMajor:   int(info.targetMajor),
+			},
+			postgresqlSystemEntry: {
+				startingCluster: generatePostgreSQLSystemCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10), true),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlSystemEntry],
 				targetMajor:   int(info.targetMajor),
 			},
 		}
@@ -344,6 +412,23 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 		Expect(storageClass).ToNot(BeEmpty())
 
+		By("creating the certificates for MinIO", func() {
+			err := minioEnv.CreateCaSecret(env, namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("creating the credentials for minio", func() {
+			_, err = secrets.CreateObjectStorageSecret(
+				env.Ctx,
+				env.Client,
+				namespace,
+				"backup-storage-creds",
+				"minio",
+				"minio123",
+			)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
 		// We cannot use generated entries in the DescribeTable, so we use the scenario key as a constant, but
 		// define the actual content here.
 		// See https://onsi.github.io/ginkgo/#mental-model-table-specs-are-just-syntactic-sugar
@@ -358,6 +443,19 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		Expect(err).NotTo(HaveOccurred())
 		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady],
 			env)
+
+		if cluster.Spec.Backup != nil {
+			By("verifying connectivity of barman to minio", func() {
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() (bool, error) {
+					connectionStatus, err := minio.TestBarmanConnectivity(
+						cluster.Namespace, cluster.Name, primaryPod.Name,
+						"minio", "minio123", minioEnv.ServiceName)
+					return connectionStatus, err
+				}, 60).Should(BeTrue())
+			})
+		}
 
 		By("Performing switchover to move to timeline 2")
 		AssertSwitchover(cluster.Namespace, cluster.Name, env)
@@ -447,5 +545,6 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		Entry("PostGIS", postgisEntry),
 		Entry("PostgreSQL", postgresqlEntry),
 		Entry("PostgreSQL minimal", postgresqlMinimalEntry),
+		Entry("PostgreSQL system", postgresqlSystemEntry),
 	)
 })
