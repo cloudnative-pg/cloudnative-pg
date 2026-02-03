@@ -5463,9 +5463,18 @@ var _ = Describe("validateExtensions", func() {
 		}
 
 		err := v.validateExtensions(cluster)
-		Expect(err).To(HaveLen(2))
+		// 4 errors: 2 for exact name duplicates + 2 for sanitized volume name duplicates
+		Expect(err).To(HaveLen(4))
+		// First pair of errors for extTwo duplicate
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[0].BadValue).To(Equal("extTwo"))
-		Expect(err[1].BadValue).To(Equal("extOne"))
+		Expect(err[1].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[1].BadValue).To(Equal("extTwo"))
+		// Second pair of errors for extOne duplicate
+		Expect(err[2].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[2].BadValue).To(Equal("extOne"))
+		Expect(err[3].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[3].BadValue).To(Equal("extOne"))
 	})
 
 	It("returns multiple errors for both invalid ExtensionControlPath and DynamicLibraryPath", func() {
@@ -5613,6 +5622,61 @@ var _ = Describe("validateExtensions", func() {
 
 		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns an error when extension names collide after underscore sanitization", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pg_ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_ivm:latest",
+							},
+						},
+						{
+							Name: "pg-ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg-ivm:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(ContainSubstring("extensions[1].name"))
+		Expect(err[0].BadValue).To(Equal("pg-ivm"))
+		Expect(err[0].Detail).To(ContainSubstring("duplicate volume name"))
+	})
+
+	It("returns no error when extension names with underscores don't collide", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pg_ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_ivm:latest",
+							},
+						},
+						{
+							Name: "pg_stat",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_stat:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 })
 

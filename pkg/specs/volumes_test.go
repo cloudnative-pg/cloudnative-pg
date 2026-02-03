@@ -625,4 +625,24 @@ var _ = Describe("ImageVolume Extensions", func() {
 			})
 		})
 	})
+
+	Context("sanitizeExtensionNameForVolume", func() {
+		It("should replace underscores with hyphens", func() {
+			Expect(sanitizeExtensionNameForVolume("pg_ivm")).To(Equal("pg-ivm"))
+		})
+
+		It("should handle multiple underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("my-custom-extension"))
+		})
+
+		It("should not modify names without underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("foo")).To(Equal("foo"))
+			Expect(sanitizeExtensionNameForVolume("foo-bar")).To(Equal("foo-bar"))
+		})
+
+		It("should handle leading and trailing underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("_pg_stat")).To(Equal("-pg-stat"))
+			Expect(sanitizeExtensionNameForVolume("pg_stat_")).To(Equal("pg-stat-"))
+		})
+	})
 })
