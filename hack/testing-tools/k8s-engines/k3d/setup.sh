@@ -44,7 +44,7 @@ trap 'rm -fr ${TEMP_DIR_LOCAL}' EXIT
 # --- KIND HELPER FUNCTIONS ---
 
 # load_image_k3d: Loads a Docker image directly into the Kind cluster nodes.
-load_image_k3d() {
+function load_image_k3d() {
   local cluster_name=$1
   local image=$2
   k3d image import "${image}" -c "${cluster_name}"
@@ -173,30 +173,23 @@ function create_cluster_k3d() {
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
   local options=()
-  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
-    config_file="${TEMP_DIR}/k3d-registries.yaml"
-    cat >"${config_file}" <<-EOF
+  local config_file="${TEMP_DIR}/k3d-registries.yaml"
+  cat >"${config_file}" <<-EOF
 mirrors:
-EOF
-
-    if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-      cat >>"${config_file}" <<-EOF
-  "docker.io":
-    endpoint:
-      - "${DOCKER_REGISTRY_MIRROR}"
-EOF
-    fi
-
-    if [ -n "${ENABLE_REGISTRY:-}" ]; then
-      cat >>"${config_file}" <<-EOF
   "${registry_name}:5000":
     endpoint:
     - http://${registry_name}:5000
 EOF
-    fi
 
-    options+=(--registry-config "${config_file}")
-  fi
+if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+  cat >>"${config_file}" <<-EOF
+  "docker.io":
+    endpoint:
+      - "${DOCKER_REGISTRY_MIRROR}"
+EOF
+fi
+
+options+=(--registry-config "${config_file}")
 
   local agents=()
   if [ "$NODES" -gt 1 ]; then
@@ -207,9 +200,7 @@ EOF
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
     --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
-    docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
-  fi
+  docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
 }
 # ---------------------------------------------------------------------------------
 
