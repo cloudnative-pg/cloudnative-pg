@@ -68,6 +68,9 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:16",
 			},
+			Status: apiv1.ClusterStatus{
+				TimelineID: 5, // Simulating pre-upgrade timeline
+			},
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			buildPrimaryPVC(1),
@@ -106,6 +109,9 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		// the upgrade has been marked as done
 		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
 		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
+
+		// the timeline ID has been reset to 1 to match pg_upgrade behavior
+		Expect(cluster.Status.TimelineID).To(Equal(1))
 
 		// the job has been deleted
 		var tempJob batchv1.Job
