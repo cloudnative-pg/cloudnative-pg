@@ -2106,10 +2106,10 @@ var _ = Describe("Cluster name validation", func() {
 		Expect(v.validateName(cluster)).NotTo(BeEmpty())
 	})
 
-	It("should return errors when the name length is greater than 50", func() {
+	It("should return errors when the name length is greater than 40", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: strings.Repeat("toomuchlong", 4) + "-" + "after4times",
+				Name: strings.Repeat("toomuchlong", 3) + "-" + "after4times",
 			},
 		}
 		Expect(v.validateName(cluster)).NotTo(BeEmpty())
