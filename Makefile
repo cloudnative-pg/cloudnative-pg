@@ -57,7 +57,7 @@ KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
 CONTROLLER_TOOLS_VERSION ?= v0.20.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
-CRDREFDOCS_VERSION ?= v0.2.0
+CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.13.3
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
