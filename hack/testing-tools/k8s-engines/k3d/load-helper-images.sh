@@ -30,9 +30,9 @@ source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/40-utils-registry.sh" # Contains push_helper_images_to_registry
 
-# --- KIND SPECIFIC HELPER ---
+# --- K3D SPECIFIC HELPER ---
 
-# load_image_k3d: Executes the necessary 'kind load' command.
+# load_image_k3d: Executes the necessary 'k3d image' command.
 function load_image_k3d() {
   local cluster_name=$1
   local image=$2

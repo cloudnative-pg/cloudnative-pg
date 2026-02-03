@@ -30,7 +30,7 @@ source "${COMMON_DIR}/00-paths.sh"
 
 # --- HELPER FUNCTION ---
 
-# export_logs_k3d: Executes the Kind log export command.
+# export_logs_k3d: Exports the logs from all k3d nodes.
 function export_logs_k3d() {
   local cluster_name=$1
   while IFS= read -r line; do
