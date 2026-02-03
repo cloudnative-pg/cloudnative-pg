@@ -237,6 +237,9 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
+	// Reset timeline ID to 1 after major upgrade to match pg_upgrade behavior.
+	// This prevents replicas from restoring incompatible timeline history files
+	// from the pre-upgrade cluster in object storage.
 	if err := status.PatchWithOptimisticLock(
 		ctx,
 		c,
@@ -245,6 +248,7 @@ func majorVersionUpgradeHandleCompletion(
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
 		}),
+		status.SetTimelineID(1),
 	); err != nil {
 		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
 		return nil, err
