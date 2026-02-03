@@ -33,6 +33,7 @@ echo -e "${bright}Tearing down k3d cluster '${CLUSTER_NAME}'.${reset}"
 
 destroy_k3d() {
   local cluster_name=$1
+  # shellcheck disable=SC2154
   docker network disconnect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
   k3d cluster delete "${cluster_name}" || true
   docker network rm "k3d-${cluster_name}" &>/dev/null || true

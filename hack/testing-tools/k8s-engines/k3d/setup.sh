@@ -20,7 +20,7 @@
 
 # shellcheck disable=SC1090,SC1091
 
-# Kind-specific cluster creation logic.
+# K3D-specific cluster creation logic.
 set -eEuo pipefail
 
 # Load common modules needed for paths, config, and registry helpers
@@ -31,7 +31,7 @@ source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/20-utils-k8s.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
 
-# --- KIND SPECIFIC CONSTANTS AND DEFAULTS ---
+# --- K3D SPECIFIC CONSTANTS AND DEFAULTS ---
 K8S_VERSION=${K8S_VERSION:-$K3D_NODE_DEFAULT_VERSION}
 NODES=${NODES:-3}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
@@ -41,9 +41,9 @@ TEMP_DIR_LOCAL="$(mktemp -d)"
 trap 'rm -fr ${TEMP_DIR_LOCAL}' EXIT
 # --------------------------------------------------------
 
-# --- KIND HELPER FUNCTIONS ---
+# --- K3D HELPER FUNCTIONS ---
 
-# load_image_k3d: Loads a Docker image directly into the Kind cluster nodes.
+# load_image_k3d: Loads a Docker image directly into the K3D cluster nodes.
 function load_image_k3d() {
   local cluster_name=$1
   local image=$2
@@ -139,7 +139,7 @@ function deploy_fluentd() {
   docker pull "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
   # shellcheck disable=SC2153
-  load_image_kind "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
+  load_image_k3d "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
 
   "${K8S_CLI}" apply -f "${E2E_DIR}/local-fluentd.yaml"
 
@@ -164,7 +164,7 @@ function deploy_fluentd() {
   done
 }
 
-# create_cluster_kind: Generates the config file and creates the Kind cluster.
+# create_cluster_k3d: Generates the config file and creates the K3D cluster.
 function create_cluster_k3d() {
   local k8s_version=$1
   local cluster_name=$2
@@ -210,7 +210,7 @@ main() {
   # Validate required tools are installed
   validate_required_tools k3d docker kubectl helm
 
-  echo -e "${bright}Running Kind setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+  echo -e "${bright}Running K3D setup: Creating cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
   create_cluster_k3d "${K8S_VERSION}" "${CLUSTER_NAME}"
 
@@ -228,7 +228,7 @@ main() {
   fi
   deploy_prometheus_crds
 
-  echo -e "${bright}Kind cluster ${CLUSTER_NAME} setup complete.${reset}"
+  echo -e "${bright}K3D cluster ${CLUSTER_NAME} setup complete.${reset}"
 }
 
 main
