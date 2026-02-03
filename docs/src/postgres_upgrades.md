@@ -160,7 +160,7 @@ automatically decide the rollback.
 ### Backup and WAL Archive Considerations
 
 When performing a major upgrade, `pg_upgrade` creates a new database system
-with a new System ID and resets the PostgreSQL timeline to 1. This has
+with a new *System ID* and resets the PostgreSQL timeline to 1. This has
 implications for backup and WAL archiving:
 
 - **Timeline file conflicts**: New timeline 1 files may overwrite timeline 1
@@ -181,11 +181,11 @@ others require manual configuration to use different archive paths for each
 major version. Consult your backup plugin documentation for its specific
 behavior during major upgrades.
 
-**Example: Manual archive path separation with plugin-barman-cloud**
+#### Example: Manual archive path separation with the Barman Cloud plugin
 
-The `plugin-barman-cloud` backup plugin does not automatically separate
-archives during major upgrades. To preserve pre-upgrade backups and keep
-archives clean, change the `serverName` parameter when you trigger the upgrade.
+The Barman Cloud plugin does not automatically separate archives during major
+upgrades. To preserve pre-upgrade backups and keep archives clean, change the
+`serverName` parameter when you trigger the upgrade.
 
 Before upgrade (PostgreSQL 16):
 
@@ -219,8 +219,7 @@ intact for pre-upgrade recovery, while the upgraded cluster writes to
 
 :::info
 The deprecated in-tree `barmanObjectStore` implementation also requires manual
-`serverName` changes to separate archives during major upgrades. Consider
-migrating to backup plugins for better flexibility and ongoing support.
+`serverName` changes to separate archives during major upgrades.
 :::
 
 ### Example: Performing a Major Upgrade
