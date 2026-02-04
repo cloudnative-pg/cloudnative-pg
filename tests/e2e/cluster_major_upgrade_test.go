@@ -541,6 +541,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		// Expect temporary files to be deleted
 		By("Checking no leftovers exist from the upgrade")
 		verifyCleanupAfterUpgrade(env.Ctx, env.Client, primary)
+
+		// Verify WAL archiving continues to work after the major upgrade
+		if cluster.Spec.Backup != nil {
+			By("Verifying WAL archiving works after the major upgrade")
+			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
+		}
 	},
 		Entry("PostGIS", postgisEntry),
 		Entry("PostgreSQL", postgresqlEntry),
