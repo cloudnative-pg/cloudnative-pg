@@ -70,7 +70,7 @@ OPERATOR_SDK_VERSION ?= v1.42.0
 OPM_VERSION ?= v1.63.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.16.0
-OPENSHIFT_VERSIONS ?= v4.12-v4.19
+OPENSHIFT_VERSIONS ?= v4.14-v4.21
 ARCH ?= amd64
 
 export CONTROLLER_IMG
