@@ -142,4 +142,21 @@ var _ = Describe("isRetryableExecError", func() {
 			Expect(isRetryableExecError(err)).To(BeTrue())
 		})
 	})
+
+	Context("when error messages have different casing", func() {
+		It("should return true for uppercase 'PROXY ERROR'", func() {
+			err := errors.New("PROXY ERROR from localhost:9443")
+			Expect(isRetryableExecError(err)).To(BeTrue())
+		})
+
+		It("should return true for mixed case 'Connection Refused'", func() {
+			err := errors.New("dial tcp: Connection Refused")
+			Expect(isRetryableExecError(err)).To(BeTrue())
+		})
+
+		It("should return true for uppercase 'I/O TIMEOUT'", func() {
+			err := errors.New("I/O TIMEOUT")
+			Expect(isRetryableExecError(err)).To(BeTrue())
+		})
+	})
 })

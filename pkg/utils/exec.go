@@ -56,7 +56,7 @@ func isRetryableExecError(err error) bool {
 		return false
 	}
 
-	errStr := err.Error()
+	errStr := strings.ToLower(err.Error())
 
 	// Kubernetes API proxy errors (common in AKS)
 	if strings.Contains(errStr, "proxy error") ||
@@ -65,8 +65,8 @@ func isRetryableExecError(err error) bool {
 	}
 
 	// HTTP 500 errors from API server
-	if strings.Contains(errStr, "500 Internal Server Error") ||
-		strings.Contains(errStr, "Internal error occurred") {
+	if strings.Contains(errStr, "500 internal server error") ||
+		strings.Contains(errStr, "internal error occurred") {
 		return true
 	}
 
@@ -74,7 +74,7 @@ func isRetryableExecError(err error) bool {
 	if strings.Contains(errStr, "connection refused") ||
 		strings.Contains(errStr, "connection reset") ||
 		strings.Contains(errStr, "i/o timeout") ||
-		strings.Contains(errStr, "TLS handshake timeout") ||
+		strings.Contains(errStr, "tls handshake timeout") ||
 		strings.Contains(errStr, "dial tcp") {
 		return true
 	}
@@ -130,7 +130,7 @@ func ExecCommand(
 	var stdout, stderr string
 	var execErr error
 
-	err := retry.New(
+	_ = retry.New(
 		retry.Attempts(execRetryAttempts),
 		retry.Delay(execRetryDelay),
 		retry.DelayType(retry.BackOffDelay),
@@ -166,12 +166,10 @@ func ExecCommand(
 			return nil
 		},
 	)
-	// Return the last attempt's result
-	if err != nil {
-		return stdout, stderr, execErr
-	}
 
-	return stdout, stderr, nil
+	// Return the execution result. If retry failed, err will be non-nil and
+	// execErr contains the actual error from the last execution attempt
+	return stdout, stderr, execErr
 }
 
 // execCommandOnce performs a single kubectl exec operation without retries
