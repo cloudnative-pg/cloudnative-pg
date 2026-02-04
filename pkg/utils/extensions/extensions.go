@@ -75,16 +75,15 @@ func ResolveFromCatalog(
 			)
 		}
 
-		var resultExtension apiv1.ExtensionConfiguration
-		if found {
-			// Found the extension in the catalog, so let's use the catalog entry as a base
-			// and eventually override it with Cluster Spec values
-			resultExtension = catalogExtension
-		} else {
+		if !found {
 			// No catalog entry, rely fully on the Cluster Spec
 			resolvedExtensions = append(resolvedExtensions, extension)
 			continue
 		}
+
+		// Found the extension in the catalog, so let's use the catalog entry as a base
+		// and eventually override it with Cluster Spec values
+		resultExtension := catalogExtension
 
 		// Apply the Cluster Spec overrides
 		if extension.ImageVolumeSource.Reference != "" {

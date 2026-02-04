@@ -111,7 +111,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
-func getImageInfoFromImage(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
+func getImageInfoFromCluster(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 	// Parse the version from the tag
 	imageVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
 	if err != nil {
@@ -133,7 +133,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	if cluster.Spec.ImageCatalogRef == nil {
 		if cluster.Spec.ImageName != "" {
-			return getImageInfoFromImage(cluster)
+			return getImageInfoFromCluster(cluster)
 		}
 
 		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
