@@ -57,19 +57,20 @@ KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
 CONTROLLER_TOOLS_VERSION ?= v0.20.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
-CRDREFDOCS_VERSION ?= v0.2.0
+CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.13.3
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.57.0
+SPELLCHECK_VERSION ?= 0.58.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.42.0
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.61.0
+OPM_VERSION ?= v1.63.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.16.0
+OPENSHIFT_VERSIONS ?= v4.14-v4.21
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -182,6 +183,8 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 

@@ -31,7 +31,7 @@ _Appears in:_
 {{ end -}}
 
 {{ range $type.Members -}}
-| `{{ .Name  }}` _{{ markdownRenderType .Type }}_ | {{ template "type_members" . }} | {{ if not .Markers.optional -}}True{{- end }} | {{ markdownRenderDefault .Default }} | {{ range .Validation -}} {{ markdownRenderFieldDoc . }} <br />{{ end }} |
+| `{{ .Name  }}` _{{ markdownRenderType .Type }}_ | {{ template "type_members" . }} | {{ if not .Markers.optional -}}True{{- end }} | {{ markdownRenderDefault .Default }} | {{ range .Validation -}}{{- $v := markdownRenderFieldDoc . }}{{- if and $v (ne $v "Optional: \\{\\}") -}} {{ $v }} <br />{{ end }}{{- end }} |
 {{ end -}}
 
 {{ end -}}

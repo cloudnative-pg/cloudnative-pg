@@ -571,6 +571,20 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumes[1].Name).To(Equal("bar"))
 				Expect(extensionVolumes[1].VolumeSource.Image.Reference).To(Equal("bar:dev"))
 			})
+			It("should sanitize extension names with underscores for volume names", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+					{
+						Name: "pg_ivm",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "pg_ivm:latest",
+						},
+					},
+				}
+				extensionVolumes := createExtensionVolumes(&cluster)
+				Expect(len(extensionVolumes)).To(BeEquivalentTo(1))
+				Expect(extensionVolumes[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("pg_ivm:latest"))
+			})
 		})
 	})
 
@@ -595,6 +609,43 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumeMounts[1].Name).To(Equal("bar"))
 				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
 			})
+			It("should sanitize extension names with underscores for volume mount names", func() {
+				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+					{
+						Name: "pg_ivm",
+						ImageVolumeSource: corev1.ImageVolumeSource{
+							Reference: "pg_ivm:latest",
+						},
+					},
+				}
+				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(1))
+				Expect(extensionVolumeMounts[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumeMounts[0].MountPath).To(Equal(postgres.ExtensionsBaseDirectory + "/pg_ivm"))
+			})
+		})
+	})
+
+	Context("sanitizeExtensionNameForVolume", func() {
+		It("should replace underscores with hyphens", func() {
+			Expect(sanitizeExtensionNameForVolume("pg_ivm")).To(Equal("pg-ivm"))
+		})
+
+		It("should handle multiple underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("my-custom-extension"))
+		})
+
+		It("should not modify names without underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("foo")).To(Equal("foo"))
+			Expect(sanitizeExtensionNameForVolume("foo-bar")).To(Equal("foo-bar"))
+		})
+
+		It("should handle mixed underscores and hyphens", func() {
+			Expect(sanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("pg-foo-bar"))
+		})
+
+		It("should handle consecutive underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("pg__stat")).To(Equal("pg--stat"))
 		})
 	})
 })
