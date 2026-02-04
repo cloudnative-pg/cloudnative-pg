@@ -43,7 +43,7 @@ env:
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.31.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
-  ROOK_VERSION: "v1.18.9"
+  ROOK_VERSION: "v1.19.0"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
   EXTERNAL_SNAPSHOTTER_VERSION: "v8.4.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
