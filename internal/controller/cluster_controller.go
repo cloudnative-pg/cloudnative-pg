@@ -689,7 +689,6 @@ func (r *ClusterReconciler) handleSwitchover(
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Primary is healthy, No switchover in progress.
 	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
