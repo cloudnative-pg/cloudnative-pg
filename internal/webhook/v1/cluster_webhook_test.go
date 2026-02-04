@@ -5492,7 +5492,9 @@ var _ = Describe("validateExtensions", func() {
 
 		err := v.validateExtensions(cluster)
 		Expect(err).To(HaveLen(2))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[0].BadValue).To(Equal("extTwo"))
+		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[1].BadValue).To(Equal("extOne"))
 	})
 
@@ -5641,6 +5643,121 @@ var _ = Describe("validateExtensions", func() {
 
 		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns an error when extension names collide after underscore sanitization", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pg_ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_ivm:latest",
+							},
+						},
+						{
+							Name: "pg-ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg-ivm:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(ContainSubstring("extensions[1].name"))
+		Expect(err[0].BadValue).To(Equal("pg-ivm"))
+		Expect(err[0].Detail).To(ContainSubstring("duplicate volume name"))
+	})
+
+	It("returns no error when extension names with underscores don't collide", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pg_ivm",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_ivm:latest",
+							},
+						},
+						{
+							Name: "pg_stat",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_stat:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns no error when extension names have mixed underscores and hyphens without collisions", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pg_foo-bar",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_foo-bar:latest",
+							},
+						},
+						{
+							Name: "pg-foo_baz",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg-foo_baz:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
+	It("returns an error when three extensions collide after sanitization", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "pgstat",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pgstat:latest",
+							},
+						},
+						{
+							Name: "pg_stat",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg_stat:latest",
+							},
+						},
+						{
+							Name: "pg-stat",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "pg-stat:latest",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(ContainSubstring("extensions[2].name"))
+		Expect(err[0].BadValue).To(Equal("pg-stat"))
 	})
 })
 
