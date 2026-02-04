@@ -243,7 +243,7 @@ func majorVersionUpgradeHandleCompletion(
 	// This ensures that extension images match the upgraded PostgreSQL version.
 	// If extension resolution fails (e.g., catalog doesn't have extensions for new version),
 	// we fail the major upgrade completion to avoid leaving the cluster in an inconsistent state.
-	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	exts, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
 	if err != nil {
 		contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
 			"requestedMajor", requestedMajor)
@@ -273,7 +273,7 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
-			Extensions:   extensions,
+			Extensions:   exts,
 		}),
 		status.SetTimelineID(1),
 	); err != nil {
