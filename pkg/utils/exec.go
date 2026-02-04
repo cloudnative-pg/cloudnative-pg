@@ -166,7 +166,6 @@ func ExecCommand(
 			return nil
 		},
 	)
-
 	// Return the last attempt's result
 	if err != nil {
 		return stdout, stderr, execErr

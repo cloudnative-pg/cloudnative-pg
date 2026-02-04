@@ -137,7 +137,8 @@ var _ = Describe("isRetryableExecError", func() {
 
 	Context("when error matches the AKS proxy failure pattern", func() {
 		It("should return true for the exact error from AKS failures", func() {
-			err := errors.New("error dialing backend: proxy error from localhost:9443 while dialing 10.224.0.5:10250, code 500: 500 Internal Server Error")
+			err := errors.New("error dialing backend: proxy error from " +
+				"localhost:9443 while dialing 10.224.0.5:10250, code 500: 500 Internal Server Error")
 			Expect(isRetryableExecError(err)).To(BeTrue())
 		})
 	})
