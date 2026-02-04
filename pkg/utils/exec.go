@@ -28,20 +28,71 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/avast/retry-go/v5"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
+const (
+	execRetryAttempts = 3
+	execRetryDelay    = 2 * time.Second
+)
+
 // ErrorContainerNotFound is raised when an Exec call is invoked against
 // a non existing container
 var ErrorContainerNotFound = fmt.Errorf("container not found")
 
-// ExecCommand executes a command inside the pod, and returns its result
+// isRetryableExecError returns true for transient infrastructure errors
+func isRetryableExecError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	// Kubernetes API proxy errors (common in AKS)
+	if strings.Contains(errStr, "proxy error") ||
+		strings.Contains(errStr, "error dialing backend") {
+		return true
+	}
+
+	// HTTP 500 errors from API server
+	if strings.Contains(errStr, "500 Internal Server Error") ||
+		strings.Contains(errStr, "Internal error occurred") {
+		return true
+	}
+
+	// Network connectivity issues
+	if strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset") ||
+		strings.Contains(errStr, "i/o timeout") ||
+		strings.Contains(errStr, "TLS handshake timeout") ||
+		strings.Contains(errStr, "dial tcp") {
+		return true
+	}
+
+	// Kubernetes API errors that are typically transient
+	if apierrors.IsInternalError(err) ||
+		apierrors.IsServerTimeout(err) ||
+		apierrors.IsTimeout(err) ||
+		apierrors.IsServiceUnavailable(err) ||
+		apierrors.IsTooManyRequests(err) {
+		return true
+	}
+
+	return false
+}
+
+// ExecCommand executes a command inside the pod, automatically retrying
+// transient errors like proxy failures or network issues.
 func ExecCommand(
 	ctx context.Context,
 	client kubernetes.Interface,
@@ -51,7 +102,12 @@ func ExecCommand(
 	timeout *time.Duration,
 	command ...string,
 ) (string, string, error) {
-	// iterate through all containers looking for the one running PostgreSQL.
+	contextLogger := log.FromContext(ctx).WithValues(
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"container", containerName,
+	)
+
 	targetContainer := -1
 	for i, cr := range pod.Spec.Containers {
 		if cr.Name == containerName {
@@ -64,13 +120,71 @@ func ExecCommand(
 		return "", "", ErrorContainerNotFound
 	}
 
-	// Unfortunately RESTClient doesn't still work with contexts but when it
-	// will, we'll use the context there.
-	//
-	// A similar consideration can be applied for the `container` parameter:
-	// in this moment we need to specify that parameter in the "Post" request
-	// and in the VersionedParams section too. This will hopefully be unified
-	// in a next client-go release.
+	execCtx := ctx
+	var cancelFunc context.CancelFunc
+	if timeout != nil {
+		execCtx, cancelFunc = context.WithTimeout(ctx, *timeout)
+		defer cancelFunc()
+	}
+
+	var stdout, stderr string
+	var execErr error
+
+	err := retry.New(
+		retry.Attempts(execRetryAttempts),
+		retry.Delay(execRetryDelay),
+		retry.DelayType(retry.BackOffDelay),
+		retry.Context(execCtx),
+		retry.LastErrorOnly(true),
+		retry.OnRetry(func(n uint, err error) {
+			contextLogger.Info("Retrying kubectl exec",
+				"attempt", n+1,
+				"error", err.Error(),
+			)
+		}),
+	).Do(
+		func() error {
+			stdout, stderr, execErr = execCommandOnce(
+				execCtx, client, config, pod,
+				targetContainer, timeout, command...,
+			)
+
+			// Don't retry if context was cancelled or timed out
+			if execCtx.Err() != nil {
+				return retry.Unrecoverable(execErr)
+			}
+
+			if execErr != nil && isRetryableExecError(execErr) {
+				return execErr
+			}
+
+			// Either success or non-retryable error
+			if execErr != nil {
+				return retry.Unrecoverable(execErr)
+			}
+
+			return nil
+		},
+	)
+
+	// Return the last attempt's result
+	if err != nil {
+		return stdout, stderr, execErr
+	}
+
+	return stdout, stderr, nil
+}
+
+// execCommandOnce performs a single kubectl exec operation without retries
+func execCommandOnce(
+	ctx context.Context,
+	client kubernetes.Interface,
+	config *rest.Config,
+	pod corev1.Pod,
+	targetContainer int,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
 	req := client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
@@ -82,9 +196,6 @@ func ExecCommand(
 	if timeout != nil {
 		req.Timeout(*timeout)
 		newConfig.Timeout = *timeout
-		timedCtx, cancelFunc := context.WithTimeout(ctx, *timeout)
-		defer cancelFunc()
-		ctx = timedCtx
 	}
 
 	req.VersionedParams(&corev1.PodExecOptions{
