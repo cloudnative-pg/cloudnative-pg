@@ -76,3 +76,10 @@ func SetPGDataImageInfo(imageInfo *apiv1.ImageInfo) Transaction {
 		cluster.Status.PGDataImageInfo = imageInfo
 	}
 }
+
+// SetTimelineID is a transaction that sets the cluster timeline ID
+func SetTimelineID(timelineID int) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.TimelineID = timelineID
+	}
+}

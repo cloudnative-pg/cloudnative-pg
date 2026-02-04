@@ -815,7 +815,6 @@ disablePassword
 disabledDefaultServices
 discoverable
 displayName
-displayName
 distro
 distroless
 distros
@@ -1341,6 +1340,7 @@ runtime
 rw
 sSfL
 sa
+sanitization
 sas
 scalability
 scalable

@@ -2842,13 +2842,28 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 	var result field.ErrorList
 
 	extensionNames := stringset.New()
+	// Track sanitized volume names (e.g., pg_ivm and pg-ivm both become pg-ivm)
+	sanitizedVolumeNames := stringset.New()
 
 	for i, v := range r.Spec.PostgresConfiguration.Extensions {
 		basePath := field.NewPath("spec", "postgresql", "extensions").Index(i)
 		if nameErr := ensureNotEmptyOrDuplicate(basePath.Child("name"), extensionNames, v.Name); nameErr != nil {
 			result = append(result, nameErr)
+			// Skip sanitization check for duplicate names to avoid redundant error reporting
+			continue
 		}
 		extensionNames.Put(v.Name)
+
+		sanitizedName := strings.ReplaceAll(v.Name, "_", "-")
+		if sanitizedVolumeNames.Has(sanitizedName) {
+			result = append(result, field.Invalid(
+				basePath.Child("name"),
+				v.Name,
+				fmt.Sprintf("extension name results in duplicate volume name %q after sanitization "+
+					"(underscores are converted to hyphens)", sanitizedName),
+			))
+		}
+		sanitizedVolumeNames.Put(sanitizedName)
 
 		controlPaths := stringset.New()
 		for j, path := range v.ExtensionControlPath {

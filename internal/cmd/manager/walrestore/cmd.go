@@ -122,6 +122,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
+	// Validate timeline history files before any restore attempt (plugin or in-tree)
+	// to ensure replicas don't download future timeline history files
+	if err := validateTimelineHistoryFile(ctx, walName, cluster, podName); err != nil {
+		return err
+	}
+
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
@@ -206,10 +212,6 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		}
 	} else {
 		// This is not a regular WAL file, we fetch it directly
-		if err := validateTimelineHistoryFile(ctx, walName, cluster, podName); err != nil {
-			return err
-		}
-
 		walFilesList = []string{walName}
 	}
 
