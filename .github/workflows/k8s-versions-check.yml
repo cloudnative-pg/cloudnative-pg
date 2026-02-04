@@ -115,6 +115,9 @@ jobs:
           sort -Vru | \
           awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
           jq -Rn '[inputs]' | tee .github/openshift_versions.json
+
+          OCP_VERSIONS=`cat .github/openshift_versions.json | jq -r '"v"+.[-1]+"-v"+.[0]'`
+          sed -i -e 's/\(OPENSHIFT_VERSIONS ?= \)\(.*\)/\1'${OCP_VERSIONS}'/g' Makefile
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
