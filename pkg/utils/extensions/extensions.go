@@ -42,8 +42,9 @@ func ResolveFromCatalog(
 	resolvedExtensions := make([]apiv1.ExtensionConfiguration, 0, len(requestedExtensions))
 
 	// Build a map of extensions coming from the catalog
-	catalogExtensionsMap := make(map[string]apiv1.ExtensionConfiguration)
+	var catalogExtensionsMap map[string]apiv1.ExtensionConfiguration
 	if extensions, ok := catalog.GetSpec().FindExtensionsForMajor(requestedMajorVersion); ok {
+		catalogExtensionsMap = make(map[string]apiv1.ExtensionConfiguration, len(extensions))
 		for _, extension := range extensions {
 			catalogExtensionsMap[extension.Name] = extension
 		}
