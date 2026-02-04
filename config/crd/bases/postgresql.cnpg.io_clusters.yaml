@@ -4414,7 +4414,7 @@ spec:
                         name:
                           description: The name of the extension, required
                           minLength: 1
-                          pattern: ^[a-z0-9_]([-a-z0-9_]*[a-z0-9_])?$
+                          pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
                       required:
                       - image

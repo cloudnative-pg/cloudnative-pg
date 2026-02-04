@@ -640,9 +640,12 @@ var _ = Describe("ImageVolume Extensions", func() {
 			Expect(sanitizeExtensionNameForVolume("foo-bar")).To(Equal("foo-bar"))
 		})
 
-		It("should handle leading and trailing underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("_pg_stat")).To(Equal("-pg-stat"))
-			Expect(sanitizeExtensionNameForVolume("pg_stat_")).To(Equal("pg-stat-"))
+		It("should handle mixed underscores and hyphens", func() {
+			Expect(sanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("pg-foo-bar"))
+		})
+
+		It("should handle consecutive underscores", func() {
+			Expect(sanitizeExtensionNameForVolume("pg__stat")).To(Equal("pg--stat"))
 		})
 	})
 })

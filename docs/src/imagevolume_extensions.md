@@ -138,13 +138,14 @@ spec:
 The `name` field is **mandatory** and **must be unique within the cluster**, as
 it determines the mount path (`/extensions/foo` in this example). It must
 consist of *lowercase alphanumeric characters, underscores (`_`) or hyphens (`-`)* and must start
-and end with an alphanumeric character or underscore.
+and end with an alphanumeric character.
 
 :::note
 Extension names containing underscores (e.g., `pg_ivm`) are converted to use
 hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
-DNS label requirements. Ensure that extension names don't collide after this
-sanitization (e.g., `pg_ivm` and `pg-ivm` would conflict).
+DNS label requirements. Do not use extension names that become identical after
+sanitization (e.g., `pg_ivm` and `pg-ivm` both sanitize to `pg-ivm`). The
+webhook validation will prevent such conflicts.
 :::
 
 The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).

@@ -321,8 +321,8 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
-// sanitizeExtensionNameForVolume converts an extension name to a valid Kubernetes volume name
-// by replacing underscores with hyphens to comply with RFC 1123 DNS label requirements
+// sanitizeExtensionNameForVolume replaces underscores with hyphens to comply with RFC 1123
+// DNS label requirements for Kubernetes volume names. The mount path preserves the original name.
 func sanitizeExtensionNameForVolume(extensionName string) string {
 	return strings.ReplaceAll(extensionName, "_", "-")
 }
