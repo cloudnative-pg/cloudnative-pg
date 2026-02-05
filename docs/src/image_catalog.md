@@ -7,27 +7,43 @@ title: Image Catalog
 # Image Catalog
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-`ImageCatalog` and `ClusterImageCatalog` are essential resources that empower
-you to define images for creating a `Cluster`.
+`ImageCatalog` and `ClusterImageCatalog` are Custom Resource Definitions (CRDs)
+that allow you to decouple the PostgreSQL image lifecycle from the `Cluster`
+definition. By using a catalog, you can manage image updates centrally; when a
+catalog entry is updated, all associated clusters automatically
+[roll out the new image](rolling_update.md).
 
-The key distinction lies in their scope: an `ImageCatalog` is namespaced, while
-a `ClusterImageCatalog` is cluster-scoped.
+## Catalog scoping
 
-Both share a common structure, comprising a list of images, each equipped with
-a `major` field indicating the major version of the image.
+The primary difference between the two resources is their scope:
+
+| Resource              | Scope        | Best use case                                               |
+| --------------------- | ------------ | ----------------------------------------------------------- |
+| `ImageCatalog`        | Namespaced   | Application-specific versions or team-level restrictions.   |
+| `ClusterImageCatalog` | Cluster-wide | Global standards across all namespaces for an organization. |
+
+## Catalog structure
+
+Both resources share a common schema:
+
+- **Major versioning**: A list of images keyed by the `major` PostgreSQL version.
+- **Uniqueness**: The `major` field must be unique within a single catalog.
+- **Extensions**: Support for certified extension container images (available for
+  PostgreSQL 18+ via `extension_control_path`).
 
 :::warning
-    The operator places trust in the user-defined major version and refrains
-    from conducting any PostgreSQL version detection. It is the user's
-    responsibility to ensure alignment between the declared major version in
-    the catalog and the PostgreSQL image.
+The operator trusts the user-defined `major` version and does **not** perform
+image detection. Ensure the declared major version in the catalog matches the
+actual PostgreSQL image.
 :::
 
-The `major` field's value must remain unique within a catalog, preventing
-duplication across images. Distinct catalogs, however, may
-expose different images under the same `major` value.
+## Configuration examples
 
-**Example of a Namespaced `ImageCatalog`:**
+### Defining a catalog
+
+You can define multiple major versions within a single catalog.
+
+The following example defines a namespaced `ImageCatalog`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -47,13 +63,13 @@ spec:
       image: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 ```
 
-**Example of a Cluster-Wide Catalog using `ClusterImageCatalog` Resource:**
+The following example defines a cluster-wide `ClusterImageCatalog`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: ClusterImageCatalog
 metadata:
-  name: postgresql
+  name: postgresql-global
 spec:
   images:
     - major: 15
@@ -66,9 +82,9 @@ spec:
       image: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 ```
 
-A `Cluster` resource has the flexibility to reference either an `ImageCatalog`
-(like in the following example) or a `ClusterImageCatalog` to precisely specify
-the desired image.
+### Referencing a Catalog in a Cluster
+
+A `Cluster` resource uses the `imageCatalogRef` to select its images.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -79,22 +95,17 @@ spec:
   instances: 3
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
-    # Change the following to `ClusterImageCatalog` if needed
-    kind: ImageCatalog
-    name: postgresql
-    major: 16
+    kind: ClusterImageCatalog # Or 'ImageCatalog'
+    name: postgresql-global
+    major: 18
   storage:
     size: 1Gi
 ```
 
-Clusters utilizing these catalogs maintain continuous monitoring.
-Any alterations to the images within a catalog trigger automatic updates for
-**all associated clusters** referencing that specific entry.
-
 ## Image Catalog with Image Volume Extensions
 
-[Image Volume Extensions](imagevolume_extensions.md) can be defined for each
-`.spec.images` entry of a Catalog using the `extensions` field. For example:
+[Image Volume Extensions](imagevolume_extensions.md) allow you to bundle
+sidecar containers for extensions directly within the catalog entry.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -111,9 +122,7 @@ spec:
             reference: # registry path for your `foo` extension image
 ```
 
-The `extensions` section follows the same API schema of the Cluster's `.spec.postgresql.extensions` field.
-For a complete field overview of the available
-fields, refer to the [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
+The `extensions` section follows the [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration) API schema.
 
 As a result, the [Image volume Extensions - Advanced Topics](imagevolume_extensions.md#advanced-topics) section also apply
 here in case you need to finely control the configuration of an extension.
