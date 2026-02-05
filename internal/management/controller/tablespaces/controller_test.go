@@ -316,7 +316,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 				postgresExpectations: func(mock sqlmock.Sqlmock) {
-					// we expect the reconciler to list the tablespaces on DB, and to
+					// we expect the reconciler to list the tablespaces on DB, and NOT to
 					// create a new tablespace
 					rows := sqlmock.NewRows(
 						[]string{"spcname", "rolname"}).
