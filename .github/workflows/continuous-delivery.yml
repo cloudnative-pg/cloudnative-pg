@@ -828,7 +828,7 @@ jobs:
       CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
       CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
       E2E_DEFAULT_STORAGE_CLASS: local-path  # K3D uses local-path by default
-      E2E_CSI_STORAGE_CLASS: local-path
+      E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
       LOG_DIR: ${{ github.workspace }}/k3d-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
