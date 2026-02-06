@@ -24,7 +24,6 @@ import (
 	"errors"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -86,7 +85,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 // capabilities
 type clusterOwnedResourceWithStatus interface {
 	client.Object
-	GetClusterRef() corev1.LocalObjectReference
+	GetClusterRef() apiv1.ClusterObjectReference
 	GetStatusMessage() string
 	SetAsFailed(err error)
 	SetStatusObservedGeneration(obsGeneration int64)
