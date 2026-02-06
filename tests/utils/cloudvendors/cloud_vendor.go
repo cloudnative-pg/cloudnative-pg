@@ -47,11 +47,15 @@ var LOCAL = TestEnvVendor("local")
 // OCP openshift cloud cluster
 var OCP = TestEnvVendor("ocp")
 
+// K3D local k3d cluster
+var K3D = TestEnvVendor("k3d")
+
 var vendors = map[string]*TestEnvVendor{
 	"aks":   &AKS,
 	"eks":   &EKS,
 	"gke":   &GKE,
 	"local": &LOCAL,
+	"k3d":   &K3D,
 	"ocp":   &OCP,
 }
 
@@ -81,6 +85,10 @@ type EnvProfile interface {
 func GetEnvProfile(te TestEnvVendor) EnvProfile {
 	profileMap := map[TestEnvVendor]EnvProfile{
 		LOCAL: envProfile{
+			isLeaderElectionEnabled: true,
+			usesNodeDiskSpace:       true,
+		},
+		K3D: envProfile{
 			isLeaderElectionEnabled: true,
 			usesNodeDiskSpace:       true,
 		},

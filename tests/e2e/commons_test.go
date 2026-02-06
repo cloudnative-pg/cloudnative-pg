@@ -51,3 +51,8 @@ func IsLocal() bool {
 func IsOpenshift() bool {
 	return *testCloudVendorEnv == cloudvendors.OCP
 }
+
+// IsK3D checks if the running cluster is on K3D
+func IsK3D() bool {
+	return *testCloudVendorEnv == cloudvendors.K3D
+}
