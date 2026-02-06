@@ -16,9 +16,7 @@ This feature allows you to mount a [PostgreSQL extension](https://www.postgresql
 packaged as an OCI-compliant container image, as a read-only and immutable
 volume inside a running pod at a known filesystem path.
 
-If the extension requires one or more shared libraries to be pre-loaded at server
-start, you can add them via the [`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries).
-Also, if your extension requires being created at the database level through
+If your extension requires being created at the database level through
 the `CREATE EXTENSION` command, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md#managing-extensions-in-a-database)
 to ensure consistent, automated extension setup within your PostgreSQL databases.
 
@@ -34,13 +32,19 @@ As a result, you can:
 
 - Use the [official PostgreSQL `minimal` operand images](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#minimal-images)
   provided by CloudNativePG.
-- Dynamically add the extensions you need to your `Cluster` definitions,
-  without rebuilding or maintaining custom PostgreSQL images.
+- Dynamically add required extensions to your `Cluster` definitions, either
+  directly or via an image catalog, without rebuilding or maintaining custom
+  PostgreSQL images.
 - Reduce your operational surface by using immutable, minimal, and secure base
   images while adding only the extensions required for each workload.
 
 Extension images must be built according to the
 [documented specifications](#image-specifications).
+
+:::important
+The CloudNativePG Community maintains extension images as part of the
+[`postgres-extensions-containers` project](https://github.com/cloudnative-pg/postgres-extensions-containers).
+:::
 
 ## Requirements
 
@@ -58,18 +62,16 @@ To use image volume extensions with CloudNativePG, you need:
 
 ## How it works
 
-Extension images can be defined:
-
-* in the `.spec.postgresql.extensions` stanza of a `Cluster` resource
-* in the `.spec.images[].extensions` stanza of an `ImageCatalog/ClusterImageCatalog` resource
-* or using a combination of both
-
-The `extensions` stanza accepts a list of extensions to be added to the PostgreSQL cluster.
+An extension image can be added to a new or existing `Cluster` resource using
+the `.spec.postgresql.extensions` stanza.
 
 :::info
     For field-level details, see the
     [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
 :::
+
+The `extensions` stanza accepts a list of extensions to be added to the
+PostgreSQL cluster.
 
 Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
 
@@ -178,6 +180,11 @@ will work without additional configuration, as PostgreSQL will locate:
 
 - the extension control file at `/extensions/foo/share/extension/foo.control`
 - the shared library at `/extensions/foo/lib/foo.so`
+
+:::note
+If the extension requires one or more shared libraries to be pre-loaded at
+server start, you can add them via the [`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries).
+:::
 
 ### Adding a new extension defined via `Image Catalog` to a `Cluster` resource
 
