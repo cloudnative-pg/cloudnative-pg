@@ -149,6 +149,21 @@ Each catalog corresponds to a specific combination of image type (e.g.
 `minimal`) and Debian release (e.g. `trixie`). It lists the most up-to-date
 container images for every supported PostgreSQL major version.
 
+:::important
+To ensure maximum security and immutability, all images within official
+CloudNativePG catalogs are identified by their **SHA256 digests** rather than
+just tags.
+:::
+
+### Version Compatibility
+
+While standard catalogs work with older versions of the operator, **catalogs
+containing an `extensions` section are only compatible with CloudNativePG 1.29
+or later**. Using a catalog with extension definitions on an older operator
+will result in those definitions being rejected.
+
+### Installation and Usage
+
 By installing these catalogs, cluster administrators can ensure that their
 PostgreSQL clusters are automatically updated to the latest patch release
 within a given PostgreSQL major version, for the selected Debian distribution
@@ -175,8 +190,10 @@ You can then view all the catalogs deployed with:
 kubectl get clusterimagecatalogs.postgresql.cnpg.io
 ```
 
-For example, you can create a cluster with the latest `minimal` image for
-PostgreSQL 18 on `trixie` with:
+### Example: Using a Catalog in a Cluster
+
+To create a cluster that always tracks the latest `minimal` image for
+PostgreSQL 18 on `trixie`, define your `Cluster` as follows:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
