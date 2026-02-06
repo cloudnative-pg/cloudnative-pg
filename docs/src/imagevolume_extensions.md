@@ -31,10 +31,12 @@ as part of the [`postgres-extensions-containers` project](https://github.com/clo
 These images are built on top of the
 [official PostgreSQL `minimal` images](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#minimal-images).
 
+:::info
 While this documentation provides the necessary technical specifications for
 third parties to build their own images and catalogs, the following
 instructions focus specifically on the deployment and usage of our official
 extension images and catalogs.
+:::
 
 ## Benefits
 
@@ -43,7 +45,7 @@ images, this feature removes a significant barrier to running PostgreSQL in
 containers. It eliminates the need to embed extensions at build time, allowing
 you to use official minimal operand images and dynamically add only the
 required extensions to your `Cluster` definitions—either directly or via an
-image catalog.
+[image catalog](image_catalog.md).
 
 This approach significantly reduces the attack surface of your database
 clusters by ensuring that the core database container contains only the
@@ -80,6 +82,15 @@ To use image volume extensions with CloudNativePG, you need:
 An extension image can be added to a new or existing `Cluster` resource using
 the `.spec.postgresql.extensions` stanza.
 
+:::important
+    When a new extension is added to a running `Cluster`, CloudNativePG will
+    automatically trigger a [rolling update](rolling_update.md) to attach the new
+    image volume to each pod. Before adding a new extension in production,
+    ensure you have thoroughly tested it in a staging environment to prevent
+    configuration issues that could leave your PostgreSQL cluster in an unhealthy
+    state.
+:::
+
 :::info
     For field-level details, see the
     [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
@@ -87,16 +98,28 @@ the `.spec.postgresql.extensions` stanza.
 
 ### Configuration Source and Precedence
 
-The `extensions` stanza accepts a list of extensions. Each entry provides the
-configuration for a container image and the options required for PostgreSQL to
-locate and load it:
+The `extensions` stanza accepts a list of entries, each requiring a `name` that
+must be unique within the cluster.
 
-- **Via Image Catalog:** If the cluster references an `ImageCatalog` that
-  defines extensions for the current PostgreSQL major version, those
-  definitions serve as the default configuration. This allows the catalog to
-  centrally manage the `image.reference`, while the cluster simply enables the
-  extension by name.
-- **Direct Definition:** If a cluster does not use an image catalog, the `image.reference` field is **mandatory** and must explicitly point to the extension's container image.
+:::important
+The `name` must consist of lowercase alphanumeric characters, underscores (`_`)
+or hyphens (`-`) and must start and end with an alphanumeric character.
+:::
+
+Each entry defines the configuration for a container image and specifies the
+options PostgreSQL needs to locate and load the extension:
+
+- [**Via Image Catalog**](#via-an-image-catalog-recommended):
+  If the cluster references an `ImageCatalog` that defines extensions for the
+  current PostgreSQL major version, those definitions serve as the default
+  configuration. This allows the catalog to centrally manage the
+  `image.reference`, while the cluster simply enables the extension by name.
+
+- [**Direct Definition**](#directly-in-the-cluster):
+  If a cluster does not use an image catalog, the `image.reference` field is
+  mandatory and must explicitly point to a valid container registry path for the
+  extension image. The `image` stanza follows the
+  [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).
 
 Following the *"convention over configuration"* paradigm, CloudNativePG
 provides total flexibility: any value inherited from a catalog, including the
@@ -108,11 +131,20 @@ definition to meet specific local requirements.
 
 Each extension is mounted as a read-only volume at
 `/extensions/<EXTENSION_NAME>` inside the pod.
+
 By default, CloudNativePG automatically manages the relevant GUCs by setting:
 
 - `extension_control_path` to `/extensions/<EXTENSION_NAME>/share`, allowing
   PostgreSQL to locate any extension control file within `/extensions/<EXTENSION_NAME>/share/extension`
 - `dynamic_library_path` to `/extensions/<EXTENSION_NAME>/lib`
+
+:::note
+Extension names containing underscores (e.g., `pg_ivm`) are converted to use
+hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
+DNS label requirements. Do not use extension names that become identical after
+sanitization (e.g., `pg_ivm` and `pg-ivm` both sanitize to `pg-ivm`). The
+webhook validation will prevent such conflicts.
+:::
 
 These values are appended in the order in which the extensions are defined in
 the `extensions` list, ensuring deterministic path resolution within
@@ -123,7 +155,7 @@ While you can manually adjust these paths to match a custom image layout,
 official CloudNativePG catalogs pre-configure these options to the correct
 values for each extension, ensuring they work out-of-the-box.
 
-:::info[Important]
+:::important
 If an extension image includes shared libraries, they must be compiled for the
 same PostgreSQL major version, operating system distribution, and CPU
 architecture as the operand image.  Using official CloudNativePG catalogs
@@ -132,246 +164,206 @@ the specific environment of the cluster, preventing runtime issues caused by
 library or architecture mismatches.
 :::
 
-## How to add a new extension
+### Installation in a Database
 
-Adding an extension to a database in CloudNativePG involves a few steps:
+You can leverage [declarative database management](declarative_database_management#managing-extensions-in-a-database)
+to automate the final activation of any extension that supports the standard
+PostgreSQL `CREATE EXTENSION` mechanism.
 
-1. Define the extension image in the `Cluster` resource so that PostgreSQL can
-   discover and load it.
-2. Add the library to [`shared_preload_libraries`](postgresql_conf.md#shared-preload-libraries)
-   if the extension requires it.
-3. Declare the extension in the `Database` resource where you want it
-   installed, if the extension supports `CREATE EXTENSION`.
-
-:::warning
-    Avoid making changes to extension images and PostgreSQL configuration
-    settings (such as `shared_preload_libraries`) simultaneously.
-    First, allow the pod to roll out with the new extension image, then update
-    the PostgreSQL configuration.
-    This limitation will be addressed in a future release of CloudNativePG.
-:::
-
-For illustration purposes, this guide uses a simple, fictitious extension named
-`foo` that supports `CREATE EXTENSION`.
-
-### Adding a new extension to a `Cluster` resource
-
-You can add an `ImageVolume`-based extension to a `Cluster` using the
-`.spec.postgresql.extensions` stanza. For example:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: foo-18
-spec:
-  # ...
-  postgresql:
-    extensions:
-      - name: foo
-        image:
-          reference: # registry path for your extension image
-  # ...
-```
-
-The `name` field is **mandatory** and **must be unique within the cluster**, as
-it determines the mount path (`/extensions/foo` in this example). It must
-consist of *lowercase alphanumeric characters, underscores (`_`) or hyphens (`-`)* and must start
-and end with an alphanumeric character.
-
-:::note
-Extension names containing underscores (e.g., `pg_ivm`) are converted to use
-hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
-DNS label requirements. Do not use extension names that become identical after
-sanitization (e.g., `pg_ivm` and `pg-ivm` both sanitize to `pg-ivm`). The
-webhook validation will prevent such conflicts.
-:::
-
-The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).
-The `reference` must point to a valid container registry path for the extension
-image.
-
-:::info[Important]
-    When a new extension is added to a running `Cluster`, CloudNativePG will
-    automatically trigger a [rolling update](rolling_update.md) to attach the new
-    image volume to each pod. Before adding a new extension in production,
-    ensure you have thoroughly tested it in a staging environment to prevent
-    configuration issues that could leave your PostgreSQL cluster in an unhealthy
-    state.
-:::
-
-Once mounted, CloudNativePG will automatically configure PostgreSQL by appending:
-
-- `/extensions/foo/share` to `extension_control_path`
-- `/extensions/foo/lib` to `dynamic_library_path`
-
-This ensures that the PostgreSQL container is ready to serve the `foo`
-extension when requested by a database, as described in the next section. The
-`CREATE EXTENSION foo` command, triggered automatically during the
-[reconciliation of the `Database` resource](declarative_database_management.md#managing-extensions-in-a-database),
-will work without additional configuration, as PostgreSQL will locate:
-
-- the extension control file at `/extensions/foo/share/extension/foo.control`
-- the shared library at `/extensions/foo/lib/foo.so`
-
-:::note
-If the extension requires one or more shared libraries to be pre-loaded at
-server start, you can add them via the [`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries).
-:::
-
-### Adding a new extension defined via `Image Catalog` to a `Cluster` resource
-
-`ImageVolume` extension can also be defined in the `.spec.images[].extensions` stanza
-of an `ImageCatalog` or `ClusterImageCatalog`.
-To add extensions to a catalog, please refer to [Image Catalog with Image Volume Extensions](image_catalog.md#image-catalog-with-image-volume-extensions).
-
-Clusters that reference a catalog image for which extensions are defined can request any of
-those extensions to be loaded into the `Cluster`.
-
-**Example: enabling catalog-defined extensions:**
-Given an `ImageCatalog` that defines the extensions `foo` and `bar`
-for the PostgreSQL major version `18`:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: ImageCatalog
-metadata:
-  name: postgresql
-spec:
-  images:
-    - major: 18
-      image: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
-      extensions:
-        - name: foo
-          image:
-            reference: # registry path for your `foo` extension image
-        - name: bar
-          image:
-            reference: # registry path for your `bar` extension image
-```
-
-You can enable one or more of these extensions inside a `Cluster` by referencing the extension's `name`
-under `.spec.postgresql.extensions`.
-For example, to enable only the `foo` extension:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  imageCatalogRef:
-    apiGroup: postgresql.cnpg.io
-    kind: ImageCatalog
-    name: postgresql
-    major: 18
-
-  postgresql:
-    extensions:
-      - name: foo
-```
-
-**Example: combining catalog-defined and cluster-defined extensions:**
-You can define additional extensions directly at the `Cluster` level alongside extensions coming
-from the referenced catalog. For example:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  imageCatalogRef:
-    apiGroup: postgresql.cnpg.io
-    kind: ImageCatalog
-    name: postgresql
-    major: 18
-
-  postgresql:
-    extensions:
-      - name: foo
-      - name: baz
-        image:
-          reference: # registry path for your `baz` extension image
-```
-
-In this case:
-* `foo` is loaded from the catalog definition
-* `baz` is defined entirely at the Cluster level
-
-**Example: overriding catalog-defined extensions:**
-
-Any configuration field of an extension defined in the catalog can be overridden directly
-in the `Cluster` object.
-
-When both the catalog and the `Cluster` define an extension with the same `name`, the
-`Cluster` configuration takes precedence.
-This allows the catalog to act as a base layer
-of configuration that can be selectively overridden by individual clusters.
-
-For example, you can request the `bar` extension from the catalog while overriding its
-configuration to set a custom `extension_control_path`:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  imageCatalogRef:
-    apiGroup: postgresql.cnpg.io
-    kind: ImageCatalog
-    name: postgresql
-    major: 18
-
-  postgresql:
-    extensions:
-      - name: foo
-      - name: baz
-        image:
-          reference: # registry path for your `baz` extension image
-      - name: bar
-        extension_control_path:
-          - my/bar/custom/path
-```
-
-In this example, the bar extension is loaded using the `image.reference` defined in the catalog, while
-its `extension_control_path` is overridden at the Cluster level with a custom value.
-
-Any field of an [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration) can be
-overridden at `Cluster` level, with the exception of `name`.
-Changing the `name` results in defining a separate extension rather than overriding an
-existing one.
-
-### Adding a new extension to a `Database` resource
-
-Once the extension is available in the PostgreSQL instance, you can leverage
-declarative databases to [manage the lifecycle of your extensions](declarative_database_management.md#managing-extensions-in-a-database)
-within the target database.
-
-Continuing with the `foo` example, you can request the installation of the
-`foo` extension in the `app` database of the `foo-18` cluster using the
-following resource definition:
+Once the extension image is mounted and the GUCs are configured, the extension
+is available to the PostgreSQL instance but is not yet active within a specific
+database. To install it, define a `Database` resource. The example below uses
+`pgvector`, following the implementation standards of the
+[official `postgres-extensions-containers` project](https://github.com/cloudnative-pg/postgres-extensions-containers/tree/main/pgvector):
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: foo-app
+  name: cluster-example-app
 spec:
   name: app
   owner: app
   cluster:
-    name: foo-18
+    name: cluster-example
   extensions:
-    - name: foo
-      version: 1.0
+    - name: vector
+      version: "<VERSION>"
 ```
 
-CloudNativePG will automatically reconcile this resource, executing the
-`CREATE EXTENSION foo` command inside the `app` database if it is not
-already installed, ensuring your desired state is maintained without manual
-intervention.
+CloudNativePG automatically reconciles this resource by executing
+`CREATE EXTENSION IF NOT EXISTS vector` within the target database. This
+ensures your desired state is maintained and consistently applied across all
+instances.
+
+:::note
+Some PostgreSQL components, often referred to as modules, do not use the
+`CREATE EXTENSION` mechanism. These typically consist of shared libraries that
+must be loaded via `shared_preload_libraries` at server start.
+Even when using an image catalog to simplify the distribution of these
+binaries, you must still manually add the library name to the
+[`shared_preload_libraries` option](postgresql_conf.md#shared-preload-libraries)
+in your `Cluster` definition to ensure it is loaded into memory.
+:::
+
+## Adding an Extension to a Postgres Cluster
+
+As anticipated earlier, CloudNativePG offers two ways to define extension
+images. While both achieve the same result at the Pod level, using an image
+catalog is the recommended approach for maintaining a consistent,
+production-ready supply chain.
+
+### Via an Image Catalog (Recommended)
+
+:::info
+Support for extension container images in image catalogs was introduced in
+CloudNativePG 1.29.
+:::
+
+When you use an [image catalog that covers extensions](image_catalog.md#image-catalog-with-image-volume-extensions)
+like the [official ones](image_catalog.md#cloudnativepg-catalogs)
+provided by the community, the complex configuration details, such as the
+specific container image `reference` and the required filesystem paths, are
+managed centrally.
+
+Your `Cluster` definition remains clean and declarative, as it only needs to
+"opt-in" to the extension by name. The operator automatically handles the
+resolution of the image and the required PostgreSQL settings based on the
+catalog's definitions.
+
+To enable an extension like `pgvector` from a catalog, add it to the
+`extensions` list in your cluster like in the following excerpt:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  # ... <snip>
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+
+  postgresql:
+    extensions:
+      - name: pgvector # Resolves all details, including the image reference, from the catalog
+      # ... <snip>
+```
+
+This method ensures that the extension image is always compatible with the
+PostgreSQL operand image defined in the same catalog entry.
+
+### Directly in the Cluster
+
+:::info
+Defining extensions directly in the `Cluster` resource is the original method
+and remains the only option for versions prior to CloudNativePG 1.29.
+It is also useful if you need to use an extension not present in your current
+catalog or for testing custom images.
+:::
+
+You can define an extension directly within the `Cluster` resource without a
+catalog. In this case, you must explicitly provide the image `reference`.
+
+The following example shows how to add `pgvector` by explicitly pointing to its
+official container image:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  # ... <snip>
+  postgresql:
+    extensions:
+      - name: pgvector
+        image:
+          reference: ghcr.io/cloudnative-pg/pgvector:<TAG>
+```
+
+:::tip
+Remember that configuration provided directly in the `Cluster` takes
+precedence. If you reference a catalog but also define the same extension name
+in the `Cluster` stanza, the settings in the `Cluster` will override those in
+the catalog.
+While every field in an [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration)
+can be overridden at the `Cluster` level to provide total flexibility, the
+`name` field is the exception.
+:::
+
+:::warning
+The `name` serves as the unique identifier; changing it will define a new
+extension entry rather than overriding an existing one from a catalog.
+:::
+
+### Verifying Extension Status
+
+Because extensions can be sourced from both image catalogs and direct cluster
+definitions, CloudNativePG provides a "resolved" view of the configuration in
+the `Cluster` status. This is the final, effective state the operator uses to
+provision the pods.
+
+You can inspect the `status.pgDataImageInfo.extensions` field to see the
+results of any inheritance or overrides:
+
+```yaml
+# ... <snip>
+status:
+  # ... <snip>
+  pgDataImageInfo:
+    image: # registry path for your PostgreSQL image
+    majorVersion: 18
+    extensions:
+    - name: foo
+      image:
+        reference: # registry path for your `foo` extension image
+    - name: bar
+      image:
+        reference: # registry path for your `bar` extension image
+    # ... <snip>
+```
+
+This section is particularly useful for:
+
+- **Validating Resolution:** Confirming that an extension requested by name in
+  the `Cluster` has correctly pulled its `image.reference` from the associated
+  catalog.
+- **Confirming Overrides:** Verifying that a cluster-level override (such as a
+  specific image version) has successfully replaced the catalog's default
+  value.
+- **Troubleshooting:** Ensuring all desired extensions are recognized by the
+  operator before the pods undergo a rolling update.
+
+## Removing an Extension from a PostgreSQL Cluster
+
+Removing an extension involves a two-step process to clean up both the
+infrastructure and the database metadata.
+
+You should first remove the extension from the database to avoid "library not
+found" errors. If you are using declarative management, update your `Database`
+resource by setting `ensure: absent` for the extension:
+
+```yaml
+spec:
+  # ... <snip>
+  extensions:
+    - name: pgvector
+      ensure: absent
+    # ... <snip>
+```
+
+This triggers CloudNativePG to execute `DROP EXTENSION` within the database.
+
+If the extension was added to `shared_preload_libraries`, you must also remove
+it from your `Cluster` configuration.
+
+Then, remove the extension entry from the `.spec.postgresql.extensions` list in
+your `Cluster` resource. The operator will perform a rolling update to detach
+the `ImageVolume` and update the relevant GUC paths.
 
 ## Advanced Topics
 
@@ -410,6 +402,7 @@ For example:
 
 ```yaml
 spec:
+  # ... <snip>
   postgresql:
     extensions:
       - name: my-extension
@@ -419,6 +412,9 @@ spec:
           - my/lib/path
         image:
           reference: # registry path for your extension image
+      # ... <snip>
+    # ... <snip>
+  # ... <snip>
 ```
 
 CloudNativePG will configure PostgreSQL with:
@@ -441,7 +437,7 @@ in its own subdirectory:
 ```yaml
 # ...
 spec:
-  # ...
+  # ... <snip>
   postgresql:
     extensions:
       - name: geospatial
@@ -451,12 +447,12 @@ spec:
         dynamic_library_path:
           - postgis/lib
           - pgrouting/lib
-        # ...
+        # ... <snip>
         image:
           reference: # registry path for your geospatial image
-      # ...
-    # ...
-  # ...
+      # ... <snip>
+    # ... <snip>
+  # ... <snip>
 ```
 
 ### Including System Libraries
@@ -472,58 +468,32 @@ required libraries:
 ```yaml
 # ...
 spec:
-  # ...
+  # ... <snip>
   postgresql:
     extensions:
       - name: postgis
-        # ...
+        # ... <snip>
         ld_library_path:
           - system
         image:
           reference: # registry path for your PostGIS image
-      # ...
-    # ...
-  # ...
+      # ... <snip>
+    # ... <snip>
+  # ... <snip>
 ```
 
 CloudNativePG will set the `LD_LIBRARY_PATH` environment variable to include
 `/extensions/postgis/system`, allowing PostgreSQL to locate and load these
 system libraries at runtime.
 
-:::info[Important]
-    Since `ld_library_path` must be set when the PostgreSQL process starts,
-    changing this value requires a **cluster restart** for the new value to take effect.
-    CloudNativePG does not currently trigger this restart automatically; you will need to
-    manually restart the cluster (e.g., using `cnpg restart`) after modifying `ld_library_path`.
+:::important
+Since `ld_library_path` must be set when the PostgreSQL process starts,
+changing this value requires a **cluster restart** for the new value to take
+effect.
+CloudNativePG does not currently trigger this restart automatically; you will
+need to manually restart the cluster (e.g., using `cnpg restart`) after
+modifying `ld_library_path`.
 :::
-
-## Inspecting the Cluster's Extensions Status
-
-The `Cluster` status includes a dedicated section for `ImageVolume` Extensions:
-
-```yaml
-status:
-
-  <- snipped ->
-  pgDataImageInfo:
-    image: # registry path for your PostgreSQL image
-    majorVersion: 18
-    extensions:
-    - name: foo
-      image:
-        reference: # registry path for your `foo` extension image
-    - name: bar
-      image:
-        reference: # registry path for your `bar` extension image
-```
-
-This section is particularly useful when extensions are defined through an image
-catalog, when catalog-defined and Cluster-defined extensions are combined, or
-when catalog-defined extensions are overridden at the Cluster level.
-
-The `pgDataImageInfo.extensions` field shows the fully resolved configuration of
-all `ImageVolume` Extensions. This is the effective configuration that the operator
-uses to provision and configure extensions for the Cluster's instances.
 
 ## Image Specifications
 
@@ -539,15 +509,20 @@ Following this structure ensures that the extension will be automatically
 discoverable and usable by PostgreSQL within CloudNativePG without requiring
 manual configuration.
 
-:::info[Important]
-    We encourage PostgreSQL extension developers to publish OCI-compliant extension
-    images following this layout as part of their artifact distribution, making
-    their extensions easily consumable within Kubernetes environments.
-    Ideally, extension images should target a specific operating system
-    distribution and architecture, be tied to a particular PostgreSQL version, and
-    be built using the distribution’s native packaging system (for example, using
-    Debian or RPM packages). This approach ensures consistency, security, and
-    compatibility with the PostgreSQL images used in your clusters.
+:::important
+We encourage PostgreSQL extension developers and third-party providers to
+publish OCI-compliant extension images following this layout.
+For practical implementation details, we recommend reviewing the
+[`postgres-extensions-containers` project](https://github.com/cloudnative-pg/postgres-extensions-containers),
+which serves as the reference for building official CloudNativePG extension images.
+
+Ideally, extension images should:
+
+- Target a specific operating system distribution and set of CPU architectures.
+- Be tied to a particular PostgreSQL major version.
+- Be built using the distribution’s native packaging system (e.g., `.deb` or
+  `.rpm` packages) to ensure consistency, security, and compatibility with the
+  PostgreSQL operand images used in your clusters.
 :::
 
 ## Caveats
