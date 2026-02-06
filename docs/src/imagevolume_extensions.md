@@ -9,49 +9,64 @@ title: Image Volume Extensions
 
 CloudNativePG supports the **dynamic loading of PostgreSQL extensions** into a
 `Cluster` at Pod startup using the [Kubernetes `ImageVolume` feature](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
-and the `extension_control_path` GUC introduced in PostgreSQL 18, to which this
-project contributed.
+alongside the `extension_control_path` GUC introduced in PostgreSQL 18, a
+feature to which the CloudNativePG project contributed.
 
 This feature allows you to mount a [PostgreSQL extension](https://www.postgresql.org/docs/current/extend-extensions.html),
 packaged as an OCI-compliant container image, as a read-only and immutable
-volume inside a running pod at a known filesystem path.
+volume at a designated filesystem path within a running pod.
 
-If your extension requires being created at the database level through
-the `CREATE EXTENSION` command, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md#managing-extensions-in-a-database)
-to ensure consistent, automated extension setup within your PostgreSQL databases.
+For extensions requiring database-level installation via the `CREATE EXTENSION`
+command, you can use the [`Database` resource’s declarative extension management](declarative_database_management.md#managing-extensions-in-a-database)
+to ensure consistent, automated setup across all your PostgreSQL databases.
+
+## Official Extension Images and Catalogs
+
+The CloudNativePG Community maintains a suite of extension container
+images, including
+[pgvector](https://github.com/cloudnative-pg/postgres-extensions-containers/tree/main/pgvector)
+and
+[PostGIS](https://github.com/cloudnative-pg/postgres-extensions-containers/tree/main/postgis),
+as part of the [`postgres-extensions-containers` project](https://github.com/cloudnative-pg/postgres-extensions-containers)).
+These images are built on top of the
+[official PostgreSQL `minimal` images](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#minimal-images).
+
+While this documentation provides the necessary technical specifications for
+third parties to build their own images and catalogs, the following
+instructions focus specifically on the deployment and usage of our official
+extension images and catalogs.
 
 ## Benefits
 
-Image volume extensions decouple the distribution of PostgreSQL operand
-container images from the distribution of extensions. This eliminates the
-need to define and embed extensions at build time within your PostgreSQL
-images—a major adoption blocker for PostgreSQL as a containerized workload,
-including from a security and supply chain perspective.
+By decoupling the distribution of extensions from the PostgreSQL operand
+images, this feature removes a significant barrier to running PostgreSQL in
+containers. It eliminates the need to embed extensions at build time, allowing
+you to use official minimal operand images and dynamically add only the
+required extensions to your `Cluster` definitions—either directly or via an
+image catalog.
 
-As a result, you can:
-
-- Use the [official PostgreSQL `minimal` operand images](https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#minimal-images)
-  provided by CloudNativePG.
-- Dynamically add required extensions to your `Cluster` definitions, either
-  directly or via an image catalog, without rebuilding or maintaining custom
-  PostgreSQL images.
-- Reduce your operational surface by using immutable, minimal, and secure base
-  images while adding only the extensions required for each workload.
-
-Extension images must be built according to the
-[documented specifications](#image-specifications).
+This approach significantly reduces the attack surface of your database
+clusters by ensuring that the core database container contains only the
+essential binaries required for operation.
+By excluding unnecessary extensions, libraries, and build-time dependencies,
+you minimize potential entry points for exploits and simplify vulnerability
+management.
+This architecture enhances supply chain security and reduces operational
+overhead by maintaining an immutable, minimal base image for your data
+workloads.
 
 :::important
-The CloudNativePG Community maintains extension images as part of the
-[`postgres-extensions-containers` project](https://github.com/cloudnative-pg/postgres-extensions-containers).
+Extension images must be built according to the [documented specifications](#image-specifications).
 :::
 
 ## Requirements
 
 To use image volume extensions with CloudNativePG, you need:
 
-- **PostgreSQL 18 or later**, with support for `extension_control_path`.
-- **Kubernetes 1.35** or later (1.33 and 1.34 with the `ImageVolume` feature gate enabled).
+- **PostgreSQL 18 or later**: Required for `extension_control_path` support.
+- **Kubernetes 1.35 or later**: The `ImageVolume` feature is enabled by
+  default. Users on Kubernetes 1.33 and 1.34 must manually enable the
+  `ImageVolume` feature gate.
 - **Container runtime with `ImageVolume` support**:
     - `containerd` v2.1.0 or later, or
     - `CRI-O` v1.31 or later.
@@ -71,9 +86,10 @@ the `.spec.postgresql.extensions` stanza.
 :::
 
 The `extensions` stanza accepts a list of extensions to be added to the
-PostgreSQL cluster.
-
-Each image volume is mounted at `/extensions/<EXTENSION_NAME>`.
+PostgreSQL cluster. Each entry provides the configuration for a container image
+to be loaded as a read-only volume, as well as the options that allow PostgreSQL
+to locate and load the extension. Each image volume is mounted at
+`/extensions/<EXTENSION_NAME>` inside the pod.
 
 By default, CloudNativePG automatically manages the relevant GUCs, setting:
 
