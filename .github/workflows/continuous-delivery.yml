@@ -795,6 +795,7 @@ jobs:
     name: Run E2E on K3D
     if: |
       (always() && !cancelled()) &&
+      github.event_name == 'workflow_dispatch' &&
       needs.generate-jobs.outputs.k3dEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
     needs:
