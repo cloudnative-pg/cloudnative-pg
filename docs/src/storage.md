@@ -153,6 +153,8 @@ spec:
     storageClass: standard
     size: 1Gi
 ```
+You can update the storageClass by [Re-creating the PVCs](#Re-creating-storage)
+
 
 ## Configuration via a PVC template
 
@@ -274,11 +276,10 @@ doesn't support that, you must delete the pod to trigger the resize.
 The best way to proceed is to delete one pod at a time, starting from replicas
 and waiting for each pod to be back up.
 
-### Re-creating storage
+## Re-creating storage
 
-If the storage class doesn't support volume expansion, you can still regenerate
-your cluster on different PVCs. Allocate new PVCs with increased storage and
-then move the database there. This operation is feasible only when the cluster
+If the storage class doesn't support volume expansion or you need to migrate to a new storageClass, you can still regenerate
+your cluster on different PVCs. Allocate new PVCs with increased storage and then move the database there. This operation is feasible only when the cluster
 contains more than one node.
 
 While you do that, you need to prevent the operator from changing the existing
@@ -344,6 +345,23 @@ cluster-example-2              1/1     Running     0          5m43s
 cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
+
+For recreating the PVCs on a new storageClass, edit the cluster definition to include it:
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-storage-class
+spec:
+  instances: 3
+  storage:
+    storageClass: database
+    size: 1Gi
+```
+Then delete the pods and PVC's one by one starting with the replicas, then promote the updated running replica to primary, after the new primary is healthy you can delete the old primary pod and PVCs.
+
+If using NFS refer to [CREATING-CLUSTER-NFS](https://www.postgresql.org/docs/current/creating-cluster.html#CREATING-CLUSTER-NFS)
+
 
 ## Static provisioning of persistent volumes
 
