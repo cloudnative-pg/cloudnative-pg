@@ -119,7 +119,7 @@ options PostgreSQL needs to locate and load the extension:
   If a cluster does not use an image catalog, the `image.reference` field is
   mandatory and must explicitly point to a valid container registry path for the
   extension image. The `image` stanza follows the
-  [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).
+  [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/concepts/storage/volumes/#image).
 
 Following the *"convention over configuration"* paradigm, CloudNativePG
 provides total flexibility: any value inherited from a catalog, including the
@@ -158,7 +158,7 @@ values for each extension, ensuring they work out-of-the-box.
 :::important
 If an extension image includes shared libraries, they must be compiled for the
 same PostgreSQL major version, operating system distribution, and CPU
-architecture as the operand image.  Using official CloudNativePG catalogs
+architecture as the operand image. Using official CloudNativePG catalogs
 ensures this compatibility automatically: the catalogs are designed to match
 the specific environment of the cluster, preventing runtime issues caused by
 library or architecture mismatches.

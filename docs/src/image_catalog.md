@@ -22,7 +22,7 @@ resources, covering all official Community PostgreSQL container images.
 The primary difference between the two resources is their scope:
 
 | Resource              | Scope        | Best use case                                               |
-| --------------------- | ------------ | ----------------------------------------------------------- |
+|-----------------------|--------------|-------------------------------------------------------------|
 | `ImageCatalog`        | Namespaced   | Application-specific versions or team-level restrictions.   |
 | `ClusterImageCatalog` | Cluster-wide | Global standards across all namespaces for an organization. |
 
