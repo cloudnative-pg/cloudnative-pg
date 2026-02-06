@@ -52,6 +52,7 @@ body:
         - "1.26 (latest patch)"
         - "1.25 (latest patch)"
         - "trunk (main)"
+        - "older in 1.28.x"
         - "older in 1.27.x"
         - "older in 1.26.x"
         - "older in 1.25.x"
@@ -63,6 +64,7 @@ body:
     attributes:
       label: What version of Kubernetes are you using?
       options:
+        - "1.35"
         - "1.34"
         - "1.33"
         - "1.32"
