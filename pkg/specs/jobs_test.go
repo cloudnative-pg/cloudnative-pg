@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -164,7 +165,8 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		job, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
@@ -185,7 +187,8 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		job, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).ToNot(HaveOccurred())
 
 		jobCommand := job.Spec.Template.Spec.Containers[0].Command
 		Expect(jobCommand).Should(ContainElement("--initdb-flags"))
@@ -223,7 +226,8 @@ var _ = Describe("Job created via InitDB", func() {
 				},
 			},
 		}
-		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		job, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).ToNot(HaveOccurred())
 		Expect(job.Labels).To(BeEquivalentTo(map[string]string{
 			utils.ClusterLabelName:                cluster.Name,
 			utils.JobRoleLabelName:                "initdb",
@@ -244,5 +248,97 @@ var _ = Describe("Job created via InitDB", func() {
 			utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 			utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 		}))
+	})
+})
+
+var _ = Describe("CreatePrimaryJob via InitDB with JobPatch", func() {
+	It("applies JSON patch from annotation to job container image", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.JobPatchAnnotationName: `[{"op": "add", "path": "/spec/template/spec/terminationGracePeriodSeconds", "value": 30}]`, // nolint: lll
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "original-image:old",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+
+		job, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(job).ToNot(BeNil())
+		Expect(job.Spec.Template.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To[int64](30)))
+	})
+
+	It("applies JSON patch from annotation to job name", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.JobPatchAnnotationName: `[{"op": "replace", "path": "/metadata/name", "value": "custom-job-name"}]`, // nolint: lll
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+
+		job, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(job).ToNot(BeNil())
+		Expect(job.Name).To(Equal("custom-job-name"))
+	})
+
+	It("returns error if JSON patch is invalid", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.JobPatchAnnotationName: `invalid-json-patch`,
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+
+		_, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
+	})
+
+	It("returns error if JSON patch path is invalid", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.JobPatchAnnotationName: `[{"op": "replace", "path": "/nonexistent/path", "value": "test"}]`,
+				},
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:18.0",
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{},
+				},
+			},
+		}
+
+		_, err := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("while applying JSON patch from annotation"))
 	})
 })
