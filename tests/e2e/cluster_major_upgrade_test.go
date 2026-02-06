@@ -77,6 +77,9 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		defaultMinimalSuffix  = "-minimal-trixie"
 		defaultSystemSuffix   = "-system-trixie"
 		defaultPostGISSuffix  = "-postgis-trixie"
+
+		// env vars used to skip certain scenarios
+		skipArchiveScenarioEnvVar = "POSTGRES_MAJOR_UPGRADE_SKIP_ARCHIVE_SCENARIO"
 	)
 
 	type scenario struct {
@@ -438,6 +441,16 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 	DescribeTable("can upgrade a Cluster to a newer major version", func(scenarioName string) {
 		By("Creating the starting cluster")
 		scenario := scenarios[scenarioName]
+
+		// If the skipArchiveScenarioEnvVar is present, skip the archiving scenario.
+		skipArchiveScenario := false
+		if _, ok := os.LookupEnv(skipArchiveScenarioEnvVar); ok {
+			skipArchiveScenario = true
+		}
+		if scenarioName == postgresqlSystemEntry && skipArchiveScenario {
+			Skip("Skipping the archiving scenario")
+		}
+
 		cluster := scenario.startingCluster
 		err := env.Client.Create(env.Ctx, cluster)
 		Expect(err).NotTo(HaveOccurred())
