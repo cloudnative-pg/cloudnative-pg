@@ -13,6 +13,10 @@ definition. By using a catalog, you can manage image updates centrally; when a
 catalog entry is updated, all associated clusters automatically
 [roll out the new image](rolling_update.md).
 
+While you can build custom catalogs, CloudNativePG provides
+[official catalogs](#cloudnativepg-catalogs) as `ClusterImageCatalog`
+resources, covering all official Community PostgreSQL container images.
+
 ## Catalog scoping
 
 The primary difference between the two resources is their scope:
@@ -122,14 +126,16 @@ spec:
             reference: # registry path for your `foo` extension image
 ```
 
-The `extensions` section follows the [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration) API schema.
+The `extensions` section follows the [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration)
+API schema and structure.
+Clusters referencing an image catalog can load any of its associated extensions
+by name.
 
-As a result, the [Image volume Extensions - Advanced Topics](imagevolume_extensions.md#advanced-topics) section also apply
-here in case you need to finely control the configuration of an extension.
-
-A `Cluster` that references a Catalog image for a given major version can
-request any extensions associated with that image to be loaded into the `Cluster`.
-For details, see [Adding a new extension defined via `Image Catalog` to a `Cluster` resource](imagevolume_extensions.md#adding-a-new-extension-defined-via-image-catalog-to-a-cluster-resource).
+:::info
+Refer to the [documentation of image volume extensions](imagevolume_extensions.md)
+for details on the internal image structure, configuration options, and
+instructions on how to select or override catalog extensions within a cluster.
+:::
 
 ## CloudNativePG Catalogs
 
@@ -169,7 +175,8 @@ You can then view all the catalogs deployed with:
 kubectl get clusterimagecatalogs.postgresql.cnpg.io
 ```
 
-For example, you can create a cluster with the latest `minimal` image for PostgreSQL 18 on `trixie` with:
+For example, you can create a cluster with the latest `minimal` image for
+PostgreSQL 18 on `trixie` with:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
