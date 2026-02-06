@@ -1,0 +1,21 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-with-plugin
+spec:
+  instances: 1
+  
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Define the plugin
+  plugins:
+    - name: cnpg-i-plugin-mock.test
+      enabled: true
+      parameters:
+        mock: "true"
+
+  storage:
+    size: 1Gi
