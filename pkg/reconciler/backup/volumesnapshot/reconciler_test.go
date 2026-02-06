@@ -631,3 +631,148 @@ var _ = Describe("unmarshalMetadata", func() {
 		Expect(data).To(BeNil())
 	})
 })
+
+type mockClient struct {
+	k8client.Client
+	createError error
+}
+
+func (m *mockClient) Create(ctx context.Context, obj k8client.Object, opts ...k8client.CreateOption) error {
+	if m.createError != nil {
+		return m.createError
+	}
+	return m.Client.Create(ctx, obj, opts...)
+}
+
+var _ = Describe("createSnapshot with race condition", func() {
+	var (
+		ctx       context.Context
+		backup    *apiv1.Backup
+		cluster   *apiv1.Cluster
+		targetPod *corev1.Pod
+		pvc       *corev1.PersistentVolumeClaim
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-backup",
+			},
+			Status: apiv1.BackupStatus{
+				StartedAt: ptr.To(metav1.Now()),
+			},
+		}
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
+						ClassName: "csi-hostpath-snapclass",
+					},
+				},
+			},
+		}
+		targetPod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-pod",
+			},
+		}
+		pvc = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-pvc",
+				Labels: map[string]string{
+					utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+				},
+			},
+		}
+	})
+
+	It("should succeed if Create fails but Get returns existing snapshot with UID", func() {
+		// Prepare existing snapshot
+		snapName := persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name)
+		existingSnapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      snapName,
+				UID:       types.UID("existing-uid"),
+			},
+			Spec: volumesnapshotv1.VolumeSnapshotSpec{
+				Source: volumesnapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: &pvc.Name,
+				},
+			},
+		}
+
+		// Fake client with existing snapshot
+		baseClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(existingSnapshot).
+			Build()
+
+		// Wraps with mock to inject Create error
+		mClient := &mockClient{
+			Client:      baseClient,
+			createError: fmt.Errorf("simulated conflict error"),
+		}
+
+		reconciler := NewReconcilerBuilder(mClient, record.NewFakeRecorder(3)).Build()
+
+		// We use createSnapshot directly to test the unexpected error handling logic there
+		err := reconciler.createSnapshot(ctx, cluster, backup, targetPod, pvc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should fail if Create fails and Get fails (snapshot does not exist)", func() {
+		// Fake client WITHOUT existing snapshot
+		baseClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			Build()
+
+		// Wraps with mock to inject Create error
+		mClient := &mockClient{
+			Client:      baseClient,
+			createError: fmt.Errorf("simulated conflict error"),
+		}
+
+		reconciler := NewReconcilerBuilder(mClient, record.NewFakeRecorder(3)).Build()
+
+		err := reconciler.createSnapshot(ctx, cluster, backup, targetPod, pvc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("simulated conflict error"))
+	})
+
+	It("should fail if Create fails and Get returns snapshot without UID", func() {
+		// Prepare existing snapshot WITHOUT UID (simulating not yet persisted or some weird state)
+		snapName := persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName(backup.Name)
+		existingSnapshot := &volumesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      snapName,
+				// No UID
+			},
+		}
+
+		baseClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(existingSnapshot).
+			Build()
+
+		mClient := &mockClient{
+			Client:      baseClient,
+			createError: fmt.Errorf("simulated conflict error"),
+		}
+
+		reconciler := NewReconcilerBuilder(mClient, record.NewFakeRecorder(3)).Build()
+
+		err := reconciler.createSnapshot(ctx, cluster, backup, targetPod, pvc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("snapshot exists but has no UID"))
+	})
+})
