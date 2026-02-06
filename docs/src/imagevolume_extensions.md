@@ -85,13 +85,30 @@ the `.spec.postgresql.extensions` stanza.
     [API reference for `ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration).
 :::
 
-The `extensions` stanza accepts a list of extensions to be added to the
-PostgreSQL cluster. Each entry provides the configuration for a container image
-to be loaded as a read-only volume, as well as the options that allow PostgreSQL
-to locate and load the extension. Each image volume is mounted at
-`/extensions/<EXTENSION_NAME>` inside the pod.
+### Configuration Source and Precedence
 
-By default, CloudNativePG automatically manages the relevant GUCs, setting:
+The `extensions` stanza accepts a list of extensions. Each entry provides the
+configuration for a container image and the options required for PostgreSQL to
+locate and load it:
+
+- **Via Image Catalog:** If the cluster references an `ImageCatalog` that
+  defines extensions for the current PostgreSQL major version, those
+  definitions serve as the default configuration. This allows the catalog to
+  centrally manage the `image.reference`, while the cluster simply enables the
+  extension by name.
+- **Direct Definition:** If a cluster does not use an image catalog, the `image.reference` field is **mandatory** and must explicitly point to the extension's container image.
+
+Following the *"convention over configuration"* paradigm, CloudNativePG
+provides total flexibility: any value inherited from a catalog, including the
+`image.reference`, can be selectively overridden within the `Cluster`
+definition to meet specific local requirements.
+
+
+### Mounting and PostgreSQL Configuration
+
+Each extension is mounted as a read-only volume at
+`/extensions/<EXTENSION_NAME>` inside the pod.
+By default, CloudNativePG automatically manages the relevant GUCs by setting:
 
 - `extension_control_path` to `/extensions/<EXTENSION_NAME>/share`, allowing
   PostgreSQL to locate any extension control file within `/extensions/<EXTENSION_NAME>/share/extension`
@@ -102,17 +119,17 @@ the `extensions` list, ensuring deterministic path resolution within
 PostgreSQL. This allows PostgreSQL to discover and load the extension without
 requiring manual configuration inside the pod.
 
-:::info
-    Depending on how your extension container images are built and their layout,
-    you may need to adjust the default `extension_control_path` and
-    `dynamic_library_path` values to match the image structure.
-:::
+While you can manually adjust these paths to match a custom image layout,
+official CloudNativePG catalogs pre-configure these options to the correct
+values for each extension, ensuring they work out-of-the-box.
 
 :::info[Important]
-    If the extension image includes shared libraries, they must be compiled
-    with the same PostgreSQL major version, operating system distribution, and CPU
-    architecture as the PostgreSQL container image used by your cluster, to ensure
-    compatibility and prevent runtime issues.
+If an extension image includes shared libraries, they must be compiled for the
+same PostgreSQL major version, operating system distribution, and CPU
+architecture as the operand image.  Using official CloudNativePG catalogs
+ensures this compatibility automatically: the catalogs are designed to match
+the specific environment of the cluster, preventing runtime issues caused by
+library or architecture mismatches.
 :::
 
 ## How to add a new extension
