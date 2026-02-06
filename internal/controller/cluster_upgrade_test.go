@@ -280,27 +280,30 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	When("cluster has resources specified", func() {
-		clusterWithResources := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.0",
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
-					Limits: corev1.ResourceList{
-						"cpu":    resource.MustParse("2"),
-						"memory": resource.MustParse("1Gi"),
+		It("should trigger a rollout when the cluster has a Resource changed", func(ctx SpecContext) {
+			originalCluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.0",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("1Gi"),
+						},
 					},
 				},
-			},
-		}
-		It("should trigger a rollout when the cluster has a Resource changed", func(ctx SpecContext) {
+			}
 			pod, err := specs.NewInstance(
 				context.TODO(),
-				clusterWithResources,
+				originalCluster,
 				1,
 				true,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			clusterWithResources.Spec.Resources.Limits["cpu"] = resource.MustParse("3") // was "2"
+
+			// Create a modified cluster with different CPU limit
+			modifiedCluster := originalCluster.DeepCopy()
+			modifiedCluster.Spec.Resources.Limits["cpu"] = resource.MustParse("3") // was "2"
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -309,17 +312,32 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ExecutableHash: "test_hash",
 			}
 
-			rollout := isInstanceNeedingRollout(ctx, status, &clusterWithResources)
+			rollout := isInstanceNeedingRollout(ctx, status, modifiedCluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
-			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
+			Expect(rollout.reason).To(ContainSubstring("resource requirements changed"))
+			Expect(rollout.reason).To(ContainSubstring("pod recreation required"))
 			Expect(rollout.needsChangeOperandImage).To(BeFalse())
 			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
-			pod, err := specs.NewInstance(context.TODO(), clusterWithResources, 1, true)
+			originalCluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.0",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			pod, err := specs.NewInstance(context.TODO(), originalCluster, 1, true)
 			Expect(err).ToNot(HaveOccurred())
-			clusterWithResources.Spec.Resources = corev1.ResourceRequirements{}
+
+			// Create a modified cluster with resources deleted
+			modifiedCluster := originalCluster.DeepCopy()
+			modifiedCluster.Spec.Resources = corev1.ResourceRequirements{}
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -328,10 +346,10 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ExecutableHash: "test_hash",
 			}
 
-			rollout := isInstanceNeedingRollout(ctx, status, &clusterWithResources)
+			rollout := isInstanceNeedingRollout(ctx, status, modifiedCluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
-			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
+			Expect(rollout.reason).To(ContainSubstring("resource requirements changed"))
+			Expect(rollout.reason).To(ContainSubstring("pod recreation required"))
 			Expect(rollout.needsChangeOperandImage).To(BeFalse())
 			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
 		})
