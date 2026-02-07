@@ -353,6 +353,25 @@ The `.spec.smartShutdownTimeout` and `.spec.stopDelay` options, expressed in sec
 control the amount of time given to PostgreSQL to shut down. The values default
 to 180 and 1800 seconds, respectively.
 
+:::warning[Important Relationship with failoverDelay]
+The `.spec.smartShutdownTimeout` value must be significantly smaller than `.spec.failoverDelay`
+to prevent premature failover during controlled shutdown operations. A recommended
+ratio is at least 1:5, meaning `smartShutdownTimeout` should not exceed 20% of `failoverDelay`.
+This ensures that planned shutdowns complete before the cluster considers the instance
+unhealthy and triggers a failover.
+
+### Preventing Split-Brain Scenarios
+
+This relationship is critical to prevent **split-brain scenarios** that can occur when:
+
+1. **Smart shutdown fails** due to open connections blocking the shutdown process
+2. **The former primary remains running** but is unable to accept new connections during the smart shutdown attempt
+3. **Failover triggers prematurely** because `failoverDelay` is too short
+4. **Two primaries operate simultaneously** - the original primary (still running but blocked) and the newly promoted replica
+
+When smart shutdown fails due to long-running transactions, or connections kept open by a connection pooler, PostgreSQL waits for those transactions to complete before proceeding. If `failoverDelay` expires during this waiting period, the cluster may incorrectly assume the primary is unhealthy and promote a replica, leading to data inconsistency and potential corruption.
+:::
+
 The shutdown procedure is composed of two steps:
 
 1. The instance manager first issues a `CHECKPOINT`, then initiates a **smart**
