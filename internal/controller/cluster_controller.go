@@ -358,12 +358,22 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
+	// Check if poolers have been paused for too long (timeout check)
+	if err := r.checkPoolerPauseTimeout(ctx, cluster); err != nil {
+		contextLogger.Error(err, "while checking pooler pause timeout")
+	}
+
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		contextLogger.Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
+
+		// Pause poolers during switchover/failover
+		if err := r.pausePoolersDuringSwitchover(ctx, cluster); err != nil {
+			contextLogger.Error(err, "while pausing poolers for switchover")
+		}
 
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
@@ -683,6 +693,11 @@ func (r *ClusterReconciler) handleSwitchover(
 		return &ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
+		// Pause poolers before failover proceeds
+		if err := r.pausePoolersDuringSwitchover(ctx, cluster); err != nil {
+			contextLogger.Error(err, "while pausing poolers for failover")
+		}
+
 		// If we selected a new primary, stop the reconciliation loop here
 		contextLogger.Info("Waiting for the new primary to notice the promotion request",
 			"newPrimary", selectedPrimary)
@@ -690,6 +705,11 @@ func (r *ClusterReconciler) handleSwitchover(
 	}
 
 	// Primary is healthy, No switchover in progress.
+	// Resume poolers that were automatically paused during switchover
+	if err := r.resumePoolersAfterSwitchover(ctx, cluster); err != nil {
+		contextLogger.Error(err, "while resuming poolers after switchover")
+	}
+
 	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""

@@ -204,6 +204,23 @@ type ImageCatalogRef struct {
 	Major int `json:"major"`
 }
 
+// PoolerIntegrationConfiguration contains settings for pooler integration during cluster operations
+type PoolerIntegrationConfiguration struct {
+	// PauseDuringSwitchover when true, automatically pauses all associated
+	// PgBouncer poolers with automated integration during switchover/failover
+	// operations to minimize client connection failures.
+	// +kubebuilder:default:=false
+	// +optional
+	PauseDuringSwitchover *bool `json:"pauseDuringSwitchover,omitempty"`
+
+	// PauseDuringSwitchoverTimeout is the maximum duration to keep poolers
+	// paused during switchover. If the switchover doesn't complete within
+	// this time, poolers will be automatically resumed to prevent indefinite service disruption.
+	// +kubebuilder:default:="120s"
+	// +optional
+	PauseDuringSwitchoverTimeout *metav1.Duration `json:"pauseDuringSwitchoverTimeout,omitempty"`
+}
+
 // +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
 
 // ClusterSpec defines the desired state of a PostgreSQL cluster managed by
@@ -363,6 +380,10 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=0
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
+
+	// Pooler contains the configuration for pooler integration during cluster operations
+	// +optional
+	Pooler *PoolerIntegrationConfiguration `json:"pooler,omitempty"`
 
 	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
 	// to successfully respond to the liveness probe (default 30).
@@ -979,6 +1000,14 @@ type ClusterStatus struct {
 	// The timestamp when the last request for a new primary has occurred
 	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
+
+	// PoolersPausedForSwitchover indicates poolers were automatically paused for switchover/failover
+	// +optional
+	PoolersPausedForSwitchover bool `json:"poolersPausedForSwitchover,omitempty"`
+
+	// PoolersPausedTimestamp is when poolers were paused (RFC3339 format)
+	// +optional
+	PoolersPausedTimestamp string `json:"poolersPausedTimestamp,omitempty"`
 
 	// The integration needed by poolers referencing the cluster
 	// +optional

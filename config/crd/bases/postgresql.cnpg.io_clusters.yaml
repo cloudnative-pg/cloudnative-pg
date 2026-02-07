@@ -4338,6 +4338,25 @@ spec:
                         type: string
                     type: object
                 type: object
+              pooler:
+                description: Pooler contains the configuration for pooler integration
+                  during cluster operations
+                properties:
+                  pauseDuringSwitchover:
+                    default: false
+                    description: |-
+                      PauseDuringSwitchover when true, automatically pauses all associated
+                      PgBouncer poolers with automated integration during switchover/failover
+                      operations to minimize client connection failures.
+                    type: boolean
+                  pauseDuringSwitchoverTimeout:
+                    default: 120s
+                    description: |-
+                      PauseDuringSwitchoverTimeout is the maximum duration to keep poolers
+                      paused during switchover. If the switchover doesn't complete within
+                      this time, poolers will be automatically resumed to prevent indefinite service disruption.
+                    type: string
+                type: object
               postgresGID:
                 default: 26
                 description: The GID of the `postgres` user inside the image, defaults
@@ -7070,6 +7089,14 @@ spec:
                         type: array
                     type: object
                 type: object
+              poolersPausedForSwitchover:
+                description: PoolersPausedForSwitchover indicates poolers were automatically
+                  paused for switchover/failover
+                type: boolean
+              poolersPausedTimestamp:
+                description: PoolersPausedTimestamp is when poolers were paused (RFC3339
+                  format)
+                type: string
               pvcCount:
                 description: How many PVCs have been created by this cluster
                 format: int32
