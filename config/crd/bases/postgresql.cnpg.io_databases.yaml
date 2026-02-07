@@ -339,6 +339,31 @@ spec:
                 items:
                   description: SchemaSpec configures a schema in a database
                   properties:
+                    create:
+                      description: |-
+                        List of roles for which `CREATE` privileges on the schema are granted or revoked.
+                        Maps to the `GRANT CREATE ON SCHEMA` and `REVOKE CREATE ON SCHEMA` SQL commands.
+                      items:
+                        description: UsageSpec configures a usage for a foreign data
+                          wrapper
+                        properties:
+                          name:
+                            description: Name of the usage
+                            type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
+                          type:
+                            default: grant
+                            description: The type of usage
+                            enum:
+                            - grant
+                            - revoke
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     ensure:
                       default: present
                       description: |-
@@ -359,6 +384,31 @@ spec:
                         It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
                         `OWNER TO` command of `ALTER SCHEMA`.
                       type: string
+                    usage:
+                      description: |-
+                        List of roles for which `USAGE` privileges on the schema are granted or revoked.
+                        Maps to the `GRANT USAGE ON SCHEMA` and `REVOKE USAGE ON SCHEMA` SQL commands.
+                      items:
+                        description: UsageSpec configures a usage for a foreign data
+                          wrapper
+                        properties:
+                          name:
+                            description: Name of the usage
+                            type: string
+                            x-kubernetes-validations:
+                            - message: name is required
+                              rule: self != ''
+                          type:
+                            default: grant
+                            description: The type of usage
+                            enum:
+                            - grant
+                            - revoke
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                   required:
                   - name
                   type: object
