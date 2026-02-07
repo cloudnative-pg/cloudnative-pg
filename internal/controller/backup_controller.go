@@ -98,7 +98,7 @@ func NewBackupReconciler(
 		Client:               mgr.GetClient(),
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
-		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
+		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"), //nolint:staticcheck
 		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
 	}

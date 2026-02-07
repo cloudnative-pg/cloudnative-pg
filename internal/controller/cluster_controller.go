@@ -104,7 +104,7 @@ func NewClusterReconciler(
 		DiscoveryClient: discoveryClient,
 		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
+		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"), //nolint:staticcheck
 		Plugins:         plugins,
 		rolloutManager: rolloutManager.New(
 			configuration.Current.GetClustersRolloutDelay(),

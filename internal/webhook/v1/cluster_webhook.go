@@ -38,13 +38,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -59,8 +57,8 @@ var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
 // SetupClusterWebhookWithManager registers the webhook for Cluster in the manager.
 func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Cluster{}).
-		WithValidator(newBypassableValidator(&ClusterCustomValidator{})).
+	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Cluster{}).
+		WithValidator(newBypassableValidator[*apiv1.Cluster](&ClusterCustomValidator{})).
 		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
 }
@@ -73,14 +71,8 @@ func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 // Kind Cluster when those are created or updated.
 type ClusterCustomDefaulter struct{}
 
-var _ webhook.CustomDefaulter = &ClusterCustomDefaulter{}
-
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Cluster.
-func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
+func (d *ClusterCustomDefaulter) Default(_ context.Context, cluster *apiv1.Cluster) error {
 	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
 	cluster.Default()
@@ -97,14 +89,8 @@ func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) 
 // when it is created, updated, or deleted.
 type ClusterCustomValidator struct{}
 
-var _ webhook.CustomValidator = &ClusterCustomValidator{}
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
-func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
+func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
 	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
@@ -123,18 +109,8 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
 func (v *ClusterCustomValidator) ValidateUpdate(
 	_ context.Context,
-	oldObj, newObj runtime.Object,
+	oldCluster *apiv1.Cluster, cluster *apiv1.Cluster,
 ) (admission.Warnings, error) {
-	cluster, ok := newObj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object for the newObj but got %T", newObj)
-	}
-
-	oldCluster, ok := oldObj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object for the oldObj but got %T", oldObj)
-	}
-
 	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
@@ -157,11 +133,7 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
-func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
-	}
+func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, cluster *apiv1.Cluster) (admission.Warnings, error) {
 	clusterLog.Info("Validation for Cluster upon deletion", "name", cluster.GetName(), "namespace",
 		cluster.GetNamespace())
 
