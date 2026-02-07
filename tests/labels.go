@@ -103,4 +103,7 @@ const (
 
 	// LabelImageVolumeExtensions is a label for imageVolume extensions tests
 	LabelImageVolumeExtensions = "image-volume-extensions"
+
+	// LabelNamespacedOperator is a label for namespaced deployment tests with restricted rbac
+	LabelNamespacedOperator = "namespaced-operator"
 )

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -64,17 +65,20 @@ func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 
 	// First step: check if the current primary is running in an unschedulable node
 	// and issue a switchover if that's the case
-	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsPodReady)) &&
-		primary.Pod.Name == cluster.Status.CurrentPrimary &&
-		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulableOrBeingDrained(ctx, primary.Node)
-		if err != nil {
-			contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
-			// in case of error it's better to proceed with the normal target primary reconciliation
-		} else if isPrimaryOnUnschedulableNode {
-			contextLogger.Info("Primary is running on an unschedulable node, will try switching over",
-				"node", primary.Node, "primary", primary.Pod.Name)
-			return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primary)
+	// Can not check node settings in namespaced deployment
+	if !configuration.Current.Namespaced {
+		if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsPodReady)) &&
+			primary.Pod.Name == cluster.Status.CurrentPrimary &&
+			cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
+			isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulableOrBeingDrained(ctx, primary.Node)
+			if err != nil {
+				contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
+				// in case of error it's better to proceed with the normal target primary reconciliation
+			} else if isPrimaryOnUnschedulableNode {
+				contextLogger.Info("Primary is running on an unschedulable node, will try switching over",
+					"node", primary.Node, "primary", primary.Pod.Name)
+				return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primary)
+			}
 		}
 	}
 
