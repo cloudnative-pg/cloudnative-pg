@@ -112,10 +112,6 @@ func RunController(
 		LeaseDuration:    &leaderConfig.leaseDuration,
 		RenewDeadline:    &leaderConfig.renewDeadline,
 		LeaderElectionID: LeaderElectionID,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    port,
-			CertDir: defaultWebhookCertDir,
-		}),
 		PprofBindAddress: getPprofServerAddress(pprofDebug),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -130,6 +126,13 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
+	if conf.EnableWebhooks {
+		managerOptions.WebhookServer = webhook.NewServer(webhook.Options{
+			Port:    port,
+			CertDir: defaultWebhookCertDir,
+		})
+	}
+
 	if conf.WatchNamespace != "" {
 		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
@@ -140,7 +143,7 @@ func RunController(
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
-	if conf.WebhookCertDir != "" {
+	if conf.EnableWebhooks && conf.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
 		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = conf.WebhookCertDir
@@ -152,14 +155,16 @@ func RunController(
 		return err
 	}
 
-	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
-	if conf.WebhookCertDir != "" {
-		// Use certificate names compatible with OLM
-		webhookServer.Options.CertName = "apiserver.crt"
-		webhookServer.Options.KeyName = "apiserver.key"
-	} else {
-		webhookServer.Options.CertName = "tls.crt"
-		webhookServer.Options.KeyName = "tls.key"
+	var webhookServer *webhook.DefaultServer
+	if conf.EnableWebhooks {
+		webhookServer = mgr.GetWebhookServer().(*webhook.DefaultServer)
+		if conf.WebhookCertDir != "" {
+			webhookServer.Options.CertName = "apiserver.crt"
+			webhookServer.Options.KeyName = "apiserver.key"
+		} else {
+			webhookServer.Options.CertName = "tls.crt"
+			webhookServer.Options.KeyName = "tls.key"
+		}
 	}
 
 	// kubeClient is the kubernetes client set with
@@ -208,8 +213,10 @@ func RunController(
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
 
-	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
-		return err
+	if conf.EnableWebhooks {
+		if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
+			return err
+		}
 	}
 
 	pluginRepository := repository.New()
@@ -264,43 +271,45 @@ func RunController(
 		return err
 	}
 
-	if err = webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
-		return err
-	}
+	if conf.EnableWebhooks {
+		if err = webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
+			return err
+		}
 
-	if err = webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
-		return err
-	}
+		if err = webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
+			return err
+		}
 
-	if err = webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
-		return err
-	}
+		if err = webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
+			return err
+		}
 
-	if err = webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
-		return err
-	}
+		if err = webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
+			return err
+		}
 
-	if err = webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
-		return err
-	}
+		if err = webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
+			return err
+		}
 
-	// Setup the handler used by the readiness and liveliness probe.
-	//
-	// Unfortunately the readiness of the probe is not sufficient for the operator to be
-	// working correctly. The probe may be positive even when:
-	//
-	// 1. the CA is not yet updated inside the CRD and/or in the validating/mutating
-	//    webhook configuration. In that case we have a timeout error after trying
-	//    to send a POST message and getting no response message.
-	//
-	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
-	//    deleted. In that case we could get a "Connection refused" error message.
-	webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
+		// Setup the handler used by the readiness and liveliness probe.
+		//
+		// Unfortunately the readiness of the probe is not sufficient for the operator to be
+		// working correctly. The probe may be positive even when:
+		//
+		// 1. the CA is not yet updated inside the CRD and/or in the validating/mutating
+		//    webhook configuration. In that case we have a timeout error after trying
+		//    to send a POST message and getting no response message.
+		//
+		// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
+		//    deleted. In that case we could get a "Connection refused" error message.
+		webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
+	}
 
 	// +kubebuilder:scaffold:builder
 

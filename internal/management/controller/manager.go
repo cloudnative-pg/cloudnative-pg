@@ -33,6 +33,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
@@ -56,6 +58,7 @@ type InstanceReconciler struct {
 
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
+	admission             *guard.Admission
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -74,6 +77,10 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		admission: &guard.Admission{
+			Defaulter: &webhookv1.ClusterCustomDefaulter{},
+			Validator: &webhookv1.ClusterCustomValidator{},
+		},
 	}
 }
 
