@@ -35,7 +35,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -154,9 +154,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			)
 			var clusterOnePrimary, clusterTwoPrimary *corev1.Pod
 
-			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
-				for _, condition := range conditions {
-					if condition.Type == replicaclusterswitch.ConditionReplicaClusterSwitch {
+			getReplicaClusterSwitchCondition := func(conds []metav1.Condition) *metav1.Condition {
+				for _, condition := range conds {
+					if condition.Type == conditions.ReplicaClusterSwitch {
 						return &condition
 					}
 				}

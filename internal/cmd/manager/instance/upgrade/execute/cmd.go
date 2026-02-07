@@ -160,7 +160,7 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 		contextLogger.Error(err, "Error while getting cluster")
 		return err
 	}
-	instance.Cluster = &cluster
+	instance.SetCluster(&cluster)
 
 	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
