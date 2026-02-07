@@ -1100,6 +1100,19 @@ func (r *ClusterReconciler) handleRollingUpdate(
 			"The primary needs to be restarted, but the chosen new primary is still " +
 				"not connected via streaming replication, waiting for 5 seconds",
 		)
+		// Update phase to reflect the actual blocking condition.
+		// This prevents leaving a stale "Waiting for instances to become active"
+		// message when the real issue is the WAL receiver check.
+		// This is especially important for replica clusters where all pods
+		// are running but the rollout is blocked.
+		if regErr := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseWaitingForWalReceiver,
+			"Waiting for WAL receiver to become active on switchover target instance",
+		); regErr != nil {
+			contextLogger.Error(regErr, "Failed to register phase for WAL receiver wait")
+		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case errors.Is(err, errRolloutDelayed):
 		contextLogger.Warning(
