@@ -94,7 +94,7 @@ func NewBackupReconciler(
 	plugins repository.Interface,
 ) *BackupReconciler {
 	cli := mgr.GetClient()
-	recorder := mgr.GetEventRecorderFor("cloudnative-pg-backup")
+	recorder := mgr.GetEventRecorderFor("cloudnative-pg-backup") //nolint:staticcheck
 	return &BackupReconciler{
 		Client:               cli,
 		DiscoveryClient:      discoveryClient,
