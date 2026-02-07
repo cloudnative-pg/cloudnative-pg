@@ -1,0 +1,13 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-nonexistent-sa
+spec:
+  instances: 1
+  
+  # Reference a ServiceAccount that doesn't exist
+  serviceAccountName: nonexistent-service-account
+
+  storage:
+    size: 1Gi
