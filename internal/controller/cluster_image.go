@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -37,6 +38,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // reconcileImage processes the image request, executes it, and stores
@@ -63,39 +65,44 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		)
 	}
 
-	// Case 2: there's a running image. The code checks if the user selected
-	// an image of the same major version or if a change in the major
-	// version has been requested.
-	if requestedImageInfo.Image == cluster.Status.PGDataImageInfo.Image {
-		// The requested image is the same as the current one, no action needed
-		return nil, nil
-	}
+	extensionsChanged := !reflect.DeepEqual(cluster.Status.PGDataImageInfo.Extensions, requestedImageInfo.Extensions)
+	imageChanged := requestedImageInfo.Image != cluster.Status.PGDataImageInfo.Image
 
 	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
 	requestedMajorVersion := requestedImageInfo.MajorVersion
 
-	if currentMajorVersion > requestedMajorVersion {
-		// Major version downgrade requested. This is not allowed.
-		contextLogger.Info(
-			"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
-			"currentImage", cluster.Status.PGDataImageInfo.Image,
-			"requestedImage", requestedImageInfo)
-		return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
-			currentMajorVersion, requestedMajorVersion)
+	// Case 2: nothing to be done.
+	if !imageChanged && !extensionsChanged {
+		return nil, nil
 	}
 
-	if currentMajorVersion < requestedMajorVersion {
-		// Major version upgrade requested
-		return nil, status.PatchWithOptimisticLock(
-			ctx,
-			r.Client,
-			cluster,
-			status.SetImage(requestedImageInfo.Image),
-		)
+	// Case 3: there's a running image. The code checks if the user selected
+	// an image of the same major version or if a change in the major
+	// version has been requested.
+	if imageChanged {
+		if currentMajorVersion > requestedMajorVersion {
+			// Major version downgrade requested. This is not allowed.
+			contextLogger.Info(
+				"Cannot downgrade the PostgreSQL major version. Forcing the current requestedImageInfo.",
+				"currentImage", cluster.Status.PGDataImageInfo.Image,
+				"requestedImage", requestedImageInfo)
+			return nil, fmt.Errorf("cannot downgrade the PostgreSQL major version from %d to %d",
+				currentMajorVersion, requestedMajorVersion)
+		}
+
+		if currentMajorVersion < requestedMajorVersion {
+			// Major version upgrade requested
+			return nil, status.PatchWithOptimisticLock(
+				ctx,
+				r.Client,
+				cluster,
+				status.SetImage(requestedImageInfo.Image),
+			)
+		}
 	}
 
-	// The major versions are the same, but the images are different.
-	// This is a minor version upgrade/downgrade.
+	// Case 4: This is either a minor version upgrade/downgrade or a
+	// change to the extension images.
 	return nil, status.PatchWithOptimisticLock(
 		ctx,
 		r.Client,
@@ -104,16 +111,18 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		status.SetPGDataImageInfo(&requestedImageInfo))
 }
 
-func getImageInfoFromImage(image string) (apiv1.ImageInfo, error) {
+func getImageInfoFromCluster(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 	// Parse the version from the tag
-	imageVersion, err := version.FromTag(reference.New(image).Tag)
+	imageVersion, err := version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
 	if err != nil {
-		return apiv1.ImageInfo{}, fmt.Errorf("cannot parse version from image %s: %w", image, err)
+		return apiv1.ImageInfo{},
+			fmt.Errorf("cannot parse version from image %s: %w", cluster.Spec.ImageName, err)
 	}
 
 	return apiv1.ImageInfo{
-		Image:        image,
+		Image:        cluster.Spec.ImageName,
 		MajorVersion: int(imageVersion.Major()), //nolint:gosec
+		Extensions:   cluster.Spec.PostgresConfiguration.Extensions,
 	}, nil
 }
 
@@ -124,7 +133,7 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	if cluster.Spec.ImageCatalogRef == nil {
 		if cluster.Spec.ImageName != "" {
-			return getImageInfoFromImage(cluster.Spec.ImageName)
+			return getImageInfoFromCluster(cluster)
 		}
 
 		return apiv1.ImageInfo{}, fmt.Errorf("ImageName is not defined and no catalog is referenced")
@@ -185,7 +194,16 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
 	}
 
-	return apiv1.ImageInfo{Image: catalogImage, MajorVersion: requestedMajorVersion}, nil
+	exts, err := extensions.ResolveFromCatalog(cluster, catalog, requestedMajorVersion)
+	if err != nil {
+		return apiv1.ImageInfo{}, fmt.Errorf("cannot retrieve extensions for image %s: %w", catalogImage, err)
+	}
+
+	return apiv1.ImageInfo{
+		Image:        catalogImage,
+		MajorVersion: requestedMajorVersion,
+		Extensions:   exts,
+	}, nil
 }
 
 func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
