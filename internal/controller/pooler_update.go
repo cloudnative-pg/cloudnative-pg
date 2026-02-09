@@ -232,7 +232,7 @@ func (r *PoolerReconciler) updateServiceAccount(
 	contextLog := log.FromContext(ctx)
 
 	// If a custom ServiceAccount is specified, validate it exists and return
-	if pooler.Spec.ServiceAccountName != nil {
+	if pooler.Spec.ServiceAccountName != "" {
 		return r.validateExistingServiceAccount(ctx, pooler)
 	}
 

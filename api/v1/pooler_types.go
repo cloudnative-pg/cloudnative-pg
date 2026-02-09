@@ -104,7 +104,8 @@ type PoolerSpec struct {
 	// ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).
 	// If not specified, a ServiceAccount will be created with the pooler name.
 	// +optional
-	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceAccountName is immutable"
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // PoolerMonitoringConfiguration is the type containing all the monitoring

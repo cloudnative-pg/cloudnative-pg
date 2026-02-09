@@ -362,6 +362,32 @@ spec:
     The `serviceAccountName` field is immutable once set. If you need to change
     the `ServiceAccount`, you must recreate the cluster.
 
+#### Using a shared ServiceAccount with Poolers
+
+The same shared `ServiceAccount` feature is available for `Pooler` resources.
+When deploying PgBouncer poolers in cloud environments with IAM integration,
+you can specify the `serviceAccountName` field in the Pooler spec to reference
+an existing `ServiceAccount` instead of having the operator create one per pooler.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-prod
+spec:
+  cluster:
+    name: cluster-prod
+  serviceAccountName: pgbouncer-cloud-sa
+  instances: 3
+  pgbouncer:
+    poolMode: session
+```
+
+!!! Warning
+    As with clusters, the `serviceAccountName` field on poolers is immutable
+    once set. If you need to change the `ServiceAccount`, you must recreate
+    the pooler.
+
 For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
 file. For example, to retrieve the permissions of a generic `mypg` cluster in the

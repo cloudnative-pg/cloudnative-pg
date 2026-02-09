@@ -168,8 +168,7 @@ var _ = Describe("Deployment", func() {
 
 	It("sets the custom service account name when specified", func() {
 		customPooler := pooler.DeepCopy()
-		customSA := "custom-service-account"
-		customPooler.Spec.ServiceAccountName = &customSA
+		customPooler.Spec.ServiceAccountName = "custom-service-account"
 		deployment, err := Deployment(customPooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
