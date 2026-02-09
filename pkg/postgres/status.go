@@ -101,6 +101,62 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
+
+	// DiskStatus contains disk usage statistics gathered from statfs.
+	DiskStatus *DiskStatus `json:"diskStatus,omitempty"`
+
+	// WALHealthStatus contains the WAL archive health information.
+	WALHealthStatus *WALHealthStatus `json:"walHealthStatus,omitempty"`
+}
+
+// DiskStatus contains disk usage statistics for all instance volumes.
+type DiskStatus struct {
+	// DataVolume contains disk stats for the PGDATA volume.
+	DataVolume *VolumeStatus `json:"dataVolume,omitempty"`
+	// WALVolume contains disk stats for the WAL volume (if separate from PGDATA).
+	WALVolume *VolumeStatus `json:"walVolume,omitempty"`
+	// Tablespaces contains disk stats for tablespace volumes.
+	Tablespaces map[string]*VolumeStatus `json:"tablespaces,omitempty"`
+}
+
+// VolumeStatus contains disk usage statistics for a single volume.
+type VolumeStatus struct {
+	// TotalBytes is the total capacity of the volume in bytes.
+	TotalBytes uint64 `json:"totalBytes"`
+	// UsedBytes is the number of bytes currently in use.
+	UsedBytes uint64 `json:"usedBytes"`
+	// AvailableBytes is the number of bytes available for use (non-root).
+	AvailableBytes uint64 `json:"availableBytes"`
+	// PercentUsed is the percentage of the volume in use (0-100).
+	PercentUsed float64 `json:"percentUsed"`
+	// InodesTotal is the total number of inodes.
+	InodesTotal uint64 `json:"inodesTotal"`
+	// InodesUsed is the number of inodes in use.
+	InodesUsed uint64 `json:"inodesUsed"`
+	// InodesFree is the number of free inodes.
+	InodesFree uint64 `json:"inodesFree"`
+}
+
+// WALHealthStatus contains WAL archive health information for the instance.
+type WALHealthStatus struct {
+	// ArchiveHealthy indicates whether the WAL archive process is healthy.
+	ArchiveHealthy bool `json:"archiveHealthy"`
+	// PendingWALFiles is the count of .ready files in pg_wal/archive_status/.
+	PendingWALFiles int `json:"pendingWALFiles"`
+	// ArchiverFailedCount is the total number of failed archive operations.
+	ArchiverFailedCount int64 `json:"archiverFailedCount"`
+	// InactiveSlotCount is the number of inactive physical replication slots.
+	InactiveSlotCount int `json:"inactiveSlotCount"`
+	// InactiveSlots contains detailed information about inactive physical replication slots.
+	InactiveSlots []WALInactiveSlotInfo `json:"inactiveSlots,omitempty"`
+}
+
+// WALInactiveSlotInfo contains information about an inactive physical replication slot.
+type WALInactiveSlotInfo struct {
+	// SlotName is the name of the replication slot.
+	SlotName string `json:"slotName"`
+	// RetentionBytes is the WAL retention in bytes caused by this slot.
+	RetentionBytes int64 `json:"retentionBytes"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance

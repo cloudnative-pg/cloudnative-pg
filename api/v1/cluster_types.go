@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -1030,6 +1031,14 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// DiskStatus contains the disk usage status for all instances.
+	// +optional
+	DiskStatus *ClusterDiskStatus `json:"diskStatus,omitempty"`
+
+	// AutoResizeEvents contains the history of auto-resize operations.
+	// +optional
+	AutoResizeEvents []AutoResizeEvent `json:"autoResizeEvents,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image
@@ -2060,6 +2069,167 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+
+	// Resize contains the configuration for automatic PVC resizing.
+	// When enabled, CloudNativePG will monitor disk usage and automatically
+	// expand PVCs when configured thresholds are reached.
+	// +optional
+	Resize *ResizeConfiguration `json:"resize,omitempty"`
+}
+
+// ResizeMode represents the mode of auto-resize operations.
+// +kubebuilder:validation:Enum=Standard
+type ResizeMode string
+
+const (
+	// ResizeModeStandard is the standard resize mode using Kubernetes PVC patching.
+	ResizeModeStandard ResizeMode = "Standard"
+)
+
+// ResizeVolumeType represents the type of volume in a resize operation.
+// +kubebuilder:validation:Enum=data;wal;tablespace
+type ResizeVolumeType string
+
+const (
+	// ResizeVolumeTypeData represents a PostgreSQL data volume.
+	ResizeVolumeTypeData ResizeVolumeType = "data"
+	// ResizeVolumeTypeWAL represents a PostgreSQL WAL volume.
+	ResizeVolumeTypeWAL ResizeVolumeType = "wal"
+	// ResizeVolumeTypeTablespace represents a PostgreSQL tablespace volume.
+	ResizeVolumeTypeTablespace ResizeVolumeType = "tablespace"
+)
+
+// ResizeResult represents the outcome of a resize operation.
+// +kubebuilder:validation:Enum=success;failure
+type ResizeResult string
+
+const (
+	// ResizeResultSuccess indicates the resize operation succeeded.
+	ResizeResultSuccess ResizeResult = "success"
+	// ResizeResultFailure indicates the resize operation failed.
+	ResizeResultFailure ResizeResult = "failure"
+)
+
+// ResizeConfiguration defines the automatic PVC resize behavior.
+type ResizeConfiguration struct {
+	// Enabled activates automatic PVC resizing.
+	// +optional
+	// +kubebuilder:default:=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Triggers defines the conditions that trigger a resize operation.
+	// +optional
+	Triggers *ResizeTriggers `json:"triggers,omitempty"`
+
+	// Expansion defines the expansion policy including step size and limits.
+	// +optional
+	Expansion *ExpansionPolicy `json:"expansion,omitempty"`
+
+	// Strategy defines how resize operations are performed, including
+	// rate limiting and WAL safety policies.
+	// +optional
+	Strategy *ResizeStrategy `json:"strategy,omitempty"`
+}
+
+// ResizeTriggers defines the conditions that trigger an auto-resize.
+type ResizeTriggers struct {
+	// UsageThreshold is the disk usage percentage (1-99) that triggers a resize.
+	// When the volume usage exceeds this threshold, a resize is triggered.
+	// Either condition (UsageThreshold or MinAvailable) alone is sufficient.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=99
+	UsageThreshold *int `json:"usageThreshold,omitempty"`
+
+	// MinAvailable is the minimum available space that must remain on the volume.
+	// When available space drops below this value, a resize is triggered.
+	// Can be specified as an absolute value (e.g., "10Gi").
+	// +optional
+	MinAvailable string `json:"minAvailable,omitempty"`
+}
+
+// ExpansionPolicy defines how much to expand the PVC when triggered.
+type ExpansionPolicy struct {
+	// Step is the amount to increase the PVC by on each resize.
+	// Can be a percentage (e.g., "20%") of current size or an absolute
+	// value (e.g., "10Gi"). Defaults to "20%".
+	// +optional
+	Step intstr.IntOrString `json:"step,omitempty"`
+
+	// MinStep is the minimum expansion step when using percentage-based steps.
+	// Prevents tiny expansions on small volumes. Defaults to "2Gi".
+	// Ignored when step is an absolute value.
+	// +optional
+	// +kubebuilder:default:="2Gi"
+	MinStep string `json:"minStep,omitempty"`
+
+	// MaxStep is the maximum expansion step when using percentage-based steps.
+	// Prevents oversized expansions on large volumes. Defaults to "500Gi".
+	// Ignored when step is an absolute value.
+	// +optional
+	// +kubebuilder:default:="500Gi"
+	MaxStep string `json:"maxStep,omitempty"`
+
+	// Limit is the maximum size the PVC can be expanded to.
+	// Once this limit is reached, no further automatic resizing will occur.
+	// +optional
+	Limit string `json:"limit,omitempty"`
+}
+
+// ResizeStrategy defines the operational strategy for auto-resize.
+type ResizeStrategy struct {
+	// Mode defines the resize mode. Currently only "Standard" is supported.
+	// +optional
+	// +kubebuilder:default:=Standard
+	Mode ResizeMode `json:"mode,omitempty"`
+
+	// MaxActionsPerDay is the maximum number of resize operations per volume
+	// within a 24-hour rolling window. Reflects cloud provider limits
+	// (e.g., AWS EBS allows ~4 modifications per day).
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
+	MaxActionsPerDay *int `json:"maxActionsPerDay,omitempty"`
+
+	// WALSafetyPolicy defines safety checks for WAL-related volumes.
+	// When the data volume shares WAL storage (single-volume clusters)
+	// or when resizing the WAL volume, these checks ensure archiving
+	// and replication are healthy before allowing resize.
+	// +optional
+	WALSafetyPolicy *WALSafetyPolicy `json:"walSafetyPolicy,omitempty"`
+}
+
+// WALSafetyPolicy defines safety checks for WAL volumes.
+type WALSafetyPolicy struct {
+	// AcknowledgeWALRisk must be set to true for single-volume clusters
+	// (where data and WAL share the same volume) to enable auto-resize.
+	// This explicit acknowledgment is required because resizing without
+	// separate WAL storage can mask WAL-related issues.
+	// +optional
+	AcknowledgeWALRisk bool `json:"acknowledgeWALRisk,omitempty"`
+
+	// RequireArchiveHealthy blocks resize when WAL archiving is unhealthy
+	// (last_failed_time > last_archived_time). Defaults to true.
+	// +optional
+	// +kubebuilder:default:=true
+	RequireArchiveHealthy *bool `json:"requireArchiveHealthy,omitempty"`
+
+	// MaxPendingWALFiles blocks resize when the number of pending WAL files
+	// (.ready files in archive_status) exceeds this threshold. Defaults to 100.
+	// +optional
+	// +kubebuilder:default:=100
+	MaxPendingWALFiles *int `json:"maxPendingWALFiles,omitempty"`
+
+	// MaxSlotRetentionBytes blocks resize when any inactive physical
+	// replication slot retains more WAL than this threshold.
+	// +optional
+	MaxSlotRetentionBytes *int64 `json:"maxSlotRetentionBytes,omitempty"`
+
+	// AlertOnResize emits a Kubernetes warning event when a WAL-related
+	// resize occurs. Defaults to true.
+	// +optional
+	// +kubebuilder:default:=true
+	AlertOnResize *bool `json:"alertOnResize,omitempty"`
 }
 
 // TablespaceConfiguration is the configuration of a tablespace, and includes
@@ -2442,6 +2612,130 @@ type PluginStatus struct {
 	// Status contain the status reported by the plugin through the SetStatusInCluster interface
 	// +optional
 	Status string `json:"status,omitempty"`
+}
+
+// ClusterDiskStatus contains disk usage status for all instances.
+type ClusterDiskStatus struct {
+	// Instances contains the disk status for each instance.
+	// +optional
+	Instances map[string]*InstanceDiskStatus `json:"instances,omitempty"`
+}
+
+// InstanceDiskStatus contains disk usage status for a single instance.
+type InstanceDiskStatus struct {
+	// DataVolume contains disk stats for the PGDATA volume.
+	// +optional
+	DataVolume *VolumeDiskStatus `json:"dataVolume,omitempty"`
+
+	// WALVolume contains disk stats for the WAL volume (if separate from PGDATA).
+	// +optional
+	WALVolume *VolumeDiskStatus `json:"walVolume,omitempty"`
+
+	// Tablespaces contains disk stats for tablespace volumes.
+	// +optional
+	Tablespaces map[string]*VolumeDiskStatus `json:"tablespaces,omitempty"`
+
+	// WALHealth contains the WAL archive health status.
+	// +optional
+	WALHealth *WALHealthInfo `json:"walHealth,omitempty"`
+
+	// LastUpdated is the timestamp when this status was last updated.
+	// +optional
+	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
+}
+
+// VolumeDiskStatus contains the disk usage status of a single volume.
+type VolumeDiskStatus struct {
+	// TotalBytes is the total capacity of the volume in bytes.
+	// +optional
+	TotalBytes uint64 `json:"totalBytes,omitempty"`
+
+	// UsedBytes is the number of bytes currently in use.
+	// +optional
+	UsedBytes uint64 `json:"usedBytes,omitempty"`
+
+	// AvailableBytes is the number of bytes available for use (non-root).
+	// +optional
+	AvailableBytes uint64 `json:"availableBytes,omitempty"`
+
+	// PercentUsed is the percentage of the volume in use (0-100), rounded.
+	// +optional
+	PercentUsed int `json:"percentUsed,omitempty"`
+
+	// InodesTotal is the total number of inodes on the volume.
+	// +optional
+	InodesTotal uint64 `json:"inodesTotal,omitempty"`
+
+	// InodesUsed is the number of inodes in use on the volume.
+	// +optional
+	InodesUsed uint64 `json:"inodesUsed,omitempty"`
+
+	// InodesFree is the number of free inodes on the volume.
+	// +optional
+	InodesFree uint64 `json:"inodesFree,omitempty"`
+}
+
+// WALHealthInfo contains WAL archive health information.
+type WALHealthInfo struct {
+	// ArchiveHealthy indicates whether the WAL archive process is healthy.
+	// +optional
+	ArchiveHealthy bool `json:"archiveHealthy,omitempty"`
+
+	// PendingWALFiles is the count of .ready files in pg_wal/archive_status/.
+	// +optional
+	PendingWALFiles int `json:"pendingWALFiles,omitempty"`
+
+	// InactiveSlotCount is the number of inactive physical replication slots.
+	// +optional
+	InactiveSlotCount int `json:"inactiveSlotCount,omitempty"`
+
+	// InactiveSlots lists inactive physical replication slots and their WAL retention.
+	// +optional
+	InactiveSlots []InactiveSlotInfo `json:"inactiveSlots,omitempty"`
+}
+
+// InactiveSlotInfo contains information about an inactive replication slot.
+type InactiveSlotInfo struct {
+	// SlotName is the name of the replication slot.
+	SlotName string `json:"slotName"`
+
+	// RetentionBytes is the amount of WAL retained by this slot in bytes.
+	RetentionBytes int64 `json:"retentionBytes"`
+}
+
+// AutoResizeEvent records a single auto-resize operation.
+type AutoResizeEvent struct {
+	// Timestamp is when the resize was initiated.
+	// +optional
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+
+	// InstanceName is the name of the instance that was resized.
+	// +optional
+	InstanceName string `json:"instanceName,omitempty"`
+
+	// PVCName is the name of the PVC that was resized.
+	// +optional
+	PVCName string `json:"pvcName,omitempty"`
+
+	// VolumeType is the type of volume that was resized (data/wal/tablespace).
+	// +optional
+	VolumeType ResizeVolumeType `json:"volumeType,omitempty"`
+
+	// Tablespace is the tablespace name if VolumeType is tablespace.
+	// +optional
+	Tablespace string `json:"tablespace,omitempty"`
+
+	// PreviousSize is the size of the PVC before the resize.
+	// +optional
+	PreviousSize string `json:"previousSize,omitempty"`
+
+	// NewSize is the requested new size of the PVC.
+	// +optional
+	NewSize string `json:"newSize,omitempty"`
+
+	// Result is the outcome of the resize operation (success/failure).
+	// +optional
+	Result ResizeResult `json:"result,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role

@@ -5966,6 +5966,129 @@ spec:
                           backing this claim.
                         type: string
                     type: object
+                  resize:
+                    description: |-
+                      Resize contains the configuration for automatic PVC resizing.
+                      When enabled, CloudNativePG will monitor disk usage and automatically
+                      expand PVCs when configured thresholds are reached.
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enabled activates automatic PVC resizing.
+                        type: boolean
+                      expansion:
+                        description: Expansion defines the expansion policy including
+                          step size and limits.
+                        properties:
+                          limit:
+                            description: |-
+                              Limit is the maximum size the PVC can be expanded to.
+                              Once this limit is reached, no further automatic resizing will occur.
+                            type: string
+                          maxStep:
+                            default: 500Gi
+                            description: |-
+                              MaxStep is the maximum expansion step when using percentage-based steps.
+                              Prevents oversized expansions on large volumes. Defaults to "500Gi".
+                              Ignored when step is an absolute value.
+                            type: string
+                          minStep:
+                            default: 2Gi
+                            description: |-
+                              MinStep is the minimum expansion step when using percentage-based steps.
+                              Prevents tiny expansions on small volumes. Defaults to "2Gi".
+                              Ignored when step is an absolute value.
+                            type: string
+                          step:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Step is the amount to increase the PVC by on each resize.
+                              Can be a percentage (e.g., "20%") of current size or an absolute
+                              value (e.g., "10Gi"). Defaults to "20%".
+                            x-kubernetes-int-or-string: true
+                        type: object
+                      strategy:
+                        description: |-
+                          Strategy defines how resize operations are performed, including
+                          rate limiting and WAL safety policies.
+                        properties:
+                          maxActionsPerDay:
+                            description: |-
+                              MaxActionsPerDay is the maximum number of resize operations per volume
+                              within a 24-hour rolling window. Reflects cloud provider limits
+                              (e.g., AWS EBS allows ~4 modifications per day).
+                            maximum: 10
+                            minimum: 0
+                            type: integer
+                          mode:
+                            default: Standard
+                            description: Mode defines the resize mode. Currently only
+                              "Standard" is supported.
+                            enum:
+                            - Standard
+                            type: string
+                          walSafetyPolicy:
+                            description: |-
+                              WALSafetyPolicy defines safety checks for WAL-related volumes.
+                              When the data volume shares WAL storage (single-volume clusters)
+                              or when resizing the WAL volume, these checks ensure archiving
+                              and replication are healthy before allowing resize.
+                            properties:
+                              acknowledgeWALRisk:
+                                description: |-
+                                  AcknowledgeWALRisk must be set to true for single-volume clusters
+                                  (where data and WAL share the same volume) to enable auto-resize.
+                                  This explicit acknowledgment is required because resizing without
+                                  separate WAL storage can mask WAL-related issues.
+                                type: boolean
+                              alertOnResize:
+                                default: true
+                                description: |-
+                                  AlertOnResize emits a Kubernetes warning event when a WAL-related
+                                  resize occurs. Defaults to true.
+                                type: boolean
+                              maxPendingWALFiles:
+                                default: 100
+                                description: |-
+                                  MaxPendingWALFiles blocks resize when the number of pending WAL files
+                                  (.ready files in archive_status) exceeds this threshold. Defaults to 100.
+                                type: integer
+                              maxSlotRetentionBytes:
+                                description: |-
+                                  MaxSlotRetentionBytes blocks resize when any inactive physical
+                                  replication slot retains more WAL than this threshold.
+                                format: int64
+                                type: integer
+                              requireArchiveHealthy:
+                                default: true
+                                description: |-
+                                  RequireArchiveHealthy blocks resize when WAL archiving is unhealthy
+                                  (last_failed_time > last_archived_time). Defaults to true.
+                                type: boolean
+                            type: object
+                        type: object
+                      triggers:
+                        description: Triggers defines the conditions that trigger
+                          a resize operation.
+                        properties:
+                          minAvailable:
+                            description: |-
+                              MinAvailable is the minimum available space that must remain on the volume.
+                              When available space drops below this value, a resize is triggered.
+                              Can be specified as an absolute value (e.g., "10Gi").
+                            type: string
+                          usageThreshold:
+                            description: |-
+                              UsageThreshold is the disk usage percentage (1-99) that triggers a resize.
+                              When the volume usage exceeds this threshold, a resize is triggered.
+                              Either condition (UsageThreshold or MinAvailable) alone is sufficient.
+                            maximum: 99
+                            minimum: 1
+                            type: integer
+                        type: object
+                    type: object
                   resizeInUseVolumes:
                     default: true
                     description: Resize existent PVCs, defaults to true
@@ -6221,6 +6344,129 @@ spec:
                               description: volumeName is the binding reference to
                                 the PersistentVolume backing this claim.
                               type: string
+                          type: object
+                        resize:
+                          description: |-
+                            Resize contains the configuration for automatic PVC resizing.
+                            When enabled, CloudNativePG will monitor disk usage and automatically
+                            expand PVCs when configured thresholds are reached.
+                          properties:
+                            enabled:
+                              default: false
+                              description: Enabled activates automatic PVC resizing.
+                              type: boolean
+                            expansion:
+                              description: Expansion defines the expansion policy
+                                including step size and limits.
+                              properties:
+                                limit:
+                                  description: |-
+                                    Limit is the maximum size the PVC can be expanded to.
+                                    Once this limit is reached, no further automatic resizing will occur.
+                                  type: string
+                                maxStep:
+                                  default: 500Gi
+                                  description: |-
+                                    MaxStep is the maximum expansion step when using percentage-based steps.
+                                    Prevents oversized expansions on large volumes. Defaults to "500Gi".
+                                    Ignored when step is an absolute value.
+                                  type: string
+                                minStep:
+                                  default: 2Gi
+                                  description: |-
+                                    MinStep is the minimum expansion step when using percentage-based steps.
+                                    Prevents tiny expansions on small volumes. Defaults to "2Gi".
+                                    Ignored when step is an absolute value.
+                                  type: string
+                                step:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Step is the amount to increase the PVC by on each resize.
+                                    Can be a percentage (e.g., "20%") of current size or an absolute
+                                    value (e.g., "10Gi"). Defaults to "20%".
+                                  x-kubernetes-int-or-string: true
+                              type: object
+                            strategy:
+                              description: |-
+                                Strategy defines how resize operations are performed, including
+                                rate limiting and WAL safety policies.
+                              properties:
+                                maxActionsPerDay:
+                                  description: |-
+                                    MaxActionsPerDay is the maximum number of resize operations per volume
+                                    within a 24-hour rolling window. Reflects cloud provider limits
+                                    (e.g., AWS EBS allows ~4 modifications per day).
+                                  maximum: 10
+                                  minimum: 0
+                                  type: integer
+                                mode:
+                                  default: Standard
+                                  description: Mode defines the resize mode. Currently
+                                    only "Standard" is supported.
+                                  enum:
+                                  - Standard
+                                  type: string
+                                walSafetyPolicy:
+                                  description: |-
+                                    WALSafetyPolicy defines safety checks for WAL-related volumes.
+                                    When the data volume shares WAL storage (single-volume clusters)
+                                    or when resizing the WAL volume, these checks ensure archiving
+                                    and replication are healthy before allowing resize.
+                                  properties:
+                                    acknowledgeWALRisk:
+                                      description: |-
+                                        AcknowledgeWALRisk must be set to true for single-volume clusters
+                                        (where data and WAL share the same volume) to enable auto-resize.
+                                        This explicit acknowledgment is required because resizing without
+                                        separate WAL storage can mask WAL-related issues.
+                                      type: boolean
+                                    alertOnResize:
+                                      default: true
+                                      description: |-
+                                        AlertOnResize emits a Kubernetes warning event when a WAL-related
+                                        resize occurs. Defaults to true.
+                                      type: boolean
+                                    maxPendingWALFiles:
+                                      default: 100
+                                      description: |-
+                                        MaxPendingWALFiles blocks resize when the number of pending WAL files
+                                        (.ready files in archive_status) exceeds this threshold. Defaults to 100.
+                                      type: integer
+                                    maxSlotRetentionBytes:
+                                      description: |-
+                                        MaxSlotRetentionBytes blocks resize when any inactive physical
+                                        replication slot retains more WAL than this threshold.
+                                      format: int64
+                                      type: integer
+                                    requireArchiveHealthy:
+                                      default: true
+                                      description: |-
+                                        RequireArchiveHealthy blocks resize when WAL archiving is unhealthy
+                                        (last_failed_time > last_archived_time). Defaults to true.
+                                      type: boolean
+                                  type: object
+                              type: object
+                            triggers:
+                              description: Triggers defines the conditions that trigger
+                                a resize operation.
+                              properties:
+                                minAvailable:
+                                  description: |-
+                                    MinAvailable is the minimum available space that must remain on the volume.
+                                    When available space drops below this value, a resize is triggered.
+                                    Can be specified as an absolute value (e.g., "10Gi").
+                                  type: string
+                                usageThreshold:
+                                  description: |-
+                                    UsageThreshold is the disk usage percentage (1-99) that triggers a resize.
+                                    When the volume usage exceeds this threshold, a resize is triggered.
+                                    Either condition (UsageThreshold or MinAvailable) alone is sufficient.
+                                  maximum: 99
+                                  minimum: 1
+                                  type: integer
+                              type: object
                           type: object
                         resizeInUseVolumes:
                           default: true
@@ -6630,6 +6876,129 @@ spec:
                           backing this claim.
                         type: string
                     type: object
+                  resize:
+                    description: |-
+                      Resize contains the configuration for automatic PVC resizing.
+                      When enabled, CloudNativePG will monitor disk usage and automatically
+                      expand PVCs when configured thresholds are reached.
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enabled activates automatic PVC resizing.
+                        type: boolean
+                      expansion:
+                        description: Expansion defines the expansion policy including
+                          step size and limits.
+                        properties:
+                          limit:
+                            description: |-
+                              Limit is the maximum size the PVC can be expanded to.
+                              Once this limit is reached, no further automatic resizing will occur.
+                            type: string
+                          maxStep:
+                            default: 500Gi
+                            description: |-
+                              MaxStep is the maximum expansion step when using percentage-based steps.
+                              Prevents oversized expansions on large volumes. Defaults to "500Gi".
+                              Ignored when step is an absolute value.
+                            type: string
+                          minStep:
+                            default: 2Gi
+                            description: |-
+                              MinStep is the minimum expansion step when using percentage-based steps.
+                              Prevents tiny expansions on small volumes. Defaults to "2Gi".
+                              Ignored when step is an absolute value.
+                            type: string
+                          step:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Step is the amount to increase the PVC by on each resize.
+                              Can be a percentage (e.g., "20%") of current size or an absolute
+                              value (e.g., "10Gi"). Defaults to "20%".
+                            x-kubernetes-int-or-string: true
+                        type: object
+                      strategy:
+                        description: |-
+                          Strategy defines how resize operations are performed, including
+                          rate limiting and WAL safety policies.
+                        properties:
+                          maxActionsPerDay:
+                            description: |-
+                              MaxActionsPerDay is the maximum number of resize operations per volume
+                              within a 24-hour rolling window. Reflects cloud provider limits
+                              (e.g., AWS EBS allows ~4 modifications per day).
+                            maximum: 10
+                            minimum: 0
+                            type: integer
+                          mode:
+                            default: Standard
+                            description: Mode defines the resize mode. Currently only
+                              "Standard" is supported.
+                            enum:
+                            - Standard
+                            type: string
+                          walSafetyPolicy:
+                            description: |-
+                              WALSafetyPolicy defines safety checks for WAL-related volumes.
+                              When the data volume shares WAL storage (single-volume clusters)
+                              or when resizing the WAL volume, these checks ensure archiving
+                              and replication are healthy before allowing resize.
+                            properties:
+                              acknowledgeWALRisk:
+                                description: |-
+                                  AcknowledgeWALRisk must be set to true for single-volume clusters
+                                  (where data and WAL share the same volume) to enable auto-resize.
+                                  This explicit acknowledgment is required because resizing without
+                                  separate WAL storage can mask WAL-related issues.
+                                type: boolean
+                              alertOnResize:
+                                default: true
+                                description: |-
+                                  AlertOnResize emits a Kubernetes warning event when a WAL-related
+                                  resize occurs. Defaults to true.
+                                type: boolean
+                              maxPendingWALFiles:
+                                default: 100
+                                description: |-
+                                  MaxPendingWALFiles blocks resize when the number of pending WAL files
+                                  (.ready files in archive_status) exceeds this threshold. Defaults to 100.
+                                type: integer
+                              maxSlotRetentionBytes:
+                                description: |-
+                                  MaxSlotRetentionBytes blocks resize when any inactive physical
+                                  replication slot retains more WAL than this threshold.
+                                format: int64
+                                type: integer
+                              requireArchiveHealthy:
+                                default: true
+                                description: |-
+                                  RequireArchiveHealthy blocks resize when WAL archiving is unhealthy
+                                  (last_failed_time > last_archived_time). Defaults to true.
+                                type: boolean
+                            type: object
+                        type: object
+                      triggers:
+                        description: Triggers defines the conditions that trigger
+                          a resize operation.
+                        properties:
+                          minAvailable:
+                            description: |-
+                              MinAvailable is the minimum available space that must remain on the volume.
+                              When available space drops below this value, a resize is triggered.
+                              Can be specified as an absolute value (e.g., "10Gi").
+                            type: string
+                          usageThreshold:
+                            description: |-
+                              UsageThreshold is the disk usage percentage (1-99) that triggers a resize.
+                              When the volume usage exceeds this threshold, a resize is triggered.
+                              Either condition (UsageThreshold or MinAvailable) alone is sufficient.
+                            maximum: 99
+                            minimum: 1
+                            type: integer
+                        type: object
+                    type: object
                   resizeInUseVolumes:
                     default: true
                     description: Resize existent PVCs, defaults to true
@@ -6660,6 +7029,50 @@ spec:
               to date. Populated by the system. Read-only.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
+              autoResizeEvents:
+                description: AutoResizeEvents contains the history of auto-resize
+                  operations.
+                items:
+                  description: AutoResizeEvent records a single auto-resize operation.
+                  properties:
+                    instanceName:
+                      description: InstanceName is the name of the instance that was
+                        resized.
+                      type: string
+                    newSize:
+                      description: NewSize is the requested new size of the PVC.
+                      type: string
+                    previousSize:
+                      description: PreviousSize is the size of the PVC before the
+                        resize.
+                      type: string
+                    pvcName:
+                      description: PVCName is the name of the PVC that was resized.
+                      type: string
+                    result:
+                      description: Result is the outcome of the resize operation (success/failure).
+                      enum:
+                      - success
+                      - failure
+                      type: string
+                    tablespace:
+                      description: Tablespace is the tablespace name if VolumeType
+                        is tablespace.
+                      type: string
+                    timestamp:
+                      description: Timestamp is when the resize was initiated.
+                      format: date-time
+                      type: string
+                    volumeType:
+                      description: VolumeType is the type of volume that was resized
+                        (data/wal/tablespace).
+                      enum:
+                      - data
+                      - wal
+                      - tablespace
+                      type: string
+                  type: object
+                type: array
               availableArchitectures:
                 description: AvailableArchitectures reports the available architectures
                   of a cluster
@@ -6836,6 +7249,181 @@ spec:
                   TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
                   WAL file, and Time of latest checkpoint
                 type: string
+              diskStatus:
+                description: DiskStatus contains the disk usage status for all instances.
+                properties:
+                  instances:
+                    additionalProperties:
+                      description: InstanceDiskStatus contains disk usage status for
+                        a single instance.
+                      properties:
+                        dataVolume:
+                          description: DataVolume contains disk stats for the PGDATA
+                            volume.
+                          properties:
+                            availableBytes:
+                              description: AvailableBytes is the number of bytes available
+                                for use (non-root).
+                              format: int64
+                              type: integer
+                            inodesFree:
+                              description: InodesFree is the number of free inodes
+                                on the volume.
+                              format: int64
+                              type: integer
+                            inodesTotal:
+                              description: InodesTotal is the total number of inodes
+                                on the volume.
+                              format: int64
+                              type: integer
+                            inodesUsed:
+                              description: InodesUsed is the number of inodes in use
+                                on the volume.
+                              format: int64
+                              type: integer
+                            percentUsed:
+                              description: PercentUsed is the percentage of the volume
+                                in use (0-100), rounded.
+                              type: integer
+                            totalBytes:
+                              description: TotalBytes is the total capacity of the
+                                volume in bytes.
+                              format: int64
+                              type: integer
+                            usedBytes:
+                              description: UsedBytes is the number of bytes currently
+                                in use.
+                              format: int64
+                              type: integer
+                          type: object
+                        lastUpdated:
+                          description: LastUpdated is the timestamp when this status
+                            was last updated.
+                          format: date-time
+                          type: string
+                        tablespaces:
+                          additionalProperties:
+                            description: VolumeDiskStatus contains the disk usage
+                              status of a single volume.
+                            properties:
+                              availableBytes:
+                                description: AvailableBytes is the number of bytes
+                                  available for use (non-root).
+                                format: int64
+                                type: integer
+                              inodesFree:
+                                description: InodesFree is the number of free inodes
+                                  on the volume.
+                                format: int64
+                                type: integer
+                              inodesTotal:
+                                description: InodesTotal is the total number of inodes
+                                  on the volume.
+                                format: int64
+                                type: integer
+                              inodesUsed:
+                                description: InodesUsed is the number of inodes in
+                                  use on the volume.
+                                format: int64
+                                type: integer
+                              percentUsed:
+                                description: PercentUsed is the percentage of the
+                                  volume in use (0-100), rounded.
+                                type: integer
+                              totalBytes:
+                                description: TotalBytes is the total capacity of the
+                                  volume in bytes.
+                                format: int64
+                                type: integer
+                              usedBytes:
+                                description: UsedBytes is the number of bytes currently
+                                  in use.
+                                format: int64
+                                type: integer
+                            type: object
+                          description: Tablespaces contains disk stats for tablespace
+                            volumes.
+                          type: object
+                        walHealth:
+                          description: WALHealth contains the WAL archive health status.
+                          properties:
+                            archiveHealthy:
+                              description: ArchiveHealthy indicates whether the WAL
+                                archive process is healthy.
+                              type: boolean
+                            inactiveSlotCount:
+                              description: InactiveSlotCount is the number of inactive
+                                physical replication slots.
+                              type: integer
+                            inactiveSlots:
+                              description: InactiveSlots lists inactive physical replication
+                                slots and their WAL retention.
+                              items:
+                                description: InactiveSlotInfo contains information
+                                  about an inactive replication slot.
+                                properties:
+                                  retentionBytes:
+                                    description: RetentionBytes is the amount of WAL
+                                      retained by this slot in bytes.
+                                    format: int64
+                                    type: integer
+                                  slotName:
+                                    description: SlotName is the name of the replication
+                                      slot.
+                                    type: string
+                                required:
+                                - retentionBytes
+                                - slotName
+                                type: object
+                              type: array
+                            pendingWALFiles:
+                              description: PendingWALFiles is the count of .ready
+                                files in pg_wal/archive_status/.
+                              type: integer
+                          type: object
+                        walVolume:
+                          description: WALVolume contains disk stats for the WAL volume
+                            (if separate from PGDATA).
+                          properties:
+                            availableBytes:
+                              description: AvailableBytes is the number of bytes available
+                                for use (non-root).
+                              format: int64
+                              type: integer
+                            inodesFree:
+                              description: InodesFree is the number of free inodes
+                                on the volume.
+                              format: int64
+                              type: integer
+                            inodesTotal:
+                              description: InodesTotal is the total number of inodes
+                                on the volume.
+                              format: int64
+                              type: integer
+                            inodesUsed:
+                              description: InodesUsed is the number of inodes in use
+                                on the volume.
+                              format: int64
+                              type: integer
+                            percentUsed:
+                              description: PercentUsed is the percentage of the volume
+                                in use (0-100), rounded.
+                              type: integer
+                            totalBytes:
+                              description: TotalBytes is the total capacity of the
+                                volume in bytes.
+                              format: int64
+                              type: integer
+                            usedBytes:
+                              description: UsedBytes is the number of bytes currently
+                                in use.
+                              format: int64
+                              type: integer
+                          type: object
+                      type: object
+                    description: Instances contains the disk status for each instance.
+                    type: object
+                type: object
               firstRecoverabilityPoint:
                 description: |-
                   The first recoverability point, stored as a date in RFC3339 format.
