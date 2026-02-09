@@ -91,7 +91,7 @@ spec:
 
 ### Referencing a Catalog in a Cluster
 
-A `Cluster` resource uses the `imageCatalogRef` to select its images.
+A `Cluster` resource uses the `imageCatalogRef` to select its images:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -112,7 +112,7 @@ spec:
 ## Image Catalog with Image Volume Extensions
 
 [Image Volume Extensions](imagevolume_extensions.md) allow you to bundle
-sidecar containers for extensions directly within the catalog entry.
+containers for extensions directly within the catalog entry:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
