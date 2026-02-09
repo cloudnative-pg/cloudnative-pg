@@ -70,9 +70,9 @@ func ResolveFromCatalog(
 		// but it could be moved there if we decide to add one.
 		if found && catalogExtension.ImageVolumeSource.Reference == "" && extension.ImageVolumeSource.Reference == "" {
 			return []apiv1.ExtensionConfiguration{}, fmt.Errorf(
-				"extension %q found in image catalog %s/%s but no ImageVolumeSource.Reference is defined "+
+				"extension %q found in image catalog %s but no ImageVolumeSource.Reference is defined "+
 					"in both the image catalog and the Cluster Spec",
-				extension.Name, catalog.GetNamespace(), catalog.GetName(),
+				extension.Name, apiv1.CatalogIdentifier(catalog),
 			)
 		}
 
