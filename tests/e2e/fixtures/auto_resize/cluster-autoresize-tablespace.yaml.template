@@ -1,0 +1,48 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-tablespace
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        step: "1Gi"
+        limit: "10Gi"
+      strategy:
+        maxActionsPerDay: 10
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+
+  tablespaces:
+    - name: tbs1
+      storage:
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+        size: 2Gi
+        resize:
+          enabled: true
+          triggers:
+            usageThreshold: 80
+          expansion:
+            step: "1Gi"
+            limit: "10Gi"
+          strategy:
+            maxActionsPerDay: 10

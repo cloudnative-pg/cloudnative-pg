@@ -215,11 +215,11 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			if hasDelay {
 				By("making sure that the operator is enforcing the switchover delay")
-				timeout := 120
+				
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					return cluster.Status.CurrentPrimaryFailingSinceTimestamp, err
-				}, timeout).Should(Not(Equal("")))
+				}, testTimeouts[timeouts.ClusterIsReady]).Should(Not(Equal("")))
 			}
 
 			By("making sure that the targetPrimary has switched away from current primary")

@@ -1,0 +1,52 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-wal-runtime
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      # Use min_wal_size and max_wal_size for faster WAL recycling in tests
+      min_wal_size: "32MB"
+      max_wal_size: "64MB"
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        step: "1Gi"
+        limit: "10Gi"
+      strategy:
+        maxActionsPerDay: 10
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        step: "1Gi"
+        limit: "10Gi"
+      strategy:
+        maxActionsPerDay: 10
+        walSafetyPolicy:
+          # No archive health required for this runtime test
+          requireArchiveHealthy: false

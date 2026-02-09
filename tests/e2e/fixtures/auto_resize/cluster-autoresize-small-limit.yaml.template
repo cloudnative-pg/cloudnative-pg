@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-small-limit
+spec:
+  instances: 2
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        step: "500Mi"
+        minStep: "500Mi"
+        limit: "3Gi"
+      strategy:
+        maxActionsPerDay: 5
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+          requireArchiveHealthy: false

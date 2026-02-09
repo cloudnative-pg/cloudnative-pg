@@ -103,4 +103,7 @@ const (
 
 	// LabelImageVolumeExtensions is a label for imageVolume extensions tests
 	LabelImageVolumeExtensions = "image-volume-extensions"
+
+	// LabelAutoResize is a label for PVC auto-resize tests
+	LabelAutoResize = "auto-resize"
 )

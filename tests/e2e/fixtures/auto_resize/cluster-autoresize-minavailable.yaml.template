@@ -1,0 +1,27 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-minavailable
+spec:
+  instances: 1
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        # High percentage so it doesn't fire first
+        usageThreshold: 99
+        minAvailable: "500Mi"
+      expansion:
+        step: "1Gi"
+      strategy:
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+          requireArchiveHealthy: false

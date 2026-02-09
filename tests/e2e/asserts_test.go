@@ -148,12 +148,11 @@ func AssertSwitchoverWithHistory(
 			Namespace: namespace,
 			Name:      oldPrimary,
 		}
-		timeout := 120
 		Eventually(func() (bool, error) {
 			pod := corev1.Pod{}
 			err := env.Client.Get(env.Ctx, namespacedName, &pod)
 			return utils.IsPodActive(pod) && utils.IsPodReady(pod), err
-		}, timeout).Should(BeTrue())
+		}, testTimeouts[timeouts.ClusterIsReady]).Should(BeTrue())
 	})
 
 	By("waiting that the old primary become a standby", func() {
@@ -161,12 +160,11 @@ func AssertSwitchoverWithHistory(
 			Namespace: namespace,
 			Name:      oldPrimary,
 		}
-		timeout := 120
 		Eventually(func() (bool, error) {
 			pod := corev1.Pod{}
 			err := env.Client.Get(env.Ctx, namespacedName, &pod)
 			return specs.IsPodStandby(pod), err
-		}, timeout).Should(BeTrue())
+		}, testTimeouts[timeouts.ClusterIsReady]).Should(BeTrue())
 	})
 
 	// After we finish the switchover, we should wait for the cluster to be ready
@@ -176,8 +174,6 @@ func AssertSwitchoverWithHistory(
 
 	if !isReplica {
 		By("confirming that the all postgres containers have *.history file after switchover", func() {
-			timeout := 120
-
 			// Gather pod names
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(len(podList.Items), err).To(BeEquivalentTo(oldPodListLength))
@@ -210,7 +206,7 @@ func AssertSwitchoverWithHistory(
 					return errors.New("at least 1 .history file expected but none found")
 				}
 				return nil
-			}, timeout).ShouldNot(HaveOccurred())
+			}, testTimeouts[timeouts.ClusterIsReady]).ShouldNot(HaveOccurred())
 		})
 	}
 }
@@ -721,7 +717,7 @@ func AssertClusterStandbysAreStreaming(namespace string, clusterName string, tim
 		}
 
 		return nil
-	}, timeout).ShouldNot(HaveOccurred())
+	}, testTimeouts[timeouts.ClusterIsReady]).ShouldNot(HaveOccurred())
 }
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {
@@ -829,8 +825,6 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 	var newPrimaryPod string
 	By(fmt.Sprintf("verifying the new primary pod, oldPrimary is %s", oldPrimary), func() {
-		// Gather the primary
-		timeout := 120
 		// Wait for the operator to set a new TargetPrimary
 		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) {
@@ -841,7 +835,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 				BeEquivalentTo(oldPrimary),
 				BeEquivalentTo(apiv1.PendingFailoverMarker),
 			))
-		}, timeout).Should(Succeed())
+		}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(Succeed())
 		newPrimary := cluster.Status.TargetPrimary
 
 		// Expect the chosen pod to eventually become a primary
@@ -853,7 +847,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 			pod := corev1.Pod{}
 			err := env.Client.Get(env.Ctx, namespacedName, &pod)
 			return specs.IsPodPrimary(pod), err
-		}, timeout).Should(BeTrue())
+		}, testTimeouts[timeouts.ClusterIsReady]).Should(BeTrue())
 		newPrimaryPod = newPrimary
 	})
 	By(fmt.Sprintf("verifying write operation on the new primary pod: %s", newPrimaryPod), func() {
@@ -929,7 +923,7 @@ func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string,
 		err := env.Client.Get(env.Ctx,
 			scheduledBackupNamespacedName, scheduledBackup)
 		return scheduledBackup.Status.LastScheduleTime, err
-	}, timeout).ShouldNot(BeNil())
+	}, testTimeouts[timeouts.ClusterIsReady]).ShouldNot(BeNil())
 
 	// Within a few minutes we should have at least two backups
 	Eventually(func() (int, error) {

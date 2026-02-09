@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-limit
+spec:
+  instances: 1
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        # Step is 1Gi, but Limit is 2.5Gi. 
+        # Resize should grow from 2Gi to exactly 2.5Gi (clamped).
+        step: "1Gi"
+        limit: "2.5Gi"
+      strategy:
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+          requireArchiveHealthy: false

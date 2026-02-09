@@ -101,7 +101,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			By("waiting for the jobs to be removed", func() {
-				timeout := 180
+				timeout := testTimeouts[testsUtils.ClusterIsReady]
 				Eventually(func() (int, error) {
 					podList, err := pods.List(env.Ctx, env.Client, namespace)
 					if err != nil {
@@ -132,7 +132,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			By("verifying failover after drain", func() {
-				timeout := 180
+				timeout := testTimeouts[testsUtils.ClusterIsReady]
 				Eventually(func() (string, error) {
 					pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
@@ -191,7 +191,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			By("waiting for the jobs to be removed", func() {
 				// Wait for jobs to be removed
-				timeout := 180
+				timeout := testTimeouts[testsUtils.ClusterIsReady]
 				Eventually(func() (int, error) {
 					podList, err := pods.List(env.Ctx, env.Client, namespace)
 					if err != nil {
@@ -237,7 +237,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			)
 
 			By("verifying failover after drain", func() {
-				timeout := 180
+				timeout := testTimeouts[testsUtils.ClusterIsReady]
 				// Expect a failover to have happened
 				Eventually(func() (string, error) {
 					pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -315,7 +315,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 				By("waiting for the jobs to be removed", func() {
 					// Wait for jobs to be removed
-					timeout := 180
+					timeout := testTimeouts[testsUtils.ClusterIsReady]
 					Eventually(func() (int, error) {
 						podList, err := pods.List(env.Ctx, env.Client, namespace)
 						if err != nil {
@@ -370,7 +370,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				)
 
 				By("verifying failover after drain", func() {
-					timeout := 180
+					timeout := testTimeouts[testsUtils.ClusterIsReady]
 					// Expect a failover to have happened
 					Eventually(func() (string, error) {
 						pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -449,7 +449,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// Avoid pod from init jobs interfering with the tests
 			By("waiting for the jobs to be removed", func() {
 				// Wait for jobs to be removed
-				timeout := 180
+				timeout := testTimeouts[testsUtils.ClusterIsReady]
 				Eventually(func() (int, error) {
 					podList, err := pods.List(env.Ctx, env.Client, namespace)
 					if err != nil {
@@ -543,7 +543,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				var drainedNodeName string
 				By("waiting for the jobs to be removed", func() {
 					// Wait for jobs to be removed
-					timeout := 180
+					timeout := testTimeouts[testsUtils.ClusterIsReady]
 					var podList *corev1.PodList
 					Eventually(func() (int, error) {
 						var err error

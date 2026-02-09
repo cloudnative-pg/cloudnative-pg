@@ -1,0 +1,56 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-autoresize-archive-block
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Configure backup pointing to a localhost port with nothing listening.
+  # Connection is refused instantly (no DNS lookup delay), which makes
+  # barman-cloud fail fast. pg_stat_archiver records the failure and the
+  # WAL health checker reports unhealthy status.
+  #
+  # NOTE: archive_command is a FIXED parameter in CNPG — you cannot set it
+  # directly. The operator always sets it to "/controller/manager wal-archive ...".
+  # Without a backup config, wal-archive silently succeeds (no-op).
+  # With an invalid backup config, it fails and pg_stat_archiver records it.
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://nonexistent-bucket/archive-block-test/
+      endpointURL: http://127.0.0.1:19999
+      s3Credentials:
+        accessKeyId:
+          name: archive-block-dummy-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: archive-block-dummy-creds
+          key: ACCESS_SECRET_KEY
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 2Gi
+    resize:
+      enabled: true
+      triggers:
+        usageThreshold: 80
+      expansion:
+        step: "1Gi"
+        limit: "10Gi"
+      strategy:
+        maxActionsPerDay: 10
+        walSafetyPolicy:
+          acknowledgeWALRisk: true
+          # This will block resize when archive is unhealthy
+          requireArchiveHealthy: true
