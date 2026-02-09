@@ -1073,6 +1073,8 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+	// ConditionReconciled indicates whether the resource has been successfully reconciled.
+	ConditionReconciled ClusterConditionType = "Reconciled"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1121,6 +1123,9 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// ConditionReasonOutsideWatchScope is the reason when the resource is in a namespace not watched by the operator.
+	ConditionReasonOutsideWatchScope ConditionReason = "OutsideWatchScope"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
