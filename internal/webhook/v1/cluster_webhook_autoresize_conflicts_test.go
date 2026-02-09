@@ -58,7 +58,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size: "10Gi",
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 						Strategy: &apiv1.ResizeStrategy{
 							WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 								AcknowledgeWALRisk: ptr.To(true),
@@ -81,7 +81,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size: "10Gi",
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 					},
 				},
 				WalStorage: &apiv1.StorageConfiguration{
@@ -302,7 +302,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "not-valid-data",
 							},
@@ -311,7 +311,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 					WalStorage: &apiv1.StorageConfiguration{
 						Size: "5Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "not-valid-wal",
 							},
@@ -323,7 +323,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 							Storage: apiv1.StorageConfiguration{
 								Size: "20Gi",
 								Resize: &apiv1.ResizeConfiguration{
-									Enabled: true,
+									Enabled: ptr.To(true),
 									Expansion: &apiv1.ExpansionPolicy{
 										Limit: "not-valid-tbs",
 									},
@@ -402,7 +402,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 			// volume in clusters without separate WAL storage.
 			cluster := makeMultiVolumeCluster(func(c *apiv1.Cluster) {
 				c.Spec.WalStorage.Resize = &apiv1.ResizeConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					// No acknowledgeWALRisk — should be fine for WAL volume
 				}
 			})
@@ -417,7 +417,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 						Storage: apiv1.StorageConfiguration{
 							Size: "20Gi",
 							Resize: &apiv1.ResizeConfiguration{
-								Enabled: true,
+								Enabled: ptr.To(true),
 								// No acknowledgeWALRisk — should be fine for tablespace
 							},
 						},
@@ -445,7 +445,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 			// CURRENT: accepted — when enabled=false, validation is skipped entirely.
 			// This is intentional: users may configure resize before enabling it.
 			cluster := makeCluster(func(c *apiv1.Cluster) {
-				c.Spec.StorageConfiguration.Resize.Enabled = false
+				c.Spec.StorageConfiguration.Resize.Enabled = ptr.To(false)
 				c.Spec.StorageConfiguration.Resize.Expansion = &apiv1.ExpansionPolicy{
 					Step:  intstr.IntOrString{Type: intstr.String, StrVal: "garbage"},
 					Limit: "also-garbage",
@@ -462,7 +462,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "100Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								UsageThreshold: ptr.To(85),
 							},
@@ -478,7 +478,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 					WalStorage: &apiv1.StorageConfiguration{
 						Size: "50Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								UsageThreshold: ptr.To(90),
 								MinAvailable:   "2Gi",
@@ -501,7 +501,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 							Storage: apiv1.StorageConfiguration{
 								Size: "200Gi",
 								Resize: &apiv1.ResizeConfiguration{
-									Enabled: true,
+									Enabled: ptr.To(true),
 									Expansion: &apiv1.ExpansionPolicy{
 										Step:    intstr.IntOrString{Type: intstr.String, StrVal: "30%"},
 										MinStep: "10Gi",
@@ -516,7 +516,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 							Storage: apiv1.StorageConfiguration{
 								Size: "500Gi",
 								Resize: &apiv1.ResizeConfiguration{
-									Enabled: true,
+									Enabled: ptr.To(true),
 									Expansion: &apiv1.ExpansionPolicy{
 										Step: intstr.IntOrString{Type: intstr.String, StrVal: "50Gi"},
 									},
@@ -532,7 +532,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 		It("should enable resize on data only, not WAL or tablespaces", func() {
 			cluster := makeMultiVolumeCluster(func(c *apiv1.Cluster) {
 				c.Spec.StorageConfiguration.Resize = &apiv1.ResizeConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 				}
 				// WAL and tablespace resize left nil — should be fine
 				c.Spec.Tablespaces = []apiv1.TablespaceConfiguration{

@@ -46,7 +46,7 @@ var _ = Describe("Reconciler Helpers", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					StorageConfiguration: apiv1.StorageConfiguration{
-						Resize: &apiv1.ResizeConfiguration{Enabled: true},
+						Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(true)},
 					},
 				},
 			}
@@ -57,7 +57,7 @@ var _ = Describe("Reconciler Helpers", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					WalStorage: &apiv1.StorageConfiguration{
-						Resize: &apiv1.ResizeConfiguration{Enabled: true},
+						Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(true)},
 					},
 				},
 			}
@@ -71,7 +71,7 @@ var _ = Describe("Reconciler Helpers", func() {
 						{
 							Name: "t1",
 							Storage: apiv1.StorageConfiguration{
-								Resize: &apiv1.ResizeConfiguration{Enabled: true},
+								Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(true)},
 							},
 						},
 					},
@@ -90,16 +90,16 @@ var _ = Describe("Reconciler Helpers", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
-					Resize: &apiv1.ResizeConfiguration{Enabled: true},
+					Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(true)},
 				},
 				WalStorage: &apiv1.StorageConfiguration{
-					Resize: &apiv1.ResizeConfiguration{Enabled: false},
+					Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(false)},
 				},
 				Tablespaces: []apiv1.TablespaceConfiguration{
 					{
 						Name: "t1",
 						Storage: apiv1.StorageConfiguration{
-							Resize: &apiv1.ResizeConfiguration{Enabled: true},
+							Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(true)},
 						},
 					},
 				},
@@ -114,7 +114,7 @@ var _ = Describe("Reconciler Helpers", func() {
 			}
 			config := getResizeConfigForPVC(cluster, pvc)
 			Expect(config).ToNot(BeNil())
-			Expect(config.Enabled).To(BeTrue())
+			Expect(ptr.Deref(config.Enabled, false)).To(BeTrue())
 		})
 
 		It("should return WAL resize config", func() {
@@ -125,7 +125,7 @@ var _ = Describe("Reconciler Helpers", func() {
 			}
 			config := getResizeConfigForPVC(cluster, pvc)
 			Expect(config).ToNot(BeNil())
-			Expect(config.Enabled).To(BeFalse())
+			Expect(ptr.Deref(config.Enabled, true)).To(BeFalse())
 		})
 
 		It("should return tablespace resize config", func() {
@@ -139,7 +139,7 @@ var _ = Describe("Reconciler Helpers", func() {
 			}
 			config := getResizeConfigForPVC(cluster, pvc)
 			Expect(config).ToNot(BeNil())
-			Expect(config.Enabled).To(BeTrue())
+			Expect(ptr.Deref(config.Enabled, false)).To(BeTrue())
 		})
 
 		It("should return nil for unknown role", func() {
@@ -308,7 +308,7 @@ var _ = Describe("reconcilePVC", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 						Triggers: &apiv1.ResizeTriggers{
 							UsageThreshold: ptr.To(80),
 						},
@@ -376,7 +376,7 @@ var _ = Describe("reconcilePVC", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 					},
 				},
 			},
@@ -431,7 +431,7 @@ var _ = Describe("reconcilePVC", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 						Expansion: &apiv1.ExpansionPolicy{
 							Limit: "invalid",
 						},
@@ -487,7 +487,7 @@ var _ = Describe("Reconcile", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
-					Resize: &apiv1.ResizeConfiguration{Enabled: false},
+					Resize: &apiv1.ResizeConfiguration{Enabled: ptr.To(false)},
 				},
 			},
 		}
@@ -504,7 +504,7 @@ var _ = Describe("Reconcile", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 						Triggers: &apiv1.ResizeTriggers{
 							UsageThreshold: ptr.To(80),
 						},
@@ -571,7 +571,7 @@ var _ = Describe("Reconcile", func() {
 			Spec: apiv1.ClusterSpec{
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Resize: &apiv1.ResizeConfiguration{
-						Enabled: true,
+						Enabled: ptr.To(true),
 						Expansion: &apiv1.ExpansionPolicy{
 							Limit: "invalid",
 						},

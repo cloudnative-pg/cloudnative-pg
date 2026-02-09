@@ -2115,7 +2115,7 @@ type ResizeConfiguration struct {
 	// Enabled activates automatic PVC resizing.
 	// +optional
 	// +kubebuilder:default:=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// Triggers defines the conditions that trigger a resize operation.
 	// +optional

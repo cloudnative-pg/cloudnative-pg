@@ -56,7 +56,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								UsageThreshold: ptr.To(80),
 							},
@@ -83,7 +83,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 						},
 					},
 					// No WalStorage → single-volume cluster
@@ -100,7 +100,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 						},
 					},
 					WalStorage: &apiv1.StorageConfiguration{
@@ -117,7 +117,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: false,
+							Enabled: ptr.To(false),
 						},
 					},
 				},
@@ -133,7 +133,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								UsageThreshold: ptr.To(85),
 								MinAvailable:   "5Gi",
@@ -156,7 +156,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								MinAvailable: "invalid",
 							},
@@ -182,7 +182,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step: intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
 							},
@@ -204,7 +204,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step: intstr.IntOrString{Type: intstr.String, StrVal: "10Gi"},
 							},
@@ -226,7 +226,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step: intstr.IntOrString{Type: intstr.String, StrVal: "0%"},
 							},
@@ -250,7 +250,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step: intstr.IntOrString{Type: intstr.String, StrVal: "invalid"},
 							},
@@ -274,7 +274,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step: intstr.FromInt(20),
 							},
@@ -298,7 +298,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "not-a-quantity",
 							},
@@ -322,7 +322,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								MinStep: "100Gi",
 								MaxStep: "10Gi",
@@ -349,7 +349,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 									AcknowledgeWALRisk: ptr.To(true),
@@ -371,7 +371,7 @@ var _ = Describe("auto-resize validation", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 									AcknowledgeWALRisk:    ptr.To(true),
@@ -398,7 +398,7 @@ var _ = Describe("auto-resize validation", func() {
 					WalStorage: &apiv1.StorageConfiguration{
 						Size: "5Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "invalid",
 							},
@@ -426,7 +426,7 @@ var _ = Describe("auto-resize validation", func() {
 							Storage: apiv1.StorageConfiguration{
 								Size: "20Gi",
 								Resize: &apiv1.ResizeConfiguration{
-									Enabled: true,
+									Enabled: ptr.To(true),
 									Expansion: &apiv1.ExpansionPolicy{
 										Step: intstr.IntOrString{Type: intstr.String, StrVal: "invalid%"},
 									},
@@ -451,7 +451,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Strategy: &apiv1.ResizeStrategy{
 								MaxActionsPerDay: ptr.To(0),
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
@@ -475,7 +475,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "1Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								MinAvailable: "5Gi",
 							},
@@ -501,7 +501,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "5Gi",
 							},
@@ -527,7 +527,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Expansion: &apiv1.ExpansionPolicy{
 								Step:    intstr.IntOrString{Type: intstr.String, StrVal: "10Gi"},
 								MinStep: "2Gi",
@@ -554,7 +554,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 									AcknowledgeWALRisk: ptr.To(true),
@@ -580,7 +580,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 									AcknowledgeWALRisk:    ptr.To(true),
@@ -613,7 +613,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: true,
+							Enabled: ptr.To(true),
 							Triggers: &apiv1.ResizeTriggers{
 								UsageThreshold: ptr.To(80),
 							},
@@ -644,7 +644,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 					StorageConfiguration: apiv1.StorageConfiguration{
 						Size: "10Gi",
 						Resize: &apiv1.ResizeConfiguration{
-							Enabled: false,
+							Enabled: ptr.To(false),
 							// Even with bad config, disabled should skip warnings
 							Expansion: &apiv1.ExpansionPolicy{
 								Limit: "1Gi", // Would warn if enabled

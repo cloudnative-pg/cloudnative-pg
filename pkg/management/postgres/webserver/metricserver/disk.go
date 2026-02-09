@@ -373,7 +373,7 @@ func (dm *DiskMetrics) deriveDecisionMetrics(
 
 	// 4. Resize blocked metric - set when auto-resize cannot proceed
 	// Only populate if auto-resize is enabled for this volume
-	if resizeConfig != nil && resizeConfig.Enabled {
+	if resizeConfig != nil && resizeConfig.Enabled != nil && *resizeConfig.Enabled {
 		if budgetRemain == 0 {
 			dm.ResizeBlocked.WithLabelValues(volType, ts, "rate_limit").Set(1)
 		} else {

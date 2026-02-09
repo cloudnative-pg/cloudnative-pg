@@ -2609,7 +2609,8 @@ func getAutoResizeWarningsForStorage(
 	cluster *apiv1.Cluster,
 	isSingleVolume bool,
 ) admission.Warnings {
-	if configuration == nil || configuration.Resize == nil || !configuration.Resize.Enabled {
+	if configuration == nil || configuration.Resize == nil ||
+		configuration.Resize.Enabled == nil || !*configuration.Resize.Enabled {
 		return nil
 	}
 
@@ -3050,7 +3051,7 @@ func validateResizeConfiguration(
 ) field.ErrorList {
 	var result field.ErrorList
 
-	if !config.Enabled {
+	if config.Enabled == nil || !*config.Enabled {
 		return result
 	}
 

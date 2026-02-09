@@ -135,7 +135,7 @@ func reconcilePVC(
 
 	pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 	resizeConfig := getResizeConfigForPVC(cluster, pvc)
-	if resizeConfig == nil || !resizeConfig.Enabled {
+	if resizeConfig == nil || resizeConfig.Enabled == nil || !*resizeConfig.Enabled {
 		return false, nil
 	}
 
@@ -273,18 +273,22 @@ func mapPVCRoleToVolumeType(role string) apiv1.ResizeVolumeType {
 // IsAutoResizeEnabled checks if auto-resize is enabled for any storage in the cluster.
 func IsAutoResizeEnabled(cluster *apiv1.Cluster) bool {
 	if cluster.Spec.StorageConfiguration.Resize != nil &&
-		cluster.Spec.StorageConfiguration.Resize.Enabled {
+		cluster.Spec.StorageConfiguration.Resize.Enabled != nil &&
+		*cluster.Spec.StorageConfiguration.Resize.Enabled {
 		return true
 	}
 
 	if cluster.Spec.WalStorage != nil &&
 		cluster.Spec.WalStorage.Resize != nil &&
-		cluster.Spec.WalStorage.Resize.Enabled {
+		cluster.Spec.WalStorage.Resize.Enabled != nil &&
+		*cluster.Spec.WalStorage.Resize.Enabled {
 		return true
 	}
 
 	for _, tbs := range cluster.Spec.Tablespaces {
-		if tbs.Storage.Resize != nil && tbs.Storage.Resize.Enabled {
+		if tbs.Storage.Resize != nil &&
+			tbs.Storage.Resize.Enabled != nil &&
+			*tbs.Storage.Resize.Enabled {
 			return true
 		}
 	}

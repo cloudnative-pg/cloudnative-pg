@@ -176,7 +176,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.Spec.StorageConfiguration.Resize).ToNot(BeNil())
-				Expect(cluster.Spec.StorageConfiguration.Resize.Enabled).To(BeTrue())
+				Expect(ptr.Deref(cluster.Spec.StorageConfiguration.Resize.Enabled, false)).To(BeTrue())
 			})
 
 			By("filling the disk on ALL instances to trigger auto-resize", func() {
@@ -394,10 +394,10 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.Spec.StorageConfiguration.Resize).ToNot(BeNil())
-				Expect(cluster.Spec.StorageConfiguration.Resize.Enabled).To(BeTrue())
+				Expect(ptr.Deref(cluster.Spec.StorageConfiguration.Resize.Enabled, false)).To(BeTrue())
 				Expect(cluster.Spec.WalStorage).ToNot(BeNil())
 				Expect(cluster.Spec.WalStorage.Resize).ToNot(BeNil())
-				Expect(cluster.Spec.WalStorage.Resize.Enabled).To(BeTrue())
+				Expect(ptr.Deref(cluster.Spec.WalStorage.Resize.Enabled, false)).To(BeTrue())
 			})
 
 			By("verifying PVCs exist for both data and WAL", func() {
@@ -668,7 +668,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 			cluster.Spec.StorageConfiguration = apiv1.StorageConfiguration{
 				Size: "2Gi",
 				Resize: &apiv1.ResizeConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					// No strategy with acknowledgeWALRisk → should be rejected
 				},
 			}
@@ -697,7 +697,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 			cluster.Spec.StorageConfiguration = apiv1.StorageConfiguration{
 				Size: "2Gi",
 				Resize: &apiv1.ResizeConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Strategy: &apiv1.ResizeStrategy{
 						WALSafetyPolicy: &apiv1.WALSafetyPolicy{
 							AcknowledgeWALRisk: ptr.To(true),
@@ -957,7 +957,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 			cluster.Spec.StorageConfiguration = apiv1.StorageConfiguration{
 				Size: "100Gi",
 				Resize: &apiv1.ResizeConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Expansion: &apiv1.ExpansionPolicy{
 						Step:    intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
 						MaxStep: "10Gi",
@@ -1067,7 +1067,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				Expect(cluster.Spec.Tablespaces).To(HaveLen(1))
 				Expect(cluster.Spec.Tablespaces[0].Name).To(Equal("tbs1"))
 				Expect(cluster.Spec.Tablespaces[0].Storage.Resize).ToNot(BeNil())
-				Expect(cluster.Spec.Tablespaces[0].Storage.Resize.Enabled).To(BeTrue())
+				Expect(ptr.Deref(cluster.Spec.Tablespaces[0].Storage.Resize.Enabled, false)).To(BeTrue())
 			})
 
 			By("verifying tablespace PVC exists", func() {
