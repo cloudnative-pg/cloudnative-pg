@@ -2853,7 +2853,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		if r.Spec.ImageCatalogRef == nil && v.ImageVolumeSource.Reference == "" {
 			result = append(result,
 				field.Invalid(
-					basePath.Child("ImageVolumeSource", "reference"),
+					basePath.Child("image", "reference"),
 					v.ImageVolumeSource.Reference,
 					fmt.Sprintf("Image reference for extension `%s` must be set when no image catalog is configured", v.Name),
 				),
