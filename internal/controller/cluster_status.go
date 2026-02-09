@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
@@ -780,10 +781,108 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		})
 	}
 
+	// Update disk status from instance status
+	updateDiskStatus(cluster, cluster.Status.DiskStatus, statuses)
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
+}
+
+// updateDiskStatus populates cluster.Status.DiskStatus from instance statuses.
+// The Instances map is rebuilt on each update to ensure stale entries for removed pods are cleared.
+// LastUpdated is only updated for an instance if its volume or health data has changed.
+func updateDiskStatus(
+	cluster *apiv1.Cluster,
+	existingDiskStatus *apiv1.ClusterDiskStatus,
+	statuses postgres.PostgresqlStatusList,
+) {
+	if cluster.Status.DiskStatus == nil {
+		cluster.Status.DiskStatus = &apiv1.ClusterDiskStatus{}
+	}
+	// Reinitialize the map on each update to clear entries for pods that no longer exist
+	cluster.Status.DiskStatus.Instances = make(map[string]*apiv1.InstanceDiskStatus, len(statuses.Items))
+
+	for _, item := range statuses.Items {
+		if item.Pod == nil || item.DiskStatus == nil {
+			continue
+		}
+
+		podName := item.Pod.Name
+		instanceStatus := &apiv1.InstanceDiskStatus{}
+
+		// Convert data volume
+		if item.DiskStatus.DataVolume != nil {
+			instanceStatus.DataVolume = convertVolumeStatus(item.DiskStatus.DataVolume)
+		}
+
+		// Convert WAL volume
+		if item.DiskStatus.WALVolume != nil {
+			instanceStatus.WALVolume = convertVolumeStatus(item.DiskStatus.WALVolume)
+		}
+
+		// Convert tablespace volumes
+		if len(item.DiskStatus.Tablespaces) > 0 {
+			instanceStatus.Tablespaces = make(map[string]*apiv1.VolumeDiskStatus)
+			for name, vol := range item.DiskStatus.Tablespaces {
+				instanceStatus.Tablespaces[name] = convertVolumeStatus(vol)
+			}
+		}
+
+		// Convert WAL health status
+		if item.WALHealthStatus != nil {
+			instanceStatus.WALHealth = convertWALHealthStatus(item.WALHealthStatus)
+		}
+
+		// Idempotency check: only update LastUpdated if the actual data changed
+		if existingDiskStatus != nil && existingDiskStatus.Instances != nil {
+			if existingInstance, ok := existingDiskStatus.Instances[podName]; ok {
+				// Create a copy of the existing instance status without the timestamp for comparison
+				comparisonInstance := existingInstance.DeepCopy()
+				comparisonInstance.LastUpdated = nil
+				if reflect.DeepEqual(comparisonInstance, instanceStatus) {
+					instanceStatus.LastUpdated = existingInstance.LastUpdated
+				}
+			}
+		}
+
+		// If LastUpdated is still nil, it means it's new or data changed
+		if instanceStatus.LastUpdated == nil {
+			instanceStatus.LastUpdated = &metav1.Time{Time: time.Now()}
+		}
+
+		cluster.Status.DiskStatus.Instances[podName] = instanceStatus
+	}
+}
+
+// convertVolumeStatus converts a postgres.VolumeStatus to apiv1.VolumeDiskStatus.
+func convertVolumeStatus(vol *postgres.VolumeStatus) *apiv1.VolumeDiskStatus {
+	return &apiv1.VolumeDiskStatus{
+		TotalBytes:     vol.TotalBytes,
+		UsedBytes:      vol.UsedBytes,
+		AvailableBytes: vol.AvailableBytes,
+		PercentUsed:    int(vol.PercentUsed),
+		InodesTotal:    vol.InodesTotal,
+		InodesUsed:     vol.InodesUsed,
+		InodesFree:     vol.InodesFree,
+	}
+}
+
+// convertWALHealthStatus converts a postgres.WALHealthStatus to apiv1.WALHealthInfo.
+func convertWALHealthStatus(health *postgres.WALHealthStatus) *apiv1.WALHealthInfo {
+	info := &apiv1.WALHealthInfo{
+		ArchiveHealthy:    health.ArchiveHealthy,
+		PendingWALFiles:   health.PendingWALFiles,
+		InactiveSlotCount: health.InactiveSlotCount,
+	}
+	for _, slot := range health.InactiveSlots {
+		info.InactiveSlots = append(info.InactiveSlots, apiv1.InactiveSlotInfo{
+			SlotName:       slot.SlotName,
+			RetentionBytes: slot.RetentionBytes,
+		})
+	}
+	return info
 }
 
 // getPodsTopology returns a map with all the information about the pods topology

@@ -56,11 +56,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/autoresize"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -809,6 +811,40 @@ func (r *ClusterReconciler) reconcileResources(
 		return res, err
 	}
 
+	// Auto-resize PVCs based on disk usage
+	diskInfoByPod := buildDiskInfoByPod(instancesStatus)
+	origCluster := cluster.DeepCopy()
+	autoResizeRes, autoResizeErr := autoresize.Reconcile(
+		ctx,
+		r.Client,
+		r.Recorder,
+		cluster,
+		diskInfoByPod,
+		resources.pvcs.Items,
+	)
+
+	// If the autoresize logic added events or changed status, persist it now.
+	// This is CRITICAL because if we return early on error or requeue, the
+	// rest of the loop is skipped and memory changes are lost.
+	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
+		newStatus := cluster.Status
+		if err := status.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
+			c.Status = newStatus
+		}); err != nil {
+			contextLogger.Error(err, "failed to persist auto-resize status changes")
+			return ctrl.Result{}, err
+		}
+	}
+
+	if autoResizeErr != nil {
+		// Return the autoResizeRes (which has RequeueAfter) so the reconciler retries
+		return autoResizeRes, autoResizeErr
+	}
+
+	if !autoResizeRes.IsZero() {
+		return autoResizeRes, nil
+	}
+
 	// In-place Postgres major version upgrades
 	if result, err := majorupgrade.Reconcile(
 		ctx,
@@ -824,9 +860,12 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Reconcile Pods
+	contextLogger.Debug("starting reconcilePods")
 	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		contextLogger.Debug("reconcilePods returned early", "result", res, "error", err)
 		return res, err
 	}
+	contextLogger.Debug("reconcilePods completed")
 
 	if len(resources.instances.Items) > 0 && resources.noInstanceIsAlive() {
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
@@ -853,7 +892,32 @@ func (r *ClusterReconciler) reconcileResources(
 
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
+	// For clusters with auto-resize enabled, schedule periodic reconciliation
+	// to monitor disk usage and trigger resize when needed. This is done at the
+	// END of reconciliation after RegisterPhase to ensure it doesn't block
+	// the cluster from reaching healthy status.
+	if autoresize.IsAutoResizeEnabled(cluster) {
+		return ctrl.Result{RequeueAfter: autoresize.MonitoringInterval}, nil
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// buildDiskInfoByPod constructs a map of pod name to disk info from the instance status list.
+// This is used by the auto-resize reconciler to evaluate disk usage triggers.
+func buildDiskInfoByPod(instancesStatus postgres.PostgresqlStatusList) map[string]*autoresize.InstanceDiskInfo {
+	diskInfoByPod := make(map[string]*autoresize.InstanceDiskInfo)
+	for idx := range instancesStatus.Items {
+		status := &instancesStatus.Items[idx]
+		if status.Pod == nil || status.DiskStatus == nil {
+			continue
+		}
+		diskInfoByPod[status.Pod.Name] = &autoresize.InstanceDiskInfo{
+			DiskStatus:      status.DiskStatus,
+			WALHealthStatus: status.WALHealthStatus,
+		}
+	}
+	return diskInfoByPod
 }
 
 // deleteTerminatedPods will delete the Pods that are terminated
