@@ -36,9 +36,12 @@ Both resources share a common schema:
   PostgreSQL 18+ via `extension_control_path`).
 
 :::warning
-The operator trusts the user-defined `major` version and does **not** perform
-image detection. Ensure the declared major version in the catalog matches the
-actual PostgreSQL image.
+While the operator trusts the user-defined `major` version without performing
+image detection, the official CloudNativePG catalogs are pre-validated by the
+community to ensure that every extension and operand image entry correctly
+matches the declared major version. If you are creating a custom catalog, you
+must ensure the declared major version matches the actual PostgreSQL images to
+maintain compatibility.
 :::
 
 ## Configuration examples
