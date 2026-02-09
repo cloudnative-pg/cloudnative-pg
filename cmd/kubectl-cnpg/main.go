@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/disk"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
@@ -116,6 +117,7 @@ func main() {
 		backup.NewCmd(),
 		certificate.NewCmd(),
 		destroy.NewCmd(),
+		disk.NewCmd(),
 		fence.NewCmd(),
 		fio.NewCmd(),
 		hibernate.NewCmd(),
