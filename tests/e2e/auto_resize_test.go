@@ -77,14 +77,19 @@ const (
 	slotRetentionFillRowCount = 120000
 
 	// Disk usage thresholds (percentage)
-	diskUsageThreshold           = 80
-	diskUsageThresholdMinAvail   = 99
-	metricsToleranceBytes        = 2e8 // 200MB tolerance for filesystem overhead
-	expectedDiskTotalBytes       = 2147483648
-	slotRetentionThresholdBytes  = 104857600 // 100MB
+	diskUsageThreshold          = 80
+	diskUsageThresholdMinAvail  = 99
+	metricsToleranceBytes       = 2e8 // 200MB tolerance for filesystem overhead
+	expectedDiskTotalBytes      = 2147483648
+	slotRetentionThresholdBytes = 104857600 // 100MB
 
 	// Volume sizes
 	originalVolumeSize = "2Gi"
+
+	// Fill file paths
+	dataFillFile       = "/var/lib/postgresql/data/pgdata/fill_file"
+	dataFillFile2      = "/var/lib/postgresql/data/pgdata/fill_file2"
+	tablespaceFillFile = "/var/lib/postgresql/tablespaces/tbs1/fill_file"
 )
 
 func getDiskUsage(pod *corev1.Pod, path string) (percentUsed int, availableBytes int64, err error) {
@@ -186,10 +191,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 					// Fill the disk to exceed the usage threshold
 					commandTimeout := diskFillCommandTimeout
+					ddCmd := fmt.Sprintf(
+						"dd if=/dev/zero of=%s bs=1M count=%d || true",
+						dataFillFile, diskFillSizeBasic)
 					_, _, err = env.EventuallyExecCommand(
 						env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-						"sh", "-c",
-						fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d || true", diskFillSizeBasic),
+						"sh", "-c", ddCmd,
 					)
 					Expect(err).ToNot(HaveOccurred())
 				}
@@ -308,10 +315,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				// The volume is 2Gi, minAvailable is 500Mi, and usageThreshold is 99.
 				// Writing ~1.7Gi should leave <500Mi available while staying under 99% usage.
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeMinAvailable)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeMinAvailable),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -514,10 +523,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				// Fill the disk to exceed the usage threshold
 				// The volume is 2Gi, so writing ~1.7Gi should trigger resize
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeMinAvailable)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeMinAvailable),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -575,10 +586,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 				// Write ~2Gi to the now-2.5Gi volume to exceed threshold again
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d || true",
+					dataFillFile2, diskFillSizeLimitTest)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file2 bs=1M count=%d || true", diskFillSizeLimitTest),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -738,10 +751,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 				// Fill the disk to exceed the usage threshold
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeMinAvailable)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeMinAvailable),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -872,10 +887,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 				// Fill the disk to exceed the usage threshold
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeMinAvailable)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeMinAvailable),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -1081,10 +1098,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 				// Fill the tablespace volume to exceed the usage threshold
 				// Tablespaces are mounted at /var/lib/postgresql/tablespaces/<name>
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					tablespaceFillFile, diskFillSizeMinAvailable)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/tablespaces/tbs1/fill_file bs=1M count=%d", diskFillSizeMinAvailable),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -1263,10 +1282,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 				// Fill the disk to exceed the usage threshold
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeArchiveBlock)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeArchiveBlock),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1467,10 +1488,12 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 
 				// Fill the disk to exceed the usage threshold
 				commandTimeout := diskFillCommandTimeout
+				ddCmd := fmt.Sprintf(
+					"dd if=/dev/zero of=%s bs=1M count=%d",
+					dataFillFile, diskFillSizeSlotBlock)
 				_, _, err = env.EventuallyExecCommand(
 					env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
-					"sh", "-c",
-					fmt.Sprintf("dd if=/dev/zero of=/var/lib/postgresql/data/pgdata/fill_file bs=1M count=%d", diskFillSizeSlotBlock),
+					"sh", "-c", ddCmd,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})

@@ -69,3 +69,97 @@ spec:
       for: 1m
       labels:
         severity: warning
+  - name: cnpg-disk.rules
+    rules:
+    # Critical alerts
+    - alert: CNPGDiskCritical
+      annotations:
+        description: Disk usage on {{ $labels.pod }} volume {{ $labels.volume_type }} is above 95% ({{ $value | humanizePercentage }})
+        summary: Critical disk usage on PostgreSQL volume
+      expr: |-
+        cnpg_disk_percent_used{volume_type=~"data|wal"} > 95
+      for: 5m
+      labels:
+        severity: critical
+    - alert: CNPGWALGrowthArchiveFailure
+      annotations:
+        description: WAL archiving is failing on {{ $labels.pod }} while WAL is growing rapidly ({{ $value | humanize1024 }}B/hour)
+        summary: WAL growth with archive failure may cause disk exhaustion
+      expr: |-
+        cnpg_wal_archive_healthy == 0 and rate(cnpg_disk_used_bytes{volume_type="wal"}[1h]) > 1073741824
+      for: 5m
+      labels:
+        severity: critical
+    # Warning alerts
+    - alert: CNPGDiskWarning
+      annotations:
+        description: Disk usage on {{ $labels.pod }} volume {{ $labels.volume_type }} is above 80% ({{ $value | humanizePercentage }})
+        summary: High disk usage on PostgreSQL volume
+      expr: |-
+        cnpg_disk_percent_used > 80
+      for: 15m
+      labels:
+        severity: warning
+    - alert: CNPGAutoResizeBlocked
+      annotations:
+        description: Auto-resize is blocked on {{ $labels.pod }} for volume {{ $labels.volume_type }}
+        summary: PVC auto-resize is blocked due to WAL safety policy or other conditions
+      expr: |-
+        cnpg_disk_resize_blocked == 1
+      for: 5m
+      labels:
+        severity: warning
+    - alert: CNPGAtLimit
+      annotations:
+        description: Disk {{ $labels.volume_type }} on {{ $labels.pod }} is at expansion limit and usage is above 80%
+        summary: PVC has reached expansion limit with high disk usage
+      expr: |-
+        cnpg_disk_at_limit == 1 and cnpg_disk_percent_used > 80
+      for: 5m
+      labels:
+        severity: warning
+    - alert: CNPGArchiveUnhealthy
+      annotations:
+        description: WAL archiving is unhealthy on {{ $labels.pod }}
+        summary: WAL archive is not functioning properly
+      expr: |-
+        cnpg_wal_archive_healthy == 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: CNPGInactiveReplicationSlots
+      annotations:
+        description: There are {{ $value }} inactive replication slots on {{ $labels.pod }} that may cause WAL retention
+        summary: Inactive replication slots detected
+      expr: |-
+        cnpg_wal_inactive_slots > 0
+      for: 30m
+      labels:
+        severity: warning
+    - alert: CNPGResizeBudgetExhausted
+      annotations:
+        description: Auto-resize budget is exhausted on {{ $labels.pod }} for volume {{ $labels.volume_type }}
+        summary: Daily resize budget exhausted, no more resizes until budget resets
+      expr: |-
+        cnpg_disk_resize_budget_remaining == 0
+      for: 5m
+      labels:
+        severity: warning
+    # Info alerts
+    - alert: CNPGAutoResizeOccurred
+      annotations:
+        description: A successful auto-resize occurred on {{ $labels.pod }} for volume {{ $labels.volume_type }}
+        summary: PVC was automatically resized
+      expr: |-
+        increase(cnpg_disk_resizes_total{result="success"}[1h]) > 0
+      labels:
+        severity: info
+    - alert: CNPGTablespaceHighUsage
+      annotations:
+        description: Tablespace volume usage on {{ $labels.pod }} is above 85% ({{ $value | humanizePercentage }})
+        summary: High tablespace disk usage
+      expr: |-
+        cnpg_disk_percent_used{volume_type="tablespace"} > 85
+      for: 15m
+      labels:
+        severity: info

@@ -215,7 +215,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			if hasDelay {
 				By("making sure that the operator is enforcing the switchover delay")
-				
+
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					return cluster.Status.CurrentPrimaryFailingSinceTimestamp, err

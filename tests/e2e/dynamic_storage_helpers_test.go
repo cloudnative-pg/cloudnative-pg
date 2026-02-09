@@ -52,9 +52,6 @@ const (
 	helperNewReplicaTimeout     = 5 * time.Minute
 	helperWALFillTimeout        = 120 * time.Second
 	helperDataIntegrityTimeout  = 60 * time.Second
-
-	// Disk usage thresholds
-	helperDiskUsageThreshold = 80
 )
 
 // fillDiskToTriggerResize fills disk on a specific pod to trigger auto-resize
