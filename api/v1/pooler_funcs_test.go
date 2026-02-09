@@ -21,7 +21,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,22 +58,10 @@ var _ = Describe("Pooler GetServiceAccountName", func() {
 				Name: "my-pooler",
 			},
 			Spec: PoolerSpec{
-				ServiceAccountName: ptr.To("shared-service-account"),
+				ServiceAccountName: "shared-service-account",
 			},
 		}
 		Expect(pooler.GetServiceAccountName()).To(Equal("shared-service-account"))
-	})
-
-	It("returns pooler name when serviceAccountName is nil", func() {
-		pooler := &Pooler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "my-pooler",
-			},
-			Spec: PoolerSpec{
-				ServiceAccountName: nil,
-			},
-		}
-		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))
 	})
 
 	It("returns pooler name when serviceAccountName is empty string", func() {
@@ -83,7 +70,7 @@ var _ = Describe("Pooler GetServiceAccountName", func() {
 				Name: "my-pooler",
 			},
 			Spec: PoolerSpec{
-				ServiceAccountName: ptr.To(""),
+				ServiceAccountName: "",
 			},
 		}
 		Expect(pooler.GetServiceAccountName()).To(Equal("my-pooler"))

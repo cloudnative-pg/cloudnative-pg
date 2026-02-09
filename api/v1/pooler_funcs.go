@@ -119,8 +119,8 @@ func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
 // If ServiceAccountName is specified in the spec and is not empty, it returns that value.
 // Otherwise, it returns the Pooler name.
 func (in *Pooler) GetServiceAccountName() string {
-	if in.Spec.ServiceAccountName != nil && *in.Spec.ServiceAccountName != "" {
-		return *in.Spec.ServiceAccountName
+	if in.Spec.ServiceAccountName != "" {
+		return in.Spec.ServiceAccountName
 	}
 	return in.Name
 }

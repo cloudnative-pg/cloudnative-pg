@@ -155,7 +155,7 @@ func (r *PoolerReconciler) getManagedResources(
 
 	// Only fetch the ServiceAccount managed by the operator (with pooler name)
 	// If a custom ServiceAccount is specified, we don't manage it
-	if pooler.Spec.ServiceAccountName == nil {
+	if pooler.Spec.ServiceAccountName == "" {
 		result.ServiceAccount, err = getServiceAccountOrNil(
 			ctx, r.Client, client.ObjectKey{Name: pooler.Name, Namespace: pooler.Namespace})
 		if err != nil {
