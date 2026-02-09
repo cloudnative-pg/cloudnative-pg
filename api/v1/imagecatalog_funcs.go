@@ -24,6 +24,21 @@ func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
 	return &c.Spec
 }
 
+// CatalogIdentifier returns a human-readable Kind/Name identifier
+// for a catalog, e.g. "ImageCatalog/my-catalog".
+func CatalogIdentifier(catalog GenericImageCatalog) string {
+	var kind string
+	switch catalog.(type) {
+	case *ImageCatalog:
+		kind = ImageCatalogKind
+	case *ClusterImageCatalog:
+		kind = ClusterImageCatalogKind
+	default:
+		kind = "UnknownCatalog"
+	}
+	return kind + "/" + catalog.GetName()
+}
+
 // FindImageForMajor finds the correct image for the selected major version
 func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
 	for _, entry := range spec.Images {

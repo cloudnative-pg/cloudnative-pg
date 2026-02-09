@@ -185,10 +185,9 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 		r.Recorder.Eventf(
 			cluster,
 			"Warning",
-			"DiscoverImage", "Cannot find major %v in %v/%v",
+			"DiscoverImage", "Cannot find major %v in %v",
 			cluster.Spec.ImageCatalogRef.Major,
-			catalogKind,
-			catalogName)
+			apiv1.CatalogIdentifier(catalog))
 		contextLogger.Info("cannot find requested major version",
 			"requestedMajorVersion", requestedMajorVersion)
 		return apiv1.ImageInfo{}, fmt.Errorf("selected major version is not available in the catalog")
