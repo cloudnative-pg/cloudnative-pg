@@ -34,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -52,12 +53,12 @@ func Reconcile(
 
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
-	if isDesignatedPrimaryTransitionCompleted(cluster) {
+	if conditions.IsDesignatedPrimaryTransitionCompleted(cluster) {
 		return reconcileDemotionToken(ctx, cli, cluster, instanceClient, instances)
 	}
 
 	// waiting for the instance manager
-	if IsDesignatedPrimaryTransitionRequested(cluster) {
+	if conditions.IsDesignatedPrimaryTransitionRequested(cluster) {
 		contextLogger.Info("waiting for the instance manager to transition the primary instance to a designated primary")
 		return nil, nil
 	}
@@ -99,19 +100,19 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 		cluster,
 		func(cluster *apiv1.Cluster) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:    conditionDesignatedPrimaryTransition,
+				Type:    conditions.DesignatedPrimaryTransition,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ReplicaClusterAfterCreation",
 				Message: "Enabled external cluster after a node was generated",
 			})
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:    conditionFence,
+				Type:    conditions.Fence,
 				Status:  metav1.ConditionTrue,
 				Reason:  "ReplicaClusterAfterCreation",
 				Message: "Enabled external cluster after a node was generated",
 			})
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:    ConditionReplicaClusterSwitch,
+				Type:    conditions.ReplicaClusterSwitch,
 				Status:  metav1.ConditionFalse,
 				Reason:  "ReplicaEnabledSetTrue",
 				Message: "Starting the Replica cluster transition",
@@ -131,7 +132,7 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 	contextLogger.Info("removing all the unnecessary metadata from the cluster object")
 
 	// TODO(leonardoce): should we unfence just the primary?
-	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, conditionFence, metav1.ConditionTrue) &&
+	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, conditions.Fence, metav1.ConditionTrue) &&
 		cluster.IsInstanceFenced("*") {
 		if err := utils.NewFencingMetadataExecutor(cli).RemoveFencing().ForAllInstances().Execute(
 			ctx,
@@ -147,10 +148,10 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 		cli,
 		cluster,
 		func(cluster *apiv1.Cluster) {
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
-			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionFence)
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditions.DesignatedPrimaryTransition)
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditions.Fence)
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:    ConditionReplicaClusterSwitch,
+				Type:    conditions.ReplicaClusterSwitch,
 				Status:  metav1.ConditionTrue,
 				Reason:  "ReplicaEnabledSetTrue",
 				Message: "Completed the Replica cluster transition",

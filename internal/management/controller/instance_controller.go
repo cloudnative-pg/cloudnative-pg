@@ -59,7 +59,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
-	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
@@ -139,8 +139,7 @@ func (r *InstanceReconciler) Reconcile(
 	ctx = cnpgiclient.SetPluginClientInContext(ctx, pluginClient)
 	ctx = cluster.SetInContext(ctx)
 
-	// Reconcile PostgreSQL instance parameters
-	r.reconcileInstance(cluster)
+	r.instance.SetCluster(cluster)
 
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
@@ -979,38 +978,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	r.metricsServerExporter.SetCustomQueries(queriesCollector)
 }
 
-// reconcileInstance sets PostgreSQL instance parameters to current values
-func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
-	detectRequiresDesignatedPrimaryTransition := func() bool {
-		if !cluster.IsReplica() {
-			return false
-		}
-
-		if !externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
-			return false
-		}
-
-		if !r.instance.IsFenced() && !r.instance.MightBeUnavailable() {
-			return false
-		}
-
-		// Check if this pod was the primary before the transition started.
-		// We use CurrentPrimary instead of IsPrimary() because IsPrimary()
-		// checks for the absence of standby.signal, which gets created during
-		// the transition by RefreshReplicaConfiguration(). Using CurrentPrimary
-		// keeps the sentinel true throughout the transition, allowing retries
-		// if the status update fails due to optimistic locking conflicts.
-		return cluster.Status.CurrentPrimary == r.instance.GetPodName()
-	}
-
-	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
-	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
-	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
-	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
-	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
-	r.instance.Cluster = cluster
-}
-
 // PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
 // given the relative setting in `.spec.postgresql.enableAlterSystem`
 func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx context.Context, cluster *apiv1.Cluster) {
@@ -1218,7 +1185,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 ) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
 	if cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
-		!r.instance.RequiresDesignatedPrimaryTransition {
+		!r.instance.RequiresDesignatedPrimaryTransition() {
 		return false, nil
 	}
 
@@ -1233,15 +1200,10 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 
 	cluster.Status.CurrentPrimary = r.instance.GetPodName()
 	cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-	if r.instance.RequiresDesignatedPrimaryTransition {
-		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
+	if r.instance.RequiresDesignatedPrimaryTransition() {
+		conditions.SetDesignatedPrimaryTransitionCompleted(cluster)
 	}
-
-	if err := r.client.Status().Update(ctx, cluster); err != nil {
-		return changed, err
-	}
-
-	return changed, nil
+	return changed, r.client.Status().Update(ctx, cluster)
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
