@@ -65,6 +65,9 @@ const (
 	// MinimalSuffix is the suffix for minimal images
 	MinimalSuffix = "minimal-trixie"
 
+	// SystemSuffix is the suffix for system images (includes barman-cloud tools)
+	SystemSuffix = "system-trixie"
+
 	// PostGISSuffix is the suffix for PostGIS images
 	PostGISSuffix = "3-standard-trixie"
 
@@ -249,4 +252,19 @@ func (env *TestingEnvironment) OfficialStandardImageName(tag string) string {
 // Example: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
 func (env *TestingEnvironment) OfficialMinimalImageName(tag string) string {
 	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, MinimalSuffix)
+}
+
+// SystemImageName returns the full image name for a system Postgres image.
+// System images include barman-cloud tools for backup and recovery.
+// Example: ghcr.io/cloudnative-pg/postgresql:17-system-trixie
+func (env *TestingEnvironment) SystemImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageName, tag, SystemSuffix)
+}
+
+// OfficialSystemImageName returns the full image name for the official CloudNativePG system Postgres image.
+// This is used for major upgrade tests where source images must come from the official registry.
+// System images include barman-cloud tools for backup and recovery.
+// Example: ghcr.io/cloudnative-pg/postgresql:16-system-trixie
+func (env *TestingEnvironment) OfficialSystemImageName(tag string) string {
+	return fmt.Sprintf("%s:%s-%s", env.PostgresImageRepository, tag, SystemSuffix)
 }
