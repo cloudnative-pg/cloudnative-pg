@@ -2206,7 +2206,7 @@ type WALSafetyPolicy struct {
 	// This explicit acknowledgment is required because resizing without
 	// separate WAL storage can mask WAL-related issues.
 	// +optional
-	AcknowledgeWALRisk bool `json:"acknowledgeWALRisk,omitempty"`
+	AcknowledgeWALRisk *bool `json:"acknowledgeWALRisk,omitempty"`
 
 	// RequireArchiveHealthy blocks resize when WAL archiving is unhealthy
 	// (last_failed_time > last_archived_time). Defaults to true.

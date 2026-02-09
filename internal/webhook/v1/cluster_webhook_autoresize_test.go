@@ -67,7 +67,7 @@ var _ = Describe("auto-resize validation", func() {
 							Strategy: &apiv1.ResizeStrategy{
 								MaxActionsPerDay: ptr.To(3),
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -140,7 +140,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -162,7 +162,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -188,7 +188,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -210,7 +210,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -232,7 +232,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -256,7 +256,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -280,7 +280,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -304,7 +304,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -329,7 +329,7 @@ var _ = Describe("auto-resize validation", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -352,7 +352,7 @@ var _ = Describe("auto-resize validation", func() {
 							Enabled: true,
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 									MaxPendingWALFiles: ptr.To(-1),
 								},
 							},
@@ -374,7 +374,7 @@ var _ = Describe("auto-resize validation", func() {
 							Enabled: true,
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk:    true,
+									AcknowledgeWALRisk:    ptr.To(true),
 									MaxSlotRetentionBytes: ptr.To(int64(-1)),
 								},
 							},
@@ -455,7 +455,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							Strategy: &apiv1.ResizeStrategy{
 								MaxActionsPerDay: ptr.To(0),
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -481,7 +481,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -507,7 +507,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -534,7 +534,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							},
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -557,7 +557,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							Enabled: true,
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk: true,
+									AcknowledgeWALRisk: ptr.To(true),
 								},
 							},
 						},
@@ -583,7 +583,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							Enabled: true,
 							Strategy: &apiv1.ResizeStrategy{
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk:    true,
+									AcknowledgeWALRisk:    ptr.To(true),
 									RequireArchiveHealthy: ptr.To(true),
 								},
 							},
@@ -624,7 +624,7 @@ var _ = Describe("getAutoResizeWarnings", func() {
 							Strategy: &apiv1.ResizeStrategy{
 								MaxActionsPerDay: ptr.To(3),
 								WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-									AcknowledgeWALRisk:    true,
+									AcknowledgeWALRisk:    ptr.To(true),
 									RequireArchiveHealthy: ptr.To(false),
 								},
 							},

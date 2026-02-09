@@ -831,8 +831,7 @@ func (r *ClusterReconciler) reconcileResources(
 		if err := status.PatchWithOptimisticLock(ctx, r.Client, cluster, func(c *apiv1.Cluster) {
 			c.Status = newStatus
 		}); err != nil {
-			contextLogger.Error(err, "failed to persist auto-resize status changes")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to persist auto-resize status changes: %w", err)
 		}
 	}
 

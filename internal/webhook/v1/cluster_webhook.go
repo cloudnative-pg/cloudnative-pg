@@ -2602,7 +2602,7 @@ func getAutoResizeWarnings(r *apiv1.Cluster) admission.Warnings {
 	return result
 }
 
-//nolint:gocognit // complexity is inherent to checking multiple warning conditions
+//nolint:gocognit,gocyclo // complexity is inherent to checking multiple warning conditions
 func getAutoResizeWarningsForStorage(
 	path field.Path,
 	configuration *apiv1.StorageConfiguration,
@@ -2668,7 +2668,7 @@ func getAutoResizeWarningsForStorage(
 	// WAL safety warnings
 	if resize.Strategy != nil && resize.Strategy.WALSafetyPolicy != nil {
 		policy := resize.Strategy.WALSafetyPolicy
-		if !isSingleVolume && policy.AcknowledgeWALRisk {
+		if !isSingleVolume && policy.AcknowledgeWALRisk != nil && *policy.AcknowledgeWALRisk {
 			warnings = append(warnings, fmt.Sprintf(
 				"%s has no effect when a separate WAL volume is configured",
 				path.Child("resize", "strategy", "walSafetyPolicy", "acknowledgeWALRisk").String(),
@@ -3076,7 +3076,8 @@ func validateResizeConfiguration(
 	if isSingleVolume {
 		if config.Strategy == nil ||
 			config.Strategy.WALSafetyPolicy == nil ||
-			!config.Strategy.WALSafetyPolicy.AcknowledgeWALRisk {
+			config.Strategy.WALSafetyPolicy.AcknowledgeWALRisk == nil ||
+			!*config.Strategy.WALSafetyPolicy.AcknowledgeWALRisk {
 			result = append(result, field.Required(
 				structPath.Child("strategy", "walSafetyPolicy", "acknowledgeWALRisk"),
 				"single-volume clusters (no separate WAL storage) must set acknowledgeWALRisk=true "+

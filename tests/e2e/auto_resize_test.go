@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -699,7 +700,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 					Enabled: true,
 					Strategy: &apiv1.ResizeStrategy{
 						WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-							AcknowledgeWALRisk: true,
+							AcknowledgeWALRisk: ptr.To(true),
 						},
 					},
 				},
@@ -963,7 +964,7 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 					},
 					Strategy: &apiv1.ResizeStrategy{
 						WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-							AcknowledgeWALRisk: true,
+							AcknowledgeWALRisk: ptr.To(true),
 						},
 					},
 				},

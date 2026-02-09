@@ -510,7 +510,7 @@ var _ = Describe("Reconcile", func() {
 						},
 						Strategy: &apiv1.ResizeStrategy{
 							WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-								AcknowledgeWALRisk: true,
+								AcknowledgeWALRisk: ptr.To(true),
 							},
 						},
 					},

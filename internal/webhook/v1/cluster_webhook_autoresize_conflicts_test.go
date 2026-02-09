@@ -61,7 +61,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 						Enabled: true,
 						Strategy: &apiv1.ResizeStrategy{
 							WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-								AcknowledgeWALRisk: true,
+								AcknowledgeWALRisk: ptr.To(true),
 							},
 						},
 					},
@@ -285,7 +285,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 				}
 				c.Spec.StorageConfiguration.Resize.Strategy = &apiv1.ResizeStrategy{
 					WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-						AcknowledgeWALRisk: true,
+						AcknowledgeWALRisk: ptr.To(true),
 						MaxPendingWALFiles: ptr.To(-5),
 					},
 				}
@@ -358,7 +358,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 			cluster := makeCluster(func(c *apiv1.Cluster) {
 				c.Spec.StorageConfiguration.Resize.Strategy = &apiv1.ResizeStrategy{
 					WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-						AcknowledgeWALRisk: true,
+						AcknowledgeWALRisk: ptr.To(true),
 						MaxPendingWALFiles: ptr.To(0),
 					},
 				}
@@ -371,7 +371,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 			cluster := makeCluster(func(c *apiv1.Cluster) {
 				c.Spec.StorageConfiguration.Resize.Strategy = &apiv1.ResizeStrategy{
 					WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-						AcknowledgeWALRisk:    true,
+						AcknowledgeWALRisk:    ptr.To(true),
 						MaxSlotRetentionBytes: ptr.To(int64(0)),
 					},
 				}
@@ -385,7 +385,7 @@ var _ = Describe("auto-resize configuration conflicts", func() {
 			cluster := makeCluster(func(c *apiv1.Cluster) {
 				c.Spec.StorageConfiguration.Resize.Strategy = &apiv1.ResizeStrategy{
 					WALSafetyPolicy: &apiv1.WALSafetyPolicy{
-						AcknowledgeWALRisk:    false, // explicitly false
+						AcknowledgeWALRisk:    ptr.To(false), // explicitly false
 						RequireArchiveHealthy: ptr.To(false),
 						MaxPendingWALFiles:    ptr.To(0),
 						MaxSlotRetentionBytes: ptr.To(int64(0)),

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git reset:*)",
+      "Bash(# 6. Plugin\ngit add internal/cmd/plugin/disk/ cmd/kubectl-cnpg/main.go &&  git commit -s -m \"\"$\\(cat <<''EOF''\nfeat\\(plugin\\): add kubectl cnpg disk command\n\nAdd new ''kubectl cnpg disk'' command for disk status inspection:\n\ninternal/cmd/plugin/disk/:\n- cmd.go: Main command setup with ''status'' subcommand\n- status.go: Display disk usage for cluster instances\n- doc.go: Package documentation\n\nShows per-instance disk usage including:\n- Data volume: total, available, percent used\n- WAL volume: total, available, percent used \\(if separate\\)\n- Tablespace volumes: usage per tablespace\n- Auto-resize status: enabled, last action, budget remaining\n\nExample usage:\n  kubectl cnpg disk status cluster-example\n\nOutput format matches other cnpg plugin commands with\ntable-based display and optional JSON/YAML output.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\"\")",
+      "Bash(golangci-lint run:*)",
+      "Bash(do if git show $hash)",
+      "Bash(then echo \"✓ $hash $msg\" else echo \"✗ $hash $msg \\(missing sign-off\\)\" fi done)",
+      "Bash(then echo \"✓ $hash - has Claude co-author\" else echo \"✗ $hash - missing Claude co-author\" fi done)"
+    ]
+  }
+}

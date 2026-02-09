@@ -84,7 +84,6 @@ func Reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	contextLogger := log.FromContext(ctx).WithName("autoresize")
 	var resizedAny bool
 	var errs []error
 
@@ -92,8 +91,7 @@ func Reconcile(
 		pvc := &pvcs[i]
 		resized, err := reconcilePVC(ctx, c, recorder, cluster, diskInfoByPod, pvc)
 		if err != nil {
-			contextLogger.Error(err, "failed to auto-resize PVC", "pvcName", pvc.Name)
-			errs = append(errs, fmt.Errorf("PVC %s: %w", pvc.Name, err))
+			errs = append(errs, fmt.Errorf("pvc %s: %w", pvc.Name, err))
 			continue
 		}
 		resizedAny = resizedAny || resized
@@ -229,7 +227,7 @@ func reconcilePVC(
 		Build()
 
 	if err := c.Patch(ctx, updatedPVC, client.MergeFrom(oldPVC)); err != nil {
-		return false, fmt.Errorf("failed to patch PVC %s: %w", pvc.Name, err)
+		return false, fmt.Errorf("failed to patch pvc %s: %w", pvc.Name, err)
 	}
 
 	// Record standard Kubernetes Event

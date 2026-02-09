@@ -159,7 +159,7 @@ func parseQuantityOrDefault(qtyStr string, defaultStr string) *resource.Quantity
 		qty, err := resource.ParseQuantity(defaultStr)
 		if err != nil {
 			// This should never happen with hardcoded defaults, but avoid panics in controller code.
-			autoresizeLog.Error(err, "BUG: invalid hardcoded default quantity", "default", defaultStr)
+			autoresizeLog.Error(err, "invalid hardcoded default quantity", "default", defaultStr)
 			zero := resource.MustParse("0")
 			return &zero
 		}
@@ -173,7 +173,7 @@ func parseQuantityOrDefault(qtyStr string, defaultStr string) *resource.Quantity
 		fallback, err := resource.ParseQuantity(defaultStr)
 		if err != nil {
 			// This should never happen with hardcoded defaults, but avoid panics in controller code.
-			autoresizeLog.Error(err, "BUG: invalid hardcoded default quantity", "default", defaultStr)
+			autoresizeLog.Error(err, "invalid hardcoded default quantity", "default", defaultStr)
 			zero := resource.MustParse("0")
 			return &zero
 		}

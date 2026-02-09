@@ -38,7 +38,7 @@ var _ = Describe("EvaluateWALSafety", func() {
 
 	BeforeEach(func() {
 		walSafety = &apiv1.WALSafetyPolicy{
-			AcknowledgeWALRisk:    true,
+			AcknowledgeWALRisk:    ptr.To(true),
 			RequireArchiveHealthy: ptr.To(true),
 			MaxPendingWALFiles:    ptr.To(100),
 		}
@@ -72,7 +72,7 @@ var _ = Describe("EvaluateWALSafety", func() {
 
 	Context("single-volume cluster checks", func() {
 		It("should block resize when acknowledgeWALRisk is not set", func() {
-			walSafety.AcknowledgeWALRisk = false
+			walSafety.AcknowledgeWALRisk = ptr.To(false)
 
 			result := EvaluateWALSafety(
 				string(utils.PVCRolePgData),
@@ -96,7 +96,7 @@ var _ = Describe("EvaluateWALSafety", func() {
 		})
 
 		It("should allow resize when acknowledgeWALRisk is set", func() {
-			walSafety.AcknowledgeWALRisk = true
+			walSafety.AcknowledgeWALRisk = ptr.To(true)
 
 			result := EvaluateWALSafety(
 				string(utils.PVCRolePgData),

@@ -91,7 +91,7 @@ func EvaluateWALSafety(
 
 	// Single-volume clusters must explicitly acknowledge WAL risk
 	if isSingleVolume && pvcRole == string(utils.PVCRolePgData) {
-		if walSafety == nil || !walSafety.AcknowledgeWALRisk {
+		if walSafety == nil || walSafety.AcknowledgeWALRisk == nil || !*walSafety.AcknowledgeWALRisk {
 			return WALSafetyResult{
 				Allowed:      false,
 				BlockReason:  WALSafetyBlockSingleVolumeNoAck,
