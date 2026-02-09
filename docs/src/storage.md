@@ -115,6 +115,11 @@ Additionally, it supports creating clusters with:
 In CloudNativePG, the volumes attached to a single PostgreSQL instance are
 defined as a *PVC group*.
 
+:::info
+For automatic PVC resizing based on disk usage, see
+[Automatic PVC Resizing](storage_autoresize.md).
+:::
+
 ## Configuration via a storage class
 
 :::info[Important]
