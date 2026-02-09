@@ -32,6 +32,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -72,7 +73,9 @@ func (f *fakePluginRepository) RegisterRemotePlugin(
 	return nil
 }
 
-func (f *fakePluginRepository) ForgetPlugin(_ string) {}
+func (f *fakePluginRepository) ForgetPlugin(name string) {
+	delete(f.registeredPlugins, name)
+}
 
 // generateTestCertificate creates a self-signed certificate for testing with custom DNS names
 func generateTestCertificate(dnsNames []string) (certPEM, keyPEM []byte, err error) {
@@ -338,6 +341,133 @@ var _ = Describe("PluginReconciler", func() {
 
 			// Verify plugin was not registered
 			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
+		})
+	})
+
+	Context("when handling plugin service lifecycle with finalizers", func() {
+		It("should add finalizer when reconciling a new plugin service", func() {
+			annotations := map[string]string{
+				utils.PluginServerSecretAnnotationName: serverSecretName,
+				utils.PluginClientSecretAnnotationName: clientSecretName,
+				utils.PluginPortAnnotationName:         pluginPort,
+			}
+
+			service := createPluginService(annotations)
+			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
+			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
+
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
+			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
+
+			// First reconcile should add the finalizer
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(time.Second))
+
+			// Verify finalizer was added
+			var updatedService corev1.Service
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)).To(Succeed())
+			Expect(updatedService.Finalizers).To(ContainElement(utils.PluginFinalizerName))
+
+			// Second reconcile should register the plugin
+			result, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
+
+			// Verify plugin was registered
+			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
+		})
+
+		It("should cleanup plugin and remove finalizer when service is deleted", func() {
+			annotations := map[string]string{
+				utils.PluginServerSecretAnnotationName: serverSecretName,
+				utils.PluginClientSecretAnnotationName: clientSecretName,
+				utils.PluginPortAnnotationName:         pluginPort,
+			}
+
+			service := createPluginService(annotations)
+			service.Finalizers = []string{utils.PluginFinalizerName}
+			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
+			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
+
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
+			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
+
+			// First reconcile to register the plugin
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
+
+			// Delete the service (this will set DeletionTimestamp since it has a finalizer)
+			Expect(fakeClient.Delete(ctx, service)).To(Succeed())
+
+			// Reconcile should cleanup the plugin and remove finalizer
+			_, err = reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify plugin was forgotten
+			Expect(pluginRepository.registeredPlugins).ToNot(HaveKey(pluginName))
+
+			// After reconcile, the finalizer should be removed and service should be gone
+			var updatedService corev1.Service
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(service), &updatedService)
+			// Service should either be gone (NotFound) or have no finalizer
+			if err == nil {
+				Expect(updatedService.Finalizers).ToNot(ContainElement(utils.PluginFinalizerName))
+			}
+		})
+
+		It("should not cleanup plugin if finalizer is not present on deletion", func() {
+			annotations := map[string]string{
+				utils.PluginServerSecretAnnotationName: serverSecretName,
+				utils.PluginClientSecretAnnotationName: clientSecretName,
+				utils.PluginPortAnnotationName:         pluginPort,
+			}
+
+			service := createPluginService(annotations)
+			// No finalizer added
+			serverSecret := createSecret(serverSecretName, serverCertPEM, serverKeyPEM)
+			clientSecret := createSecret(clientSecretName, clientCertPEM, clientKeyPEM)
+
+			Expect(fakeClient.Create(ctx, service)).To(Succeed())
+			Expect(fakeClient.Create(ctx, serverSecret)).To(Succeed())
+			Expect(fakeClient.Create(ctx, clientSecret)).To(Succeed())
+
+			// Manually register the plugin
+			pluginRepository.registeredPlugins[pluginName] = &pluginRegistration{
+				address: serviceName + ":" + pluginPort,
+			}
+
+			// Delete the service (without finalizer, it's immediately deleted)
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(service)}
+			Expect(fakeClient.Delete(ctx, service)).To(Succeed())
+
+			// Reconcile should be a no-op since the service is not found
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Since there was no finalizer, the reconciler doesn't handle deletion cleanup
+			// This demonstrates why the finalizer is important
+			// In real scenarios, without the finalizer, plugins would be orphaned
+			Expect(pluginRepository.registeredPlugins).To(HaveKey(pluginName))
+		})
+
+		It("should return nil when service is not found (already deleted)", func() {
+			// This simulates the case where the service has been fully deleted after finalizer cleanup
+			req := ctrl.Request{
+				NamespacedName: client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      "non-existent-service",
+				},
+			}
+			result, err := reconciler.Reconcile(ctx, req)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
 		})
 	})
 })
