@@ -256,9 +256,9 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 }
 
 // This probe is for the instance status, including replication
-func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, r *http.Request) {
 	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus()
+	status, err := ws.instance.GetStatus(r.Context())
 	if err != nil {
 		log.Debug(
 			"Instance status probe failing",

@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -33,14 +34,14 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
-	result = &postgres.PostgresqlStatus{
+func (instance *Instance) GetStatus(ctx context.Context) (result *postgresSpec.PostgresqlStatus, err error) {
+	result = &postgresSpec.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
@@ -77,7 +78,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	// Get the latest configuration hash from the PostgreSQL settings
 	rowConfigHash := superUserDB.QueryRow(
 		"SELECT setting FROM pg_catalog.pg_show_all_file_settings() WHERE name = $1",
-		postgres.CNPGConfigSha256)
+		postgresSpec.CNPGConfigSha256)
 	if err := rowConfigHash.Scan(&result.LoadedConfigurationHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// The applied configuration doesn't contain a CNPGConfigSha256 so probably it is not
@@ -124,6 +125,9 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
 	result.SessionID = instance.SessionID
 
+	instance.fillDiskStatus(result)
+	instance.fillWALHealthStatus(ctx, superUserDB, result)
+
 	return result, nil
 }
 
@@ -133,7 +137,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 func updateResultForDecrease(
 	instance *Instance,
 	superUserDB *sql.DB,
-	result *postgres.PostgresqlStatus,
+	result *postgresSpec.PostgresqlStatus,
 ) error {
 	// get all the hot standby sensible parameters being decreased
 	decreasedValues, err := instance.GetDecreasedSensibleSettings(superUserDB)
@@ -238,7 +242,7 @@ WHERE pending_settings.name IN (
 
 // fillStatus extract the current instance information into the PostgresqlStatus
 // structure
-func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillStatus(result *postgresSpec.PostgresqlStatus) error {
 	var err error
 
 	if result.IsPrimary {
@@ -271,13 +275,13 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 
 func (instance *Instance) fillBasebackupStats(
 	superUserDB *sql.DB,
-	result *postgres.PostgresqlStatus,
+	result *postgresSpec.PostgresqlStatus,
 ) error {
 	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
 		return nil
 	}
 
-	var basebackupList []postgres.PgStatBasebackup
+	var basebackupList []postgresSpec.PgStatBasebackup
 
 	rows, err := superUserDB.Query(`SELECT
 		   usename,
@@ -304,7 +308,7 @@ func (instance *Instance) fillBasebackupStats(
 	}()
 
 	for rows.Next() {
-		var pgr postgres.PgStatBasebackup
+		var pgr postgresSpec.PgStatBasebackup
 		if err := rows.Scan(
 			&pgr.Usename,
 			&pgr.ApplicationName,
@@ -328,7 +332,7 @@ func (instance *Instance) fillBasebackupStats(
 }
 
 // fillStatusFromPrimary get information for primary servers (including WAL and replication)
-func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillStatusFromPrimary(result *postgresSpec.PostgresqlStatus) error {
 	var err error
 
 	superUserDB, err := instance.GetSuperUserDB()
@@ -354,7 +358,7 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 }
 
 // fillArchiverStatus get information about the PostgreSQL archiving process
-func fillArchiverStatus(superUserDB *sql.DB, result *postgres.PostgresqlStatus) error {
+func fillArchiverStatus(superUserDB *sql.DB, result *postgresSpec.PostgresqlStatus) error {
 	row := superUserDB.QueryRow(
 		`
 		SELECT
@@ -375,7 +379,7 @@ func fillArchiverStatus(superUserDB *sql.DB, result *postgres.PostgresqlStatus) 
 }
 
 // fillReplicationSlotsStatus get information about the replication slots
-func (instance *Instance) fillReplicationSlotsStatus(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillReplicationSlotsStatus(result *postgresSpec.PostgresqlStatus) error {
 	if !result.IsPrimary {
 		return nil
 	}
@@ -384,7 +388,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	}
 
 	var err error
-	var slots postgres.PgReplicationSlotList
+	var slots postgresSpec.PgReplicationSlotList
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
@@ -413,7 +417,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 		}
 	}()
 	for rows.Next() {
-		slot := postgres.PgReplicationSlot{}
+		slot := postgresSpec.PgReplicationSlot{}
 		if err := rows.Scan(
 			&slot.SlotName,
 			&slot.Plugin,
@@ -439,7 +443,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 
 // fillWalStatus retrieves information about the WAL senders processes
 // and the on-disk WAL archives status
-func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillWalStatus(result *postgresSpec.PostgresqlStatus) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
@@ -451,12 +455,15 @@ func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error
 // fillWalStatus retrieves information about the WAL senders processes
 // and the on-disk WAL archives status using a specified database
 // interface. This is mainly useful for testing
-func (instance *Instance) fillWalStatusFromConnection(result *postgres.PostgresqlStatus, superUserDB *sql.DB) error {
+func (instance *Instance) fillWalStatusFromConnection(
+	result *postgresSpec.PostgresqlStatus,
+	superUserDB *sql.DB,
+) error {
 	if !result.IsPrimary {
 		return nil
 	}
 	var err error
-	var replicationInfo postgres.PgStatReplicationList
+	var replicationInfo postgresSpec.PgStatReplicationList
 
 	rows, err := superUserDB.Query(
 		`SELECT
@@ -486,7 +493,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 	}()
 
 	for rows.Next() {
-		pgr := postgres.PgStatReplication{}
+		pgr := postgresSpec.PgStatReplication{}
 		err := rows.Scan(
 			&pgr.ApplicationName,
 			&pgr.State,
@@ -520,7 +527,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 }
 
 // fillStatusFromReplica get WAL information for replica servers
-func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillStatusFromReplica(result *postgresSpec.PostgresqlStatus) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err

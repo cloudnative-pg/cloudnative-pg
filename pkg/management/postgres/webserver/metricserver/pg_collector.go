@@ -80,6 +80,7 @@ type metrics struct {
 	FencingOn                    prometheus.Gauge
 	PgStatWalMetrics             PgStatWalMetrics
 	NodesUsed                    prometheus.Gauge
+	DiskMetrics                  *DiskMetrics
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -271,6 +272,7 @@ func newMetrics() *metrics {
 					"fsync_writethrough, otherwise zero). Only available on PG 14 to 17.",
 			}, []string{"stats_reset"}),
 		},
+		DiskMetrics: newDiskMetrics(),
 	}
 }
 
@@ -292,6 +294,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 	e.Metrics.NodesUsed.Describe(ch)
+	e.Metrics.DiskMetrics.describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -319,7 +322,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("collecting Postgres instance metrics")
-	e.updateInstanceMetrics()
+	ctx := context.Background()
+	e.updateInstanceMetrics(ctx)
 	e.collectInstanceMetrics(ch)
 
 	if e.queries != nil {
@@ -375,6 +379,7 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
 	e.Metrics.NodesUsed.Collect(ch)
+	e.Metrics.DiskMetrics.collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
 		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
@@ -399,7 +404,7 @@ func (e *Exporter) collectInstanceMetrics(ch chan<- prometheus.Metric) {
 }
 
 // updateInstanceMetrics updates metrics from the instance manager
-func (e *Exporter) updateInstanceMetrics() {
+func (e *Exporter) updateInstanceMetrics(ctx context.Context) {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	if e.instance.IsFenced() {
@@ -455,6 +460,12 @@ func (e *Exporter) updateInstanceMetrics() {
 
 		e.collectFromPrimaryLastFailedBackupTimestamp()
 	}
+
+	// Collect disk usage metrics (statfs-based)
+	collectDiskUsageMetrics(e)
+
+	// Collect WAL health metrics
+	collectWALHealthMetrics(ctx, e, db, isPrimary)
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
 		log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
