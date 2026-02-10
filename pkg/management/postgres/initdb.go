@@ -299,7 +299,7 @@ func (info InitInfo) GetInstance(cluster *apiv1.Cluster) *Instance {
 	postgresInstance := NewInstance()
 	postgresInstance.PgData = info.PgData
 	postgresInstance.StartupOptions = []string{"listen_addresses='127.0.0.1'"}
-	postgresInstance.Cluster = cluster
+	postgresInstance.SetCluster(cluster)
 	return postgresInstance
 }
 

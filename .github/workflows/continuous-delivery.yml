@@ -1992,6 +1992,7 @@ jobs:
           oc: ${{ matrix.k8s_version }}
       -
         name: Install OpenShift Cluster ${{ matrix.k8s_version }}
+        timeout-minutes: 60
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
           openshift-install create cluster --dir hack/ --log-level debug
@@ -2012,6 +2013,7 @@ jobs:
             --docker-server="$REGISTRY" --docker-username="$REGISTRY_USER" --docker-password="$REGISTRY_PASSWORD"
       -
         name: Run preflight operator test
+        timeout-minutes: 30
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           PFLT_INDEXIMAGE: ${{ needs.buildx.outputs.index_img }}
@@ -2034,6 +2036,7 @@ jobs:
           fi
       -
         name: Run E2E tests
+        timeout-minutes: 180
         if: (always() && !cancelled())
         run: |
           # Before running on OpenShift we make sure that the catalog is created
