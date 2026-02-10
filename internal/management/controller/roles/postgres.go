@@ -100,6 +100,34 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	return roles, nil
 }
 
+func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, silcenceErrLog bool) error {
+	if !silcenceErrLog {
+		_, err := db.ExecContext(ctx, statement)
+		return err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			errRollback := tx.Rollback()
+			if errRollback != nil {
+				err = errors.Join(err, errRollback)
+			}
+		}
+	}()
+	_, err = tx.ExecContext(ctx, "SET LOCAL log_min_error_statement = 'PANIC'")
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, statement)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // Update the role
 func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
@@ -114,9 +142,8 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
 	// will change no matter what, the next reconciliation cycle we would update the password
-	appendPasswordOption(role, &query)
-
-	_, err := db.ExecContext(ctx, query.String())
+	containsPassword := appendPasswordOption(role, &query)
+	err := executeRoleStatement(ctx, db, query.String(), containsPassword)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -136,13 +163,13 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
-	appendPasswordOption(role, &query)
+	containsPassword := appendPasswordOption(role, &query)
 	contextLog.Debug("Creating", "query", query.String())
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if _, err := db.ExecContext(ctx, query.String()); err != nil {
+	if err := executeRoleStatement(ctx, db, query.String(), containsPassword); err != nil {
 		return wrapErr(err)
 	}
 
@@ -360,7 +387,8 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	fmt.Fprintf(query, " CONNECTION LIMIT %d", role.ConnectionLimit)
 }
 
-func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
+func appendPasswordOption(role DatabaseRole, query *strings.Builder) bool {
+	var sendsPassword bool
 	switch {
 	case role.ignorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of
@@ -370,6 +398,7 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 		query.WriteString(" PASSWORD NULL")
 	default:
 		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
+		sendsPassword = true
 	}
 
 	if role.ValidUntil.Valid {
@@ -381,4 +410,6 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 		}
 		fmt.Fprintf(query, " VALID UNTIL %s", pq.QuoteLiteral(value))
 	}
+
+	return sendsPassword
 }
