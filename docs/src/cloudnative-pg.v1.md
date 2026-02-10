@@ -53,6 +53,30 @@ _Appears in:_
 | `additionalPodAffinity` _[PodAffinity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podaffinity-v1-core)_ | AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods. |  |  |  |
 
 
+#### AutoResizeEvent
+
+
+
+AutoResizeEvent records a single auto-resize operation.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `timestamp` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Timestamp is when the resize was initiated. |  |  |  |
+| `instanceName` _string_ | InstanceName is the name of the instance that was resized. |  |  |  |
+| `pvcName` _string_ | PVCName is the name of the PVC that was resized. |  |  |  |
+| `volumeType` _[ResizeVolumeType](#resizevolumetype)_ | VolumeType is the type of volume that was resized (data/wal/tablespace). |  |  | Enum: [data wal tablespace] <br /> |
+| `tablespace` _string_ | Tablespace is the tablespace name if VolumeType is tablespace. |  |  |  |
+| `previousSize` _string_ | PreviousSize is the size of the PVC before the resize. |  |  |  |
+| `newSize` _string_ | NewSize is the requested new size of the PVC. |  |  |  |
+| `result` _[ResizeResult](#resizeresult)_ | Result is the outcome of the resize operation (success/failure). |  |  | Enum: [success failure] <br /> |
+
+
 #### AvailableArchitecture
 
 
@@ -513,6 +537,23 @@ managed by CloudNativePG.
 
 
 
+#### ClusterDiskStatus
+
+
+
+ClusterDiskStatus contains disk usage status for all instances.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `instances` _object (keys:string, values:[InstanceDiskStatus](#instancediskstatus))_ | Instances contains the disk status for each instance. |  |  |  |
+
+
 #### ClusterImageCatalog
 
 
@@ -680,6 +721,8 @@ _Appears in:_
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
 | `systemID` _string_ | SystemID is the latest detected PostgreSQL SystemID |  |  |  |
+| `diskStatus` _[ClusterDiskStatus](#clusterdiskstatus)_ | DiskStatus contains the disk usage status for all instances. |  |  |  |
+| `autoResizeEvents` _[AutoResizeEvent](#autoresizeevent) array_ | AutoResizeEvents contains the history of auto-resize operations. |  |  |  |
 
 
 
@@ -969,6 +1012,26 @@ _Appears in:_
 | `temporaryData` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#quantity-resource-api)_ | TemporaryData is the size limit of the temporary data volume |  |  |  |
 
 
+#### ExpansionPolicy
+
+
+
+ExpansionPolicy defines how much to expand the PVC when triggered.
+
+
+
+_Appears in:_
+
+- [ResizeConfiguration](#resizeconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `step` _[IntOrString](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#intorstring-intstr-util)_ | Step is the amount to increase the PVC by on each resize.<br />Can be a percentage (e.g., "20%") of current size or an absolute<br />value (e.g., "10Gi"). Defaults to "20%". |  |  |  |
+| `minStep` _string_ | MinStep is the minimum expansion step when using percentage-based steps.<br />Prevents tiny expansions on small volumes. Defaults to "2Gi".<br />Ignored when step is an absolute value. |  | 2Gi |  |
+| `maxStep` _string_ | MaxStep is the maximum expansion step when using percentage-based steps.<br />Prevents oversized expansions on large volumes. Defaults to "500Gi".<br />Ignored when step is an absolute value. |  | 500Gi |  |
+| `limit` _string_ | Limit is the maximum size the PVC can be expanded to.<br />Once this limit is reached, no further automatic resizing will occur. |  |  |  |
+
+
 #### ExtensionConfiguration
 
 
@@ -1221,6 +1284,45 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `externalCluster` _string_ | The name of the externalCluster used for import | True |  |  |
+
+
+#### InactiveSlotInfo
+
+
+
+InactiveSlotInfo contains information about an inactive replication slot.
+
+
+
+_Appears in:_
+
+- [WALHealthInfo](#walhealthinfo)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `slotName` _string_ | SlotName is the name of the replication slot. | True |  |  |
+| `retentionBytes` _integer_ | RetentionBytes is the amount of WAL retained by this slot in bytes. | True |  |  |
+
+
+#### InstanceDiskStatus
+
+
+
+InstanceDiskStatus contains disk usage status for a single instance.
+
+
+
+_Appears in:_
+
+- [ClusterDiskStatus](#clusterdiskstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `dataVolume` _[VolumeDiskStatus](#volumediskstatus)_ | DataVolume contains disk stats for the PGDATA volume. |  |  |  |
+| `walVolume` _[VolumeDiskStatus](#volumediskstatus)_ | WALVolume contains disk stats for the WAL volume (if separate from PGDATA). |  |  |  |
+| `tablespaces` _object (keys:string, values:[VolumeDiskStatus](#volumediskstatus))_ | Tablespaces contains disk stats for tablespace volumes. |  |  |  |
+| `walHealth` _[WALHealthInfo](#walhealthinfo)_ | WALHealth contains the WAL archive health status. |  |  |  |
+| `lastUpdated` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | LastUpdated is the timestamp when this status was last updated. |  |  |  |
 
 
 #### InstanceID
@@ -2307,6 +2409,123 @@ _Appears in:_
 | `synchronizeLogicalDecoding` _boolean_ | When enabled, the operator automatically manages synchronization of logical<br />decoding (replication) slots across high-availability clusters.<br />Requires one of the following conditions:<br />- PostgreSQL version 17 or later<br />- PostgreSQL version < 17 with pg_failover_slots extension enabled |  |  |  |
 
 
+#### ResizeConfiguration
+
+
+
+ResizeConfiguration defines the automatic PVC resize behavior.
+
+
+
+_Appears in:_
+
+- [StorageConfiguration](#storageconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled activates automatic PVC resizing. |  | false |  |
+| `triggers` _[ResizeTriggers](#resizetriggers)_ | Triggers defines the conditions that trigger a resize operation. |  |  |  |
+| `expansion` _[ExpansionPolicy](#expansionpolicy)_ | Expansion defines the expansion policy including step size and limits. |  |  |  |
+| `strategy` _[ResizeStrategy](#resizestrategy)_ | Strategy defines how resize operations are performed, including<br />rate limiting and WAL safety policies. |  |  |  |
+
+
+#### ResizeMode
+
+_Underlying type:_ _string_
+
+ResizeMode represents the mode of auto-resize operations.
+
+_Validation:_
+
+- Enum: [Standard]
+
+_Appears in:_
+
+- [ResizeStrategy](#resizestrategy)
+
+| Field | Description |
+| --- | --- |
+| `Standard` | ResizeModeStandard is the standard resize mode using Kubernetes PVC patching.<br /> |
+
+
+#### ResizeResult
+
+_Underlying type:_ _string_
+
+ResizeResult represents the outcome of a resize operation.
+
+_Validation:_
+
+- Enum: [success failure]
+
+_Appears in:_
+
+- [AutoResizeEvent](#autoresizeevent)
+
+| Field | Description |
+| --- | --- |
+| `success` | ResizeResultSuccess indicates the resize operation succeeded.<br /> |
+| `failure` | ResizeResultFailure indicates the resize operation failed.<br /> |
+
+
+#### ResizeStrategy
+
+
+
+ResizeStrategy defines the operational strategy for auto-resize.
+
+
+
+_Appears in:_
+
+- [ResizeConfiguration](#resizeconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `mode` _[ResizeMode](#resizemode)_ | Mode defines the resize mode. Currently only "Standard" is supported. |  | Standard | Enum: [Standard] <br /> |
+| `maxActionsPerDay` _integer_ | MaxActionsPerDay is the maximum number of resize operations per volume<br />within a 24-hour rolling window. Reflects cloud provider limits<br />(e.g., AWS EBS allows ~4 modifications per day). |  |  | Maximum: 10 <br />Minimum: 0 <br /> |
+| `walSafetyPolicy` _[WALSafetyPolicy](#walsafetypolicy)_ | WALSafetyPolicy defines safety checks for WAL-related volumes.<br />When the data volume shares WAL storage (single-volume clusters)<br />or when resizing the WAL volume, these checks ensure archiving<br />and replication are healthy before allowing resize. |  |  |  |
+
+
+#### ResizeTriggers
+
+
+
+ResizeTriggers defines the conditions that trigger an auto-resize.
+
+
+
+_Appears in:_
+
+- [ResizeConfiguration](#resizeconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `usageThreshold` _integer_ | UsageThreshold is the disk usage percentage (1-99) that triggers a resize.<br />When the volume usage exceeds this threshold, a resize is triggered.<br />Either condition (UsageThreshold or MinAvailable) alone is sufficient. |  |  | Maximum: 99 <br />Minimum: 1 <br /> |
+| `minAvailable` _string_ | MinAvailable is the minimum available space that must remain on the volume.<br />When available space drops below this value, a resize is triggered.<br />Can be specified as an absolute value (e.g., "10Gi"). |  |  |  |
+
+
+#### ResizeVolumeType
+
+_Underlying type:_ _string_
+
+ResizeVolumeType represents the type of volume in a resize operation.
+
+_Validation:_
+
+- Enum: [data wal tablespace]
+
+_Appears in:_
+
+- [AutoResizeEvent](#autoresizeevent)
+
+| Field | Description |
+| --- | --- |
+| `data` | ResizeVolumeTypeData represents a PostgreSQL data volume.<br /> |
+| `wal` | ResizeVolumeTypeWAL represents a PostgreSQL WAL volume.<br /> |
+| `tablespace` | ResizeVolumeTypeTablespace represents a PostgreSQL tablespace volume.<br /> |
+
+
 #### RoleConfiguration
 
 
@@ -2674,6 +2893,7 @@ _Appears in:_
 | `size` _string_ | Size of the storage. Required if not already specified in the PVC template.<br />Changes to this field are automatically reapplied to the created PVCs.<br />Size cannot be decreased. |  |  |  |
 | `resizeInUseVolumes` _boolean_ | Resize existent PVCs, defaults to true |  | true |  |
 | `pvcTemplate` _[PersistentVolumeClaimSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#persistentvolumeclaimspec-v1-core)_ | Template to be used to generate the Persistent Volume Claim |  |  |  |
+| `resize` _[ResizeConfiguration](#resizeconfiguration)_ | Resize contains the configuration for automatic PVC resizing.<br />When enabled, CloudNativePG will monitor disk usage and automatically<br />expand PVCs when configured thresholds are reached. |  |  |  |
 
 
 #### Subscription
@@ -2972,6 +3192,29 @@ _Appears in:_
 | `revoke` | RevokeUsageSpecType indicates a revoke usage permission.<br /> |
 
 
+#### VolumeDiskStatus
+
+
+
+VolumeDiskStatus contains the disk usage status of a single volume.
+
+
+
+_Appears in:_
+
+- [InstanceDiskStatus](#instancediskstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `totalBytes` _integer_ | TotalBytes is the total capacity of the volume in bytes. |  |  |  |
+| `usedBytes` _integer_ | UsedBytes is the number of bytes currently in use. |  |  |  |
+| `availableBytes` _integer_ | AvailableBytes is the number of bytes available for use (non-root). |  |  |  |
+| `percentUsed` _integer_ | PercentUsed is the percentage of the volume in use (0-100), rounded. |  |  |  |
+| `inodesTotal` _integer_ | InodesTotal is the total number of inodes on the volume. |  |  |  |
+| `inodesUsed` _integer_ | InodesUsed is the number of inodes in use on the volume. |  |  |  |
+| `inodesFree` _integer_ | InodesFree is the number of free inodes on the volume. |  |  |  |
+
+
 #### VolumeSnapshotConfiguration
 
 
@@ -2994,6 +3237,47 @@ _Appears in:_
 | `snapshotOwnerReference` _[SnapshotOwnerReference](#snapshotownerreference)_ | SnapshotOwnerReference indicates the type of owner reference the snapshot should have |  | none | Enum: [none cluster backup] <br /> |
 | `online` _boolean_ | Whether the default type of backup with volume snapshots is<br />online/hot (`true`, default) or offline/cold (`false`) |  | true |  |
 | `onlineConfiguration` _[OnlineConfiguration](#onlineconfiguration)_ | Configuration parameters to control the online/hot backup with volume snapshots |  | \{ immediateCheckpoint:false waitForArchive:true \} |  |
+
+
+#### WALHealthInfo
+
+
+
+WALHealthInfo contains WAL archive health information.
+
+
+
+_Appears in:_
+
+- [InstanceDiskStatus](#instancediskstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `archiveHealthy` _boolean_ | ArchiveHealthy indicates whether the WAL archive process is healthy. |  |  |  |
+| `pendingWALFiles` _integer_ | PendingWALFiles is the count of .ready files in pg_wal/archive_status/. |  |  |  |
+| `inactiveSlotCount` _integer_ | InactiveSlotCount is the number of inactive physical replication slots. |  |  |  |
+| `inactiveSlots` _[InactiveSlotInfo](#inactiveslotinfo) array_ | InactiveSlots lists inactive physical replication slots and their WAL retention. |  |  |  |
+
+
+#### WALSafetyPolicy
+
+
+
+WALSafetyPolicy defines safety checks for WAL volumes.
+
+
+
+_Appears in:_
+
+- [ResizeStrategy](#resizestrategy)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `acknowledgeWALRisk` _boolean_ | AcknowledgeWALRisk must be set to true for single-volume clusters<br />(where data and WAL share the same volume) to enable auto-resize.<br />This explicit acknowledgment is required because resizing without<br />separate WAL storage can mask WAL-related issues. |  |  |  |
+| `requireArchiveHealthy` _boolean_ | RequireArchiveHealthy blocks resize when WAL archiving is unhealthy<br />(last_failed_time > last_archived_time). Defaults to true. |  | true |  |
+| `maxPendingWALFiles` _integer_ | MaxPendingWALFiles blocks resize when the number of pending WAL files<br />(.ready files in archive_status) exceeds this threshold. Defaults to 100. |  | 100 |  |
+| `maxSlotRetentionBytes` _integer_ | MaxSlotRetentionBytes blocks resize when any inactive physical<br />replication slot retains more WAL than this threshold. |  |  |  |
+| `alertOnResize` _boolean_ | AlertOnResize emits a Kubernetes warning event when a WAL-related<br />resize occurs. Defaults to true. |  | true |  |
 
 
 

@@ -32,10 +32,10 @@ spec:
       endpointURL: http://127.0.0.1:19999
       s3Credentials:
         accessKeyId:
-          name: archive-block-dummy-creds
+          name: archive-block-placeholder-creds
           key: ACCESS_KEY_ID
         secretAccessKey:
-          name: archive-block-dummy-creds
+          name: archive-block-placeholder-creds
           key: ACCESS_SECRET_KEY
 
   storage:

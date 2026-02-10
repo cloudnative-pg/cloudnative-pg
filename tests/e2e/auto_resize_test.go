@@ -1172,20 +1172,20 @@ var _ = Describe("PVC Auto-Resize", Label(tests.LabelAutoResize), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating dummy S3 credentials for the bogus backup destination", func() {
+			By("creating placeholder S3 credentials for the bogus backup destination", func() {
 				// The fixture configures barmanObjectStore pointing to a non-existent
 				// endpoint. This Secret provides the required credentials so the cluster
 				// can be created. When PostgreSQL tries to archive WAL, barman-cloud
 				// will fail to connect, causing pg_stat_archiver to record failures.
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "archive-block-dummy-creds",
+						Name:      "archive-block-placeholder-creds",
 						Namespace: namespace,
 					},
 					Type: corev1.SecretTypeOpaque,
 					StringData: map[string]string{
-						"ACCESS_KEY_ID":     "dummy-access-key",
-						"ACCESS_SECRET_KEY": "dummy-secret-key",
+						"ACCESS_KEY_ID":     "placeholder-access-key",
+						"ACCESS_SECRET_KEY": "placeholder-secret-key",
 					},
 				}
 				err := env.Client.Create(env.Ctx, secret)

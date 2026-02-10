@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -373,7 +374,7 @@ func (dm *DiskMetrics) deriveDecisionMetrics(
 
 	// 4. Resize blocked metric - set when auto-resize cannot proceed
 	// Only populate if auto-resize is enabled for this volume
-	if resizeConfig != nil && resizeConfig.Enabled != nil && *resizeConfig.Enabled {
+	if resizeConfig != nil && ptr.Deref(resizeConfig.Enabled, false) {
 		if budgetRemain == 0 {
 			dm.ResizeBlocked.WithLabelValues(volType, ts, "rate_limit").Set(1)
 		} else {

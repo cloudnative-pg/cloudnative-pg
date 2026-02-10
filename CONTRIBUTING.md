@@ -35,6 +35,15 @@ We welcome many types of contributions including:
 For development contributions, please refer to the separate section called
 ["Contributing to the source code"](contribute/README.md).
 
+## AI-Assisted Contributions
+
+If you're using AI tools (like Claude, GitHub Copilot, or other LLMs) to assist with contributions, please review:
+
+* **[AI_CONTRIBUTING.md](AI_CONTRIBUTING.md)** - Technical rules, code standards, and operator patterns
+* **[AI_CONTRIBUTORS.md](AI_CONTRIBUTORS.md)** - Social patterns, review culture, and SME mapping
+
+These documents help AI agents understand both the technical requirements and the social context of our project, leading to PRs that pass review with minimal friction.
+
 ## External Contributors vs Maintainers
 
 **External Contributors:** If you're contributing from outside the core team, please note that some instructions in our detailed development docs apply only to maintainers. See the [development contribution guide](contribute/README.md) for complete details, but note:

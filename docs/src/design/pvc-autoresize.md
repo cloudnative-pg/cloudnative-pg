@@ -67,7 +67,7 @@ The following open and closed issues informed this design:
 | [#9301](https://github.com/cloudnative-pg/cloudnative-pg/issues/9301) | Can't increase storage because CNPG won't operate | Proactive resize avoids this circular dependency entirely |
 | [#8369](https://github.com/cloudnative-pg/cloudnative-pg/issues/8369) | Increase storage above EBS size limit, unrecoverable state | `limit` field prevents exceeding CSI/platform limits |
 | [#7827](https://github.com/cloudnative-pg/cloudnative-pg/issues/7827) | Replica shows healthy after I/O error from storage exhaustion | Disk metrics enable early detection before I/O errors |
-| [#7505](https://github.com/cloudnative-pg/cloudnative-pg/issues/7505) | Master node pod deleted during disk space increase | Online resize via CSI avoids pod disruption |
+| [#7505](https://github.com/cloudnative-pg/cloudnative-pg/issues/7505) | Primary node pod deleted during disk space increase | Online resize via CSI avoids pod disruption |
 | [#7324](https://github.com/cloudnative-pg/cloudnative-pg/issues/7324) | PVC resize on Azure not properly detected | CSI failure detection via `statfs()` vs. PVC spec comparison |
 | [#6152](https://github.com/cloudnative-pg/cloudnative-pg/issues/6152) | walStorage PVC will not grow | WAL safety checks block resize when archive lag is the root cause |
 | [#5083](https://github.com/cloudnative-pg/cloudnative-pg/issues/5083) | Handling PVC volume shrink | Shrinking is a non-goal; K8s doesn't support it |

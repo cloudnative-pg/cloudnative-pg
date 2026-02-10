@@ -32,6 +32,8 @@ development workflow, with some customizations:
 We adopt the [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
 format for commit messages.
 
+**For AI-assisted development:** Review [AI_CONTRIBUTING.md](../AI_CONTRIBUTING.md) and [AI_CONTRIBUTORS.md](../AI_CONTRIBUTORS.md) for technical standards and social patterns that help AI agents produce review-ready PRs.
+
 The [roadmap](https://github.com/orgs/cloudnative-pg/projects/1) is defined as a [Github Project](https://docs.github.com/en/issues/trying-out-the-new-projects-experience/about-projects).
 
 We have an [operational Kanban board](https://github.com/orgs/cloudnative-pg/projects/2)
