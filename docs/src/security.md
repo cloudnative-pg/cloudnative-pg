@@ -592,6 +592,13 @@ versions it is set to `md5`.
     `postgres` user to `NULL` (de facto disabling remote access through password authentication).
 :::
 
+:::info[Important]
+    Postgres may include cleartext password in its logs in some cases, as
+    mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-createrole.html). \
+    CloudNativePG disables postgres logs produced by CREATE/ALTER operations on
+    roles that include a password string.
+:::
+
 See the ["Secrets" section in the "Connecting from an application" page](applications.md#secrets) for more information.
 
 You can use those files to configure application access to the database.
