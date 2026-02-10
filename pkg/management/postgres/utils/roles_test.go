@@ -80,7 +80,8 @@ var _ = Describe("Credentials management functions", func() {
 
 	It("can set the password for a PostgreSQL role", func() {
 		mock.ExpectBegin()
-		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'")
+		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'testpassword'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
@@ -89,7 +90,8 @@ var _ = Describe("Credentials management functions", func() {
 
 	It("will correctly escape the password if needed", func() {
 		mock.ExpectBegin()
-		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'")
+		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
@@ -98,13 +100,14 @@ var _ = Describe("Credentials management functions", func() {
 
 	It("will rollback setting of the password if there is an error", func() {
 		mock.ExpectBegin()
-		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'")
+		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
 		dbError := errors.New("kaboom")
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
 			WillReturnError(dbError)
 		mock.ExpectRollback()
 		err := SetUserPassword("testuser", "this \"is\" weird but 'possible'", db)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})
 })

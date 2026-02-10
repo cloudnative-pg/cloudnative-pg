@@ -189,7 +189,8 @@ as mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/c
 > The password will be transmitted to the server in cleartext, and it might
 > also be logged in the client's command history or the server log
 
-CloudNativePG adds a safety layer by ensuring that postgres logging is disabled for any CREATE or ALTER operation on a role that includes a non-null password.
+CloudNativePG adds a safety layer by ensuring that postgres logging is disabled
+for any CREATE or ALTER operation on a role that includes a non-null password.
 The  Status section of the cluster will still report any pending roles.
 
 ## Unrealizable role configurations
