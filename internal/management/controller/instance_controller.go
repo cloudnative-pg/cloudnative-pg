@@ -1034,12 +1034,20 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		return nil
 	}
 
-	// if there is a pending restart, the instance is a primary and
-	// the restart is due to a decrease of sensible parameters,
-	// we will need to restart the primary instance in place
+	// if there is a pending restart, the instance is a primary (or the designated
+	// primary in a replica cluster) and the restart is due to a decrease of sensible
+	// parameters, we will need to restart the primary instance in place
 	phase := apiv1.PhaseApplyingConfiguration
 	phaseReason := "PostgreSQL configuration changed"
-	if status.IsPrimary && status.PendingRestartForDecrease {
+
+	// In a replica cluster, the designated primary acts as the local primary.
+	// It should handle hot-standby sensitive parameter decreases the same way
+	// a real primary would, triggering an in-place restart.
+	isDesignatedPrimary := cluster.IsReplica() &&
+		cluster.Status.CurrentPrimary == r.instance.GetPodName()
+	isPrimaryLike := status.IsPrimary || isDesignatedPrimary
+
+	if isPrimaryLike && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
 			return r.triggerRestartForDecrease(ctx, cluster)
 		}
@@ -1052,7 +1060,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	}
 	if phase == apiv1.PhaseApplyingConfiguration &&
 		(cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
-			(status.IsPrimary && cluster.Spec.Instances > 1)) {
+			(isPrimaryLike && cluster.Spec.Instances > 1)) {
 		// I'm not the first instance spotting the configuration
 		// change, everything is fine and there is no need to signal
 		// the operator again.
