@@ -100,8 +100,8 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	return roles, nil
 }
 
-func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, silcenceErrLog bool) error {
-	if !silcenceErrLog {
+func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, silenceErrLog bool) error {
+	if !silenceErrLog {
 		_, err := db.ExecContext(ctx, statement)
 		return err
 	}
