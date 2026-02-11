@@ -47,7 +47,7 @@ Extension images must be built according to the
 To use image volume extensions with CloudNativePG, you need:
 
 - **PostgreSQL 18 or later**, with support for `extension_control_path`.
-- **Kubernetes 1.33**, with the `ImageVolume` feature gate enabled.
+- **Kubernetes 1.35** or later (1.33 and 1.34 with the `ImageVolume` feature gate enabled).
 - **Container runtime with `ImageVolume` support**:
     - `containerd` v2.1.0 or later, or
     - `CRI-O` v1.31 or later.
