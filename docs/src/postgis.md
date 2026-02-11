@@ -153,7 +153,7 @@ spec:
 ```
 
 :::tip
-Specifying the `version` in the extensions stanza is highly recommended.
+Specifying the `version` in the `extensions` stanza is highly recommended.
 CloudNativePG will compare this version with the one currently installed in the
 database; if they differ, it will automatically execute the necessary
 `ALTER EXTENSION ... UPDATE TO ...` command.
