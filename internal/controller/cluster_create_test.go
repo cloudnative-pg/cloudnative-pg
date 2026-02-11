@@ -1383,3 +1383,59 @@ var _ = Describe("Service Reconciling", func() {
 		})
 	})
 })
+
+var _ = Describe("ServiceAccount with custom name", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("should use existing ServiceAccount when specified", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+
+		existingSA := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-sa",
+				Namespace: namespace,
+			},
+		}
+		Expect(env.client.Create(ctx, existingSA)).To(Succeed())
+
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "shared-sa"
+
+		By("executing createOrPatchServiceAccount", func() {
+			err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying no new ServiceAccount was created", func() {
+			var sa corev1.ServiceAccount
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      cluster.Name,
+				Namespace: namespace,
+			}, &sa)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
+
+		By("verifying existing ServiceAccount still exists", func() {
+			var sa corev1.ServiceAccount
+			err := env.client.Get(ctx, types.NamespacedName{
+				Name:      "shared-sa",
+				Namespace: namespace,
+			}, &sa)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	It("should fail when specified ServiceAccount doesn't exist", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "non-existent-sa"
+
+		err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("not found"))
+	})
+})

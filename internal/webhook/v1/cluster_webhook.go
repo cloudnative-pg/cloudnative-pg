@@ -195,6 +195,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
 		v.validateExtensions,
+		v.validateServiceAccountConfig,
 	}
 
 	for _, validate := range validations {
@@ -2865,4 +2866,19 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 	}
 
 	return result
+}
+
+// validateServiceAccountConfig validates the ServiceAccount configuration
+// ensuring that serviceAccountName and serviceAccountTemplate are mutually exclusive.
+func (v *ClusterCustomValidator) validateServiceAccountConfig(r *apiv1.Cluster) field.ErrorList {
+	if r.Spec.ServiceAccountName != "" && r.Spec.ServiceAccountTemplate != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "serviceAccountName"),
+				r.Spec.ServiceAccountName,
+				"serviceAccountName and serviceAccountTemplate are mutually exclusive",
+			),
+		}
+	}
+	return nil
 }

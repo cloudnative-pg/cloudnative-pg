@@ -97,6 +97,15 @@ type PoolerSpec struct {
 	// Template for the Service to be created
 	// +optional
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
+
+	// Name of an existing ServiceAccount to use for the pooler.
+	// When specified, the operator will not create a new ServiceAccount
+	// but will use the provided one. This is useful for sharing a single
+	// ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).
+	// If not specified, a ServiceAccount will be created with the pooler name.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceAccountName is immutable"
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // PoolerMonitoringConfiguration is the type containing all the monitoring
