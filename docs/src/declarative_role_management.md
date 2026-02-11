@@ -183,15 +183,17 @@ stringData:
 
 While role passwords are safely managed in Kubernetes using Secrets,
 there is still a risk on the PostgreSQL side. If creating/altering a role with
-password, postgres may print the password in some logging statements,
-as mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-createrole.html):
+password, PostgreSQL may print the password as part of the query statement
+in some `postgres` logs, as mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-createrole.html):
 
 > The password will be transmitted to the server in cleartext, and it might
 > also be logged in the client's command history or the server log
 
-CloudNativePG adds a safety layer by ensuring that postgres logging is disabled
-for any CREATE or ALTER operation on a role that includes a non-null password.
-The  Status section of the cluster will still report any pending roles.
+CloudNativePG adds a safety layer by ensuring that `postgres` logging does not
+include the query statement for any CREATE or ALTER operation on a role with
+password, thus preventing leakage.
+The  Status section of the cluster does not print the query statement for any
+managed role operation.
 
 ## Unrealizable role configurations
 
