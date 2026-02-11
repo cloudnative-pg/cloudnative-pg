@@ -37,14 +37,6 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	cluster *apiv1.Cluster,
 	cli client.Client,
 ) (changed bool, err error) {
-	// TODO: Remove this code when enough time has passed since 1.21 release
-	//       This is due to the operator switching from postgresql.auto.conf
-	//       to override.conf for coordinating replication configuration
-	changed, err = instance.migratePostgresAutoConfFile(ctx)
-	if err != nil {
-		return changed, err
-	}
-
 	primary, err := instance.IsPrimary()
 	if err != nil {
 		return changed, err
