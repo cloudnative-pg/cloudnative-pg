@@ -133,24 +133,6 @@ func RemoveOptionsFromConfigurationContents(lines []string, options ...string) [
 	return lines
 }
 
-// ReadLinesFromConfigurationContents read the options from the configuration file as a map
-func ReadLinesFromConfigurationContents(content []string, options ...string) []string {
-	result := make([]string, 0, len(options))
-	for _, line := range content {
-		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
-		key := strings.TrimSpace(kv[0])
-
-		for _, option := range options {
-			if key == option {
-				result = append(result, line)
-				break
-			}
-		}
-	}
-
-	return result
-}
-
 // EnsureIncludes makes sure the passed PostgreSQL configuration file has an include directive
 // to every filesToInclude.
 func EnsureIncludes(fileName string, filesToInclude ...string) (changed bool, err error) {
