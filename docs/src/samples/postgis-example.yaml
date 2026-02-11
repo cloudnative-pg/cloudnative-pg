@@ -3,13 +3,19 @@ kind: Cluster
 metadata:
   name: postgis-example
 spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie
+
   storage:
     size: 1Gi
+
   postgresql:
-    parameters:
-      log_statement: ddl
+    extensions:
+    - name: postgis
+      image:
+        reference: ghcr.io/cloudnative-pg/postgis-extension:3.6.1-18-trixie
+      ld_library_path:
+      - system
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
@@ -22,6 +28,11 @@ spec:
     name: postgis-example
   extensions:
   - name: postgis
-  - name: postgis_topology
+    version: '3.6.1'
+  - name: postgis_raster
+  - name: postgis_sfcgal
   - name: fuzzystrmatch
+  - name: address_standardizer
+  - name: address_standardizer_data_us
   - name: postgis_tiger_geocoder
+  - name: postgis_topology
