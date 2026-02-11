@@ -5146,22 +5146,12 @@ var _ = Describe("validateManagedServices", func() {
 
 	Context("disabledDefault service validation", func() {
 		It("should allow the disablement of ro and r service", func() {
-			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{
-				apiv1.ServiceSelectorTypeR,
-				apiv1.ServiceSelectorTypeRO,
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.DisabledDefaultServiceSelectorType{
+				apiv1.DisabledDefaultServiceSelectorTypeR,
+				apiv1.DisabledDefaultServiceSelectorTypeRO,
 			}
 			errs := v.validateManagedServices(cluster)
 			Expect(errs).To(BeEmpty())
-		})
-
-		It("should not allow the disablement of rw service", func() {
-			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{
-				apiv1.ServiceSelectorTypeRW,
-			}
-			errs := v.validateManagedServices(cluster)
-			Expect(errs).To(HaveLen(1))
-			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
-			Expect(errs[0].Field).To(Equal("spec.managed.services.disabledDefaultServices"))
 		})
 	})
 })
