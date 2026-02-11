@@ -115,17 +115,12 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgis:18.1-3.6.1-system-trixie
   storage:
     size: 1Gi
-  postgresql:
-    parameters:
-      log_statement: ddl
 ```
-
----
 
 ## Enabling the Extension
 
-Once the binaries are provisioned (via an image volume extension or directly in
-the `Cluster` resource), you must enable the extension in the database.
+Once the binaries are provisioned (via either method above), you must enable
+the extension in the database.
 
 Using the `Database` resource allows for declarative management of the
 extension's lifecycle, including version upgrades.
@@ -204,17 +199,14 @@ kubectl cnpg psql cluster-postgis -- app -c '\dx'
 The command returns something like this:
 
 ```console
-                                                                                List of installed extensions
-             Name             | Version | Default version |   Schema   |                                                     Description
-
-------------------------------+---------+-----------------+------------+---------------------------------------------------------------------------------
-------------------------------------
- address_standardizer         | 3.6.1   | 3.6.1           | public     | Used to parse an address into constituent elements. Generally used to support ge
-ocoding address normalization step.
+                                        List of installed extensions
+             Name             | Version | Default version |   Schema   |                  Description
+------------------------------+---------+-----------------+------------+------------------------------------------------
+ address_standardizer         | 3.6.1   | 3.6.1           | public     | Used to parse an address into constituent ...
  address_standardizer_data_us | 3.6.1   | 3.6.1           | public     | Address Standardizer US dataset example
- fuzzystrmatch                | 1.2     | 1.2             | public     | determine similarities and distance between strings
+ fuzzystrmatch                | 1.2     | 1.2             | public     | determine similarities and distance between...
  plpgsql                      | 1.0     | 1.0             | pg_catalog | PL/pgSQL procedural language
- postgis                      | 3.6.1   | 3.6.1           | public     | PostGIS geometry and geography spatial types and functions
+ postgis                      | 3.6.1   | 3.6.1           | public     | PostGIS geometry and geography spatial type...
  postgis_raster               | 3.6.1   | 3.6.1           | public     | PostGIS raster types and functions
  postgis_sfcgal               | 3.6.1   | 3.6.1           | public     | PostGIS SFCGAL functions
  postgis_tiger_geocoder       | 3.6.1   | 3.6.1           | tiger      | PostGIS tiger geocoder and reverse geocoder
@@ -231,13 +223,14 @@ kubectl cnpg psql cluster-postgis -- app -c 'SELECT postgis_full_version()'
 Returning:
 
 ```console
-                             postgis_full_version
-
----------------------------------------------------------------------------------------------------------------------------------------------------------
----------------------------------------------------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------
- POSTGIS="3.6.1 f533623" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2" SFCGAL="SFCGAL 2.0.0, CGAL 6.0, BOOST 1.83.0" PROJ="9.6.0 NETWORK_ENABLED=OFF
-URL_ENDPOINT= USER_WRITABLE_DIRECTORY=/tmp/proj" (compiled against PROJ 9.6.0) GDAL="GDAL 3.10.3, released 2025/04/01 GDAL_DATA not found" LIBXML="2.9.14
-" LIBJSON="0.18" LIBPROTOBUF="1.5.1" WAGYU="0.5.0 (Internal)" TOPOLOGY RASTER
+                                                    postgis_full_version
+------------------------------------------------------------------------------------------------------------------------
+ POSTGIS="3.6.1 f533623" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2"
+ SFCGAL="SFCGAL 2.0.0, CGAL 6.0, BOOST 1.83.0"
+ PROJ="9.6.0 NETWORK_ENABLED=OFF URL_ENDPOINT= USER_WRITABLE_DIRECTORY=/tmp/proj"
+ (compiled against PROJ 9.6.0)
+ GDAL="GDAL 3.10.3, released 2025/04/01 GDAL_DATA not found"
+ LIBXML="2.9.14" LIBJSON="0.18" LIBPROTOBUF="1.5.1" WAGYU="0.5.0 (Internal)"
+ TOPOLOGY RASTER
 (1 row)
 ```
