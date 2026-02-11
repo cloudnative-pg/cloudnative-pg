@@ -118,9 +118,9 @@ your PostgreSQL cluster.
 
 ## PostGIS
 
-**PostGIS example**
+**PostGIS example with image volume extensions**
 : [`postgis-example.yaml`](samples/postgis-example.yaml):
-   An example of a PostGIS cluster. See [PostGIS](postgis.md) for details.
+   An example of a PostGIS cluster using image volume extensions. See [PostGIS](postgis.md) for details.
 
 ## Managed roles
 
