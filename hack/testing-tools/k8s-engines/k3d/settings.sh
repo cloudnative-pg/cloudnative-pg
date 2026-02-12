@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 ##
 ## Copyright © contributors to CloudNativePG, established as
 ## CloudNativePG a Series of LF Projects, LLC.
@@ -18,14 +19,7 @@
 ## SPDX-License-Identifier: Apache-2.0
 ##
 
-# shellcheck disable=SC1090,SC1091
-
-# k3d-specific image loading logic.
-set -eEuo pipefail
-
-# load_image_k3d: Executes the necessary 'k3d image' command.
-function load_image_k3d() {
-  local cluster_name=$1
-  local image=$2
-  k3d image import "${image}" -c "${cluster_name}"
-}
+# renovate: datasource=docker depName=k3d/node
+K3D_NODE_DEFAULT_VERSION=v1.35.0
+export K8S_VERSION=${K8S_VERSION:-$K3D_NODE_DEFAULT_VERSION}
+export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-local-path}
