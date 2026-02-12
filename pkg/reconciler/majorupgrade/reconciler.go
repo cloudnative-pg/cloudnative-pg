@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/imagecatalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -318,7 +318,7 @@ func resolveExtensionsForMajorVersion(
 ) ([]apiv1.ExtensionConfiguration, error) {
 	// If using imageCatalogRef, resolve extensions from the catalog
 	if cluster.Spec.ImageCatalogRef != nil {
-		catalog, err := getCatalog(ctx, c, cluster)
+		catalog, err := imagecatalog.Get(ctx, c, cluster)
 		if err != nil {
 			return nil, fmt.Errorf("cannot get catalog: %w", err)
 		}
@@ -333,41 +333,6 @@ func resolveExtensionsForMajorVersion(
 
 	// If using imageName directly, extensions must be fully specified in cluster spec
 	return extensions.ValidateWithoutCatalog(cluster)
-}
-
-// getCatalog retrieves the image catalog referenced by the cluster
-func getCatalog(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-) (apiv1.GenericImageCatalog, error) {
-	catalogKind := cluster.Spec.ImageCatalogRef.Kind
-	var catalog apiv1.GenericImageCatalog
-
-	switch catalogKind {
-	case apiv1.ClusterImageCatalogKind:
-		catalog = &apiv1.ClusterImageCatalog{}
-	case apiv1.ImageCatalogKind:
-		catalog = &apiv1.ImageCatalog{}
-	default:
-		return nil, fmt.Errorf("invalid image catalog type: %s", catalogKind)
-	}
-
-	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
-	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
-		return nil, fmt.Errorf("invalid image catalog group")
-	}
-
-	catalogName := cluster.Spec.ImageCatalogRef.Name
-	err := c.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			return nil, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
-		}
-		return nil, fmt.Errorf("error getting catalog: %w", err)
-	}
-
-	return catalog, nil
 }
 
 // getPrimarySerial tries to obtain the primary serial from a group of PVCs
