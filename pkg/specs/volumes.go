@@ -321,13 +321,10 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
-// sanitizeExtensionNameForVolume produces a Kubernetes-compliant volume name
-// for an extension. It adds an "ext-" prefix to avoid collisions with system
-// volume names (e.g. pgdata, shm, pg-wal) and replaces underscores with
-// hyphens to comply with RFC 1123 DNS label requirements.
-// The mount path preserves the original extension name.
+// sanitizeExtensionNameForVolume replaces underscores with hyphens to comply with RFC 1123
+// DNS label requirements for Kubernetes volume names. The mount path preserves the original name.
 func sanitizeExtensionNameForVolume(extensionName string) string {
-	return "ext-" + strings.ReplaceAll(extensionName, "_", "-")
+	return strings.ReplaceAll(extensionName, "_", "-")
 }
 
 func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
