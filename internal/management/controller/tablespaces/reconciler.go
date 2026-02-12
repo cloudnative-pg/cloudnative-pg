@@ -92,32 +92,33 @@ func (r *TablespaceReconciler) Reconcile(
 	return reconcile.Result{}, nil
 }
 
-func arePVCsForTablespaceHealthy(
+// buildPVCChecker returns a function that checks whether all PVCs for a given
+// tablespace are healthy across all instances. It builds the healthy PVC lookup
+// map once and captures it in the returned closure.
+func buildPVCChecker(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	tablespaceName string,
-) bool {
+) func(tablespaceName string) bool {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 
-	healthyPVCs := cluster.Status.HealthyPVC
-	isPVCHealthy := make(map[string]bool)
-	for _, pvc := range healthyPVCs {
-		isPVCHealthy[pvc] = true
+	healthyPVCSet := make(map[string]bool, len(cluster.Status.HealthyPVC))
+	for _, pvc := range cluster.Status.HealthyPVC {
+		healthyPVCSet[pvc] = true
 	}
-	instanceNames := cluster.Status.InstanceNames
 
-	for _, instance := range instanceNames {
-		pvcNameForTablespace := specs.PvcNameForTablespace(instance, tablespaceName)
-		if !isPVCHealthy[pvcNameForTablespace] {
-			contextLog.Warning("pvc unhealthy for tablespace",
-				"pvcName", pvcNameForTablespace,
-				"instance", instance,
-				"tablespace", tablespaceName)
-			return false
+	return func(tablespaceName string) bool {
+		for _, instance := range cluster.Status.InstanceNames {
+			pvcName := specs.PvcNameForTablespace(instance, tablespaceName)
+			if !healthyPVCSet[pvcName] {
+				contextLog.Info("PVC not yet healthy for tablespace, deferring creation",
+					"pvcName", pvcName,
+					"instance", instance,
+					"tablespace", tablespaceName)
+				return false
+			}
 		}
+		return true
 	}
-
-	return true
 }
 
 func (r *TablespaceReconciler) reconcile(
@@ -134,9 +135,7 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
 
-	pvcChecker := func(tablespace string) bool {
-		return arePVCsForTablespaceHealthy(ctx, cluster, tablespace)
-	}
+	pvcChecker := buildPVCChecker(ctx, cluster)
 
 	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	result := r.applySteps(
