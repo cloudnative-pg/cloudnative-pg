@@ -75,10 +75,11 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 
 	assertVolumeMounts := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
+		volumeName := "ext-" + strings.ReplaceAll(imageVolumeExtension, "_", "-")
 		mountPath := filepath.Join(postgres.ExtensionsBaseDirectory, imageVolumeExtension)
 		for _, pod := range podList.Items {
 			for _, volumeMount := range pod.Spec.Containers[0].VolumeMounts {
-				if volumeMount.Name == imageVolumeExtension && volumeMount.MountPath == mountPath {
+				if volumeMount.Name == volumeName && volumeMount.MountPath == mountPath {
 					found = true
 				}
 			}
@@ -88,9 +89,10 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 
 	assertVolumes := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
+		volumeName := "ext-" + strings.ReplaceAll(imageVolumeExtension, "_", "-")
 		for _, pod := range podList.Items {
 			for _, volume := range pod.Spec.Volumes {
-				if volume.Name == imageVolumeExtension && volume.Image.Reference != "" {
+				if volume.Name == volumeName && volume.Image.Reference != "" {
 					found = true
 				}
 			}
