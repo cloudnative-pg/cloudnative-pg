@@ -1573,3 +1573,11 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
+
+// SetAdmissionError sets the admission error in the cluster status
+func (cluster *Cluster) SetAdmissionError(msg string) {
+	if len(msg) > 0 {
+		cluster.Status.Phase = PhaseConfigValidationFailed
+		cluster.Status.PhaseReason = msg
+	}
+}
