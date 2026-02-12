@@ -255,7 +255,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
-	It("Create will send a correct CREATE with password and prevent Postgres logging", func(ctx context.Context) {
+	It("Create with password will send CREATE and prevent Postgres from logging the query", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -297,7 +297,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-	It("Create will rollback CREATE with password to the DB if there is an error", func(ctx context.Context) {
+	It("Create with password will rollback CREATE if there is an error", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -376,7 +376,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Update(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-	It("Update with PASS will ALTER the DB and prevent Postgres logging", func(ctx context.Context) {
+	It("Update with password will ALTER the DB and prevent Postgres from logging the query", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -392,7 +392,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Update(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-	It("Update with PASS will rollback ALTER if there is an error", func(ctx context.Context) {
+	It("Update with password will rollback ALTER if there is an error", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
