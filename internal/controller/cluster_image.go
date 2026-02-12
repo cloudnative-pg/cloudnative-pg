@@ -27,7 +27,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +38,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/imagecatalog"
 )
 
 // reconcileImage processes the image request, executes it, and stores
@@ -179,40 +179,11 @@ func (r *ClusterReconciler) getRequestedImageInfo(
 
 	contextLogger = contextLogger.WithValues("catalogRef", cluster.Spec.ImageCatalogRef)
 
-	// Ensure the catalog has a correct type
-	catalogKind := cluster.Spec.ImageCatalogRef.Kind
-	var catalog apiv1.GenericImageCatalog
-	switch catalogKind {
-	case apiv1.ClusterImageCatalogKind:
-		catalog = &apiv1.ClusterImageCatalog{}
-	case apiv1.ImageCatalogKind:
-		catalog = &apiv1.ImageCatalog{}
-	default:
-		contextLogger.Info("Unknown catalog kind")
-		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog type")
-	}
-
-	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
-	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
-		contextLogger.Info("Unknown catalog group")
-		return apiv1.ImageInfo{}, fmt.Errorf("invalid image catalog group")
-	}
-
-	// Get the referenced catalog
-	catalogName := cluster.Spec.ImageCatalogRef.Name
-	err := r.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
+	catalog, err := imagecatalog.Get(ctx, r.Client, cluster)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
-			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
-				catalogKind, catalogName)
-			contextLogger.Info("catalog not found", "catalogKind", catalogKind, "catalogName", catalogName)
-			return apiv1.ImageInfo{}, fmt.Errorf("catalog %s/%s not found", catalogKind, catalogName)
-		}
-
 		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Error getting %v/%v: %v",
-			catalogKind, catalogName, err)
-		contextLogger.Error(err, "while getting imageCatalog",
-			"catalogKind", catalogKind, "catalogName", catalogName)
+			cluster.Spec.ImageCatalogRef.Kind, cluster.Spec.ImageCatalogRef.Name, err)
+		contextLogger.Error(err, "while getting imageCatalog")
 		return apiv1.ImageInfo{}, err
 	}
 
