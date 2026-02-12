@@ -22,7 +22,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -65,7 +65,10 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		)
 	}
 
-	extensionsChanged := !reflect.DeepEqual(cluster.Status.PGDataImageInfo.Extensions, requestedImageInfo.Extensions)
+	extensionsChanged := !extensionsEqual(
+		cluster.Status.PGDataImageInfo.Extensions,
+		requestedImageInfo.Extensions,
+	)
 	imageChanged := requestedImageInfo.Image != cluster.Status.PGDataImageInfo.Image
 
 	currentMajorVersion := cluster.Status.PGDataImageInfo.MajorVersion
@@ -129,6 +132,36 @@ func getImageInfoFromCluster(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 		MajorVersion: int(imageVersion.Major()), //nolint:gosec
 		Extensions:   exts,
 	}, nil
+}
+
+// extensionsEqual compares two extension lists ignoring ordering.
+func extensionsEqual(a, b []apiv1.ExtensionConfiguration) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sortByName := func(x, y apiv1.ExtensionConfiguration) int {
+		if x.Name < y.Name {
+			return -1
+		}
+		if x.Name > y.Name {
+			return 1
+		}
+		return 0
+	}
+
+	sortedA := slices.SortedFunc(slices.Values(a), sortByName)
+	sortedB := slices.SortedFunc(slices.Values(b), sortByName)
+
+	return slices.EqualFunc(sortedA, sortedB, extensionConfigEqual)
+}
+
+func extensionConfigEqual(a, b apiv1.ExtensionConfiguration) bool {
+	return a.Name == b.Name &&
+		a.ImageVolumeSource == b.ImageVolumeSource &&
+		slices.Equal(a.ExtensionControlPath, b.ExtensionControlPath) &&
+		slices.Equal(a.DynamicLibraryPath, b.DynamicLibraryPath) &&
+		slices.Equal(a.LdLibraryPath, b.LdLibraryPath)
 }
 
 func (r *ClusterReconciler) getRequestedImageInfo(
