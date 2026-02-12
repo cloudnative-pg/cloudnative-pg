@@ -20,12 +20,25 @@
 
 # shellcheck disable=SC1090,SC1091
 
-# Kind-specific image loading logic.
+# k3d-specific cluster teardown logic.
 set -eEuo pipefail
 
-# load_image_kind: Executes the necessary 'kind load' command.
-function load_image_kind() {
+# Load common library to access global vars (registry_name, CLUSTER_NAME)
+source "$(dirname "$0")/../../common/00-paths.sh"
+source "$(dirname "$0")/../../common/10-config.sh" # For CLUSTER_NAME
+source "$(dirname "$0")/../../common/40-utils-registry.sh" # For registry_name
+
+# shellcheck disable=SC2153,SC2154
+echo -e "${bright}Tearing down k3d cluster '${CLUSTER_NAME}'.${reset}"
+
+destroy_k3d() {
   local cluster_name=$1
-  local image=$2
-  kind load -v 1 docker-image --name "${cluster_name}" "${image}"
+  # shellcheck disable=SC2154
+  docker network disconnect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
+  k3d cluster delete "${cluster_name}" || true
+  docker network rm "k3d-${cluster_name}" &>/dev/null || true
 }
+
+destroy_k3d "${CLUSTER_NAME}"
+
+echo -e "${bright}K3D cluster '${CLUSTER_NAME}' successfully torn down.${reset}"

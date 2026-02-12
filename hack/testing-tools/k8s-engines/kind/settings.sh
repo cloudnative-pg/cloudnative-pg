@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 ##
 ## Copyright © contributors to CloudNativePG, established as
 ## CloudNativePG a Series of LF Projects, LLC.
@@ -18,14 +19,7 @@
 ## SPDX-License-Identifier: Apache-2.0
 ##
 
-# shellcheck disable=SC1090,SC1091
-
-# Kind-specific image loading logic.
-set -eEuo pipefail
-
-# load_image_kind: Executes the necessary 'kind load' command.
-function load_image_kind() {
-  local cluster_name=$1
-  local image=$2
-  kind load -v 1 docker-image --name "${cluster_name}" "${image}"
-}
+# renovate: datasource=docker depName=kindest/node
+KIND_NODE_DEFAULT_VERSION=v1.35.0
+export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
+export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
