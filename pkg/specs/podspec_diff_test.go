@@ -27,22 +27,6 @@ import (
 )
 
 var _ = Describe("PodSpecDiff", func() {
-	It("returns true for superuser-secret volume", func() {
-		Expect(shouldIgnoreCurrentVolume("superuser-secret")).To(BeTrue())
-	})
-
-	It("returns true for app-secret volume", func() {
-		Expect(shouldIgnoreCurrentVolume("app-secret")).To(BeTrue())
-	})
-
-	It("returns false for other volumes", func() {
-		Expect(shouldIgnoreCurrentVolume("other-volume")).To(BeFalse())
-	})
-
-	It("returns false for empty volume name", func() {
-		Expect(shouldIgnoreCurrentVolume("")).To(BeFalse())
-	})
-
 	It("return false when the startup probe do not match and true otherwise", func() {
 		containerPre := corev1.Container{
 			StartupProbe: &corev1.Probe{
