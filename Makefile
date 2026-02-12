@@ -132,13 +132,13 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 e2e-test-kind: ## Run e2e tests locally using kind.
-	hack/e2e/run-e2e-kind.sh
+	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
 
-e2e-test-k3d: ## Run e2e tests locally using K3D.
-	hack/e2e/run-e2e-k3d.sh
+e2e-test-k3d: ## Run e2e tests locally using k3d.
+	CLUSTER_ENGINE=k3d hack/e2e/run-e2e-local.sh
 
-e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
-	hack/e2e/run-e2e-local.sh
+e2e-test-existing-cluster: ## Run e2e tests using the default kubernetes context.
+	hack/e2e/run-e2e-existing-cluster.sh
 
 ##@ Build
 build: generate fmt vet build-manager build-plugin ## Build binaries.
