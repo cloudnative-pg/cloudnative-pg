@@ -183,7 +183,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 	defer func() {
 		closeErr := rows.Close()
 		if closeErr != nil {
-			contextLogger.Error(closeErr, "while closing rows: %w")
+			contextLogger.Error(closeErr, "while closing rows")
 		}
 	}()
 
