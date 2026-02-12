@@ -74,11 +74,14 @@ func SetUserPassword(username string, password string, db *sql.DB) error {
 		_ = tx.Rollback()
 	}()
 
+	if _, err = tx.Exec("SET LOCAL log_statement = 'none'"); err != nil {
+		return err
+	}
 	if _, err = tx.Exec("SET LOCAL log_min_error_statement = 'PANIC'"); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
+	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
 		pgx.Identifier{username}.Sanitize(),
 		pq.QuoteLiteral(password)))
 	if err != nil {

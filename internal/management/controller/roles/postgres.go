@@ -114,6 +114,10 @@ func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, sil
 		// is committed
 		_ = tx.Rollback()
 	}()
+	_, err = tx.ExecContext(ctx, "SET LOCAL log_statement = 'none'")
+	if err != nil {
+		return err
+	}
 	_, err = tx.ExecContext(ctx, "SET LOCAL log_min_error_statement = 'PANIC'")
 	if err != nil {
 		return err
@@ -160,8 +164,8 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
-	containsPassword := appendPasswordOption(role, &query)
 	contextLog.Debug("Creating", "query", query.String())
+	containsPassword := appendPasswordOption(role, &query)
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error

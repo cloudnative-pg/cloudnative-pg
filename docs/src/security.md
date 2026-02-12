@@ -594,10 +594,10 @@ versions it is set to `md5`.
 
 :::info[Important]
     PostgreSQL may include cleartext role passwords in its logs for some role
-     operations, as mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-createrole.html). \
-    CloudNativePG ensures that `postgres` logs produced by CREATE/ALTER ROLE
-    operations don't include the query statement, thus preventing any password
-    leakage.
+    operations, as mentioned in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-createrole.html). \
+    CloudNativePG ensures that `postgres` logging (both statement logging and
+    error statement logging) is temporarily suppressed for CREATE/ALTER ROLE
+    operations with passwords, thus preventing any password leakage.
 :::
 
 See the ["Secrets" section in the "Connecting from an application" page](applications.md#secrets) for more information.
