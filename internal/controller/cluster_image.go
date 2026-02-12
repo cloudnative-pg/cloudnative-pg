@@ -119,10 +119,15 @@ func getImageInfoFromCluster(cluster *apiv1.Cluster) (apiv1.ImageInfo, error) {
 			fmt.Errorf("cannot parse version from image %s: %w", cluster.Spec.ImageName, err)
 	}
 
+	exts, err := extensions.ValidateWithoutCatalog(cluster)
+	if err != nil {
+		return apiv1.ImageInfo{}, err
+	}
+
 	return apiv1.ImageInfo{
 		Image:        cluster.Spec.ImageName,
 		MajorVersion: int(imageVersion.Major()), //nolint:gosec
-		Extensions:   cluster.Spec.PostgresConfiguration.Extensions,
+		Extensions:   exts,
 	}, nil
 }
 
