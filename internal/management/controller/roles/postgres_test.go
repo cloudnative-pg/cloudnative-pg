@@ -115,6 +115,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
+	wantedLogStatementSuppressionStmt := "SET LOCAL log_statement = 'none'"
 	wantedLogPreventionStmt := "SET LOCAL log_min_error_statement = 'PANIC'"
 
 	wantedRoleWithoutValidUntilExpectedCrtStmt := fmt.Sprintf(
@@ -260,6 +261,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedLogPreventionStmt).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedRoleWithPassExpectedCrtStmt).
@@ -280,6 +283,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedLogPreventionStmt).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedRoleWithoutValidUntilExpectedCrtStmt).
@@ -302,6 +307,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedLogPreventionStmt).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		dbError := errors.New("kaboom")
@@ -381,6 +388,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedLogPreventionStmt).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedRoleExpectedAltWithPasswordStmt).
@@ -397,6 +406,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedLogPreventionStmt).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		dbError := errors.New("kaboom")
