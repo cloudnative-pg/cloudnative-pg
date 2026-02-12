@@ -64,8 +64,28 @@ func DisableSuperuserPassword(db *sql.DB) error {
 
 // SetUserPassword change the password of a user in the PostgreSQL database
 func SetUserPassword(username string, password string, db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This has no effect if the transaction
+		// is committed
+		_ = tx.Rollback()
+	}()
+
+	if _, err = tx.Exec("SET LOCAL log_statement = 'none'"); err != nil {
+		return err
+	}
+	if _, err = tx.Exec("SET LOCAL log_min_error_statement = 'PANIC'"); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
 		pgx.Identifier{username}.Sanitize(),
 		pq.QuoteLiteral(password)))
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
