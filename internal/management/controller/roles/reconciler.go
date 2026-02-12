@@ -78,9 +78,15 @@ func Reconcile(
 	}
 
 	if len(rolesByStatus[apiv1.RoleStatusPendingReconciliation]) != 0 {
-		// forces runnable to run
-		instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
-		contextLogger.Info("Triggered a managed role reconciliation")
+		// triggers reconciliation actions on DB, if this is a primary
+		isPrimary, err := instance.IsPrimary()
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if isPrimary {
+			instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
+			contextLogger.Info("Triggered a managed role reconciliation")
+		}
 	}
 
 	updatedCluster := cluster.DeepCopy()

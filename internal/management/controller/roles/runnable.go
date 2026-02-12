@@ -89,6 +89,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	}
 	if !isPrimary {
 		contextLog.Info("skipping the RoleSynchronizer in replicas")
+		<-ctx.Done()
 	}
 	go func() {
 		var config *apiv1.ManagedConfiguration
