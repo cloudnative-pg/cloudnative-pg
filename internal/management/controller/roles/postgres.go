@@ -110,12 +110,9 @@ func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, sil
 		return err
 	}
 	defer func() {
-		if err != nil {
-			errRollback := tx.Rollback()
-			if errRollback != nil {
-				err = errors.Join(err, errRollback)
-			}
-		}
+		// This has no effect if the transaction
+		// is committed
+		_ = tx.Rollback()
 	}()
 	_, err = tx.ExecContext(ctx, "SET LOCAL log_min_error_statement = 'PANIC'")
 	if err != nil {

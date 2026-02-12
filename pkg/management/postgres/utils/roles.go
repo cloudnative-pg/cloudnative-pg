@@ -69,11 +69,9 @@ func SetUserPassword(username string, password string, db *sql.DB) error {
 		return err
 	}
 	defer func() {
-		if err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = errors.Join(err, errRollback)
-			}
-		}
+		// This has no effect if the transaction
+		// is committed
+		_ = tx.Rollback()
 	}()
 
 	if _, err = tx.Exec("SET LOCAL log_min_error_statement = 'PANIC'"); err != nil {
