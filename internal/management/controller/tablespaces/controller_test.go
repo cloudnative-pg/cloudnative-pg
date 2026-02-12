@@ -427,3 +427,54 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 	})
 })
+
+var _ = Describe("buildPVCChecker", func() {
+	It("returns true when all PVCs for a tablespace are healthy", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1", "cluster-2"},
+				HealthyPVC: []string{
+					"cluster-1-tbs-foo", "cluster-2-tbs-foo",
+				},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeTrue())
+	})
+
+	It("returns false when a PVC for a tablespace is missing from the healthy list", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1", "cluster-2"},
+				HealthyPVC: []string{
+					"cluster-1-tbs-foo",
+					// cluster-2-tbs-foo is missing
+				},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeFalse())
+	})
+
+	It("returns true when the cluster has no instances", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{},
+				HealthyPVC:    []string{},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeTrue())
+	})
+
+	It("returns false when there are instances but no healthy PVCs", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1"},
+				HealthyPVC:    []string{},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeFalse())
+	})
+})
