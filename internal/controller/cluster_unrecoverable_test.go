@@ -112,4 +112,74 @@ var _ = Describe("Unrecoverable replicas", func() {
 
 		Expect(result).To(ConsistOf("cluster-example-3", "cluster-example-4"))
 	})
+
+	It("Detects unrecoverable instances even when pods are not ready", func(ctx SpecContext) {
+		makeNonReadyPod := func(name string, unrecoverable string) corev1.Pod {
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+					Annotations: map[string]string{
+						utils.UnrecoverableInstanceAnnotationName: unrecoverable,
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionFalse,
+						},
+					},
+				},
+			}
+			return pod
+		}
+
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec: apiv1.ClusterSpec{
+				Instances: 2,
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "cluster-example-1",
+				TargetPrimary:  "cluster-example-1",
+			},
+		}
+
+		// Primary pod is ready
+		primaryPod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "cluster-example-1",
+				Annotations: map[string]string{},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		// Replica pod is not ready (e.g., postgres process not running, startup probe
+		// failing) but annotated as unrecoverable by the user
+		nonReadyUnrecoverablePod := makeNonReadyPod("cluster-example-2", "true")
+
+		result := collectNamesOfUnrecoverableInstances(
+			ctx,
+			cluster,
+			&managedResources{
+				instances: corev1.PodList{
+					Items: []corev1.Pod{
+						primaryPod,
+						nonReadyUnrecoverablePod,
+					},
+				},
+			},
+		)
+
+		Expect(result).To(ConsistOf("cluster-example-2"))
+	})
 })
