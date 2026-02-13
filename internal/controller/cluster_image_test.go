@@ -588,3 +588,130 @@ var _ = Describe("Cluster with container image extensions", func() {
 		Expect(cluster.Status.PhaseReason).To(Not(BeEmpty()))
 	})
 })
+
+var _ = Describe("extensionsEqual", func() {
+	It("returns true for two nil slices", func() {
+		Expect(extensionsEqual(nil, nil)).To(BeTrue())
+	})
+
+	It("returns true for two empty slices", func() {
+		Expect(extensionsEqual(
+			[]apiv1.ExtensionConfiguration{},
+			[]apiv1.ExtensionConfiguration{},
+		)).To(BeTrue())
+	})
+
+	It("returns true for nil and empty slice", func() {
+		Expect(extensionsEqual(nil, []apiv1.ExtensionConfiguration{})).To(BeTrue())
+	})
+
+	It("returns false when lengths differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{Name: "foo", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"}},
+		}
+		Expect(extensionsEqual(a, nil)).To(BeFalse())
+	})
+
+	It("returns true for identical extensions in same order", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{Name: "alpha", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "alpha:1"}},
+			{Name: "beta", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "beta:1"}},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{Name: "alpha", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "alpha:1"}},
+			{Name: "beta", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "beta:1"}},
+		}
+		Expect(extensionsEqual(a, b)).To(BeTrue())
+	})
+
+	It("returns true for identical extensions in different order", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{Name: "beta", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "beta:1"}},
+			{Name: "alpha", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "alpha:1"}},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{Name: "alpha", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "alpha:1"}},
+			{Name: "beta", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "beta:1"}},
+		}
+		Expect(extensionsEqual(a, b)).To(BeTrue())
+	})
+
+	It("returns false when image references differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{Name: "foo", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"}},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{Name: "foo", ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:2"}},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+
+	It("returns false when pull policies differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{Name: "foo", ImageVolumeSource: corev1.ImageVolumeSource{
+				Reference:  "foo:1",
+				PullPolicy: "Always",
+			}},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{Name: "foo", ImageVolumeSource: corev1.ImageVolumeSource{
+				Reference:  "foo:1",
+				PullPolicy: "IfNotPresent",
+			}},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+
+	It("returns false when extension control paths differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{
+				Name:                 "foo",
+				ImageVolumeSource:    corev1.ImageVolumeSource{Reference: "foo:1"},
+				ExtensionControlPath: []string{"/share"},
+			},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{
+				Name:                 "foo",
+				ImageVolumeSource:    corev1.ImageVolumeSource{Reference: "foo:1"},
+				ExtensionControlPath: []string{"/custom"},
+			},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+
+	It("returns false when dynamic library paths differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{
+				Name:               "foo",
+				ImageVolumeSource:  corev1.ImageVolumeSource{Reference: "foo:1"},
+				DynamicLibraryPath: []string{"/lib"},
+			},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{
+				Name:               "foo",
+				ImageVolumeSource:  corev1.ImageVolumeSource{Reference: "foo:1"},
+				DynamicLibraryPath: []string{"/lib", "/extra"},
+			},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+
+	It("returns false when ld library paths differ", func() {
+		a := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+				LdLibraryPath:     []string{"/lib"},
+			},
+		}
+		b := []apiv1.ExtensionConfiguration{
+			{
+				Name:              "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{Reference: "foo:1"},
+			},
+		}
+		Expect(extensionsEqual(a, b)).To(BeFalse())
+	})
+})
