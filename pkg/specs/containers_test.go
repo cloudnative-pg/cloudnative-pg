@@ -33,7 +33,7 @@ import (
 var _ = Describe("Bootstrap Container creation", func() {
 	It("create a Bootstrap Container with resources with nil values into Limits and Requests fields", func() {
 		cluster := apiv1.Cluster{}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, nil)
 		Expect(container.Resources.Limits).To(BeNil())
 		Expect(container.Resources.Requests).To(BeNil())
 	})
@@ -52,7 +52,7 @@ var _ = Describe("Bootstrap Container creation", func() {
 				LogLevel: "info",
 			},
 		}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, nil)
 		Expect(container.Resources.Limits["a_test_field"]).ToNot(BeNil())
 		Expect(container.Resources.Requests["another_test_field"]).ToNot(BeNil())
 	})
