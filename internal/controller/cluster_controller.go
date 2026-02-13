@@ -239,6 +239,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = cnpgiClient.SetPluginClientInContext(ctx, pluginClient)
 
+	// Validate cluster creation
+	// At the first reconciliation the number of instances will be 0
+	if cluster.Status.Instances == 0 {
+		if err := validateClusterCreate(ctx, r.Client, pluginClient, cluster); err != nil {
+			return ctrl.Result{RequeueAfter: 60 * time.Second}, nil
+		}
+	}
+
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {
