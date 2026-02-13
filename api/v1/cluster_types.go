@@ -1469,6 +1469,8 @@ type PostgresConfiguration struct {
 
 	// The configuration of the extensions to be added
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
