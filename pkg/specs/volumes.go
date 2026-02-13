@@ -84,7 +84,7 @@ func PvcNameForTablespace(podName, tablespaceName string) string {
 // VolumeMountNameForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func VolumeMountNameForTablespace(tablespaceName string) string {
-	return convertPostgresIDToK8sName(tablespaceName)
+	return "tbs-" + convertPostgresIDToK8sName(tablespaceName)
 }
 
 // SnapshotBackupNameForTablespace returns the volume snapshot backup name for the tablespace
