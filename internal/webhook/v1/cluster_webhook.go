@@ -2885,6 +2885,19 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 
 			libraryPaths.Put(path)
 		}
+
+		ldLibraryPaths := stringset.New()
+		for j, path := range v.LdLibraryPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("ld_library_path").Index(j),
+				ldLibraryPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			ldLibraryPaths.Put(path)
+		}
 	}
 
 	return result
