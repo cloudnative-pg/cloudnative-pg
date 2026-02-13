@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -158,7 +159,7 @@ func extensionsEqual(a, b []apiv1.ExtensionConfiguration) bool {
 
 func extensionConfigEqual(a, b apiv1.ExtensionConfiguration) bool {
 	return a.Name == b.Name &&
-		a.ImageVolumeSource == b.ImageVolumeSource &&
+		apiequality.Semantic.DeepEqual(a.ImageVolumeSource, b.ImageVolumeSource) &&
 		slices.Equal(a.ExtensionControlPath, b.ExtensionControlPath) &&
 		slices.Equal(a.DynamicLibraryPath, b.DynamicLibraryPath) &&
 		slices.Equal(a.LdLibraryPath, b.LdLibraryPath)
