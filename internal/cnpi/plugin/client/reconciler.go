@@ -174,7 +174,7 @@ func reconcilerHook(
 			return newReconcilerRequeueResult(plugin.Name(), result.GetRequeueAfter())
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_CONTINUE:
-			return newContinueResult(plugin.Name())
+			// Continue to next plugin
 		}
 	}
 
