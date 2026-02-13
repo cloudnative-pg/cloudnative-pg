@@ -22,9 +22,13 @@ package specs
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // ComparePodSpecs compares two pod specs, returns true iff they are equivalent, and
@@ -132,11 +136,65 @@ func compareMaps[V comparable](current, target map[string]V) (bool, string) {
 	return true, ""
 }
 
+// shouldIgnoreCurrentVolume checks if a volume or mount is the superuser or app
+// mount, which had been added, superflously, in previous versions. If so, ignores
+// it for the PodSpec drift detector, to avoid unnecessary restarts
+//
+// TODO: delete this function after minor version 1.24 is discontinued
+func shouldIgnoreCurrentVolume(name string) bool {
+	return name == "superuser-secret" || name == "app-secret"
+}
+
+// normalizeVolumeName maps old unprefixed volume names to the new prefixed
+// scheme (ext- for extensions, tbs- for tablespaces) to avoid spurious
+// pod restarts on upgrade.
+//
+// TODO: delete this function after minor version 1.28 is discontinued
+func normalizeVolumeName(vol corev1.Volume) string {
+	name := vol.Name
+
+	if vol.Image != nil && !strings.HasPrefix(name, "ext-") {
+		return sanitizeExtensionNameForVolume(name)
+	}
+
+	if vol.PersistentVolumeClaim != nil &&
+		strings.Contains(vol.PersistentVolumeClaim.ClaimName, apiv1.TablespaceVolumeInfix) &&
+		!strings.HasPrefix(name, "tbs-") {
+		return "tbs-" + name
+	}
+
+	return name
+}
+
+// normalizeVolumeMountName maps old unprefixed volume mount names to the new
+// prefixed scheme based on mount path.
+//
+// TODO: delete this function after minor version 1.28 is discontinued
+func normalizeVolumeMountName(mount corev1.VolumeMount) string {
+	name := mount.Name
+
+	extensionPathPrefix := postgres.ExtensionsBaseDirectory + "/"
+	if strings.HasPrefix(mount.MountPath, extensionPathPrefix) && !strings.HasPrefix(name, "ext-") {
+		return sanitizeExtensionNameForVolume(name)
+	}
+
+	if strings.HasPrefix(mount.MountPath, PgTablespaceVolumePath+"/") && !strings.HasPrefix(name, "tbs-") {
+		return "tbs-" + name
+	}
+
+	return name
+}
+
 func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string) {
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
 	for _, vol := range currentVolumes {
-		current[vol.Name] = vol
+		if shouldIgnoreCurrentVolume(vol.Name) {
+			continue
+		}
+		normalized := normalizeVolumeName(vol)
+		vol.Name = normalized
+		current[normalized] = vol
 	}
 	for _, vol := range targetVolumes {
 		target[vol.Name] = vol
@@ -149,7 +207,12 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	current := make(map[string]corev1.VolumeMount)
 	target := make(map[string]corev1.VolumeMount)
 	for _, mount := range currentMounts {
-		current[mount.Name] = mount
+		if shouldIgnoreCurrentVolume(mount.Name) {
+			continue
+		}
+		normalized := normalizeVolumeMountName(mount)
+		mount.Name = normalized
+		current[normalized] = mount
 	}
 	for _, mount := range targetMounts {
 		target[mount.Name] = mount

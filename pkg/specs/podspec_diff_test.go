@@ -22,6 +22,8 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -76,5 +78,171 @@ var _ = Describe("PodSpecDiff", func() {
 		status, diff := doContainersMatch(containerPre, containerPost)
 		Expect(status).To(BeFalse())
 		Expect(diff).To(Equal("readiness-probe"))
+	})
+})
+
+var _ = Describe("normalizeVolumeName", func() {
+	It("adds ext- prefix to image volumes without it", func() {
+		vol := corev1.Volume{
+			Name: "postgis",
+			VolumeSource: corev1.VolumeSource{
+				Image: &corev1.ImageVolumeSource{Reference: "postgis:latest"},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("ext-postgis"))
+	})
+
+	It("replaces underscores for image volumes without ext- prefix", func() {
+		vol := corev1.Volume{
+			Name: "pg_ivm",
+			VolumeSource: corev1.VolumeSource{
+				Image: &corev1.ImageVolumeSource{Reference: "pg_ivm:latest"},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("ext-pg-ivm"))
+	})
+
+	It("does not modify image volumes that already have ext- prefix", func() {
+		vol := corev1.Volume{
+			Name: "ext-postgis",
+			VolumeSource: corev1.VolumeSource{
+				Image: &corev1.ImageVolumeSource{Reference: "postgis:latest"},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("ext-postgis"))
+	})
+
+	It("adds tbs- prefix to tablespace PVC volumes without it", func() {
+		vol := corev1.Volume{
+			Name: "myts",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "pod-1-tbs-myts",
+				},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("tbs-myts"))
+	})
+
+	It("does not modify tablespace PVC volumes that already have tbs- prefix", func() {
+		vol := corev1.Volume{
+			Name: "tbs-myts",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "pod-1-tbs-myts",
+				},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("tbs-myts"))
+	})
+
+	It("does not modify system volumes", func() {
+		vol := corev1.Volume{
+			Name: "pgdata",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "pod-1",
+				},
+			},
+		}
+		Expect(normalizeVolumeName(vol)).To(Equal("pgdata"))
+	})
+})
+
+var _ = Describe("normalizeVolumeMountName", func() {
+	It("adds ext- prefix to extension mounts without it", func() {
+		mount := corev1.VolumeMount{
+			Name:      "postgis",
+			MountPath: postgres.ExtensionsBaseDirectory + "/postgis",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("ext-postgis"))
+	})
+
+	It("replaces underscores for extension mounts without ext- prefix", func() {
+		mount := corev1.VolumeMount{
+			Name:      "pg_ivm",
+			MountPath: postgres.ExtensionsBaseDirectory + "/pg_ivm",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("ext-pg-ivm"))
+	})
+
+	It("does not modify extension mounts that already have ext- prefix", func() {
+		mount := corev1.VolumeMount{
+			Name:      "ext-postgis",
+			MountPath: postgres.ExtensionsBaseDirectory + "/postgis",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("ext-postgis"))
+	})
+
+	It("adds tbs- prefix to tablespace mounts without it", func() {
+		mount := corev1.VolumeMount{
+			Name:      "myts",
+			MountPath: PgTablespaceVolumePath + "/myts",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("tbs-myts"))
+	})
+
+	It("does not modify tablespace mounts that already have tbs- prefix", func() {
+		mount := corev1.VolumeMount{
+			Name:      "tbs-myts",
+			MountPath: PgTablespaceVolumePath + "/myts",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("tbs-myts"))
+	})
+
+	It("does not modify system mounts", func() {
+		mount := corev1.VolumeMount{
+			Name:      "pgdata",
+			MountPath: "/var/lib/postgresql/data",
+		}
+		Expect(normalizeVolumeMountName(mount)).To(Equal("pgdata"))
+	})
+})
+
+var _ = Describe("compareVolumes migration", func() {
+	It("matches old unprefixed extension volume with new prefixed one", func() {
+		current := []corev1.Volume{
+			{
+				Name: "postgis",
+				VolumeSource: corev1.VolumeSource{
+					Image: &corev1.ImageVolumeSource{Reference: "postgis:latest"},
+				},
+			},
+		}
+		target := []corev1.Volume{
+			{
+				Name: "ext-postgis",
+				VolumeSource: corev1.VolumeSource{
+					Image: &corev1.ImageVolumeSource{Reference: "postgis:latest"},
+				},
+			},
+		}
+		match, _ := compareVolumes(current, target)
+		Expect(match).To(BeTrue())
+	})
+
+	It("matches old unprefixed tablespace volume with new prefixed one", func() {
+		current := []corev1.Volume{
+			{
+				Name: "myts",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1-tbs-myts",
+					},
+				},
+			},
+		}
+		target := []corev1.Volume{
+			{
+				Name: "tbs-myts",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1-tbs-myts",
+					},
+				},
+			},
+		}
+		match, _ := compareVolumes(current, target)
+		Expect(match).To(BeTrue())
 	})
 })
