@@ -164,7 +164,32 @@ func createMajorUpgradeJob(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
+	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for new major version",
+			"requestedMajor", requestedMajor)
+
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions for major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions for major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")

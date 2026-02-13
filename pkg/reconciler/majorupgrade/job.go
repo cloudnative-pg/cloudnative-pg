@@ -52,8 +52,20 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 	return "", false
 }
 
-// createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version
-func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *batchv1.Job {
+// createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version.
+// The extensions parameter specifies the new-version extensions for the main container,
+// while the init container uses old extensions from PGDataImageInfo (it runs with the old image).
+func createMajorUpgradeJobDefinition(
+	cluster *apiv1.Cluster,
+	nodeSerial int,
+	extensions []apiv1.ExtensionConfiguration,
+) *batchv1.Job {
+	// The init container runs the old image and needs old extensions
+	var oldExtensions []apiv1.ExtensionConfiguration
+	if cluster.Status.PGDataImageInfo != nil {
+		oldExtensions = cluster.Status.PGDataImageInfo.Extensions
+	}
+
 	prepareCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -66,7 +78,7 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command:         prepareCommand,
-		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster),
+		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: specs.GetSecurityContext(cluster),
 	}
@@ -78,7 +90,7 @@ func createMajorUpgradeJobDefinition(cluster *apiv1.Cluster, nodeSerial int) *ba
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand)
+	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, extensions)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 
 	return job
