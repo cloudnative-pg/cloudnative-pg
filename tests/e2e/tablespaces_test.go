@@ -977,7 +977,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 				}
 				for _, tbsConfig := range cluster.Spec.Tablespaces {
 					g.Expect(volumeNames).To(ContainElement(
-						tbsConfig.Name,
+						specs.VolumeMountNameForTablespace(tbsConfig.Name),
 					))
 					g.Expect(claimNames).To(ContainElement(
 						pod.Name + "-tbs-" + tbsConfig.Name,

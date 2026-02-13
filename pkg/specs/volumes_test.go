@@ -371,7 +371,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "fragglerock",
+				Name:             "tbs-fragglerock",
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/tablespaces/fragglerock",
 				SubPath:          "",
@@ -379,7 +379,7 @@ var _ = DescribeTable("test creation of volume mounts",
 				SubPathExpr:      "",
 			},
 			{
-				Name:             "futurama",
+				Name:             "tbs-futurama",
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/tablespaces/futurama",
 				SubPath:          "",
@@ -462,7 +462,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "fragglerock",
+				Name: "tbs-fragglerock",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1-tbs-fragglerock",
@@ -470,7 +470,7 @@ var _ = DescribeTable("test creation of volumes",
 				},
 			},
 			{
-				Name: "futurama",
+				Name: "tbs-futurama",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1-tbs-futurama",
