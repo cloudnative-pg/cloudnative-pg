@@ -12,7 +12,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
+  GOLANG_VERSION: "1.26.0"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
