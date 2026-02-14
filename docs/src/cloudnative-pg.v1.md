@@ -572,6 +572,7 @@ _Appears in:_
 | `schedulerName` _string_ | If specified, the pod will be dispatched by specified Kubernetes<br />scheduler. If not specified, the pod will be dispatched by the default<br />scheduler. More info:<br />https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/ |  |  |  |
 | `postgresUID` _integer_ | The UID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
 | `postgresGID` _integer_ | The GID of the `postgres` user inside the image, defaults to `26` |  | 26 |  |
+| `hostUsers` _boolean_ | Defines whether the pod's processes run in the host's user namespace.<br />If set to `false`, a user namespace is created for the pod and all container<br />processes run with a different UID/GID than on the host, providing additional<br />isolation. Requires Kubernetes 1.25+ with user namespace support enabled.<br />More info: https://kubernetes.io/docs/concepts/workloads/pods/user-namespaces/ |  |  |  |
 | `instances` _integer_ | Number of instances required in the cluster | True | 1 | Minimum: 1 <br /> |
 | `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
 | `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
