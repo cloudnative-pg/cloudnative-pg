@@ -154,7 +154,7 @@ func normalizeVolumeName(vol corev1.Volume) string {
 	name := vol.Name
 
 	if vol.Image != nil && !strings.HasPrefix(name, "ext-") {
-		return sanitizeExtensionNameForVolume(name)
+		return SanitizeExtensionNameForVolume(name)
 	}
 
 	if vol.PersistentVolumeClaim != nil &&
@@ -175,7 +175,7 @@ func normalizeVolumeMountName(mount corev1.VolumeMount) string {
 
 	extensionPathPrefix := postgres.ExtensionsBaseDirectory + "/"
 	if strings.HasPrefix(mount.MountPath, extensionPathPrefix) && !strings.HasPrefix(name, "ext-") {
-		return sanitizeExtensionNameForVolume(name)
+		return SanitizeExtensionNameForVolume(name)
 	}
 
 	if strings.HasPrefix(mount.MountPath, PgTablespaceVolumePath+"/") && !strings.HasPrefix(name, "tbs-") {

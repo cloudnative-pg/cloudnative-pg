@@ -628,24 +628,24 @@ var _ = Describe("ImageVolume Extensions", func() {
 
 	Context("sanitizeExtensionNameForVolume", func() {
 		It("should add ext- prefix and replace underscores with hyphens", func() {
-			Expect(sanitizeExtensionNameForVolume("pg_ivm")).To(Equal("ext-pg-ivm"))
+			Expect(SanitizeExtensionNameForVolume("pg_ivm")).To(Equal("ext-pg-ivm"))
 		})
 
 		It("should handle multiple underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("ext-my-custom-extension"))
+			Expect(SanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("ext-my-custom-extension"))
 		})
 
 		It("should add ext- prefix to names without underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("foo")).To(Equal("ext-foo"))
-			Expect(sanitizeExtensionNameForVolume("foo-bar")).To(Equal("ext-foo-bar"))
+			Expect(SanitizeExtensionNameForVolume("foo")).To(Equal("ext-foo"))
+			Expect(SanitizeExtensionNameForVolume("foo-bar")).To(Equal("ext-foo-bar"))
 		})
 
 		It("should handle mixed underscores and hyphens", func() {
-			Expect(sanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("ext-pg-foo-bar"))
+			Expect(SanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("ext-pg-foo-bar"))
 		})
 
 		It("should handle consecutive underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("pg__stat")).To(Equal("ext-pg--stat"))
+			Expect(SanitizeExtensionNameForVolume("pg__stat")).To(Equal("ext-pg--stat"))
 		})
 	})
 })

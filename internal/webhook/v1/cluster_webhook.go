@@ -2839,7 +2839,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		}
 		extensionNames.Put(v.Name)
 
-		sanitizedName := "ext-" + strings.ReplaceAll(v.Name, "_", "-")
+		sanitizedName := specs.SanitizeExtensionNameForVolume(v.Name)
 		if sanitizedVolumeNames.Has(sanitizedName) {
 			result = append(result, field.Invalid(
 				basePath.Child("name"),
