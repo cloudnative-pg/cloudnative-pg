@@ -1760,14 +1760,16 @@ func (v *ClusterCustomValidator) validateTablespaceNames(r *apiv1.Cluster) field
 	}
 
 	hasTablespace := make(map[string]bool)
+	sanitizedVolumeNames := stringset.New()
 	for idx, tbsConfig := range r.Spec.Tablespaces {
 		name := tbsConfig.Name
+		basePath := field.NewPath("spec", "tablespaces").Index(idx)
 		// NOTE: postgres identifiers are case-insensitive, so we could have
 		// different map keys (names) which are identical for PG
 		_, found := hasTablespace[strings.ToLower(name)]
 		if found {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces").Index(idx),
+				basePath,
 				name,
 				"duplicate tablespace name"))
 			continue
@@ -1776,10 +1778,21 @@ func (v *ClusterCustomValidator) validateTablespaceNames(r *apiv1.Cluster) field
 
 		if _, err := postgres.IsTablespaceNameValid(name); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces").Index(idx),
+				basePath,
 				name,
 				err.Error()))
 		}
+
+		sanitizedName := specs.VolumeMountNameForTablespace(name)
+		if sanitizedVolumeNames.Has(sanitizedName) {
+			result = append(result, field.Invalid(
+				basePath,
+				name,
+				fmt.Sprintf("tablespace name results in duplicate volume name %q after sanitization "+
+					"(special characters are converted to hyphens)", sanitizedName),
+			))
+		}
+		sanitizedVolumeNames.Put(sanitizedName)
 	}
 	return result
 }
@@ -2826,7 +2839,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		}
 		extensionNames.Put(v.Name)
 
-		sanitizedName := strings.ReplaceAll(v.Name, "_", "-")
+		sanitizedName := specs.SanitizeExtensionNameForVolume(v.Name)
 		if sanitizedVolumeNames.Has(sanitizedName) {
 			result = append(result, field.Invalid(
 				basePath.Child("name"),
