@@ -321,12 +321,9 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
-// sanitizeExtensionNameForVolume produces a Kubernetes-compliant volume name
-// for an extension. It adds an "ext-" prefix to avoid collisions with system
-// volume names (e.g. pgdata, shm, pg-wal) and replaces underscores with
-// hyphens to comply with RFC 1123 DNS label requirements.
-// The mount path preserves the original extension name.
-func sanitizeExtensionNameForVolume(extensionName string) string {
+// SanitizeExtensionNameForVolume returns a prefixed, RFC 1123 compliant
+// volume name for an extension.
+func SanitizeExtensionNameForVolume(extensionName string) string {
 	return "ext-" + strings.ReplaceAll(extensionName, "_", "-")
 }
 
@@ -335,7 +332,7 @@ func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
-				Name: sanitizeExtensionNameForVolume(extension.Name),
+				Name: SanitizeExtensionNameForVolume(extension.Name),
 				VolumeSource: corev1.VolumeSource{
 					Image: &extension.ImageVolumeSource,
 				},
@@ -351,7 +348,7 @@ func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
-				Name:      sanitizeExtensionNameForVolume(extension.Name),
+				Name:      SanitizeExtensionNameForVolume(extension.Name),
 				MountPath: filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name),
 			},
 		)

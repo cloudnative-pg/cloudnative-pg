@@ -31,6 +31,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -75,7 +76,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 
 	assertVolumeMounts := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
-		volumeName := "ext-" + strings.ReplaceAll(imageVolumeExtension, "_", "-")
+		volumeName := specs.SanitizeExtensionNameForVolume(imageVolumeExtension)
 		mountPath := filepath.Join(postgres.ExtensionsBaseDirectory, imageVolumeExtension)
 		for _, pod := range podList.Items {
 			for _, volumeMount := range pod.Spec.Containers[0].VolumeMounts {
@@ -89,7 +90,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 
 	assertVolumes := func(podList *corev1.PodList, imageVolumeExtension string) {
 		found := false
-		volumeName := "ext-" + strings.ReplaceAll(imageVolumeExtension, "_", "-")
+		volumeName := specs.SanitizeExtensionNameForVolume(imageVolumeExtension)
 		for _, pod := range podList.Items {
 			for _, volume := range pod.Spec.Volumes {
 				if volume.Name == volumeName && volume.Image.Reference != "" {
