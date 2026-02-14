@@ -1573,3 +1573,16 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
+
+// ShouldPausePoolersDuringSwitchover returns whether poolers should be paused during switchover
+func (c *ClusterSpec) ShouldPausePoolersDuringSwitchover() bool {
+	return c.Pooler != nil && c.Pooler.PauseDuringSwitchover != nil && *c.Pooler.PauseDuringSwitchover
+}
+
+// GetPoolerPauseDuringSwitchoverTimeout returns the configured timeout or default (120s)
+func (c *ClusterSpec) GetPoolerPauseDuringSwitchoverTimeout() time.Duration {
+	if c.Pooler != nil && c.Pooler.PauseDuringSwitchoverTimeout != nil {
+		return c.Pooler.PauseDuringSwitchoverTimeout.Duration
+	}
+	return 120 * time.Second
+}
