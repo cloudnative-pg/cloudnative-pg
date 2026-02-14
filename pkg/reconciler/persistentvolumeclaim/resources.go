@@ -76,6 +76,19 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
+// isFileSystemResizePending returns true if PersistentVolumeClaimFileSystemResizePending condition is present.
+// This condition indicates the volume has been resized at the storage layer but the filesystem
+// resize is pending - it requires a pod to mount the volume to complete the resize.
+func isFileSystemResizePending(pvc corev1.PersistentVolumeClaim) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
+			return true
+		}
+	}
+
+	return false
+}
+
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
 func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
 	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
