@@ -191,6 +191,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateResources,
 		v.validateHibernationAnnotation,
 		v.validatePodPatchAnnotation,
+		v.validateJobPatchAnnotation,
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
@@ -2725,6 +2726,25 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
 				jsonPatch,
 				fmt.Sprintf("jsonpatch doesn't apply cleanly to the pod: %s", err.Error()),
+			),
+		}
+	}
+
+	return nil
+}
+
+func (v *ClusterCustomValidator) validateJobPatchAnnotation(r *apiv1.Cluster) field.ErrorList {
+	jsonPatch, ok := r.Annotations[utils.JobPatchAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	if _, err := jsonpatch.DecodePatch([]byte(jsonPatch)); err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.JobPatchAnnotationName),
+				jsonPatch,
+				fmt.Sprintf("error decoding JSON patch: %s", err.Error()),
 			),
 		}
 	}
