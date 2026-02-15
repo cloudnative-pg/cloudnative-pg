@@ -4382,7 +4382,7 @@ spec:
                             type: string
                           type: array
                         image:
-                          description: The image containing the extension, required
+                          description: The image containing the extension.
                           properties:
                             pullPolicy:
                               description: |-
@@ -4402,9 +4402,6 @@ spec:
                                 container images in workload controllers like Deployments and StatefulSets.
                               type: string
                           type: object
-                          x-kubernetes-validations:
-                          - message: An image reference is required
-                            rule: has(self.reference)
                         ld_library_path:
                           description: The list of directories inside the image which
                             should be added to ld_library_path.
@@ -4417,10 +4414,12 @@ spec:
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
                       required:
-                      - image
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   ldap:
                     description: Options to specify LDAP configuration
                     properties:
@@ -6984,6 +6983,64 @@ spec:
                 description: PGDataImageInfo contains the details of the latest image
                   that has run on the current data directory.
                 properties:
+                  extensions:
+                    description: Extensions contains the container image extensions
+                      available for the current Image
+                    items:
+                      description: |-
+                        ExtensionConfiguration is the configuration used to add
+                        PostgreSQL extensions to the Cluster.
+                      properties:
+                        dynamic_library_path:
+                          description: |-
+                            The list of directories inside the image which should be added to dynamic_library_path.
+                            If not defined, defaults to "/lib".
+                          items:
+                            type: string
+                          type: array
+                        extension_control_path:
+                          description: |-
+                            The list of directories inside the image which should be added to extension_control_path.
+                            If not defined, defaults to "/share".
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: The image containing the extension.
+                          properties:
+                            pullPolicy:
+                              description: |-
+                                Policy for pulling OCI objects. Possible values are:
+                                Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+                                Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+                                IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+                                Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+                              type: string
+                            reference:
+                              description: |-
+                                Required: Image or artifact reference to be used.
+                                Behaves in the same way as pod.spec.containers[*].image.
+                                Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+                                More info: https://kubernetes.io/docs/concepts/containers/images
+                                This field is optional to allow higher level config management to default or override
+                                container images in workload controllers like Deployments and StatefulSets.
+                              type: string
+                          type: object
+                        ld_library_path:
+                          description: The list of directories inside the image which
+                            should be added to ld_library_path.
+                          items:
+                            type: string
+                          type: array
+                        name:
+                          description: The name of the extension, required
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
                   image:
                     description: Image is the image name
                     type: string
