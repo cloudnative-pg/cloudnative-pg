@@ -261,6 +261,66 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	}
 }
 
+// GetCrossNamespaceDatabaseRoleName returns the name of the ClusterRole
+// used for cross-namespace Database access
+func GetCrossNamespaceDatabaseRoleName(cluster apiv1.Cluster) string {
+	return "cnpg-" + cluster.Namespace + "-" + cluster.Name + "-cross-ns-db"
+}
+
+// CreateCrossNamespaceDatabaseRole creates a ClusterRole with the permissions
+// needed by the instance manager to manage Database resources from any namespace
+func CreateCrossNamespaceDatabaseRole(cluster apiv1.Cluster) rbacv1.ClusterRole {
+	return rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: GetCrossNamespaceDatabaseRoleName(cluster),
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.ClusterNamespaceLabelName:       cluster.Namespace,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"postgresql.cnpg.io"},
+				Resources: []string{"databases"},
+				Verbs:     []string{"get", "update", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"postgresql.cnpg.io"},
+				Resources: []string{"databases/status"},
+				Verbs:     []string{"get", "patch", "update"},
+			},
+		},
+	}
+}
+
+// CreateCrossNamespaceDatabaseRoleBinding creates a ClusterRoleBinding that binds
+// the cross-namespace Database ClusterRole to the cluster's ServiceAccount
+func CreateCrossNamespaceDatabaseRoleBinding(cluster apiv1.Cluster) rbacv1.ClusterRoleBinding {
+	return rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: GetCrossNamespaceDatabaseRoleName(cluster),
+			Labels: map[string]string{
+				utils.ClusterLabelName:                cluster.Name,
+				utils.ClusterNamespaceLabelName:       cluster.Namespace,
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      cluster.Name,
+				Namespace: cluster.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     GetCrossNamespaceDatabaseRoleName(cluster),
+		},
+	}
+}
+
 func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	involvedSecretNames := []string{
 		cluster.GetReplicationSecretName(),
