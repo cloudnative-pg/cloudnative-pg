@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -51,6 +52,129 @@ type fakeInstanceData struct {
 func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
 	return f.db, nil
 }
+
+// mockInstanceForStart implements instanceInterface with controllable IsPrimary behavior.
+// isPrimaryChecked is signaled each time IsPrimary is called inside the goroutine loop,
+// allowing tests to synchronize on trigger processing without time.Sleep.
+type mockInstanceForStart struct {
+	isPrimaryVal     atomic.Bool
+	syncChan         chan *apiv1.ManagedConfiguration
+	isPrimaryChecked chan struct{}
+	isReadyCalls     atomic.Int32
+}
+
+func (m *mockInstanceForStart) GetSuperUserDB() (*sql.DB, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockInstanceForStart) IsPrimary() (bool, error) {
+	result := m.isPrimaryVal.Load()
+	if m.isPrimaryChecked != nil {
+		select {
+		case m.isPrimaryChecked <- struct{}{}:
+		default:
+		}
+	}
+	return result, nil
+}
+
+func (m *mockInstanceForStart) RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration {
+	return m.syncChan
+}
+
+func (m *mockInstanceForStart) IsReady() error {
+	m.isReadyCalls.Add(1)
+	return fmt.Errorf("not ready")
+}
+
+func (m *mockInstanceForStart) GetClusterName() string {
+	return "test-cluster"
+}
+
+func (m *mockInstanceForStart) GetNamespaceName() string {
+	return "default"
+}
+
+var _ = Describe("RoleSynchronizer Start", func() {
+	It("should return nil when context is cancelled", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration)
+		instance := &mockInstanceForStart{syncChan: syncChan}
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- sr.Start(ctx)
+		}()
+
+		// Ensure Start is blocking (not returning immediately)
+		Consistently(errCh, 200*time.Millisecond).ShouldNot(Receive())
+
+		cancel()
+
+		var startErr error
+		Eventually(errCh).Should(Receive(&startErr))
+		Expect(startErr).ToNot(HaveOccurred())
+	})
+
+	It("should skip reconciliation on non-primary instances", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		// isPrimaryVal defaults to false (zero value of atomic.Bool)
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		// Send a trigger with a valid config
+		syncChan <- &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+
+		// Wait for IsPrimary to be checked (confirms the trigger was processed)
+		Eventually(isPrimaryChecked).Should(Receive())
+
+		// Verify reconcile was NOT called (IsReady is the first call in reconcile)
+		Expect(instance.isReadyCalls.Load()).To(BeEquivalentTo(0))
+	})
+
+	It("should attempt reconciliation on primary instances", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		instance.isPrimaryVal.Store(true)
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		// Send a trigger with a valid config
+		syncChan <- &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+
+		// Wait for IsPrimary to be checked
+		Eventually(isPrimaryChecked).Should(Receive())
+
+		// Verify reconcile WAS called (IsReady is the first call in reconcile)
+		Eventually(func() int32 {
+			return instance.isReadyCalls.Load()
+		}).Should(BeEquivalentTo(1))
+	})
+})
 
 var _ = Describe("Role synchronizer tests", func() {
 	var (

@@ -83,14 +83,7 @@ func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *Rol
 func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Info("starting up the runnable")
-	isPrimary, err := sr.instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-	if !isPrimary {
-		contextLog.Info("skipping the RoleSynchronizer in replicas")
-		<-ctx.Done()
-	}
+
 	go func() {
 		var config *apiv1.ManagedConfiguration
 		contextLog.Info("setting up RoleSynchronizer loop")
@@ -113,7 +106,21 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 				continue
 			}
 
-			err := sr.reconcile(ctx, config)
+			// Only reconcile roles on primaries. Replicas and designated
+			// primaries must not write to the database. This check is
+			// evaluated on each trigger so that a promoted instance
+			// starts reconciling without requiring a pod restart.
+			isPrimary, err := sr.instance.IsPrimary()
+			if err != nil {
+				contextLog.Error(err, "checking primary status")
+				continue
+			}
+			if !isPrimary {
+				contextLog.Debug("skipping role reconciliation on a non-primary instance")
+				continue
+			}
+
+			err = sr.reconcile(ctx, config)
 			if err != nil {
 				contextLog.Error(err, "synchronizing roles", "config", config)
 				continue
