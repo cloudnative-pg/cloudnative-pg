@@ -743,9 +743,9 @@ func updateClusterWithSnapshotsBackupTimes(
 	namespace string,
 	name string,
 ) error {
-	wrapErr := func(msg string, err error) error {
-		return fmt.Errorf("in updateFirstRecoverabilityPont, %s: %w", msg, err)
-	}
+	       wrapErr := func(msg string, err error) error {
+		       return fmt.Errorf("updateClusterWithSnapshotsBackupTimes: %s: %w", msg, err)
+	       }
 
 	// refresh the cluster, as this function will get called after the backup
 	// has finished, potentially a long time
