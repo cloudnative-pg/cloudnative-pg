@@ -254,33 +254,39 @@ TODO
 
 TODO
 
+
 What happens if all nodes of PostgreSQL have a failure?
 
-TODO
+If all PostgreSQL nodes in a CloudNativePG cluster fail, the operator will continuously attempt to recover the cluster based on the defined Kubernetes resources and available persistent volumes. If the underlying storage (PersistentVolumeClaims) is intact, new pods will be scheduled and PostgreSQL will recover using the existing data. If the storage is lost, recovery will depend on the availability of backups (physical or logical) configured for the cluster. It is strongly recommended to set up regular backups and test restore procedures to ensure business continuity in such scenarios.
 
 ## Backup and restore
 
+
 Does CloudNativePG support logical backups with pg_dump?
 
-TODO
+Yes, CloudNativePG supports logical backups using standard PostgreSQL tools such as pg_dump and pg_dumpall. You can run these tools against your PostgreSQL cluster as you would with any native PostgreSQL installation. For automated or scheduled logical backups, consider running pg_dump in a Kubernetes Job or using an external backup management tool.
 
-What is the recommended setup for the best outcomes in terms of disaster
-recovery?
 
-TODO
+What is the recommended setup for the best outcomes in terms of disaster recovery?
 
-What happens if the Kubernetes cluster where I was running PostgreSQL is
-permanently gone?
+For optimal disaster recovery, it is recommended to:
+- Enable continuous physical backups using CloudNativePG's built-in backup features.
+- Schedule regular logical backups with pg_dump for additional safety.
+- Store backups in a remote, durable object storage (such as S3, GCS, or Azure Blob Storage).
+- Regularly test your restore procedures to ensure backups are valid and recovery is possible.
 
-TODO
+
+What happens if the Kubernetes cluster where I was running PostgreSQL is permanently gone?
+
+If the Kubernetes cluster is permanently lost, you can recover your PostgreSQL data by creating a new CloudNativePG cluster in a new Kubernetes environment and restoring from your most recent backup. Ensure that your backup storage is external to the lost cluster (e.g., cloud object storage) so it remains accessible for recovery.
 
 
 ## Miscellaneous
 
-**What are the Kubernetes distributions that CloudNativePG
-supports? What's the rationale behind this decision?**
 
-TODO
+**What are the Kubernetes distributions that CloudNativePG supports? What's the rationale behind this decision?**
+
+CloudNativePG is tested and supported on major Kubernetes distributions, including upstream Kubernetes, Red Hat OpenShift, and Rancher. The rationale is to ensure compatibility with widely used, CNCF-compliant platforms, providing flexibility and reliability for users in different environments.
 
 **Are there performance tests or values for large environments (e.g. \>
 4 TB/256 GB/64 cores) ?**
