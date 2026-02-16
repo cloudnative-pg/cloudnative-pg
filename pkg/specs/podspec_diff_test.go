@@ -246,3 +246,39 @@ var _ = Describe("compareVolumes migration", func() {
 		Expect(match).To(BeTrue())
 	})
 })
+
+var _ = Describe("compareVolumeMounts migration", func() {
+	It("matches old unprefixed extension mount with new prefixed one", func() {
+		current := []corev1.VolumeMount{
+			{
+				Name:      "postgis",
+				MountPath: postgres.ExtensionsBaseDirectory + "/postgis",
+			},
+		}
+		target := []corev1.VolumeMount{
+			{
+				Name:      "ext-postgis",
+				MountPath: postgres.ExtensionsBaseDirectory + "/postgis",
+			},
+		}
+		match, _ := compareVolumeMounts(current, target)
+		Expect(match).To(BeTrue())
+	})
+
+	It("matches old unprefixed tablespace mount with new prefixed one", func() {
+		current := []corev1.VolumeMount{
+			{
+				Name:      "myts",
+				MountPath: PgTablespaceVolumePath + "/myts",
+			},
+		}
+		target := []corev1.VolumeMount{
+			{
+				Name:      "tbs-myts",
+				MountPath: PgTablespaceVolumePath + "/myts",
+			},
+		}
+		match, _ := compareVolumeMounts(current, target)
+		Expect(match).To(BeTrue())
+	})
+})

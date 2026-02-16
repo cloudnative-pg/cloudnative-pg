@@ -149,6 +149,11 @@ func shouldIgnoreCurrentVolume(name string) bool {
 // scheme (ext- for extensions, tbs- for tablespaces) to avoid spurious
 // pod restarts on upgrade.
 //
+// NOTE: extensions named "ext_*" or tablespaces named "tbs_*" will have
+// old sanitized names that already start with "ext-" or "tbs-", causing
+// this function to skip normalization. This results in one spurious pod
+// restart for the affected cluster on the first reconciliation after upgrade.
+//
 // TODO: delete this function after minor version 1.28 is discontinued
 func normalizeVolumeName(vol corev1.Volume) string {
 	name := vol.Name
@@ -167,7 +172,8 @@ func normalizeVolumeName(vol corev1.Volume) string {
 }
 
 // normalizeVolumeMountName maps old unprefixed volume mount names to the new
-// prefixed scheme based on mount path.
+// prefixed scheme based on mount path. See normalizeVolumeName for known
+// limitations with "ext_*" and "tbs_*" naming patterns.
 //
 // TODO: delete this function after minor version 1.28 is discontinued
 func normalizeVolumeMountName(mount corev1.VolumeMount) string {
