@@ -1045,9 +1045,11 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	// a real primary would, triggering an in-place restart.
 	isDesignatedPrimary := cluster.IsReplica() &&
 		cluster.Status.CurrentPrimary == r.instance.GetPodName()
-	isPrimaryLike := status.IsPrimary || isDesignatedPrimary
+	// Determine the local acting primary instance in cluster, which is either
+	// the real primary or a designated primary
+	isActingPrimary := status.IsPrimary || isDesignatedPrimary
 
-	if isPrimaryLike && status.PendingRestartForDecrease {
+	if isActingPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
 			return r.triggerRestartForDecrease(ctx, cluster)
 		}
@@ -1060,7 +1062,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	}
 	if phase == apiv1.PhaseApplyingConfiguration &&
 		(cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
-			(isPrimaryLike && cluster.Spec.Instances > 1)) {
+			(isActingPrimary && cluster.Spec.Instances > 1)) {
 		// I'm not the first instance spotting the configuration
 		// change, everything is fine and there is no need to signal
 		// the operator again.
