@@ -111,9 +111,9 @@ func (f *fakeReconcilerHooksClient) set(d *fakeConnection) {
 
 var _ = Describe("reconcilerHook", func() {
 	var (
-		ctx           context.Context
-		plugins       []connection.Interface
-		cluster       k8client.Object
+		ctx            context.Context
+		plugins        []connection.Interface
+		cluster        k8client.Object
 		executePreHook = func(
 			ctx context.Context,
 			plugin reconciler.ReconcilerHooksClient,
