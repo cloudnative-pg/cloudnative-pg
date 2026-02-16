@@ -37,8 +37,6 @@ NODES=${NODES:-3}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 ENABLE_FLUENTD=${ENABLE_FLUENTD:-false}
 
-TEMP_DIR_LOCAL="$(mktemp -d)"
-trap 'rm -fr ${TEMP_DIR_LOCAL}' EXIT
 # --------------------------------------------------------
 
 # --- K3D HELPER FUNCTIONS ---

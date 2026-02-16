@@ -174,7 +174,7 @@ function deploy_csi_host_path() {
   # --- 3. Install Driver and Plugin ---
 
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
-  local plugin_file="${TEMP_DIR_LOCAL}/csi-hostpath-plugin.yaml"
+  local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
   curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
