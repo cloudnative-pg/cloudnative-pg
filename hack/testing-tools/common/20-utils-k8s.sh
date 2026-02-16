@@ -229,7 +229,7 @@ function deploy_fluentd() {
   docker pull "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
   # shellcheck disable=SC2153
-  load_image_kind "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
+  "load_image_${CLUSTER_ENGINE}" "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
 
   "${K8S_CLI}" apply -f "${E2E_DIR}/local-fluentd.yaml"
 
