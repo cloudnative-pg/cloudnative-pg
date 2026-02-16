@@ -111,18 +111,23 @@ func (f *fakeReconcilerHooksClient) set(d *fakeConnection) {
 
 var _ = Describe("reconcilerHook", func() {
 	var (
-		ctx     context.Context
-		d       *data
-		cluster k8client.Object
+		ctx           context.Context
+		plugins       []connection.Interface
+		cluster       k8client.Object
+		executePreHook = func(
+			ctx context.Context,
+			plugin reconciler.ReconcilerHooksClient,
+			request *reconciler.ReconcilerHooksRequest,
+		) (*reconciler.ReconcilerHooksResult, error) {
+			return plugin.Pre(ctx, request)
+		}
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		d = &data{
-			plugins: []connection.Interface{
-				&fakeConnection{
-					name: "test",
-				},
+		plugins = []connection.Interface{
+			&fakeConnection{
+				name: "test",
 			},
 		}
 
@@ -145,9 +150,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeFalse())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal(cnpgOperatorKey))
@@ -160,9 +165,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeTrue())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal("test"))
@@ -175,10 +180,10 @@ var _ = Describe("reconcilerHook", func() {
 			10,
 			nil,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
-		Expect(result.StopReconciliation).To(BeTrue())	
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
+		Expect(result.StopReconciliation).To(BeTrue())
 		Expect(result.Result.RequeueAfter.Seconds()).To(BeEquivalentTo(10))
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal("test"))
@@ -192,16 +197,16 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			expectedErr,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeTrue())
 		Expect(result.Err).To(HaveOccurred())
 		Expect(result.Identifier).To(Equal("test"))
 	})
 
 	It("should process multiple plugins when all return CONTINUE", func() {
-		d.plugins = []connection.Interface{
+		plugins = []connection.Interface{
 			&fakeConnection{name: "plugin-1"},
 			&fakeConnection{name: "plugin-2"},
 			&fakeConnection{name: "plugin-3"},
@@ -213,7 +218,7 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f1.set(d.plugins[0].(*fakeConnection))
+		f1.set(plugins[0].(*fakeConnection))
 
 		f2 := newFakeReconcilerHooksClient(
 			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
@@ -221,7 +226,7 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f2.set(d.plugins[1].(*fakeConnection))
+		f2.set(plugins[1].(*fakeConnection))
 
 		f3 := newFakeReconcilerHooksClient(
 			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
@@ -229,9 +234,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f3.set(d.plugins[2].(*fakeConnection))
+		f3.set(plugins[2].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeFalse())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal(cnpgOperatorKey))
@@ -241,7 +246,7 @@ var _ = Describe("reconcilerHook", func() {
 	})
 
 	It("should stop at second plugin when it returns TERMINATE after first returns CONTINUE", func() {
-		d.plugins = []connection.Interface{
+		plugins = []connection.Interface{
 			&fakeConnection{name: "plugin-1"},
 			&fakeConnection{name: "plugin-2"},
 			&fakeConnection{name: "plugin-3"},
@@ -253,7 +258,7 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f1.set(d.plugins[0].(*fakeConnection))
+		f1.set(plugins[0].(*fakeConnection))
 
 		f2 := newFakeReconcilerHooksClient(
 			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
@@ -261,7 +266,7 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f2.set(d.plugins[1].(*fakeConnection))
+		f2.set(plugins[1].(*fakeConnection))
 
 		f3 := newFakeReconcilerHooksClient(
 			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
@@ -269,9 +274,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f3.set(d.plugins[2].(*fakeConnection))
+		f3.set(plugins[2].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeTrue())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal("plugin-2"))
@@ -281,7 +286,7 @@ var _ = Describe("reconcilerHook", func() {
 	})
 
 	It("should skip plugins without the required capability", func() {
-		d.plugins = []connection.Interface{
+		plugins = []connection.Interface{
 			&fakeConnection{name: "plugin-without-capability"},
 			&fakeConnection{name: "plugin-with-capability"},
 		}
@@ -292,7 +297,7 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f1.set(d.plugins[0].(*fakeConnection))
+		f1.set(plugins[0].(*fakeConnection))
 
 		f2 := newFakeReconcilerHooksClient(
 			[]reconciler.ReconcilerHooksCapability_Kind{reconciler.ReconcilerHooksCapability_KIND_CLUSTER},
@@ -300,9 +305,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f2.set(d.plugins[1].(*fakeConnection))
+		f2.set(plugins[1].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, cluster)
+		result := reconcilerHook(ctx, cluster, cluster, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeFalse())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal(cnpgOperatorKey))
@@ -328,9 +333,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, backup)
+		result := reconcilerHook(ctx, cluster, backup, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeFalse())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal(cnpgOperatorKey))
@@ -354,9 +359,9 @@ var _ = Describe("reconcilerHook", func() {
 			0,
 			nil,
 		)
-		f.set(d.plugins[0].(*fakeConnection))
+		f.set(plugins[0].(*fakeConnection))
 
-		result := d.PreReconcile(ctx, cluster, pod)
+		result := reconcilerHook(ctx, cluster, pod, plugins, executePreHook)
 		Expect(result.StopReconciliation).To(BeFalse())
 		Expect(result.Err).ToNot(HaveOccurred())
 		Expect(result.Identifier).To(Equal(cnpgOperatorKey))
