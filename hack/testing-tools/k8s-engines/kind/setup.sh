@@ -37,8 +37,6 @@ NODES=${NODES:-3}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 ENABLE_FLUENTD=${ENABLE_FLUENTD:-false}
 
-TEMP_DIR_LOCAL="$(mktemp -d)"
-trap 'rm -fr ${TEMP_DIR_LOCAL}' EXIT
 # --------------------------------------------------------
 
 # --- KIND HELPER FUNCTIONS ---
@@ -56,7 +54,7 @@ function create_cluster_kind() {
   local cluster_name=$2
 
   # Generate Kind cluster configuration
-  config_file="${TEMP_DIR_LOCAL}/kind-config.yaml"
+  config_file="${TEMP_DIR}/kind-config.yaml"
   cat >"${config_file}" <<-EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
