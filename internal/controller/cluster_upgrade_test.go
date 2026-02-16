@@ -989,8 +989,8 @@ var _ = Describe("Supervised primary update strategy and rollout slots", func() 
 	buildPodListWithPrimaryNeedingRollout := func(cluster *apiv1.Cluster) *postgres.PostgresqlStatusList {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-cluster-1",
-				Namespace: namespace,
+				Name:      cluster.Status.CurrentPrimary,
+				Namespace: cluster.Namespace,
 				Annotations: map[string]string{
 					utils.ClusterSerialAnnotationName: "1",
 				},
