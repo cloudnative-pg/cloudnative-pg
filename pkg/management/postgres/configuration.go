@@ -440,7 +440,8 @@ func createPostgresqlConfiguration(
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
-	if isSynchronizeLogicalDecodingEnabled(cluster) {
+	if cluster.Spec.ReplicationSlots != nil &&
+		cluster.Spec.ReplicationSlots.HighAvailability.GetSynchronizeLogicalDecoding() {
 		slots := make([]string, 0, len(cluster.Status.InstanceNames)-1)
 		for _, instanceName := range cluster.Status.InstanceNames {
 			if instanceName == cluster.Status.CurrentPrimary {
@@ -458,13 +459,6 @@ func createPostgresqlConfiguration(
 
 	file, sha := postgres.CreatePostgresqlConfFile(config)
 	return file, sha, nil
-}
-
-func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
-	return cluster.Spec.ReplicationSlots != nil &&
-		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
-		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
-		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import

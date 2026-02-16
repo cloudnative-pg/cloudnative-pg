@@ -324,6 +324,17 @@ func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
 	return true
 }
 
+// GetSynchronizeLogicalDecoding returns true if logical slot synchronization is configured.
+// This requires both HighAvailability slots to be enabled and SynchronizeLogicalDecoding
+// to be set to true. When true on PostgreSQL 17+, the cluster is configured for native
+// slot synchronization from primary to standbys.
+func (r *ReplicationSlotsHAConfiguration) GetSynchronizeLogicalDecoding() bool {
+	if r == nil {
+		return false
+	}
+	return r.GetEnabled() && r.SynchronizeLogicalDecoding
+}
+
 // ToPostgreSQLConfigurationKeyword returns the contained value as a valid PostgreSQL parameter to be injected
 // in the 'synchronous_standby_names' field
 func (s SynchronousReplicaConfigurationMethod) ToPostgreSQLConfigurationKeyword() string {
