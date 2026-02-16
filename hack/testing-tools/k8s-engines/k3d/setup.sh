@@ -40,13 +40,7 @@ ENABLE_FLUENTD=${ENABLE_FLUENTD:-false}
 # --------------------------------------------------------
 
 # --- K3D HELPER FUNCTIONS ---
-
-# load_image_k3d: Loads a Docker image directly into the K3D cluster nodes.
-function load_image_k3d() {
-  local cluster_name=$1
-  local image=$2
-  k3d image import "${image}" -c "${cluster_name}"
-}
+source "${DIR}/load-helper-images.sh"
 
 # create_cluster_k3d: Generates the config file and creates the K3D cluster.
 function create_cluster_k3d() {
@@ -55,6 +49,10 @@ function create_cluster_k3d() {
 
   local latest_k3s_tag
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
+  if [[ -z "${latest_k3s_tag}" ]]; then
+    echo "ERROR: No k3s image found for version ${k8s_version}" >&2
+    exit 1
+  fi
 
   local options=()
   local config_file="${TEMP_DIR}/k3d-registries.yaml"
@@ -65,15 +63,15 @@ mirrors:
     - http://${registry_name}:5000
 EOF
 
-if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-  cat >>"${config_file}" <<-EOF
+  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+    cat >>"${config_file}" <<-EOF
   "docker.io":
     endpoint:
       - "${DOCKER_REGISTRY_MIRROR}"
 EOF
-fi
+  fi
 
-options+=(--registry-config "${config_file}")
+  options+=(--registry-config "${config_file}")
 
   local agents=()
   if [ "$NODES" -gt 1 ]; then

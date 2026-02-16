@@ -40,13 +40,7 @@ ENABLE_FLUENTD=${ENABLE_FLUENTD:-false}
 # --------------------------------------------------------
 
 # --- KIND HELPER FUNCTIONS ---
-
-# load_image_kind: Loads a Docker image directly into the Kind cluster nodes.
-function load_image_kind() {
-  local cluster_name=$1
-  local image=$2
-  kind load -v 1 docker-image --name "${cluster_name}" "${image}"
-}
+source "${DIR}/load-helper-images.sh"
 
 # create_cluster_kind: Generates the config file and creates the Kind cluster.
 function create_cluster_kind() {

@@ -23,23 +23,6 @@
 
 # --- COMMON IMAGE AND VERSION DEFAULTS ---
 
-# TODO: understand whether the following lines are still required,
-#       or the settings.sh files are enough to store versions and
-#       defaults for different kubernetes engines.
-#       E.g.: hack/testing-tools/k8s-engines/k3d/settings.sh
-
-## renovate: datasource=docker depName=kindest/node
-#KIND_NODE_DEFAULT_VERSION=v1.35.0
-## renovate: datasource=docker depName=k3d/node
-#K3D_NODE_DEFAULT_VERSION=1.32.11
-#
-#case "${CLUSTER_ENGINE}" in
-#    kind) export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION} ;;
-#    k3d) export K8S_VERSION=${K8S_VERSION:-$K3D_NODE_DEFAULT_VERSION} ;;
-#esac
-#
-#export KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
-
 # Defines the default cluster name based on the Kubernetes version.
 export CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
 
