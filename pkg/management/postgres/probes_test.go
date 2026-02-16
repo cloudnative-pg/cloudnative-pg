@@ -65,7 +65,7 @@ var _ = Describe("updateResultForDecrease", func() {
 	decreasedSettingsQuery := regexp.QuoteMeta(
 		`SELECT pending_settings.name, CAST(coalesce(new_setting,default_setting) AS INTEGER) as new_setting`)
 
-	Context("when there are no decreased sensible settings", func() {
+	Context("when there are no decreased standby-sensitive settings", func() {
 		It("should not modify the result", func() {
 			db, mock, err := sqlmock.New()
 			Expect(err).ToNot(HaveOccurred())
