@@ -65,7 +65,7 @@ Commands:
 
 Options:
     -e|--engine
-        <CLUSTER_ENGINE>  Specify the kuberentes cluster's engine to run. Current
+        <CLUSTER_ENGINE>  Specify the kubernetes cluster's engine to run. Current
                           available options are 'kind' and 'k3d'. Default: 'kind'.
                           Env: CLUSTER_ENGINE
 

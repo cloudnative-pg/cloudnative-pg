@@ -60,6 +60,7 @@ VENDOR="${CLUSTER_ENGINE:-kind}"
 if [[ "${CLUSTER_ENGINE}" != "kind" ]] && [[ "${CLUSTER_ENGINE}" != "k3d" ]]
 then
     echo "ERROR: Cluster engine ${CLUSTER_ENGINE} not supported!" >&2
+    exit 1
 fi
 
 export CLUSTER_ENGINE

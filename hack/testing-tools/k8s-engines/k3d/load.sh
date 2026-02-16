@@ -23,7 +23,7 @@ set -eEuo pipefail
 
 # This script is sourced by manage.sh. It assumes common helpers are loaded.
 
-# The Kind-specific loader function, executed by manage.sh
+# The K3D-specific loader function, executed by manage.sh
 function load_operator_image_vendor_specific() {
   # Execute the generic build and push to the local registry
   build_and_load_operator_image_from_sources
