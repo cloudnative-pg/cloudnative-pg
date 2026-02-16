@@ -55,6 +55,30 @@ func ReconcileReplicationSlots(
 		return dropReplicationSlots(ctx, db, cluster, isPrimary)
 	}
 
+	// Clean up orphaned logical slots on replicas when synchronizeLogicalDecoding is enabled.
+	// After switchover, a former primary retains its locally-created logical slots (synced=false).
+	// PostgreSQL's slot sync worker cannot overwrite these slots because slots with synced=false
+	// are considered locally-owned and read-only to the sync process. We must drop them so
+	// the sync worker can recreate them with synced=true.
+	if !isPrimary && cluster.Spec.ReplicationSlots.HighAvailability.GetSynchronizeLogicalDecoding() {
+		contextLogger := log.FromContext(ctx)
+		pgMajor, err := cluster.GetPostgresqlMajorVersion()
+		if err != nil {
+			// Log with full context to help debugging. Orphaned slots won't be cleaned up
+			// until this is resolved, but we continue reconciliation to avoid blocking
+			// other slot management operations.
+			contextLogger.Warning("Unable to retrieve PostgreSQL major version for logical slot cleanup; "+
+				"orphaned slots will not be cleaned up until this is resolved",
+				"clusterName", cluster.Name,
+				"imageName", cluster.Spec.ImageName,
+				"err", err)
+		} else if pgMajor >= 17 {
+			if err := cleanupOrphanedLogicalSlots(ctx, db); err != nil {
+				return reconcile.Result{}, fmt.Errorf("cleaning up orphaned logical slots: %w", err)
+			}
+		}
+	}
+
 	if isPrimary {
 		return reconcilePrimaryHAReplicationSlots(ctx, db, cluster)
 	}
@@ -183,4 +207,60 @@ func dropReplicationSlots(
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// cleanupOrphanedLogicalSlots removes orphaned failover-enabled logical slots.
+// This function should only be called on PostgreSQL 17+ replicas.
+//
+// An orphaned failover slot is one where:
+// - synced=false: It was created locally (when this instance was primary)
+// - failover=true: It was configured for failover synchronization
+// - active=false: No consumer is connected (required to drop)
+//
+// After a switchover, the demoted primary retains its locally-created failover slots.
+// PostgreSQL's slot sync worker cannot overwrite these because synced=false slots
+// are read-only to the sync process. We drop them so the sync worker can recreate
+// them with synced=true.
+//
+// We specifically require failover=true to avoid dropping legitimate external
+// subscription slots (like those created by pg_createsubscription), which have
+// failover=false and should not be touched.
+func cleanupOrphanedLogicalSlots(ctx context.Context, db *sql.DB) error {
+	contextLog := log.FromContext(ctx).WithName("cleanupOrphanedLogicalSlots")
+
+	slots, err := infrastructure.ListLogicalSlotsWithSyncStatus(ctx, db)
+	if err != nil {
+		return fmt.Errorf("listing logical slots: %w", err)
+	}
+
+	for _, slot := range slots {
+		// Skip synced slots - they are properly managed by the sync worker
+		if slot.Synced {
+			contextLog.Trace("Skipping synced logical slot", "slotName", slot.SlotName)
+			continue
+		}
+
+		// Skip non-failover slots - these are external subscription slots that should not be touched
+		if !slot.Failover {
+			contextLog.Trace("Skipping non-failover logical slot (likely external subscription)",
+				"slotName", slot.SlotName)
+			continue
+		}
+
+		// Skip active slots - they cannot be dropped and we'll retry on next reconciliation
+		if slot.Active {
+			contextLog.Trace("Skipping active orphaned logical slot (cannot be dropped)",
+				"slotName", slot.SlotName)
+			continue
+		}
+
+		// Drop orphaned failover slot (synced=false AND failover=true AND active=false)
+		contextLog.Info("Dropping orphaned logical slot", "slotName", slot.SlotName)
+
+		if err := infrastructure.DeleteLogicalSlot(ctx, db, slot.SlotName); err != nil {
+			return fmt.Errorf("deleting orphaned logical slot %q: %w", slot.SlotName, err)
+		}
+	}
+
+	return nil
 }
