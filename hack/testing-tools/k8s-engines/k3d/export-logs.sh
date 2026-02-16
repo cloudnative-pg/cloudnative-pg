@@ -33,6 +33,7 @@ source "${COMMON_DIR}/00-paths.sh"
 # export_logs_k3d: Exports the logs from all k3d nodes.
 function export_logs_k3d() {
   local cluster_name=$1
+  local NODES_LIST=()
   while IFS= read -r line; do
     NODES_LIST+=("$line")
   done < <(k3d node list | awk "/${cluster_name}/{print \$1}")
