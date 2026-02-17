@@ -196,7 +196,7 @@ function deploy_csi_host_path() {
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
 
   ## Annotate the StorageClass to set the default snapshot class
-  "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapshotclass
+  "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
 
   # Wait for CSI plugin to be ready
   echo -e "${bright}CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready...${reset}"
