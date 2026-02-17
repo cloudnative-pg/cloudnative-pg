@@ -54,7 +54,7 @@ var _ = Describe("Job conditions", func() {
 
 	runningJob := batchv1.Job{
 		Status: batchv1.JobStatus{
-			Succeeded: 0,
+			Succeeded:  0,
 			Conditions: []batchv1.JobCondition{},
 		},
 	}

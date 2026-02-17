@@ -1120,15 +1120,19 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
-	// recoverySnapshot, use that as the source
-	if res, err := persistentvolumeclaim.CreateInstancePVCs(
+	// recoverySnapshot, use that as the source.
+	// We intentionally ignore the ctrl.Result here because PVC creation returns
+	// a requeue request, but we must continue to create the init job in the same
+	// reconciliation loop. Otherwise the operator sees dangling PVCs without pods
+	// and gets stuck.
+	if _, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		recoverySnapshot,
 		nodeSerial,
-	); !res.IsZero() || err != nil {
-		return res, err
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot create primary instance PVCs: %w", err)
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1347,15 +1351,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	// Create PVCs before creating the job
-	if res, err := persistentvolumeclaim.CreateInstancePVCs(
+	// Create PVCs before creating the job.
+	// We intentionally ignore the ctrl.Result here because PVC creation returns
+	// a requeue request, but we must continue to create the join job in the same
+	// reconciliation loop.
+	if _, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		storageSource,
 		nodeSerial,
-	); !res.IsZero() || err != nil {
-		return res, err
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
 	}
 
 	if err := r.Create(ctx, job); err != nil {

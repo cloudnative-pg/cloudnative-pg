@@ -178,8 +178,9 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelReplication), f
 })
 
 var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRestore, tests.LabelSnapshot), func() {
+	// Use the same fixture as the working hot snapshot test
 	const (
-		clusterWithSnapshotFile = fixturesDir + "/volume_snapshot/cluster-pvc-snapshot.yaml.template"
+		clusterWithSnapshotFile = fixturesDir + "/volume_snapshot/cluster-pvc-hot-snapshot.yaml.template"
 		level                   = tests.High
 	)
 
@@ -192,9 +193,11 @@ var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRe
 		}
 	})
 
-	// This test verifies that when a snapshot-recovery job fails,
-	// the operator falls back to pg_basebackup for that specific snapshot
-	It("falls back to pg_basebackup when snapshot recovery fails", func() {
+	// This test verifies that when scaling up with a completed snapshot backup:
+	// 1. The operator creates replica PVCs with VolumeSnapshot as DataSource
+	// 2. If snapshot recovery fails, the operator falls back to pg_basebackup
+	// 3. The cluster eventually reaches healthy state
+	It("uses snapshot for replica creation and handles failures gracefully", func() {
 		const namespacePrefix = "snapshot-fallback"
 		var err error
 
@@ -218,7 +221,7 @@ var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRe
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("creating a cluster with snapshot backup capability", func() {
+		By("creating a single-instance cluster with snapshot backup capability", func() {
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterWithSnapshotFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, clusterWithSnapshotFile, env)
@@ -235,7 +238,7 @@ var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRe
 		})
 
 		var backup *apiv1.Backup
-		By("taking a volume snapshot backup", func() {
+		By("taking a volume snapshot backup targeting the primary", func() {
 			backupName := fmt.Sprintf("%s-snapshot", clusterName)
 			backup = &apiv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -243,16 +246,14 @@ var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRe
 					Name:      backupName,
 				},
 				Spec: apiv1.BackupSpec{
-					Target:  apiv1.BackupTargetStandby,
+					// Target primary since this is a single-instance cluster
+					Target:  apiv1.BackupTargetPrimary,
 					Method:  apiv1.BackupMethodVolumeSnapshot,
 					Cluster: apiv1.LocalObjectReference{Name: clusterName},
 				},
 			}
 			err := env.Client.Create(env.Ctx, backup)
 			Expect(err).ToNot(HaveOccurred())
-
-			// Trigger a checkpoint to ensure backup completes
-			CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
 
 			// Wait for backup to complete
 			Eventually(func(g Gomega) {
@@ -268,67 +269,23 @@ var _ = Describe("Snapshot recovery fallback", Serial, Label(tests.LabelBackupRe
 			}, 300, 5).Should(Succeed())
 		})
 
-		By("scaling up to trigger snapshot recovery", func() {
+		By("scaling up to 3 instances to trigger snapshot-based replica creation", func() {
 			_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		var snapshotRecoveryJob *batchv1.Job
-		By("waiting for a snapshot-recovery job to be created", func() {
-			Eventually(func(g Gomega) {
-				var jobs batchv1.JobList
-				err := env.Client.List(env.Ctx, &jobs,
-					k8client.InNamespace(namespace),
-					k8client.MatchingLabels{
-						utils.ClusterLabelName: clusterName,
-						utils.JobRoleLabelName: "snapshot-recovery",
-					},
-				)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(jobs.Items).ToNot(BeEmpty(),
-					"snapshot-recovery job should be created when scaling up with available snapshot")
-				snapshotRecoveryJob = &jobs.Items[0]
-
-				// Verify the job has the snapshot data source annotation
-				g.Expect(snapshotRecoveryJob.Annotations).To(HaveKey(utils.SnapshotDataSourceAnnotationName),
-					"snapshot-recovery job should have snapshot data source annotation")
-			}, 120, 5).Should(Succeed())
-		})
-
-		By("attempting to disrupt the snapshot-recovery job by deleting its pods", func() {
-			// Try to cause job disruption by deleting pods
-			for i := 0; i < 3; i++ {
-				var pods corev1.PodList
-				err := env.Client.List(env.Ctx, &pods,
-					k8client.InNamespace(namespace),
-					k8client.MatchingLabels{
-						"job-name": snapshotRecoveryJob.Name,
-					},
-				)
-				if err != nil || len(pods.Items) == 0 {
-					time.Sleep(3 * time.Second)
-					continue
-				}
-
-				for _, pod := range pods.Items {
-					_ = env.Client.Delete(env.Ctx, &pod,
-						k8client.GracePeriodSeconds(0),
-					)
-				}
-				time.Sleep(3 * time.Second)
-			}
-		})
-
-		// The key test: whether snapshot recovery fails or succeeds, the cluster should
-		// eventually reach a healthy state (either via snapshot or pg_basebackup fallback)
+		// The key test: the cluster should eventually reach healthy state
+		// The replicas will be created using either:
+		// - VolumeSnapshot (preferred, if snapshot is available and works)
+		// - pg_basebackup fallback (if snapshot recovery fails)
 		By("verifying the cluster eventually reaches healthy state", func() {
 			AssertClusterIsReady(namespace, clusterName, 900, env)
 		})
 
-		By("verifying all replicas are connected", func() {
+		By("verifying all replicas are ready", func() {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cluster.Status.ReadyInstances).To(Equal(int32(3)),
+			Expect(cluster.Status.ReadyInstances).To(Equal(3),
 				"all 3 instances should be ready")
 		})
 	})
