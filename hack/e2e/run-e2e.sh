@@ -81,6 +81,9 @@ fi
 # renovate: datasource=github-releases depName=onsi/ginkgo
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 
+# Build kubectl-cnpg and export its path
+make build-plugin
+export PATH=${ROOT_DIR}/bin/:${PATH}
 
 LABEL_FILTERS=""
 if [ "${FEATURE_TYPE-}" ]; then
@@ -147,7 +150,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,
-# which handles ginkgo install, plugin build, and test execution.
+# which handles ginkgo install and test execution.
 RC_MAIN=0
 "${ROOT_DIR}/hack/e2e/run-e2e-suite.sh" || RC_MAIN=$?
 
