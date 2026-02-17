@@ -23,6 +23,11 @@
 
 # --- COMMON IMAGE AND VERSION DEFAULTS ---
 
+if [ -z "${K8S_VERSION:-}" ]; then
+  echo "ERROR: K8S_VERSION is not set. Source the engine-specific settings.sh first." >&2
+  exit 1
+fi
+
 # Defines the default cluster name based on the Kubernetes version.
 export CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
 
