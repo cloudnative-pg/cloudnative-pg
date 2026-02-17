@@ -21,6 +21,7 @@ package utils
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,7 +46,7 @@ var _ = Describe("Job conditions", func() {
 			Conditions: []batchv1.JobCondition{
 				{
 					Type:   batchv1.JobFailed,
-					Status: "True",
+					Status: corev1.ConditionTrue,
 				},
 			},
 		},
