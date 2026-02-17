@@ -112,7 +112,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest-16-cores
     permissions:
       packages: write
       contents: write
