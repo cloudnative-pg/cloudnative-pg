@@ -226,11 +226,11 @@ tests for `kind` and `k3d`. It embeds `hack/setup-cluster.sh` and
 `hack/e2e/run-e2e.sh` to create a local Kubernetes cluster and then
 run E2E tests on it.
 
-There is also a script to run E2E tests on an existing Kubernetes
-cluster. It tries to detect the appropriate defaults for
-storage class and volume snapshot class environment variables by
-looking at the annotation of the default storage class and the volume
-snapshot class.
+Both `run-e2e-local.sh` and `run-e2e-existing-cluster.sh` detect the
+appropriate defaults for storage class, CSI storage class, and volume
+snapshot class environment variables from the live cluster by looking
+at the `storageclass.kubernetes.io/is-default-class` and
+`storage.kubernetes.io/default-snapshot-class` annotations.
 
 #### On kind
 
@@ -272,16 +272,15 @@ You can test the operator on an existing Kubernetes cluster with:
 run-e2e-existing-cluster.sh
 ```
 
-The script will try detecting the storage class and volume snapshot class to use
-by looking at the following annotations and environment variables:
+The script detects the storage classes and volume snapshot class to use
+from the live cluster using the following annotations:
 
-* `storageclass.kubernetes.io/is-default-class: "true"` for the default storage class to use
-* `E2E_CSI_STORAGE_CLASS` variable for the default CSI storage class to use. The default is `csi-hostpath-sc`
-* `storage.kubernetes.io/default-snapshot-class: "$SNAPSHOT_CLASS_NAME"` for the default volume snapshot class
-   to use with the storage class provided in the `E2E_CSI_STORAGE_CLASS` environment variable.
+* `storageclass.kubernetes.io/is-default-class: "true"` to find the default storage class (`E2E_DEFAULT_STORAGE_CLASS`)
+* `storage.kubernetes.io/default-snapshot-class: "$SNAPSHOT_CLASS_NAME"` to find the CSI storage class
+  that supports snapshots (`E2E_CSI_STORAGE_CLASS`) and the associated volume snapshot class
+  (`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`)
 
-The clusters created by `setup-cluster.sh` script will have the correct storage class and volume snapshot class
-detected automatically.
+All three variables can be overridden by setting them explicitly in the environment.
 
 The script will then run the tests on the existing cluster.
 
@@ -300,14 +299,10 @@ the following ones can be defined:
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`
-* `K8S_VERSION`: the version of K8s to run. Default: `v1.30.0`
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
   false to get the image from a registry. Default: `false`
 * `LOG_DIR`: the directory where the container logs are exported. Default:
   `_logs/` directory in the project root
-
-`run-e2e-local.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` in case of `kind`
-and `E2E_DEFAULT_STORAGE_CLASS=local-path` in case of `k3d`.
 
 By default, the script uses the `setup-cluster.sh` script to initialize the cluster using
 the `kind` engine.
@@ -386,8 +381,10 @@ Example:
       /test type=smoke,upgrade
    ```
 
-## Storage class for volume snapshots on Kind
+## Storage class for volume snapshots
 
-In order to enable testing of Kubernetes volume snapshots on a local Kind
-Cluster, we are installing the `csi-hostpath-sc` storage class and the
-`csi-hostpath-snapclass` volume snapshot class.
+The `setup-cluster.sh` script installs a CSI storage class with snapshot
+support (e.g. `csi-hostpath-sc`) and an associated volume snapshot class
+(e.g. `csi-hostpath-snapclass`) on local clusters. The e2e wrapper scripts
+detect these automatically via the `storage.kubernetes.io/default-snapshot-class`
+annotation on the storage class.
