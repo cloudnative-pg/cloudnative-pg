@@ -366,7 +366,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 
 	defer func() {
 		if err := fileutils.RemoveFile(testWALPath); err != nil {
-			contextLogger.Error(err, "while deleting the temporary wal file: %w")
+			contextLogger.Error(err, "while deleting the temporary wal file")
 		}
 	}()
 
