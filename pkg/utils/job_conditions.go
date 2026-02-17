@@ -32,6 +32,16 @@ func JobHasOneCompletion(job batchv1.Job) bool {
 	return job.Status.Succeeded == requestedCompletions
 }
 
+// IsJobFailed checks if a job has failed
+func IsJobFailed(job batchv1.Job) bool {
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobFailed && condition.Status == "True" {
+			return true
+		}
+	}
+	return false
+}
+
 // FilterJobsWithOneCompletion returns jobs that have one completion
 func FilterJobsWithOneCompletion(jobList []batchv1.Job) []batchv1.Job {
 	var result []batchv1.Job

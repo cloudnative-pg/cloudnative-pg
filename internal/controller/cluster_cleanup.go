@@ -30,7 +30,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// cleanupCompletedJobs remove all the Jobs which are completed
+// cleanupCompletedJobs removes all Jobs which are completed.
+// Note: Failed jobs are intentionally left intact for troubleshooting
+// and to serve as markers for fallback logic (e.g., snapshot recovery fallback).
 func (r *ClusterReconciler) cleanupCompletedJobs(
 	ctx context.Context,
 	jobs batchv1.JobList,

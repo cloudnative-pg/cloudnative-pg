@@ -39,8 +39,34 @@ var _ = Describe("Job conditions", func() {
 		},
 	}
 
+	failedJob := batchv1.Job{
+		Status: batchv1.JobStatus{
+			Succeeded: 0,
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:   batchv1.JobFailed,
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	runningJob := batchv1.Job{
+		Status: batchv1.JobStatus{
+			Succeeded: 0,
+			Conditions: []batchv1.JobCondition{},
+		},
+	}
+
 	It("detects if a certain job is completed", func() {
 		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
 		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
+	})
+
+	It("detects if a certain job has failed", func() {
+		Expect(IsJobFailed(failedJob)).To(BeTrue())
+		Expect(IsJobFailed(runningJob)).To(BeFalse())
+		Expect(IsJobFailed(completeJob)).To(BeFalse())
+		Expect(IsJobFailed(nonCompleteJob)).To(BeFalse())
 	})
 })

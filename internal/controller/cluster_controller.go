@@ -746,6 +746,20 @@ func (r *ClusterReconciler) reconcileResources(
 	contextLogger := log.FromContext(ctx)
 	runningJobs := resources.runningJobNames()
 
+	// Safety net: if we're in a scaling phase but the cluster is actually at the desired
+	// instance count with no running jobs, clear the phase to healthy. This handles edge
+	// cases like manually deleted jobs or other unexpected state transitions.
+	if cluster.IsScalingPhase() &&
+		cluster.Status.Instances == cluster.Spec.Instances &&
+		len(runningJobs) == 0 {
+		contextLogger.Info("Clearing stuck scaling phase - instance count matches desired with no running jobs",
+			"phase", cluster.Status.Phase,
+			"instances", cluster.Status.Instances)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 
 	if len(runningJobs) > 0 {
