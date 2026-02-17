@@ -272,7 +272,7 @@ lint-fix: ## Run the linter with --fix.
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
-	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
+	find -name '*.sh' -exec shellcheck -x -a -S style {} + ;\
 	}
 
 spellcheck: ## Runs the spellcheck on the project.

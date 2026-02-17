@@ -18,7 +18,7 @@
 ## SPDX-License-Identifier: Apache-2.0
 ##
 
-# shellcheck disable=SC1090,SC1091
+# shellcheck source-path=SCRIPTDIR
 
 # Kind-specific cluster creation logic.
 set -eEuo pipefail
@@ -26,9 +26,13 @@ set -eEuo pipefail
 # Load common modules needed for paths, config, and registry helpers
 DIR="$(dirname "${BASH_SOURCE[0]}")"
 COMMON_DIR="${DIR}/../../common"
+# shellcheck source=../../common/00-paths.sh
 source "${COMMON_DIR}/00-paths.sh"
+# shellcheck source=../../common/10-config.sh
 source "${COMMON_DIR}/10-config.sh"
+# shellcheck source=../../common/20-utils-k8s.sh
 source "${COMMON_DIR}/20-utils-k8s.sh"
+# shellcheck source=../../common/40-utils-registry.sh
 source "${COMMON_DIR}/40-utils-registry.sh"
 
 # --- KIND SPECIFIC CONSTANTS AND DEFAULTS ---
