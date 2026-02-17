@@ -114,7 +114,7 @@ func (rs *roleInheritanceManager) getRoleInheritance(ctx context.Context) ([]Rol
 	defer func() {
 		closeErr := rows.Close()
 		if closeErr != nil {
-			contextLogger.Error(closeErr, "while closing rows: %w")
+			contextLogger.Error(closeErr, "while closing rows")
 		}
 	}()
 
