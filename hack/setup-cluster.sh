@@ -135,11 +135,6 @@ main() {
     esac
   done
 
-  # Set default K8S_VERSION if not provided by flag or environment
-  if [ -z "${K8S_VERSION}" ]; then
-    export K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
-  fi
-
   # Recalculate CLUSTER_NAME only if user didn't explicitly set it before running this script
   # User-specified names are preserved, auto-calculated names use the updated K8S_VERSION
   if [ -z "${CLUSTER_NAME_USER_SET}" ]; then
