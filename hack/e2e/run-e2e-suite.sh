@@ -41,65 +41,6 @@ function notinpath() {
     esac
 }
 
-# Detect the default storage class from the live cluster
-detect_default_storage_class() {
-  local sc_names sc_count
-  sc_names=$(kubectl get storageclass -o json | \
-    jq -r '[.items[] | select(.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name]')
-  sc_count=$(echo "$sc_names" | jq 'length')
-  if [[ "$sc_count" -eq 0 ]]; then
-    echo "ERROR: no default storage class found in the cluster" >&2
-    return 1
-  elif [[ "$sc_count" -gt 1 ]]; then
-    echo "ERROR: multiple default storage classes found: $(echo "$sc_names" | jq -r 'join(", ")')" >&2
-    return 1
-  fi
-  echo "$sc_names" | jq -r '.[0]'
-}
-
-# Detect the CSI storage class that supports snapshots (has the default-snapshot-class annotation)
-detect_csi_storage_class() {
-  local sc_names sc_count
-  sc_names=$(kubectl get storageclass -o json | \
-    jq -r '[.items[] | select(.metadata.annotations["storage.kubernetes.io/default-snapshot-class"] != null) | .metadata.name]')
-  sc_count=$(echo "$sc_names" | jq 'length')
-  if [[ "$sc_count" -eq 0 ]]; then
-    echo "ERROR: no storage class with default-snapshot-class annotation found in the cluster" >&2
-    return 1
-  elif [[ "$sc_count" -gt 1 ]]; then
-    echo "ERROR: multiple storage classes with default-snapshot-class annotation found: $(echo "$sc_names" | jq -r 'join(", ")')" >&2
-    return 1
-  fi
-  echo "$sc_names" | jq -r '.[0]'
-}
-
-# Detect the default volume snapshot class from the CSI storage class annotation
-detect_default_volumesnapshot_class() {
-  local storage_class=$1 snap_class
-  snap_class=$(kubectl get storageclass "$storage_class" -o json | \
-    jq -r '.metadata.annotations["storage.kubernetes.io/default-snapshot-class"] // empty')
-  if [[ -z "$snap_class" ]]; then
-    echo "ERROR: no default-snapshot-class annotation found on storage class ${storage_class}" >&2
-    return 1
-  fi
-  echo "$snap_class"
-}
-
-if [[ -z "${E2E_DEFAULT_STORAGE_CLASS:-}" ]]; then
-  E2E_DEFAULT_STORAGE_CLASS=$(detect_default_storage_class)
-fi
-export E2E_DEFAULT_STORAGE_CLASS
-
-if [[ -z "${E2E_CSI_STORAGE_CLASS:-}" ]]; then
-  E2E_CSI_STORAGE_CLASS=$(detect_csi_storage_class)
-fi
-export E2E_CSI_STORAGE_CLASS
-
-if [[ -z "${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-}" ]]; then
-  E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=$(detect_default_volumesnapshot_class "$E2E_CSI_STORAGE_CLASS")
-fi
-export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS
-
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
@@ -121,7 +62,7 @@ unset DEBUG
 make build-plugin
 export PATH=${ROOT_DIR}/bin/:${PATH}
 
-LABEL_FILTERS=${FEATURE_TYPE//,/ ||}
+LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
 readonly LABEL_FILTERS
 
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
@@ -131,7 +72,7 @@ RC_GINKGO=0
 export TEST_SKIP_UPGRADE=true
 ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
-       --force-newlines \
+       ${GITHUB_ACTIONS:+--github-output} --force-newlines \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO=$?
 
@@ -146,3 +87,5 @@ if [[ $RC == 0 ]]; then
     echo
   fi
 fi
+
+exit $RC

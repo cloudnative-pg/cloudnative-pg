@@ -226,11 +226,14 @@ tests for `kind` and `k3d`. It embeds `hack/setup-cluster.sh` and
 `hack/e2e/run-e2e.sh` to create a local Kubernetes cluster and then
 run E2E tests on it.
 
-Both `run-e2e-local.sh` and `run-e2e-existing-cluster.sh` detect the
-appropriate defaults for storage class, CSI storage class, and volume
-snapshot class environment variables from the live cluster by looking
-at the `storageclass.kubernetes.io/is-default-class` and
-`storage.kubernetes.io/default-snapshot-class` annotations.
+The Go test framework automatically detects the appropriate defaults for
+storage class, CSI storage class, and volume snapshot class from the
+live cluster during `BeforeSuite` by looking at the
+`storageclass.kubernetes.io/is-default-class` and
+`storage.kubernetes.io/default-snapshot-class` annotations on
+StorageClass objects. You can override detection by setting the
+`E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, and
+`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` environment variables explicitly.
 
 #### On kind
 
@@ -269,20 +272,10 @@ make e2e-test-k3d
 You can test the operator on an existing Kubernetes cluster with:
 
 ``` bash
-run-e2e-existing-cluster.sh
+run-e2e-suite.sh
 ```
 
-The script detects the storage classes and volume snapshot class to use
-from the live cluster using the following annotations:
-
-* `storageclass.kubernetes.io/is-default-class: "true"` to find the default storage class (`E2E_DEFAULT_STORAGE_CLASS`)
-* `storage.kubernetes.io/default-snapshot-class: "$SNAPSHOT_CLASS_NAME"` to find the CSI storage class
-  that supports snapshots (`E2E_CSI_STORAGE_CLASS`) and the associated volume snapshot class
-  (`E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`)
-
-All three variables can be overridden by setting them explicitly in the environment.
-
-The script will then run the tests on the existing cluster.
+The Go test framework auto-detects storage class configuration from the live cluster (see above). You can override any value by setting `E2E_DEFAULT_STORAGE_CLASS`, `E2E_CSI_STORAGE_CLASS`, or `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS` in the environment before running the script.
 
 We have also provided a shortcut to this script in the main `Makefile`:
 
@@ -385,6 +378,6 @@ Example:
 
 The `setup-cluster.sh` script installs a CSI storage class with snapshot
 support (e.g. `csi-hostpath-sc`) and an associated volume snapshot class
-(e.g. `csi-hostpath-snapclass`) on local clusters. The e2e wrapper scripts
-detect these automatically via the `storage.kubernetes.io/default-snapshot-class`
+(e.g. `csi-hostpath-snapclass`) on local clusters. The Go test framework
+detects these automatically via the `storage.kubernetes.io/default-snapshot-class`
 annotation on the storage class.
