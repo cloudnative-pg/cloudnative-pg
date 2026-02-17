@@ -388,6 +388,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					RestartPolicy:             corev1.RestartPolicyNever,
 					NodeSelector:              cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints: cluster.Spec.TopologySpreadConstraints,
+					HostUsers:                 cluster.Spec.HostUsers,
 				},
 			},
 		},

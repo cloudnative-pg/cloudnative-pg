@@ -479,6 +479,13 @@ type ClusterSpec struct {
 	// +optional
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
+	// Determines if the pod's processes run in the host's user namespace.
+	// If set to `false`, a user namespace is created for the pod and all
+	// the container processes run with a different UID/GID than on the host.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/user-namespaces/
+	// +optional
+	HostUsers *bool `json:"hostUsers,omitempty"`
+
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
