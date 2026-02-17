@@ -54,13 +54,8 @@ fi
 # renovate: datasource=github-releases depName=onsi/ginkgo
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 
-
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
-
-# Build kubectl-cnpg and export its path
-make build-plugin
-export PATH=${ROOT_DIR}/bin/:${PATH}
 
 LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
 readonly LABEL_FILTERS
