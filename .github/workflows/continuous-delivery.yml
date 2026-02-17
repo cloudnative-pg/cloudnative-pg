@@ -605,7 +605,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest-16-cores
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
