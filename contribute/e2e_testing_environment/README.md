@@ -307,7 +307,7 @@ the following ones can be defined:
   `_logs/` directory in the project root
 
 `run-e2e-local.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` in case of `kind`
-and `E2E_DEFAULT_STORAGE_CLASS=host-path` in case of `k3d`.
+and `E2E_DEFAULT_STORAGE_CLASS=local-path` in case of `k3d`.
 
 By default, the script uses the `setup-cluster.sh` script to initialize the cluster using
 the `kind` engine.
