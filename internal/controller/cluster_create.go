@@ -1121,14 +1121,14 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
-	if err := persistentvolumeclaim.CreateInstancePVCs(
+	if res, err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
 		recoverySnapshot,
 		nodeSerial,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create primary instance PVCs: %w", err)
+	); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1235,6 +1235,43 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 	return &backup, nil
 }
 
+// getFailedSnapshotDataSources returns the set of snapshot data source names that have failed
+// recovery jobs. This allows us to skip retrying the same snapshot while still allowing
+// new snapshots to be attempted.
+//
+// The failed job is intentionally left in place as:
+// 1. Evidence for troubleshooting why the snapshot recovery failed
+// 2. A marker that prevents retrying that specific snapshot until manually cleared
+//
+// To re-enable snapshot recovery for a specific snapshot, delete its failed job.
+func (r *ClusterReconciler) getFailedSnapshotDataSources(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (map[string]bool, error) {
+	var jobs batchv1.JobList
+	if err := r.List(ctx, &jobs,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			utils.ClusterLabelName: cluster.Name,
+			utils.JobRoleLabelName: "snapshot-recovery",
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	failedSnapshots := make(map[string]bool)
+	for idx := range jobs.Items {
+		if utils.IsJobFailed(jobs.Items[idx]) {
+			snapshotName := jobs.Items[idx].Annotations[utils.SnapshotDataSourceAnnotationName]
+			if snapshotName != "" {
+				failedSnapshots[snapshotName] = true
+			}
+		}
+	}
+
+	return failedSnapshots, nil
+}
+
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int,
@@ -1256,7 +1293,28 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
 	if storageSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+		// Check if this specific snapshot has already failed - if so, fall back to pg_basebackup
+		// This allows new snapshots to be tried while preventing retries of known-bad snapshots
+		failedSnapshots, err := r.getFailedSnapshotDataSources(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		snapshotName := storageSource.DataSource.Name
+		if failedSnapshots[snapshotName] {
+			contextLogger.Info("Snapshot has previously failed, falling back to pg_basebackup",
+				"snapshot", snapshotName)
+			r.Recorder.Eventf(cluster, "Warning", "SnapshotRecoveryFailed",
+				"Snapshot %s has previously failed, falling back to pg_basebackup for replica %v-%v",
+				snapshotName, cluster.Name, nodeSerial)
+			storageSource = nil
+		} else {
+			job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+			// Track which snapshot this job is attempting so we can skip it on failure
+			if job.Annotations == nil {
+				job.Annotations = make(map[string]string)
+			}
+			job.Annotations[utils.SnapshotDataSourceAnnotationName] = snapshotName
+		}
 	}
 
 	contextLogger.Info("Creating new Job",
@@ -1289,6 +1347,17 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
+	// Create PVCs before creating the job
+	if res, err := persistentvolumeclaim.CreateInstancePVCs(
+		ctx,
+		r.Client,
+		cluster,
+		storageSource,
+		nodeSerial,
+	); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
@@ -1298,16 +1367,6 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 		contextLogger.Error(err, "Unable to create Job", "job", job)
 		return ctrl.Result{}, err
-	}
-
-	if err := persistentvolumeclaim.CreateInstancePVCs(
-		ctx,
-		r.Client,
-		cluster,
-		storageSource,
-		nodeSerial,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
