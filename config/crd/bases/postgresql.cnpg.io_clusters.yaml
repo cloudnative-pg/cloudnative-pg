@@ -5858,6 +5858,44 @@ spec:
                         - kind
                         - name
                         type: object
+                      metadata:
+                        description: |-
+                          PVCMetadata contains labels and annotations to be applied to PersistentVolumeClaims.
+                          Operator-reserved key prefixes (cnpg.io/, alpha.cnpg.io/, k8s.io/) are blocked
+                          via CRD validation rules.
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              Annotations is an unstructured key value map stored with a resource that may be
+                              set by external tools to store and retrieve arbitrary metadata. They are not
+                              queryable and should be preserved when modifying objects.
+                              More info: http://kubernetes.io/docs/user-guide/annotations
+                            type: object
+                            x-kubernetes-validations:
+                            - message: Annotations with 'cnpg.io/', 'alpha.cnpg.io/'
+                                or 'k8s.io/' prefixes are reserved for the operator
+                              rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/')
+                                && !key.startsWith('k8s.io/'))
+                            - message: Annotation 'cloudnative-pg.io/managed-by' is
+                                reserved for the operator
+                              rule: '!self.has(''cloudnative-pg.io/managed-by'')'
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              Map of string keys and values that can be used to organize and categorize
+                              (scope and select) objects. May match selectors of replication controllers
+                              and services.
+                              More info: http://kubernetes.io/docs/user-guide/labels
+                            type: object
+                            x-kubernetes-validations:
+                            - message: Labels with 'cnpg.io/', 'alpha.cnpg.io/' or
+                                'k8s.io/' prefixes are reserved
+                              rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/')
+                                && !key.startsWith('k8s.io/'))
+                        type: object
                       resources:
                         description: |-
                           resources represents the minimum resources the volume should have.
@@ -6113,6 +6151,44 @@ spec:
                               required:
                               - kind
                               - name
+                              type: object
+                            metadata:
+                              description: |-
+                                PVCMetadata contains labels and annotations to be applied to PersistentVolumeClaims.
+                                Operator-reserved key prefixes (cnpg.io/, alpha.cnpg.io/, k8s.io/) are blocked
+                                via CRD validation rules.
+                              properties:
+                                annotations:
+                                  additionalProperties:
+                                    type: string
+                                  description: |-
+                                    Annotations is an unstructured key value map stored with a resource that may be
+                                    set by external tools to store and retrieve arbitrary metadata. They are not
+                                    queryable and should be preserved when modifying objects.
+                                    More info: http://kubernetes.io/docs/user-guide/annotations
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: Annotations with 'cnpg.io/', 'alpha.cnpg.io/'
+                                      or 'k8s.io/' prefixes are reserved for the operator
+                                    rule: self.all(key, !key.startsWith('cnpg.io/')
+                                      && !key.startsWith('alpha.cnpg.io/') && !key.startsWith('k8s.io/'))
+                                  - message: Annotation 'cloudnative-pg.io/managed-by'
+                                      is reserved for the operator
+                                    rule: '!self.has(''cloudnative-pg.io/managed-by'')'
+                                labels:
+                                  additionalProperties:
+                                    type: string
+                                  description: |-
+                                    Map of string keys and values that can be used to organize and categorize
+                                    (scope and select) objects. May match selectors of replication controllers
+                                    and services.
+                                    More info: http://kubernetes.io/docs/user-guide/labels
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: Labels with 'cnpg.io/', 'alpha.cnpg.io/'
+                                      or 'k8s.io/' prefixes are reserved
+                                    rule: self.all(key, !key.startsWith('cnpg.io/')
+                                      && !key.startsWith('alpha.cnpg.io/') && !key.startsWith('k8s.io/'))
                               type: object
                             resources:
                               description: |-
@@ -6521,6 +6597,44 @@ spec:
                         required:
                         - kind
                         - name
+                        type: object
+                      metadata:
+                        description: |-
+                          PVCMetadata contains labels and annotations to be applied to PersistentVolumeClaims.
+                          Operator-reserved key prefixes (cnpg.io/, alpha.cnpg.io/, k8s.io/) are blocked
+                          via CRD validation rules.
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              Annotations is an unstructured key value map stored with a resource that may be
+                              set by external tools to store and retrieve arbitrary metadata. They are not
+                              queryable and should be preserved when modifying objects.
+                              More info: http://kubernetes.io/docs/user-guide/annotations
+                            type: object
+                            x-kubernetes-validations:
+                            - message: Annotations with 'cnpg.io/', 'alpha.cnpg.io/'
+                                or 'k8s.io/' prefixes are reserved for the operator
+                              rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/')
+                                && !key.startsWith('k8s.io/'))
+                            - message: Annotation 'cloudnative-pg.io/managed-by' is
+                                reserved for the operator
+                              rule: '!self.has(''cloudnative-pg.io/managed-by'')'
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              Map of string keys and values that can be used to organize and categorize
+                              (scope and select) objects. May match selectors of replication controllers
+                              and services.
+                              More info: http://kubernetes.io/docs/user-guide/labels
+                            type: object
+                            x-kubernetes-validations:
+                            - message: Labels with 'cnpg.io/', 'alpha.cnpg.io/' or
+                                'k8s.io/' prefixes are reserved
+                              rule: self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/')
+                                && !key.startsWith('k8s.io/'))
                         type: object
                       resources:
                         description: |-
