@@ -117,7 +117,12 @@ data:
               END AS lag,
               pg_catalog.pg_is_in_recovery() AS in_recovery,
               EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
-              (SELECT count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas"
+              (SELECT count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas,
+              (SELECT timeline_id FROM pg_control_checkpoint()) AS timeline_id,
+              (SELECT CASE WHEN EXISTS (TABLE pg_stat_wal_receiver)
+              THEN (SELECT received_tli FROM pg_stat_wal_receiver)
+              ELSE 0
+              END) AS received_timeline_id"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -131,6 +136,12 @@ data:
         - streaming_replicas:
             usage: "GAUGE"
             description: "Number of streaming replicas connected to the instance"
+        - timeline_id:
+            usage: "GAUGE"
+            description: "Timeline ID of instance"
+        - received_timeline_id:
+            usage: "GAUGE"
+            description: "Timeline ID replica instance is receiving from primary"
 
     pg_replication_slots:
       query: |
