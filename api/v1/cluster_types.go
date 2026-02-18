@@ -2333,6 +2333,20 @@ const (
 	ServiceSelectorTypeRO ServiceSelectorType = "ro"
 )
 
+// DisabledDefaultServiceSelectorType is the type for DisabledDefaultServices.
+// Only "r" and "ro" are valid because the read-write service cannot be disabled.
+//
+// +kubebuilder:validation:Enum=r;ro
+type DisabledDefaultServiceSelectorType string
+
+// Constants representing the valid values for DisabledDefaultServiceSelectorType.
+const (
+	// DisabledDefaultServiceSelectorTypeR selects the read service.
+	DisabledDefaultServiceSelectorTypeR DisabledDefaultServiceSelectorType = "r"
+	// DisabledDefaultServiceSelectorTypeRO selects the read-only service.
+	DisabledDefaultServiceSelectorTypeRO DisabledDefaultServiceSelectorType = "ro"
+)
+
 // ServiceUpdateStrategy describes how the changes to the managed service should be handled
 // +kubebuilder:validation:Enum=patch;replace
 type ServiceUpdateStrategy string
@@ -2349,7 +2363,7 @@ type ManagedServices struct {
 	// DisabledDefaultServices is a list of service types that are disabled by default.
 	// Valid values are "r", and "ro", representing read, and read-only services.
 	// +optional
-	DisabledDefaultServices []ServiceSelectorType `json:"disabledDefaultServices,omitempty"`
+	DisabledDefaultServices []DisabledDefaultServiceSelectorType `json:"disabledDefaultServices,omitempty"`
 	// Additional is a list of additional managed services specified by the user.
 	// +optional
 	Additional []ManagedService `json:"additional,omitempty"`

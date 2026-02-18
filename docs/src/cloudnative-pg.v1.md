@@ -906,6 +906,27 @@ _Appears in:_
 | `servers` _[DatabaseObjectStatus](#databaseobjectstatus) array_ | Servers is the status of the managed servers |  |  |  |
 
 
+#### DisabledDefaultServiceSelectorType
+
+_Underlying type:_ _string_
+
+DisabledDefaultServiceSelectorType is the type for DisabledDefaultServices.
+Only "r" and "ro" are valid because the read-write service cannot be disabled.
+
+_Validation:_
+
+- Enum: [r ro]
+
+_Appears in:_
+
+- [ManagedServices](#managedservices)
+
+| Field | Description |
+| --- | --- |
+| `r` | DisabledDefaultServiceSelectorTypeR selects the read service.<br /> |
+| `ro` | DisabledDefaultServiceSelectorTypeRO selects the read-only service.<br /> |
+
+
 #### EmbeddedObjectMetadata
 
 
@@ -1461,7 +1482,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `disabledDefaultServices` _[ServiceSelectorType](#serviceselectortype) array_ | DisabledDefaultServices is a list of service types that are disabled by default.<br />Valid values are "r", and "ro", representing read, and read-only services. |  |  | Enum: [rw r ro] <br /> |
+| `disabledDefaultServices` _[DisabledDefaultServiceSelectorType](#disableddefaultserviceselectortype) array_ | DisabledDefaultServices is a list of service types that are disabled by default.<br />Valid values are "r", and "ro", representing read, and read-only services. |  |  | Enum: [r ro] <br /> |
 | `additional` _[ManagedService](#managedservice) array_ | Additional is a list of additional managed services specified by the user. |  |  |  |
 
 
@@ -2571,7 +2592,6 @@ _Validation:_
 _Appears in:_
 
 - [ManagedService](#managedservice)
-- [ManagedServices](#managedservices)
 
 | Field | Description |
 | --- | --- |
