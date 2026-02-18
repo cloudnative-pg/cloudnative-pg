@@ -74,6 +74,9 @@ const (
 	// inside one Pod
 	PostgresContainerName = "postgres"
 
+	// PostgresPortName is the name of the PostgreSQL port inside the container
+	PostgresPortName = "postgresql"
+
 	// BootstrapControllerContainerName is the name of the container copying the bootstrap
 	// controller inside the Pod file system
 	BootstrapControllerContainerName = "bootstrap-controller"
@@ -258,7 +261,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
 				{
-					Name:          "postgresql",
+					Name:          PostgresPortName,
 					ContainerPort: postgres.ServerPort,
 					Protocol:      "TCP",
 				},
