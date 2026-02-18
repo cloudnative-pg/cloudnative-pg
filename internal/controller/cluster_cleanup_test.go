@@ -21,6 +21,7 @@ package controller
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,7 +92,7 @@ var _ = Describe("cluster_cleanup", func() {
 					Conditions: []batchv1.JobCondition{
 						{
 							Type:   batchv1.JobFailed,
-							Status: "True",
+							Status: corev1.ConditionTrue,
 						},
 					},
 				},

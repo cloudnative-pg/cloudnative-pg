@@ -625,7 +625,7 @@ var _ = Describe("managedResources", func() {
 								Conditions: []batchv1.JobCondition{
 									{
 										Type:   batchv1.JobFailed,
-										Status: "True",
+										Status: corev1.ConditionTrue,
 									},
 								},
 							},
@@ -663,7 +663,7 @@ var _ = Describe("managedResources", func() {
 								Conditions: []batchv1.JobCondition{
 									{
 										Type:   batchv1.JobFailed,
-										Status: "True",
+										Status: corev1.ConditionTrue,
 									},
 								},
 							},
