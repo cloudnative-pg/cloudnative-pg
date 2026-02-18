@@ -20,18 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"fmt"
-	"time"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,11 +50,12 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelReplication), f
 	})
 
 	// This test verifies that a failed join job does not block the reconciliation loop.
-	// When a join job fails, the operator should:
-	// 1. Exclude the failed job from runningJobNames() count
-	// 2. Continue processing other scaling operations
-	// 3. Eventually reach the desired cluster state
-	It("continues scaling after a join job fails", func() {
+	// It creates a synthetic failed job with the correct CNPG labels and sets the cluster
+	// phase to "Creating replica", then verifies the reconciler:
+	// 1. Excludes the failed job from runningJobNames()
+	// 2. Clears the stuck phase via the safety net
+	// 3. Returns the cluster to healthy state
+	It("does not get stuck when a failed job is present", func() {
 		const namespacePrefix = "failed-job-handling"
 		var err error
 
@@ -68,67 +66,83 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelReplication), f
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 
-		By("scaling to 4 instances", func() {
-			_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
-			Expect(err).ToNot(HaveOccurred())
+		By("verifying cluster is healthy", func() {
+			AssertClusterIsReady(namespace, clusterName, 300, env)
 		})
 
-		var joinJob *batchv1.Job
-		By("waiting for a join job to be created", func() {
-			Eventually(func(g Gomega) {
-				var jobs batchv1.JobList
-				err := env.Client.List(env.Ctx, &jobs,
-					k8client.InNamespace(namespace),
-					k8client.MatchingLabels{
+		By("creating a synthetic failed join job owned by the cluster", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName + "-join-failed",
+					Namespace: namespace,
+					Labels: map[string]string{
 						utils.ClusterLabelName: clusterName,
 						utils.JobRoleLabelName: "join",
 					},
-				)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(jobs.Items).ToNot(BeEmpty())
-				joinJob = &jobs.Items[0]
-			}, 60, 2).Should(Succeed())
-		})
-
-		By("attempting to disrupt the join job by deleting its pods", func() {
-			// Try to cause job disruption by deleting pods
-			// Note: The job might succeed anyway if Azure disk attach is fast enough
-			for i := 0; i < 3; i++ {
-				var pods corev1.PodList
-				err := env.Client.List(env.Ctx, &pods,
-					k8client.InNamespace(namespace),
-					k8client.MatchingLabels{
-						"job-name": joinJob.Name,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: apiv1.SchemeGroupVersion.String(),
+							Kind:       apiv1.ClusterKind,
+							Name:       cluster.Name,
+							UID:        cluster.UID,
+							Controller: ptr.To(true),
+						},
 					},
-				)
-				if err != nil || len(pods.Items) == 0 {
-					time.Sleep(3 * time.Second)
-					continue
-				}
-
-				for _, pod := range pods.Items {
-					_ = env.Client.Delete(env.Ctx, &pod,
-						k8client.GracePeriodSeconds(0),
-					)
-				}
-				time.Sleep(3 * time.Second)
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyNever,
+							Containers: []corev1.Container{
+								{
+									Name:    "fake",
+									Image:   "scratch",
+									Command: []string{"/bin/false"},
+								},
+							},
+						},
+					},
+				},
 			}
-		})
-
-		// The key test: whether the job fails or succeeds, the cluster should
-		// eventually reach a stable state and not get stuck in "Creating replica"
-		By("verifying the cluster eventually reaches healthy state", func() {
-			// The reconciler should handle both success and failure scenarios:
-			// - If job succeeded: cluster becomes healthy
-			// - If job failed: reconciler continues (doesn't get stuck)
-			// Either way, scaling down to 3 should result in a healthy cluster
-			AssertClusterIsReady(namespace, clusterName, 600, env)
-		})
-
-		By("verifying we can scale back to 3 instances", func() {
-			_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+			err = env.Client.Create(env.Ctx, failedJob)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, clusterName, 300, env)
+
+			// Set the job status to Failed
+			failedJob.Status.Conditions = []batchv1.JobCondition{
+				{
+					Type:               batchv1.JobFailed,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "BackoffLimitExceeded",
+					Message:            "Synthetic failed job for E2E test",
+				},
+			}
+			err = env.Client.Status().Update(env.Ctx, failedJob)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("setting the cluster phase to 'Creating replica' to simulate stuck state", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			cluster.Status.Phase = apiv1.PhaseCreatingReplica
+			cluster.Status.PhaseReason = "Simulated stuck phase with failed job"
+			err = env.Client.Status().Update(env.Ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verifying the cluster returns to healthy state", func() {
+			// If runningJobNames() did NOT exclude failed jobs, the reconciler would
+			// see len(runningJobs) > 0 and spin forever. This proves it excludes them.
+			Eventually(func(g Gomega) {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseHealthy),
+					"reconciler should not get stuck when a failed job is present")
+			}, 120, 5).Should(Succeed())
 		})
 	})
 
