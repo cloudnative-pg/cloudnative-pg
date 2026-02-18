@@ -90,6 +90,18 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		}
 	}
 
+	// Get the current version of the PostgreSQL instance
+	rowPostgreSQLVersion := superUserDB.QueryRow(
+		"SELECT SPLIT_PART(version(), ' ', 2);")
+	if err := rowPostgreSQLVersion.Scan(&result.PostgreSQLVersion); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// If no row are returned, set empty string
+			result.PostgreSQLVersion = ""
+		} else {
+			return result, err
+		}
+	}
+
 	row := superUserDB.QueryRow(
 		`SELECT
 			(pg_catalog.pg_control_system()).system_identifier,
@@ -394,12 +406,12 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 		`SELECT
     slot_name,
 	coalesce(plugin::text, ''),
-	coalesce(slot_type::text, ''),	
-	coalesce(datoid::text,''),	
-	coalesce(database::text,''),	
+	coalesce(slot_type::text, ''),
+	coalesce(datoid::text,''),
+	coalesce(database::text,''),
 	active,
-	coalesce(xmin::text, ''),	
-	coalesce(catalog_xmin::text, ''),	
+	coalesce(xmin::text, ''),
+	coalesce(catalog_xmin::text, ''),
 	coalesce(restart_lsn::text, ''),
 	coalesce(wal_status::text, ''),
 	safe_wal_size
