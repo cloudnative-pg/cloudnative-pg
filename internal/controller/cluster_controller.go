@@ -751,7 +751,8 @@ func (r *ClusterReconciler) reconcileResources(
 	// cases like manually deleted jobs or other unexpected state transitions.
 	if cluster.IsScalingPhase() &&
 		cluster.Status.Instances == cluster.Spec.Instances &&
-		len(runningJobs) == 0 {
+		len(runningJobs) == 0 &&
+		resources.allInstancesAreActive() {
 		contextLogger.Info("Clearing stuck scaling phase - instance count matches desired with no running jobs",
 			"phase", cluster.Status.Phase,
 			"instances", cluster.Status.Instances)
