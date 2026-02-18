@@ -20,12 +20,12 @@
 
 # shellcheck disable=SC1090,SC1091
 
-# Kind-specific image loading logic.
+# k3d-specific image loading logic.
 set -eEuo pipefail
 
-# load_image_kind: Executes the necessary 'kind load' command.
-function load_image_kind() {
+# load_image_k3d: Executes the necessary 'k3d image' command.
+function load_image_k3d() {
   local cluster_name=$1
   local image=$2
-  kind load -v 1 docker-image --name "${cluster_name}" "${image}"
+  k3d image import "${image}" -c "${cluster_name}"
 }
