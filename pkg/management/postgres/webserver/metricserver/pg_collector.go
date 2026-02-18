@@ -132,7 +132,8 @@ func newMetrics() *metrics {
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if PostgreSQL is up, 0 otherwise.",
-		}, []string{"cluster"}),
+			// "cluster" label for backwards-compatibility
+		}, []string{"cluster", "cnpg_cluster"}),
 		CollectionDuration: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -169,7 +170,8 @@ func newMetrics() *metrics {
 			Subsystem: subsystem,
 			Name:      "postgres_version",
 			Help:      "Postgres version",
-		}, []string{"full", "cluster"}),
+			// "cluster" label for backwards-compatibility
+		}, []string{"full", "cluster", "cnpg_cluster"}),
 		PgWALDirectory: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -425,13 +427,13 @@ func (e *Exporter) updateInstanceMetrics() {
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
 		log.Warning("Unable to collect metrics", "error", err)
-		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(0)
+		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName(), e.instance.GetClusterName()).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
-	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
+	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName(), e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
@@ -596,7 +598,7 @@ func collectPGVersion(e *Exporter) error {
 	if err != nil {
 		return err
 	}
-	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.GetClusterName()).Set(version)
+	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.GetClusterName(), e.instance.GetClusterName()).Set(version)
 
 	return nil
 }
