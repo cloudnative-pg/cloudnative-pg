@@ -12,7 +12,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, eks, aks, gke, openshift)'
+        description: 'Limit to the specified engines list (local, k3d, eks, aks, gke, openshift)'
         required: false
       test_level:
         description: 'Test level: 0(highest) to 4(lowest). Default is 4.'
@@ -42,6 +42,8 @@ env:
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.31.0"
+  # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
+  K3D_VERSION: "v5.8.3"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
   ROOK_VERSION: "v1.19.0"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
@@ -563,6 +565,9 @@ jobs:
       localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
       localTimeout: ${{ steps.generate-jobs.outputs.localE2ETimeout }}
+      k3dMatrix: ${{ steps.generate-jobs.outputs.k3dMatrix }}
+      k3dEnabled: ${{ steps.generate-jobs.outputs.k3dEnabled }}
+      k3dTimeout: ${{ steps.generate-jobs.outputs.k3dE2ETimeout }}
       eksMatrix: ${{ steps.generate-jobs.outputs.eksMatrix }}
       eksEnabled: ${{ steps.generate-jobs.outputs.eksEnabled }}
       eksTimeout: ${{ steps.generate-jobs.outputs.eksE2ETimeout }}
@@ -777,6 +782,184 @@ jobs:
 
       -
         name: Archive e2e logs
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e-k3d:
+    name: Run E2E on K3D
+    if: |
+      (always() && !cancelled()) &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.generate-jobs.outputs.k3dEnabled == 'true' &&
+      needs.generate-jobs.result == 'success'
+    needs:
+      - buildx
+      - generate-jobs
+      - evaluate_options
+    strategy:
+      fail-fast: false
+      max-parallel: 6  # Adjust based on resource constraints
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
+    runs-on: ubuntu-24.04
+    env:
+      # TEST_DEPTH determines the maximum test level the suite should be running
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
+      # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
+      FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      POSTGRES_KIND: ${{ matrix.postgres_kind }}
+      MATRIX: ${{ matrix.id }}
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      # The version of operator to upgrade FROM, in the rolling upgrade E2E test
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.k3dTimeout }}
+      BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
+      CONTROLLER_IMG_DIGEST: ${{ needs.buildx.outputs.controller_img_digest }}
+      CONTROLLER_IMG_PRIME_DIGEST: ${{ needs.buildx.outputs.controller_img_prime_digest }}
+      E2E_DEFAULT_STORAGE_CLASS: local-path  # K3D uses local-path by default
+      E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
+      LOG_DIR: ${{ github.workspace }}/k3d-logs/
+      DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
+      TEST_CLOUD_VENDOR: "k3d"
+    steps:
+      - name: Cleanup Disk
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          tool-cache: true
+          large-packages: false
+          swap-storage: false
+      - name: Cleanup docker cache
+        run: |
+          echo "-------------Disk info before cleanup----------------"
+          df -h
+          echo "-----------------------------------------------------"
+          docker system prune -a -f
+          echo "-------------Disk info after cleanup----------------"
+          df -h
+          echo "-----------------------------------------------------"
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+      - name: Install Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+      - ## In case hack/setup-cluster.sh needs to pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      - name: Install K3D
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+          k3d version
+      - name: Install kubectl
+        uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4.0.0
+        with:
+          version: ${{ env.K8S_VERSION }}
+      - name: Prepare patch for customization
+        env:
+          ## the following variables all need to be set if we use env_override_customized.yaml.template
+          ## this is customization for local k3d
+          LEADER_ELECTION: "true"
+          LEADER_LEASE_DURATION: 15
+          LEADER_RENEW_DEADLINE: 10
+          LIVENESS_PROBE_THRESHOLD: 3
+          LOG_LEVEL: ${{ needs.evaluate_options.outputs.log_level }}
+        run: |
+          LOG_LEVEL=${LOG_LEVEL:-info}
+          envsubst < hack/e2e/env_override_customized.yaml.template > config/manager/env_override.yaml
+          cat config/manager/env_override.yaml
+      - name: Run K3D End-to-End tests
+        env:
+          ENABLE_APISERVER_AUDIT: true
+        run: |
+          make e2e-test-k3d
+      - # Summarize the failed E2E test cases if there are any
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      - # Create an individual artifact for each E2E test
+        name: Create individual artifact for each E2E test
+        if: (always() && !cancelled())
+        env:
+          RUNNER: "k3d"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
+        run: |
+          set +x
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            --environment=true
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              --environment=true
+          fi
+      - name: Archive test artifacts
+        if: (always() && !cancelled())
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: testartifacts-${{ env.MATRIX }}
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      - name: Cleanup test artifacts
+        if: always()
+        run: |
+          rm -rf testartifacts-${{ env.MATRIX }}/
+      - name: Cleanup ginkgo JSON report
+        if: always()
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
+          if [ -f tests/e2e/out/report.json ]; then
+            rm tests/e2e/out/report.json
+          fi
+      - # Archive logs for failed test cases if there are any
+        name: Archive K3D logs
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: k3d-logs-${{ matrix.id }}
+          path: k3d-logs/
+          retention-days: 7
+      - name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -2133,6 +2316,7 @@ jobs:
     needs:
       - evaluate_options
       - e2e-local
+      - e2e-k3d
       - e2e-eks
       - e2e-aks
       - e2e-gke
