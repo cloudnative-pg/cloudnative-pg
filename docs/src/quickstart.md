@@ -273,7 +273,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: cluster-with-metrics
+  name: cluster-with-metrics-podmonitor
 spec:
   selector:
     matchLabels:

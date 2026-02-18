@@ -19,7 +19,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: cluster-example
+  name: cluster-example-podmonitor
 spec:
   selector:
     matchLabels:
