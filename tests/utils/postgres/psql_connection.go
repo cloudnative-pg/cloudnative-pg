@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,7 +43,7 @@ import (
 // PSQLForwardConnection manages the creation of a port-forwarding to open a new database connection
 type PSQLForwardConnection struct {
 	pooler      pool.Pooler
-	portForward *portforward.PortForwarder
+	portForward *forwardconnection.ForwardConnection
 }
 
 // Close will stop the port-forwarding and exit
@@ -89,6 +88,12 @@ func startForwardConnection(
 	}
 
 	err = retry.OnError(backoff, resources.RetryAlways, func() error {
+		// Close previous forwarder if retrying
+		if forwarder != nil {
+			forwarder.Close()
+			forwarder = nil
+		}
+
 		// Create a child context with a timeout for this attempt
 		innerCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
@@ -109,11 +114,15 @@ func startForwardConnection(
 		return nil
 	})
 	if err != nil {
+		if forwarder != nil {
+			forwarder.Close()
+		}
 		return nil, nil, err
 	}
 
 	localPort, err := forwarder.GetLocalPort()
 	if err != nil {
+		forwarder.Close()
 		return nil, nil, err
 	}
 
@@ -127,6 +136,7 @@ func startForwardConnection(
 
 	conn, err := pooler.Connection(dbname)
 	if err != nil {
+		forwarder.Close()
 		return nil, nil, err
 	}
 
@@ -136,7 +146,7 @@ func startForwardConnection(
 	conn.SetConnMaxIdleTime(time.Hour)
 
 	return &PSQLForwardConnection{
-		portForward: forwarder.Forwarder,
+		portForward: forwarder,
 		pooler:      pooler,
 	}, conn, err
 }
