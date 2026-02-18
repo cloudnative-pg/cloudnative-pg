@@ -33,6 +33,11 @@ TESTING_TOOLS_DIR="${ROOT_DIR}/hack/testing-tools"
 CLUSTER_MGR_SCRIPT="${TESTING_TOOLS_DIR}/k8s-engines/manage.sh"
 COMMON_DIR="${TESTING_TOOLS_DIR}/common"
 
+# Declare the Cluster Engine variable
+export CLUSTER_ENGINE="${CLUSTER_ENGINE:-kind}"
+
+source "${TESTING_TOOLS_DIR}/k8s-engines/${CLUSTER_ENGINE}/settings.sh"
+
 # Capture if user explicitly set CLUSTER_NAME before loading config
 CLUSTER_NAME_USER_SET="${CLUSTER_NAME:-}"
 
@@ -59,6 +64,11 @@ Commands:
     pyroscope             Deploy Pyroscope and enable pprof for the operator
 
 Options:
+    -e|--engine
+        <CLUSTER_ENGINE>  Specify the kubernetes cluster's engine to run. Current
+                          available options are 'kind' and 'k3d'. Default: 'kind'.
+                          Env: CLUSTER_ENGINE
+
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
                           (e.g., v1.35.0). Env: K8S_VERSION
@@ -89,7 +99,7 @@ main() {
     case "${o}" in
       -e | --engine)
         shift
-        # no-op, kept for compatibility
+        export CLUSTER_ENGINE="${1}"
         shift
         ;;
       -k | --k8s-version)
@@ -124,11 +134,6 @@ main() {
         ;;
     esac
   done
-
-  # Set default K8S_VERSION if not provided by flag or environment
-  if [ -z "${K8S_VERSION}" ]; then
-    export K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
-  fi
 
   # Recalculate CLUSTER_NAME only if user didn't explicitly set it before running this script
   # User-specified names are preserved, auto-calculated names use the updated K8S_VERSION

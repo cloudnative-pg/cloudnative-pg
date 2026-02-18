@@ -20,12 +20,34 @@
 
 # shellcheck disable=SC1090,SC1091
 
-# Kind-specific image loading logic.
+# K3D-specific log export logic.
 set -eEuo pipefail
 
-# load_image_kind: Executes the necessary 'kind load' command.
-function load_image_kind() {
+# Load common library for access to CLUSTER_NAME and LOG_DIR
+DIR="$(dirname "${BASH_SOURCE[0]}")"
+COMMON_DIR="${DIR}/../../common"
+source "${COMMON_DIR}/00-paths.sh"
+
+# --- HELPER FUNCTION ---
+
+# export_logs_k3d: Exports the logs from all k3d nodes.
+function export_logs_k3d() {
   local cluster_name=$1
-  local image=$2
-  kind load -v 1 docker-image --name "${cluster_name}" "${image}"
+  local NODES_LIST=()
+  while IFS= read -r line; do
+    NODES_LIST+=("$line")
+  done < <(k3d node list | awk "/${cluster_name}/{print \$1}")
+  for i in "${NODES_LIST[@]}"; do
+    mkdir -p "${LOG_DIR}/${i}"
+    docker cp -L "${i}:/var/log/." "${LOG_DIR}/${i}"
+  done
 }
+
+# --- MAIN EXECUTION ---
+
+main() {
+  # shellcheck disable=SC2153
+  export_logs_k3d "${CLUSTER_NAME}"
+}
+
+main
