@@ -444,3 +444,79 @@ var _ = Describe("major version filtering in candidate backup selection", func()
 		Expect(source).To(BeNil())
 	})
 })
+
+var _ = Describe("failed snapshot exclusion in storage source selection", func() {
+	newCompletedSnapshotBackup := func(name string, cluster *apiv1.Cluster, snapshotName string) apiv1.Backup {
+		return apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				// Ensure the backup timestamp is after the cluster's creation
+				CreationTimestamp: metav1.NewTime(cluster.CreationTimestamp.Add(1 * time.Hour)),
+				Name:              name,
+			},
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
+			},
+			Status: apiv1.BackupStatus{
+				Phase: apiv1.BackupPhaseCompleted,
+				BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+					Elements: []apiv1.BackupSnapshotElementStatus{
+						{
+							Name: snapshotName,
+							Type: string(utils.PVCRolePgData),
+						},
+					},
+				},
+			},
+		}
+	}
+
+	It("should skip a backup whose snapshot is in FailedSnapshots", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				FailedSnapshots: []string{"snap-1"},
+			},
+		}
+
+		backup1 := newCompletedSnapshotBackup("backup-1", cluster, "snap-1")
+		backup2 := newCompletedSnapshotBackup("backup-2", cluster, "snap-2")
+		// backup1 is more recent, but its snapshot has previously failed
+		backup1.CreationTimestamp = metav1.NewTime(cluster.CreationTimestamp.Add(2 * time.Hour))
+		backup2.CreationTimestamp = metav1.NewTime(cluster.CreationTimestamp.Add(1 * time.Hour))
+
+		backupList := apiv1.BackupList{Items: []apiv1.Backup{backup1, backup2}}
+
+		source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+		Expect(source).ToNot(BeNil())
+		Expect(source.DataSource.Name).To(Equal("snap-2"))
+	})
+
+	It("should return nil when all snapshots have failed", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+			},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				FailedSnapshots: []string{"snap-1"},
+			},
+		}
+
+		backup1 := newCompletedSnapshotBackup("backup-1", cluster, "snap-1")
+		backupList := apiv1.BackupList{Items: []apiv1.Backup{backup1}}
+
+		source := GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+		Expect(source).To(BeNil())
+	})
+})

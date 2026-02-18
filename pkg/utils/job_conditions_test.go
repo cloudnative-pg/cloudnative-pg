@@ -21,6 +21,7 @@ package utils
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,5 +43,27 @@ var _ = Describe("Job conditions", func() {
 	It("detects if a certain job is completed", func() {
 		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
 		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
+	})
+
+	failedJob := batchv1.Job{
+		Status: batchv1.JobStatus{
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	runningJob := batchv1.Job{
+		Status: batchv1.JobStatus{},
+	}
+
+	It("detects if a certain job has failed", func() {
+		Expect(IsJobFailed(failedJob)).To(BeTrue())
+		Expect(IsJobFailed(runningJob)).To(BeFalse())
+		Expect(IsJobFailed(completeJob)).To(BeFalse())
+		Expect(IsJobFailed(nonCompleteJob)).To(BeFalse())
 	})
 })

@@ -168,6 +168,7 @@ FDWSpec
 FDWs
 FQDN
 FQDNs
+FailedSnapshots
 FailoverQuorum
 FailoverQuorumStatus
 Fei
