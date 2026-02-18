@@ -31,6 +31,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -41,7 +42,6 @@ import (
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -128,16 +128,9 @@ func RunController(
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
-	}
-
-	if conf.WatchNamespace != "" {
-		namespaces := conf.WatchedNamespaces()
-		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
-			namespaces,
-			conf.OperatorNamespace)
-		setupLog.Info("Listening for changes", "watchNamespaces", namespaces)
-	} else {
-		setupLog.Info("Listening for changes on all namespaces")
+		Cache: cache.Options{
+			DefaultNamespaces: getNamespacesToWatch(conf),
+		},
 	}
 
 	if conf.WebhookCertDir != "" {
@@ -488,4 +481,22 @@ func getPprofServerAddress(enabled bool) string {
 	}
 
 	return ""
+}
+
+func getNamespacesToWatch(conf *configuration.Data) map[string]cache.Config {
+	if len(conf.WatchNamespace) == 0 {
+		setupLog.Info("Listening for changes on all namespaces")
+		return nil
+	}
+	// ensure we always watch operator namespace
+	namespaces := map[string]cache.Config{
+		conf.OperatorNamespace: {},
+	}
+
+	for _, namespace := range conf.WatchedNamespaces() {
+		namespaces[namespace] = cache.Config{}
+	}
+
+	setupLog.Info("Listening for changes", "watchNamespaces", conf.WatchedNamespaces())
+	return namespaces
 }
