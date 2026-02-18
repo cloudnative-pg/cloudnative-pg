@@ -66,7 +66,7 @@ func FromReader(
 	defer func() {
 		// This code is executed only if the instance manager has not been updated, and
 		// this is the only condition we have a temporary file to remove
-		removeError := os.Remove(updatedInstanceManager.Name())
+		removeError := os.Remove(updatedInstanceManager.Name()) //nolint:gosec // path from our own temp file
 		if removeError != nil {
 			log.Warning("Error while removing temporary instance manager upload file",
 				"name", updatedInstanceManager.Name(), "err", err)
@@ -97,6 +97,7 @@ func FromReader(
 	}
 
 	// Replace the new instance manager with the new one
+	//nolint:gosec // path from our own temp file
 	if err := os.Rename(updatedInstanceManager.Name(), InstanceManagerPath); err != nil {
 		return fmt.Errorf("while replacing instance manager binary: %w", err)
 	}
@@ -184,7 +185,7 @@ func validateInstanceManagerHash(
 // This function never returns in case of success.
 func reloadInstanceManager() error {
 	log.Info("Replacing current instance")
-	err := syscall.Exec(InstanceManagerPath, os.Args, os.Environ()) // #nosec G204
+	err := syscall.Exec(InstanceManagerPath, os.Args, os.Environ()) //nolint:gosec // execing our own binary with os.Args
 	if err != nil {
 		return err
 	}

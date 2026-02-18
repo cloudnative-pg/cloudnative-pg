@@ -124,7 +124,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(js)
+	_, _ = w.Write(js) //nolint:gosec // serving JSON from internal cache
 }
 
 // This function schedule a backup

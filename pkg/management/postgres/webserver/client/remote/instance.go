@@ -199,7 +199,7 @@ func (r *instanceClientImpl) GetPgControlDataFromInstance(
 		return "", err
 	}
 	r.Timeout = defaultRequestTimeout
-	resp, err := r.Do(req)
+	resp, err := r.Do(req) //nolint:gosec // URL built from internal pod IP
 	if err != nil {
 		return "", err
 	}
@@ -259,7 +259,7 @@ func (r *instanceClientImpl) UpgradeInstanceManager(
 	req.Body = binaryFileStream
 
 	r.Timeout = noRequestTimeout
-	resp, err := r.Do(req)
+	resp, err := r.Do(req) //nolint:gosec // URL built from internal pod IP
 	// This is the desired response. The instance manager will
 	// synchronously update and this call won't return.
 	if isEOF(err) {
@@ -308,7 +308,7 @@ func (r *instanceClientImpl) rawInstanceStatusRequest(
 	}
 
 	r.Timeout = defaultRequestTimeout
-	resp, err := r.Do(req)
+	resp, err := r.Do(req) //nolint:gosec // URL built from internal pod IP
 	if err != nil {
 		result.Error = err
 		return result
@@ -387,7 +387,7 @@ func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.
 	if err != nil {
 		return "", err
 	}
-	resp, err := r.Do(req)
+	resp, err := r.Do(req) //nolint:gosec // URL built from internal pod IP
 	if err != nil {
 		return "", err
 	}
