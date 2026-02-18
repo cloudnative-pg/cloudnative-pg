@@ -119,7 +119,7 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	}
 	var query strings.Builder
 
-	query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
+	fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	appendRoleOptions(role, &query)
 	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
@@ -143,7 +143,7 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	}
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("CREATE ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
+	fmt.Fprintf(&query, "CREATE ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
 	// Log before appending password to prevent password leakage in operator logs
@@ -159,8 +159,8 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 
 	if len(role.Comment) > 0 {
 		query.Reset()
-		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
-			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
+		fmt.Fprintf(&query, "COMMENT ON ROLE %s IS %s",
+			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 
 		if _, err := db.ExecContext(ctx, query.String()); err != nil {
 			return wrapErr(err)

@@ -876,8 +876,8 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 
 	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf.String())))
 	postgresConf.WriteString(cnpgConf.String())
-	postgresConf.WriteString(fmt.Sprintf("%v = %v\n", CNPGConfigSha256,
-		escapePostgresConfValue(sha256sum)))
+	fmt.Fprintf(&postgresConf, "%v = %v\n", CNPGConfigSha256,
+		escapePostgresConfValue(sha256sum))
 
 	return postgresConf.String(), sha256sum
 }

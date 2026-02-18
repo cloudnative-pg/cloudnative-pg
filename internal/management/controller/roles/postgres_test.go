@@ -538,7 +538,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ConnectionLimit: 0,
 		}
 		var query strings.Builder
-		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
 		appendRoleOptions(roleWithNo, &query)
 
 		expectedQuery := "ALTER ROLE \"alighieri\" NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN " +
@@ -561,7 +561,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		expectedQuery := "ALTER ROLE \"alighieri\" BYPASSRLS CREATEDB CREATEROLE INHERIT LOGIN " +
 			"REPLICATION SUPERUSER CONNECTION LIMIT 10"
 
-		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
 		appendRoleOptions(roles, &query)
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
@@ -576,7 +576,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		var query strings.Builder
 		expectedQuery := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy'"
 
-		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
 		appendPasswordOption(dbRole, &query)
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
@@ -584,7 +584,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("password with valid until", func() {
 		role := apiv1.RoleConfiguration{}
 		var queryValidUntil strings.Builder
-		queryValidUntil.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		fmt.Fprintf(&queryValidUntil, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
 		expectedQueryValidUntil := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy' VALID UNTIL '2100-01-01 01:01:00Z'"
 		validUntil := metav1.Date(2100, 0o1, 0o1, 0o1, 0o1, 0o0, 0o0, time.UTC)
 		role.ValidUntil = &validUntil
