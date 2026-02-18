@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -100,6 +101,46 @@ var _ = Describe("pooler_status unit tests", func() {
 		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		assertAuthUserStatus(pooler, authUserSecret)
+	})
+
+	Context("should set image in status", func() {
+		It("will have a default image if unspecified", func() {
+			ctx := context.Background()
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pooler := newFakePooler(env.client, cluster)
+			dep, err := pgbouncer.Deployment(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			res := &poolerManagedResources{Deployment: dep, Cluster: cluster}
+			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(pooler.Status.Image).To(Equal(versions.DefaultPgbouncerImage))
+		})
+		It("will have a specific image if specified", func() {
+			img := "pgbouncer:latest"
+			ctx := context.Background()
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pooler := newFakePooler(env.client, cluster)
+			pooler.Spec.Template = &apiv1.PodTemplateSpec{}
+			pooler.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "pgbouncer",
+					Image: img,
+				},
+			}
+			err := env.poolerReconciler.updateOwnedObjects(ctx, pooler, &poolerManagedResources{Cluster: cluster})
+			Expect(err).ToNot(HaveOccurred())
+			dep, err := pgbouncer.Deployment(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, &poolerManagedResources{Deployment: dep, Cluster: cluster})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(pooler.Status.Image).To(Equal(img))
+		})
 	})
 
 	It("should correctly set the deployment status", func() {
