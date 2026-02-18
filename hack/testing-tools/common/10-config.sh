@@ -23,10 +23,10 @@
 
 # --- COMMON IMAGE AND VERSION DEFAULTS ---
 
-# renovate: datasource=docker depName=kindest/node
-KIND_NODE_DEFAULT_VERSION=v1.35.0
-export K8S_VERSION=${K8S_VERSION:-$KIND_NODE_DEFAULT_VERSION}
-export KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
+if [ -z "${K8S_VERSION:-}" ]; then
+  echo "ERROR: K8S_VERSION is not set. Source the engine-specific settings.sh first." >&2
+  exit 1
+fi
 
 # Defines the default cluster name based on the Kubernetes version.
 export CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}

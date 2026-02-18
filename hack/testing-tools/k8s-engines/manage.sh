@@ -54,17 +54,25 @@ set -eEuo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")"
 COMMON_DIR="${DIR}/../common"
 
+# Map CLUSTER_ENGINE env var to k8s-engines/<vendor>/ subdirectory (default: kind)
+VENDOR="${CLUSTER_ENGINE:-kind}"
+
+if [[ "${CLUSTER_ENGINE}" != "kind" ]] && [[ "${CLUSTER_ENGINE}" != "k3d" ]]
+then
+    echo "ERROR: Cluster engine ${CLUSTER_ENGINE} not supported!" >&2
+    exit 1
+fi
+
+export CLUSTER_ENGINE
+
 # Source necessary common files to define paths, constants, and utility functions
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
-source "${COMMON_DIR}/50-utils-operator-load.sh"
+source "${COMMON_DIR}/50-utils-images-load.sh"
 
 # Get the action from the first argument
 ACTION="${1:-}"
-
-# Map CLUSTER_ENGINE env var to k8s-engines/<vendor>/ subdirectory (default: kind)
-VENDOR="${CLUSTER_ENGINE:-kind}"
 
 if [ -z "$ACTION" ]; then
     echo "Usage: $0 <create|load-from-sources|deploy-from-sources|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
@@ -137,7 +145,7 @@ case "$ACTION" in
 
         if [ -f "${LOAD_HELPER_SCRIPT}" ]; then
             source "${LOAD_HELPER_SCRIPT}"
-            load_helper_images_vendor_specific
+            load_helper_images_vendor_specific "${VENDOR}"
         else
             echo "No implementation of 'load-helper-images' for ${VENDOR}"
         fi
