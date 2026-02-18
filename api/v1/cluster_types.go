@@ -679,6 +679,9 @@ const (
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
+	// PhaseWaitingForWalReceiver is set when a rollout is blocked waiting for WAL receiver on switchover target
+	PhaseWaitingForWalReceiver = "Waiting for WAL receiver on switchover target"
+
 	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
 	PhaseOnlineUpgrading = "Online upgrade in progress"
 
