@@ -25,11 +25,15 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -39,12 +43,67 @@ import (
 // PostgresPortMap is the default port map for the PostgreSQL Pod
 const PostgresPortMap = "0:5432"
 
+// expectedPortForwardErrors lists error substrings that are expected during
+// port-forward teardown and should be suppressed. These originate from
+// k8s.io/client-go/tools/portforward calling runtime.HandleError for:
+//   - "error closing listener" — when listeners are closed during shutdown
+//   - "an error occurred forwarding" — when kubelet reports connection reset
+//     on the error stream during normal connection close
+//
+// This slice must not be modified after init.
+var expectedPortForwardErrors = []string{
+	"error closing listener",
+	"an error occurred forwarding",
+}
+
+// isExpectedPortForwardError returns true if the error matches a known
+// benign port-forward teardown error that should be suppressed.
+func isExpectedPortForwardError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	for _, expected := range expectedPortForwardErrors {
+		if strings.Contains(errMsg, expected) {
+			return true
+		}
+	}
+	return false
+}
+
+// init replaces utilruntime.ErrorHandlers with a single wrapper that
+// suppresses known port-forward errors and delegates everything else
+// to the handlers that were registered before this init ran.
+//
+// NOTE: because utilruntime.handleError iterates the ErrorHandlers
+// slice directly, any handler appended after this init will be called
+// for all errors regardless of the filter. This is fine as long as no
+// other code in the test binary modifies ErrorHandlers.
+func init() {
+	originalHandlers := make([]utilruntime.ErrorHandler, len(utilruntime.ErrorHandlers))
+	copy(originalHandlers, utilruntime.ErrorHandlers)
+
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
+			if isExpectedPortForwardError(err) {
+				return
+			}
+			for _, handler := range originalHandlers {
+				handler(ctx, err, msg, keysAndValues...)
+			}
+		},
+	}
+}
+
 // ForwardConnection holds the necessary information to manage a port-forward
 // against a service of pod inside Kubernetes
 type ForwardConnection struct {
-	Forwarder    *portforward.PortForwarder
+	forwarder    *portforward.PortForwarder
 	stopChannel  chan struct{}
 	readyChannel chan struct{}
+	closeOnce    sync.Once
+	done         chan struct{}
+	started      atomic.Bool
 }
 
 // NewDialerFromService returns a Dialer against the service specified
@@ -78,10 +137,11 @@ func NewForwardConnection(
 	fc := &ForwardConnection{
 		stopChannel:  make(chan struct{}),
 		readyChannel: make(chan struct{}, 1),
+		done:         make(chan struct{}),
 	}
 
 	var err error
-	fc.Forwarder, err = portforward.New(
+	fc.forwarder, err = portforward.New(
 		dialer,
 		portMaps,
 		fc.stopChannel,
@@ -119,12 +179,15 @@ func NewDialer(
 	return dialer, nil
 }
 
-// StartAndWait begins the port-forwarding and waits until it's ready
+// StartAndWait begins the port-forwarding and waits until it's ready.
+// It must be called at most once per ForwardConnection.
 func (fc *ForwardConnection) StartAndWait(ctx context.Context) error {
+	fc.started.Store(true)
 	errChan := make(chan error, 1)
 	go func() {
+		defer close(fc.done)
 		ginkgo.GinkgoWriter.Println("Starting port-forward")
-		if err := fc.Forwarder.ForwardPorts(); err != nil {
+		if err := fc.forwarder.ForwardPorts(); err != nil {
 			ginkgo.GinkgoWriter.Printf("port-forward failed with error %s\n", err.Error())
 			errChan <- err
 		}
@@ -138,14 +201,24 @@ func (fc *ForwardConnection) StartAndWait(ctx context.Context) error {
 		ginkgo.GinkgoWriter.Println("port-forward failed before becoming ready")
 		return err
 	case <-ctx.Done():
-		close(fc.stopChannel)
+		fc.closeOnce.Do(func() { close(fc.stopChannel) })
 		return ctx.Err()
+	}
+}
+
+// Close stops the port-forward and waits for the forwarding goroutine to exit.
+// It is safe to call multiple times and safe to call even if StartAndWait was
+// never called.
+func (fc *ForwardConnection) Close() {
+	fc.closeOnce.Do(func() { close(fc.stopChannel) })
+	if fc.started.Load() {
+		<-fc.done
 	}
 }
 
 // GetLocalPort will return the local port where the forward has started
 func (fc *ForwardConnection) GetLocalPort() (string, error) {
-	ports, err := fc.Forwarder.GetPorts()
+	ports, err := fc.forwarder.GetPorts()
 	if err != nil {
 		return "", err
 	}

@@ -125,6 +125,20 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, nil
 	}
 
+	// If the primary update strategy is supervised, we should not consume a rollout slot.
+	// The user must issue a switchover manually.
+	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
+		contextLogger := log.FromContext(ctx)
+		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
+			"primaryPod", primaryPostgresqlStatus.Pod.Name,
+			"reason", podRollout.reason)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
+			"User must issue a supervised switchover"); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	managerResult := r.rolloutManager.CoordinateRollout(
 		client.ObjectKeyFromObject(cluster),
 		primaryPostgresqlStatus.Pod.Name)
@@ -154,19 +168,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
-
-	// we need to check whether a manual switchover is required
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
-	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
-		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
-			"reason", reason)
-		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser, "User must issue a supervised switchover")
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
-	}
 
 	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {
 		if inPlacePossible {
