@@ -5808,7 +5808,7 @@ var _ = Describe("validatePVCTemplateMetadata", func() {
 								},
 							},
 						},
-						Metadata: apiv1.Metadata{
+						Metadata: apiv1.PVCMetadata{
 							Labels: map[string]string{
 								"test-label": "test-value",
 							},
@@ -5835,7 +5835,7 @@ var _ = Describe("validatePVCTemplateMetadata", func() {
 								},
 							},
 						},
-						Metadata: apiv1.Metadata{
+						Metadata: apiv1.PVCMetadata{
 							Labels: map[string]string{
 								utils.ClusterLabelName: "forbidden",
 							},
@@ -5861,7 +5861,7 @@ var _ = Describe("validatePVCTemplateMetadata", func() {
 								},
 							},
 						},
-						Metadata: apiv1.Metadata{
+						Metadata: apiv1.PVCMetadata{
 							Annotations: map[string]string{
 								utils.OperatorVersionAnnotationName: "forbidden",
 							},
@@ -5887,7 +5887,7 @@ var _ = Describe("validatePVCTemplateMetadata", func() {
 								},
 							},
 						},
-						Metadata: apiv1.Metadata{
+						Metadata: apiv1.PVCMetadata{
 							Annotations: map[string]string{
 								"container.apparmor.security.beta.kubernetes.io/test": "forbidden",
 							},
@@ -5899,6 +5899,106 @@ var _ = Describe("validatePVCTemplateMetadata", func() {
 		errs := v.validatePVCTemplateMetadata(cluster)
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Field).To(Equal("spec.storage.pvcTemplate.metadata.annotations.container.apparmor.security.beta.kubernetes.io/test"))
+	})
+
+	It("should complain with the managed-by annotation in PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.PVCMetadata{
+							Annotations: map[string]string{
+								"cloudnative-pg.io/managed-by": "forbidden",
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.storage.pvcTemplate.metadata.annotations.cloudnative-pg.io/managed-by"))
+	})
+
+	It("should not complain when PVC template is nil", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(v.validatePVCTemplateMetadata(cluster)).To(BeEmpty())
+	})
+
+	It("should validate walStorage PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "1Gi",
+				},
+				WalStorage: &apiv1.StorageConfiguration{
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						Metadata: apiv1.PVCMetadata{
+							Labels: map[string]string{
+								utils.ClusterLabelName: "forbidden",
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.walStorage.pvcTemplate.metadata.labels.cnpg.io/cluster"))
+	})
+
+	It("should validate tablespace PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "1Gi",
+				},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{
+						Name: "myts",
+						Storage: apiv1.StorageConfiguration{
+							PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+								PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+									Resources: corev1.VolumeResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+								Metadata: apiv1.PVCMetadata{
+									Annotations: map[string]string{
+										utils.OperatorVersionAnnotationName: "forbidden",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := v.validatePVCTemplateMetadata(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.tablespaces[0].storage.pvcTemplate.metadata.annotations.cnpg.io/operatorVersion"))
 	})
 })
 

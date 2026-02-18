@@ -36,7 +36,6 @@ type Metadata struct {
 	// and services.
 	// More info: http://kubernetes.io/docs/user-guide/labels
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))",message="Labels with 'cnpg.io/' or 'k8s.io/' prefixes are reserved"
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
@@ -44,7 +43,27 @@ type Metadata struct {
 	// queryable and should be preserved when modifying objects.
 	// More info: http://kubernetes.io/docs/user-guide/annotations
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('k8s.io/'))",message="Annotations with 'cnpg.io/' or 'k8s.io/' prefixes are reserved for the operator"
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// PVCMetadata contains labels and annotations to be applied to PersistentVolumeClaims.
+// Operator-reserved key prefixes (cnpg.io/, alpha.cnpg.io/, k8s.io/) are blocked
+// via CRD validation rules.
+type PVCMetadata struct {
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	// More info: http://kubernetes.io/docs/user-guide/labels
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/') && !key.startsWith('k8s.io/'))",message="Labels with 'cnpg.io/', 'alpha.cnpg.io/' or 'k8s.io/' prefixes are reserved"
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	// More info: http://kubernetes.io/docs/user-guide/annotations
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('cnpg.io/') && !key.startsWith('alpha.cnpg.io/') && !key.startsWith('k8s.io/'))",message="Annotations with 'cnpg.io/', 'alpha.cnpg.io/' or 'k8s.io/' prefixes are reserved for the operator"
 	// +kubebuilder:validation:XValidation:rule="!self.has('cloudnative-pg.io/managed-by')",message="Annotation 'cloudnative-pg.io/managed-by' is reserved for the operator"
 	Annotations map[string]string `json:"annotations,omitempty"`
 }

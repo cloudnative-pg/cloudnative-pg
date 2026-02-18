@@ -57,20 +57,23 @@ func Build(
 
 	metadataBuilder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
-		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace).
-		WithAnnotations(map[string]string{
-			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-			utils.PVCStatusAnnotationName:     configuration.Status,
-		}).
-		WithLabels(calculator.GetLabels(instanceName))
+		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace)
 
+	// Apply user-defined metadata first so that operator-managed
+	// labels and annotations always take precedence on collision.
 	if configuration.Storage.PersistentVolumeClaimTemplate != nil {
 		metadataBuilder.
 			WithLabels(configuration.Storage.PersistentVolumeClaimTemplate.Metadata.Labels).
 			WithAnnotations(configuration.Storage.PersistentVolumeClaimTemplate.Metadata.Annotations)
 	}
 
-	builder := metadataBuilder.WithClusterInheritance(cluster).
+	builder := metadataBuilder.
+		WithAnnotations(map[string]string{
+			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
+			utils.PVCStatusAnnotationName:     configuration.Status,
+		}).
+		WithLabels(calculator.GetLabels(instanceName)).
+		WithClusterInheritance(cluster).
 		EndMetadata().
 		WithSpec(pvcSpec).
 		WithSource(configuration.Source).

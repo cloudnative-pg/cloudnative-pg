@@ -122,7 +122,13 @@ var (
 		utils.FailoverQuorumAnnotationName:           {},
 		utils.EnableInstancePprofAnnotationName:      {},
 		utils.LivenessPingerAnnotationName:           {},
+		managedByAnnotation:                          {},
 	}
+
+	// managedByAnnotation is the cloudnative-pg.io/managed-by annotation,
+	// reserved for the operator. Not under the cnpg.io/ prefix so it needs
+	// explicit blocking.
+	managedByAnnotation = "cloudnative-pg.io/managed-by"
 )
 
 func isReservedLabel(key string) bool {
@@ -1675,33 +1681,53 @@ func (v *ClusterCustomValidator) validateStorageSize(r *apiv1.Cluster) field.Err
 }
 
 // validatePVCTemplateMetadata verifies that the user is not specifying
-// any label or annotation which is reserved by CloudNativePG
+// any label or annotation which is reserved by CloudNativePG on any
+// PVC template (storage, walStorage, tablespaces).
 func (v *ClusterCustomValidator) validatePVCTemplateMetadata(r *apiv1.Cluster) field.ErrorList {
 	var allErrors field.ErrorList
 
-	if r.Spec.StorageConfiguration.PersistentVolumeClaimTemplate == nil ||
-		r.Spec.StorageConfiguration.PersistentVolumeClaimTemplate.Metadata.Labels == nil &&
-		r.Spec.StorageConfiguration.PersistentVolumeClaimTemplate.Metadata.Annotations == nil {
+	allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+		field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)...)
+
+	if r.Spec.WalStorage != nil {
+		allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+			field.NewPath("spec", "walStorage"), *r.Spec.WalStorage)...)
+	}
+
+	for idx, ts := range r.Spec.Tablespaces {
+		allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+			field.NewPath("spec", "tablespaces").Index(idx).Child("storage"), ts.Storage)...)
+	}
+
+	return allErrors
+}
+
+// validateStoragePVCTemplateMetadata checks that a single StorageConfiguration's
+// PVC template metadata does not use reserved labels or annotations.
+func validateStoragePVCTemplateMetadata(basePath *field.Path, storage apiv1.StorageConfiguration) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if storage.PersistentVolumeClaimTemplate == nil ||
+		(storage.PersistentVolumeClaimTemplate.Metadata.Labels == nil &&
+			storage.PersistentVolumeClaimTemplate.Metadata.Annotations == nil) {
 		return allErrors
 	}
 
-	pvcTemplatePath := field.NewPath("spec", "storage", "pvcTemplate", "metadata")
-	
-	// Check labels
-	for key := range r.Spec.StorageConfiguration.PersistentVolumeClaimTemplate.Metadata.Labels {
+	metadataPath := basePath.Child("pvcTemplate", "metadata")
+
+	for key := range storage.PersistentVolumeClaimTemplate.Metadata.Labels {
 		if isReservedLabel(key) {
 			allErrors = append(allErrors, field.Forbidden(
-				pvcTemplatePath.Child("labels", key),
+				metadataPath.Child("labels", key),
 				fmt.Sprintf("label %s is reserved for internal use by CloudNativePG", key),
 			))
 		}
 	}
 
-	// Check annotations
-	for key := range r.Spec.StorageConfiguration.PersistentVolumeClaimTemplate.Metadata.Annotations {
+	for key := range storage.PersistentVolumeClaimTemplate.Metadata.Annotations {
 		if isReservedAnnotation(key) {
 			allErrors = append(allErrors, field.Forbidden(
-				pvcTemplatePath.Child("annotations", key),
+				metadataPath.Child("annotations", key),
 				fmt.Sprintf("annotation %s is reserved for internal use by CloudNativePG", key),
 			))
 		}
