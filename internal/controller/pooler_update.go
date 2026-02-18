@@ -150,11 +150,61 @@ func (r *PoolerReconciler) reconcileService(
 	}
 
 	patchedService := resources.Service.DeepCopy()
-	patchedService.Spec = expectedService.Spec
+
+	// only update specific fields in the spec to avoid overwriting
+	// fields that might be automatically managed by the cloud environment
+	// e.g., externalIPs for LoadBalancer services
+	var shouldUpdate bool
+
+	// update the selector if it is different
+	if !reflect.DeepEqual(expectedService.Spec.Selector, patchedService.Spec.Selector) {
+		patchedService.Spec.Selector = expectedService.Spec.Selector
+		shouldUpdate = true
+	}
+
+	// update ports if they are different
+	if !reflect.DeepEqual(expectedService.Spec.Ports, patchedService.Spec.Ports) {
+		patchedService.Spec.Ports = expectedService.Spec.Ports
+		shouldUpdate = true
+	}
+
+	// update service type if it is different
+	if expectedService.Spec.Type != patchedService.Spec.Type {
+		patchedService.Spec.Type = expectedService.Spec.Type
+		shouldUpdate = true
+	}
+
+	// update session affinity if it is different
+	if expectedService.Spec.SessionAffinity != patchedService.Spec.SessionAffinity {
+		patchedService.Spec.SessionAffinity = expectedService.Spec.SessionAffinity
+		shouldUpdate = true
+	}
+
+	// update session affinity config if it is different
+	if !reflect.DeepEqual(expectedService.Spec.SessionAffinityConfig, patchedService.Spec.SessionAffinityConfig) {
+		patchedService.Spec.SessionAffinityConfig = expectedService.Spec.SessionAffinityConfig
+		shouldUpdate = true
+	}
+
+	// merge metadata
+	originalLabels := make(map[string]string)
+	for k, v := range patchedService.GetLabels() {
+		originalLabels[k] = v
+	}
+	originalAnnotations := make(map[string]string)
+	for k, v := range patchedService.GetAnnotations() {
+		originalAnnotations[k] = v
+	}
+
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
-	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
-		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
+	// check if metadata actually changed
+	if !reflect.DeepEqual(originalLabels, patchedService.GetLabels()) ||
+		!reflect.DeepEqual(originalAnnotations, patchedService.GetAnnotations()) {
+		shouldUpdate = true
+	}
+
+	if !shouldUpdate {
 		return nil
 	}
 
