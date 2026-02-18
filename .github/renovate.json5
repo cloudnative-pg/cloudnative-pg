@@ -47,7 +47,6 @@
       managerFilePatterns: [
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
-        '/^hack/e2e/run-e2e-kind.sh$/',
         '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
       ],
       matchStrings: [
@@ -114,7 +113,7 @@
       customType: 'regex',
       managerFilePatterns:  [
         '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
-        '/^hack/e2e/run-e2e-local.sh$/',
+        '/^hack/e2e/run-e2e-existing-cluster.sh$/',
         '/^hack/e2e/run-e2e\\.sh$/',
       ],
       matchStrings: [
