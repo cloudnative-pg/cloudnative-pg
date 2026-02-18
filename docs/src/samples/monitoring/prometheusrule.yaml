@@ -17,8 +17,8 @@ spec:
         severity: warning
     - alert: BackendsWaiting
       annotations:
-        description: Pod {{ $labels.pod  }} has been waiting for longer than 5 minutes
-        summary: If a backend is waiting for longer than 5 minutes
+        description: Pod {{ $labels.pod  }} has more than 300 backends in waiting state
+        summary: High waiting backends count
       expr: |-
         cnpg_backends_waiting_total > 300
       for: 1m
