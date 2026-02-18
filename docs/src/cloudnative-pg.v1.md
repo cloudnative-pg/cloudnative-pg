@@ -680,6 +680,7 @@ _Appears in:_
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
 | `systemID` _string_ | SystemID is the latest detected PostgreSQL SystemID |  |  |  |
+| `failedSnapshots` _string array_ | FailedSnapshots is a list of VolumeSnapshot names whose recovery<br />jobs failed during instance creation. The operator skips these<br />when selecting a snapshot for new replicas, falling back to<br />pg_basebackup when none remain. |  |  |  |
 
 
 

@@ -1030,6 +1030,13 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// FailedSnapshots is a list of VolumeSnapshot names whose recovery
+	// jobs failed during instance creation. The operator skips these
+	// when selecting a snapshot for new replicas, falling back to
+	// pg_basebackup when none remain.
+	// +optional
+	FailedSnapshots []string `json:"failedSnapshots,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image

@@ -1788,3 +1788,29 @@ var _ = Describe("Failover quorum", func() {
 		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
 })
+
+var _ = Describe("HasFailedSnapshot", func() {
+	It("returns true for a snapshot in the list", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				FailedSnapshots: []string{"snap-a", "snap-b"},
+			},
+		}
+		Expect(cluster.HasFailedSnapshot("snap-a")).To(BeTrue())
+		Expect(cluster.HasFailedSnapshot("snap-b")).To(BeTrue())
+	})
+
+	It("returns false for a snapshot not in the list", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				FailedSnapshots: []string{"snap-a"},
+			},
+		}
+		Expect(cluster.HasFailedSnapshot("snap-c")).To(BeFalse())
+	})
+
+	It("returns false when list is empty", func() {
+		cluster := &Cluster{}
+		Expect(cluster.HasFailedSnapshot("snap-a")).To(BeFalse())
+	})
+})

@@ -1573,3 +1573,9 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
+
+// HasFailedSnapshot returns true if the given VolumeSnapshot name is
+// recorded as a failed snapshot recovery attempt
+func (cluster *Cluster) HasFailedSnapshot(snapshotName string) bool {
+	return slices.Contains(cluster.Status.FailedSnapshots, snapshotName)
+}

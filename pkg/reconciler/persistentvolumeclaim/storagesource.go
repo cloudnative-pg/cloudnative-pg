@@ -170,9 +170,18 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		contextLogger.Debug("found a backup that is a valid storage source candidate")
+		source := getCandidateSourceFromBackup(backup)
+		if cluster.HasFailedSnapshot(source.DataSource.Name) {
+			contextLogger.Info(
+				"skipping backup because its snapshot previously failed during recovery",
+				"backup", backup.Name,
+				"snapshot", source.DataSource.Name,
+			)
+			continue
+		}
 
-		return getCandidateSourceFromBackup(backup)
+		contextLogger.Debug("found a backup that is a valid storage source candidate")
+		return source
 	}
 
 	return nil
@@ -213,9 +222,13 @@ func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSou
 	}
 
 	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-	return &StorageSource{
+	source := &StorageSource{
 		DataSource:       volumeSnapshots.Storage,
 		WALSource:        volumeSnapshots.WalStorage,
 		TablespaceSource: volumeSnapshots.TablespaceStorage,
 	}
+	if cluster.HasFailedSnapshot(source.DataSource.Name) {
+		return nil
+	}
+	return source
 }
