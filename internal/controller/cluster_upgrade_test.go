@@ -22,16 +22,21 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -913,5 +918,146 @@ var _ = Describe("checkPodSpec with plugins", Ordered, func() {
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal(
 			"original and target PodSpec differ in containers: container postgres differs in environment"))
+	})
+})
+
+var _ = Describe("Supervised primary update strategy and rollout slots", func() {
+	const namespace = "supervised-test"
+
+	var (
+		reconciler *ClusterReconciler
+		rm         *rolloutManager.Manager
+		k8sClient  k8client.Client
+	)
+
+	BeforeEach(func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		k8sClient = fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			Build()
+
+		// Create namespace
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		}
+		Expect(k8sClient.Create(context.Background(), ns)).To(Succeed())
+
+		// Rollout manager with a large cluster delay so we can detect slot consumption
+		rm = rolloutManager.New(time.Hour, 0)
+
+		reconciler = &ClusterReconciler{
+			Client:         k8sClient,
+			Scheme:         scheme,
+			Recorder:       record.NewFakeRecorder(120),
+			rolloutManager: rm,
+		}
+
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	// Helper to create a cluster in the fake client with the given primary update strategy
+	createCluster := func(strategy apiv1.PrimaryUpdateStrategy) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:             1,
+				ImageName:             "postgres:16.0",
+				PrimaryUpdateStrategy: strategy,
+				PrimaryUpdateMethod:   apiv1.PrimaryUpdateMethodRestart,
+				StorageConfiguration:  apiv1.StorageConfiguration{Size: "1Gi"},
+			},
+		}
+		cluster.SetDefaults()
+		// Set status fields after SetDefaults() since it may clear them
+		cluster.Status.CurrentPrimary = "test-cluster-1"
+		cluster.Status.Image = "postgres:16.1"
+		cluster.Status.Instances = 1
+		Expect(k8sClient.Create(context.Background(), cluster)).To(Succeed())
+		Expect(k8sClient.Status().Update(context.Background(), cluster)).To(Succeed())
+		return cluster
+	}
+
+	// Helper to build a pod status list where the primary needs rollout (image mismatch)
+	buildPodListWithPrimaryNeedingRollout := func(cluster *apiv1.Cluster) *postgres.PostgresqlStatusList {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Status.CurrentPrimary,
+				Namespace: cluster.Namespace,
+				Annotations: map[string]string{
+					utils.ClusterSerialAnnotationName: "1",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:16.0", // Different from cluster.Status.Image (16.1) -> triggers rollout
+					},
+				},
+			},
+		}
+		return &postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test_hash",
+				},
+			},
+		}
+	}
+
+	It("supervised cluster does NOT consume a rollout slot", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategySupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Verify the rollout slot was NOT consumed: a second cluster should still be allowed
+		secondCluster := k8client.ObjectKey{Namespace: namespace, Name: "other-cluster"}
+		result := rm.CoordinateRollout(secondCluster, "other-pod")
+		Expect(result.RolloutAllowed).To(BeTrue(),
+			"supervised strategy should not consume the rollout slot")
+	})
+
+	It("supervised cluster returns true and sets PhaseWaitingForUser", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategySupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Re-fetch the cluster to see the updated status
+		var updatedCluster apiv1.Cluster
+		Expect(k8sClient.Get(ctx,
+			k8client.ObjectKeyFromObject(cluster),
+			&updatedCluster)).To(Succeed())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseWaitingForUser))
+	})
+
+	It("unsupervised cluster DOES consume a rollout slot", func(ctx SpecContext) {
+		cluster := createCluster(apiv1.PrimaryUpdateStrategyUnsupervised)
+		podList := buildPodListWithPrimaryNeedingRollout(cluster)
+
+		// Create the pod in the fake client so upgradePod (Delete) can find it
+		pod := podList.Items[0].Pod.DeepCopy()
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+
+		restarted, err := reconciler.rolloutRequiredInstances(ctx, cluster, podList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(restarted).To(BeTrue())
+
+		// Verify the rollout slot WAS consumed: a second cluster should be blocked
+		secondCluster := k8client.ObjectKey{Namespace: namespace, Name: "other-cluster"}
+		result := rm.CoordinateRollout(secondCluster, "other-pod")
+		Expect(result.RolloutAllowed).To(BeFalse(),
+			"unsupervised strategy should consume the rollout slot")
 	})
 })
