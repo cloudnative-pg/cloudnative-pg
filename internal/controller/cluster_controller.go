@@ -750,7 +750,7 @@ func (r *ClusterReconciler) reconcileResources(
 
 	if len(runningJobs) > 0 {
 		contextLogger.Debug("A job is currently running. Waiting", "runningJobs", runningJobs)
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 
 	if result, err := r.deleteTerminatedPods(ctx, cluster, resources); err != nil {
