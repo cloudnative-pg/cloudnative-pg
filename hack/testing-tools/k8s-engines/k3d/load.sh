@@ -28,12 +28,12 @@ function load_operator_image_vendor_specific() {
   # Execute the generic build and push to the local registry
   build_and_load_operator_image_from_sources
 
-# NOTE: For k3d, we don't need to use 'k3d image import' for operator images.
-# The docker-build target uses 'docker buildx bake --push' which pushes
-# directly to the local registry (registry.dev:5000). K3d nodes are
-# configured to pull from this registry, so the images will be pulled
-# automatically when the operator is deployed.
-#
-# This is different from helper images (like FluentD) which are explicitly
-# loaded using 'k3d image import' because they're not built with buildx.
+  # NOTE: For k3d, we don't need to use 'k3d image import' for operator images.
+  # The docker-build target uses 'docker buildx bake --push' which pushes
+  # directly to the local registry (registry.dev:5000). K3d nodes are
+  # configured via registries.yaml to pull from this registry, so the images
+  # will be pulled automatically when the operator is deployed.
+  #
+  # This is different from helper images (like FluentD) which are explicitly
+  # loaded using 'k3d image import' because they're not built with buildx.
 }
