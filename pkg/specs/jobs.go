@@ -363,6 +363,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				},
 				Spec: corev1.PodSpec{
 					Hostname: jobName,
+					EnableServiceLinks: ptr.To(false),
 					InitContainers: []corev1.Container{
 						createBootstrapContainer(cluster),
 					},
