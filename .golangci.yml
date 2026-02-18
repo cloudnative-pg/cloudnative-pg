@@ -110,7 +110,27 @@ linters:
       # TODO: fix by renaming packages that conflict with Go standard library names
       - linters:
           - revive
-        path: (pkg/utils/(context|hash)|internal/(cmd|cnpi)/plugin|internal/cmd/manager/debug|tests/utils/exec|pkg/management/(postgres/metrics|url)|pkg/postgres/plugin)/
+        path: pkg/utils/(context|hash)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/(cmd|cnpi)/plugin/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/cmd/manager/debug/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: tests/utils/exec/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/management/(postgres/metrics|url)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/postgres/plugin/
         text: avoid package names that conflict with Go standard library package names
     paths:
       - zz_generated.*
