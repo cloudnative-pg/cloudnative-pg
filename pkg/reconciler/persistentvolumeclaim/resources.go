@@ -81,7 +81,8 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 // resize is pending - it requires a pod to mount the volume to complete the resize.
 func isFileSystemResizePending(pvc corev1.PersistentVolumeClaim) bool {
 	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
+		if condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending &&
+			condition.Status == corev1.ConditionTrue {
 			return true
 		}
 	}

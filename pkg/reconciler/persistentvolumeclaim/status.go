@@ -276,6 +276,10 @@ func classifyPVC(
 		// but filesystem resize requires a pod to mount the volume.
 		// Treat as dangling so pod recreation happens.
 		if isFileSystemResizePending(pvc) {
+			contextLogger := log.FromContext(ctx)
+			contextLogger.Info("PVC has FileSystemResizePending condition without a pod, "+
+				"classifying as dangling to trigger pod creation for filesystem resize",
+				"pvc", pvc.Name)
 			return dangling
 		}
 		// Still waiting for volume resize at storage layer

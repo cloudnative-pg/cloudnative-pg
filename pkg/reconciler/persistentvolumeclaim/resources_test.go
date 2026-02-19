@@ -156,6 +156,23 @@ var _ = Describe("isFileSystemResizePending", func() {
 		Expect(isFileSystemResizePending(pvc)).To(BeTrue())
 	})
 
+	It("returns false when FileSystemResizePending condition has ConditionFalse status", func() {
+		pvc := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pvc",
+			},
+			Status: corev1.PersistentVolumeClaimStatus{
+				Conditions: []corev1.PersistentVolumeClaimCondition{
+					{
+						Type:   corev1.PersistentVolumeClaimFileSystemResizePending,
+						Status: corev1.ConditionFalse,
+					},
+				},
+			},
+		}
+		Expect(isFileSystemResizePending(pvc)).To(BeFalse())
+	})
+
 	It("returns true when both Resizing and FileSystemResizePending conditions are present", func() {
 		pvc := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
