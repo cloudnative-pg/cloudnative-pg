@@ -880,6 +880,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
+			})
+			By("waiting for the cluster to be ready again", func() {
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			})
 
