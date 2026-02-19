@@ -93,8 +93,7 @@ func (r *TablespaceReconciler) Reconcile(
 }
 
 // buildPVCChecker returns a function that checks whether all PVCs for a given
-// tablespace are healthy across all instances. It builds the healthy PVC lookup
-// map once and captures it in the returned closure.
+// tablespace are healthy across all instances.
 func buildPVCChecker(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -137,13 +136,8 @@ func (r *TablespaceReconciler) reconcile(
 
 	pvcChecker := buildPVCChecker(ctx, cluster)
 
-	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
-	result := r.applySteps(
-		ctx,
-		superUserDB,
-		steps,
-		pvcChecker,
-	)
+	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces, pvcChecker)
+	result := r.applySteps(ctx, superUserDB, steps)
 
 	// update the cluster status
 	updatedCluster := cluster.DeepCopy()
@@ -168,12 +162,11 @@ func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	db *sql.DB,
 	actions []tablespaceReconcilerStep,
-	pvcChecker func(tablespace string) bool,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		result[idx] = step.execute(ctx, db, r.storageManager, pvcChecker)
+		result[idx] = step.execute(ctx, db, r.storageManager)
 	}
 
 	return result
