@@ -154,6 +154,10 @@ type Instance struct {
 	// The name of the cluster this instance belongs in
 	clusterName string
 
+	// Cluster is a cached copy of the Cluster resource, used during probes
+	// to determine replica cluster status without requiring a reconciler context.
+	Cluster *apiv1.Cluster
+
 	// The sha256 of the config. It is computed on the config string, before
 	// adding the PostgreSQL CNPGConfigSha256 parameter
 	ConfigSha256 string

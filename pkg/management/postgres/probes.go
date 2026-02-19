@@ -162,8 +162,19 @@ func updateResultForDecrease(
 	// mark the pending restart as due to a decrease
 	result.PendingRestartForDecrease = true
 	if !result.IsPrimary {
-		// in case of hot standby parameters being decreased,
-		// followers need to wait for the new value to be present in the PGDATA before being restarted.
+		// In a replica cluster, pg_controldata values are received from the external
+		// source primary through the WAL stream, not from this cluster's designated
+		// primary. Comparing decreased parameter values against pg_controldata is
+		// incorrect for replica clusters because those values reflect the source
+		// primary's configuration, not the local cluster's. We skip this check and
+		// keep PendingRestart as-is, allowing the restart to proceed.
+		cluster := instance.Cluster
+		if cluster != nil && cluster.IsReplica() {
+			return nil
+		}
+
+		// In non-replica clusters, followers need to wait for the new value to be
+		// present in the PGDATA before being restarted.
 		pgControldataParams, err := LoadEnforcedParametersFromPgControldata(instance.PgData)
 		if err != nil {
 			return err
