@@ -22,6 +22,9 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +81,47 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = environment.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
+	display := func(s string) string {
+		if strings.TrimSpace(s) == "" {
+			return "<none>"
+		}
+		return s
+	}
+	_, _ = fmt.Fprintf(GinkgoWriter, `
+E2E test configuration:
+  Postgres image:                %s:%s
+  Postgres version:              %d
+  Postgres image repository:     %s
+  PostGIS image repository:      %s
+  Pre-rolling update image:      %s
+  Cloud vendor:                  %s
+  Default storage class:         %s
+  CSI storage class:             %s
+  Default volume snapshot class: %s
+`,
+		env.PostgresImageName, env.PostgresImageTag,
+		env.PostgresVersion,
+		display(env.PostgresImageRepository),
+		display(env.PostGISImageRepository),
+		display(os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")),
+		display(os.Getenv("TEST_CLOUD_VENDOR")),
+		display(env.DefaultStorageClass),
+		display(env.CSIStorageClass),
+		display(env.DefaultVolumeSnapshotClass),
+	)
+
+	// Export detected storage class values as environment variables for
+	// code that uses os.Getenv (e.g. MinIO PVC setup).
+	for k, v := range map[string]string{
+		"E2E_DEFAULT_STORAGE_CLASS":        env.DefaultStorageClass,
+		"E2E_CSI_STORAGE_CLASS":            env.CSIStorageClass,
+		"E2E_DEFAULT_VOLUMESNAPSHOT_CLASS": env.DefaultVolumeSnapshotClass,
+	} {
+		if err := os.Setenv(k, v); err != nil {
+			panic(err)
+		}
+	}
+
 	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
 	// matching both the operator's and the clusters' pods, we need to start stern twice.
 	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
@@ -127,6 +171,19 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// accessible to all nodes (specs)
 	if env, err = environment.NewTestingEnvironment(); err != nil {
 		panic(err)
+	}
+
+	// Export detected storage class values as environment variables for
+	// backward compatibility with test code that uses os.Getenv and
+	// YAML template substitution via envsubst.
+	for k, v := range map[string]string{
+		"E2E_DEFAULT_STORAGE_CLASS":        env.DefaultStorageClass,
+		"E2E_CSI_STORAGE_CLASS":            env.CSIStorageClass,
+		"E2E_DEFAULT_VOLUMESNAPSHOT_CLASS": env.DefaultVolumeSnapshotClass,
+	} {
+		if err := os.Setenv(k, v); err != nil {
+			panic(err)
+		}
 	}
 
 	_ = k8sscheme.AddToScheme(env.Scheme)

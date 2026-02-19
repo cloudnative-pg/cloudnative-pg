@@ -30,26 +30,19 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 HACK_DIR="${ROOT_DIR}/hack"
 E2E_DIR="${HACK_DIR}/e2e"
-ENGINES_DIR="${HACK_DIR}/testing-tools/k8s-engines"
 
 # Specify which engine to use to create the kubernetes cluster.
 # E.g.: CLUSTER_ENGINE=k3d ./hack/e2e/run-e2e-local.sh
 # Default: kind
 export CLUSTER_ENGINE="${CLUSTER_ENGINE:-kind}"
 
-# shellcheck source=/dev/null
-source "${ENGINES_DIR}/${CLUSTER_ENGINE}/settings.sh"
-
 export PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 export BUILD_IMAGE=${BUILD_IMAGE:-false}
-export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
 export LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-false}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
-export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
-export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-csi-hostpath-snapclass}
 export CONTROLLER_IMG_DIGEST=${CONTROLLER_IMG_DIGEST:-""}
 export CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 

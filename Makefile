@@ -138,7 +138,7 @@ e2e-test-k3d: ## Run e2e tests locally using k3d.
 	CLUSTER_ENGINE=k3d hack/e2e/run-e2e-local.sh
 
 e2e-test-existing-cluster: ## Run e2e tests using the default kubernetes context.
-	hack/e2e/run-e2e-existing-cluster.sh
+	hack/e2e/run-e2e-suite.sh
 
 ##@ Build
 build: generate fmt vet build-manager build-plugin ## Build binaries.
