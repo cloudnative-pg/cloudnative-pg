@@ -56,9 +56,9 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelSelfHealing), f
 	// 1. The reconciler detects the failed job
 	// 2. It reads the VolumeSnapshot name from the PGDATA PVC's dataSource
 	// 3. It records the snapshot name in cluster.Status.ExcludedSnapshots
-	// 4. It deletes the failed job
-	// 5. The cluster recovers to healthy state
-	It("deletes failed snapshot-recovery jobs and excludes the snapshot from future use", func() {
+	// 4. The failed job is retained (TTL controller handles cleanup)
+	// 5. The cluster stays healthy (failed jobs don't block the reconciler)
+	It("excludes the snapshot from future use when a snapshot-recovery job fails", func() {
 		const namespacePrefix = "failed-job-handling"
 		const snapshotName = "test-snapshot-pgdata"
 		var err error
@@ -170,58 +170,48 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelSelfHealing), f
 			err = env.Client.Create(env.Ctx, failedJob)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Re-fetch to get the server-set resourceVersion
-			err = env.Client.Get(env.Ctx, ctrlclient.ObjectKeyFromObject(failedJob), failedJob)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Set the job status to Failed. K8s 1.35+ validates:
+			// Set the job status to Failed with a retry loop to handle
+			// conflicts from the reconciler updating the job concurrently.
+			// K8s 1.35+ validates:
 			// - FailureTarget condition must appear before Failed
 			// - active == 0 for finished jobs (guaranteed by Suspend: true)
 			// - startTime must be set for finished jobs
 			// - uncountedTerminatedPods must be nil for finished jobs
-			now := metav1.Now()
-			failedJob.Status.StartTime = &now
-			failedJob.Status.Failed = 1
-			failedJob.Status.UncountedTerminatedPods = nil
-			failedJob.Status.Conditions = []batchv1.JobCondition{
-				{
-					Type:               batchv1.JobFailureTarget,
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: now,
-					Reason:             "BackoffLimitExceeded",
-					Message:            "Synthetic failed job for E2E test",
-				},
-				{
-					Type:               batchv1.JobFailed,
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: now,
-					Reason:             "BackoffLimitExceeded",
-					Message:            "Synthetic failed job for E2E test",
-				},
-			}
-			err = env.Client.Status().Update(env.Ctx, failedJob)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("setting the cluster phase to 'Creating replica' to simulate stuck state", func() {
-			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			cluster.Status.Phase = apiv1.PhaseCreatingReplica
-			cluster.Status.PhaseReason = "Simulated stuck phase with failed snapshot-recovery job"
-			err = env.Client.Status().Update(env.Ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("verifying the failed job gets deleted by the reconciler", func() {
 			Eventually(func(g Gomega) {
-				var job batchv1.Job
-				err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{
-					Namespace: namespace,
-					Name:      clusterName + "-snap-recovery-failed",
-				}, &job)
-				g.Expect(err).To(HaveOccurred(), "job should be deleted")
-			}, 120, 5).Should(Succeed())
+				g.Expect(env.Client.Get(env.Ctx, ctrlclient.ObjectKeyFromObject(failedJob), failedJob)).
+					To(Succeed())
+
+				now := metav1.Now()
+				failedJob.Status.StartTime = &now
+				failedJob.Status.Failed = 1
+				failedJob.Status.UncountedTerminatedPods = nil
+				failedJob.Status.Conditions = []batchv1.JobCondition{
+					{
+						Type:               batchv1.JobFailureTarget,
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: now,
+						Reason:             "BackoffLimitExceeded",
+						Message:            "Synthetic failed job for E2E test",
+					},
+					{
+						Type:               batchv1.JobFailed,
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: now,
+						Reason:             "BackoffLimitExceeded",
+						Message:            "Synthetic failed job for E2E test",
+					},
+				}
+				g.Expect(env.Client.Status().Update(env.Ctx, failedJob)).To(Succeed())
+			}, 30, 1).Should(Succeed())
+		})
+
+		By("verifying the failed job is retained (TTL controller handles cleanup)", func() {
+			var job batchv1.Job
+			err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{
+				Namespace: namespace,
+				Name:      clusterName + "-snap-recovery-failed",
+			}, &job)
+			Expect(err).ToNot(HaveOccurred(), "failed job should still exist")
 		})
 
 		By("verifying cluster.Status.ExcludedSnapshots contains the snapshot name", func() {
@@ -233,12 +223,12 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelSelfHealing), f
 			}, 120, 5).Should(Succeed())
 		})
 
-		By("verifying the cluster recovers to healthy state", func() {
+		By("verifying the cluster remains healthy", func() {
 			Eventually(func(g Gomega) {
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseHealthy),
-					"cluster should recover from stuck phase after failed job is deleted")
+					"cluster should stay healthy since failed jobs don't block the reconciler")
 			}, 120, 5).Should(Succeed())
 		})
 	})

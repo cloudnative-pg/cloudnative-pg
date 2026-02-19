@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"slices"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Enable removes a VolumeSnapshot from the cluster's ExcludedSnapshots list,
