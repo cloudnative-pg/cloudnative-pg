@@ -84,7 +84,7 @@ func init() {
 	copy(originalHandlers, utilruntime.ErrorHandlers)
 
 	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
-		func(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
+		func(ctx context.Context, err error, msg string, keysAndValues ...any) {
 			if isExpectedPortForwardError(err) {
 				return
 			}

@@ -48,7 +48,7 @@ type Error struct {
 }
 
 // Response a response from the http webserver
-type Response[T interface{}] struct {
+type Response[T any] struct {
 	Data  *T     `json:"data,omitempty"`
 	Error *Error `json:"error,omitempty"`
 }
@@ -158,7 +158,7 @@ func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string
 	})
 }
 
-func sendJSONResponseWithData[T interface{}](w http.ResponseWriter, statusCode int, data T) {
+func sendJSONResponseWithData[T any](w http.ResponseWriter, statusCode int, data T) {
 	sendJSONResponse(w, statusCode, Response[T]{
 		Data: &data,
 	})

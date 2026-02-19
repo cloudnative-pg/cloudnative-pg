@@ -56,7 +56,7 @@ type MetricMap struct {
 
 	// Conversion is the function to convert a dynamic type into a value suitable
 	// for the exporter
-	Conversion func(interface{}) (float64, bool) `json:"-"`
+	Conversion func(any) (float64, bool) `json:"-"`
 }
 
 // MetricMapSet is a set of MetricMap, usually associated to a UserQuery
@@ -182,7 +182,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Desc: prometheus.NewDesc(
 				columnFQName,
 				columnMapping.Description, variableLabels, nil),
-			Conversion: func(in interface{}) (float64, bool) {
+			Conversion: func(in any) (float64, bool) {
 				text, ok := in.(string)
 				if !ok {
 					return math.NaN(), false
@@ -204,7 +204,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_milliseconds", columnFQName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: func(in interface{}) (float64, bool) {
+			Conversion: func(in any) (float64, bool) {
 				var durationString string
 				switch t := in.(type) {
 				case []byte:
