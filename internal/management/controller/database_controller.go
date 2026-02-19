@@ -32,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -43,6 +45,7 @@ type DatabaseReconciler struct {
 
 	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Database]
+	admission           *guard.Admission
 
 	getSuperUserDB func() (*sql.DB, error)
 	getTargetDB    func(dbname string) (*sql.DB, error)
@@ -104,6 +107,14 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}, &database); err != nil {
 		contextLogger.Trace("Could not fetch Database", "error", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(ctx, guard.AdmissionParams{
+		Object:       &database,
+		Client:       r.Client,
+		ApplyChanges: true,
+	}); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// This is not for me!
@@ -206,6 +217,10 @@ func NewDatabaseReconciler(
 		},
 		getTargetDB: func(dbname string) (*sql.DB, error) {
 			return instance.ConnectionPool().Connection(dbname)
+		},
+		admission: &guard.Admission{
+			Defaulter: &webhookv1.DatabaseCustomDefaulter{},
+			Validator: &webhookv1.DatabaseCustomValidator{},
 		},
 	}
 

@@ -50,6 +50,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
@@ -116,6 +117,17 @@ func (r *InstanceReconciler) Reconcile(
 		}
 
 		return reconcile.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
+	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(
+		ctx,
+		guard.AdmissionParams{
+			Object:       cluster,
+			Client:       r.client,
+			ApplyChanges: false,
+		},
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	contextLogger.Debug("Reconciling Cluster")
