@@ -111,13 +111,11 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
 		// for replication and pg_rewind to work correctly.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := configureInstancePermissions(postgresContext, i.instance); err != nil {
 				contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
 			}
-		}()
+		})
 
 		// From now on the instance can be checked for readiness. This is
 		// used from the readiness probe to avoid testing PostgreSQL.
