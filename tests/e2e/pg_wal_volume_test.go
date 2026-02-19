@@ -156,7 +156,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			assertAddWALVolume()
 
 			By("verifying the primary did not switch", func() {
-				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 	})
@@ -174,7 +174,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			assertAddWALVolume()
 
 			By("verifying the primary did switch", func() {
-				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
 			})
 		})
 	})

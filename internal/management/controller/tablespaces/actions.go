@@ -49,7 +49,7 @@ func (r *createTablespaceAction) execute(
 ) apiv1.TablespaceState {
 	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
 
-	contextLog.Trace("creating tablespace ", "tablespace", r.tablespace.Name)
+	contextLog.Trace("creating tablespace", "tablespace", r.tablespace.Name)
 	if exists, err := tbsStorageManager.storageExists(r.tablespace.Name); err != nil || !exists {
 		contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
 			"tablespaceName", r.tablespace.Name,

@@ -734,7 +734,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("checking the primary didn't switch", func() {
-				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 
@@ -884,7 +884,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("checking the primary did switch", func() {
-				AssertPrimaryWasUpdated(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
 			})
 		})
 	})

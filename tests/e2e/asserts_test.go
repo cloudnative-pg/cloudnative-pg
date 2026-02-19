@@ -3083,10 +3083,10 @@ func assertExcludesMetrics(g Gomega, rawMetricsOutput string, nonCollected []str
 	}
 }
 
-// AssertPrimaryWasUpdated verifies that the -rw endpoint points to the expected primary,
+// AssertPrimaryUpdateMethod verifies that the -rw endpoint points to the expected primary,
 // and checks if the new primary is the same as before (Restart)
 // or has changed (Switchover)
-func AssertPrimaryWasUpdated(
+func AssertPrimaryUpdateMethod(
 	namespace, clusterName string,
 	oldPrimaryPod *corev1.Pod, primaryUpdateMethod apiv1.PrimaryUpdateMethod,
 ) {
