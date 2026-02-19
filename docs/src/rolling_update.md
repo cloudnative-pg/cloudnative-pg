@@ -50,8 +50,8 @@ updated.
 
 When `primaryUpdateStrategy` is set to `unsupervised`, the rolling update
 process is managed by Kubernetes and is entirely automated. Once the replicas
-have been upgraded, the selected `primaryUpdateMethod` operation will initiate
-on the primary. This is the default behavior.
+have been upgraded, the selected `primaryUpdateMethod` operation will be executed
+on the primary. Unsupervised update is the default behavior.
 
 The `primaryUpdateMethod` option accepts one of the following values:
 
@@ -69,7 +69,7 @@ requirements in terms of [RPO](before_you_start.md#postgresql-terminology) and
 [RTO](before_you_start.md#postgresql-terminology), whether your PostgreSQL architecture is shared
 or shared nothing, and so on.
 
-Indeed, being PostgreSQL a primary/standby architecture database management
+Indeed, since PostgreSQL is a primary/standby architecture database management
 system, the update process inevitably generates a downtime for your
 applications. One important aspect to consider for your context is the time it
 takes for your pod to download the new PostgreSQL container image, as that

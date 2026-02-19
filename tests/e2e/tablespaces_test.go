@@ -681,6 +681,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
 		var namespace string
+		var initialPrimary *corev1.Pod
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -688,6 +689,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			clusterSetup(namespace, clusterManifest)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
+			Expect(err).ToNot(HaveOccurred())
+			initialPrimary, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("can update cluster by adding tablespaces", func() {
@@ -726,6 +731,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 			By("waiting for the cluster to be ready again", func() {
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			})
+
+			By("checking the primary didn't switch", func() {
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
 			})
 		})
 
@@ -811,6 +820,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
 		var namespace string
+		var initialPrimary *corev1.Pod
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -818,6 +828,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			clusterSetup(namespace, clusterManifest)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
+			Expect(err).ToNot(HaveOccurred())
+			initialPrimary, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("can update cluster adding tablespaces", func() {
@@ -861,17 +875,23 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
-		})
 
-		It("can verify tablespaces and PVC were created", func() {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(cluster.ContainsTablespaces()).To(BeTrue())
+			By("verifying tablespaces and PVC were created", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
-			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
-			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
-			AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
+				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
+				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
+			})
+			By("waiting for the cluster to be ready again", func() {
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			})
+
+			By("checking the primary did switch", func() {
+				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+			})
 		})
 	})
 })
