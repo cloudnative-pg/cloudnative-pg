@@ -25,12 +25,135 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/blang/semver"
+	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("areAllParamsUpdated", func() {
+	It("should return true when all params match", func() {
+		decreased := map[string]int{"max_connections": 90, "max_worker_processes": 4}
+		controldata := map[string]int{"max_connections": 90, "max_worker_processes": 4}
+		Expect(areAllParamsUpdated(decreased, controldata)).To(BeTrue())
+	})
+
+	It("should return false when a param doesn't match", func() {
+		decreased := map[string]int{"max_connections": 90}
+		controldata := map[string]int{"max_connections": 100}
+		Expect(areAllParamsUpdated(decreased, controldata)).To(BeFalse())
+	})
+
+	It("should return false when a param is missing from controldata", func() {
+		decreased := map[string]int{"max_connections": 90}
+		controldata := map[string]int{}
+		Expect(areAllParamsUpdated(decreased, controldata)).To(BeFalse())
+	})
+
+	It("should return true for empty decreased values", func() {
+		decreased := map[string]int{}
+		controldata := map[string]int{"max_connections": 100}
+		Expect(areAllParamsUpdated(decreased, controldata)).To(BeTrue())
+	})
+})
+
+var _ = Describe("updateResultForDecrease", func() {
+	// decreasedSettingsQuery matches the SQL used by GetDecreasedSensibleSettings
+	decreasedSettingsQuery := regexp.QuoteMeta(
+		`SELECT pending_settings.name, CAST(coalesce(new_setting,default_setting) AS INTEGER) as new_setting`)
+
+	Context("when there are no decreased standby-sensitive settings", func() {
+		It("should not modify the result", func() {
+			db, mock, err := sqlmock.New()
+			Expect(err).ToNot(HaveOccurred())
+
+			mock.ExpectQuery(decreasedSettingsQuery).
+				WillReturnRows(sqlmock.NewRows([]string{"name", "new_setting"}))
+
+			instance := &Instance{}
+			result := &postgres.PostgresqlStatus{
+				IsPrimary:      false,
+				PendingRestart: true,
+			}
+
+			err = updateResultForDecrease(instance, db, result)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.PendingRestart).To(BeTrue())
+			Expect(result.PendingRestartForDecrease).To(BeFalse())
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
+		})
+	})
+
+	Context("when this is a primary instance", func() {
+		It("should keep PendingRestart true and set PendingRestartForDecrease", func() {
+			db, mock, err := sqlmock.New()
+			Expect(err).ToNot(HaveOccurred())
+
+			mock.ExpectQuery(decreasedSettingsQuery).
+				WillReturnRows(sqlmock.NewRows([]string{"name", "new_setting"}).
+					AddRow("max_connections", 90))
+
+			instance := &Instance{}
+			result := &postgres.PostgresqlStatus{
+				IsPrimary:      true,
+				PendingRestart: true,
+			}
+
+			err = updateResultForDecrease(instance, db, result)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.PendingRestart).To(BeTrue())
+			Expect(result.PendingRestartForDecrease).To(BeTrue())
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
+		})
+	})
+
+	Context("when this is a replica cluster instance", func() {
+		DescribeTable("should keep PendingRestart true regardless of pod role",
+			func(podName string, currentPrimary string) {
+				db, mock, err := sqlmock.New()
+				Expect(err).ToNot(HaveOccurred())
+
+				mock.ExpectQuery(decreasedSettingsQuery).
+					WillReturnRows(sqlmock.NewRows([]string{"name", "new_setting"}).
+						AddRow("max_connections", 95))
+
+				instance := (&Instance{}).WithPodName(podName)
+				instance.Cluster = &apiv1.Cluster{
+					Spec: apiv1.ClusterSpec{
+						ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+							Enabled: ptr.To(true),
+							Source:  "cluster-example",
+						},
+					},
+					Status: apiv1.ClusterStatus{
+						CurrentPrimary: currentPrimary,
+					},
+				}
+
+				result := &postgres.PostgresqlStatus{
+					IsPrimary:      false,
+					PendingRestart: true,
+				}
+
+				err = updateResultForDecrease(instance, db, result)
+				Expect(err).ToNot(HaveOccurred())
+				// In a replica cluster, PendingRestart should remain true
+				// because pg_controldata values come from the external source
+				// primary, not from this cluster
+				Expect(result.PendingRestart).To(BeTrue())
+				Expect(result.PendingRestartForDecrease).To(BeTrue())
+				Expect(mock.ExpectationsWereMet()).To(Succeed())
+			},
+			Entry("designated primary",
+				"cluster-replica-tls-1", "cluster-replica-tls-1"),
+			Entry("non-designated-primary standby",
+				"cluster-replica-tls-2", "cluster-replica-tls-1"),
+		)
+	})
+})
 
 var _ = Describe("probes", func() {
 	It("fillWalStatus should properly handle errors", func() {
