@@ -125,6 +125,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	if utils.IsReconciliationDisabled(backup.GetMetadata()) {
+		contextLogger.Warning("Disable reconciliation loop annotation set, skipping the reconciliation.")
+		return ctrl.Result{}, nil
+	}
+
 	switch backup.Status.Phase {
 	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
 		return ctrl.Result{}, nil
