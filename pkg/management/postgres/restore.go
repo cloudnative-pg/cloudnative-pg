@@ -179,14 +179,6 @@ func (info InitInfo) concludeRestore(
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
-	// we need a migration here, otherwise the server will not start up if
-	// we recover from a base which has postgresql.auto.conf
-	// the override.conf and include statement is present, what we need to do is to
-	// migrate the content
-	if _, err := info.GetInstance(cluster).migratePostgresAutoConfFile(ctx); err != nil {
-		return err
-	}
-
 	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
 	// destination path is empty
