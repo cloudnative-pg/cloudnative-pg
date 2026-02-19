@@ -470,7 +470,7 @@ var _ = Describe("failed snapshot exclusion in storage source selection", func()
 		}
 	}
 
-	It("should skip a backup whose snapshot is in FailedSnapshots", func(ctx context.Context) {
+	It("should skip a backup whose snapshot is in ExcludedSnapshots", func(ctx context.Context) {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
@@ -481,7 +481,7 @@ var _ = Describe("failed snapshot exclusion in storage source selection", func()
 				},
 			},
 			Status: apiv1.ClusterStatus{
-				FailedSnapshots: []string{"snap-1"},
+				ExcludedSnapshots: []string{"snap-1"},
 			},
 		}
 
@@ -509,7 +509,7 @@ var _ = Describe("failed snapshot exclusion in storage source selection", func()
 				},
 			},
 			Status: apiv1.ClusterStatus{
-				FailedSnapshots: []string{"snap-1"},
+				ExcludedSnapshots: []string{"snap-1"},
 			},
 		}
 

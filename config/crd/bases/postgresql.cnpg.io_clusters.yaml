@@ -6836,12 +6836,12 @@ spec:
                   TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
                   WAL file, and Time of latest checkpoint
                 type: string
-              failedSnapshots:
+              excludedSnapshots:
                 description: |-
-                  FailedSnapshots is a list of VolumeSnapshot names whose recovery
-                  jobs failed during instance creation. The operator skips these
-                  when selecting a snapshot for new replicas, falling back to
-                  pg_basebackup when none remain.
+                  ExcludedSnapshots is a list of VolumeSnapshot names that the operator
+                  will skip when selecting a snapshot for new replicas, falling back to
+                  pg_basebackup when none remain. Snapshots are added here automatically
+                  when a recovery job fails, or manually via the cnpg plugin.
                 items:
                   type: string
                 type: array

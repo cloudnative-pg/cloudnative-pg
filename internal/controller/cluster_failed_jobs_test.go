@@ -22,7 +22,6 @@ package controller
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -50,7 +49,7 @@ var _ = Describe("handleFailedJobs", func() {
 		recorder = record.NewFakeRecorder(10)
 	})
 
-	It("should delete a failed job and emit an event", func(ctx SpecContext) {
+	It("should emit an event for a failed job and leave it in place", func(ctx SpecContext) {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
@@ -101,9 +100,9 @@ var _ = Describe("handleFailedJobs", func() {
 		err := r.handleFailedJobs(ctx, cluster, resources)
 		Expect(err).ToNot(HaveOccurred())
 
-		// The failed job should be deleted
+		// The failed job should still exist (not deleted)
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&failedJob), &batchv1.Job{})
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
 
 		// An event should have been emitted
 		Expect(recorder.Events).To(HaveLen(1))
@@ -113,7 +112,7 @@ var _ = Describe("handleFailedJobs", func() {
 		Expect(event).To(ContainSubstring("test-job-1"))
 
 		// No snapshots should be recorded
-		Expect(cluster.Status.FailedSnapshots).To(BeEmpty())
+		Expect(cluster.Status.ExcludedSnapshots).To(BeEmpty())
 	})
 
 	It("should record the snapshot name for a failed snapshot-recovery job", func(ctx SpecContext) {
@@ -183,12 +182,12 @@ var _ = Describe("handleFailedJobs", func() {
 		err := r.handleFailedJobs(ctx, cluster, resources)
 		Expect(err).ToNot(HaveOccurred())
 
-		// The failed job should be deleted
+		// The failed job should still exist (not deleted)
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&failedJob), &batchv1.Job{})
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
 
-		// The snapshot name should be recorded in FailedSnapshots
-		Expect(cluster.Status.FailedSnapshots).To(ContainElement("snapshot-abc"))
+		// The snapshot name should be recorded in ExcludedSnapshots
+		Expect(cluster.Status.ExcludedSnapshots).To(ContainElement("snapshot-abc"))
 	})
 
 	It("should not duplicate snapshot names", func(ctx SpecContext) {
@@ -198,7 +197,7 @@ var _ = Describe("handleFailedJobs", func() {
 				Namespace: "default",
 			},
 			Status: apiv1.ClusterStatus{
-				FailedSnapshots: []string{"snapshot-already-there"},
+				ExcludedSnapshots: []string{"snapshot-already-there"},
 			},
 		}
 
@@ -261,12 +260,12 @@ var _ = Describe("handleFailedJobs", func() {
 		err := r.handleFailedJobs(ctx, cluster, resources)
 		Expect(err).ToNot(HaveOccurred())
 
-		// The failed job should be deleted
+		// The failed job should still exist (not deleted)
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&failedJob), &batchv1.Job{})
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
 
 		// The snapshot name should NOT be duplicated
-		Expect(cluster.Status.FailedSnapshots).To(Equal([]string{"snapshot-already-there"}))
+		Expect(cluster.Status.ExcludedSnapshots).To(Equal([]string{"snapshot-already-there"}))
 	})
 
 	It("should skip already-completed jobs", func(ctx SpecContext) {

@@ -1031,12 +1031,12 @@ type ClusterStatus struct {
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
 
-	// FailedSnapshots is a list of VolumeSnapshot names whose recovery
-	// jobs failed during instance creation. The operator skips these
-	// when selecting a snapshot for new replicas, falling back to
-	// pg_basebackup when none remain.
+	// ExcludedSnapshots is a list of VolumeSnapshot names that the operator
+	// will skip when selecting a snapshot for new replicas, falling back to
+	// pg_basebackup when none remain. Snapshots are added here automatically
+	// when a recovery job fails, or manually via the cnpg plugin.
 	// +optional
-	FailedSnapshots []string `json:"failedSnapshots,omitempty"`
+	ExcludedSnapshots []string `json:"excludedSnapshots,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image

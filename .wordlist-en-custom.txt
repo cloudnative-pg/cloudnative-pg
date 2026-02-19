@@ -159,6 +159,7 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExcludedSnapshots
 ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus
@@ -168,7 +169,6 @@ FDWSpec
 FDWs
 FQDN
 FQDNs
-FailedSnapshots
 FailoverQuorum
 FailoverQuorumStatus
 Fei

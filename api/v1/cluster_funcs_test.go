@@ -1789,28 +1789,28 @@ var _ = Describe("Failover quorum", func() {
 	)
 })
 
-var _ = Describe("HasFailedSnapshot", func() {
+var _ = Describe("HasExcludedSnapshot", func() {
 	It("returns true for a snapshot in the list", func() {
 		cluster := &Cluster{
 			Status: ClusterStatus{
-				FailedSnapshots: []string{"snap-a", "snap-b"},
+				ExcludedSnapshots: []string{"snap-a", "snap-b"},
 			},
 		}
-		Expect(cluster.HasFailedSnapshot("snap-a")).To(BeTrue())
-		Expect(cluster.HasFailedSnapshot("snap-b")).To(BeTrue())
+		Expect(cluster.HasExcludedSnapshot("snap-a")).To(BeTrue())
+		Expect(cluster.HasExcludedSnapshot("snap-b")).To(BeTrue())
 	})
 
 	It("returns false for a snapshot not in the list", func() {
 		cluster := &Cluster{
 			Status: ClusterStatus{
-				FailedSnapshots: []string{"snap-a"},
+				ExcludedSnapshots: []string{"snap-a"},
 			},
 		}
-		Expect(cluster.HasFailedSnapshot("snap-c")).To(BeFalse())
+		Expect(cluster.HasExcludedSnapshot("snap-c")).To(BeFalse())
 	})
 
 	It("returns false when list is empty", func() {
 		cluster := &Cluster{}
-		Expect(cluster.HasFailedSnapshot("snap-a")).To(BeFalse())
+		Expect(cluster.HasExcludedSnapshot("snap-a")).To(BeFalse())
 	})
 })

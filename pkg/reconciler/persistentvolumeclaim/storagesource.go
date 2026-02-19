@@ -171,9 +171,9 @@ func getCandidateSourceFromBackupList(
 		}
 
 		source := getCandidateSourceFromBackup(backup)
-		if cluster.HasFailedSnapshot(source.DataSource.Name) {
+		if cluster.HasExcludedSnapshot(source.DataSource.Name) {
 			contextLogger.Info(
-				"skipping backup because its snapshot previously failed during recovery",
+				"skipping backup because its snapshot is excluded from recovery",
 				"backup", backup.Name,
 				"snapshot", source.DataSource.Name,
 			)
@@ -227,7 +227,7 @@ func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSou
 		WALSource:        volumeSnapshots.WalStorage,
 		TablespaceSource: volumeSnapshots.TablespaceStorage,
 	}
-	if cluster.HasFailedSnapshot(source.DataSource.Name) {
+	if cluster.HasExcludedSnapshot(source.DataSource.Name) {
 		return nil
 	}
 	return source

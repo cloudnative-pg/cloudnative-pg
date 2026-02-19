@@ -55,7 +55,7 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelSelfHealing), f
 	// This test verifies the full flow for failed snapshot-recovery jobs:
 	// 1. The reconciler detects the failed job
 	// 2. It reads the VolumeSnapshot name from the PGDATA PVC's dataSource
-	// 3. It records the snapshot name in cluster.Status.FailedSnapshots
+	// 3. It records the snapshot name in cluster.Status.ExcludedSnapshots
 	// 4. It deletes the failed job
 	// 5. The cluster recovers to healthy state
 	It("deletes failed snapshot-recovery jobs and excludes the snapshot from future use", func() {
@@ -224,12 +224,12 @@ var _ = Describe("Failed job handling", Serial, Label(tests.LabelSelfHealing), f
 			}, 120, 5).Should(Succeed())
 		})
 
-		By("verifying cluster.Status.FailedSnapshots contains the snapshot name", func() {
+		By("verifying cluster.Status.ExcludedSnapshots contains the snapshot name", func() {
 			Eventually(func(g Gomega) {
 				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(cluster.Status.FailedSnapshots).To(ContainElement(snapshotName),
-					"the snapshot used by the failed job's PVC should be recorded in FailedSnapshots")
+				g.Expect(cluster.Status.ExcludedSnapshots).To(ContainElement(snapshotName),
+					"the snapshot used by the failed job's PVC should be recorded in ExcludedSnapshots")
 			}, 120, 5).Should(Succeed())
 		})
 

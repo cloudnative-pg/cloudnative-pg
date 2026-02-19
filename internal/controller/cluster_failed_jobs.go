@@ -21,7 +21,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -33,8 +32,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// handleFailedJobs detects failed jobs, emits warning events, records
-// failed snapshot names so they are excluded from future use, and deletes the failed jobs.
+// handleFailedJobs detects failed jobs, emits warning events, and records
+// excluded snapshot names so they are not used for future replica creation.
+// Failed jobs are left in place for troubleshooting; their TTL controller
+// or the user is responsible for cleanup.
 func (r *ClusterReconciler) handleFailedJobs(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -55,7 +56,7 @@ func (r *ClusterReconciler) handleFailedJobs(
 		instanceName := job.Labels[utils.InstanceNameLabelName]
 		reason := getJobFailureReason(*job)
 
-		contextLogger.Info("Detected failed job, deleting",
+		contextLogger.Info("Detected failed job",
 			"job", job.Name,
 			"role", role,
 			"instance", instanceName,
@@ -63,7 +64,7 @@ func (r *ClusterReconciler) handleFailedJobs(
 		)
 
 		r.Recorder.Eventf(cluster, "Warning", "FailedJob",
-			"Job %s (role: %s, instance: %s) failed: %s. Deleting to unblock reconciliation.",
+			"Job %s (role: %s, instance: %s) failed: %s",
 			job.Name, role, instanceName, reason)
 
 		// For snapshot-recovery jobs, find the VolumeSnapshot name
@@ -72,15 +73,11 @@ func (r *ClusterReconciler) handleFailedJobs(
 			if snapshotName := getSnapshotNameFromPVCs(
 				resources.pvcs.Items, instanceName,
 			); snapshotName != "" {
-				if !slices.Contains(cluster.Status.FailedSnapshots, snapshotName) &&
+				if !slices.Contains(cluster.Status.ExcludedSnapshots, snapshotName) &&
 					!slices.Contains(snapshotsToAdd, snapshotName) {
 					snapshotsToAdd = append(snapshotsToAdd, snapshotName)
 				}
 			}
-		}
-
-		if err := r.Delete(ctx, job); err != nil {
-			return fmt.Errorf("deleting failed job %s: %w", job.Name, err)
 		}
 	}
 
@@ -90,8 +87,8 @@ func (r *ClusterReconciler) handleFailedJobs(
 			r.Client,
 			cluster,
 			func(c *apiv1.Cluster) {
-				c.Status.FailedSnapshots = append(
-					c.Status.FailedSnapshots,
+				c.Status.ExcludedSnapshots = append(
+					c.Status.ExcludedSnapshots,
 					snapshotsToAdd...,
 				)
 			},

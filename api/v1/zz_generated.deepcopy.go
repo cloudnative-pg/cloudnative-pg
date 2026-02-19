@@ -989,8 +989,8 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		}
 	}
 	out.SwitchReplicaClusterStatus = in.SwitchReplicaClusterStatus
-	if in.FailedSnapshots != nil {
-		in, out := &in.FailedSnapshots, &out.FailedSnapshots
+	if in.ExcludedSnapshots != nil {
+		in, out := &in.ExcludedSnapshots, &out.ExcludedSnapshots
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
