@@ -67,7 +67,7 @@ cleanup() {
 
 main() {
   # Call to setup-cluster.sh script
-  "${HACK_DIR}/setup-cluster.sh" create -n 6
+  "${HACK_DIR}/setup-cluster.sh" create load-helper-images
 
   trap cleanup EXIT
 
