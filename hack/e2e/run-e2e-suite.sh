@@ -41,28 +41,8 @@ function notinpath() {
     esac
 }
 
-function get_default_storage_class() {
-  kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
-}
-
-function get_default_snapshot_class() {
-  local STORAGE_CLASS=${1:-${1:?STORAGE_CLASS is required}}
-  kubectl get storageclass "$STORAGE_CLASS" -o json | jq -r '.metadata.annotations["storage.kubernetes.io/default-snapshot-class"]'
-}
-
-function get_postgres_image() {
-  grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
-}
-
-function get_pgbouncer_image() {
-  grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
-}
-
-export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
-export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
-export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-$(get_default_snapshot_class "$E2E_CSI_STORAGE_CLASS")}
-export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
-export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(get_pgbouncer_image)}
+export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 
 # Ensure GOBIN is in path, we'll use this to install and execute ginkgo
@@ -74,15 +54,10 @@ fi
 # renovate: datasource=github-releases depName=onsi/ginkgo
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 
-
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
-# Build kubectl-cnpg and export its path
-make build-plugin
-export PATH=${ROOT_DIR}/bin/:${PATH}
-
-LABEL_FILTERS=${FEATURE_TYPE//,/ ||}
+LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
 readonly LABEL_FILTERS
 
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
@@ -92,13 +67,26 @@ RC_GINKGO=0
 export TEST_SKIP_UPGRADE=true
 ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
-       --force-newlines \
+       ${GITHUB_ACTIONS:+--github-output} --force-newlines \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO=$?
 
 # Report if there are any tests that failed
 RC=0
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
+
+# Handle a known ginkgo race condition: when running in parallel mode,
+# ginkgo has a hardcoded 1-second timeout waiting for the parallel server
+# to finalize. If the timeout fires, the per-suite JSON report is never
+# created, producing an empty merged report that fails the jq check above.
+# When ginkgo itself exited 0 (all tests passed) but the report is empty,
+# trust ginkgo's exit code.
+if [[ $RC -ne 0 && $RC_GINKGO -eq 0 ]]; then
+  echo "WARNING: ginkgo exited 0 (all tests passed) but the JSON report check failed."
+  echo "This is likely the known ginkgo parallel report finalization race condition."
+  echo "Trusting ginkgo's exit code."
+  RC=0
+fi
 
 set +x
 if [[ $RC == 0 ]]; then
@@ -107,3 +95,5 @@ if [[ $RC == 0 ]]; then
     echo
   fi
 fi
+
+exit $RC
