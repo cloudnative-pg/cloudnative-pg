@@ -75,7 +75,7 @@ func convertPostgresIDToK8s(tablespaceName string) string {
 	return name
 }
 
-// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// PvcNameForTablespace returns the normalized tablespace PVC name for a given
 // tablespace, on a cluster pod
 func PvcNameForTablespace(podName, tablespaceName string) string {
 	return podName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
