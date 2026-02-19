@@ -81,13 +81,15 @@ fi
 # renovate: datasource=github-releases depName=onsi/ginkgo
 go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
 
+# Build kubectl-cnpg and export its path
+make build-plugin
+export PATH=${ROOT_DIR}/bin/:${PATH}
 
 LABEL_FILTERS=""
 if [ "${FEATURE_TYPE-}" ]; then
   LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
 fi
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
-# The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
 RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
@@ -147,34 +149,20 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
     cnpg-controller-manager
 fi
 
-# Unset DEBUG to prevent k8s from spamming messages
-unset DEBUG
-
-# Build kubectl-cnpg and export its path
-make build-plugin
-export PATH=${ROOT_DIR}/bin/:${PATH}
-
-mkdir -p "${ROOT_DIR}/tests/e2e/out"
-
-# Create at most 4 testing nodes. Using -p instead of --nodes
-# would create CPUs-1 nodes and saturate the testing server
-RC_GINKGO2=0
-export TEST_SKIP_UPGRADE=true
-ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
-       ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
-       --github-output --force-newlines \
-       --output-dir "${ROOT_DIR}/tests/e2e/out/" \
-       --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
-
-# Report if there are any tests that failed
-jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
+# Run the main (non-upgrade) test suite via run-e2e-suite.sh,
+# which handles ginkgo install and test execution.
+RC_MAIN=0
+"${ROOT_DIR}/hack/e2e/run-e2e-suite.sh" || RC_MAIN=$?
 
 set +x
-if [[ $RC == 0 ]]; then
-  if [[ $RC_GINKGO1 != 0 || $RC_GINKGO2 != 0 ]]; then
+if [[ $RC == 0 && $RC_MAIN == 0 ]]; then
+  if [[ $RC_GINKGO1 != 0 ]]; then
     printf "\033[0;32m%s\n" "SUCCESS."
     echo
   fi
 fi
 
-exit $RC
+if [[ $RC -ne 0 ]]; then
+  exit $RC
+fi
+exit $RC_MAIN
