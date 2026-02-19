@@ -161,18 +161,16 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 func (r *ClusterReconciler) switchPrimary(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList *postgres.PostgresqlStatusList,
-	primaryPod corev1.Pod,
-	targetInstance postgres.PostgresqlStatus,
+	currentPrimaryName string,
+	targetPrimaryName string,
 	reason rolloutReason,
 ) (bool, error) {
-	podList.LogStatus(ctx)
 	r.Recorder.Eventf(cluster, "Normal", "Switchover",
-		"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
+		"Initiating switchover to %s to upgrade %s", targetPrimaryName, currentPrimaryName)
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, reason); err != nil {
 		return false, err
 	}
-	if err := r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name); err != nil {
+	if err := r.setPrimaryInstance(ctx, cluster, targetPrimaryName); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -246,8 +244,9 @@ func (r *ClusterReconciler) updatePrimaryPod(
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetInstance.Pod.Name)
+		podList.LogStatus(ctx)
 
-		return r.switchPrimary(ctx, cluster, podList, primaryPod, targetInstance, reason)
+		return r.switchPrimary(ctx, cluster, primaryPod.Name, targetInstance.Pod.Name, reason)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
