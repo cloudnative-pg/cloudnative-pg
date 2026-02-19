@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	storageutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -78,19 +79,22 @@ const (
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
-	RestClientConfig        *rest.Config
-	Client                  client.Client
-	Interface               kubernetes.Interface
-	APIExtensionClient      apiextensionsclientset.Interface
-	Ctx                     context.Context
-	Scheme                  *runtime.Scheme
-	Log                     logr.Logger
-	PostgresImageName       string
-	PostgresImageTag        string
-	PostgresVersion         uint64
-	PostgresImageRepository string
-	PostGISImageRepository  string
-	createdNamespaces       *uniqueStringSlice
+	RestClientConfig           *rest.Config
+	Client                     client.Client
+	Interface                  kubernetes.Interface
+	APIExtensionClient         apiextensionsclientset.Interface
+	Ctx                        context.Context
+	Scheme                     *runtime.Scheme
+	Log                        logr.Logger
+	PostgresImageName          string
+	PostgresImageTag           string
+	PostgresVersion            uint64
+	PostgresImageRepository    string
+	PostGISImageRepository     string
+	DefaultStorageClass        string
+	CSIStorageClass            string
+	DefaultVolumeSnapshotClass string
+	createdNamespaces          *uniqueStringSlice
 }
 
 type uniqueStringSlice struct {
@@ -181,6 +185,37 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	err = utils.DetectSecurityContextConstraints(clientDiscovery)
 	if err != nil {
 		return nil, fmt.Errorf("could not detect SeccompProfile support: %w", err)
+	}
+
+	// Detect storage class configuration from the cluster, allowing
+	// environment variable overrides. This follows the same pattern
+	// used for POSTGRES_IMG above.
+	if val, ok := os.LookupEnv("E2E_DEFAULT_STORAGE_CLASS"); ok && val != "" {
+		env.DefaultStorageClass = val
+	} else {
+		env.DefaultStorageClass, err = storageutils.GetDefaultStorageClassName(env.Ctx, env.Interface)
+		if err != nil {
+			return nil, fmt.Errorf("detecting default storage class: %w", err)
+		}
+	}
+
+	if val, ok := os.LookupEnv("E2E_CSI_STORAGE_CLASS"); ok && val != "" {
+		env.CSIStorageClass = val
+	} else {
+		env.CSIStorageClass, err = storageutils.GetCSIStorageClassName(env.Ctx, env.Interface)
+		if err != nil {
+			return nil, fmt.Errorf("detecting CSI storage class: %w", err)
+		}
+	}
+
+	if val, ok := os.LookupEnv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS"); ok && val != "" {
+		env.DefaultVolumeSnapshotClass = val
+	} else {
+		env.DefaultVolumeSnapshotClass, err = storageutils.GetDefaultVolumeSnapshotClassName(
+			env.Ctx, env.Interface, env.CSIStorageClass)
+		if err != nil {
+			return nil, fmt.Errorf("detecting default volume snapshot class: %w", err)
+		}
 	}
 
 	return &env, nil

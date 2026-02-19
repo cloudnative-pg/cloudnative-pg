@@ -113,7 +113,7 @@
       customType: 'regex',
       managerFilePatterns:  [
         '/^\\.github\\/workflows\\/[^/]+\\.ya?ml$/',
-        '/^hack/e2e/run-e2e-existing-cluster.sh$/',
+        '/^hack/e2e/run-e2e-suite.sh$/',
         '/^hack/e2e/run-e2e\\.sh$/',
       ],
       matchStrings: [
