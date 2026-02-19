@@ -156,6 +156,30 @@ type ServiceTemplateSpec struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 }
 
+// PgBouncerDatabaseConfig defines per-database configuration for PgBouncer.
+// This allows overriding connection settings on a per-database basis.
+type PgBouncerDatabaseConfig struct {
+	// Name is the database name as seen by clients connecting to PgBouncer.
+	// Use "*" as a wildcard to match any database.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// DBName is the actual database name on the PostgreSQL server.
+	// If not specified, defaults to the value of Name.
+	// +optional
+	DBName string `json:"dbname,omitempty"`
+
+	// PoolMode overrides the default pool_mode for this database.
+	// +optional
+	PoolMode PgBouncerPoolMode `json:"poolMode,omitempty"`
+
+	// Parameters contains per-database connection parameters.
+	// Supported parameters include: pool_size, reserve_pool, connect_query,
+	// pool_mode (alternative to PoolMode field), client_encoding, datestyle, timezone, etc.
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
 // PgBouncerSpec defines how to configure PgBouncer
 type PgBouncerSpec struct {
 	// The pool mode. Default: `session`.
@@ -218,6 +242,13 @@ type PgBouncerSpec struct {
 	// +kubebuilder:default:=false
 	// +optional
 	Paused *bool `json:"paused,omitempty"`
+
+	// Databases allows defining per-database connection settings.
+	// Each entry configures how PgBouncer handles connections to a specific database.
+	// If not specified or empty, a default wildcard (*) entry is used that routes
+	// all databases to the cluster service with the global pool settings.
+	// +optional
+	Databases []PgBouncerDatabaseConfig `json:"databases,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler
