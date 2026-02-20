@@ -21,13 +21,16 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -39,7 +42,7 @@ var databaseLog = log.WithName("database-resource").WithValues("version", "v1")
 // SetupDatabaseWebhookWithManager registers the webhook for Database in the manager.
 func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &apiv1.Database{}).
-		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{})).
+		WithValidator(newBypassableValidator[*apiv1.Database](&DatabaseCustomValidator{client: mgr.GetClient()})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
 }
@@ -65,17 +68,20 @@ func (d *DatabaseCustomDefaulter) Default(_ context.Context, database *apiv1.Dat
 
 // DatabaseCustomValidator is responsible for validating the Database
 // resource when it is created, updated, or deleted.
-type DatabaseCustomValidator struct{}
+type DatabaseCustomValidator struct {
+	client client.Client
+}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateCreate(
-	_ context.Context, database *apiv1.Database,
+	ctx context.Context, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
 		"Validation for Database upon creation",
 		"name", database.GetName(), "namespace", database.GetNamespace())
 
 	allErrs := v.validate(database)
+	allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
 	allWarnings := v.getAdmissionWarnings(database)
 
 	if len(allErrs) == 0 {
@@ -89,7 +95,7 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Database .
 func (v *DatabaseCustomValidator) ValidateUpdate(
-	_ context.Context,
+	ctx context.Context,
 	oldDatabase *apiv1.Database, database *apiv1.Database,
 ) (admission.Warnings, error) {
 	databaseLog.Info(
@@ -100,6 +106,7 @@ func (v *DatabaseCustomValidator) ValidateUpdate(
 		v.validate(database),
 		v.validateDatabaseChanges(database, oldDatabase)...,
 	)
+	allErrs = append(allErrs, v.validateCrossNamespaceCluster(ctx, database)...)
 	allWarnings := v.getAdmissionWarnings(database)
 
 	if len(allErrs) == 0 {
@@ -111,7 +118,73 @@ func (v *DatabaseCustomValidator) ValidateUpdate(
 		database.Name, allErrs)
 }
 
-func (v *DatabaseCustomValidator) validateDatabaseChanges(_ *apiv1.Database, _ *apiv1.Database) field.ErrorList {
+func (v *DatabaseCustomValidator) validateDatabaseChanges(newDB, oldDB *apiv1.Database) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Prevent changing cluster.namespace after creation
+	if oldDB.Spec.ClusterRef.Namespace != "" &&
+		newDB.Spec.ClusterRef.Namespace != oldDB.Spec.ClusterRef.Namespace {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "cluster", "namespace"),
+			newDB.Spec.ClusterRef.Namespace,
+			"cluster.namespace is immutable once set",
+		))
+	}
+
+	return allErrs
+}
+
+// validateCrossNamespaceCluster validates that if the Database references a Cluster
+// in a different namespace, the Cluster must have EnableCrossNamespaceDatabases set to true.
+func (v *DatabaseCustomValidator) validateCrossNamespaceCluster(
+	ctx context.Context,
+	db *apiv1.Database,
+) field.ErrorList {
+	// If not cross-namespace, no validation needed
+	if !db.IsCrossNamespace() {
+		return nil
+	}
+
+	// If no client is available (e.g., in unit tests), skip this validation
+	if v.client == nil {
+		return nil
+	}
+
+	// Fetch the referenced Cluster
+	cluster := &apiv1.Cluster{}
+	clusterKey := types.NamespacedName{
+		Name:      db.Spec.ClusterRef.Name,
+		Namespace: db.Spec.ClusterRef.Namespace,
+	}
+
+	if err := v.client.Get(ctx, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return field.ErrorList{
+				field.NotFound(
+					field.NewPath("spec", "cluster"),
+					fmt.Sprintf("%s/%s", db.Spec.ClusterRef.Namespace, db.Spec.ClusterRef.Name),
+				),
+			}
+		}
+		// For other errors, log and allow (fail open) to avoid blocking all operations
+		databaseLog.Error(err, "Failed to fetch cluster for cross-namespace validation",
+			"cluster", clusterKey)
+		return nil
+	}
+
+	// Check if the cluster has EnableCrossNamespaceDatabases set to true
+	if !cluster.Spec.EnableCrossNamespaceDatabases {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "cluster", "namespace"),
+				fmt.Sprintf(
+					"cluster %q does not have enableCrossNamespaceDatabases set to true",
+					db.Spec.ClusterRef.Name,
+				),
+			),
+		}
+	}
+
 	return nil
 }
 

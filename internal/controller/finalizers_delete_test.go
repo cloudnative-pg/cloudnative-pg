@@ -68,7 +68,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "cluster",
 						},
 					},
@@ -87,7 +87,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 					},
 					Spec: apiv1.DatabaseSpec{
 						Name: "db-test-2",
-						ClusterRef: corev1.LocalObjectReference{
+						ClusterRef: apiv1.ClusterObjectReference{
 							Name: "cluster",
 						},
 					},
@@ -125,7 +125,7 @@ var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 						},
 						Spec: apiv1.DatabaseSpec{
 							Name: "db-test",
-							ClusterRef: corev1.LocalObjectReference{
+							ClusterRef: apiv1.ClusterObjectReference{
 								Name: "another-cluster",
 							},
 						},

@@ -20,9 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -318,5 +323,279 @@ var _ = Describe("Database validation", func() {
 			"spec.servers[0].usages[1].name":  "dup_usage",
 			"spec.servers[1].name":            "server1",
 		})
+	})
+})
+
+var _ = Describe("Database namespace immutability validation", func() {
+	var v *DatabaseCustomValidator
+
+	BeforeEach(func() {
+		v = &DatabaseCustomValidator{}
+	})
+
+	It("allows update when cluster.namespace is unchanged", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.Owner = "new-owner" // Change something else
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows update when cluster.namespace was empty and remains empty", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.Owner = "new-owner"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows setting cluster.namespace when it was previously empty", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = "cluster-namespace"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("rejects changing cluster.namespace once it is set", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "original-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = "different-namespace"
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(errs[0].Detail).To(ContainSubstring("immutable"))
+	})
+
+	It("rejects clearing cluster.namespace once it is set", func() {
+		oldDB := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "original-namespace",
+				},
+				Name:  "mydb",
+				Owner: "app",
+			},
+		}
+
+		newDB := oldDB.DeepCopy()
+		newDB.Spec.ClusterRef.Namespace = ""
+
+		errs := v.validateDatabaseChanges(newDB, oldDB)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+	})
+})
+
+var _ = Describe("Database cross-namespace validation", func() {
+	var ctx context.Context
+
+	BeforeEach(func() {
+		ctx = context.Background()
+	})
+
+	It("allows same-namespace Database without checking cluster", func() {
+		v := &DatabaseCustomValidator{}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name: "my-cluster",
+					// No namespace specified, defaults to same namespace
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("allows cross-namespace Database when cluster has EnableCrossNamespaceDatabases=true", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:                     1,
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("rejects cross-namespace Database when cluster has EnableCrossNamespaceDatabases=false", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-cluster",
+				Namespace: "cluster-namespace",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances:                     1,
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster.namespace"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(errs[0].Detail).To(ContainSubstring("enableCrossNamespaceDatabases"))
+	})
+
+	It("rejects cross-namespace Database when cluster does not exist", func() {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			Build()
+
+		v := &DatabaseCustomValidator{client: fakeClient}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "non-existent-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Field).To(Equal("spec.cluster"))
+		Expect(errs[0].Type).To(Equal(field.ErrorTypeNotFound))
+	})
+
+	It("skips validation when client is nil (unit test mode)", func() {
+		v := &DatabaseCustomValidator{client: nil}
+		db := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mydb",
+				Namespace: "app-namespace",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: apiv1.ClusterObjectReference{
+					Name:      "my-cluster",
+					Namespace: "cluster-namespace",
+				},
+				Name: "mydb",
+			},
+		}
+
+		errs := v.validateCrossNamespaceCluster(ctx, db)
+		Expect(errs).To(BeEmpty())
 	})
 })

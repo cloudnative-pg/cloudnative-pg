@@ -21,6 +21,9 @@ spec:
     - jsonPath: .spec.cluster.name
       name: Cluster
       type: string
+    - jsonPath: .spec.cluster.namespace
+      name: Cluster Namespace
+      type: string
     - jsonPath: .spec.name
       name: PG Name
       type: string
@@ -77,16 +80,15 @@ spec:
                 description: The name of the PostgreSQL cluster hosting the database.
                 properties:
                   name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name of the Cluster.
                     type: string
+                  namespace:
+                    description: Namespace of the Cluster. Defaults to the Database's
+                      namespace if empty.
+                    type: string
+                required:
+                - name
                 type: object
-                x-kubernetes-map-type: atomic
               collationVersion:
                 description: |-
                   Maps to the `COLLATION_VERSION` parameter of `CREATE DATABASE`. This

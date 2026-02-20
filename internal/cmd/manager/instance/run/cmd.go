@@ -198,11 +198,8 @@ func runSubCommand( //nolint:gocognit,gocyclo
 						instance.GetNamespaceName(): {},
 					},
 				},
-				&apiv1.Database{}: {
-					Namespaces: map[string]cache.Config{
-						instance.GetNamespaceName(): {},
-					},
-				},
+				// Watch all namespaces for cross-namespace Database support
+				&apiv1.Database{}: {},
 				&apiv1.Publication{}: {
 					Namespaces: map[string]cache.Config{
 						instance.GetNamespaceName(): {},
