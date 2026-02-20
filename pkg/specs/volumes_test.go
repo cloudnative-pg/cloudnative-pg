@@ -626,7 +626,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 		})
 	})
 
-	Context("sanitizeExtensionNameForVolume", func() {
+	Context("SanitizeExtensionNameForVolume", func() {
 		It("should add ext- prefix and replace underscores with hyphens", func() {
 			Expect(SanitizeExtensionNameForVolume("pg_ivm")).To(Equal("ext-pg-ivm"))
 		})

@@ -136,23 +136,19 @@ func compareMaps[V comparable](current, target map[string]V) (bool, string) {
 	return true, ""
 }
 
-// shouldIgnoreCurrentVolume checks if a volume or mount is the superuser or app
-// mount, which had been added, superflously, in previous versions. If so, ignores
-// it for the PodSpec drift detector, to avoid unnecessary restarts
+// isLegacyVolumeToIgnore returns true for volumes that were removed in 1.24
+// but may still exist on running pods.
 //
 // TODO: delete this function after minor version 1.24 is discontinued
-func shouldIgnoreCurrentVolume(name string) bool {
+func isLegacyVolumeToIgnore(name string) bool {
 	return name == "superuser-secret" || name == "app-secret"
 }
 
 // normalizeVolumeName maps old unprefixed volume names to the new prefixed
 // scheme (ext- for extensions, tbs- for tablespaces) to avoid spurious
-// pod restarts on upgrade.
-//
-// NOTE: extensions named "ext_*" or tablespaces named "tbs_*" will have
-// old sanitized names that already start with "ext-" or "tbs-", causing
-// this function to skip normalization. This results in one spurious pod
-// restart for the affected cluster on the first reconciliation after upgrade.
+// pod restarts on upgrade. Names already starting with the correct prefix
+// are left unchanged, which causes one spurious restart for extensions
+// named "ext_*" or tablespaces named "tbs_*".
 //
 // TODO: delete this function after minor version 1.28 is discontinued
 func normalizeVolumeName(vol corev1.Volume) string {
@@ -171,9 +167,8 @@ func normalizeVolumeName(vol corev1.Volume) string {
 	return name
 }
 
-// normalizeVolumeMountName maps old unprefixed volume mount names to the new
-// prefixed scheme based on mount path. See normalizeVolumeName for known
-// limitations with "ext_*" and "tbs_*" naming patterns.
+// normalizeVolumeMountName is the VolumeMount counterpart of
+// normalizeVolumeName, using mount paths to detect the volume type.
 //
 // TODO: delete this function after minor version 1.28 is discontinued
 func normalizeVolumeMountName(mount corev1.VolumeMount) string {
@@ -195,7 +190,7 @@ func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
 	for _, vol := range currentVolumes {
-		if shouldIgnoreCurrentVolume(vol.Name) {
+		if isLegacyVolumeToIgnore(vol.Name) {
 			continue
 		}
 		normalized := normalizeVolumeName(vol)
@@ -213,7 +208,7 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	current := make(map[string]corev1.VolumeMount)
 	target := make(map[string]corev1.VolumeMount)
 	for _, mount := range currentMounts {
-		if shouldIgnoreCurrentVolume(mount.Name) {
+		if isLegacyVolumeToIgnore(mount.Name) {
 			continue
 		}
 		normalized := normalizeVolumeMountName(mount)
