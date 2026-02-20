@@ -1289,6 +1289,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
+	// Create PVCs before the job. If PVC creation fails, we avoid leaving
+	// an orphaned job without its backing storage.
+	if err := persistentvolumeclaim.CreateInstancePVCs(
+		ctx,
+		r.Client,
+		cluster,
+		storageSource,
+		nodeSerial,
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
+	}
+
 	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
@@ -1298,16 +1310,6 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 		contextLogger.Error(err, "Unable to create Job", "job", job)
 		return ctrl.Result{}, err
-	}
-
-	if err := persistentvolumeclaim.CreateInstancePVCs(
-		ctx,
-		r.Client,
-		cluster,
-		storageSource,
-		nodeSerial,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create replica instance PVCs: %w", err)
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop

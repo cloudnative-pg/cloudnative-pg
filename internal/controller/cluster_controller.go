@@ -744,6 +744,12 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Handle failed jobs: emit events, record failed snapshots, delete
+	if err := r.handleFailedJobs(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
