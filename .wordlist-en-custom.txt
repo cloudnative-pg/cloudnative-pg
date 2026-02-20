@@ -815,7 +815,6 @@ disablePassword
 disabledDefaultServices
 discoverable
 displayName
-displayName
 distro
 distroless
 distros
@@ -883,6 +882,7 @@ fieldPath
 fieldref
 filesystem
 finalizer
+finalizers
 findstr
 fio
 fips
@@ -990,6 +990,7 @@ jobCount
 jq
 json
 jsonpath
+juliamertz
 kb
 kbytes
 keepalive
@@ -1151,6 +1152,7 @@ passwordSecret
 passwordStatus
 passwordstate
 pc
+pchovelon
 pdf
 periodSeconds
 persistentVolumeClaims
@@ -1341,6 +1343,7 @@ runtime
 rw
 sSfL
 sa
+sanitization
 sas
 scalability
 scalable
@@ -1392,6 +1395,7 @@ sha
 shm
 shmall
 shmmax
+shusaan
 sig
 sigs
 sigstore

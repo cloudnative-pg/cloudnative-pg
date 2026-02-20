@@ -4,25 +4,25 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=workflow-requirements.txt --strip-extras workflow-requirements.in
 #
-boto3==1.42.24 \
-    --hash=sha256:8ed6ad670a5a2d7f66c1b0d3362791b48392c7a08f78479f5d8ab319a4d9118f \
-    --hash=sha256:c47a2f40df933e3861fc66fd8d6b87ee36d4361663a7e7ba39a87f5a78b2eae1
+boto3==1.42.46 \
+    --hash=sha256:679cf4930e559621653bbd1439cf6e93b138cbaf46e36e5d7d95319999b7a356 \
+    --hash=sha256:c8c82ab34dd8d2d4d93a562d0e75fca164efa644651d3ccddb0f4aa88a481b38
     # via -r workflow-requirements.in
-botocore==1.42.24 \
-    --hash=sha256:8fca9781d7c84f7ad070fceffaff7179c4aa7a5ffb27b43df9d1d957801e0a8d \
-    --hash=sha256:be8d1bea64fb91eea08254a1e5fea057e4428d08e61f4e11083a02cafc1f8cc6
+botocore==1.42.46 \
+    --hash=sha256:f7459fcf586f38a3b0a242a172d3332141c770a3f5767bbb21e79d810db95d75 \
+    --hash=sha256:fc290b33aba6e271f627c4f46b8bcebfa1a94e19157d396732da417404158c01
     # via
     #   boto3
     #   s3transfer
-jmespath==1.0.1 \
-    --hash=sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980 \
-    --hash=sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe
+jmespath==1.1.0 \
+    --hash=sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d \
+    --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64
     # via
     #   boto3
     #   botocore
-packaging==25.0 \
-    --hash=sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484 \
-    --hash=sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f
+packaging==26.0 \
+    --hash=sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4 \
+    --hash=sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529
     # via -r workflow-requirements.in
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \

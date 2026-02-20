@@ -57,19 +57,20 @@ KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
 CONTROLLER_TOOLS_VERSION ?= v0.20.0
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
-CRDREFDOCS_VERSION ?= v0.2.0
+CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
 GORELEASER_VERSION ?= v2.13.3
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.57.0
+SPELLCHECK_VERSION ?= 0.58.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.42.0
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.61.0
+OPM_VERSION ?= v1.63.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.16.0
+OPENSHIFT_VERSIONS ?= v4.14-v4.21
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -131,10 +132,13 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 e2e-test-kind: ## Run e2e tests locally using kind.
-	hack/e2e/run-e2e-kind.sh
+	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
 
-e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
-	hack/e2e/run-e2e-local.sh
+e2e-test-k3d: ## Run e2e tests locally using k3d.
+	CLUSTER_ENGINE=k3d hack/e2e/run-e2e-local.sh
+
+e2e-test-existing-cluster: ## Run e2e tests using the default kubernetes context.
+	hack/e2e/run-e2e-suite.sh
 
 ##@ Build
 build: generate fmt vet build-manager build-plugin ## Build binaries.
@@ -182,6 +186,8 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
@@ -266,7 +272,7 @@ lint-fix: ## Run the linter with --fix.
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
-	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
+	find -name '*.sh' -exec shellcheck -x -a -S style {} + ;\
 	}
 
 spellcheck: ## Runs the spellcheck on the project.

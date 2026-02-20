@@ -1298,8 +1298,9 @@ type NodeMaintenanceWindow struct {
 // the primary server of the cluster as part of rolling updates
 type PrimaryUpdateStrategy string
 
-// PrimaryUpdateMethod contains the method to use when upgrading
-// the primary server of the cluster as part of rolling updates
+// PrimaryUpdateMethod defines the method to use when upgrading
+// the primary instance of the cluster as part of rolling updates.
+// The default method is "restart"
 type PrimaryUpdateMethod string
 
 const (
@@ -1473,7 +1474,7 @@ type PostgresConfiguration struct {
 type ExtensionConfiguration struct {
 	// The name of the extension, required
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// The image containing the extension, required

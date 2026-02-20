@@ -12,7 +12,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.6"
+  GOLANG_VERSION: "1.25.7"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
@@ -87,7 +87,7 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}

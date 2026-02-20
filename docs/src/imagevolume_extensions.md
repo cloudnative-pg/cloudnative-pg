@@ -47,7 +47,7 @@ Extension images must be built according to the
 To use image volume extensions with CloudNativePG, you need:
 
 - **PostgreSQL 18 or later**, with support for `extension_control_path`.
-- **Kubernetes 1.33**, with the `ImageVolume` feature gate enabled.
+- **Kubernetes 1.35** or later (1.33 and 1.34 with the `ImageVolume` feature gate enabled).
 - **Container runtime with `ImageVolume` support**:
     - `containerd` v2.1.0 or later, or
     - `CRI-O` v1.31 or later.
@@ -137,8 +137,16 @@ spec:
 
 The `name` field is **mandatory** and **must be unique within the cluster**, as
 it determines the mount path (`/extensions/foo` in this example). It must
-consist of *lowercase alphanumeric characters or hyphens (`-`)* and must start
+consist of *lowercase alphanumeric characters, underscores (`_`) or hyphens (`-`)* and must start
 and end with an alphanumeric character.
+
+:::note
+Extension names containing underscores (e.g., `pg_ivm`) are converted to use
+hyphens (e.g., `pg-ivm`) for Kubernetes volume names to comply with RFC 1123
+DNS label requirements. Do not use extension names that become identical after
+sanitization (e.g., `pg_ivm` and `pg-ivm` both sanitize to `pg-ivm`). The
+webhook validation will prevent such conflicts.
+:::
 
 The `image` stanza follows the [Kubernetes `ImageVolume` API](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/).
 The `reference` must point to a valid container registry path for the extension

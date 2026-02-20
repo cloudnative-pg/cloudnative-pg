@@ -370,7 +370,7 @@ func runSubCommand( //nolint:gocognit,gocyclo
 	localSrv, err := webserver.NewLocalWebServer(
 		instance,
 		mgr.GetClient(),
-		mgr.GetEventRecorderFor("local-webserver"),
+		mgr.GetEventRecorderFor("local-webserver"), //nolint:staticcheck
 	)
 	if err != nil {
 		contextLogger.Error(err, "unable to create local webserver runnable")
@@ -420,15 +420,13 @@ func runSubCommand( //nolint:gocognit,gocyclo
 		return makeUnretryableError(errNoFreeWALSpace)
 	}
 
-	if instance.Cluster != nil {
-		enabledArchiverPluginName := instance.Cluster.GetEnabledWALArchivePluginName()
-		if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
-			contextLogger.Info(
-				"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
-				"enabledArchiverPluginName", enabledArchiverPluginName,
-				"loadedPluginNames", loadedPluginNames)
-			return makeUnretryableError(errWALArchivePluginNotAvailable)
-		}
+	enabledArchiverPluginName := instance.GetClusterOrDefault().GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !slices.Contains(loadedPluginNames, enabledArchiverPluginName) {
+		contextLogger.Info(
+			"Detected missing WAL archiver plugin, waiting for the operator to rollout a new instance Pod",
+			"enabledArchiverPluginName", enabledArchiverPluginName,
+			"loadedPluginNames", loadedPluginNames)
+		return makeUnretryableError(errWALArchivePluginNotAvailable)
 	}
 
 	return nil

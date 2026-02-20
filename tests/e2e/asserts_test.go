@@ -243,6 +243,13 @@ func AssertCreateCluster(
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+
+	// Verify pod sequentiality on fresh cluster creation
+	// This should only be checked here, not in AssertClusterIsReady,
+	// because after scale operations or pod deletions, gaps are expected
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	AssertClusterHasSequentialPods(namespace, clusterName, cluster.Spec.Instances, env)
 }
 
 // AssertClusterIsReady checks the cluster has as many pods as in spec, that
@@ -318,6 +325,73 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		}
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
+}
+
+// AssertClusterHasSequentialPods verifies that pod serial numbers are sequential starting from 1.
+// Non-sequential numbering on a freshly created cluster suggests pods were recreated during
+// initial creation, indicating a potential issue requiring investigation.
+func AssertClusterHasSequentialPods(
+	namespace string,
+	clusterName string,
+	expectedInstances int,
+	env *environment.TestingEnvironment,
+) {
+	podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred(), "failed to list cluster pods")
+	Expect(podList.Items).To(HaveLen(expectedInstances),
+		"cluster should have exactly %d pods", expectedInstances)
+
+	// Extract pod serial numbers
+	podSerials := make([]int, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		var serial int
+		_, err := fmt.Sscanf(pod.Name, clusterName+"-%d", &serial)
+		Expect(err).ToNot(HaveOccurred(),
+			"pod name %s should match expected format %s-<number>", pod.Name, clusterName)
+		podSerials = append(podSerials, serial)
+	}
+
+	// Build expected sequential serials [1, 2, 3, ..., expectedInstances]
+	expectedSerials := make([]int, expectedInstances)
+	for i := 0; i < expectedInstances; i++ {
+		expectedSerials[i] = i + 1
+	}
+
+	// Sort actual serials for comparison
+	slices.Sort(podSerials)
+
+	// Check if serials are sequential
+	if !slices.Equal(podSerials, expectedSerials) {
+		// Calculate which serials were skipped
+		if len(podSerials) == 0 {
+			Fail("No pods found for cluster")
+		}
+		maxSerial := podSerials[len(podSerials)-1]
+		var skippedSerials []int
+		serialIdx := 0
+		for i := 1; i <= maxSerial; i++ {
+			if serialIdx < len(podSerials) && podSerials[serialIdx] == i {
+				serialIdx++
+			} else {
+				skippedSerials = append(skippedSerials, i)
+			}
+		}
+
+		// Build detailed error message
+		errorMsg := fmt.Sprintf(
+			"Pod serial numbers are non-sequential on a freshly created cluster.\n"+
+				"Expected: %v\n"+
+				"Actual:   %v\n",
+			expectedSerials, podSerials)
+
+		if len(skippedSerials) > 0 {
+			errorMsg += fmt.Sprintf("Skipped serial number(s): %v\n", skippedSerials)
+		}
+
+		errorMsg += "\nThis requires investigation to determine the root cause.\n"
+
+		Fail(errorMsg)
+	}
 }
 
 func AssertClusterDefault(
@@ -3007,4 +3081,37 @@ func assertExcludesMetrics(g Gomega, rawMetricsOutput string, nonCollected []str
 		// match a metric with the value of expectedMetrics key
 		g.Expect(rawMetricsOutput).NotTo(ContainSubstring(nonCollectable))
 	}
+}
+
+// AssertPrimaryUpdateMethod verifies that the -rw endpoint points to the expected primary,
+// and checks if the new primary is the same as before (Restart)
+// or has changed (Switchover)
+func AssertPrimaryUpdateMethod(
+	namespace, clusterName string,
+	oldPrimaryPod *corev1.Pod, primaryUpdateMethod apiv1.PrimaryUpdateMethod,
+) {
+	var cluster *apiv1.Cluster
+	var err error
+
+	Eventually(func(g Gomega) {
+		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		g.Expect(err).ToNot(HaveOccurred())
+		if primaryUpdateMethod == apiv1.PrimaryUpdateMethodSwitchover {
+			g.Expect(cluster.Status.CurrentPrimary).ToNot(BeEquivalentTo(oldPrimaryPod.Name))
+		} else {
+			g.Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(oldPrimaryPod.Name))
+		}
+	}, RetryTimeout).Should(Succeed())
+
+	// Get the new current primary Pod
+	currentPrimaryPod, err := podutils.Get(env.Ctx, env.Client, namespace, cluster.Status.CurrentPrimary)
+	Expect(err).ToNot(HaveOccurred())
+
+	endpointName := clusterName + "-rw"
+	// we give 10 seconds to the apiserver to update the endpoint
+	timeout := 10
+	Eventually(func() (string, error) {
+		endpointSlice, err := testsUtils.GetEndpointSliceByServiceName(env.Ctx, env.Client, namespace, endpointName)
+		return testsUtils.FirstEndpointSliceIP(endpointSlice), err
+	}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
 }

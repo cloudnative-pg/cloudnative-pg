@@ -31,11 +31,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -105,6 +106,75 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			AssertSwitchoverOnReplica(replicaNamespace, replicaName, env)
 
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
+
+			By("increasing max_connections to 120 on the replica cluster", func() {
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
+					if err != nil {
+						return err
+					}
+					if cluster.Spec.PostgresConfiguration.Parameters == nil {
+						cluster.Spec.PostgresConfiguration.Parameters = map[string]string{}
+					}
+					cluster.Spec.PostgresConfiguration.Parameters["max_connections"] = "120"
+					return env.Client.Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the replica cluster to apply the increased max_connections", func() {
+				AssertClusterEventuallyReachesPhase(replicaNamespace, replicaName,
+					[]string{
+						apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade,
+						apiv1.PhaseWaitingForInstancesToBeActive,
+					}, 30)
+				AssertClusterIsReady(replicaNamespace, replicaName,
+					testTimeouts[timeouts.ClusterIsReadyQuick], env)
+			})
+
+			By("verifying max_connections is 120 on all pods", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, replicaNamespace, replicaName)
+				Expect(err).ToNot(HaveOccurred())
+				for idx := range podList.Items {
+					pod := &podList.Items[idx]
+					Eventually(QueryMatchExpectationPredicate(
+						pod, postgres.PostgresDBName, "SHOW max_connections", "120"),
+						30).Should(Succeed())
+				}
+			})
+
+			By("decreasing max_connections to 110 on the replica cluster", func() {
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, replicaNamespace, replicaName)
+					if err != nil {
+						return err
+					}
+					cluster.Spec.PostgresConfiguration.Parameters["max_connections"] = "110"
+					return env.Client.Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("waiting for the replica cluster to apply the decreased max_connections", func() {
+				AssertClusterEventuallyReachesPhase(replicaNamespace, replicaName,
+					[]string{
+						apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade,
+						apiv1.PhaseWaitingForInstancesToBeActive,
+					}, 30)
+				AssertClusterIsReady(replicaNamespace, replicaName,
+					testTimeouts[timeouts.ClusterIsReadyQuick], env)
+			})
+
+			By("verifying max_connections is 110 on all pods", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, replicaNamespace, replicaName)
+				Expect(err).ToNot(HaveOccurred())
+				for idx := range podList.Items {
+					pod := &podList.Items[idx]
+					Eventually(QueryMatchExpectationPredicate(
+						pod, postgres.PostgresDBName, "SHOW max_connections", "110"),
+						30).Should(Succeed())
+				}
+			})
 		})
 	})
 
@@ -154,9 +224,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			)
 			var clusterOnePrimary, clusterTwoPrimary *corev1.Pod
 
-			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
-				for _, condition := range conditions {
-					if condition.Type == replicaclusterswitch.ConditionReplicaClusterSwitch {
+			getReplicaClusterSwitchCondition := func(conds []metav1.Condition) *metav1.Condition {
+				for _, condition := range conds {
+					if condition.Type == conditions.ReplicaClusterSwitch {
 						return &condition
 					}
 				}
