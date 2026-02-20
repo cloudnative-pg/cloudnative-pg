@@ -840,14 +840,14 @@ kubectl cnpg logs cluster CLUSTER [flags]
 Using the `-f` option to follow:
 
 ```sh
-kubectl cnpg report cluster CLUSTER -f
+kubectl cnpg logs cluster CLUSTER -f
 ```
 
 Using `--tail` option to display 3 lines from each pod and the `-f` option
 to follow:
 
 ```sh
-kubectl cnpg report cluster CLUSTER -f --tail 3
+kubectl cnpg logs cluster CLUSTER -f --tail 3
 ```
 
 ```output
