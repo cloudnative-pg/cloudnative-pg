@@ -705,3 +705,6 @@ Users are not allowed to set the following configuration parameters in the
 - `unix_socket_directories`
 - `unix_socket_group`
 - `unix_socket_permissions`
+
+!!! Note
+    When using a custom `walSegmentSize`, CloudNativePG ensures that `min_wal_size` is always at least twice the `walSegmentSize`, as required by PostgreSQL. The operator will automatically enforce this during restore and validate it on cluster creation and update.

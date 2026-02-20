@@ -1186,6 +1186,100 @@ var _ = Describe("configuration change validation", func() {
 			Expect(v.validateConfiguration(cluster)).To(BeEmpty())
 		})
 	})
+
+	It("complains when min_wal_size is less than twice walSegmentSize in validateConfiguration", func() {
+		walSeg := 64
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						WalSegmentSize: walSeg,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "80MB",
+					},
+				},
+			},
+		}
+		// 2 * 64 = 128, so 80MB is invalid
+		validator := &ClusterCustomValidator{}
+		errs := validator.validateConfiguration(clusterNew)
+		Expect(errs).NotTo(BeEmpty())
+		found := false
+		for _, err := range errs {
+			if strings.Contains(err.Error(), "min_wal_size must be at least 128MB") {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(BeTrue(), "Expected error message about min_wal_size being at least 128MB")
+	})
+
+	It("accepts when min_wal_size is at least twice walSegmentSize in validateConfiguration", func() {
+		walSeg := 64
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						WalSegmentSize: walSeg,
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "128MB",
+					},
+				},
+			},
+		}
+		// 2 * 64 = 128, so 128MB is valid
+		validator := &ClusterCustomValidator{}
+		errs := validator.validateConfiguration(clusterNew)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("accepts when wal_segment_size is specified in parameters and min_wal_size is sufficient", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_segment_size": "64",
+						"min_wal_size":     "128MB",
+					},
+				},
+			},
+		}
+		// 2 * 64 = 128, so 128MB is valid
+		validator := &ClusterCustomValidator{}
+		errs := validator.validateConfiguration(clusterNew)
+		Expect(errs).To(BeEmpty())
+	})
+
+	It("complains when wal_segment_size is specified in parameters but min_wal_size is insufficient", func() {
+		clusterNew := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_segment_size": "64",
+						"min_wal_size":     "80MB",
+					},
+				},
+			},
+		}
+		// 2 * 64 = 128, so 80MB is invalid
+		validator := &ClusterCustomValidator{}
+		errs := validator.validateConfiguration(clusterNew)
+		Expect(errs).NotTo(BeEmpty())
+		found := false
+		for _, err := range errs {
+			if strings.Contains(err.Error(), "min_wal_size must be at least 128MB") {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(BeTrue(), "Expected error message about min_wal_size being at least 128MB")
+	})
 })
 
 var _ = Describe("validate image name change", func() {

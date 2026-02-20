@@ -82,6 +82,7 @@ var (
 		"max_worker_processes setting": "max_worker_processes",
 		"max_prepared_xacts setting":   "max_prepared_transactions",
 		"max_locks_per_xact setting":   "max_locks_per_transaction",
+		"Bytes per WAL segment":        "wal_segment_size",
 	}
 )
 
@@ -661,6 +662,43 @@ func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, err
 	return recoveryFileContents, nil
 }
 
+// validateAndAdjustWalSizeParameters ensures that min_wal_size is at least twice the wal_segment_size
+// as required by PostgreSQL. This is particularly important when restoring from volume snapshots
+// where the original cluster had a non-default WAL segment size.
+func validateAndAdjustWalSizeParameters(
+	controldataParams map[string]int,
+	clusterParams map[string]int,
+	enforcedParams map[string]string,
+) {
+	// Get WAL segment size from pg_controldata (in bytes)
+	walSegmentSizeBytes, hasWalSegmentSize := controldataParams["wal_segment_size"]
+	if !hasWalSegmentSize {
+		// If we can't get WAL segment size from pg_controldata, use default (16MB)
+		walSegmentSizeBytes = 16 * 1024 * 1024
+	}
+
+	// Convert to MB for easier comparison
+	walSegmentSizeMB := walSegmentSizeBytes / (1024 * 1024)
+
+	// Check if min_wal_size is set and if it's sufficient
+	if minWalSizeStr, hasMinWalSize := clusterParams["min_wal_size"]; hasMinWalSize {
+		// Parse min_wal_size (it's stored as MB in clusterParams)
+		minWalSizeMB := minWalSizeStr
+
+		// PostgreSQL requires min_wal_size >= 2 * wal_segment_size
+		requiredMinWalSizeMB := walSegmentSizeMB * 2
+
+		if minWalSizeMB < requiredMinWalSizeMB {
+			// Update the enforced parameters to set the correct min_wal_size
+			enforcedParams["min_wal_size"] = fmt.Sprintf("%dMB", requiredMinWalSizeMB)
+		}
+	} else {
+		// If min_wal_size is not set, set it to the required value
+		requiredMinWalSizeMB := walSegmentSizeMB * 2
+		enforcedParams["min_wal_size"] = fmt.Sprintf("%dMB", requiredMinWalSizeMB)
+	}
+}
+
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
@@ -703,6 +741,7 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		value := max(clusterParams[param], controldataParams[param])
 		enforcedParams[param] = strconv.Itoa(value)
 	}
+	validateAndAdjustWalSizeParameters(controldataParams, clusterParams, enforcedParams)
 	changed, err := configfile.UpdatePostgresConfigurationFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 		enforcedParams,

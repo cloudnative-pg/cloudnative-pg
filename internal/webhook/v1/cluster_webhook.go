@@ -1156,8 +1156,20 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	}
 
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
+	// and validate WAL segment size relationship
+	walSegmentSize := (*int32)(nil)
+	if param, ok := r.Spec.PostgresConfiguration.Parameters["wal_segment_size"]; ok && param != "" {
+		if v, err := strconv.Atoi(param); err == nil {
+			v32 := int32(v)
+			walSegmentSize = &v32
+		}
+	}
+	if walSegmentSize == nil && r.Spec.Bootstrap != nil && r.Spec.Bootstrap.InitDB != nil && r.Spec.Bootstrap.InitDB.WalSegmentSize != 0 {
+		v := int32(r.Spec.Bootstrap.InitDB.WalSegmentSize)
+		walSegmentSize = &v
+	}
 	result = append(result, validateWalSizeConfiguration(
-		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
+		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil(), walSegmentSize)...)
 
 	if err := validateSyncReplicaElectionConstraint(
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
@@ -1187,8 +1199,10 @@ func tryParseBooleanPostgresParameter(r *apiv1.Cluster, parameterName string) (*
 }
 
 // validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
+// and that min_wal_size >= 2 * wal_segment_size when walSegmentSize is specified
 func validateWalSizeConfiguration(
 	postgresConfig apiv1.PostgresConfiguration, walVolumeSize *resource.Quantity,
+	walSegmentSize *int32,
 ) field.ErrorList {
 	const (
 		minWalSizeKey     = "min_wal_size"
@@ -1238,6 +1252,22 @@ func validateWalSizeConfiguration(
 				minWalSize,
 				fmt.Sprintf("Invalid vale. Parameter %s (default %s) should be smaller than parameter %s (default %s)",
 					minWalSizeKey, minWalSizeDefault, maxWalSizeKey, maxWalSizeDefault)))
+	}
+
+	// Validate that min_wal_size >= 2 * wal_segment_size when walSegmentSize is specified
+	if walSegmentSize != nil && *walSegmentSize > 0 {
+		requiredMinWalSizeMB := int64(*walSegmentSize) * 2
+		requiredMinWalSize := resource.NewQuantity(requiredMinWalSizeMB*1024*1024, resource.BinarySI)
+
+		if minWalSizeValue.Cmp(*requiredMinWalSize) < 0 {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+					minWalSize,
+					fmt.Sprintf("Parameter %s must be at least %dMB when walSegmentSize is %dMB (PostgreSQL requirement: min_wal_size >= 2 * wal_segment_size)",
+						minWalSizeKey, requiredMinWalSizeMB, *walSegmentSize)))
+		}
 	}
 
 	if walVolumeSize == nil {
