@@ -330,6 +330,8 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 	jobName := role.getJobName(instanceName)
 	version, _ := cluster.GetPostgresqlMajorVersion()
 
+	serviceAccount := cluster.GetServiceAccountName()
+
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
 	job := &batchv1.Job{
@@ -384,7 +386,7 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					SecurityContext:           GetPodSecurityContext(&cluster),
 					Affinity:                  CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:               cluster.Spec.Affinity.Tolerations,
-					ServiceAccountName:        cluster.Name,
+					ServiceAccountName:        serviceAccount,
 					RestartPolicy:             corev1.RestartPolicyNever,
 					NodeSelector:              cluster.Spec.Affinity.NodeSelector,
 					TopologySpreadConstraints: cluster.Spec.TopologySpreadConstraints,

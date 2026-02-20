@@ -1,0 +1,16 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-nonexistent-sa
+spec:
+  cluster:
+    name: cluster-pooler-shared-sa
+  type: rw
+  instances: 1
+  serviceAccountName: nonexistent-service-account
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "25"

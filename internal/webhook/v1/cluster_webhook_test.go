@@ -6098,3 +6098,51 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("ServiceAccount configuration validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts cluster without serviceAccountName or serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountName specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName: "shared-sa",
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountTemplate specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects cluster with both serviceAccountName and serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName:     "shared-sa",
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
+		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
+	})
+})

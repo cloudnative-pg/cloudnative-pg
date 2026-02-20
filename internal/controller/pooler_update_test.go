@@ -217,7 +217,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			Expect(expectedRole.Rules).To(Equal(role.Rules))
 
-			expectedRb := pgbouncer.RoleBinding(pooler)
+			expectedRb := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 			roleBinding := &rbacv1.RoleBinding{}
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedRb.Name, Namespace: expectedRb.Namespace}, roleBinding)
 			Expect(err).ToNot(HaveOccurred())

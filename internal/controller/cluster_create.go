@@ -570,6 +570,10 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 // createOrPatchServiceAccount creates or synchronizes the ServiceAccount used by the
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Spec.ServiceAccountName != "" {
+		return r.validateExistingServiceAccount(ctx, cluster)
+	}
+
 	var sa corev1.ServiceAccount
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -601,6 +605,26 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
 	if err := r.Patch(ctx, &sa, client.MergeFrom(origSa)); err != nil {
 		return fmt.Errorf("while patching service account: %w", err)
+	}
+
+	return nil
+}
+
+// validateExistingServiceAccount checks if the specified ServiceAccount exists
+func (r *ClusterReconciler) validateExistingServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
+	var sa corev1.ServiceAccount
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      cluster.Spec.ServiceAccountName,
+		Namespace: cluster.Namespace,
+	}, &sa)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "ServiceAccountNotFound",
+				"Specified ServiceAccount %q not found in namespace %q",
+				cluster.Spec.ServiceAccountName, cluster.Namespace)
+			return fmt.Errorf("serviceAccount %q not found: %w", cluster.Spec.ServiceAccountName, err)
+		}
+		return fmt.Errorf("while validating existing service account: %w", err)
 	}
 
 	return nil
@@ -1033,7 +1057,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
-	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
+	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta, cluster.GetServiceAccountName())
 	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)

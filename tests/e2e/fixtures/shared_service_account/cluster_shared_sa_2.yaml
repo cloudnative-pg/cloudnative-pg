@@ -1,0 +1,13 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-shared-sa-2
+spec:
+  instances: 1
+  
+  # Reference the same shared ServiceAccount as cluster-shared-sa-1
+  serviceAccountName: cluster-shared-sa
+
+  storage:
+    size: 1Gi
