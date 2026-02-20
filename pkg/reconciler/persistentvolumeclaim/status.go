@@ -263,26 +263,21 @@ func classifyPVC(
 
 	// PVC has a corresponding Pod
 	if hasPod(pvc, podList) {
-		// If resizing with a pod present, it can complete filesystem resize
 		if isResizing(pvc) {
 			return resizing
 		}
 		return healthy
 	}
 
-	// PVC is resizing but needs to check if it's waiting for a pod mount
+	// PVC is resizing without a pod
 	if isResizing(pvc) {
-		// FileSystemResizePending means the volume resize is done at the storage layer
-		// but filesystem resize requires a pod to mount the volume.
-		// Treat as dangling so pod recreation happens.
+		// Filesystem resize requires a pod mount to complete; classify as
+		// dangling so the reconciler creates one.
 		if isFileSystemResizePending(pvc) {
-			contextLogger := log.FromContext(ctx)
-			contextLogger.Info("PVC has FileSystemResizePending condition without a pod, "+
-				"classifying as dangling to trigger pod creation for filesystem resize",
+			log.FromContext(ctx).Info("PVC filesystem resize pending without a pod, classifying as dangling",
 				"pvc", pvc.Name)
 			return dangling
 		}
-		// Still waiting for volume resize at storage layer
 		return resizing
 	}
 

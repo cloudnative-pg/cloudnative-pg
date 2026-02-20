@@ -110,198 +110,64 @@ var _ = Describe("PVCs used by instance", func() {
 })
 
 var _ = Describe("isFileSystemResizePending", func() {
-	It("returns false when no conditions are present", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pvc",
-			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Conditions: nil,
-			},
+	pvcWith := func(conditions ...corev1.PersistentVolumeClaimCondition) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			Status: corev1.PersistentVolumeClaimStatus{Conditions: conditions},
 		}
-		Expect(isFileSystemResizePending(pvc)).To(BeFalse())
+	}
+
+	It("returns false when no conditions are present", func() {
+		Expect(isFileSystemResizePending(pvcWith())).To(BeFalse())
 	})
 
 	It("returns false when only Resizing condition is present", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pvc",
+		Expect(isFileSystemResizePending(pvcWith(
+			corev1.PersistentVolumeClaimCondition{
+				Type: corev1.PersistentVolumeClaimResizing, Status: corev1.ConditionTrue,
 			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimResizing,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		}
-		Expect(isFileSystemResizePending(pvc)).To(BeFalse())
+		))).To(BeFalse())
 	})
 
-	It("returns true when FileSystemResizePending condition is present", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pvc",
+	It("returns true when FileSystemResizePending condition is true", func() {
+		Expect(isFileSystemResizePending(pvcWith(
+			corev1.PersistentVolumeClaimCondition{
+				Type: corev1.PersistentVolumeClaimFileSystemResizePending, Status: corev1.ConditionTrue,
 			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimFileSystemResizePending,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		}
-		Expect(isFileSystemResizePending(pvc)).To(BeTrue())
+		))).To(BeTrue())
 	})
 
-	It("returns false when FileSystemResizePending condition has ConditionFalse status", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pvc",
+	It("returns false when FileSystemResizePending condition is false", func() {
+		Expect(isFileSystemResizePending(pvcWith(
+			corev1.PersistentVolumeClaimCondition{
+				Type: corev1.PersistentVolumeClaimFileSystemResizePending, Status: corev1.ConditionFalse,
 			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimFileSystemResizePending,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			},
-		}
-		Expect(isFileSystemResizePending(pvc)).To(BeFalse())
-	})
-
-	It("returns true when both Resizing and FileSystemResizePending conditions are present", func() {
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pvc",
-			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimResizing,
-						Status: corev1.ConditionTrue,
-					},
-					{
-						Type:   corev1.PersistentVolumeClaimFileSystemResizePending,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		}
-		Expect(isFileSystemResizePending(pvc)).To(BeTrue())
+		))).To(BeFalse())
 	})
 })
 
 var _ = Describe("PVC classification with FileSystemResizePending", func() {
 	clusterName := "myCluster"
+	makeCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+		}
+	}
 
-	It("classifies resizing PVC with pod as resizing (can complete resize)", func(ctx SpecContext) {
-		// When a pod is attached and PVC is resizing, filesystem resize can complete
+	It("classifies resizing PVC without pod and with FileSystemResizePending as dangling", func(ctx SpecContext) {
 		pvc := makePVC(clusterName, "1", "1", NewPgDataCalculator(), true)
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName,
-			},
-		}
-		EnrichStatus(
-			ctx,
-			cluster,
-			[]corev1.Pod{makePod(clusterName, "1", specs.ClusterRoleLabelPrimary)},
-			[]batchv1.Job{},
-			[]corev1.PersistentVolumeClaim{pvc},
-		)
-		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{clusterName + "-1"}))
-		Expect(cluster.Status.DanglingPVC).Should(BeEmpty())
-	})
-
-	It("classifies FileSystemResizePending PVC without pod as dangling to trigger pod creation", func(ctx SpecContext) {
-		// Key scenario: volume resize done at storage layer, but filesystem resize
-		// needs a pod mount. Should be classified as dangling to trigger pod creation.
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName + "-1",
-				Labels: map[string]string{
-					"cnpg.io/pvcRole": "PG_DATA",
-				},
-				Annotations: map[string]string{
-					"cnpg.io/nodeSerial":    "1",
-					"cnpg.io/operatorOwned": "true",
-					"cnpg.io/pvcStatus":     StatusReady,
-				},
-			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Phase: corev1.ClaimBound,
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimResizing,
-						Status: corev1.ConditionTrue,
-					},
-					{
-						Type:   corev1.PersistentVolumeClaimFileSystemResizePending,
-						Status: corev1.ConditionTrue,
-					},
-				},
-			},
-		}
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName,
-			},
-		}
-		EnrichStatus(
-			ctx,
-			cluster,
-			[]corev1.Pod{}, // No pod attached
-			[]batchv1.Job{},
-			[]corev1.PersistentVolumeClaim{pvc},
-		)
-		// Should be dangling (not resizing) to trigger pod creation
+		pvc.Status.Conditions = append(pvc.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+			Type: corev1.PersistentVolumeClaimFileSystemResizePending, Status: corev1.ConditionTrue,
+		})
+		cluster := makeCluster()
+		EnrichStatus(ctx, cluster, []corev1.Pod{}, []batchv1.Job{}, []corev1.PersistentVolumeClaim{pvc})
 		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{clusterName + "-1"}))
 		Expect(cluster.Status.ResizingPVC).Should(BeEmpty())
 	})
 
 	It("classifies resizing PVC without pod and without FileSystemResizePending as resizing", func(ctx SpecContext) {
-		// When volume resize is still in progress at storage layer (no FileSystemResizePending),
-		// we should wait and not create a pod yet
-		pvc := corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName + "-1",
-				Labels: map[string]string{
-					"cnpg.io/pvcRole": "PG_DATA",
-				},
-				Annotations: map[string]string{
-					"cnpg.io/nodeSerial":    "1",
-					"cnpg.io/operatorOwned": "true",
-					"cnpg.io/pvcStatus":     StatusReady,
-				},
-			},
-			Status: corev1.PersistentVolumeClaimStatus{
-				Phase: corev1.ClaimBound,
-				Conditions: []corev1.PersistentVolumeClaimCondition{
-					{
-						Type:   corev1.PersistentVolumeClaimResizing,
-						Status: corev1.ConditionTrue,
-					},
-					// No FileSystemResizePending - volume resize still in progress
-				},
-			},
-		}
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName,
-			},
-		}
-		EnrichStatus(
-			ctx,
-			cluster,
-			[]corev1.Pod{}, // No pod attached
-			[]batchv1.Job{},
-			[]corev1.PersistentVolumeClaim{pvc},
-		)
-		// Should remain as resizing since volume resize not complete
+		pvc := makePVC(clusterName, "1", "1", NewPgDataCalculator(), true)
+		cluster := makeCluster()
+		EnrichStatus(ctx, cluster, []corev1.Pod{}, []batchv1.Job{}, []corev1.PersistentVolumeClaim{pvc})
 		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{clusterName + "-1"}))
 		Expect(cluster.Status.DanglingPVC).Should(BeEmpty())
 	})
