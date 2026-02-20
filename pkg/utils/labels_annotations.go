@@ -247,6 +247,10 @@ const (
 	// BackupEndWALAnnotationName is the name of the annotation where a backup's end WAL is kept
 	BackupEndWALAnnotationName = MetadataNamespace + "/backupEndWAL"
 
+	// SnapshotDataSourceAnnotationName is the name of the annotation containing the name of the
+	// VolumeSnapshot used as the data source for a snapshot-recovery job
+	SnapshotDataSourceAnnotationName = MetadataNamespace + "/snapshotDataSource"
+
 	// BackupStartTimeAnnotationName is the name of the annotation where a backup's start time is kept
 	BackupStartTimeAnnotationName = MetadataNamespace + "/backupStartTime"
 

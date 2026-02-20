@@ -1788,3 +1788,23 @@ var _ = Describe("Failover quorum", func() {
 		Entry("with failover quorum disabled", clusterWithFailoverQuorumDisabled, false),
 	)
 })
+
+var _ = Describe("Scaling phase detection", func() {
+	DescribeTable(
+		"IsScalingPhase",
+		func(phase string, expected bool) {
+			cluster := &Cluster{
+				Status: ClusterStatus{
+					Phase: phase,
+				},
+			}
+			Expect(cluster.IsScalingPhase()).To(Equal(expected))
+		},
+		Entry("returns true for PhaseFirstPrimary", PhaseFirstPrimary, true),
+		Entry("returns true for PhaseCreatingReplica", PhaseCreatingReplica, true),
+		Entry("returns false for PhaseHealthy", PhaseHealthy, false),
+		Entry("returns false for PhaseSwitchover", PhaseSwitchover, false),
+		Entry("returns false for PhaseUpgrade", PhaseUpgrade, false),
+		Entry("returns false for PhaseInplacePrimaryRestart", PhaseInplacePrimaryRestart, false),
+	)
+})
