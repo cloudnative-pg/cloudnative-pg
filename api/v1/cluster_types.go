@@ -826,6 +826,12 @@ type ClusterStatus struct {
 	// +optional
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
+	// SelectorLabels is the label query used to select pods managed by this cluster.
+	// This field is populated by the operator and used by the scale sub-resource
+	// to enable VPA (Vertical Pod Autoscaler) support.
+	// +optional
+	SelectorLabels string `json:"selectorLabels,omitempty"`
+
 	// InstancesStatus indicates in which status the instances are
 	// +optional
 	InstancesStatus map[PodStatus][]string `json:"instancesStatus,omitempty"`
@@ -2541,7 +2547,7 @@ type RoleConfiguration struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
-// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
+// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances,selectorpath=.status.selectorLabels
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Instances",type="integer",JSONPath=".status.instances",description="Number of instances"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
