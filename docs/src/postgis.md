@@ -225,7 +225,7 @@ Returning:
 ```console
                                                     postgis_full_version
 ------------------------------------------------------------------------------------------------------------------------
- POSTGIS="3.6.2 f533623" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2"
+ POSTGIS="3.6.2 08d9b9f" [EXTENSION] PGSQL="180" GEOS="3.13.1-CAPI-1.19.2"
  SFCGAL="SFCGAL 2.0.0, CGAL 6.0, BOOST 1.83.0"
  PROJ="9.6.0 NETWORK_ENABLED=OFF URL_ENDPOINT= USER_WRITABLE_DIRECTORY=/tmp/proj"
  (compiled against PROJ 9.6.0)
