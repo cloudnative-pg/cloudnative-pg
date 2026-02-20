@@ -63,14 +63,6 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 	})
 
 	AfterAll(func() {
-		By("deleting cluster", func() {
-			cluster, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
-			if err == nil {
-				err = env.Client.Delete(env.Ctx, cluster)
-				Expect(err).ToNot(HaveOccurred())
-			}
-		})
-
 		namespaced.RevertNamespacedDeployment(env, operatorNamespace, uint(testTimeouts[timeouts.OperatorIsReady]))
 	})
 
@@ -80,8 +72,16 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 				env.Ctx, env.Client,
 				operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 		}
-		err := DeleteResourcesFromFile(operatorNamespace, sampleFile)
-		Expect(err).ToNot(HaveOccurred())
+
+		By("deleting cluster", func() {
+			err := DeleteResourcesFromFile(operatorNamespace, sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			// Wait for the cluster to be deleted
+			Eventually(func() error {
+				_, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
+				return err
+			}, testTimeouts[timeouts.ClusterIsReady]).Should(HaveOccurred())
+		})
 	})
 
 	It("can create and reconcile clusters in namespaced mode", func() {
@@ -136,6 +136,49 @@ var _ = Describe("Namespaced Deployment", Label(tests.LabelNoOpenshift, tests.La
 			}, 300).Should(BeEquivalentTo(2))
 
 			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		})
+	})
+})
+
+var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpenshift, tests.LabelDisruptive,
+	tests.LabelNamespacedOperator), Ordered, Serial, func() {
+	const (
+		operatorNamespace = "cnpg-system"
+		clusterName       = "postgresql-storage-class"
+		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		level             = tests.Highest
+	)
+
+	BeforeAll(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+
+		if IsOpenshift() {
+			Skip("This test case is not applicable on OpenShift clusters")
+		}
+
+		namespaced.ConfigureNamespacedDeployment(env, operatorNamespace, uint(testTimeouts[timeouts.OperatorIsReady]))
+	})
+
+	AfterAll(func() {
+		namespaced.RevertNamespacedDeployment(env, operatorNamespace, uint(testTimeouts[timeouts.OperatorIsReady]))
+	})
+
+	AfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			namespaces.DumpNamespaceObjects(
+				env.Ctx, env.Client,
+				operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+		}
+
+		By("deleting cluster", func() {
+			err := DeleteResourcesFromFile(operatorNamespace, sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
+				return err
+			}, testTimeouts[timeouts.ClusterIsReady]).Should(HaveOccurred())
 		})
 	})
 

@@ -172,7 +172,7 @@ var _ = Describe("Annotation and label inheritance", func() {
 	})
 })
 
-var _ = Describe("Validate namespace parameters combination for namespaced deployment", func() {
+var _ = Describe("Namespaced deployment config validation", func() {
 	It("should pass when namespaced is disabled", func() {
 		conf := &Data{
 			Namespaced:        false,

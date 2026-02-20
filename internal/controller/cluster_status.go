@@ -793,7 +793,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 }
 
 // getPodsTopology returns a map with all the information about the pods topology.
-// When namespaced is true, the operator doesn't have access to node information,
+// In namespaced deployment, the operator doesn't have access to node information,
 // so topology extraction fails and returns an empty topology.
 func getPodsTopology(
 	ctx context.Context,

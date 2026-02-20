@@ -272,7 +272,6 @@ func (config *Data) GetIncludePlugins() []string {
 }
 
 // Validate validates configuration parameters and combinations.
-// This can programatically validate deployment parameters
 // If validation fails it returns an error.
 func (config *Data) Validate() error {
 	if err := config.validateNamespacedConfiguration(); err != nil {
@@ -289,11 +288,7 @@ func (config *Data) validateNamespacedConfiguration() error {
 		return nil
 	}
 
-	if config.OperatorNamespace == "" {
-		return ErrNamespaceEmpty
-	}
-
-	if config.WatchNamespace == "" {
+	if config.OperatorNamespace == "" || config.WatchNamespace == "" {
 		return ErrNamespaceEmpty
 	}
 

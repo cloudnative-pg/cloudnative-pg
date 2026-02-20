@@ -206,7 +206,9 @@ You can also access pprof using the browser at [http://localhost:6060/debug/ppro
 
 ## Namespaced Deployment
 
-By default, CloudNativePG operates in cluster-wide mode, watching and managing PostgreSQL clusters across all namespaces. However, you can configure the operator to run in namespaced mode, where it only manages resources within a specific namespace.
+By default, CloudNativePG operates in cluster-wide mode, watching and managing
+PostgreSQL clusters across all namespaces. However, you can configure the operator
+to run in namespaced mode, where it only manages resources within a specific namespace.
 
 ### Enabling Namespaced Mode
 
@@ -228,19 +230,28 @@ env:
 
 ### RBAC Considerations
 
-When deploying in namespaced mode, the operator's default RBAC permissions can be restricted to not access `Nodes` and `ClusterImageCatalog`.
-In namespaced mode, the operator will not have permissions to access cluster-scoped resources or resources in other namespaces.
+When deploying in namespaced mode, RBAC permissions can be restricted for the
+`ClusterRole` to only access the admission controllers. The operator does not
+require access to `Nodes` and `ClusterImageCatalog` in namespaced deployment.
+The rest of the RBAC access can be restricted to a namespaced `Role`. With these
+restrictions in place, the operator will not have access to cluster-scoped
+resources or resources in other namespaces.
 
 ### Known Limitations with SyncReplicaElectionConstraint
 
-`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to enforce deployment constraints for synchronous replicas during election. This feature will not work due to restricted rbac of the operator in namespaced mode.
+`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to
+enforce deployment constraints for synchronous replicas during election.
+This feature will not work due to restricted RBAC of the operator in namespaced mode.
 
 ### Known Limitations with PodDisruptionBudget
 
-!!! Warning
-    When running in namespaced mode with PodDisruptionBudget (PDB) enabled, node drain operations may fail.
+:::warning
+    When running in namespaced mode with PodDisruptionBudget (PDB) enabled,
+    node drain operations may fail.
+:::
 
-CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances during voluntary disruptions. However, in namespaced mode, a critical limitation exists:
+CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances
+during voluntary disruptions. However, in namespaced mode, a critical limitation exists:
 
 - The Kubernetes node drain process requires cluster-level permissions to evict pods protected by PDBs
 - In namespaced mode, the operator lacks the necessary cluster-wide permissions to properly coordinate with the node drain controller
@@ -248,20 +259,6 @@ CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances durin
 
 **Workarounds:**
 
-1. **Disable PDB**: Set `enablePDB: false` in your `Cluster` specification when running in namespaced mode
+1. **Disable PDB**: Set `spec.enablePDB: false` in your `Cluster` specification when running in namespaced mode
 2. **Manual intervention**: Manually delete or scale down PostgreSQL pods before draining nodes
 3. **Use cluster-wide mode**: If node drain automation is critical, consider deploying the operator in cluster-wide mode
-
-Example of disabling PDB:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  instances: 3
-  enablePDB: false  # Disable PDB in namespaced mode
-  storage:
-    size: 1Gi
-```
