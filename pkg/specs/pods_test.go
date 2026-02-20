@@ -628,7 +628,7 @@ var _ = Describe("PodSpec drift detection", func() {
 							SubPathExpr:      "",
 						},
 						{
-							Name:             "bar",
+							Name:             "tbs-bar",
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/tablespaces/bar",
 							SubPath:          "",
@@ -646,7 +646,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "bar",
+							Name:             "tbs-bar",
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/tablespaces/bar",
 							SubPath:          "",
@@ -732,7 +732,7 @@ var _ = Describe("PodSpec drift detection", func() {
 							SubPathExpr:      "",
 						},
 						{
-							Name:             "bar",
+							Name:             "tbs-bar",
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/tablespaces/bar",
 							SubPath:          "",
@@ -750,7 +750,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "bar",
+							Name:             "tbs-bar",
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/tablespaces/bar",
 							SubPath:          "",

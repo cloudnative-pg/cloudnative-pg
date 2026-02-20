@@ -4817,6 +4817,47 @@ var _ = Describe("Tablespaces validation", func() {
 		Expect(v.validate(cluster)).To(HaveLen(1))
 	})
 
+	It("should produce an error when tablespace names collide after sanitization", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					createFakeTemporaryTbsConf("foo_bar"),
+					createFakeTemporaryTbsConf("foo$bar"),
+				},
+			},
+		}
+		errors := v.validate(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(errors[0].Detail).To(ContainSubstring("duplicate volume name"))
+	})
+
+	It("should not produce an error when tablespace names are distinct after sanitization", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					createFakeTemporaryTbsConf("foo_bar"),
+					createFakeTemporaryTbsConf("baz_qux"),
+				},
+			},
+		}
+		Expect(v.validate(cluster)).To(BeEmpty())
+	})
+
 	It("should produce an error if the storage configured for the tablespace is invalid", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
