@@ -46,6 +46,7 @@ var _ = Describe("Retriable error messages", func() {
 		Entry("context deadline exceeded - retriable", "context deadline exceeded waiting for snapshot creation", true),
 		Entry("deadline exceeded - retriable", "deadline exceeded during Azure snapshot creation", true),
 		Entry("timed out - retriable", "operation timed out for csi-disk-handler", true),
+		Entry("OCI conflict 409 - retriable", "Error returned by Blockstorage Service. Http Status Code: 409. Error Code: Conflict.", true),
 	)
 
 	Describe("isContextDeadlineExceededError", func() {

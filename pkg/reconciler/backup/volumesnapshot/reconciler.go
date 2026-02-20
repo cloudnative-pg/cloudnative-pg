@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -502,7 +503,34 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	if err := se.cli.Create(ctx, &snapshot); err != nil {
-		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+		// If the creation fails, we check if the object already exists.
+		// This is done to handle the case where the OCI CSI driver retries the creation
+		// of the VolumeSnapshot, but the first request succeeded in the background.
+		// In this case, the second request fails with a 409 Conflict error.
+		// If the object exists and has a UID, we consider it created.
+		//
+		// We are not checking if the error is a collision or something else because
+		// we want to be robust against any kind of error that might happen during
+		// the creation of the object.
+		//
+		// In case of a collision, the object will be fetched and we will check if
+		// it is the one we want.
+		//
+		// In case of a generic error, we will check if the object was created
+		// anyway.
+		var existingSnapshot volumesnapshotv1.VolumeSnapshot
+		if errGet := se.cli.Get(ctx, client.ObjectKeyFromObject(&snapshot), &existingSnapshot); errGet != nil {
+			if apierrs.IsNotFound(errGet) {
+				return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
+			}
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w (and while getting it: %v)", snapshot.Name, err, errGet)
+		}
+
+		if len(existingSnapshot.UID) == 0 {
+			return fmt.Errorf("while creating VolumeSnapshot %s: %w (snapshot exists but has no UID)", snapshot.Name, err)
+		}
+
+		// The snapshot exists and has a UID, so we consider it created
 	}
 
 	return nil
