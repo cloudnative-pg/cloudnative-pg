@@ -1246,7 +1246,7 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
-	err = postgresutils.SetUserPassword(username, password, db)
+	err = postgresutils.SetUserPassword(ctx, username, password, db)
 	if err != nil {
 		return err
 	}
