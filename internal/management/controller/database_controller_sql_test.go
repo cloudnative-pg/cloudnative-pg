@@ -515,6 +515,249 @@ var _ = Describe("Managed schema SQL", func() {
 			Expect(dropDatabaseSchema(ctx, db, schema)).Error().To(Equal(testError))
 		})
 	})
+
+	Context("createDatabaseSchema with privileges", func() {
+		It("creates schema and grants CREATE privilege", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "appuser", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("CREATE SCHEMA \"testschema\"  AUTHORIZATION \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"appuser\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(createDatabaseSchema(ctx, db, schemaWithPrivileges)).Error().NotTo(HaveOccurred())
+		})
+
+		It("creates schema and grants USAGE privilege", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Usage: []apiv1.UsageSpec{
+					{Name: "appuser", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("CREATE SCHEMA \"testschema\"  AUTHORIZATION \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"appuser\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(createDatabaseSchema(ctx, db, schemaWithPrivileges)).Error().NotTo(HaveOccurred())
+		})
+
+		It("creates schema and applies both CREATE and USAGE privileges", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "developer", Type: apiv1.GrantUsageSpecType},
+				},
+				Usage: []apiv1.UsageSpec{
+					{Name: "reader", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("CREATE SCHEMA \"testschema\"  AUTHORIZATION \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"developer\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(createDatabaseSchema(ctx, db, schemaWithPrivileges)).Error().NotTo(HaveOccurred())
+		})
+	})
+
+	Context("updateDatabaseSchema with privileges", func() {
+		It("updates schema privileges with GRANT CREATE", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "appuser", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"appuser\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates schema privileges with REVOKE CREATE", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "appuser", Type: apiv1.RevokeUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("REVOKE CREATE ON SCHEMA \"testschema\" FROM \"appuser\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates schema privileges with GRANT USAGE", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Usage: []apiv1.UsageSpec{
+					{Name: "reader", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates schema privileges with REVOKE USAGE", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Usage: []apiv1.UsageSpec{
+					{Name: "reader", Type: apiv1.RevokeUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("REVOKE USAGE ON SCHEMA \"testschema\" FROM \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates owner and applies privileges", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "newowner",
+				Create: []apiv1.UsageSpec{
+					{Name: "developer", Type: apiv1.GrantUsageSpecType},
+				},
+				Usage: []apiv1.UsageSpec{
+					{Name: "reader", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("ALTER SCHEMA \"testschema\" OWNER TO \"newowner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"developer\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: "oldowner"})).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when GRANT CREATE fails", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "appuser", Type: apiv1.GrantUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"appuser\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().To(MatchError(testError))
+		})
+
+		It("applies multiple privileges to multiple roles", func(ctx SpecContext) {
+			schemaWithPrivileges := apiv1.SchemaSpec{
+				DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+					Name:   "testschema",
+					Ensure: "present",
+				},
+				Owner: "owner",
+				Create: []apiv1.UsageSpec{
+					{Name: "developer1", Type: apiv1.GrantUsageSpecType},
+					{Name: "developer2", Type: apiv1.GrantUsageSpecType},
+					{Name: "revoked_dev", Type: apiv1.RevokeUsageSpecType},
+				},
+				Usage: []apiv1.UsageSpec{
+					{Name: "reader1", Type: apiv1.GrantUsageSpecType},
+					{Name: "reader2", Type: apiv1.RevokeUsageSpecType},
+				},
+			}
+
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"developer1\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT CREATE ON SCHEMA \"testschema\" TO \"developer2\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("REVOKE CREATE ON SCHEMA \"testschema\" FROM \"revoked_dev\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("GRANT USAGE ON SCHEMA \"testschema\" TO \"reader1\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("REVOKE USAGE ON SCHEMA \"testschema\" FROM \"reader2\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schemaWithPrivileges,
+				&schemaInfo{Name: schemaWithPrivileges.Name, Owner: schemaWithPrivileges.Owner})).Error().NotTo(HaveOccurred())
+		})
+	})
 })
 
 var _ = Describe("Managed Foreign Data Wrapper SQL", func() {

@@ -2469,6 +2469,8 @@ _Appears in:_
 | `name` _string_ | Name of the object (extension, schema, FDW, server) | True |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Specifies whether an object (e.g schema) should be present or absent<br />in the database. If set to `present`, the object will be created if<br />it does not exist. If set to `absent`, the extension/schema will be<br />removed if it exists. |  | present | Enum: [present absent] <br /> |
 | `owner` _string_ | The role name of the user who owns the schema inside PostgreSQL.<br />It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the<br />`OWNER TO` command of `ALTER SCHEMA`. | True |  |  |
+| `create` _[UsageSpec](#usagespec) array_ | List of roles for which `CREATE` privileges on the schema are granted or revoked.<br />Maps to the `GRANT CREATE ON SCHEMA` and `REVOKE CREATE ON SCHEMA` SQL commands. |  |  |  |
+| `usage` _[UsageSpec](#usagespec) array_ | List of roles for which `USAGE` privileges on the schema are granted or revoked.<br />Maps to the `GRANT USAGE ON SCHEMA` and `REVOKE USAGE ON SCHEMA` SQL commands. |  |  |  |
 
 
 
@@ -2946,6 +2948,7 @@ UsageSpec configures a usage for a foreign data wrapper
 _Appears in:_
 
 - [FDWSpec](#fdwspec)
+- [SchemaSpec](#schemaspec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Required | Default | Validation |
