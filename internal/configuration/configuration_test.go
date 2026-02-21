@@ -171,3 +171,63 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
 })
+
+var _ = Describe("Namespaced deployment config validation", func() {
+	It("should pass when namespaced is disabled", func() {
+		conf := &Data{
+			Namespaced:        false,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "watch-ns",
+		}
+		Expect(conf.Validate()).To(Succeed())
+	})
+
+	It("should pass when namespaced is enabled and namespaces match", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "same-ns",
+			WatchNamespace:    "same-ns",
+		}
+		Expect(conf.Validate()).To(Succeed())
+	})
+
+	It("should fail when namespaced is enabled and namespaces differ", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "watch-ns",
+		}
+		err := conf.Validate()
+		Expect(err).To(Equal(ErrNamespaceMismatch))
+	})
+
+	It("should fail when namespaced is enabled and operator namespace is empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "",
+			WatchNamespace:    "watch-ns",
+		}
+		err := conf.Validate()
+		Expect(err).To(Equal(ErrNamespaceEmpty))
+	})
+
+	It("should fail when namespaced is enabled and watch namespace is empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "operator-ns",
+			WatchNamespace:    "",
+		}
+		err := conf.Validate()
+		Expect(err).To(Equal(ErrNamespaceEmpty))
+	})
+
+	It("should fail when namespaced is enabled and both namespaces are empty", func() {
+		conf := &Data{
+			Namespaced:        true,
+			OperatorNamespace: "",
+			WatchNamespace:    "",
+		}
+		err := conf.Validate()
+		Expect(err).To(Equal(ErrNamespaceEmpty))
+	})
+})

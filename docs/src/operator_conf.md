@@ -59,6 +59,7 @@ Name | Description
 `METRICS_CERT_DIR` | The directory where TLS certificates for the operator metrics server are stored. When set, enables TLS for the metrics endpoint on port 8080. The directory must contain `tls.crt` and `tls.key` files following standard Kubernetes TLS secret conventions. If not set, the metrics server operates without TLS (default behavior).
 `MONITORING_QUERIES_CONFIGMAP` | The name of a ConfigMap in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
+`NAMESPACED` | When set to `true`, the operator will only access and listen to resources within its own namespace. Default is `false`. See [Namespaced Deployment](#namespaced-deployment) for details.
 `OPERATOR_IMAGE_NAME` | The name of the operator image used to bootstrap Pods. Defaults to the image specified during installation.
 `PGBOUNCER_IMAGE_NAME` | The name of the PgBouncer image used by default for new poolers. Defaults to the version specified in the operator.
 `POSTGRES_IMAGE_NAME` | The name of the PostgreSQL image used by default for new clusters. Defaults to the version specified in the operator.
@@ -202,3 +203,62 @@ You can also access pprof using the browser at [http://localhost:6060/debug/ppro
     Treat pprof as a sensitive debugging interface and never expose it publicly.
     If you must access it remotely, secure it with proper network policies and access controls.
 :::
+
+## Namespaced Deployment
+
+By default, CloudNativePG operates in cluster-wide mode, watching and managing
+PostgreSQL clusters across all namespaces. However, you can configure the operator
+to run in namespaced mode, where it only manages resources within a specific namespace.
+
+### Enabling Namespaced Mode
+
+To enable namespaced deployment, both `OPERATOR_NAMESPACE` and `WATCH_NAMESPACE` must be set to the same namespace. Only when these parameters match can `NAMESPACED` mode be enabled:
+
+```yaml
+env:
+- name: OPERATOR_NAMESPACE
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.namespace
+- name: WATCH_NAMESPACE
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.namespace
+- name: NAMESPACED
+  value: "true"
+```
+
+### RBAC Considerations
+
+When deploying in namespaced mode, RBAC permissions can be restricted for the
+`ClusterRole` to only access the admission controllers. The operator does not
+require access to `Nodes` and `ClusterImageCatalog` in namespaced deployment.
+The rest of the RBAC access can be restricted to a namespaced `Role`. With these
+restrictions in place, the operator will not have access to cluster-scoped
+resources or resources in other namespaces.
+
+### Known Limitations with SyncReplicaElectionConstraint
+
+`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to
+enforce deployment constraints for synchronous replicas during election.
+This feature will not work due to restricted RBAC of the operator in namespaced mode.
+
+### Known Limitations with PodDisruptionBudget
+
+:::warning
+    When running in namespaced mode with PodDisruptionBudget (PDB) enabled,
+    node drain operations may fail.
+:::
+
+CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances
+during voluntary disruptions. However, in namespaced mode, a critical limitation exists:
+
+- The Kubernetes node drain process requires cluster-level permissions to evict pods protected by PDBs
+- In namespaced mode, the operator lacks the necessary cluster-wide permissions to properly coordinate with the node drain controller
+- This can result in node drain operations timing out or failing when attempting to evict PostgreSQL pods
+
+**Workarounds:**
+
+1. **Disable PDB**: Set `spec.enablePDB: false` in your `Cluster` specification when running in namespaced mode
+2. **Manual intervention**: Manually delete or scale down PostgreSQL pods before draining nodes
+3. **Use cluster-wide mode**: If node drain automation is critical, consider deploying the operator in cluster-wide mode

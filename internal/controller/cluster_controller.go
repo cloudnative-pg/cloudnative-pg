@@ -1157,7 +1157,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1183,21 +1183,26 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters()),
 		).
 		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		)
+
+	// Only monitor cluster wide resources if not namespaced
+	if !configuration.Current.Namespaced {
+		controllerBuilder = controllerBuilder.Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
 		).
-		Watches(
-			&apiv1.ImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Watches(
-			&apiv1.ClusterImageCatalog{},
-			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+			Watches(
+				&apiv1.ClusterImageCatalog{},
+				handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
+				builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+			)
+	}
+
+	return controllerBuilder.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and
@@ -1252,6 +1257,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
+	// This is not used in namespaced mode
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&corev1.Pod{},

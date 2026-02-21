@@ -584,4 +584,108 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeFalse())
 		})
 	})
+
+	Context("getPodsTopology", func() {
+		It("should extract topology successfully with nodes and no constraints", func() {
+			ctx := context.Background()
+			pods := []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+					Spec:       corev1.PodSpec{NodeName: "node-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+					Spec:       corev1.PodSpec{NodeName: "node-2"},
+				},
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": {ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+				"node-2": {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}},
+			}
+			constraints := apiv1.SyncReplicaElectionConstraints{Enabled: false}
+
+			topology := getPodsTopology(ctx, pods, nodes, constraints, false)
+
+			Expect(topology.SuccessfullyExtracted).To(BeTrue())
+			Expect(topology.Instances).To(HaveLen(2))
+			Expect(topology.NodesUsed).To(BeEquivalentTo(2))
+		})
+
+		It("should extract topology with node labels when constraints are enabled", func() {
+			ctx := context.Background()
+			pods := []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+					Spec:       corev1.PodSpec{NodeName: "node-1"},
+				},
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node-1",
+						Labels: map[string]string{"zone": "us-west-1a"},
+					},
+				},
+			}
+			constraints := apiv1.SyncReplicaElectionConstraints{
+				Enabled:                true,
+				NodeLabelsAntiAffinity: []string{"zone"},
+			}
+
+			topology := getPodsTopology(ctx, pods, nodes, constraints, false)
+
+			Expect(topology.SuccessfullyExtracted).To(BeTrue())
+			Expect(topology.Instances).To(HaveLen(1))
+			Expect(topology.Instances["pod-1"]["zone"]).To(Equal("us-west-1a"))
+		})
+
+		It("should fail when node is missing from the nodes map", func() {
+			ctx := context.Background()
+			pods := []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+					Spec:       corev1.PodSpec{NodeName: "node-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+					Spec:       corev1.PodSpec{NodeName: "node-missing"},
+				},
+			}
+			nodes := map[string]corev1.Node{
+				"node-1": {ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+			}
+			constraints := apiv1.SyncReplicaElectionConstraints{Enabled: false}
+
+			topology := getPodsTopology(ctx, pods, nodes, constraints, false)
+
+			Expect(topology.SuccessfullyExtracted).To(BeFalse())
+		})
+
+		It("should return unsuccessful topology in namespaced mode", func() {
+			ctx := context.Background()
+			pods := []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-2"}},
+			}
+			nodes := map[string]corev1.Node{} // Empty nodes map (namespaced deployment)
+			constraints := apiv1.SyncReplicaElectionConstraints{Enabled: false}
+
+			topology := getPodsTopology(ctx, pods, nodes, constraints, true)
+
+			Expect(topology.SuccessfullyExtracted).To(BeFalse())
+		})
+
+		It("should handle nil nodes map in namespaced mode", func() {
+			ctx := context.Background()
+			pods := []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+			}
+			var nodes map[string]corev1.Node // nil nodes map
+			constraints := apiv1.SyncReplicaElectionConstraints{Enabled: false}
+
+			topology := getPodsTopology(ctx, pods, nodes, constraints, true)
+
+			Expect(topology.SuccessfullyExtracted).To(BeFalse())
+		})
+	})
 })

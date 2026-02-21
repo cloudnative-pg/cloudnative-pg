@@ -6139,3 +6139,81 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("validateSyncReplicaElectionConstraint", func() {
+	It("should allow sync replica constraints when not in namespaced mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled:                true,
+			NodeLabelsAntiAffinity: []string{"zone"},
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow disabled sync replica constraints in any mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled: false,
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should reject sync replica constraints without node labels", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled: true,
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err.Field).To(ContainSubstring("nodeLabelsAntiAffinity"))
+	})
+
+	It("should reject sync replica constraints when operator is in namespaced mode", func() {
+		constraints := apiv1.SyncReplicaElectionConstraints{
+			Enabled:                true,
+			NodeLabelsAntiAffinity: []string{"zone"},
+		}
+
+		err := validateSyncReplicaElectionConstraint(constraints)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("validateImageCatalogRef", func() {
+	It("should allow nil image catalog ref", func() {
+		err := validateImageCatalogRef(nil)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow ImageCatalog in any mode", func() {
+		ref := &apiv1.ImageCatalogRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To("postgresql.cnpg.io"),
+				Kind:     "ImageCatalog",
+				Name:     "my-catalog",
+			},
+			Major: 16,
+		}
+
+		err := validateImageCatalogRef(ref)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow ClusterImageCatalog when not in namespaced mode", func() {
+		// Note: In default test environment, configuration.Current.Namespaced = false
+		ref := &apiv1.ImageCatalogRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To("postgresql.cnpg.io"),
+				Kind:     "ClusterImageCatalog",
+				Name:     "my-cluster-catalog",
+			},
+			Major: 16,
+		}
+
+		err := validateImageCatalogRef(ref)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})

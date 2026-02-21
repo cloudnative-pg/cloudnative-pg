@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1165,6 +1166,10 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		result = append(result, err)
 	}
 
+	if err := validateImageCatalogRef(r.Spec.ImageCatalogRef); err != nil {
+		result = append(result, err)
+	}
+
 	return result
 }
 
@@ -1331,6 +1336,18 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 	if !constraints.Enabled {
 		return nil
 	}
+
+	if configuration.Current.Namespaced {
+		return field.Forbidden(
+			field.NewPath(
+				"spec", "postgresql", "syncReplicaElectionConstraint", "enabled",
+			),
+			"syncReplicaElectionConstraint cannot be enabled when the operator is running in namespaced mode. "+
+				"This feature requires access to Node resources which are not available in namespaced deployments. "+
+				"Please deploy the operator in cluster-wide mode to use this feature",
+		)
+	}
+
 	if len(constraints.NodeLabelsAntiAffinity) > 0 {
 		return nil
 	}
@@ -1342,6 +1359,24 @@ func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElection
 		nil,
 		"Can't enable syncReplicaConstraints without passing labels for comparison inside nodeLabelsAntiAffinity",
 	)
+}
+
+func validateImageCatalogRef(ref *apiv1.ImageCatalogRef) *field.Error {
+	if ref == nil {
+		return nil
+	}
+
+	// In namespaced mode, ClusterImageCatalog (cluster-scoped) cannot be accessed
+	if configuration.Current.Namespaced && ref.Kind == "ClusterImageCatalog" {
+		return field.Forbidden(
+			field.NewPath("spec", "imageCatalogRef", "kind"),
+			"ClusterImageCatalog cannot be used when the operator is running in namespaced mode. "+
+				"This resource is cluster-scoped and not available in namespaced deployments. "+
+				"Please use ImageCatalog (namespaced) instead, or deploy the operator in cluster-wide mode",
+		)
+	}
+
+	return nil
 }
 
 // validateImageChange validate the change from a certain image name
