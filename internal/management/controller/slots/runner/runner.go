@@ -210,6 +210,19 @@ func synchronizeReplicationSlots(
 			if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
 				return err
 			}
+			continue
+		}
+
+		// Drop orphaned logical replication slots with synced=false (PG 17+)
+		// Only on replicas, not present on primary, not active, and not HA slot
+		if slot.Type == "logical" && slot.Synced != nil && !*slot.Synced && !slot.Active {
+			// Defensive: only drop if not present on primary and not HA
+			if !slotsInPrimary.Has(slot.SlotName) && !slot.IsHA {
+				if err := infrastructure.Delete(ctx, localDB, slot); err != nil {
+					return err
+				}
+				continue
+			}
 		}
 
 		// when the user turns off the feature we should delete all the created replication slots that aren't from HA

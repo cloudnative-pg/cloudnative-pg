@@ -33,6 +33,7 @@ type ReplicationSlot struct {
 	RestartLSN string   `json:"restartLSN,omitempty"`
 	IsHA       bool     `json:"isHA,omitempty"`
 	HoldsXmin  bool     `json:"holdsXmin,omitempty"`
+	Synced     *bool    `json:"synced,omitempty"` // nil if not available (pre-PG17 or physical)
 }
 
 // ReplicationSlotList contains a list of replication slots
