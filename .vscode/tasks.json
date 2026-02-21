@@ -1,0 +1,44 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Go tests",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./..."
+			],
+			"problemMatcher": [
+				"$go"
+			],
+			"group": "test"
+		},
+		{
+			"label": "Run Go tests",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./..."
+			],
+			"problemMatcher": [
+				"$go"
+			],
+			"group": "test"
+		},
+		{
+			"label": "Run Go tests",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./..."
+			],
+			"problemMatcher": [
+				"$go"
+			],
+			"group": "test"
+		}
+	]
+}

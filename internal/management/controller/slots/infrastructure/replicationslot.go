@@ -1,23 +1,62 @@
-/*
-Copyright © contributors to CloudNativePG, established as
-CloudNativePG a Series of LF Projects, LLC.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-SPDX-License-Identifier: Apache-2.0
-*/
 
 package infrastructure
+
+import (
+	"context"
+	"database/sql"
+)
+
+// DeleteLogicalSlot drops a logical replication slot by name
+func DeleteLogicalSlot(ctx context.Context, db *sql.DB, slotName string) error {
+	_, err := db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slotName)
+	return err
+}
+
+// ListLogicalSlotsWithSyncStatus lists logical replication slots with synced/failover/active status (PG17+)
+func ListLogicalSlotsWithSyncStatus(ctx context.Context, db *sql.DB) (ReplicationSlotList, error) {
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
+				synced, failover, active
+		 FROM pg_catalog.pg_replication_slots
+		 WHERE slot_type = 'logical'`)
+	if err != nil {
+		return ReplicationSlotList{}, err
+	}
+	defer rows.Close()
+
+	var status ReplicationSlotList
+	for rows.Next() {
+		var slot ReplicationSlot
+		var synced, failover, active sql.NullBool
+		err := rows.Scan(
+			&slot.SlotName,
+			&slot.Type,
+			&slot.Active,
+			&slot.RestartLSN,
+			&synced,
+			&failover,
+			&active,
+		)
+		if err != nil {
+			return ReplicationSlotList{}, err
+		}
+		if synced.Valid {
+			slot.Synced = &synced.Bool
+		}
+		if failover.Valid {
+			slot.Failover = &failover.Bool
+		}
+		if active.Valid {
+			slot.Active = active.Bool
+		}
+		status.Items = append(status.Items, slot)
+	}
+	if rows.Err() != nil {
+		return ReplicationSlotList{}, rows.Err()
+	}
+	return status, nil
+}
 
 // SlotType represents the type of replication slot
 type SlotType string
@@ -33,6 +72,9 @@ type ReplicationSlot struct {
 	RestartLSN string   `json:"restartLSN,omitempty"`
 	IsHA       bool     `json:"isHA,omitempty"`
 	HoldsXmin  bool     `json:"holdsXmin,omitempty"`
+	// PG17+ logical slot fields
+	Synced     *bool    `json:"synced,omitempty"`   // nil if not PG17+ logical slot
+	Failover   *bool    `json:"failover,omitempty"` // nil if not logical slot
 }
 
 // ReplicationSlotList contains a list of replication slots
