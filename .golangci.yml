@@ -107,10 +107,30 @@ linters:
           - revive
         path: /(utils|common)/[^/]+.go
         text: avoid meaningless package names
-      # TODO: fix by renaming or removing pkg/utils/context and pkg/utils/hash packages
+      # TODO: fix by renaming packages that conflict with Go standard library names
       - linters:
           - revive
         path: pkg/utils/(context|hash)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/(cmd|cnpi)/plugin/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: internal/cmd/manager/debug/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: tests/utils/exec/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/management/(postgres/metrics|url)/
+        text: avoid package names that conflict with Go standard library package names
+      - linters:
+          - revive
+        path: pkg/postgres/plugin/
         text: avoid package names that conflict with Go standard library package names
     paths:
       - zz_generated.*
