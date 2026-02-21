@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -78,7 +79,7 @@ var _ = Describe("Credentials management functions", func() {
 		Expect(DisableSuperuserPassword(db)).To(Succeed())
 	})
 
-	It("can set the password for a PostgreSQL role", func() {
+	It("can set the password for a PostgreSQL role", func(ctx context.Context) {
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL log_statement = 'none'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -87,10 +88,10 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'testpassword'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
-		Expect(SetUserPassword("testuser", "testpassword", db)).To(Succeed())
+		Expect(SetUserPassword(ctx, "testuser", "testpassword", db)).To(Succeed())
 	})
 
-	It("will correctly escape the password if needed", func() {
+	It("will correctly escape the password if needed", func(ctx context.Context) {
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL log_statement = 'none'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -99,10 +100,10 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
-		Expect(SetUserPassword("testuser", "this \"is\" weird but 'possible'", db)).To(Succeed())
+		Expect(SetUserPassword(ctx, "testuser", "this \"is\" weird but 'possible'", db)).To(Succeed())
 	})
 
-	It("will rollback setting of the password if there is an error", func() {
+	It("will rollback setting of the password if there is an error", func(ctx context.Context) {
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL log_statement = 'none'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -112,8 +113,8 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
 			WillReturnError(dbError)
 		mock.ExpectRollback()
-		err := SetUserPassword("testuser", "this \"is\" weird but 'possible'", db)
+		err := SetUserPassword(ctx, "testuser", "this \"is\" weird but 'possible'", db)
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 })

@@ -30,6 +30,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
+
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // List the available roles excluding all the roles that start with `pg_`
@@ -100,33 +102,12 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	return roles, nil
 }
 
-func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, silenceErrLog bool) error {
-	if !silenceErrLog {
-		_, err := db.ExecContext(ctx, statement)
-		return err
+func executeRoleStatement(ctx context.Context, db *sql.DB, statement string, suppressLogging bool) error {
+	if suppressLogging {
+		return postgresutils.ExecWithSuppressedLogging(ctx, db, statement)
 	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// This has no effect if the transaction
-		// is committed
-		_ = tx.Rollback()
-	}()
-	_, err = tx.ExecContext(ctx, "SET LOCAL log_statement = 'none'")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, "SET LOCAL log_min_error_statement = 'PANIC'")
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, statement)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err := db.ExecContext(ctx, statement)
+	return err
 }
 
 // Update the role
