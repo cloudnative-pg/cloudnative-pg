@@ -124,9 +124,9 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
 	// will change no matter what, the next reconciliation cycle we would update the password
-	containsPassword := appendPasswordOption(role, &query)
-	err := executeRoleStatement(ctx, db, query.String(), containsPassword)
-	if err != nil {
+	appendPasswordOption(role, &query)
+
+	if err := executeRoleStatement(ctx, db, query.String(), roleHasPassword(role)); err != nil {
 		return wrapErr(err)
 	}
 	return nil
@@ -146,12 +146,12 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
 	contextLog.Debug("Creating", "query", query.String())
-	containsPassword := appendPasswordOption(role, &query)
+	appendPasswordOption(role, &query)
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if err := executeRoleStatement(ctx, db, query.String(), containsPassword); err != nil {
+	if err := executeRoleStatement(ctx, db, query.String(), roleHasPassword(role)); err != nil {
 		return wrapErr(err)
 	}
 
@@ -369,8 +369,11 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	fmt.Fprintf(query, " CONNECTION LIMIT %d", role.ConnectionLimit)
 }
 
-func appendPasswordOption(role DatabaseRole, query *strings.Builder) bool {
-	var sendsPassword bool
+func roleHasPassword(role DatabaseRole) bool {
+	return !role.ignorePassword && role.password.Valid
+}
+
+func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	switch {
 	case role.ignorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of
@@ -380,7 +383,6 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) bool {
 		query.WriteString(" PASSWORD NULL")
 	default:
 		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
-		sendsPassword = true
 	}
 
 	if role.ValidUntil.Valid {
@@ -392,6 +394,4 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) bool {
 		}
 		fmt.Fprintf(query, " VALID UNTIL %s", pq.QuoteLiteral(value))
 	}
-
-	return sendsPassword
 }
