@@ -65,7 +65,7 @@ func (e *colorConfiguration) Type() string {
 
 // ConfigureColor renews aurora.DefaultColorizer based on flags and TTY
 func ConfigureColor(cmd *cobra.Command) {
-	configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd())))
+	configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd()))) //nolint:gosec // file descriptors always fit in int
 }
 
 func configureColor(cmd *cobra.Command, isTTY bool) {
