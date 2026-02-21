@@ -75,7 +75,7 @@ func convertPostgresIDToK8s(tablespaceName string) string {
 	return name
 }
 
-// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// PvcNameForTablespace returns the normalized tablespace PVC name for a given
 // tablespace, on a cluster pod
 func PvcNameForTablespace(podName, tablespaceName string) string {
 	return podName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
@@ -84,7 +84,7 @@ func PvcNameForTablespace(podName, tablespaceName string) string {
 // VolumeMountNameForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func VolumeMountNameForTablespace(tablespaceName string) string {
-	return convertPostgresIDToK8sName(tablespaceName)
+	return "tbs-" + convertPostgresIDToK8sName(tablespaceName)
 }
 
 // SnapshotBackupNameForTablespace returns the volume snapshot backup name for the tablespace
@@ -321,10 +321,10 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	}
 }
 
-// sanitizeExtensionNameForVolume replaces underscores with hyphens to comply with RFC 1123
-// DNS label requirements for Kubernetes volume names. The mount path preserves the original name.
-func sanitizeExtensionNameForVolume(extensionName string) string {
-	return strings.ReplaceAll(extensionName, "_", "-")
+// SanitizeExtensionNameForVolume returns a prefixed, RFC 1123 compliant
+// volume name for an extension.
+func SanitizeExtensionNameForVolume(extensionName string) string {
+	return "ext-" + strings.ReplaceAll(extensionName, "_", "-")
 }
 
 func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
@@ -332,7 +332,7 @@ func createExtensionVolumes(cluster *apiv1.Cluster) []corev1.Volume {
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumes = append(extensionVolumes,
 			corev1.Volume{
-				Name: sanitizeExtensionNameForVolume(extension.Name),
+				Name: SanitizeExtensionNameForVolume(extension.Name),
 				VolumeSource: corev1.VolumeSource{
 					Image: &extension.ImageVolumeSource,
 				},
@@ -348,7 +348,7 @@ func createExtensionVolumeMounts(cluster *apiv1.Cluster) []corev1.VolumeMount {
 	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,
 			corev1.VolumeMount{
-				Name:      sanitizeExtensionNameForVolume(extension.Name),
+				Name:      SanitizeExtensionNameForVolume(extension.Name),
 				MountPath: filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name),
 			},
 		)

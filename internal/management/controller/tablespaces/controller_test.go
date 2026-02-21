@@ -106,6 +106,7 @@ func getCluster(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (*
 // tablespace reconciler
 type tablespaceTest struct {
 	tablespacesInSpec        []apiv1.TablespaceConfiguration
+	clusterStatus            apiv1.ClusterStatus
 	postgresExpectations     func(sqlmock.Sqlmock)
 	shouldRequeue            bool
 	storageManager           tablespaceStorageManager
@@ -129,10 +130,11 @@ func assertTablespaceReconciled(ctx context.Context, tt tablespaceTest) {
 		},
 	}
 	cluster.Spec.Tablespaces = tt.tablespacesInSpec
+	cluster.Status = tt.clusterStatus
 
 	fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 		WithObjects(cluster).
-		WithStatusSubresource(&apiv1.Cluster{}).
+		WithStatusSubresource(cluster).
 		Build()
 
 	pgInstance := postgres.NewInstance().
@@ -250,6 +252,13 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 						},
 					},
 				},
+				clusterStatus: apiv1.ClusterStatus{
+					InstanceNames: []string{"cluster-example-1", "cluster-example-2"},
+					HealthyPVC: []string{
+						"cluster-example-1-tbs-foo", "cluster-example-1-tbs-bar",
+						"cluster-example-2-tbs-foo", "cluster-example-2-tbs-bar",
+					},
+				},
 				postgresExpectations: func(mock sqlmock.Sqlmock) {
 					// we expect the reconciler to list the tablespaces on DB, and to
 					// create a new tablespace
@@ -263,9 +272,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 				shouldRequeue: false,
 				storageManager: mockTablespaceStorageManager{
-					unavailableStorageLocations: []string{
-						"/foo",
-					},
+					unavailableStorageLocations: []string{},
 				},
 				expectedTablespaceStatus: []apiv1.TablespaceState{
 					{
@@ -277,6 +284,60 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 						Name:  "bar",
 						Owner: "new_user",
 						State: "reconciled",
+					},
+				},
+			})
+		})
+
+		It("will skip creating a tablespace if any required PVCs are not healthy", func(ctx context.Context) {
+			assertTablespaceReconciled(ctx, tablespaceTest{
+				tablespacesInSpec: []apiv1.TablespaceConfiguration{
+					{
+						Name: "foo",
+						Storage: apiv1.StorageConfiguration{
+							Size: "1Gi",
+						},
+					},
+					{
+						Name: "bar",
+						Storage: apiv1.StorageConfiguration{
+							Size: "1Gi",
+						},
+						Owner: apiv1.DatabaseRoleRef{
+							Name: "new_user",
+						},
+					},
+				},
+				clusterStatus: apiv1.ClusterStatus{
+					InstanceNames: []string{"cluster-example-1", "cluster-example-2"},
+					HealthyPVC: []string{
+						"cluster-example-1-tbs-foo", "cluster-example-1-tbs-bar",
+						"cluster-example-2-tbs-foo",
+					},
+				},
+				postgresExpectations: func(mock sqlmock.Sqlmock) {
+					// we expect the reconciler to list the tablespaces on DB, and NOT to
+					// create a new tablespace
+					rows := sqlmock.NewRows(
+						[]string{"spcname", "rolname"}).
+						AddRow("foo", "")
+					mock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+				},
+				shouldRequeue: true,
+				storageManager: mockTablespaceStorageManager{
+					unavailableStorageLocations: []string{},
+				},
+				expectedTablespaceStatus: []apiv1.TablespaceState{
+					{
+						Name:  "foo",
+						Owner: "",
+						State: "reconciled",
+					},
+					{
+						Name:  "bar",
+						Owner: "new_user",
+						State: "pending",
+						Error: "deferred until all required PVCs are healthy",
 					},
 				},
 			})
@@ -315,9 +376,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 				shouldRequeue: true,
 				storageManager: mockTablespaceStorageManager{
-					unavailableStorageLocations: []string{
-						"/foo",
-					},
+					unavailableStorageLocations: []string{},
 				},
 				expectedTablespaceStatus: []apiv1.TablespaceState{
 					{
@@ -366,5 +425,56 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 			})
 		})
+	})
+})
+
+var _ = Describe("buildPVCChecker", func() {
+	It("returns true when all PVCs for a tablespace are healthy", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1", "cluster-2"},
+				HealthyPVC: []string{
+					"cluster-1-tbs-foo", "cluster-2-tbs-foo",
+				},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeTrue())
+	})
+
+	It("returns false when a PVC for a tablespace is missing from the healthy list", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1", "cluster-2"},
+				HealthyPVC: []string{
+					"cluster-1-tbs-foo",
+					// cluster-2-tbs-foo is missing
+				},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeFalse())
+	})
+
+	It("returns true when the cluster has no instances", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{},
+				HealthyPVC:    []string{},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeTrue())
+	})
+
+	It("returns false when there are instances but no healthy PVCs", func(ctx context.Context) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				InstanceNames: []string{"cluster-1"},
+				HealthyPVC:    []string{},
+			},
+		}
+		checker := buildPVCChecker(ctx, cluster)
+		Expect(checker("foo")).To(BeFalse())
 	})
 })

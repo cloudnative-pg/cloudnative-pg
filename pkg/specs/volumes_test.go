@@ -371,7 +371,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "fragglerock",
+				Name:             "tbs-fragglerock",
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/tablespaces/fragglerock",
 				SubPath:          "",
@@ -379,7 +379,7 @@ var _ = DescribeTable("test creation of volume mounts",
 				SubPathExpr:      "",
 			},
 			{
-				Name:             "futurama",
+				Name:             "tbs-futurama",
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/tablespaces/futurama",
 				SubPath:          "",
@@ -462,7 +462,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "fragglerock",
+				Name: "tbs-fragglerock",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1-tbs-fragglerock",
@@ -470,7 +470,7 @@ var _ = DescribeTable("test creation of volumes",
 				},
 			},
 			{
-				Name: "futurama",
+				Name: "tbs-futurama",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1-tbs-futurama",
@@ -566,9 +566,9 @@ var _ = Describe("ImageVolume Extensions", func() {
 			It("should create a Volume for each Extension", func() {
 				extensionVolumes := createExtensionVolumes(&cluster)
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(2))
-				Expect(extensionVolumes[0].Name).To(Equal("foo"))
+				Expect(extensionVolumes[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("foo:dev"))
-				Expect(extensionVolumes[1].Name).To(Equal("bar"))
+				Expect(extensionVolumes[1].Name).To(Equal("ext-bar"))
 				Expect(extensionVolumes[1].VolumeSource.Image.Reference).To(Equal("bar:dev"))
 			})
 			It("should sanitize extension names with underscores for volume names", func() {
@@ -582,7 +582,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 				}
 				extensionVolumes := createExtensionVolumes(&cluster)
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(1))
-				Expect(extensionVolumes[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumes[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("pg_ivm:latest"))
 			})
 		})
@@ -604,9 +604,9 @@ var _ = Describe("ImageVolume Extensions", func() {
 				)
 				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(2))
-				Expect(extensionVolumeMounts[0].Name).To(Equal("foo"))
+				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
-				Expect(extensionVolumeMounts[1].Name).To(Equal("bar"))
+				Expect(extensionVolumeMounts[1].Name).To(Equal("ext-bar"))
 				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
 			})
 			It("should sanitize extension names with underscores for volume mount names", func() {
@@ -620,32 +620,32 @@ var _ = Describe("ImageVolume Extensions", func() {
 				}
 				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(1))
-				Expect(extensionVolumeMounts[0].Name).To(Equal("pg-ivm"))
+				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(postgres.ExtensionsBaseDirectory + "/pg_ivm"))
 			})
 		})
 	})
 
-	Context("sanitizeExtensionNameForVolume", func() {
-		It("should replace underscores with hyphens", func() {
-			Expect(sanitizeExtensionNameForVolume("pg_ivm")).To(Equal("pg-ivm"))
+	Context("SanitizeExtensionNameForVolume", func() {
+		It("should add ext- prefix and replace underscores with hyphens", func() {
+			Expect(SanitizeExtensionNameForVolume("pg_ivm")).To(Equal("ext-pg-ivm"))
 		})
 
 		It("should handle multiple underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("my-custom-extension"))
+			Expect(SanitizeExtensionNameForVolume("my_custom_extension")).To(Equal("ext-my-custom-extension"))
 		})
 
-		It("should not modify names without underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("foo")).To(Equal("foo"))
-			Expect(sanitizeExtensionNameForVolume("foo-bar")).To(Equal("foo-bar"))
+		It("should add ext- prefix to names without underscores", func() {
+			Expect(SanitizeExtensionNameForVolume("foo")).To(Equal("ext-foo"))
+			Expect(SanitizeExtensionNameForVolume("foo-bar")).To(Equal("ext-foo-bar"))
 		})
 
 		It("should handle mixed underscores and hyphens", func() {
-			Expect(sanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("pg-foo-bar"))
+			Expect(SanitizeExtensionNameForVolume("pg_foo-bar")).To(Equal("ext-pg-foo-bar"))
 		})
 
 		It("should handle consecutive underscores", func() {
-			Expect(sanitizeExtensionNameForVolume("pg__stat")).To(Equal("pg--stat"))
+			Expect(SanitizeExtensionNameForVolume("pg__stat")).To(Equal("ext-pg--stat"))
 		})
 	})
 })

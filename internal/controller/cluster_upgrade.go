@@ -40,12 +40,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// errLogShippingReplicaElected is raised when the pod update process need
+// errLogShippingReplicaElected is raised when the pod update process needs
 // to select a new primary before upgrading the old primary, but the chosen
 // instance is not connected via streaming replication
 var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
 
-// errRolloutDelayed is raised the a pod rollout have been delayed because
+// errRolloutDelayed is raised when a pod rollout has been delayed because
 // of the operator configuration
 var errRolloutDelayed = errors.New("pod rollout delayed")
 
@@ -125,6 +125,20 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		return false, nil
 	}
 
+	// If the primary update strategy is supervised, we should not consume a rollout slot.
+	// The user must issue a switchover manually.
+	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
+		contextLogger := log.FromContext(ctx)
+		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
+			"primaryPod", primaryPostgresqlStatus.Pod.Name,
+			"reason", podRollout.reason)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
+			"User must issue a supervised switchover"); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	managerResult := r.rolloutManager.CoordinateRollout(
 		client.ObjectKeyFromObject(cluster),
 		primaryPostgresqlStatus.Pod.Name)
@@ -141,7 +155,25 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		podRollout.canBeInPlace, podRollout.primaryForceRecreate, podRollout.reason)
+		podRollout.canBeInPlace, podRollout.reason)
+}
+
+func (r *ClusterReconciler) switchPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	currentPrimaryName string,
+	targetPrimaryName string,
+	reason rolloutReason,
+) (bool, error) {
+	r.Recorder.Eventf(cluster, "Normal", "Switchover",
+		"Initiating switchover to %s to upgrade %s", targetPrimaryName, currentPrimaryName)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, reason); err != nil {
+		return false, err
+	}
+	if err := r.setPrimaryInstance(ctx, cluster, targetPrimaryName); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -150,25 +182,12 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
-	forceRecreate bool,
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
-
-	// we need to check whether a manual switchover is required
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
-	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
-		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
-			"reason", reason)
-		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser, "User must issue a supervised switchover")
-		if err != nil {
-			return false, err
-		}
 
-		return true, nil
-	}
-
-	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {
+	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
 		if inPlacePossible {
 			// In-place restart is possible
 			if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
@@ -212,8 +231,8 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// is not active.
 		if !targetInstance.IsWalReceiverActive {
 			contextLogger.Info(
-				"chosen new primary is still not connected via streaming replication, "+
-					"interrupting the primaryPodUpdate",
+				"chosen new primary is still not connected via streaming replication. "+
+					"Delaying the switchover",
 				"updateReason", reason,
 				"currentPrimary", primaryPod.Name,
 				"targetPrimary", targetInstance.Pod.Name,
@@ -226,9 +245,8 @@ func (r *ClusterReconciler) updatePrimaryPod(
 			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetInstance.Pod.Name)
 		podList.LogStatus(ctx)
-		r.Recorder.Eventf(cluster, "Normal", "Switchover",
-			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
-		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
+
+		return r.switchPrimary(ctx, cluster, primaryPod.Name, targetInstance.Pod.Name, reason)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
@@ -268,12 +286,11 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
 type rollout struct {
-	required             bool
-	canBeInPlace         bool
-	primaryForceRecreate bool
+	required     bool
+	canBeInPlace bool
 
-	needsChangeOperatorImage bool
-	needsChangeOperandImage  bool
+	needsToChangeOperatorImage bool
+	needsToChangeOperandImage  bool
 
 	reason string
 }
@@ -300,7 +317,7 @@ func isInstanceNeedingRollout(
 			required: true,
 			reason: fmt.Sprintf("pod '%s' is not reporting the executable hash",
 				status.Pod.Name),
-			needsChangeOperatorImage: true,
+			needsToChangeOperatorImage: true,
 		}
 	}
 
@@ -494,7 +511,7 @@ func checkPodImageIsOutdated(_ context.Context, pod *corev1.Pod, cluster *apiv1.
 		required: true,
 		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
-		needsChangeOperandImage: true,
+		needsToChangeOperandImage: true,
 	}, nil
 }
 
@@ -517,16 +534,15 @@ func checkPodBootstrapImage(_ context.Context, pod *corev1.Pod, _ *apiv1.Cluster
 		required: true,
 		reason: fmt.Sprintf("the instance is using an old bootstrap container image: %s -> %s",
 			opCurrentImageName, configuration.Current.OperatorImageName),
-		needsChangeOperatorImage: true,
+		needsToChangeOperatorImage: true,
 	}, nil
 }
 
 func checkHasMissingPVCs(_ context.Context, pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod) {
 		return rollout{
-			required:             true,
-			primaryForceRecreate: true,
-			reason:               "attaching a new PVC to the instance Pod",
+			required: true,
+			reason:   "attaching a new PVC to the instance Pod",
 		}, nil
 	}
 	return rollout{}, nil
@@ -542,9 +558,8 @@ func checkClusterHasDifferentRestartAnnotation(
 		podRestart := pod.Annotations[utils.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return rollout{
-				required:     true,
-				reason:       "cluster has been explicitly restarted via annotation",
-				canBeInPlace: false,
+				required: true,
+				reason:   "cluster has been explicitly restarted via annotation",
 			}, nil
 		}
 	}
@@ -640,7 +655,7 @@ func checkPodSpecIsOutdated(
 			required: true,
 			reason: fmt.Sprintf("the instance is using an old bootstrap container image: %s -> %s",
 				opCurrentImageName, configuration.Current.OperatorImageName),
-			needsChangeOperatorImage: true,
+			needsToChangeOperatorImage: true,
 		}, nil
 	}
 

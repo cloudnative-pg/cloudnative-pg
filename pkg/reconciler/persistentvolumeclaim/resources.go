@@ -65,15 +65,22 @@ external:
 	return true
 }
 
-// isResizing returns true if PersistentVolumeClaimResizing condition is present
-func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+func hasPVCCondition(pvc corev1.PersistentVolumeClaim, condType corev1.PersistentVolumeClaimConditionType) bool {
 	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing {
+		if condition.Type == condType && condition.Status == corev1.ConditionTrue {
 			return true
 		}
 	}
 
 	return false
+}
+
+func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimResizing)
+}
+
+func isFileSystemResizePending(pvc corev1.PersistentVolumeClaim) bool {
+	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimFileSystemResizePending)
 }
 
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
