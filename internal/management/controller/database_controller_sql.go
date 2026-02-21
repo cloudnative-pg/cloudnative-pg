@@ -87,54 +87,54 @@ func createDatabase(
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateDatabase strings.Builder
-	sqlCreateDatabase.WriteString(fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateDatabase, "CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize())
 	if len(obj.Spec.Owner) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize())
 	}
 	if len(obj.Spec.Template) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize())
 	}
 	if len(obj.Spec.Tablespace) > 0 {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
 	}
 	if obj.Spec.AllowConnections != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections))
+		fmt.Fprintf(&sqlCreateDatabase, " ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections)
 	}
 	if obj.Spec.ConnectionLimit != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit))
+		fmt.Fprintf(&sqlCreateDatabase, " CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit)
 	}
 	if obj.Spec.IsTemplate != nil {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate))
+		fmt.Fprintf(&sqlCreateDatabase, " IS_TEMPLATE %v", *obj.Spec.IsTemplate)
 	}
 	if obj.Spec.Encoding != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize())
 	}
 	if obj.Spec.Locale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize())
 	}
 	if obj.Spec.LocaleProvider != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE_PROVIDER %s",
-			pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LOCALE_PROVIDER %s",
+			pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize())
 	}
 	if obj.Spec.LcCollate != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize())
 	}
 	if obj.Spec.LcCtype != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize())
 	}
 	if obj.Spec.IcuLocale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize())
 	}
 	if obj.Spec.IcuRules != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize())
 	}
 	if obj.Spec.BuiltinLocale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" BUILTIN_LOCALE %s",
-			pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " BUILTIN_LOCALE %s",
+			pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize())
 	}
 	if obj.Spec.CollationVersion != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" COLLATION_VERSION %s",
-			pgx.Identifier{obj.Spec.CollationVersion}.Sanitize()))
+		fmt.Fprintf(&sqlCreateDatabase, " COLLATION_VERSION %s",
+			pgx.Identifier{obj.Spec.CollationVersion}.Sanitize())
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase.String())
@@ -268,12 +268,12 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.Extensio
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateExtension, "CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize())
 	if len(ext.Version) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" VERSION %s", pgx.Identifier{ext.Version}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " VERSION %s", pgx.Identifier{ext.Version}.Sanitize())
 	}
 	if len(ext.Schema) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize())
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
@@ -360,9 +360,9 @@ func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSp
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateExtension strings.Builder
-	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateExtension, "CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize())
 	if len(schema.Owner) > 0 {
-		sqlCreateExtension.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
+		fmt.Fprintf(&sqlCreateExtension, " AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize())
 	}
 
 	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
@@ -548,7 +548,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateFDW strings.Builder
-	sqlCreateFDW.WriteString(fmt.Sprintf("CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize()))
+	fmt.Fprintf(&sqlCreateFDW, "CREATE FOREIGN DATA WRAPPER %s ", pgx.Identifier{fdw.Name}.Sanitize())
 
 	// Create Handler
 	if len(fdw.Handler) > 0 {
@@ -556,7 +556,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		case "-":
 			sqlCreateFDW.WriteString("NO HANDLER ")
 		default:
-			sqlCreateFDW.WriteString(fmt.Sprintf("HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize()))
+			fmt.Fprintf(&sqlCreateFDW, "HANDLER %s ", pgx.Identifier{fdw.Handler}.Sanitize())
 		}
 	}
 
@@ -566,7 +566,7 @@ func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error
 		case "-":
 			sqlCreateFDW.WriteString("NO VALIDATOR ")
 		default:
-			sqlCreateFDW.WriteString(fmt.Sprintf("VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize()))
+			fmt.Fprintf(&sqlCreateFDW, "VALIDATOR %s ", pgx.Identifier{fdw.Validator}.Sanitize())
 		}
 	}
 
@@ -737,9 +737,9 @@ func createDatabaseForeignServer(ctx context.Context, db *sql.DB, server apiv1.S
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateServer strings.Builder
-	sqlCreateServer.WriteString(fmt.Sprintf("CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
+	fmt.Fprintf(&sqlCreateServer, "CREATE SERVER %s FOREIGN DATA WRAPPER %s ",
 		pgx.Identifier{server.Name}.Sanitize(),
-		pgx.Identifier{server.FdwName}.Sanitize()))
+		pgx.Identifier{server.FdwName}.Sanitize())
 
 	if opts := extractOptionsClauses(server.Options); len(opts) > 0 {
 		sqlCreateServer.WriteString("OPTIONS (" + strings.Join(opts, ", ") + ")")

@@ -189,7 +189,7 @@ func toTableDefinitionSQL(table *apiv1.PublicationTargetTable) string {
 	}
 
 	if len(table.Schema) > 0 {
-		result.WriteString(fmt.Sprintf("%s.", pgx.Identifier{table.Schema}.Sanitize()))
+		fmt.Fprintf(&result, "%s.", pgx.Identifier{table.Schema}.Sanitize())
 	}
 
 	result.WriteString(pgx.Identifier{table.Name}.Sanitize())
@@ -199,7 +199,7 @@ func toTableDefinitionSQL(table *apiv1.PublicationTargetTable) string {
 		for _, column := range table.Columns {
 			sanitizedColumns = append(sanitizedColumns, pgx.Identifier{column}.Sanitize())
 		}
-		result.WriteString(fmt.Sprintf(" (%s)", strings.Join(sanitizedColumns, ", ")))
+		fmt.Fprintf(&result, " (%s)", strings.Join(sanitizedColumns, ", "))
 	}
 
 	return result.String()

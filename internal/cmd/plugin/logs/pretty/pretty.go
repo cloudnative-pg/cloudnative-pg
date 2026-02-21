@@ -121,7 +121,7 @@ func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel
 
 		record, err := newLogRecordFromBytes(scanner.Bytes())
 		if err != nil {
-			_, _ = fmt.Fprintln(
+			_, _ = fmt.Fprintln( //nolint:gosec // output to local stderr
 				os.Stderr,
 				aurora.Red(fmt.Sprintf("JSON syntax error (%s)", err.Error())),
 				scanner.Text())
