@@ -141,7 +141,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 	wantedRoleExpectedAltWithPasswordStmt := fmt.Sprintf(
-		"ALTER ROLE \"%s\"  BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
+		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
 			"PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)

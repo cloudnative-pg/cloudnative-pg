@@ -119,7 +119,7 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	}
 	var query strings.Builder
 
-	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
@@ -143,7 +143,7 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	}
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	query.WriteString(fmt.Sprintf("CREATE ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
 	// Log before appending password to prevent password leakage in operator logs
@@ -321,7 +321,7 @@ func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 			quotedInRoles[i] = pgx.Identifier{inRole}.Sanitize()
 		}
 
-		fmt.Fprintf(query, " IN ROLE %s ", strings.Join(quotedInRoles, ","))
+		fmt.Fprintf(query, " IN ROLE %s", strings.Join(quotedInRoles, ","))
 	}
 }
 
