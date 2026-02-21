@@ -23,6 +23,7 @@ package fence
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -33,6 +34,19 @@ import (
 
 // fencingOn marks an instance in a cluster as fenced
 func fencingOn(ctx context.Context, clusterName string, serverName string) error {
+	var cluster apiv1.Cluster
+	if err := plugin.Client.Get(ctx,
+		types.NamespacedName{Name: clusterName, Namespace: plugin.Namespace},
+		&cluster,
+	); err != nil {
+		return err
+	}
+
+	if serverName != utils.FenceAllInstances &&
+		!slices.Contains(cluster.Status.InstanceNames, serverName) {
+		return fmt.Errorf("instance %s is not a known instance of cluster %s", serverName, clusterName)
+	}
+
 	err := utils.NewFencingMetadataExecutor(plugin.Client).
 		AddFencing().
 		ForInstance(serverName).
@@ -49,6 +63,20 @@ func fencingOn(ctx context.Context, clusterName string, serverName string) error
 
 // fencingOff marks an instance in a cluster as not fenced
 func fencingOff(ctx context.Context, clusterName string, serverName string) error {
+	var cluster apiv1.Cluster
+	if err := plugin.Client.Get(ctx,
+		types.NamespacedName{Name: clusterName, Namespace: plugin.Namespace},
+		&cluster,
+	); err != nil {
+		return err
+	}
+
+	if serverName != utils.FenceAllInstances &&
+		!slices.Contains(cluster.Status.InstanceNames, serverName) &&
+		!cluster.IsInstanceFenced(serverName) {
+		return fmt.Errorf("instance %s is not a known instance of cluster %s", serverName, clusterName)
+	}
+
 	err := utils.NewFencingMetadataExecutor(plugin.Client).
 		RemoveFencing().
 		ForInstance(serverName).
