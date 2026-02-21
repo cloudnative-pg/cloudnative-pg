@@ -121,6 +121,7 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
+	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
 	// will change no matter what, the next reconciliation cycle we would update the password
@@ -145,6 +146,7 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
+	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Creating", "query", query.String())
 	appendPasswordOption(role, &query)
 

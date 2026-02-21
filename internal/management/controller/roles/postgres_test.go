@@ -322,7 +322,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Create(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 
 	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
@@ -338,7 +338,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPassDeletion}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
+	It("Create will send a correct CREATE with default connection limit to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -419,7 +419,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Update(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 	It("Update will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -431,7 +431,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = Update(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 
 	// Testing COMMENT
@@ -455,7 +455,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = UpdateComment(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 
 	It("GetParentRoles will return the roles a given role belongs to", func(ctx context.Context) {

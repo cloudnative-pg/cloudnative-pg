@@ -179,7 +179,7 @@ stringData:
   password: SCRAM-SHA-256$<iteration count>:<salt>$<StoredKey>:<ServerKey>
 ```
 
-### Safety when using non-encrypted passwords
+### Safety when transmitting cleartext passwords
 
 While role passwords are safely managed in Kubernetes using Secrets,
 there is still a risk on the PostgreSQL side. If creating/altering a role with
