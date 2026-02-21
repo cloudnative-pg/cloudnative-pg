@@ -25,6 +25,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -229,7 +230,16 @@ func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pg
 }
 
 // CreateDataDirectory creates a new data directory given the configuration
-func (info InitInfo) CreateDataDirectory() error {
+func (info InitInfo) CreateDataDirectory(reuseDirectory bool) error {
+	if exists, _ := fileutils.FileExists(info.PgData); exists {
+		// This should only occur if the user has specified reuseExistingDirectory
+		// in the spec, in which case we should not do anything.
+		if reuseDirectory {
+			return nil
+		}
+		return errors.New("Data directory already exists.")
+	}
+
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
@@ -448,13 +458,13 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 }
 
 // Bootstrap creates and configures this new PostgreSQL instance
-func (info InitInfo) Bootstrap(ctx context.Context) error {
+func (info InitInfo) Bootstrap(ctx context.Context, reuseDirectory bool) error {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
 
-	cluster, err := info.loadCluster(ctx, typedClient)
+	cluster, err := info.LoadCluster(ctx, typedClient)
 	if err != nil {
 		return err
 	}
@@ -473,7 +483,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	err = info.CreateDataDirectory()
+	err = info.CreateDataDirectory(reuseDirectory)
 	if err != nil {
 		return err
 	}
