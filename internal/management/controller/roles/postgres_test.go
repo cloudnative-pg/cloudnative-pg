@@ -115,6 +115,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
+	wantedLogStatementSuppressionStmt := "SET LOCAL log_statement = 'none'"
+	wantedLogPreventionStmt := "SET LOCAL log_min_error_statement = 'PANIC'"
+
 	wantedRoleWithoutValidUntilExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD 'myPassword'",
@@ -134,7 +137,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		wantedRole.Name, pq.QuoteLiteral(wantedRole.Comment))
 
 	wantedRoleExpectedAltStmt := fmt.Sprintf(
-		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
+		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
+			"VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name)
+	wantedRoleExpectedAltWithPasswordStmt := fmt.Sprintf(
+		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
+			"PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 
@@ -248,12 +256,18 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
-	It("Create will send a correct CREATE with password to the DB", func(ctx context.Context) {
+	It("Create with password will send CREATE and prevent Postgres from logging the query", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedRoleWithPassExpectedCrtStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectCommit()
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
@@ -268,8 +282,14 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(wantedRoleWithoutValidUntilExpectedCrtStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectCommit()
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
@@ -282,6 +302,29 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
+	It("Create with password will rollback CREATE if there is an error", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		dbError := errors.New("kaboom")
+		mock.ExpectExec(wantedRoleWithPassExpectedCrtStmt).
+			WillReturnError(dbError)
+		mock.ExpectRollback()
+
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
+		// In this unit test we are not testing the retrieval of secrets, so let's
+		// fetch the password content by hand
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = Create(ctx, db, dbRole)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(dbError))
+	})
+
 	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -295,7 +338,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPassDeletion}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
+	It("Create will send a correct CREATE with default connection limit to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -332,7 +375,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	})
 	// Testing Alter
 	It("Update will send a correct ALTER to the DB", func(ctx context.Context) {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
@@ -340,8 +383,46 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Update(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
+	It("Update with password will ALTER the DB and prevent Postgres from logging the query", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedRoleExpectedAltWithPasswordStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectCommit()
+
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = Update(ctx, db, dbRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Update with password will rollback ALTER if there is an error", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		dbError := errors.New("kaboom")
+		mock.ExpectExec(wantedRoleExpectedAltWithPasswordStmt).
+			WillReturnError(dbError)
+		mock.ExpectRollback()
+
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = Update(ctx, db, dbRole)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(dbError))
+	})
 	It("Update will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		dbError := errors.New("Kaboom")
@@ -350,12 +431,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = Update(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 
 	// Testing COMMENT
 	It("UpdateComment will send a correct COMMENT to the DB", func(ctx context.Context) {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		mock.ExpectExec(wantedRoleCommentStmt).
@@ -365,7 +446,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	})
 
 	It("UpdateComment will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		dbError := errors.New("Kaboom")
@@ -374,7 +455,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = UpdateComment(ctx, db, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, dbError)).To(BeTrue())
+		Expect(err).To(MatchError(dbError))
 	})
 
 	It("GetParentRoles will return the roles a given role belongs to", func(ctx context.Context) {

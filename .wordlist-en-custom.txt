@@ -686,6 +686,7 @@ cisecurity
 claimRef
 className
 classid
+cleartext
 cli
 clientCA
 clientCASecret
