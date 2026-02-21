@@ -261,14 +261,24 @@ func classifyPVC(
 		return unusable
 	}
 
-	// PVC is resizing
-	if isResizing(pvc) {
-		return resizing
-	}
-
 	// PVC has a corresponding Pod
 	if hasPod(pvc, podList) {
+		if isResizing(pvc) {
+			return resizing
+		}
 		return healthy
+	}
+
+	// PVC is resizing without a pod
+	if isResizing(pvc) {
+		// Filesystem resize requires a pod mount to complete; classify as
+		// dangling so the reconciler creates one.
+		if isFileSystemResizePending(pvc) {
+			log.FromContext(ctx).Info("PVC filesystem resize pending without a pod, classifying as dangling",
+				"pvc", pvc.Name)
+			return dangling
+		}
+		return resizing
 	}
 
 	// PVC has a corresponding Job but not a corresponding Pod
