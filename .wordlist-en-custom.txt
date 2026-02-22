@@ -1185,6 +1185,7 @@ pgbouncerspec
 pgdata
 pgpass
 pgstatstatements
+pgvector
 phaseReason
 pid
 pinger

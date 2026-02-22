@@ -424,15 +424,17 @@ func createPostgresqlConfiguration(
 	sort.Strings(info.TemporaryTablespaces)
 
 	// Set additional extensions
-	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
-		info.AdditionalExtensions = append(
-			info.AdditionalExtensions,
-			postgres.AdditionalExtensionConfiguration{
-				Name:                 extension.Name,
-				ExtensionControlPath: extension.ExtensionControlPath,
-				DynamicLibraryPath:   extension.DynamicLibraryPath,
-			},
-		)
+	if cluster.Status.PGDataImageInfo != nil {
+		for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
+			info.AdditionalExtensions = append(
+				info.AdditionalExtensions,
+				postgres.AdditionalExtensionConfiguration{
+					Name:                 extension.Name,
+					ExtensionControlPath: extension.ExtensionControlPath,
+					DynamicLibraryPath:   extension.DynamicLibraryPath,
+				},
+			)
+		}
 	}
 
 	// Setup minimum replay delay if we're on a replica cluster

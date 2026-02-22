@@ -50,15 +50,37 @@ for PostGIS via the
 [`postgres-extensions-containers`](https://github.com/cloudnative-pg/postgres-extensions-containers/tree/main/postgis)
 repository.
 
-<!--
-### For CloudNativePG 1.29+
+### Via an image catalog (for CloudNativePG 1.29+)
 
 Starting from CloudNativePG 1.29 you can take advantage of
 [image catalogs with image volume extensions](image_catalog.md)
 to automate the management of these versions.
 
-### For other supported CNPG versions
--->
+Refer to the [image volume extensions page](imagevolume_extensions.md#via-an-image-catalog-recommended)
+for instructions on how to add an extension to a PostgreSQL cluster, making
+sure you use the `postgis` key:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-postgis
+spec:
+  # ... <snip>
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+
+  postgresql:
+    extensions:
+      # ... <snip>
+      - name: postgis
+      # ... <snip>
+```
+
+### Directly in the `Cluster` resource
 
 The following illustrative example shows how to add PostGIS 3.6.2 to a
 PostgreSQL 18 cluster, by loading the extension directly in the `Cluster`
