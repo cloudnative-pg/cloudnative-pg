@@ -195,6 +195,15 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/operatorVersion`
 :   Version of the operator.
 
+`cnpg.io/pausedDuringSwitchover`
+:   Applied to a `Pooler` resource by the operator when the pooler is
+    automatically paused during a switchover or failover. The annotation is
+    removed when the pooler is resumed. This annotation distinguishes
+    auto-paused poolers from manually paused ones, ensuring that only
+    auto-paused poolers are resumed by the operator.
+    See [Automatic pause during switchover/failover](connection_pooling.md#automatic-pause-during-switchoverfailover)
+    for details.
+
 `cnpg.io/pgControldata`
 :   Output of the `pg_controldata` command. This annotation replaces the old,
     deprecated `cnpg.io/hibernatePgControlData` annotation.
