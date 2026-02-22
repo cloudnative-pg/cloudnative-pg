@@ -28,7 +28,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -392,10 +391,7 @@ func getPassword(
 		client.ObjectKey{Namespace: namespace, Name: secretName},
 		&secret)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
-			return passwordSecret{}, nil
-		}
-		return passwordSecret{}, err
+		return passwordSecret{}, fmt.Errorf("failed to get password secret %s: %w", secretName, err)
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
