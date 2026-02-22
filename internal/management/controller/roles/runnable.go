@@ -106,10 +106,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 				continue
 			}
 
-			// Only reconcile roles on primaries. Replicas and designated
-			// primaries must not write to the database. This check is
-			// evaluated on each trigger so that a promoted instance
-			// starts reconciling without requiring a pod restart.
+			// Skip replicas and designated primaries: only true primaries write roles.
 			isPrimary, err := sr.instance.IsPrimary()
 			if err != nil {
 				contextLog.Error(err, "checking primary status")

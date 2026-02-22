@@ -53,9 +53,6 @@ func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
 	return f.db, nil
 }
 
-// mockInstanceForStart implements instanceInterface with controllable IsPrimary behavior.
-// isPrimaryChecked is signaled each time IsPrimary is called inside the goroutine loop,
-// allowing tests to synchronize on trigger processing without time.Sleep.
 type mockInstanceForStart struct {
 	isPrimaryVal     atomic.Bool
 	syncChan         chan *apiv1.ManagedConfiguration
@@ -126,7 +123,6 @@ var _ = Describe("RoleSynchronizer Start", func() {
 			syncChan:         syncChan,
 			isPrimaryChecked: isPrimaryChecked,
 		}
-		// isPrimaryVal defaults to false (zero value of atomic.Bool)
 		sr := &RoleSynchronizer{instance: instance}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -134,15 +130,10 @@ var _ = Describe("RoleSynchronizer Start", func() {
 
 		go sr.Start(ctx) //nolint:errcheck
 
-		// Send a trigger with a valid config
 		syncChan <- &apiv1.ManagedConfiguration{
 			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
 		}
-
-		// Wait for IsPrimary to be checked (confirms the trigger was processed)
 		Eventually(isPrimaryChecked).Should(Receive())
-
-		// Verify reconcile was NOT called (IsReady is the first call in reconcile)
 		Expect(instance.isReadyCalls.Load()).To(BeEquivalentTo(0))
 	})
 
@@ -161,15 +152,43 @@ var _ = Describe("RoleSynchronizer Start", func() {
 
 		go sr.Start(ctx) //nolint:errcheck
 
-		// Send a trigger with a valid config
 		syncChan <- &apiv1.ManagedConfiguration{
 			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
 		}
-
-		// Wait for IsPrimary to be checked
 		Eventually(isPrimaryChecked).Should(Receive())
+		Eventually(func() int32 {
+			return instance.isReadyCalls.Load()
+		}).Should(BeEquivalentTo(1))
+	})
 
-		// Verify reconcile WAS called (IsReady is the first call in reconcile)
+	It("should start reconciling after promotion", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		config := &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+
+		// Trigger while still a replica: reconcile must be skipped
+		syncChan <- config
+		Eventually(isPrimaryChecked).Should(Receive())
+		Expect(instance.isReadyCalls.Load()).To(BeEquivalentTo(0))
+
+		// Simulate promotion
+		instance.isPrimaryVal.Store(true)
+
+		syncChan <- config
+		Eventually(isPrimaryChecked).Should(Receive())
 		Eventually(func() int32 {
 			return instance.isReadyCalls.Load()
 		}).Should(BeEquivalentTo(1))
