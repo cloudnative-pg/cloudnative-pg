@@ -70,7 +70,7 @@ kind: Cluster
 metadata:
   name: cluster-postgis
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.2-minimal-trixie
   instances: 1
 
   storage:
@@ -112,7 +112,7 @@ metadata:
   name: cluster-postgis
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:18.1-3.6.2-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgis:18.2-3.6.2-system-trixie
   storage:
     size: 1Gi
 ```
