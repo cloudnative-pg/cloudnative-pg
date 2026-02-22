@@ -78,7 +78,6 @@ func Reconcile(
 	}
 
 	if len(rolesByStatus[apiv1.RoleStatusPendingReconciliation]) != 0 {
-		// forces runnable to run
 		instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
 		contextLogger.Info("Triggered a managed role reconciliation")
 	}

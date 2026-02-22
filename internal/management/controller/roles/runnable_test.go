@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -51,6 +52,148 @@ type fakeInstanceData struct {
 func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
 	return f.db, nil
 }
+
+type mockInstanceForStart struct {
+	isPrimaryVal     atomic.Bool
+	syncChan         chan *apiv1.ManagedConfiguration
+	isPrimaryChecked chan struct{}
+	isReadyCalls     atomic.Int32
+}
+
+func (m *mockInstanceForStart) GetSuperUserDB() (*sql.DB, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockInstanceForStart) IsPrimary() (bool, error) {
+	result := m.isPrimaryVal.Load()
+	if m.isPrimaryChecked != nil {
+		select {
+		case m.isPrimaryChecked <- struct{}{}:
+		default:
+		}
+	}
+	return result, nil
+}
+
+func (m *mockInstanceForStart) RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration {
+	return m.syncChan
+}
+
+func (m *mockInstanceForStart) IsReady() error {
+	m.isReadyCalls.Add(1)
+	return fmt.Errorf("not ready")
+}
+
+func (m *mockInstanceForStart) GetClusterName() string {
+	return "test-cluster"
+}
+
+func (m *mockInstanceForStart) GetNamespaceName() string {
+	return "default"
+}
+
+var _ = Describe("RoleSynchronizer Start", func() {
+	It("should return nil when context is cancelled", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration)
+		instance := &mockInstanceForStart{syncChan: syncChan}
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- sr.Start(ctx)
+		}()
+
+		// Ensure Start is blocking (not returning immediately)
+		Consistently(errCh, 200*time.Millisecond).ShouldNot(Receive())
+
+		cancel()
+
+		var startErr error
+		Eventually(errCh).Should(Receive(&startErr))
+		Expect(startErr).ToNot(HaveOccurred())
+	})
+
+	It("should skip reconciliation on non-primary instances", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		syncChan <- &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+		Eventually(isPrimaryChecked).Should(Receive())
+		Expect(instance.isReadyCalls.Load()).To(BeEquivalentTo(0))
+	})
+
+	It("should attempt reconciliation on primary instances", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		instance.isPrimaryVal.Store(true)
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		syncChan <- &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+		Eventually(isPrimaryChecked).Should(Receive())
+		Eventually(func() int32 {
+			return instance.isReadyCalls.Load()
+		}).Should(BeEquivalentTo(1))
+	})
+
+	It("should start reconciling after promotion", func() {
+		syncChan := make(chan *apiv1.ManagedConfiguration, 1)
+		isPrimaryChecked := make(chan struct{}, 1)
+		instance := &mockInstanceForStart{
+			syncChan:         syncChan,
+			isPrimaryChecked: isPrimaryChecked,
+		}
+		sr := &RoleSynchronizer{instance: instance}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go sr.Start(ctx) //nolint:errcheck
+
+		config := &apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{{Name: "test-role"}},
+		}
+
+		// Trigger while still a replica: reconcile must be skipped
+		syncChan <- config
+		Eventually(isPrimaryChecked).Should(Receive())
+		Expect(instance.isReadyCalls.Load()).To(BeEquivalentTo(0))
+
+		// Simulate promotion
+		instance.isPrimaryVal.Store(true)
+
+		syncChan <- config
+		Eventually(isPrimaryChecked).Should(Receive())
+		Eventually(func() int32 {
+			return instance.isReadyCalls.Load()
+		}).Should(BeEquivalentTo(1))
+	})
+})
 
 var _ = Describe("Role synchronizer tests", func() {
 	var (
