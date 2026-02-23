@@ -424,6 +424,8 @@ jobs:
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
+      plugin_hashes: ${{ steps.plugin-hashes.outputs.hashes }}
+      operator_hashes: ${{ steps.operator-hashes.outputs.hashes }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -492,6 +494,7 @@ jobs:
 
       - name: Run GoReleaser to build kubectl plugin
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        id: goreleaser-plugin
         if: |
           github.event_name == 'schedule' ||
           (
@@ -507,6 +510,15 @@ jobs:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}
+
+      - name: Build plugin checksum file
+        id: plugin-hashes
+        env:
+          ARTIFACTS: "${{ steps.goreleaser-plugin.outputs.artifacts }}"
+        shell: bash
+        run: |
+          checksum_file=$(echo "$ARTIFACTS" | jq -r '.[] | select (.type=="Checksum") | .path')
+          echo "hashes=$(cat $checksum_file | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       # Send Slack notification if the kubectl plugin build fails.
       # To avoid message overflow, we only report runs scheduled on main or release branches
@@ -530,8 +542,10 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_MESSAGE: Building kubernetes plugin failed!
 
+      # Build the operator
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        id: goreleaser-operator
         with:
           distribution: goreleaser
           version: v2
@@ -541,6 +555,15 @@ jobs:
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}
           RACE: "true"
+
+      - name: Build operator checksum file
+        id: operator-hashes
+        env:
+          ARTIFACTS: "${{ steps.goreleaser-operator.outputs.artifacts }}"
+        shell: bash
+        run: |
+          checksum_file=$(echo "$ARTIFACTS" | jq -r '.[] | select (.type=="Checksum") | .path')
+          echo "hashes=$(cat $checksum_file | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -635,6 +658,17 @@ jobs:
           )
           cosign sign --yes ${images}
 
+  binary_provenance:
+    needs:
+      - buildx
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+    with:
+      base64-subjects: "${{ needs.buildx.outputs.operator_hashes }}"
+      upload-assets: false
 
   olm-bundle:
     name: Create OLM bundle and catalog
