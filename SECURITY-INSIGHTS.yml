@@ -1,7 +1,7 @@
 header:
-  schema-version: 2.1.0
+  schema-version: 2.2.0
   last-updated: '2025-11-17'
-  last-reviewed: '2025-11-17'
+  last-reviewed: '2026-02-23'
   url: https://github.com/cloudnative-pg/cloudnative-pg
 
 project:
