@@ -424,6 +424,7 @@ jobs:
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
+      images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -645,6 +646,35 @@ jobs:
           )
           cosign sign --yes ${images}
 
+      - name: Prepare images matrix
+        id: images_matrix
+        shell: bash
+        run: |
+          images_matrix=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+            jq -r -c '. | del(.[].["containerimage.descriptor", "buildx.build.ref"]) | to_entries | map({variant: .key} + .value)'
+          )
+          echo "images_matrix="$images_matrix >> $GITHUB_OUTPUT
+
+  provenance:
+    name: Provenance for images
+    if: |
+      always() && !cancelled()
+    needs:
+      - buildx
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.buildx.outputs.images_matrix) }}
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ matrix['image.name'] }}
+      digest: ${{ matrix['containerimage.digest'] }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   olm-bundle:
     name: Create OLM bundle and catalog
