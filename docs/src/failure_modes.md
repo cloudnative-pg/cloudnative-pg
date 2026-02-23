@@ -60,17 +60,10 @@ may be required.
 
 ### Disabling Reconciliation
 
-To temporarily disable the reconciliation loop for a PostgreSQL cluster, use
-the `cnpg.io/reconciliationLoop` annotation:
-
-```yaml
-metadata:
-  name: cluster-example-no-reconcile
-  annotations:
-    cnpg.io/reconciliationLoop: "disabled"
-spec:
-  # ...
-```
+The `cnpg.io/reconciliationLoop` annotation allows you to temporarily disable
+the reconciliation loop for CloudNativePG resources. When set to `"disabled"`,
+the operator will stop processing updates for the annotated resource, preventing
+any automated changes or self-healing actions.
 
 Use this annotation **with extreme caution** and only during emergency
 operations.
@@ -80,3 +73,19 @@ operations.
     it in place prevents the operator from executing self-healing actions,
     including failover.
 :::
+
+The following resources support this annotation:
+
+- **Cluster**: Disables reconciliation of the PostgreSQL cluster
+- **Backup**: Disables reconciliation of backup operations
+
+Example usage:
+
+```yaml
+metadata:
+  name: cluster-example-no-reconcile
+  annotations:
+    cnpg.io/reconciliationLoop: "disabled"
+spec:
+  # ...
+```
