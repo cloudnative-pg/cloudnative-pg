@@ -179,6 +179,7 @@ func (info InitInfo) concludeRestore(
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
+
 	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
 	// destination path is empty
