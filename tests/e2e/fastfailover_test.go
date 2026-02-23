@@ -48,7 +48,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		if !IsLocal() {
+		if !IsKind() {
 			maxFailoverTime = 30
 		}
 	})

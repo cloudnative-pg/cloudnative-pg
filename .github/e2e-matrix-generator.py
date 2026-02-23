@@ -211,7 +211,7 @@ class E2EJob(dict):
         return hash(self["id"])
 
 
-def build_push_include_local():
+def build_push_include_kind():
     """Build the list of tests running on push"""
     return {
         E2EJob(KIND_K8S.latest, POSTGRES.latest, "pg"),
@@ -219,9 +219,9 @@ def build_push_include_local():
     }
 
 
-def build_pull_request_include_local():
+def build_pull_request_include_kind():
     """Build the list of tests running on pull request"""
-    result = build_push_include_local()
+    result = build_push_include_kind()
 
     # Iterate over K8S versions
     for k8s_version in KIND_K8S:
@@ -236,9 +236,9 @@ def build_pull_request_include_local():
     return result
 
 
-def build_main_include_local():
+def build_main_include_kind():
     """Build the list tests running on main"""
-    result = build_pull_request_include_local()
+    result = build_pull_request_include_kind()
 
     # Iterate over K8S versions
     for k8s_version in KIND_K8S:
@@ -253,10 +253,10 @@ def build_main_include_local():
     return result
 
 
-def build_schedule_include_local():
+def build_schedule_include_kind():
     """Build the list of tests running on schedule"""
     # For the moment scheduled tests are identical to main
-    return build_main_include_local()
+    return build_main_include_kind()
 
 
 def build_push_include_cloud(engine_version_list):
@@ -288,13 +288,13 @@ def build_schedule_include_cloud(engine_version_list):
 
 
 ENGINE_MODES = {
-    "local": {
-        "push": build_push_include_local,
-        "pull_request": build_pull_request_include_local,
-        "issue_comment": build_pull_request_include_local,
-        "workflow_dispatch": build_pull_request_include_local,
-        "main": build_main_include_local,
-        "schedule": build_schedule_include_local,
+    "kind": {
+        "push": build_push_include_kind,
+        "pull_request": build_pull_request_include_kind,
+        "issue_comment": build_pull_request_include_kind,
+        "workflow_dispatch": build_pull_request_include_kind,
+        "main": build_main_include_kind,
+        "schedule": build_schedule_include_kind,
     },
     "k3d": {
         "push": lambda: build_push_include_cloud(K3D_K8S),

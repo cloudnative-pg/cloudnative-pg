@@ -122,7 +122,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		BeforeAll(func() {
 			// limit the case running on local kind env as we are using taint to simulate the eviction
 			// we do not know if other cloud vendor crd controller is running on the node been evicted
-			if !IsLocal() {
+			if !IsKind() {
 				Skip("This test is only run on local cluster")
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
@@ -176,7 +176,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			if !IsLocal() {
+			if !IsKind() {
 				Skip("This test is only run on local cluster")
 			}
 		})

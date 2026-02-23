@@ -41,22 +41,22 @@ var EKS = TestEnvVendor("eks")
 // GKE google cloud cluster
 var GKE = TestEnvVendor("gke")
 
-// LOCAL kind cluster running locally
-var LOCAL = TestEnvVendor("local")
+// KIND cluster running locally
+var KIND = TestEnvVendor("kind")
+
+// K3D cluster running locally
+var K3D = TestEnvVendor("k3d")
 
 // OCP openshift cloud cluster
 var OCP = TestEnvVendor("ocp")
 
-// K3D local k3d cluster
-var K3D = TestEnvVendor("k3d")
-
 var vendors = map[string]*TestEnvVendor{
-	"aks":   &AKS,
-	"eks":   &EKS,
-	"gke":   &GKE,
-	"local": &LOCAL,
-	"k3d":   &K3D,
-	"ocp":   &OCP,
+	"aks":  &AKS,
+	"eks":  &EKS,
+	"gke":  &GKE,
+	"kind": &KIND,
+	"k3d":  &K3D,
+	"ocp":  &OCP,
 }
 
 // TestCloudVendor creates the environment for testing
@@ -69,8 +69,8 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 		return nil, fmt.Errorf("unknown cloud vendor %s", vendorEnv)
 	}
 
-	// if none above, it is a local
-	return &LOCAL, nil
+	// if none above, it is a kind
+	return &KIND, nil
 }
 
 // EnvProfile represents the capabilities of different cloud environments for testing
@@ -84,7 +84,7 @@ type EnvProfile interface {
 // GetEnvProfile returns a cloud environment's capabilities envProfile
 func GetEnvProfile(te TestEnvVendor) EnvProfile {
 	profileMap := map[TestEnvVendor]EnvProfile{
-		LOCAL: envProfile{
+		KIND: envProfile{
 			isLeaderElectionEnabled: true,
 			usesNodeDiskSpace:       true,
 		},

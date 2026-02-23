@@ -42,9 +42,9 @@ func IsGKE() bool {
 	return *testCloudVendorEnv == cloudvendors.GKE
 }
 
-// IsLocal checks if the running cluster is on local
-func IsLocal() bool {
-	return *testCloudVendorEnv == cloudvendors.LOCAL
+// IsKind checks if the running cluster is on kind
+func IsKind() bool {
+	return *testCloudVendorEnv == cloudvendors.KIND
 }
 
 // IsOpenshift checks if the running cluster is on OpenShift

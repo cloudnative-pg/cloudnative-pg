@@ -1,5 +1,5 @@
 {
-  "local": {
+  "kind": {
     "failover":                  240,
     "namespaceCreation":         30,
     "clusterIsReady":            600,

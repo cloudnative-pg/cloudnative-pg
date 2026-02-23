@@ -67,7 +67,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		clusterWithMinioSampleFile := fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
 
 		BeforeAll(func() {
-			if !IsLocal() {
+			if !IsKind() {
 				Skip("This test is only run on local clusters")
 			}
 			const namespacePrefix = "cluster-backup-minio"
@@ -569,7 +569,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		var namespace string
 
 		BeforeAll(func() {
-			if !IsLocal() {
+			if !IsKind() {
 				Skip("This test is only run on local clusters")
 			}
 			const namespacePrefix = "timeline-divergence"
@@ -691,7 +691,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 		var namespace, clusterName string
 
 		BeforeAll(func() {
-			if !IsLocal() {
+			if !IsKind() {
 				Skip("This test is only executed on local")
 			}
 			const namespacePrefix = "recovery-barman-object-minio"

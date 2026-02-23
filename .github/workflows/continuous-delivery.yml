@@ -12,7 +12,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, k3d, eks, aks, gke, openshift)'
+        description: 'Limit to the specified engines list (kind, k3d, eks, aks, gke, openshift)'
         required: false
       test_level:
         description: 'Test level: 0(highest) to 4(lowest). Default is 4.'
@@ -88,7 +88,7 @@ jobs:
         with:
           workflow: continuous-delivery
           ref: ${{ matrix.branch }}
-          inputs: '{ "depth": "push", "limit": "local", "test_level": "4", "log_level": "debug" }'
+          inputs: '{ "depth": "push", "limit": "kind", "test_level": "4", "log_level": "debug" }'
 
   check_commenter:
     if: |
@@ -127,7 +127,7 @@ jobs:
           ARGS="${{ steps.command.outputs.command-arguments }}"
           # Set the defaults
           DEPTH="main"
-          LIMIT="local"
+          LIMIT="kind"
           TEST_LEVEL="4"
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
@@ -562,9 +562,9 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       controller_img: ${{ needs.buildx.outputs.controller_img }}
-      localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
-      localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
-      localTimeout: ${{ steps.generate-jobs.outputs.localE2ETimeout }}
+      kindMatrix: ${{ steps.generate-jobs.outputs.kindMatrix }}
+      kindEnabled: ${{ steps.generate-jobs.outputs.kindEnabled }}
+      kindTimeout: ${{ steps.generate-jobs.outputs.kindE2ETimeout }}
       k3dMatrix: ${{ steps.generate-jobs.outputs.k3dMatrix }}
       k3dEnabled: ${{ steps.generate-jobs.outputs.k3dEnabled }}
       k3dTimeout: ${{ steps.generate-jobs.outputs.k3dE2ETimeout }}
@@ -597,11 +597,11 @@ jobs:
             -m '${{ needs.evaluate_options.outputs.depth }}' \
             -l '${{ needs.evaluate_options.outputs.limit }}'
 
-  e2e-local:
-    name: Run E2E on local executors
+  e2e-kind:
+    name: Run E2E on kind executors
     if: |
       (always() && !cancelled()) &&
-      needs.generate-jobs.outputs.localEnabled == 'true' &&
+      needs.generate-jobs.outputs.kindEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
     needs:
       - buildx
@@ -609,7 +609,7 @@ jobs:
       - evaluate_options
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
     runs-on: ubuntu-24.04
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
@@ -624,7 +624,7 @@ jobs:
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.localTimeout }}
+      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.kindTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
       DEBUG: "true"
@@ -637,7 +637,7 @@ jobs:
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
-      TEST_CLOUD_VENDOR: "local"
+      TEST_CLOUD_VENDOR: "kind"
     steps:
       -
         name: Cleanup Disk
@@ -719,7 +719,7 @@ jobs:
         name: Create individual artifact for each E2E test
         if: (always() && !cancelled())
         env:
-          RUNNER: "local"
+          RUNNER: "kind"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
           GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
@@ -2315,7 +2315,7 @@ jobs:
     name: E2E test suite
     needs:
       - evaluate_options
-      - e2e-local
+      - e2e-kind
       - e2e-k3d
       - e2e-eks
       - e2e-aks
@@ -2324,8 +2324,8 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       ((
-        needs.e2e-local.result == 'success' ||
-        needs.e2e-local.result == 'failure'
+        needs.e2e-kind.result == 'success' ||
+        needs.e2e-kind.result == 'failure'
       ) ||
       (
         needs.e2e-eks.result == 'success' ||
@@ -2420,10 +2420,10 @@ jobs:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
       - evaluate_options
-      - e2e-local
+      - e2e-kind
     if: |
       always() &&
-      needs.e2e-local.result == 'success' &&
+      needs.e2e-kind.result == 'success' &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-24.04
@@ -2450,10 +2450,10 @@ jobs:
     name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
       - evaluate_options
-      - e2e-local
+      - e2e-kind
     if: |
       always() &&
-      needs.e2e-local.result == 'failure' &&
+      needs.e2e-kind.result == 'failure' &&
       github.event_name == 'issue_comment'
     runs-on: ubuntu-24.04
     steps:
