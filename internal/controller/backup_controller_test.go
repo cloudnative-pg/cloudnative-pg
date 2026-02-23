@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -39,6 +40,47 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("backup reconciliation disabled", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("skips reconciliation when the annotation is set", func(ctx context.Context) {
+		ns := newFakeNamespace(env.client)
+
+		// The backup points to a non-existent cluster on purpose: if the
+		// reconciliation-disabled check is bypassed, getCluster will set the
+		// backup status to Pending and return RequeueAfter=30s, making the
+		// assertions below fail.
+		backup := &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "backup-disabled",
+				Namespace: ns,
+				Annotations: map[string]string{
+					utils.ReconciliationLoopAnnotationName: "disabled",
+				},
+			},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{Name: "non-existent-cluster"},
+				Method:  apiv1.BackupMethodBarmanObjectStore,
+			},
+		}
+		Expect(env.client.Create(ctx, backup)).To(Succeed())
+
+		result, err := env.backupReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: client.ObjectKeyFromObject(backup),
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		// Verify the backup status was not modified (no Pending phase set)
+		var stored apiv1.Backup
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(backup), &stored)).To(Succeed())
+		Expect(stored.Status.Phase).To(BeEmpty())
+	})
+})
 
 var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 	var env *testingEnvironment
