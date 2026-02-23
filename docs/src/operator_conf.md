@@ -212,7 +212,9 @@ to run in namespaced mode, where it only manages resources within a specific nam
 
 ### Enabling Namespaced Mode
 
-To enable namespaced deployment, both `OPERATOR_NAMESPACE` and `WATCH_NAMESPACE` must be set to the same namespace. Only when these parameters match can `NAMESPACED` mode be enabled:
+To enable namespaced deployment, both `OPERATOR_NAMESPACE` and `WATCH_NAMESPACE`
+must be set to the same namespace. Only when these parameters match can
+`NAMESPACED` mode be enabled:
 
 ```yaml
 env:
@@ -253,9 +255,12 @@ This feature will not work due to restricted RBAC of the operator in namespaced 
 CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances
 during voluntary disruptions. However, in namespaced mode, a critical limitation exists:
 
-- The Kubernetes node drain process requires cluster-level permissions to evict pods protected by PDBs
-- In namespaced mode, the operator lacks the necessary cluster-wide permissions to properly coordinate with the node drain controller
-- This can result in node drain operations timing out or failing when attempting to evict PostgreSQL pods
+- The Kubernetes node drain process requires cluster-level permissions to evict
+pods protected by PDBs
+- In namespaced mode, the operator lacks the necessary cluster-wide permissions
+to properly coordinate with the node drain controller
+- This can result in node drain operations timing out or failing when attempting
+to evict PostgreSQL pods
 
 **Workarounds:**
 
