@@ -113,7 +113,7 @@ var _ = Describe("Unrecoverable replicas", func() {
 		Expect(result).To(ConsistOf("cluster-example-3", "cluster-example-4"))
 	})
 
-	It("Detects unrecoverable instances even when pods are not ready", func(ctx SpecContext) {
+	It("Collects unrecoverable instances regardless of pod readiness status", func(ctx SpecContext) {
 		makeNonReadyPod := func(name string, unrecoverable string) corev1.Pod {
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
