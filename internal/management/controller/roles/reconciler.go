@@ -52,11 +52,8 @@ func Reconcile(
 	}
 
 	// get current passwords from spec/secrets
-	latestPasswordResourceVersion, err := getPasswordSecretResourceVersion(
+	latestPasswordResourceVersion := getPasswordSecretResourceVersion(
 		ctx, c, cluster.Spec.Managed.Roles, cluster.Namespace)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
 
 	contextLogger.Debug("getting the managed roles status")
 	rolesInDB, err := List(ctx, db)

@@ -199,11 +199,8 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
 ) (map[string]apiv1.PasswordState, map[string][]string, error) {
-	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
+	latestSecretResourceVersion := getPasswordSecretResourceVersion(
 		ctx, sr.client, config.Roles, sr.instance.GetNamespaceName())
-	if err != nil {
-		return nil, nil, err
-	}
 	rolesInDB, err := List(ctx, db)
 	if err != nil {
 		return nil, nil, err
@@ -393,14 +390,18 @@ func getPassword(
 	}
 
 	var secret corev1.Secret
+	wrapSecretErr := func(secretName string, err error) error {
+		return fmt.Errorf("failed to get password secret %s: %w",
+			secretName, err)
+	}
 	err := cl.Get(ctx,
 		client.ObjectKey{Namespace: namespace, Name: secretName},
 		&secret)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			return passwordSecret{}, nil
+			return passwordSecret{}, wrapSecretErr(secretName, err)
 		}
-		return passwordSecret{}, err
+		return passwordSecret{}, wrapSecretErr(secretName, err)
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
@@ -418,26 +419,28 @@ func getPassword(
 		nil
 }
 
-// getPasswordSecretResourceVersion returns a list of resource version of the passwords secrets for managed roles
+// getPasswordSecretResourceVersion returns a list of resource version of the password secrets for managed roles
 // stored as Kubernetes secrets
 func getPasswordSecretResourceVersion(
 	ctx context.Context,
 	client client.Client,
 	rolesInSpec []apiv1.RoleConfiguration,
 	namespace string,
-) (map[string]string, error) {
+) map[string]string {
 	re := make(map[string]string)
+	logger := log.FromContext(ctx)
 	for _, role := range rolesInSpec {
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
 		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
 		if err != nil {
-			return nil, err
+			logger.Error(err, "while getting password secret resource versions", "namespace", namespace)
+			continue
 		}
 		re[role.Name] = passwordSecret.version
 	}
-	return re, nil
+	return re
 }
 
 func getRolesToGrant(inRoleInDB, inRoleInSpec []string) []string {
