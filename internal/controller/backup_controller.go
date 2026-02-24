@@ -47,6 +47,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/webhook/guard"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
@@ -83,6 +85,7 @@ type BackupReconciler struct {
 
 	instanceStatusClient remote.InstanceClient
 	vsr                  *volumesnapshot.Reconciler
+	admission            *guard.Admission
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
@@ -101,6 +104,10 @@ func NewBackupReconciler(
 		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
 		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
+		admission: &guard.Admission{
+			Defaulter: &webhookv1.BackupCustomDefaulter{},
+			Validator: &webhookv1.BackupCustomValidator{},
+		},
 	}
 }
 
@@ -122,6 +129,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if apierrs.IsNotFound(err) {
 			return ctrl.Result{}, reconcile.TerminalError(err)
 		}
+		return ctrl.Result{}, err
+	}
+
+	if result, err := r.admission.EnsureResourceIsAdmitted(ctx, guard.AdmissionParams{
+		Object:       &backup,
+		Client:       r.Client,
+		ApplyChanges: true,
+	}); !result.IsZero() || err != nil {
 		return ctrl.Result{}, err
 	}
 
