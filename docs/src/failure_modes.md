@@ -70,8 +70,8 @@ operations.
 
 :::warning
     This annotation should be removed as soon as the issue is resolved. Leaving
-    it in place prevents the operator from executing self-healing actions,
-    including failover.
+    it in place prevents the operator from managing the annotated resource. On a
+    Cluster, this includes self-healing actions and failover.
 :::
 
 The following resources support this annotation:
