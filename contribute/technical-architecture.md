@@ -10,27 +10,28 @@
 This document describes the design architecture of CloudNativePG, providing the
 technical foundation for contributors and auditors to understand how the
 operator ensures high availability and security for PostgreSQL workloads.
+It focuses on core lifecycle and reconciliation; topics such as WAL archiving,
+backup/restore pipelines, the plugin system, and webhook admission controllers
+are outside its current scope.
 
 ## Design Philosophy
 
-CloudNativePG follows the "Cloud Native" paradigm. Unlike traditional legacy
-operators for PostgreSQL, it does not rely on external tools (like Patroni,
-repmgr, or Stolon) for leader election.
-Instead, it uses the **Kubernetes API Server** as the single source of truth.
+CloudNativePG follows the "Cloud Native" paradigm. Unlike PostgreSQL solutions
+that delegate failover and replication management to additional components
+(like Patroni, repmgr, or Stolon), CloudNativePG relies on the **Kubernetes
+API** as the single source of truth.
 
-### Key Principles:
+### Key Principles
 
 - **No Sidecars:** Management logic is integrated into the primary container as
   an **Instance Manager (PID 1)**.
 - **Direct Pod Management:** Does **not** use `StatefulSets`, allowing for more
   granular control over individual instances.
 - **Native Integration:** Leverages Kubernetes primitives (Pods, PVCs,
-  Services, Config maps, Secrets, Storage classes, Volume snapshots) for all
+  Services, ConfigMaps, Secrets, StorageClasses, VolumeSnapshots) for all
   database cluster operations.
 - **Security by Design:** Minimal attack surface by reducing the number of
   moving parts and using non-root, immutable application containers.
-
----
 
 ## Architectural Actors
 
@@ -43,10 +44,9 @@ graph TD
         Cluster[Cluster CRD]
         Operator[CNPG Operator]
         K8sAPI[API Server]
-        SvcRW[Service: -rw]
     end
 
-    subgraph Node ["Worker Node"]
+    subgraph Node ["Worker Node (one per instance)"]
         Kubelet[Kubelet]
 
         subgraph Pod ["PostgreSQL Pod (Operand)"]
@@ -58,6 +58,10 @@ graph TD
 
         PVC[(Persistent Volume Claim)]
     end
+
+    SvcRW[Service: -rw]
+    SvcRO[Service: -ro]
+    SvcR[Service: -r]
 
     %% Probes
     Kubelet -->|HTTP startup probe| IM
@@ -73,10 +77,10 @@ graph TD
 
     %% Traffic Routing
     K8sAPI ---|Selector: role=primary| SvcRW
+    K8sAPI ---|Selector: role=replica| SvcRO
+    K8sAPI ---|Selector: all ready| SvcR
 
 ```
-
----
 
 ## Key Differentiator: Beyond StatefulSets
 
@@ -88,7 +92,7 @@ gains surgical control over the cluster state.
 
 `StatefulSets` are bound by ordinal logic (0, 1, 2). CloudNativePG can promote
 any replica based on the **Log Sequence Number (LSN)** reported by the Instance
-Manager, ensuring the most up-to-date node is always chosen as the new primary,
+Manager, ensuring the most up-to-date instance is always chosen as the new primary,
 regardless of its name or index.
 
 ### 2. Managing "Sensitive" Parameters
@@ -105,13 +109,12 @@ configuration changes.
 
 ### 3. Synchronous Replication Control
 
-The Operator dynamically manages `synchronous_standby_names` via a declarative
-`synchronous` stanza. It supports priority-based (`first`) and quorum-based
-(`any`) methods, allowing users to toggle between `required` (strict
-durability) and `preferred` (availability-first) modes without manual
-intervention.
-
----
+The Operator dynamically manages `synchronous_standby_names` by watching Pod
+status and updating the PostgreSQL configuration accordingly. Users configure
+this via the declarative `synchronous` section, which supports priority-based
+(`first`) and quorum-based (`any`) methods, allowing users to toggle between
+`required` (strict durability) and `preferred` (availability-first) modes
+without manual intervention.
 
 ## The Role of the Instance Manager (PID 1)
 
@@ -125,22 +128,19 @@ container. Its responsibilities include:
 - **Kubernetes Awareness:** Communicating directly with the K8s API to report
   status, replication lag, and LSN.
 
----
-
 ## Intelligent Probes
 
 The Instance Manager provides a database-aware HTTP server for Kubelet probes:
 
 - **Startup Probe:** Prevents restarts during `initdb`, recovery, or WAL
   replay.
-- **Liveness Probe:** Monitors the `postmaster` process and detects network
-  isolation. If the API server is unreachable, it fails and triggers a Kubelet
-  "fencing" restart.
+- **Liveness Probe:** On primary instances, performs an isolation check: if both
+  the API server and peer instances are unreachable (as determined by the
+  configurable `IsolationCheck` settings), the probe fails, causing Kubelet to
+  restart the Pod. Replicas always pass the liveness check.
 - **Readiness Probe:** Ensures `pg_isready` succeeds on the primary and
   validates replication lag/hot-standby status on replicas before allowing
   traffic.
-
----
 
 ## Cluster Lifecycle: Orchestrated Resources
 
@@ -152,10 +152,14 @@ manage the identity, security, and connectivity of the instances.
 Before long-running Pods start, CloudNativePG uses temporary **Jobs** to
 prepare the storage:
 
-- `initdb`: Created for the first instance to initialize the PostgreSQL data
+- **initdb:** Created for the first instance to initialize the PostgreSQL data
   directory on the PVC.
-- `join`: Created for subsequent replicas to clone data from the primary using
-  `pg_basebackup`.
+- **recovery:** Created when bootstrapping from a backup or volume snapshot,
+  restoring the data directory for point-in-time recovery.
+- **pg_basebackup:** Created when cloning from an external cluster via
+  streaming replication.
+- **join:** Created for subsequent replicas to clone data from the primary
+  using `pg_basebackup`.
 
 ### 2. Operational Phase: Resource Hierarchy
 
@@ -166,8 +170,10 @@ the following hierarchy of objects is maintained:
 graph LR
     Cluster[Cluster: cluster-example]
 
-    %% Identity
+    %% Identity & RBAC
     Cluster --> SA[ServiceAccount: cluster-example]
+    Cluster --> Role[Role: cluster-example]
+    Cluster --> RB[RoleBinding: cluster-example]
 
     %% Compute & Storage
     Cluster --> P1[Pod: cluster-example-1]
@@ -189,13 +195,15 @@ graph LR
     Cluster --> SecRepl(Secret: cluster-example-replication)
     Cluster --> SecApp(Secret: cluster-example-app)
 
-    %% Config
-    Cluster --> CM(ConfigMap: cnpg-default-monitoring)
+    %% Availability
+    Cluster --> PDB1[PodDisruptionBudget: cluster-example-primary]
+    Cluster --> PDB2[PodDisruptionBudget: cluster-example]
+
+    %% Monitoring (namespace-level, not owned by the Cluster)
+    Cluster -.-> CM(ConfigMap: cnpg-default-monitoring)
 
     style Cluster fill:#f96,stroke:#333,stroke-width:2px
 ```
-
----
 
 ## Label-Based Networking
 
@@ -210,11 +218,11 @@ Networking is purely label-driven. The Operator manages the
    Operator updates the labels. The Kubernetes API Server then automatically
    updates the **Endpoints** for the respective Services.
 
----
-
 ## Source Code Reference
 
-The following table maps architectural components to their implementation in the repository:
+The following table maps architectural components to their implementation in
+the repository. The **Core** components form the backbone of the operator;
+the remaining entries are peripheral CRDs for specific feature areas.
 
 | Category | Component | Types Definition | Logic / Functions |
 | --- | --- | --- | --- |
