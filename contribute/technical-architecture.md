@@ -46,7 +46,7 @@ graph TD
         K8sAPI[API Server]
     end
 
-    subgraph Node ["Worker Node (one per instance)"]
+    subgraph Node ["Worker Node"]
         Kubelet[Kubelet]
 
         subgraph Pod ["PostgreSQL Pod (Operand)"]
