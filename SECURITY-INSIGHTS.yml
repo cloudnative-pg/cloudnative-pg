@@ -1,8 +1,8 @@
 header:
   schema-version: 2.2.0
-  last-updated: '2025-11-17'
+  last-updated: '2026-02-23'
   last-reviewed: '2026-02-23'
-  url: https://github.com/cloudnative-pg/cloudnative-pg
+  url: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/SECURITY-INSIGHTS.yml
 
 project:
   name: CloudNativePG
@@ -51,7 +51,7 @@ repository:
     - name: Philippe Scorsolini
       primary: false
   license:
-    url: http://www.apache.org/licenses/LICENSE-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
     expression: Apache-2.0
   security:
     assessments:
