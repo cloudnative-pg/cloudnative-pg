@@ -148,6 +148,7 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level             = tests.Highest
 	)
+	var nodesWithLabels []string
 
 	BeforeAll(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -182,95 +183,91 @@ var _ = Describe("Namespaced Deployment - Node Drain", Label(tests.LabelNoOpensh
 		})
 	})
 
-	Context("node drain in namespaced mode", Label(tests.LabelDisruptive), func() {
-		var nodesWithLabels []string
-
-		BeforeEach(func() {
-			nodeList, _ := nodes.List(env.Ctx, env.Client)
-			for _, node := range nodeList.Items {
-				if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
-					nodesWithLabels = append(nodesWithLabels, node.Name)
-					cmd := fmt.Sprintf("kubectl label node %v drain=drain --overwrite", node.Name)
-					_, stderr, err := run.Run(cmd)
-					Expect(stderr).To(BeEmpty())
-					Expect(err).ToNot(HaveOccurred())
-				}
-				if len(nodesWithLabels) == 3 {
-					break
-				}
+	BeforeEach(func() {
+		nodeList, _ := nodes.List(env.Ctx, env.Client)
+		for _, node := range nodeList.Items {
+			if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
+				nodesWithLabels = append(nodesWithLabels, node.Name)
+				cmd := fmt.Sprintf("kubectl label node %v drain=drain --overwrite", node.Name)
+				_, stderr, err := run.Run(cmd)
+				Expect(stderr).To(BeEmpty())
+				Expect(err).ToNot(HaveOccurred())
 			}
-			Expect(len(nodesWithLabels)).Should(BeNumerically(">=", 2),
-				"Not enough nodes are available for this test")
+			if len(nodesWithLabels) == 3 {
+				break
+			}
+		}
+		Expect(len(nodesWithLabels)).Should(BeNumerically(">=", 2),
+			"Not enough nodes are available for this test")
+	})
+
+	AfterEach(func() {
+		err := nodes.UncordonAll(env.Ctx, env.Client)
+		Expect(err).ToNot(HaveOccurred())
+		for _, node := range nodesWithLabels {
+			cmd := fmt.Sprintf("kubectl label node %v drain-", node)
+			_, _, _ = run.Run(cmd)
+		}
+		nodesWithLabels = nil
+	})
+
+	It("can drain a node with cluster pods", func() {
+		By("creating a cluster in operator namespace", func() {
+			CreateResourceFromFile(operatorNamespace, sampleFile)
+			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 		})
 
-		AfterEach(func() {
+		By("disabling PDB", func() {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			oldCluster := cluster.DeepCopy()
+			cluster.Spec.EnablePDB = ptr.To(false)
+			err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		tableLocator := TableLocator{
+			Namespace:    operatorNamespace,
+			ClusterName:  clusterName,
+			DatabaseName: postgres.AppDBName,
+			TableName:    "test",
+		}
+
+		By("loading test data", func() {
+			AssertCreateTestData(env, tableLocator)
+		})
+
+		oldPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("draining the primary node", func() {
+			_ = nodes.DrainPrimary(
+				env.Ctx, env.Client,
+				operatorNamespace, clusterName,
+				testTimeouts[timeouts.DrainNode],
+			)
+		})
+
+		By("verifying failover after drain", func() {
+			Eventually(func() (string, error) {
+				pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, clusterName)
+				if err != nil {
+					return "", err
+				}
+				return pod.Name, err
+			}, 180).ShouldNot(BeEquivalentTo(oldPrimary.Name))
+		})
+
+		By("uncordoning all nodes", func() {
 			err := nodes.UncordonAll(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
-			for _, node := range nodesWithLabels {
-				cmd := fmt.Sprintf("kubectl label node %v drain-", node)
-				_, _, _ = run.Run(cmd)
-			}
-			nodesWithLabels = nil
 		})
 
-		It("can drain a node with cluster pods", func() {
-			By("creating a cluster in operator namespace", func() {
-				CreateResourceFromFile(operatorNamespace, sampleFile)
-				AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-			})
-
-			By("disabling PDB", func() {
-				cluster, err := clusterutils.Get(env.Ctx, env.Client, operatorNamespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-
-				oldCluster := cluster.DeepCopy()
-				cluster.Spec.EnablePDB = ptr.To(false)
-				err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			tableLocator := TableLocator{
-				Namespace:    operatorNamespace,
-				ClusterName:  clusterName,
-				DatabaseName: postgres.AppDBName,
-				TableName:    "test",
-			}
-
-			By("loading test data", func() {
-				AssertCreateTestData(env, tableLocator)
-			})
-
-			oldPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("draining the primary node", func() {
-				_ = nodes.DrainPrimary(
-					env.Ctx, env.Client,
-					operatorNamespace, clusterName,
-					testTimeouts[timeouts.DrainNode],
-				)
-			})
-
-			By("verifying failover after drain", func() {
-				Eventually(func() (string, error) {
-					pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, operatorNamespace, clusterName)
-					if err != nil {
-						return "", err
-					}
-					return pod.Name, err
-				}, 180).ShouldNot(BeEquivalentTo(oldPrimary.Name))
-			})
-
-			By("uncordoning all nodes", func() {
-				err := nodes.UncordonAll(env.Ctx, env.Client)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("verifying data and cluster health", func() {
-				AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-				AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(operatorNamespace, clusterName, 140)
-			})
+		By("verifying data and cluster health", func() {
+			AssertClusterIsReady(operatorNamespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			AssertDataExpectedCount(env, tableLocator, 2)
+			AssertClusterStandbysAreStreaming(operatorNamespace, clusterName, 140)
 		})
 	})
 })
