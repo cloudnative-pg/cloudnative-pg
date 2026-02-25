@@ -125,7 +125,7 @@ repository:
     review-policy: https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute#about-our-development-workflow
     security-policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy
     governance: https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md
-    # dependency-management-policy: TODO
+    dependency-management-policy: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/DEPENDENCIES.md
   license:
     url: https://www.apache.org/licenses/LICENSE-2.0
     expression: Apache-2.0
