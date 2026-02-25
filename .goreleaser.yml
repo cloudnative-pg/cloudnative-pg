@@ -125,7 +125,9 @@ changelog:
   disable: true
 
 sboms:
-  - disable: false
+  - artifacts: archive
+  - id: packages
+    artifacts: package
 
 signs:
   - artifacts: all
