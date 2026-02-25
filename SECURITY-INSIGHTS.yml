@@ -22,7 +22,6 @@ project:
       email: leonardo.cecchi@enterprisedb.com
       primary: false
     - name: Jonathan Gonzalez V.
-      email: jonathan.gonzalez@enterprisedb.com
       primary: false
     - name: Marco Nenciarini
       email: marco.nenciarini@enterprisedb.com
@@ -111,7 +110,6 @@ repository:
       email: leonardo.cecchi@enterprisedb.com
       primary: false
     - name: Jonathan Gonzalez V.
-      email: jonathan.gonzalez@enterprisedb.com
       primary: false
     - name: Marco Nenciarini
       email: marco.nenciarini@enterprisedb.com
