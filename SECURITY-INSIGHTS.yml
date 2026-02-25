@@ -1,7 +1,7 @@
 header:
   schema-version: 2.2.0
-  last-updated: '2026-02-23'
-  last-reviewed: '2026-02-23'
+  last-updated: '2026-02-25'
+  last-reviewed: '2026-02-25'
   url: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/SECURITY-INSIGHTS.yml
 
 project:
