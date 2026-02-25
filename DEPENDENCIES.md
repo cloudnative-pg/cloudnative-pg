@@ -22,26 +22,26 @@ it against the following criteria:
 - **Maintenance:** The dependency must be actively maintained with a history of
   timely security patches.
 - **Licensing:** All dependencies must comply with the Apache License 2.0 or a
-  compatible permissive licence (e.g. MIT, BSD-3-Clause).
+  compatible permissive license (e.g. MIT, BSD-3-Clause).
 
 ## Automated Monitoring and Scanning
 
-We employ a "defence in depth" approach to monitoring our dependency tree
+We employ a "defense in depth" approach to monitoring our dependency tree
 through automated tooling:
 
-- **Update Automation:** We use [Dependabot](https://github.com/dependabot) for
-  standard security alerts and [Renovate](https://github.com/renovatebot/renovate)
-  for granular version management, automated grouping of updates, and
-  maintenance of GitHub Actions.
+- **Update Automation:** GitHub's built-in
+  [Dependabot](https://github.com/dependabot) alerts notify us of known
+  vulnerabilities in our dependencies. We use
+  [Renovate](https://github.com/renovatebot/renovate) for granular version
+  management, automated grouping of updates, and maintenance of GitHub Actions.
 - **Vulnerability Scanning:** Every Pull Request and push to the main branch
-  triggers automated scans using [Snyk](https://snyk.io/),
-  [Trivy](https://github.com/aquasecurity/trivy), and
+  triggers automated scans using [Snyk](https://snyk.io/) and
   [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) to identify
   known vulnerabilities (CVEs).
 - **Static Analysis:** We rely on [CodeQL](https://codeql.github.com/) and
-  [golangci-lint](https://github.com/golangci/golangci-lint) (including
-  [gosec](https://github.com/securego/gosec)) to identify security risks
-  introduced by the way dependencies are utilised in our code.
+  [golangci-lint](https://github.com/golangci/golangci-lint) (which includes the
+  [gosec](https://github.com/securego/gosec) security linter) to identify security
+  risks introduced by the way dependencies are utilized in our code.
 - **Container Hardening:** We run
   [Dockle](https://github.com/goodwithtech/dockle) to lint our container images
   against security best practices, ensuring that our images are lean, do not run
