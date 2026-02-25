@@ -124,6 +124,9 @@ snapshot:
 changelog:
   disable: true
 
+sboms:
+  - disable: false
+
 signs:
   - artifacts: all
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
