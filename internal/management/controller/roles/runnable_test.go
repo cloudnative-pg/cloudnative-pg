@@ -423,13 +423,14 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(roleSynchronizer.client.Get(ctx,
 				client.ObjectKey{Namespace: namespace, Name: secretInDBName},
 				&secret)).To(Succeed())
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+			_, unreconciled, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_with_pass": {
 					TransactionID:         11,
 					SecretResourceVersion: secret.ResourceVersion,
 				},
 			})
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(unreconciled).To(BeEmpty())
 		})
 
 		It("it will not update a role password if the secret cannot be retrieved", func(ctx context.Context) {
@@ -447,14 +448,16 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+			_, unreconciled, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID:         11, // defined in the mock query to the DB above
 					SecretResourceVersion: "11",
 				},
 			})
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to get password secret"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(unreconciled).To(HaveLen(1))
+			Expect(unreconciled["role_to_test1"]).To(HaveLen(1))
+			Expect(unreconciled["role_to_test1"][0]).To(ContainSubstring("failed to get password secret"))
 		})
 
 		It("it will ignore ensure:absent roles in spec missing from DB", func(ctx context.Context) {
