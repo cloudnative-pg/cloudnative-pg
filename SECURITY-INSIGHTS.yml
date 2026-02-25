@@ -53,6 +53,8 @@ repository:
   license:
     url: https://www.apache.org/licenses/LICENSE-2.0
     expression: Apache-2.0
+  documentation:
+    dependency-management-policy: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/DEPENDENCIES.md
   security:
     assessments:
       self:
