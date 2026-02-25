@@ -76,7 +76,8 @@ func Reconcile(
 
 	if len(rolesByStatus[apiv1.RoleStatusPendingReconciliation]) != 0 {
 		instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
-		contextLogger.Info("Triggered a managed role reconciliation")
+		contextLogger.Info("Triggered a managed role reconciliation",
+			"pending-roles", roleNamesByStatus[apiv1.RoleStatusPendingReconciliation])
 	}
 
 	updatedCluster := cluster.DeepCopy()
