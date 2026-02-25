@@ -81,13 +81,26 @@ jobs:
             --out-file /src/release_notes.md \
             /src/docs/src/${{ env.FILE }}
       -
+        name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
+        # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
+        # how to use cosign.
+      -
+        name: Sign yaml files
+        run: |
+          cosign sign-blob releases/cnpg-${{ env.VERSION }}.yaml \
+          --bundle releases/cnpg-${{ env.VERSION }}.sigstore.json --yes
+      -
         name: Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           body_path: release_notes.md
           draft: false
           name: v${{ env.TAG }}
-          files: releases/cnpg-${{ env.VERSION }}.yaml
+          files: |
+            releases/cnpg-${{ env.VERSION }}.yaml
+            releases/cnpg-${{ env.VERSION }}.sigstore.json
           make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
           prerelease: ${{ needs.check-version.outputs.is_stable == 'false' || needs.check-version.outputs.is_rc == 'true' }}
         env:

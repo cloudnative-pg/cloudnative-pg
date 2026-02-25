@@ -77,6 +77,34 @@ CloudNativePG manages additional Kubernetes resources to enhance PostgreSQL
 management, including: `Backup`, `ClusterImageCatalog`, `Database`,
 `ImageCatalog`, `Pooler`, `Publication`, `ScheduledBackup`, and `Subscription`.
 
+## Verifying releases
+
+During the release process CloudNativePG uses [cosign](https://www.sigstore.dev/)
+to sign some of the assest's like the YAML and container images, these can be verified
+with the following commands:
+
+### Container images
+
+The following command requires only the image to be verified
+```shell
+cosign verify OPERATOR_IMAGE \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+### Operator YAML deployment
+
+This step requires to have the `.yaml` file and the `sigstore.json` file from the
+release page:
+
+```shell
+cosign verify-blob cnpg-{version}.yaml \
+--bundle cnpg-{version}.sigstore.json \
+--certificate-identity "https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/heads/main" \
+--certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+
 ## Out of Scope
 
 - **Kubernetes only:** CloudNativePG is dedicated to vanilla Kubernetes
