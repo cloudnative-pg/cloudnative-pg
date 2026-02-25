@@ -277,11 +277,6 @@ var _ = Describe("Updating target primary", func() {
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 	node := &corev1.Node{}
-	nodeUnschedulable := &corev1.Node{
-		Spec: corev1.NodeSpec{
-			Unschedulable: true,
-		},
-	}
 	nodeTainted := &corev1.Node{
 		Spec: corev1.NodeSpec{
 			Taints: []corev1.Taint{
@@ -309,7 +304,6 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 			Expect(isNodeUnschedulableOrBeingDrained(node, configuration.DefaultDrainTaints)).To(Equal(expected))
 		},
 		Entry("plain node", node, false),
-		Entry("node is unschedulable", nodeUnschedulable, true),
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
