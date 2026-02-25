@@ -134,7 +134,7 @@ repository:
     changelog: https://github.com/cloudnative-pg/cloudnative-pg/releases/tag/{version}
     automated-pipeline: true
     distribution-points:
-      - uri:  https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg
+      - uri: https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg
         comment: GitHub packages for CloudNativePG
       - uri: https://github.com/cloudnative-pg/artifacts/blob/release-{version}/manifests/operator-manifest.yaml
         comment: Kubernetes manifests
@@ -143,18 +143,24 @@ repository:
     tools:
       - name: Dependabot
         type: SCA
+        rulesets: ["default"]
+        results: {}
         integration:
           adhoc: true
-          ci: true
-          release: no
+          ci: false
+          release: false
       - name: Renovate
         type: SCA
+        rulesets: ["default"]
+        results: {}
         integration:
           adhoc: true
           ci: true
-          release: no
+          release: false
       - name: Snyk
         type: SAST
+        rulesets: ["default"]
+        results: {}
         comment: |
           Performs both Static Code Analysis (Snyk Code) and Vulnerability
           Scanning (Snyk Open Source).
@@ -163,14 +169,27 @@ repository:
           ci: true
           release: true
       - name: Cosign
-        type: automated-tooling
+        type: container
+        rulesets: ["default"]
+        results: {}
         comment: Used to cryptographically sign container images (operator and operand).
         integration:
           adhoc: true
           ci: true
           release: true
+      - name: CodeQL
+        type: SAST
+        rulesets: ["default"]
+        results: {}
+        comment: Performs static analysis of Go code on pushes, PRs, and weekly schedules.
+        integration:
+          adhoc: false
+          ci: true
+          release: false
       - name: GitHub Code Scanning
         type: SAST
+        rulesets: ["default"]
+        results: {}
         comment: Ingests SARIF results from Snyk for integrated GitHub security alerts.
         integration:
           adhoc: true
