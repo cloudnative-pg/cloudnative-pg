@@ -77,6 +77,7 @@ project:
       comment: CloudNativePG website
 
   documentation:
+    design: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/technical-architecture.md
     quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
     detailed-guide: https://cloudnative-pg.io/docs/current/
     code-of-conduct: https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md
@@ -173,15 +174,6 @@ repository:
       - name: GitHub Code Scanning
         type: SAST
         comment: Ingests SARIF results from Snyk for integrated GitHub security alerts.
-        integration:
-          adhoc: true
-          ci: true
-          release: true
-      - name: Trivy
-        type: automated-tooling
-        comment: |
-          Scans container images and file systems for vulnerabilities and
-          misconfigurations.
         integration:
           adhoc: true
           ci: true
