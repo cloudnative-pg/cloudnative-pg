@@ -11,6 +11,8 @@ permissions: read-all
 jobs:
   Trivy-Scan:
     runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
 
     steps:
       - name: Checkout code
