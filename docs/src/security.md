@@ -135,7 +135,7 @@ command with the image digest:
 
 ```shell
 cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
-  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 ```
 
