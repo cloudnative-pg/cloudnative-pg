@@ -647,18 +647,27 @@ jobs:
           cosign sign --yes ${images}
 
       - name: Prepare images matrix
+        if: env.PUSH == 'true'
         id: images_matrix
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         shell: bash
         run: |
-          images_matrix=$(echo '${{ steps.bake-push.outputs.metadata }}' |
-            jq -r -c '. | del(.[].["containerimage.descriptor", "buildx.build.ref"]) | to_entries | map({variant: .key} + .value)'
+          images_matrix=$(echo "$BAKE_METADATA" |
+            jq -r -c '
+              del(.[].["containerimage.descriptor", "buildx.build.ref"])
+              | to_entries
+              | map({variant: .key} + .value + {"image.name": (.value["image.name"] | split(",")[0] | sub(":[^/]+$"; ""))})
+            '
           )
-          echo "images_matrix="$images_matrix >> $GITHUB_OUTPUT
+          echo "images_matrix=${images_matrix}" >> "$GITHUB_OUTPUT"
 
   provenance:
     name: Provenance for images
     if: |
-      always() && !cancelled()
+      (always() && !cancelled()) &&
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.push == 'true'
     needs:
       - buildx
     permissions:
@@ -668,7 +677,7 @@ jobs:
     strategy:
       matrix:
         include: ${{ fromJson(needs.buildx.outputs.images_matrix) }}
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
     with:
       image: ${{ matrix['image.name'] }}
       digest: ${{ matrix['containerimage.digest'] }}
