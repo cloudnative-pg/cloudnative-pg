@@ -35,7 +35,7 @@ metadata:
   name: cluster-example-full
 spec:
   description: "Example of cluster"
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.2-system-trixie
   # imagePullSecret is only required if the images are located in a private registry
   # imagePullSecrets:
   #   - name: private_registry_access

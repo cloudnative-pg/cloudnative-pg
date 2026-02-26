@@ -223,7 +223,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:18.2-system-trixie
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -292,7 +292,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:18.2-system-trixie
 ```
 
 :::note

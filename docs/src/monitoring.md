@@ -258,7 +258,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="18.1"} 18.1
+cnpg_collector_postgres_version{cluster="cluster-example",full="18.2"} 18.2
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp (Deprecated)
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge
