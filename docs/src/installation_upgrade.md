@@ -387,7 +387,7 @@ Run the following command:
 cosign verify-blob \
   cnpg-{version}.yaml \
   --bundle cnpg-{version}.sigstore.json \
-  --certificate-identity "https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/heads/main" \
+  --certificate-identity-regexp "^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
