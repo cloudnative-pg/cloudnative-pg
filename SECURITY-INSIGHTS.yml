@@ -203,6 +203,20 @@ repository:
           adhoc: true
           ci: true
           release: true
+      - name: OSPS Baseline Scanner
+        type: Policy-as-Code
+        rulesets:
+          - Maturity Level 1
+        results:
+          adhoc:
+            name: OSPS Baseline Assessment
+            location: https://github.com/cloudnative-pg/cloudnative-pg/actions/workflows/osps_security_assessment.yml
+            comment: |
+              Evaluates the repository against the Open Source Project Security Baseline
+        integration:
+          adhoc: true
+          ci: true
+          release: false
 
     assessments:
       self:
