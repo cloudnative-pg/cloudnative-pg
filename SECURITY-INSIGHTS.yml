@@ -84,7 +84,7 @@ project:
     quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
     release-process: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/release_procedure.md
     # OSPS-DO-03.01
-    signature-verification: https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#security
+    signature-verification: https://cloudnative-pg.io/docs/devel/installation_upgrade/#verifying-release-assets
     # OSPS-DO-04.01, OSPS-DO-05.01
     support-policy: https://cloudnative-pg.io/docs/current/supported_releases
 
@@ -203,6 +203,20 @@ repository:
           adhoc: true
           ci: true
           release: true
+      - name: OSPS Baseline Scanner
+        type: Policy-as-Code
+        rulesets:
+          - Maturity Level 1
+        results:
+          adhoc:
+            name: OSPS Baseline Assessment
+            location: https://github.com/cloudnative-pg/cloudnative-pg/actions/workflows/osps_security_assessment.yml
+            comment: |
+              Evaluates the repository against the Open Source Project Security Baseline
+        integration:
+          adhoc: true
+          ci: true
+          release: false
 
     assessments:
       self:
