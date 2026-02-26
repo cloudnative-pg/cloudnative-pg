@@ -186,6 +186,7 @@ func normalizeVolumeMountName(mount corev1.VolumeMount) string {
 
 	return name
 }
+
 func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string) {
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
