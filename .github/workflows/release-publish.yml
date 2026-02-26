@@ -117,7 +117,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -178,7 +178,7 @@ jobs:
         if: |
           needs.check-version.outputs.is_latest == 'true' &&
           needs.check-version.outputs.is_stable == 'true'
-        uses: rajatjindal/krew-release-bot@3d9faef30a82761d610544f62afddca00993eef9 # v0.0.47
+        uses: rajatjindal/krew-release-bot@a7e82ae57ca41a16fca2691ef00e8a8d35bc77d4 # v0.0.50
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
@@ -272,7 +272,7 @@ jobs:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
