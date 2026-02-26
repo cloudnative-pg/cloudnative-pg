@@ -623,8 +623,7 @@ jobs:
         with:
           version: 'latest'
           image-ref: ${{ env.CONTROLLER_IMG }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          format: 'table'
 
       - name: Install cosign
         if: |
