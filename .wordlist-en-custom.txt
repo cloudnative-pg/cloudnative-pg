@@ -50,6 +50,7 @@ BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
+Buildx
 Burstable
 ByStatus
 CAs
@@ -294,6 +295,7 @@ OCI
 OLAP
 OLTP
 OOM
+OSPS
 OU
 ObjectMeta
 OnlineConfiguration
@@ -301,6 +303,7 @@ OnlineUpdateEnabled
 OnlineUpgrading
 OpenBao
 OpenID
+OpenSSF
 OpenSSL
 OpenShift
 Openshift
