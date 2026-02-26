@@ -294,7 +294,10 @@ jobs:
       actions: read
       id-token: write
       contents: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    # NOTE: pinned by tag, not SHA — the SLSA generator's builder-fetch.sh
+    # resolves the binary download URL from the git ref and breaks with SHA pins.
+    # See: https://github.com/slsa-framework/slsa-github-generator/issues/4216
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subjects: "${{ needs.release-binaries.outputs.hashes }}"
       upload-assets: true
@@ -310,7 +313,8 @@ jobs:
     strategy:
       matrix:
         include: ${{ fromJson(needs.release-binaries.outputs.images_matrix) }}
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    # NOTE: pinned by tag, not SHA — see comment on provenance-binaries above.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ matrix['image.name'] }}
       digest: ${{ matrix['containerimage.digest'] }}
