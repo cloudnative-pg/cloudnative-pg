@@ -8,24 +8,24 @@ on:
 jobs:
   osps-assessment:
     runs-on: ubuntu-24.04
-    
+
     permissions:
       contents: read
       security-events: write  # Required for SARIF upload
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      
+
       - name: Open Source Project Security Baseline Scanner
         uses: revanite-io/osps-baseline-action@99e372da63a5587fad5ef9a1a3c6e465f7e9fc03 # v1.3.1
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_GHA_PAT }}
           catalog: "osps-baseline"
           upload-sarif: "true"
-      
+
       - name: Upload Assessment Results
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
