@@ -361,8 +361,8 @@ fulfilled by the standard `status` command.
 ## Verifying release assets
 
 CloudNativePG cryptographically signs all official release assets. Verifying these
-assets ensures the software has not been tampered with and was produced by our
-official, automated build pipeline.
+signatures ensures the assets originate from the official repository and were
+published through our automated release workflow.
 
 :::info
 Refer to the ["Release integrity and supply chain" section](security.md#release-integrity-and-supply-chain)
