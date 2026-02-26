@@ -3,7 +3,7 @@
 name: continuous-delivery
 on:
   issue_comment:
-    type: [created]
+    types: [created]
   # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
