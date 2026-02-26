@@ -76,17 +76,22 @@ project:
       comment: CloudNativePG website
 
   documentation:
+    code-of-conduct: https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md
+    # OSPS-DO-01.01, OSPS-SA-02.01
+    detailed-guide: https://cloudnative-pg.io/docs/current/
+    # OSPS-GV-03.02
     design: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/technical-architecture.md
     quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
-    detailed-guide: https://cloudnative-pg.io/docs/current/
-    code-of-conduct: https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md
     release-process: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/release_procedure.md
-    support-policy: https://cloudnative-pg.io/docs/current/supported_releases
+    # OSPS-DO-03.01, OSPS-DO-03.02
     signature-verification: https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#security
+    # OSPS-DO-04.01, OSPS-DO-05.01
+    support-policy: https://cloudnative-pg.io/docs/current/supported_releases
 
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
+    # OSPS-VM-02.01, OSPS-VM-01.01, OSPS-VM-03.01, OSPS-VM-04.01
     policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy
     contact:
       name: Alias to a private mailing list in Google Groups containing just the maintainers of the project
@@ -121,10 +126,14 @@ repository:
       email: philippe.scorsolini@upbound.io
       primary: false
   documentation:
+    # OSPS-DO-02.01, OSPS-GV-03.01, OSPS-GV-03.02, OSPS-DO-07.01, OSPS-GV-03.02
     contributing-guide: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CONTRIBUTING.md
     review-policy: https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute#about-our-development-workflow
+    # OSPS-VM-02.01
     security-policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy
+    # OSPS-GV-01.01, OSPS-GV-01.02
     governance: https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md
+    # OSPS-GV-03.02
     dependency-management-policy: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/DEPENDENCIES.md
   license:
     url: https://www.apache.org/licenses/LICENSE-2.0
