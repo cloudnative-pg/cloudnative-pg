@@ -618,6 +618,7 @@ jobs:
 
       - name: Run Trivy to check Docker image for vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+        if: env.PUSH == 'true'
         id: trivy
         continue-on-error: true
         with:
