@@ -9292,6 +9292,9 @@ spec:
               date. Populated by the system. Read-only.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
+              image:
+                description: Image contains the image name used by the pods
+                type: string
               instances:
                 description: The number of pods trying to be scheduled
                 format: int32
