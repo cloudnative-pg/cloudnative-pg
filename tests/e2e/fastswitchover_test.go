@@ -197,7 +197,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	// depends on the tcp_syn_retries sysctl. Since by default
 	// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
 	// restarting the walreceiver.
-	if !IsLocal() {
+	if !IsKind() && !IsK3D() {
 		maxReattachTime = 180
 	}
 

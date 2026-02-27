@@ -54,7 +54,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// depends on the tcp_syn_retries sysctl. Since by default
 		// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
 		// restarting the walreceiver.
-		if !IsLocal() {
+		if !(IsKind() || IsK3D()) {
 			maxReattachTime = 180
 			maxFailoverTime = 30
 		}
