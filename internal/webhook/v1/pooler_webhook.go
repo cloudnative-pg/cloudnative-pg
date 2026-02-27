@@ -80,6 +80,7 @@ var AllowedPgbouncerGenericConfigurationParameters = stringset.From([]string{
 	"server_tls_protocols",
 	"server_tls_sslmode",
 	"stats_period",
+	"stats_users",
 	"suspend_timeout",
 	"tcp_defer_accept",
 	"tcp_socket_buffer",
