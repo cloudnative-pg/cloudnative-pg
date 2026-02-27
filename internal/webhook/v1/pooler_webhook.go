@@ -212,6 +212,10 @@ func (v *PoolerCustomValidator) validatePgBouncer(r *apiv1.Pooler) field.ErrorLi
 		result = append(result, v.validatePgbouncerGenericParameters(r)...)
 	}
 
+	if r.Spec.PgBouncer != nil {
+		result = append(result, v.validatePgbouncerDatabases(r)...)
+	}
+
 	return result
 }
 
@@ -252,6 +256,24 @@ func (v *PoolerCustomValidator) validatePgbouncerGenericParameters(r *apiv1.Pool
 					param, "Invalid or reserved parameter"))
 		}
 	}
+	return result
+}
+
+// validatePgbouncerDatabases validates the databases configuration
+func (v *PoolerCustomValidator) validatePgbouncerDatabases(r *apiv1.Pooler) field.ErrorList {
+	var result field.ErrorList
+
+	for i, db := range r.Spec.PgBouncer.Databases {
+		if db.Name == "*" {
+			result = append(result,
+				field.Invalid(
+					field.NewPath("spec", "pgbouncer", "databases").Index(i).Child("name"),
+					db.Name,
+					"wildcard (*) is not allowed in databases list; "+
+						"a default wildcard entry is automatically added by the operator"))
+		}
+	}
+
 	return result
 }
 
