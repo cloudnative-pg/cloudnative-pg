@@ -203,6 +203,19 @@ repository:
           adhoc: true
           ci: true
           release: true
+      - name: SLSA GitHub Generator Action
+        type: automated-tooling
+        rulesets: ["default"]
+        comment: >-
+          Generates non-falsifiable SLSA Level 3 provenance attestations for
+          release assets. This ensures that the binary artifacts and images are traced
+          back to the specific source commit and build environment without manual
+          intervention.
+
+        integration:
+          adhoc: false
+          ci: true
+          release: true
 
     assessments:
       self:
