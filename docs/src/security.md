@@ -149,9 +149,11 @@ traceability:
   comprehensive list of software artifacts included in the image or used during
   its build process, formatted using the
   [in-toto SPDX predicate standard](https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md).
-- **[Provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/):**
-  Metadata detailing how the image was built, following the [SLSA Provenance](https://slsa.dev)
-  framework.
+- **Provenance:** Metadata detailing the build process, generated via the
+  [SLSA GitHub Generator Github action](https://github.com/slsa-framework/slsa-github-generator).
+  This provides [SLSA Level 3 assurance](https://slsa.dev/spec/v1.0/levels)
+  that the artifact was built on a trusted, isolated GitHub Actions runner
+  directly from the project's source.
 
 You can retrieve the SBOM for a specific image and platform using the following
 command:
