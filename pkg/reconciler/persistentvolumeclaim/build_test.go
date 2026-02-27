@@ -56,9 +56,11 @@ var _ = Describe("PVC Creation", func() {
 				Status: StatusInitializing,
 				Storage: apiv1.StorageConfiguration{
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+							},
 						},
 					},
 				},
@@ -78,9 +80,11 @@ var _ = Describe("PVC Creation", func() {
 				Storage: apiv1.StorageConfiguration{
 					Size:         "2Gi",
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+							},
 						},
 					},
 				},
@@ -138,9 +142,11 @@ var _ = Describe("PVC Creation", func() {
 				Storage: apiv1.StorageConfiguration{
 					Size:         "2Gi",
 					StorageClass: &storageClass,
-					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+						PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+							},
 						},
 					},
 				},
@@ -164,8 +170,10 @@ var _ = Describe("PVC Creation", func() {
 			Calculator: NewPgDataCalculator(),
 			Storage: apiv1.StorageConfiguration{
 				Size: "1Gi",
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOncePod},
+				PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+					PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOncePod},
+					},
 				},
 			},
 		})
@@ -183,13 +191,69 @@ var _ = Describe("PVC Creation", func() {
 			Calculator: NewPgDataCalculator(),
 			Storage: apiv1.StorageConfiguration{
 				Size: "1Gi",
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+				PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+					PersistentVolumeClaimSpec: corev1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+					},
 				},
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvc.Spec.AccessModes).To(HaveLen(1))
 		Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
+	})
+
+	It("should propagate user-defined labels and annotations from PVC template metadata", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		}
+		pvc, err := Build(cluster, &CreateConfiguration{
+			Status:     StatusInitializing,
+			NodeSerial: 1,
+			Calculator: NewPgDataCalculator(),
+			Storage: apiv1.StorageConfiguration{
+				Size: "1Gi",
+				PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+					Metadata: apiv1.PVCMetadata{
+						Labels: map[string]string{
+							"app.kubernetes.io/team": "database",
+						},
+						Annotations: map[string]string{
+							"backup.velero.io/backup-volumes": "data",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pvc.Labels).To(HaveKeyWithValue("app.kubernetes.io/team", "database"))
+		Expect(pvc.Annotations).To(HaveKeyWithValue("backup.velero.io/backup-volumes", "data"))
+	})
+
+	It("should ensure operator metadata takes precedence over user metadata on collision", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-cluster",
+			},
+		}
+		pvc, err := Build(cluster, &CreateConfiguration{
+			Status:     StatusInitializing,
+			NodeSerial: 1,
+			Calculator: NewPgDataCalculator(),
+			Storage: apiv1.StorageConfiguration{
+				Size: "1Gi",
+				PersistentVolumeClaimTemplate: &apiv1.PVCTemplate{
+					Metadata: apiv1.PVCMetadata{
+						Annotations: map[string]string{
+							utils.PVCStatusAnnotationName: "should-be-overwritten",
+						},
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pvc.Annotations[utils.PVCStatusAnnotationName]).To(Equal(StatusInitializing))
 	})
 })

@@ -54,6 +54,94 @@ import (
 
 const sharedBuffersParameter = "shared_buffers"
 
+var (
+	reservedLabels = map[string]struct{}{
+		utils.ClusterLabelName:             {},
+		utils.JobRoleLabelName:             {},
+		utils.PvcRoleLabelName:             {},
+		utils.TablespaceNameLabelName:      {},
+		utils.PodRoleLabelName:             {},
+		utils.InstanceNameLabelName:        {},
+		utils.BackupNameLabelName:          {},
+		utils.MajorVersionLabelName:        {},
+		utils.PgbouncerNameLabel:           {},
+		utils.ClusterRoleLabelName:         {},
+		utils.ClusterInstanceRoleLabelName: {},
+		utils.ImmediateBackupLabelName:     {},
+		utils.ParentScheduledBackupLabelName: {},
+		utils.WatchedLabelName:             {},
+		utils.UserTypeLabelName:            {},
+		utils.BackupTimelineLabelName:      {},
+		utils.BackupYearLabelName:          {},
+		utils.BackupMonthLabelName:         {},
+		utils.BackupDateLabelName:          {},
+		utils.IsOnlineBackupLabelName:      {},
+		utils.IsManagedLabelName:           {},
+		utils.PluginNameLabelName:          {},
+	}
+
+	reservedAnnotations = map[string]struct{}{
+		utils.OperatorVersionAnnotationName:          {},
+		utils.ReconciliationLoopAnnotationName:       {},
+		utils.ReconcilePodSpecAnnotationName:         {},
+		utils.HibernateClusterManifestAnnotationName: {},
+		utils.HibernatePgControlDataAnnotationName:   {},
+		utils.PodEnvHashAnnotationName:               {},
+		utils.PodSpecAnnotationName:                  {},
+		utils.ClusterManifestAnnotationName:          {},
+		utils.CoredumpFilter:                         {},
+		utils.PgControldataAnnotationName:            {},
+		utils.SkipWalArchiving:                       {},
+		utils.ClusterSerialAnnotationName:            {},
+		utils.ClusterReloadAnnotationName:            {},
+		utils.PVCStatusAnnotationName:                {},
+		utils.LegacyBackupAnnotationName:             {},
+		utils.HibernationAnnotationName:              {},
+		utils.PoolerSpecHashAnnotationName:           {},
+		utils.OperatorManagedSecretsAnnotationName:   {},
+		utils.FencedInstanceAnnotation:               {},
+		utils.CNPGHashAnnotationName:                 {},
+		utils.BackupStartWALAnnotationName:           {},
+		utils.BackupEndWALAnnotationName:             {},
+		utils.BackupStartTimeAnnotationName:          {},
+		utils.BackupEndTimeAnnotationName:            {},
+		utils.BackupLabelFileAnnotationName:          {},
+		utils.BackupTablespaceMapFileAnnotationName:  {},
+		utils.BackupVolumeSnapshotDeadlineAnnotationName: {},
+		utils.SnapshotStartTimeAnnotationName:        {},
+		utils.SnapshotEndTimeAnnotationName:          {},
+		utils.ClusterRestartAnnotationName:           {},
+		utils.UpdateStrategyAnnotation:               {},
+		utils.PluginClientSecretAnnotationName:       {},
+		utils.PluginServerSecretAnnotationName:       {},
+		utils.PluginPortAnnotationName:               {},
+		utils.PodPatchAnnotationName:                 {},
+		utils.WebhookValidationAnnotationName:        {},
+		utils.FailoverQuorumAnnotationName:           {},
+		utils.EnableInstancePprofAnnotationName:      {},
+		utils.LivenessPingerAnnotationName:           {},
+		managedByAnnotation:                          {},
+	}
+
+	// managedByAnnotation is the cloudnative-pg.io/managed-by annotation,
+	// reserved for the operator. Not under the cnpg.io/ prefix so it needs
+	// explicit blocking.
+	managedByAnnotation = "cloudnative-pg.io/managed-by"
+)
+
+func isReservedLabel(key string) bool {
+	_, found := reservedLabels[key]
+	return found
+}
+
+func isReservedAnnotation(key string) bool {
+	if strings.HasPrefix(key, utils.AppArmorAnnotationPrefix) {
+		return true
+	}
+	_, found := reservedAnnotations[key]
+	return found
+}
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -162,6 +250,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateMinSyncReplicas,
 		v.validateMaxSyncReplicas,
 		v.validateStorageSize,
+		v.validatePVCTemplateMetadata,
 		v.validateWalStorageSize,
 		v.validateEphemeralVolumeSource,
 		v.validateTablespaceStorageSize,
@@ -1561,6 +1650,62 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 
 func (v *ClusterCustomValidator) validateStorageSize(r *apiv1.Cluster) field.ErrorList {
 	return validateStorageConfigurationSize(*field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)
+}
+
+// validatePVCTemplateMetadata verifies that the user is not specifying
+// any label or annotation which is reserved by CloudNativePG on any
+// PVC template (storage, walStorage, tablespaces).
+func (v *ClusterCustomValidator) validatePVCTemplateMetadata(r *apiv1.Cluster) field.ErrorList {
+	var allErrors field.ErrorList
+
+	allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+		field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)...)
+
+	if r.Spec.WalStorage != nil {
+		allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+			field.NewPath("spec", "walStorage"), *r.Spec.WalStorage)...)
+	}
+
+	for idx, ts := range r.Spec.Tablespaces {
+		allErrors = append(allErrors, validateStoragePVCTemplateMetadata(
+			field.NewPath("spec", "tablespaces").Index(idx).Child("storage"), ts.Storage)...)
+	}
+
+	return allErrors
+}
+
+// validateStoragePVCTemplateMetadata checks that a single StorageConfiguration's
+// PVC template metadata does not use reserved labels or annotations.
+func validateStoragePVCTemplateMetadata(basePath *field.Path, storage apiv1.StorageConfiguration) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if storage.PersistentVolumeClaimTemplate == nil ||
+		(storage.PersistentVolumeClaimTemplate.Metadata.Labels == nil &&
+			storage.PersistentVolumeClaimTemplate.Metadata.Annotations == nil) {
+		return allErrors
+	}
+
+	metadataPath := basePath.Child("pvcTemplate", "metadata")
+
+	for key := range storage.PersistentVolumeClaimTemplate.Metadata.Labels {
+		if isReservedLabel(key) {
+			allErrors = append(allErrors, field.Forbidden(
+				metadataPath.Child("labels", key),
+				fmt.Sprintf("label %s is reserved for internal use by CloudNativePG", key),
+			))
+		}
+	}
+
+	for key := range storage.PersistentVolumeClaimTemplate.Metadata.Annotations {
+		if isReservedAnnotation(key) {
+			allErrors = append(allErrors, field.Forbidden(
+				metadataPath.Child("annotations", key),
+				fmt.Sprintf("annotation %s is reserved for internal use by CloudNativePG", key),
+			))
+		}
+	}
+
+	return allErrors
 }
 
 func (v *ClusterCustomValidator) validateWalStorageSize(r *apiv1.Cluster) field.ErrorList {
