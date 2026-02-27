@@ -166,11 +166,35 @@ docker buildx imagetools inspect <IMAGE> \
 This command outputs the SBOM in JSON format, providing a detailed view of the
 software components and build dependencies.
 
-For the provenance, use:
+For the build-level provenance, use:
 
 ```shell
 docker buildx imagetools inspect <IMAGE> \
   --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
+```
+
+#### Verifying SLSA provenance
+
+You can verify SLSA Level 3 provenance using
+[`slsa-verifier`](https://github.com/slsa-framework/slsa-verifier).
+
+To verify a container image, pass its digest reference:
+
+```shell
+slsa-verifier verify-image \
+  ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
+```
+
+To verify a release binary, download both the artifact and the provenance file
+(`multiple.intoto.jsonl`) from the
+[GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+then run:
+
+```shell
+slsa-verifier verify-artifact <ARTIFACT> \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
 ```
 
 ### Guidelines and Frameworks for Container Security
