@@ -1,3 +1,44 @@
+// cleanupOrphanedEndpointSlices deletes EndpointSlices that are left after a Service is deleted
+// (e.g., after a replica Service is removed). It matches EndpointSlices by the service label.
+func (r *ClusterReconciler) cleanupOrphanedEndpointSlices(ctx context.Context, cluster *apiv1.Cluster) error {
+       // Only run if EndpointSlice API is available
+       discoveryClient := r.DiscoveryClient
+       _, err := discoveryClient.ServerResourcesForGroupVersion("discovery.k8s.io/v1")
+       if err != nil {
+	       // EndpointSlice API not available, skip cleanup
+	       return nil
+       }
+
+       // List all EndpointSlices in the cluster namespace
+       endpointSliceList := &discoveryv1.EndpointSliceList{}
+       if err := r.Client.List(ctx, endpointSliceList, client.InNamespace(cluster.Namespace)); err != nil {
+	       return err
+       }
+
+       // List all Services in the cluster namespace
+       serviceList := &corev1.ServiceList{}
+       if err := r.Client.List(ctx, serviceList, client.InNamespace(cluster.Namespace)); err != nil {
+	       return err
+       }
+       // Build a set of existing service names
+       serviceNames := make(map[string]struct{})
+       for _, svc := range serviceList.Items {
+	       serviceNames[svc.Name] = struct{}{}
+       }
+
+       // Delete EndpointSlices whose service-name label does not match any existing Service
+       for _, es := range endpointSliceList.Items {
+	       svcName, ok := es.Labels["kubernetes.io/service-name"]
+	       if !ok {
+		       continue
+	       }
+	       if _, exists := serviceNames[svcName]; !exists {
+		       // Orphaned EndpointSlice, delete it
+		       _ = r.Delete(ctx, &es) // ignore error to continue cleanup
+	       }
+       }
+       return nil
+}
 /*
 Copyright © contributors to CloudNativePG, established as
 CloudNativePG a Series of LF Projects, LLC.
@@ -765,6 +806,11 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	} else if result != nil {
 		return *result, err
+	}
+
+	// Clean up orphaned EndpointSlices after Service deletions
+	if err := r.cleanupOrphanedEndpointSlices(ctx, cluster); err != nil {
+		contextLogger.Error(err, "While cleaning up orphaned EndpointSlices")
 	}
 
 	if !resources.allInstancesAreActive() {
