@@ -186,17 +186,6 @@ slsa-verifier verify-image \
   --source-uri github.com/cloudnative-pg/cloudnative-pg
 ```
 
-To verify a release binary, download both the artifact and the provenance file
-(`multiple.intoto.jsonl`) from the
-[GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases),
-then run:
-
-```shell
-slsa-verifier verify-artifact <ARTIFACT> \
-  --provenance-path multiple.intoto.jsonl \
-  --source-uri github.com/cloudnative-pg/cloudnative-pg
-```
-
 ### Guidelines and Frameworks for Container Security
 
 The following guidelines and frameworks have been considered for ensuring

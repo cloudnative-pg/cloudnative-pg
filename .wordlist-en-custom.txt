@@ -1405,6 +1405,7 @@ sigs
 sigstore
 singlenamespace
 slotPrefix
+slsa
 smartShutdownTimeout
 snapshotBackupStatus
 snapshotOwnerReference
