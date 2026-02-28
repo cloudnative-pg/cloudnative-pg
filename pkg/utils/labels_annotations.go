@@ -299,6 +299,34 @@ const (
 	// patch to apply to the pod
 	PodPatchAnnotationName = MetadataNamespace + "/podPatch"
 
+	// InitDBJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the initdb jobs
+	InitDBJobPatchAnnotationName = MetadataNamespace + "/initdbJobPatch"
+
+	// ImportJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the import jobs
+	ImportJobPatchAnnotationName = MetadataNamespace + "/importJobPatch"
+
+	// PGBaseBackupJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the pgbasebackup jobs
+	PGBaseBackupJobPatchAnnotationName = MetadataNamespace + "/pgbasebackupJobPatch"
+
+	// FullRecoveryJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the full-recovery jobs
+	FullRecoveryJobPatchAnnotationName = MetadataNamespace + "/fullRecoveryJobPatch"
+
+	// JoinJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the join jobs
+	JoinJobPatchAnnotationName = MetadataNamespace + "/joinJobPatch"
+
+	// SnapshotRecoveryJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the snapshot-recovery jobs
+	SnapshotRecoveryJobPatchAnnotationName = MetadataNamespace + "/snapshotRecoveryJobPatch"
+
+	// MajorUpgradeJobPatchAnnotationName is the annotation containing the JSON patch
+	// to apply to the major upgrade jobs
+	MajorUpgradeJobPatchAnnotationName = MetadataNamespace + "/majorUpgradeJobPatch"
+
 	// WebhookValidationAnnotationName is the name of the annotation describing if
 	// the validation webhook should be enabled or disabled
 	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
@@ -582,4 +610,41 @@ func GetClusterSerialValue(annotations map[string]string) (int, error) {
 	}
 
 	return serial, nil
+}
+
+// GetJobPatchAnnotationForRole returns the appropriate job patch annotation name
+// for the given job role string. Returns an empty string if the role is unknown.
+func GetJobPatchAnnotationForRole(role string) string {
+	switch role {
+	case "import":
+		return ImportJobPatchAnnotationName
+	case "initdb":
+		return InitDBJobPatchAnnotationName
+	case "pgbasebackup":
+		return PGBaseBackupJobPatchAnnotationName
+	case "full-recovery":
+		return FullRecoveryJobPatchAnnotationName
+	case "join":
+		return JoinJobPatchAnnotationName
+	case "snapshot-recovery":
+		return SnapshotRecoveryJobPatchAnnotationName
+	case "major-upgrade":
+		return MajorUpgradeJobPatchAnnotationName
+	default:
+		return ""
+	}
+}
+
+// KnownJobPatchAnnotations returns a slice of all known job patch annotation names.
+// This is useful for validation purposes.
+func KnownJobPatchAnnotations() []string {
+	return []string{
+		InitDBJobPatchAnnotationName,
+		ImportJobPatchAnnotationName,
+		PGBaseBackupJobPatchAnnotationName,
+		FullRecoveryJobPatchAnnotationName,
+		JoinJobPatchAnnotationName,
+		SnapshotRecoveryJobPatchAnnotationName,
+		MajorUpgradeJobPatchAnnotationName,
+	}
 }

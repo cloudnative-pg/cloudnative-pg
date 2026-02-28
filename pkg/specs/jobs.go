@@ -20,9 +20,11 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +51,7 @@ func (p postInitFolder) toString() string {
 }
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
-func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) (*batchv1.Job, error) {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -179,7 +181,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 	nodeSerial int,
 	object *metav1.ObjectMeta,
 	backup *apiv1.Backup,
-) *batchv1.Job {
+) (*batchv1.Job, error) {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -198,15 +200,18 @@ func CreatePrimaryJobViaRestoreSnapshot(
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job, err := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	if err != nil {
+		return nil, err
+	}
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
-	return job
+	return job, nil
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) (*batchv1.Job, error) {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 3+len(commonFlags))
 	initCommand = append(initCommand,
@@ -217,11 +222,14 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, commonFlags...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
+	job, err := CreatePrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
+	if err != nil {
+		return nil, err
+	}
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
-	return job
+	return job, nil
 }
 
 func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
@@ -249,7 +257,7 @@ func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Ba
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
-func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) (*batchv1.Job, error) {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 3+len(commonFlags))
 	initCommand = append(initCommand,
@@ -264,7 +272,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
-func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) (*batchv1.Job, error) {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 5+len(commonFlags))
 	initCommand = append(initCommand,
@@ -280,7 +288,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
-func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) (*batchv1.Job, error) {
 	commonFlags := buildCommonInitJobFlags(cluster)
 	initCommand := make([]string, 0, 4+len(commonFlags))
 	initCommand = append(initCommand,
@@ -292,8 +300,7 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 
 	initCommand = append(initCommand, commonFlags...)
 
-	job := CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
-	return job
+	return CreatePrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
@@ -325,7 +332,7 @@ func (role jobRole) getJobName(instanceName string) string {
 
 // CreatePrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
-func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
+func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) (*batchv1.Job, error) {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
 	version, _ := cluster.GetPostgresqlMajorVersion()
@@ -453,5 +460,25 @@ func CreatePrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 		job.Spec.Template.Spec.PriorityClassName = cluster.Spec.PriorityClassName
 	}
 
-	return job
+	if jsonPatch := cluster.Annotations[utils.GetJobPatchAnnotationForRole(string(role))]; jsonPatch != "" {
+		serializedObject, err := json.Marshal(job)
+		if err != nil {
+			return nil, fmt.Errorf("while serializing job to JSON: %w", err)
+		}
+		patch, err := jsonpatch.DecodePatch([]byte(jsonPatch))
+		if err != nil {
+			return nil, fmt.Errorf("while decoding JSON patch from annotation: %w", err)
+		}
+
+		serializedObject, err = patch.Apply(serializedObject)
+		if err != nil {
+			return nil, fmt.Errorf("while applying JSON patch from annotation: %w", err)
+		}
+
+		if err = json.Unmarshal(serializedObject, job); err != nil {
+			return nil, fmt.Errorf("while deserializing job to JSON: %w", err)
+		}
+	}
+
+	return job, nil
 }
