@@ -26,8 +26,8 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 
@@ -51,7 +51,7 @@ type fakePluginClient struct {
 
 func (f fakePluginClient) LifecycleHook(
 	_ context.Context,
-	_ plugin.OperationVerb,
+	_ integration.OperationVerb,
 	_ k8client.Object,
 	object k8client.Object,
 ) (k8client.Object, error) {
@@ -82,7 +82,7 @@ var _ = Describe("extendedClient", func() {
 		newCtx = context.WithValue(newCtx, contextutils.PluginClientKey, pluginClient)
 
 		By("ensuring it works the first invocation", func() {
-			obj, err := c.invokePlugin(newCtx, plugin.OperationVerbCreate, &corev1.Pod{})
+			obj, err := c.invokePlugin(newCtx, integration.OperationVerbCreate, &corev1.Pod{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj.GetLabels()).To(Equal(expectedLabels))
 		})
@@ -90,7 +90,7 @@ var _ = Describe("extendedClient", func() {
 		By("ensuring it maintains the reference for subsequent invocations", func() {
 			newLabels := map[string]string{"test": "test"}
 			pluginClient.injectLabels = newLabels
-			obj, err := c.invokePlugin(newCtx, plugin.OperationVerbCreate, &corev1.Pod{})
+			obj, err := c.invokePlugin(newCtx, integration.OperationVerbCreate, &corev1.Pod{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj.GetLabels()).To(Equal(newLabels))
 		})

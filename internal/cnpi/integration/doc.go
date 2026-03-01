@@ -17,5 +17,5 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package plugin contains the logics that acts as bridge between cnpg-i  and the operator
-package plugin
+// Package integration contains the logics that acts as bridge between cnpg-i and the operator
+package integration

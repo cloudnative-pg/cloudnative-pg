@@ -33,8 +33,8 @@ import (
 	decoder "k8s.io/apimachinery/pkg/util/yaml"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/connection"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -187,7 +187,7 @@ var _ = Describe("LifecycleHook", func() {
 			},
 			ObjectMeta: metav1.ObjectMeta{},
 		}
-		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		obj, err := d.LifecycleHook(ctx, integration.OperationVerbCreate, clusterObj, pod)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(obj).ToNot(BeNil())
 		podModified, ok := obj.(*corev1.Pod)
@@ -213,7 +213,7 @@ var _ = Describe("LifecycleHook", func() {
 				},
 			},
 		}
-		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbDelete, clusterObj, pod)
+		obj, err := d.LifecycleHook(ctx, integration.OperationVerbDelete, clusterObj, pod)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(obj).ToNot(BeNil())
 		podModified, ok := obj.(*corev1.Pod)

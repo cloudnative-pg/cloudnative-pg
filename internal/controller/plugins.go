@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 )
 
 // preReconcilePluginHooks ensures we call the pre-reconcile plugin hooks

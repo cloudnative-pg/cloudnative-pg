@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/connection"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

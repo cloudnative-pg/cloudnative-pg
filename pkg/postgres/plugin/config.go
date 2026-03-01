@@ -26,7 +26,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )

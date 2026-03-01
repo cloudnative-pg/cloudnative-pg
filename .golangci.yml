@@ -115,7 +115,7 @@ linters:
         text: avoid package names that conflict with Go standard library package names
       - linters:
           - revive
-        path: internal/(cmd|cnpi)/plugin/
+        path: internal/cmd/plugin/
         text: avoid package names that conflict with Go standard library package names
       - linters:
           - revive

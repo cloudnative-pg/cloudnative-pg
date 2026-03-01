@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/connection"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
 
@@ -136,7 +136,7 @@ type LifecycleCapabilities interface {
 	// LifecycleHook notifies the registered plugins of a given event for a given object
 	LifecycleHook(
 		ctx context.Context,
-		operationVerb plugin.OperationVerb,
+		operationVerb integration.OperationVerb,
 		cluster client.Object,
 		object client.Object,
 	) (client.Object, error)

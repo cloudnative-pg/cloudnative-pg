@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/connection"
 )
 
 // connectionBackoff is the retry policy used to get a plugin

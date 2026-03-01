@@ -27,8 +27,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 )
 
@@ -45,7 +45,7 @@ func NewExtendedClient(c client.Client) client.Client {
 
 func (e *extendedClient) invokePlugin(
 	ctx context.Context,
-	operationVerb plugin.OperationVerb,
+	operationVerb integration.OperationVerb,
 	obj client.Object,
 ) (client.Object, error) {
 	contextLogger := log.FromContext(ctx).WithName("invokePlugin")
@@ -74,7 +74,7 @@ func (e *extendedClient) Create(
 	opts ...client.CreateOption,
 ) error {
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbCreate, obj)
+	obj, err = e.invokePlugin(ctx, integration.OperationVerbCreate, obj)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (e *extendedClient) Delete(
 
 	origObj := obj.DeepCopyObject().(client.Object)
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbDelete, obj)
+	obj, err = e.invokePlugin(ctx, integration.OperationVerbDelete, obj)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (e *extendedClient) Update(
 	opts ...client.UpdateOption,
 ) error {
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbUpdate, obj)
+	obj, err = e.invokePlugin(ctx, integration.OperationVerbUpdate, obj)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (e *extendedClient) Patch(
 	opts ...client.PatchOption,
 ) error {
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbPatch, obj)
+	obj, err = e.invokePlugin(ctx, integration.OperationVerbPatch, obj)
 	if err != nil {
 		return err
 	}
