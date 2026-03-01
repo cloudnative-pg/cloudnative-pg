@@ -91,7 +91,7 @@ func FromReader(
 		"temporaryName", updatedInstanceManager.Name())
 
 	// Grant the executable bit to the new file
-	err = os.Chmod(updatedInstanceManager.Name(), 0o755) // #nosec
+	err = os.Chmod(updatedInstanceManager.Name(), 0o755) //nolint:gosec // path from our own temp file
 	if err != nil {
 		return fmt.Errorf("while granting the executable bit to the instance manager binary: %w", err)
 	}
