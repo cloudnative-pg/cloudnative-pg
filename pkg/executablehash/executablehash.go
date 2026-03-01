@@ -41,7 +41,7 @@ func Stream() (io.ReadCloser, error) {
 
 // StreamByName opens a stream reading from an executable given its name
 func StreamByName(name string) (io.ReadCloser, error) {
-	return os.Open(name) //nolint:gosec // reading executable by trusted internal name
+	return os.Open(filepath.Clean(name))
 }
 
 // Get gets the hashcode of the executable of this binary
