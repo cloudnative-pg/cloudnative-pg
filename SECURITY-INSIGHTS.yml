@@ -206,7 +206,7 @@ repository:
       - name: OSPS Baseline Scanner
         type: Policy-as-Code
         rulesets:
-          - Maturity Level 1
+          - Maturity Level 2
         results:
           adhoc:
             name: OSPS Baseline Assessment
