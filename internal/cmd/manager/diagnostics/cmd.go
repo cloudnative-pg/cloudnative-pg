@@ -17,13 +17,13 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package debug implement the debug command subfeatures
-package debug
+// Package diagnostics implement the debug command subfeatures
+package diagnostics
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/debug/architectures"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/diagnostics/architectures"
 )
 
 // NewCmd creates the new cobra command

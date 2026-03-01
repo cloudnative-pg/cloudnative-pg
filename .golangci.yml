@@ -119,10 +119,6 @@ linters:
         text: avoid package names that conflict with Go standard library package names
       - linters:
           - revive
-        path: internal/cmd/manager/debug/
-        text: avoid package names that conflict with Go standard library package names
-      - linters:
-          - revive
         path: tests/utils/exec/
         text: avoid package names that conflict with Go standard library package names
       - linters:
