@@ -122,6 +122,8 @@ jobs:
       author_email: ${{ steps.build-meta.outputs.author_email }}
       platforms: ${{ env.PLATFORMS }}
       olm_img: ${{ steps.olm-image.outputs.olm_image }}
+      hashes: ${{ steps.hashes.outputs.hashes }}
+      images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
     steps:
       -
         name: Checkout
@@ -175,6 +177,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
+        id: goreleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
@@ -187,6 +190,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Build checksum file
+        id: hashes
+        env:
+          ARTIFACTS: "${{ steps.goreleaser.outputs.artifacts }}"
+        shell: bash
+        run: |
+          checksum_file=$(echo "$ARTIFACTS" | jq -r '.[] | select (.type=="Checksum") | .path')
+          echo "hashes=$(cat $checksum_file | base64 -w0)" >> "$GITHUB_OUTPUT"
+
       -
         name: Publish Krew
         if: |
@@ -257,6 +270,58 @@ jobs:
           ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
           echo "olm_image=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_OUTPUT
+      -
+        name: Prepare images matrix
+        id: images_matrix
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
+        shell: bash
+        run: |
+          images_matrix=$(echo "$BAKE_METADATA" |
+            jq -r -c '
+              del(.[].["containerimage.descriptor", "buildx.build.ref"])
+              | to_entries
+              | map({variant: .key} + .value + {"image.name": (.value["image.name"] | split(",")[0] | sub(":[^/]+$"; ""))})
+            '
+          )
+          echo "images_matrix=${images_matrix}" >> "$GITHUB_OUTPUT"
+
+  provenance-binaries:
+    name: Add provenance to binaries
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    # NOTE: pinned by tag, not SHA — the SLSA generator's builder-fetch.sh
+    # resolves the binary download URL from the git ref and breaks with SHA pins.
+    # See: https://github.com/slsa-framework/slsa-github-generator/issues/4216
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.release-binaries.outputs.hashes }}"
+      upload-assets: true
+
+  provenance-images:
+    name: Provenance for images
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.release-binaries.outputs.images_matrix) }}
+    # NOTE: pinned by tag, not SHA — see comment on provenance-binaries above.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ matrix['image.name'] }}
+      digest: ${{ matrix['containerimage.digest'] }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
 
   olm-bundle:
     name: Create OLM bundle and catalog
