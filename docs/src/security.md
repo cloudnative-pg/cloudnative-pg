@@ -149,9 +149,11 @@ traceability:
   comprehensive list of software artifacts included in the image or used during
   its build process, formatted using the
   [in-toto SPDX predicate standard](https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md).
-- **[Provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/):**
-  Metadata detailing how the image was built, following the [SLSA Provenance](https://slsa.dev)
-  framework.
+- **Provenance:** Metadata detailing the build process, generated via the
+  [SLSA GitHub Generator Github action](https://github.com/slsa-framework/slsa-github-generator).
+  This provides [SLSA Level 3 assurance](https://slsa.dev/spec/v1.0/levels)
+  that the artifact was built on a trusted, isolated GitHub Actions runner
+  directly from the project's source.
 
 You can retrieve the SBOM for a specific image and platform using the following
 command:
@@ -164,11 +166,24 @@ docker buildx imagetools inspect <IMAGE> \
 This command outputs the SBOM in JSON format, providing a detailed view of the
 software components and build dependencies.
 
-For the provenance, use:
+For the build-level provenance, use:
 
 ```shell
 docker buildx imagetools inspect <IMAGE> \
   --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
+```
+
+#### Verifying SLSA provenance
+
+You can verify SLSA Level 3 provenance using
+[`slsa-verifier`](https://github.com/slsa-framework/slsa-verifier).
+
+To verify a container image, pass its digest reference:
+
+```shell
+slsa-verifier verify-image \
+  ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
 ```
 
 ### Guidelines and Frameworks for Container Security
