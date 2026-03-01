@@ -112,7 +112,6 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return res, nil
 }
 
-// nolint:unparam
 func (r *PluginReconciler) reconcile(
 	ctx context.Context,
 	service *corev1.Service,

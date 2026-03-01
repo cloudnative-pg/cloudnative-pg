@@ -529,7 +529,7 @@ func applyUsagePermissions(
 			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
 
 		case apiv1.RevokeUsageSpecType:
-			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) // nolint:gosec
+			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) //nolint:gosec
 			if _, err := db.ExecContext(ctx, mutation); err != nil {
 				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
 			}

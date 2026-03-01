@@ -27,6 +27,7 @@ linters:
     - misspell
     - nakedret
     - nestif
+    - nolintlint
     - prealloc
     - predeclared
     - revive

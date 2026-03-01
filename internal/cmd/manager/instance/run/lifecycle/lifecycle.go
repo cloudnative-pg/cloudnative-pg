@@ -63,7 +63,8 @@ func (i *PostgresLifecycle) GetGlobalContext() context.Context {
 }
 
 // Start starts running the PostgresLifecycle
-// nolint:gocognit
+//
+//nolint:gocognit
 func (i *PostgresLifecycle) Start(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 	signals := make(chan os.Signal, 1)
