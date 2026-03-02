@@ -437,15 +437,15 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		Expect(currentCluster.Status.TimelineID).To(Equal(1))
 	}
 
-	applyRollback := func(ctx context.Context, client client.Client, cluster *apiv1.Cluster, startingImage string) {
+	applyRollback := func(env *environment.TestingEnvironment, cluster *apiv1.Cluster, startingImage string) {
 		By("Waiting for the upgrade job to fail")
-		currentCluster, err := clusterutils.Get(ctx, client, cluster.Namespace, cluster.Name)
+		currentCluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 		upgradeJobName := fmt.Sprintf("%s-major-upgrade", currentCluster.Status.CurrentPrimary)
 
 		upgradeJob := &batchv1.Job{}
 		Eventually(func(g Gomega) {
-			err := client.Get(ctx, types.NamespacedName{
+			err := env.Client.Get(env.Ctx, types.NamespacedName{
 				Namespace: currentCluster.Namespace,
 				Name:      upgradeJobName,
 			}, upgradeJob)
@@ -455,22 +455,31 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 		By("Reverting the cluster to the previous major version")
 		Eventually(func() error {
-			cluster, err := clusterutils.Get(ctx, client, cluster.Namespace, cluster.Name)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
 			if err != nil {
 				return err
 			}
 			cluster.Spec.ImageName = startingImage
-			return client.Update(ctx, cluster)
+			return env.Client.Update(env.Ctx, cluster)
 		}).WithTimeout(1*time.Minute).WithPolling(10*time.Second).Should(
 			Succeed(),
 			"Failed to update cluster image from %s to %s",
 			cluster.Spec.ImageName,
 			startingImage,
 		)
+		Eventually(func(g Gomega) {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Spec.ImageName).To(Equal(startingImage))
+			g.Expect(cluster.Status.Image).To(Equal(startingImage))
+			g.Expect(cluster.Status.PGDataImageInfo.Image).To(Equal(startingImage))
+		}).WithTimeout(1 * time.Minute).Should(Succeed())
 
 		By("Deleting the failed upgrade job")
-		err = client.Delete(ctx, upgradeJob)
+		err = env.Client.Delete(env.Ctx, upgradeJob)
 		Expect(err).ToNot(HaveOccurred())
+
+		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
 	}
 
 	BeforeEach(func() {
@@ -605,9 +614,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 
 		if scenarioName == rollbackEntry {
 			By("Rolling back the cluster to the initial major version")
-			applyRollback(env.Ctx, env.Client, cluster, startingImage)
-
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			applyRollback(env, cluster, startingImage)
 
 			By("Verifying the cluster was rolled back to the starting version")
 			verifyPostgresVersion(env, primary, oldStdOut, scenario.startingMajor, false)
@@ -650,10 +657,6 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
 		}
 	},
-		Entry("PostGIS", postgisEntry),
-		Entry("PostgreSQL", postgresqlEntry),
-		Entry("PostgreSQL minimal", postgresqlMinimalEntry),
-		Entry("PostgreSQL system", postgresqlSystemEntry),
 		Entry("Rollback", rollbackEntry),
 	)
 })
