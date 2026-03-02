@@ -7,27 +7,50 @@ title: Image Catalog
 # Image Catalog
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-`ImageCatalog` and `ClusterImageCatalog` are essential resources that empower
-you to define images for creating a `Cluster`.
+`ImageCatalog` and `ClusterImageCatalog` are Custom Resource Definitions (CRDs)
+that allow you to decouple the PostgreSQL image lifecycle from the `Cluster`
+definition. By using a catalog, you can manage image updates centrally; when a
+catalog entry is updated, all associated clusters automatically
+[roll out the new image](rolling_update.md).
 
-The key distinction lies in their scope: an `ImageCatalog` is namespaced, while
-a `ClusterImageCatalog` is cluster-scoped.
+While you can build custom catalogs, CloudNativePG provides
+[official catalogs](#cloudnativepg-catalogs) as `ClusterImageCatalog`
+resources, covering all official Community PostgreSQL container images.
 
-Both share a common structure, comprising a list of images, each equipped with
-a `major` field indicating the major version of the image.
+## Catalog scoping
+
+The primary difference between the two resources is their scope:
+
+| Resource              | Scope        | Best use case                                               |
+|-----------------------|--------------|-------------------------------------------------------------|
+| `ImageCatalog`        | Namespaced   | Application-specific versions or team-level restrictions.   |
+| `ClusterImageCatalog` | Cluster-wide | Global standards across all namespaces for an organization. |
+
+## Catalog structure
+
+Both resources share a common schema:
+
+- **Major versioning**: A list of images keyed by the `major` PostgreSQL version.
+- **Uniqueness**: The `major` field must be unique within a single catalog.
+- **Extensions**: Support for certified extension container images (available for
+  PostgreSQL 18+ via `extension_control_path`).
 
 :::warning
-    The operator places trust in the user-defined major version and refrains
-    from conducting any PostgreSQL version detection. It is the user's
-    responsibility to ensure alignment between the declared major version in
-    the catalog and the PostgreSQL image.
+While the operator trusts the user-defined `major` version without performing
+image detection, the official CloudNativePG catalogs are pre-validated by the
+community to ensure that every extension and operand image entry correctly
+matches the declared major version. If you are creating a custom catalog, you
+must ensure the declared major version matches the actual PostgreSQL images to
+maintain compatibility.
 :::
 
-The `major` field's value must remain unique within a catalog, preventing
-duplication across images. Distinct catalogs, however, may
-expose different images under the same `major` value.
+## Configuration examples
 
-**Example of a Namespaced `ImageCatalog`:**
+### Defining a catalog
+
+You can define multiple major versions within a single catalog.
+
+The following example defines a namespaced `ImageCatalog`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -47,13 +70,13 @@ spec:
       image: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 ```
 
-**Example of a Cluster-Wide Catalog using `ClusterImageCatalog` Resource:**
+The following example defines a cluster-wide `ClusterImageCatalog`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: ClusterImageCatalog
 metadata:
-  name: postgresql
+  name: postgresql-global
 spec:
   images:
     - major: 15
@@ -66,9 +89,9 @@ spec:
       image: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 ```
 
-A `Cluster` resource has the flexibility to reference either an `ImageCatalog`
-(like in the following example) or a `ClusterImageCatalog` to precisely specify
-the desired image.
+### Referencing a Catalog in a Cluster
+
+A `Cluster` resource uses the `imageCatalogRef` to select its images:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -79,17 +102,43 @@ spec:
   instances: 3
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
-    # Change the following to `ClusterImageCatalog` if needed
-    kind: ImageCatalog
-    name: postgresql
-    major: 16
+    kind: ClusterImageCatalog # Or 'ImageCatalog'
+    name: postgresql-global
+    major: 18
   storage:
     size: 1Gi
 ```
 
-Clusters utilizing these catalogs maintain continuous monitoring.
-Any alterations to the images within a catalog trigger automatic updates for
-**all associated clusters** referencing that specific entry.
+## Image Catalog with Image Volume Extensions
+
+[Image Volume Extensions](imagevolume_extensions.md) allow you to bundle
+containers for extensions directly within the catalog entry:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: postgresql
+spec:
+  images:
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.1-minimal-trixie
+      extensions:
+        - name: foo
+          image:
+            reference: # registry path for your `foo` extension image
+```
+
+The `extensions` section follows the [`ExtensionConfiguration`](cloudnative-pg.v1.md#extensionconfiguration)
+API schema and structure.
+Clusters referencing an image catalog can load any of its associated extensions
+by name.
+
+:::info
+Refer to the [documentation of image volume extensions](imagevolume_extensions.md)
+for details on the internal image structure, configuration options, and
+instructions on how to select or override catalog extensions within a cluster.
+:::
 
 ## CloudNativePG Catalogs
 
@@ -102,6 +151,21 @@ These catalogs are regularly updated and published in the
 Each catalog corresponds to a specific combination of image type (e.g.
 `minimal`) and Debian release (e.g. `trixie`). It lists the most up-to-date
 container images for every supported PostgreSQL major version.
+
+:::important
+To ensure maximum security and immutability, all images within official
+CloudNativePG catalogs are identified by their **SHA256 digests** rather than
+just tags.
+:::
+
+### Version Compatibility
+
+While standard catalogs work with older versions of the operator, **catalogs
+containing an `extensions` section are only compatible with CloudNativePG 1.29
+or later**. Using a catalog with extension definitions on an older operator
+will result in those definitions being rejected.
+
+### Installation and Usage
 
 By installing these catalogs, cluster administrators can ensure that their
 PostgreSQL clusters are automatically updated to the latest patch release
@@ -129,7 +193,10 @@ You can then view all the catalogs deployed with:
 kubectl get clusterimagecatalogs.postgresql.cnpg.io
 ```
 
-For example, you can create a cluster with the latest `minimal` image for PostgreSQL 18 on `trixie` with:
+### Example: Using a Catalog in a Cluster
+
+To create a cluster that always tracks the latest `minimal` image for
+PostgreSQL 18 on `trixie`, define your `Cluster` as follows:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1

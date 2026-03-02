@@ -188,11 +188,11 @@ func createClusterPodSpec(
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
-			createBootstrapContainer(cluster),
+			createBootstrapContainer(cluster, getExtensions(&cluster)),
 		},
 		SchedulerName:                 cluster.Spec.SchedulerName,
 		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
-		Volumes:                       createPostgresVolumes(&cluster, podName),
+		Volumes:                       createPostgresVolumes(&cluster, podName, getExtensions(&cluster)),
 		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
@@ -213,7 +213,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
-			VolumeMounts:    CreatePostgresVolumeMounts(cluster),
+			VolumeMounts:    CreatePostgresVolumeMounts(cluster, getExtensions(&cluster)),
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{

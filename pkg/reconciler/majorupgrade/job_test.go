@@ -50,13 +50,13 @@ var _ = Describe("Major upgrade Job generation", func() {
 	}
 
 	It("creates major upgrade jobs", func() {
-		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1)
+		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1, nil)
 		Expect(majorUpgradeJob).ToNot(BeNil())
 		Expect(majorUpgradeJob.Spec.Template.Spec.Containers[0].Image).To(Equal(newImageName))
 	})
 
 	It("is able to discover which target image was used", func() {
-		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1)
+		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1, nil)
 		Expect(majorUpgradeJob).ToNot(BeNil())
 
 		imgName, found := getTargetImageFromMajorUpgradeJob(majorUpgradeJob)
@@ -70,6 +70,6 @@ var _ = Describe("Major upgrade Job generation", func() {
 			Expect(isMajorUpgradeJob(job)).To(Equal(isMajorUpgrade))
 		},
 		Entry("initdb jobs are not major upgrades", specs.CreatePrimaryJobViaInitdb(cluster, 1), false),
-		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1), true),
+		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1, nil), true),
 	)
 })

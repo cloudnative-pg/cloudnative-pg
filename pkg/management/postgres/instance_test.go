@@ -280,6 +280,20 @@ var _ = Describe("buildPostgresEnv", func() {
 		err := os.Unsetenv("LD_LIBRARY_PATH")
 		Expect(err).ToNot(HaveOccurred())
 
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+			},
+			{
+				Name: "bar",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "bar:dev",
+				},
+			},
+		}
 		cluster = apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster-example",
@@ -287,20 +301,12 @@ var _ = Describe("buildPostgresEnv", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Extensions: []apiv1.ExtensionConfiguration{
-						{
-							Name: "foo",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "foo:dev",
-							},
-						},
-						{
-							Name: "bar",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "bar:dev",
-							},
-						},
-					},
+					Extensions: extensionsConfig,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Extensions: extensionsConfig,
 				},
 			},
 		}
@@ -324,8 +330,12 @@ var _ = Describe("buildPostgresEnv", func() {
 		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
 
 		BeforeEach(func() {
+			// Update the spec
 			cluster.Spec.PostgresConfiguration.Extensions[0].LdLibraryPath = []string{"/syslib", "sample/"}
 			cluster.Spec.PostgresConfiguration.Extensions[1].LdLibraryPath = []string{"./syslib", "./sample/"}
+			// Update the status
+			cluster.Status.PGDataImageInfo.Extensions[0].LdLibraryPath = []string{"/syslib", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].LdLibraryPath = []string{"./syslib", "./sample/"}
 		})
 
 		It("should be defined", func() {
@@ -343,6 +353,7 @@ var _ = Describe("buildPostgresEnv", func() {
 	Context("Extensions disabled", func() {
 		BeforeEach(func() {
 			cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
+			cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
 			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
