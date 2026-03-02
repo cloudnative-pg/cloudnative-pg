@@ -41,7 +41,8 @@ env:
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
-  OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
+  # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
+  OPP_SCRIPT_VERSION: "e1de0e6d6ebddc0f4fc6f7f4cec2a6f6cd57c926"
 
 defaults:
   run:
@@ -898,4 +899,4 @@ jobs:
 
       - name: Test bundle
         run: |
-          bash <(curl -sL ${{ env.OPP_SCRIPT_URL }}) ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
+          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${{ env.OPP_SCRIPT_VERSION }}/ci/scripts/opp.sh") ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
