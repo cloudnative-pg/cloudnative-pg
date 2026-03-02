@@ -391,6 +391,19 @@ cosign verify-blob \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
+#### Verifying SLSA provenance
+
+To verify a release binary, download both the artifact and the provenance file
+(`multiple.intoto.jsonl`) from the
+[GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+then run:
+
+```shell
+slsa-verifier verify-artifact <ARTIFACT> \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
+```
+
 ### Verifying the operator container images
 
 Run the following command to verify the signature of the CloudNativePG operator
@@ -419,6 +432,11 @@ To inspect the SLSA Provenance (build details):
 docker buildx imagetools inspect ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
   --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
 ```
+
+:::info
+Refer to ["Verifying SLSA provenance"](security.md#verifying-slsa-provenance)
+for SLSA Build Level 3 compliance verification.
+:::
 
 ### Verifying PostgreSQL operand images
 
