@@ -72,7 +72,7 @@ func NewCmd() *cobra.Command {
 			localSrv, err := webserver.NewLocalWebServer(
 				postgres.NewInstance().WithClusterName(clusterName).WithNamespace(namespace),
 				mgr.GetClient(),
-				mgr.GetEventRecorderFor("local-webserver"), //nolint:staticcheck
+				mgr.GetEventRecorderFor("local-webserver"),
 			)
 			if err != nil {
 				return err

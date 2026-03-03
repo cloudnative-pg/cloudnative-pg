@@ -370,7 +370,7 @@ func runSubCommand(
 	localSrv, err := webserver.NewLocalWebServer(
 		instance,
 		mgr.GetClient(),
-		mgr.GetEventRecorderFor("local-webserver"), //nolint:staticcheck
+		mgr.GetEventRecorderFor("local-webserver"),
 	)
 	if err != nil {
 		contextLogger.Error(err, "unable to create local webserver runnable")
