@@ -242,7 +242,7 @@ var _ = Describe("ALTER SYSTEM enable and disable in PostgreSQL <17", func() {
 		instance.PgData = tmpDir
 
 		autoConfFile = filepath.Join(tmpDir, "postgresql.auto.conf")
-		f, err := os.Create(autoConfFile) // nolint: gosec
+		f, err := os.Create(autoConfFile) //nolint: gosec
 		Expect(err).ToNot(HaveOccurred())
 
 		err = f.Close()

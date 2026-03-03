@@ -1055,7 +1055,6 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *api
 	return cluster.Status.LatestGeneratedNode, nil
 }
 
-// nolint: gocognit
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
