@@ -94,7 +94,7 @@ func NewFromRawData(values []interface{}, columns []string, name string) (*Value
 		if i >= len(histogramValue.Values) {
 			break
 		}
-		histogramValue.Buckets[key] = uint64(histogramValue.Values[i]) //nolint:gosec
+		histogramValue.Buckets[key] = uint64(histogramValue.Values[i])
 	}
 
 	return histogramValue, nil
