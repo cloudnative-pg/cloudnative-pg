@@ -248,7 +248,7 @@ func RunController(
 	if err = (&controller.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
+		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
 	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
@@ -258,7 +258,7 @@ func RunController(
 		Client:          mgr.GetClient(),
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
+		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
