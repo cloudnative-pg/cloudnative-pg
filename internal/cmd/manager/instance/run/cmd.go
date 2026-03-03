@@ -165,7 +165,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand( //nolint:gocognit,gocyclo
+func runSubCommand(
 	ctx context.Context,
 	instance *postgres.Instance,
 	pprofServer bool,

@@ -64,7 +64,6 @@ var _ = Describe("Operator version annotation management", func() {
 	})
 })
 
-// nolint:dupl
 var _ = Describe("Annotation management", func() {
 	config := &fakeInhericanceController{
 		annotations: []string{
@@ -89,7 +88,6 @@ var _ = Describe("Annotation management", func() {
 	})
 })
 
-// nolint:dupl
 var _ = Describe("Label management", func() {
 	config := &fakeInhericanceController{
 		labels: []string{

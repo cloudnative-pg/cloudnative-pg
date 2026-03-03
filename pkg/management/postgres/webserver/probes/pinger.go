@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -53,7 +54,7 @@ func buildInstanceReachabilityChecker(cfg *apiv1.IsolationCheckConfiguration) (*
 	}
 
 	certificateLocation := postgresSpec.ServerCACertificateLocation
-	caCertificate, err := os.ReadFile(certificateLocation) //nolint:gosec
+	caCertificate, err := os.ReadFile(filepath.Clean(certificateLocation))
 	if err != nil {
 		return nil, fmt.Errorf("while reading server CA certificate [%s]: %w", certificateLocation, err)
 	}
