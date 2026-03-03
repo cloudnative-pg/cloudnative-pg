@@ -100,6 +100,7 @@ jobs:
         id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ matrix.branch }}
         run: |
           commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
           if [ -z "${commit}" ]
@@ -108,29 +109,35 @@ jobs:
             exit 0
           fi
           echo "commit=${commit}" >> $GITHUB_OUTPUT
-          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
-          author_name=$(git show -s --format='%an' "${commit}")
-          echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
-          author_email=$(git show -s --format='%ae' "${commit}")
-          echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
+          echo "cherry-pick commit ${commit} to branch ${BRANCH}"
+
+          delim=$(uuidgen)
+          echo "AUTHOR_NAME<<${delim}" >> $GITHUB_ENV
+          git show -s --format='%an' "${commit}" >> $GITHUB_ENV
+          echo "${delim}" >> $GITHUB_ENV
+
+          echo "AUTHOR_EMAIL<<${delim}" >> $GITHUB_ENV
+          git show -s --format='%ae' "${commit}" >> $GITHUB_ENV
+          echo "${delim}" >> $GITHUB_ENV
       -
         name: cherry pick
         env:
           COMMIT: ${{ steps.check_commits.outputs.commit }}
+          BRANCH: ${{ matrix.branch }}
         if: |
           contains( github.event.pull_request.labels.*.name, matrix.branch ) && env.COMMIT != ''
         run: |
-          git config user.email "${{ env.AUTHOR_EMAIL }}"
-          git config user.name "${{ env.AUTHOR_NAME }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
           git fetch
-          git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
+          git cherry-pick -x --mainline 1 "${COMMIT}"
           make fmt vet generate apidoc wordlist-ordered
           if ! git diff --exit-code --quiet
           then
             echo "!!! Generated files need manually handling"
             exit 1
           fi
-          git push
+          git push origin HEAD:"${BRANCH}"
 
   create-tickets:
     name: Create tickets for failures

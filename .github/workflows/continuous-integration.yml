@@ -441,8 +441,11 @@ jobs:
         id: build-meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
+          commit_sha="${COMMIT_REF}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
@@ -453,9 +456,9 @@ jobs:
 
           # extract branch name
           branch_name=${GITHUB_REF#refs/heads/}
-          if [[ ${{ github.event_name }} == 'pull_request' ]]
+          if [[ "${EVENT_NAME}" == 'pull_request' ]]
           then
-            branch_name=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
+            branch_name=$(gh pr view "${PR_NUMBER}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           # extract tag from branch name
@@ -480,7 +483,7 @@ jobs:
           BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "${{ env.HEAD_REPO }}" != "${{ env.BASE_REPO }}" ]]
+          if [[ "${HEAD_REPO}" != "${BASE_REPO}" ]]
           then
             echo "PUSH=false" >> $GITHUB_ENV
           fi
@@ -639,8 +642,10 @@ jobs:
         if: |
           env.SIGN_IMAGES == 'true' &&
           env.PUSH == 'true'
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}

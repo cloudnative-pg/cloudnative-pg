@@ -121,8 +121,9 @@ jobs:
 
       - name: Process arguments
         id: args
+        env:
+          ARGS: ${{ steps.command.outputs.command-arguments }}
         run: |
-          ARGS="${{ steps.command.outputs.command-arguments }}"
           # Set the defaults
           DEPTH="main"
           LIMIT="kind"
@@ -186,17 +187,24 @@ jobs:
       log_level: ${{ env.LOG_LEVEL }}
     steps:
       - name: Parse input to env
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DEPTH: ${{ github.event.inputs.depth }}
+          INPUT_LIMIT: ${{ github.event.inputs.limit }}
+          INPUT_TEST_LEVEL: ${{ github.event.inputs.test_level }}
+          INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
+          INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
         run: |
           # Set the defaults for workflow dispatch
-          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]]; then
-            DEPTH=${{ github.event.inputs.depth }}
-            LIMIT=${{ github.event.inputs.limit }}
-            TEST_LEVEL=${{ github.event.inputs.test_level }}
-            FEATURE_TYPE="${{ github.event.inputs.feature_type }}"
-            LOG_LEVEL="${{ github.event.inputs.log_level }}"
+          if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
+            DEPTH="${INPUT_DEPTH}"
+            LIMIT="${INPUT_LIMIT}"
+            TEST_LEVEL="${INPUT_TEST_LEVEL}"
+            FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
+            LOG_LEVEL="${INPUT_LOG_LEVEL}"
           fi
           # Set the defaults for schedule dispatch
-          if [[ ${{ github.event_name }} == 'schedule' ]]; then
+          if [[ "${EVENT_NAME}" == 'schedule' ]]; then
             DEPTH="schedule"
             LIMIT=""
             TEST_LEVEL="4"
@@ -230,22 +238,36 @@ jobs:
       log_level: ${{ env.LOG_LEVEL }}
     steps:
       - name: From command
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WD_GITHUB_REF: ${{ needs.test_arguments.outputs.github_ref }}
+          WD_DEPTH: ${{ needs.test_arguments.outputs.depth }}
+          WD_LIMIT: ${{ needs.test_arguments.outputs.limit }}
+          WD_TEST_LEVEL: ${{ needs.test_arguments.outputs.test_level }}
+          WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
+          WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
+          IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
+          IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
+          IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
+          IC_TEST_LEVEL: ${{ needs.check_commenter.outputs.test_level }}
+          IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
+          IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
         run: |
-          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]; then
-            echo 'GITHUB_REF=${{ needs.test_arguments.outputs.github_ref }}' >> $GITHUB_ENV
-            echo 'DEPTH=${{ needs.test_arguments.outputs.depth }}' >> $GITHUB_ENV
-            echo 'LIMIT=${{ needs.test_arguments.outputs.limit }}' >> $GITHUB_ENV
-            echo 'TEST_LEVEL=${{ needs.test_arguments.outputs.test_level }}' >> $GITHUB_ENV
-            echo 'FEATURE_TYPE=${{ needs.test_arguments.outputs.feature_type }}' >> $GITHUB_ENV
-            echo 'LOG_LEVEL=${{ needs.test_arguments.outputs.log_level }}' >> $GITHUB_ENV
+          if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
+            echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
+            echo "DEPTH=${WD_DEPTH}" >> $GITHUB_ENV
+            echo "LIMIT=${WD_LIMIT}" >> $GITHUB_ENV
+            echo "TEST_LEVEL=${WD_TEST_LEVEL}" >> $GITHUB_ENV
+            echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
+            echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
           fi
-          if [[ ${{ github.event_name }} == 'issue_comment' ]]; then
-            echo 'GITHUB_REF=${{ needs.check_commenter.outputs.github_ref }}' >> $GITHUB_ENV
-            echo 'DEPTH=${{ needs.check_commenter.outputs.depth }}' >> $GITHUB_ENV
-            echo 'LIMIT=${{ needs.check_commenter.outputs.limit }}' >> $GITHUB_ENV
-            echo 'TEST_LEVEL=${{ needs.check_commenter.outputs.test_level }}' >> $GITHUB_ENV
-            echo 'FEATURE_TYPE=${{ needs.check_commenter.outputs.feature_type }}' >> $GITHUB_ENV
-            echo 'LOG_LEVEL=${{ needs.check_commenter.outputs.log_level }}' >> $GITHUB_ENV
+          if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
+            echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
+            echo "DEPTH=${IC_DEPTH}" >> $GITHUB_ENV
+            echo "LIMIT=${IC_LIMIT}" >> $GITHUB_ENV
+            echo "TEST_LEVEL=${IC_TEST_LEVEL}" >> $GITHUB_ENV
+            echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
+            echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
           fi
 
   buildx:
@@ -297,8 +319,11 @@ jobs:
         id: build-meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          commit_sha=${{ needs.evaluate_options.outputs.git_ref }}
+          commit_sha="${COMMIT_REF}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
@@ -317,13 +342,13 @@ jobs:
           author_email=$(git show -s --format='%ae' "${commit_sha}")
 
           # extract branch name
-          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]
+          if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]
           then
             branch_name=${GITHUB_REF#refs/heads/}
           fi
-          if [[ ${{ github.event_name }} == 'issue_comment' ]]
+          if [[ "${EVENT_NAME}" == 'issue_comment' ]]
           then
-            branch_name=$(gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
+            branch_name=$(gh pr view "${ISSUE_NUMBER}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           # extract tag from branch name
@@ -341,8 +366,13 @@ jobs:
           echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
           echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
           echo "commit_msg=${commit_message}" >> $GITHUB_OUTPUT
-          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
-          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
+          delim=$(uuidgen)
+          echo "author_name<<${delim}" >> $GITHUB_OUTPUT
+          echo "${author_name}" >> $GITHUB_OUTPUT
+          echo "${delim}" >> $GITHUB_OUTPUT
+          echo "author_email<<${delim}" >> $GITHUB_OUTPUT
+          echo "${author_email}" >> $GITHUB_OUTPUT
+          echo "${delim}" >> $GITHUB_OUTPUT
           echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
           echo "upload_artifacts=${upload_artifacts}" >> $GITHUB_OUTPUT
       -
@@ -402,8 +432,10 @@ jobs:
       -
         name: Sign images
         if: env.SIGN_IMAGES == 'true'
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
@@ -503,9 +535,12 @@ jobs:
           fetch-depth: 0
       -
         name: Configure git user
+        env:
+          AUTHOR_EMAIL: ${{ needs.buildx.outputs.author_email }}
+          AUTHOR_NAME: ${{ needs.buildx.outputs.author_name }}
         run: |
-          git config user.email "${{ needs.buildx.outputs.author_email }}"
-          git config user.name "${{ needs.buildx.outputs.author_name }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
       -
         name: Switch to or create the right branch
         env:
@@ -590,10 +625,13 @@ jobs:
         # according to the event, or to the "depth" parameter if set manually
         name: Generate Jobs
         shell: bash
+        env:
+          DEPTH: ${{ needs.evaluate_options.outputs.depth }}
+          LIMIT: ${{ needs.evaluate_options.outputs.limit }}
         run: |
           python .github/e2e-matrix-generator.py \
-            -m '${{ needs.evaluate_options.outputs.depth }}' \
-            -l '${{ needs.evaluate_options.outputs.limit }}'
+            -m "${DEPTH}" \
+            -l "${LIMIT}"
 
   e2e-kind:
     name: Run E2E on kind executors
@@ -1008,7 +1046,7 @@ jobs:
             az extension add --allow-preview true --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
-            AZURE_STORAGE_ACCOUNT="${{ github.run_number }}${{ env.E2E_SUFFIX }}"
+            AZURE_STORAGE_ACCOUNT="${GITHUB_RUN_NUMBER}${E2E_SUFFIX}"
             az storage account create \
               --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_STORAGE_ACCOUNT} \
@@ -1115,6 +1153,8 @@ jobs:
       -
         name: Create AKS cluster
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        env:
+          MATRIX_ID: ${{ matrix.id }}
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1123,16 +1163,16 @@ jobs:
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             # name of the AKS cluster
-            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )"
+            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_ID}" | tr -d '_.-' )"
             echo "AZURE_AKS=${AZURE_AKS}" >> $GITHUB_ENV
 
             # gather the storage account Key
-            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${{ env.AZURE_STORAGE_ACCOUNT }}" --query "[0].value" -o tsv)
+            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${AZURE_STORAGE_ACCOUNT}" --query "[0].value" -o tsv)
             echo "::add-mask::$AZURE_STORAGE_KEY"
             echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
 
             # name of the cluster's blob container in the storage account
-            AZURE_BLOB_CONTAINER="$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
+            AZURE_BLOB_CONTAINER="$( echo "${MATRIX_ID}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
             echo "AZURE_BLOB_CONTAINER=${AZURE_BLOB_CONTAINER}" >> $GITHUB_ENV
 
             # create and login to the AKS cluster
@@ -1413,8 +1453,10 @@ jobs:
     steps:
       -
         name: Set cluster name
+        env:
+          MATRIX_ID: ${{ matrix.id }}
         run: |
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_ID}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -1842,13 +1884,15 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         name: Set cluster name
+        env:
+          MATRIX_ID: ${{ matrix.id }}
         run: |
           # GKE cluster names rules:
           # only lowercase alphanumerics and '-' allowed, must start with a letter and end with an alphanumeric,
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
-          SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+          SHORT_ID=$( echo "${MATRIX_ID}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
+          echo "CLUSTER_NAME=${E2E_SUFFIX}-${GITHUB_RUN_NUMBER}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
@@ -2128,8 +2172,10 @@ jobs:
     steps:
       -
         name: Set cluster name
+        env:
+          MATRIX_K8S_VERSION: ${{ matrix.k8s_version }}
         run: |
-          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-ocp-${{ github.run_number}}-$( echo ${{ matrix.k8s_version }} | tr -d '.' )" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -2437,8 +2483,9 @@ jobs:
         id: get_pr_number_and_labels
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${ISSUE_NUMBER}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Label the PR as "ok to merge :ok_hand:"
@@ -2466,8 +2513,9 @@ jobs:
         id: get_pr_number_and_labels
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${ISSUE_NUMBER}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Remove "ok to merge :ok_hand:" label from PR
