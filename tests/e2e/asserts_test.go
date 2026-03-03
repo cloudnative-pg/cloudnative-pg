@@ -2685,6 +2685,9 @@ func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
 		return wrapErr(err)
 	}
 	for _, obj := range objects {
+		if cluster, ok := obj.(*apiv1.Cluster); ok {
+			clusterutils.AddTopologySpreadConstraint(cluster)
+		}
 		_, err := objectsutils.Create(env.Ctx, env.Client, obj)
 		if err != nil {
 			return wrapErr(err)
