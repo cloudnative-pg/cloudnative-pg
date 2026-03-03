@@ -60,6 +60,7 @@ func isCSIErrorMessageRetriable(msg string) bool {
 		isRetryableHTTPError,
 		isConflictError,
 		isContextDeadlineExceededError,
+		isOCIConflictError,
 	}
 
 	for _, isRetryableFunc := range isRetryableFuncs {
@@ -116,4 +117,16 @@ func isRetryableHTTPError(msg string) bool {
 	}
 
 	return false
+}
+
+// isOCIConflictError detects OCI conflict errors
+func isOCIConflictError(msg string) bool {
+	// The OCI CSI driver returns a 409 Conflict error when a backup is already in progress.
+	// This happens due to race conditions or retries.
+	// The error message typically contains "Error returned by Blockstorage Service. Http Status Code: 409. Error Code: Conflict."
+	//
+	// We check for the presence of these substrings to identify the error.
+	return strings.Contains(msg, "Error returned by Blockstorage Service") &&
+		strings.Contains(msg, "Http Status Code: 409") &&
+		strings.Contains(msg, "Error Code: Conflict")
 }
