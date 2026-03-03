@@ -188,8 +188,9 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 }
 
 // isNodeUnschedulableOrBeingDrained checks if a node is currently being drained.
-// nolint: lll
 // Copied from https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/7bacf2d36f397bd098b3388403e8759c480be7e5/cmd/hooks/prestop.go#L91
+//
+//nolint:lll
 func isNodeUnschedulableOrBeingDrained(node *corev1.Node, drainTaints []string) bool {
 	for _, taint := range node.Spec.Taints {
 		if slices.Contains(drainTaints, taint.Key) {

@@ -82,7 +82,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
-				const newPassword = "eeh2Zahohx" //nolint:gosec
+				const newPassword = "eeh2Zahohx"
 				AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
 				AssertApplicationDatabaseConnection(
 					namespace,

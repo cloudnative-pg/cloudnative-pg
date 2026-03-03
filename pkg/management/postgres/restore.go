@@ -86,7 +86,6 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
-// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -154,7 +153,6 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 			"restore_command = '%s'\n",
 		restoreCmd)
 
-	// nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
 		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
 		if err != nil {
@@ -295,7 +293,7 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	var envs []string
 	var config string
 
-	// nolint:nestif
+	//nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
 		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)

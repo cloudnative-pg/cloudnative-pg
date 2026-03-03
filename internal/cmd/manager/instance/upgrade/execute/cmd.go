@@ -139,7 +139,7 @@ type upgradeInfo struct {
 	initdbArgs    []string
 }
 
-// nolint:gocognit
+//nolint:gocognit
 func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	contextLogger := log.FromContext(ctx)
 

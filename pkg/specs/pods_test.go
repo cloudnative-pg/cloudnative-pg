@@ -938,7 +938,7 @@ var _ = Describe("NewInstance", func() {
 				Name:      "test-cluster",
 				Namespace: "default",
 				Annotations: map[string]string{
-					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/containers/0/image", "value": "new-image:latest"}]`, // nolint: lll
+					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/containers/0/image", "value": "new-image:latest"}]`, //nolint: lll
 				},
 			},
 			Status: apiv1.ClusterStatus{

@@ -227,7 +227,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			}, timeout).Should(BeEquivalentTo(1))
 		})
 	})
-	// nolint:dupl
+
 	It("03. restarting and switching Pg when a parameter requiring restart is modified", func() {
 		timeout := 300
 
@@ -336,7 +336,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams, namespace)
 	})
 
-	// nolint:dupl
 	It("07. restarting and not switching Pg when a hot standby sensible parameter requiring "+
 		"to restart first the primary instance is decreased",
 		func() {
@@ -383,7 +382,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			})
 		})
 
-	// nolint:dupl
 	It("08. restarting and not switching Pg when a hot standby sensible parameter requiring "+
 		"to restart first the primary instance is decreased, resetting to the default value",
 		func() {

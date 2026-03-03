@@ -171,7 +171,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 		}
 
-		// nolint:dupl
+		//nolint:dupl
 		assertCreatePublication := func(namespace, clusterName, publicationManifest string) {
 			pubObjectName, err := yaml.GetResourceNameFromYAML(env.Scheme, publicationManifest)
 			Expect(err).NotTo(HaveOccurred())
@@ -204,7 +204,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 		}
 
-		// nolint:dupl
+		//nolint:dupl
 		assertCreateSubscription := func(namespace, clusterName, subscriptionManifest string) {
 			subObjectName, err := yaml.GetResourceNameFromYAML(env.Scheme, subscriptionManifest)
 			Expect(err).NotTo(HaveOccurred())

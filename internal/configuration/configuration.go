@@ -57,7 +57,7 @@ var DefaultDrainTaints = []string{
 	"node.kubernetes.io/unschedulable",
 
 	// Used by the Kubernetes Cluster Autoscaler
-	// nolint: lll
+	//nolint: lll
 	// See: https://github.com/kubernetes/autoscaler/blob/aa1d413ea3bf319b56c7b2e65ade1a028e149439/cluster-autoscaler/cloudprovider/oci/nodepools/consts/annotations.go#L27
 	"ToBeDeletedByClusterAutoscaler",
 

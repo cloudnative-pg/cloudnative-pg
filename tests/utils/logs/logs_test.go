@@ -27,7 +27,7 @@ import (
 )
 
 var _ = Describe("testing CheckOptionForBarmanCommand", func() {
-	// nolint: lll
+	//nolint: lll
 	const podLogs = `{"level":"info","ts":"2024-03-04T06:07:29Z","msg":"Starting barman-cloud-backup","backupName":"pg-with-backup-20240304135929","backupNamespace":"pg-with-backup-20240304135929","logging_pod":"pg-with-backup-1","options":["--user","postgres","--name","backup-20240304055929","--immediate-checkpoint","--min-chunk-size=5MB","--read-timeout=60","--endpoint-url","http://minio-service:9000","--cloud-provider","aws-s3","s3://cluster-backups/","pg-with-backup"]}`
 
 	It("should return true if all expected options are found", func() {
