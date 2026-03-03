@@ -73,7 +73,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		Expect(err).ToNot(HaveOccurred())
 
 		By("update user application password", func() {
-			const newPassword = "eeh2Zahohx" //nolint:gosec
+			const newPassword = "eeh2Zahohx"
 
 			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
 			AssertConnection(namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword, env)
@@ -118,7 +118,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 				g.Expect(err).ToNot(HaveOccurred())
 			}, 60).Should(Succeed())
 
-			const newPassword = "fi6uCae7" //nolint:gosec
+			const newPassword = "fi6uCae7"
 			AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
 			AssertConnection(namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword, env)
 		})

@@ -331,7 +331,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	}
 }
 
-// nolint: gocognit
+//nolint:gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
 	if !ws.ongoingBackupRequest.TryLock() {
@@ -514,7 +514,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	}()
 
 	options := []string{constants.WalArchiveCommand, partialWalFileRelativePath}
-	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
+	walArchiveCmd := exec.Command("/controller/manager", options...) //nolint: gosec
 	walArchiveCmd.Dir = pgData
 	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())

@@ -1736,7 +1736,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
-		const newPassword = "eeh2Zahohx" //nolint:gosec
+		const newPassword = "eeh2Zahohx"
 		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
 
 		AssertApplicationDatabaseConnection(
@@ -1981,7 +1981,7 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
-		const newPassword = "eeh2Zahohx" //nolint:gosec
+		const newPassword = "eeh2Zahohx"
 		AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
 		AssertApplicationDatabaseConnection(
 			namespace,
