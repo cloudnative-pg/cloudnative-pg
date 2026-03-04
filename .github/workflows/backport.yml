@@ -10,10 +10,6 @@ on:
 
 permissions: read-all
 
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.26.0"
-
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything, except those PR that are created or contain `do not backport` explicitly.
@@ -96,7 +92,7 @@ jobs:
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Check commits
