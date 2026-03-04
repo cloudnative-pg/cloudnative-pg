@@ -68,6 +68,7 @@ export CLUSTER_ENGINE
 # Source necessary common files to define paths, constants, and utility functions
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
+source "${COMMON_DIR}/20-utils-k8s.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
 source "${COMMON_DIR}/50-utils-images-load.sh"
 
@@ -75,7 +76,7 @@ source "${COMMON_DIR}/50-utils-images-load.sh"
 ACTION="${1:-}"
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
+    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|deploy-from-helm|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
     exit 1
 fi
 
@@ -87,7 +88,7 @@ esac
 
 # Ensure registry exists for actions that need it
 case "$ACTION" in
-    create|load-from-sources|deploy-from-sources|load-helper-images|pyroscope)
+    create|load-from-sources|deploy-from-sources|deploy-from-helm|load-helper-images|pyroscope)
         ensure_registry
         ;;
 esac
@@ -115,6 +116,12 @@ case "$ACTION" in
             echo "ERROR: Teardown script not found for vendor '$VENDOR' at: ${TEARDOWN_SCRIPT}" >&2
             exit 1
         fi
+        ;;
+
+    deploy-from-helm)
+        # Deploy CNPG operator from cloudnativepg/charts Helm chart instead of building from source
+        source "${COMMON_DIR}/20-utils-k8s.sh"
+        deploy_operator_from_helm
         ;;
 
     load-from-sources)

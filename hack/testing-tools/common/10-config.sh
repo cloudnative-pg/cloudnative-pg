@@ -45,6 +45,9 @@ export MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/mi
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
 
+# Define the default deployment method for the operator image.
+export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-sources}
+
 # Validate that required images were successfully extracted
 if [ -z "${POSTGRES_IMG}" ]; then
   echo "ERROR: Failed to extract POSTGRES_IMG from ${ROOT_DIR}/pkg/versions/versions.go" >&2
