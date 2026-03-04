@@ -268,6 +268,14 @@
       ],
       pinDigests: false,
       separateMajorMinor: false,
+    },
+    {
+      groupName: 'SLSA actions no-digest',
+      matchPackageNames: [
+        'slsa-framework{/,}**',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
     }
   ],
 }
