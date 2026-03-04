@@ -284,6 +284,8 @@ jobs:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
+    env:
+      ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -295,18 +297,16 @@ jobs:
           check-latest: true
 
       - name: Run unit tests
-        env:
-          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
           make test
 
       - name: Coverage Summary
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           go tool cover -func=cover.out -o coverage.out
 
       - name: Publish unit test summary on the latest k8s version
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
 
@@ -877,6 +877,7 @@ jobs:
       OPP_PRODUCTION_TYPE: "k8s"
       OPP_CONTAINER_OPT: "-t"
       OPP_RELEASE_INDEX_NAME: "catalog_tmp"
+      TEST: ${{ matrix.test }}
     steps:
       - name: Checkout community-operators
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -904,4 +905,4 @@ jobs:
 
       - name: Test bundle
         run: |
-          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${{ env.OPP_SCRIPT_VERSION }}/ci/scripts/opp.sh") ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
+          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${{ env.OPP_SCRIPT_VERSION }}/ci/scripts/opp.sh") ${{ env.TEST }} operators/cloudnative-pg/${{ env.VERSION }}/
