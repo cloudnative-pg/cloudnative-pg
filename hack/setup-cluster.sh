@@ -62,6 +62,7 @@ Commands:
     teardown              Tear down the cluster
     destroy               alias of teardown
     pyroscope             Deploy Pyroscope and enable pprof for the operator
+    deploy-from-helm      Deploy the operator using Helm charts
 
 Options:
     -e|--engine
@@ -161,7 +162,7 @@ main() {
 
     # Invoke the command through the dispatcher
     case "$command" in
-    create | load | load-helper-images | deploy | print-image | export-logs | teardown | pyroscope)
+    create | load | load-helper-images | deploy | deploy-from-helm | print-image | export-logs | teardown | pyroscope)
       "${CLUSTER_MGR_SCRIPT}" "${command}"
       ;;
     *)

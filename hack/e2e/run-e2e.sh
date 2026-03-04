@@ -139,14 +139,26 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   kubectl delete namespace cnpg-system || :
   kubectl create namespace cnpg-system
   ensure_image_pull_secret
-
-  CONTROLLER_IMG="${CONTROLLER_IMG}" \
-    POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-    PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-    make -C "${ROOT_DIR}" deploy
-  kubectl wait --for=condition=Available --timeout=2m \
-    -n cnpg-system deployments \
-    cnpg-controller-manager
+  case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
+      helm)
+        CONTROLLER_IMG="${CONTROLLER_IMG}" \
+        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}"
+        make -C "${ROOT_DIR}" deploy-from-helm
+        kubectl wait --for=condition=Available --timeout=2m \
+          -n cnpg-system deployments \
+          cnpg-cloudnative-pg
+        ;;
+      sources|*)
+          CONTROLLER_IMG="${CONTROLLER_IMG}" \
+          POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+          PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+          make -C "${ROOT_DIR}" deploy
+          kubectl wait --for=condition=Available --timeout=2m \
+            -n cnpg-system deployments \
+            cnpg-controller-manager
+        ;;
+    esac
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

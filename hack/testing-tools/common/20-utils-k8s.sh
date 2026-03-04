@@ -254,4 +254,23 @@ function deploy_fluentd() {
   done
 }
 
+# Deploy the CNPG operator from the official Helm chart repository
+# instead of building from source. This is useful for testing against
+# released versions or when source build is not required.
+function deploy_operator_from_helm() {
+  echo -e "${bright}Deploying CNPG operator from Helm chart...${reset}"
+  local controller_img="${CONTROLLER_IMG:-$(print_image)}"
+  local repo="${controller_img%:*}"
+  local tag="${controller_img##*:}"
+  # add the CNPG Helm repository and install the operator
+  helm repo add cnpg https://cloudnative-pg.github.io/charts
+  retry 3 helm upgrade --install cnpg \
+    --namespace cnpg-system \
+    --create-namespace \
+    --set image.repository="${repo}" \
+    --set image.tag="${tag}" \
+    cnpg/cloudnative-pg
+  echo -e "${bright}Operator deployment using helm initiated.${reset}"
+}
+
 
