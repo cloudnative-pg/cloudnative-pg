@@ -188,7 +188,6 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
 
 	// The walreceiver of a standby that wasn't promoted may try to reconnect
@@ -199,7 +198,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	// restarting the walreceiver.
 	// This applies to all environments including Kind/K3D, since the topology
 	// spread constraint distributes pods across different nodes.
-	maxReattachTime = 180
+	var maxReattachTime int32 = 180
 
 	AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
