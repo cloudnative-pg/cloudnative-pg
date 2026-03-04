@@ -259,16 +259,14 @@ function deploy_fluentd() {
 # released versions or when source build is not required.
 function deploy_operator_from_helm() {
   echo -e "${bright}Deploying CNPG operator from Helm chart...${reset}"
-  local controller_img="${CONTROLLER_IMG:-$(print_image)}"
-  local repo="${controller_img%:*}"
-  local tag="${controller_img##*:}"
   # add the CNPG Helm repository and install the operator
+  local controller_img="${CONTROLLER_IMG:-$(print_image)}"
   helm repo add cnpg https://cloudnative-pg.github.io/charts
   retry 3 helm upgrade --install cnpg \
     --namespace cnpg-system \
     --create-namespace \
-    --set image.repository="${repo}" \
-    --set image.tag="${tag}" \
+    --set image.repository="${controller_img%:*}" \
+    --set image.tag="${controller_img##*:}" \
     cnpg/cloudnative-pg
   echo -e "${bright}Operator deployment using helm initiated.${reset}"
 }

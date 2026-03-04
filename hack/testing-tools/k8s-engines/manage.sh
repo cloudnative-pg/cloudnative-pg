@@ -76,7 +76,7 @@ source "${COMMON_DIR}/50-utils-images-load.sh"
 ACTION="${1:-}"
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|deploy-from-helm|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
+    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
     exit 1
 fi
 
@@ -88,7 +88,7 @@ esac
 
 # Ensure registry exists for actions that need it
 case "$ACTION" in
-    create|load-from-sources|deploy-from-sources|deploy-from-helm|load-helper-images|pyroscope)
+    create|load-from-sources|deploy-from-sources|load-helper-images|pyroscope)
         ensure_registry
         ;;
 esac
@@ -118,12 +118,6 @@ case "$ACTION" in
         fi
         ;;
 
-    deploy-from-helm)
-        # Deploy CNPG operator from cloudnativepg/charts Helm chart instead of building from source
-        source "${COMMON_DIR}/20-utils-k8s.sh"
-        deploy_operator_from_helm
-        ;;
-
     load-from-sources)
         LOAD_VENDOR_SCRIPT="${VENDOR_DIR}/load.sh"
 
@@ -142,9 +136,20 @@ case "$ACTION" in
             echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
             exit 1
         fi
-
-        source "${COMMON_DIR}/20-utils-k8s.sh"
-        deploy_operator_from_sources
+        CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
+        case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
+                helm)
+                    source "${COMMON_DIR}/20-utils-k8s.sh"
+                    deploy_operator_from_helm
+                    ;;
+                sources|*)
+                    source "${COMMON_DIR}/20-utils-k8s.sh"
+                    deploy_operator_from_sources
+                    ;;
+            esac
+         kubectl wait --for=condition=Available --timeout=2m \
+          -n cnpg-system deployment \
+          -l app.kubernetes.io/name=cloudnative-pg
         ;;
 
     load-helper-images)
