@@ -80,12 +80,14 @@ jobs:
       fail-fast: false
       matrix:
         branch: [release-1.25, release-1.27, release-1.28]
+    env:
+      BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           workflow: continuous-delivery
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
           inputs: '{ "depth": "push", "limit": "kind", "test_level": "4", "log_level": "debug" }'
 
   check_commenter:
@@ -366,13 +368,8 @@ jobs:
           echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
           echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
           echo "commit_msg=${commit_message}" >> $GITHUB_OUTPUT
-          delim=$(uuidgen)
-          echo "author_name<<${delim}" >> $GITHUB_OUTPUT
-          echo "${author_name}" >> $GITHUB_OUTPUT
-          echo "${delim}" >> $GITHUB_OUTPUT
-          echo "author_email<<${delim}" >> $GITHUB_OUTPUT
-          echo "${author_email}" >> $GITHUB_OUTPUT
-          echo "${delim}" >> $GITHUB_OUTPUT
+          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
+          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
           echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
           echo "upload_artifacts=${upload_artifacts}" >> $GITHUB_OUTPUT
       -
@@ -524,6 +521,8 @@ jobs:
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository_owner == 'cloudnative-pg'
     runs-on: ubuntu-24.04
+    env:
+      BRANCH: ${{ needs.buildx.outputs.branch_name }}
     steps:
       -
         name: Checkout artifact
@@ -543,8 +542,6 @@ jobs:
           git config user.name "${AUTHOR_NAME}"
       -
         name: Switch to or create the right branch
-        env:
-          BRANCH: ${{ needs.buildx.outputs.branch_name }}
         run: |
           git checkout "${BRANCH}" 2>/dev/null || git checkout -b "${BRANCH}"
 
@@ -576,7 +573,7 @@ jobs:
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
-          branch: ${{ needs.buildx.outputs.branch_name }}
+          branch: ${{ env.BRANCH }}
 
   generate-jobs:
     name: Generate jobs for E2E tests
@@ -662,6 +659,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.kindTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -699,7 +697,7 @@ jobs:
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
       -
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
@@ -758,7 +756,6 @@ jobs:
           RUNNER: "kind"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -802,7 +799,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: kind-logs-${{ matrix.id }}
+          name: kind-logs-${{ env.MATRIX }}
           path: kind-logs/
           retention-days: 7
       -
@@ -810,7 +807,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -821,7 +818,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -857,6 +854,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.k3dTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -891,7 +889,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
@@ -948,7 +946,6 @@ jobs:
           RUNNER: "k3d"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -986,14 +983,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: k3d-logs-${{ matrix.id }}
+          name: k3d-logs-${{ env.MATRIX }}
           path: k3d-logs/
           retention-days: 7
       - name: Archive e2e failure contexts
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -1002,7 +999,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -1088,6 +1085,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.aksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF:  ${{ needs.evaluate_options.outputs.git_ref }}
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
@@ -1107,7 +1105,7 @@ jobs:
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
       -
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
@@ -1154,7 +1152,7 @@ jobs:
         name: Create AKS cluster
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         env:
-          MATRIX_ID: ${{ matrix.id }}
+          MATRIX_ID: ${{ env.MATRIX }}
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1264,7 +1262,6 @@ jobs:
           RUNNER: "aks"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -1307,7 +1304,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX}}
           path: |
             tests/*/out/
           retention-days: 7
@@ -1317,7 +1314,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -1436,6 +1433,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.eksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1453,15 +1451,13 @@ jobs:
     steps:
       -
         name: Set cluster name
-        env:
-          MATRIX_ID: ${{ matrix.id }}
         run: |
-          echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_ID}" | tr -d '_.-' )" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
       -
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
@@ -1640,7 +1636,6 @@ jobs:
           RUNNER: "eks"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -1683,7 +1678,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -1693,7 +1688,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX}}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -1831,6 +1826,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.gkeTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1849,7 +1845,7 @@ jobs:
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
       -
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
@@ -1884,15 +1880,16 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         name: Set cluster name
-        env:
-          MATRIX_ID: ${{ matrix.id }}
         run: |
           # GKE cluster names rules:
           # only lowercase alphanumerics and '-' allowed, must start with a letter and end with an alphanumeric,
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
-          SHORT_ID=$( echo "${MATRIX_ID}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=${E2E_SUFFIX}-${GITHUB_RUN_NUMBER}-${SHORT_ID}" >> $GITHUB_ENV
+          SHORT_ID=$( echo "${MATRIX}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
+          delim=$(uuidgen)
+          echo "CLUSTER_NAME<<${delim}" >> $GITHUB_ENV
+          echo "${E2E_SUFFIX}-${GITHUB_RUN_NUMBER}-${SHORT_ID}" >> $GITHUB_ENV
+          echo "${delim}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
@@ -1990,7 +1987,6 @@ jobs:
           RUNNER: "gke"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -2033,7 +2029,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -2043,7 +2039,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -2149,6 +2145,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.openshiftTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -2180,7 +2177,7 @@ jobs:
         name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          ref: ${{ env.GIT_REF }}
           fetch-depth: 0
       -
         name: Install Go
@@ -2218,10 +2215,10 @@ jobs:
         uses: redhat-actions/openshift-tools-installer@144527c7d98999f2652264c048c7a9bd103f8a82 # v1
         with:
           source: "mirror"
-          openshift-install: ${{ matrix.k8s_version }}
-          oc: ${{ matrix.k8s_version }}
+          openshift-install: ${{ env.K8S_VERSION }}
+          oc: ${{ env.K8S_VERSION }}
       -
-        name: Install OpenShift Cluster ${{ matrix.k8s_version }}
+        name: Install OpenShift Cluster ${{ env.K8S_VERSION }}
         timeout-minutes: 60
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
@@ -2293,7 +2290,6 @@ jobs:
           RUNNER: "openshift"
           RUN_ID: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
           python .github/generate-test-artifacts.py \
@@ -2336,7 +2332,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ matrix.id }}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -2346,13 +2342,13 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ matrix.id }}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Destroy OpenShift Cluster ${{ matrix.k8s_version }}
+        name: Destroy OpenShift Cluster ${{ env.K8S_VERSION }}
         if: always()
         run: |
           openshift-install destroy cluster --dir hack/
