@@ -55,7 +55,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade), func() {
+var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tests.LabelPostgresMajorUpgrade), func() {
 	const (
 		level                  = tests.Medium
 		namespacePrefix        = "cluster-major-upgrade"
