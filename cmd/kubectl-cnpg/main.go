@@ -29,27 +29,27 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/publication"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgadmin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/snapshot"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/backup"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/certificate"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/destroy"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/fio"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/hibernate"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/install"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/logical/publication"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/logical/subscription"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/maintenance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/pgadmin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/pgbench"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/promote"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/psql"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/reload"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/report"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/restart"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/snapshot"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -76,9 +76,9 @@ func main() {
 				return nil
 			}
 
-			plugin.ConfigureColor(cmd)
+			cli.ConfigureColor(cmd)
 
-			return plugin.SetupKubernetesClient(configFlags)
+			return cli.SetupKubernetesClient(configFlags)
 		},
 	}
 
@@ -86,27 +86,27 @@ func main() {
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
 	adminGroup := &cobra.Group{
-		ID:    plugin.GroupIDAdmin,
+		ID:    cli.GroupIDAdmin,
 		Title: "Operator-level administration",
 	}
 
 	troubleshootingGroup := &cobra.Group{
-		ID:    plugin.GroupIDTroubleshooting,
+		ID:    cli.GroupIDTroubleshooting,
 		Title: "Troubleshooting",
 	}
 
 	pgClusterGroup := &cobra.Group{
-		ID:    plugin.GroupIDCluster,
+		ID:    cli.GroupIDCluster,
 		Title: "Cluster administration",
 	}
 
 	pgDatabaseGroup := &cobra.Group{
-		ID:    plugin.GroupIDDatabase,
+		ID:    cli.GroupIDDatabase,
 		Title: "Database administration",
 	}
 
 	miscGroup := &cobra.Group{
-		ID:    plugin.GroupIDMiscellaneous,
+		ID:    cli.GroupIDMiscellaneous,
 		Title: "Miscellaneous",
 	}
 
@@ -137,7 +137,7 @@ func main() {
 	}
 
 	for _, cmd := range subcommands {
-		plugin.AddColorControlFlag(cmd)
+		cli.AddColorControlFlag(cmd)
 		rootCmd.AddCommand(cmd)
 	}
 

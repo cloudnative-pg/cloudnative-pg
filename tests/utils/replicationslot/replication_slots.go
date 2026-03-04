@@ -38,7 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 )
 
 // PrintReplicationSlots prints replications slots with their restart_lsn
@@ -70,13 +70,13 @@ func PrintReplicationSlots(
 		m := make(map[string]string)
 		for _, slot := range slots {
 			query := fmt.Sprintf("SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = '%v'", slot)
-			restartLsn, _, err := exec.QueryInInstancePod(
+			restartLsn, _, err := podexec.QueryInInstancePod(
 				ctx, crudClient, kubeInterface, restConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: podList.Items[i].Namespace,
 					PodName:   podList.Items[i].Name,
 				},
-				exec.DatabaseName(dbName),
+				podexec.DatabaseName(dbName),
 				query)
 			if err != nil {
 				fmt.Fprintf(&output, "Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err)
@@ -150,13 +150,13 @@ func GetReplicationSlotsOnPod(
 	}
 
 	query := "SELECT slot_name FROM pg_catalog.pg_replication_slots WHERE temporary = 'f' AND slot_type = 'physical'"
-	stdout, _, err := exec.QueryInInstancePod(
+	stdout, _, err := podexec.QueryInInstancePod(
 		ctx, crudClient, kubeInterface, restConfig,
-		exec.PodLocator{
+		podexec.PodLocator{
 			Namespace: targetPod.Namespace,
 			PodName:   targetPod.Name,
 		},
-		exec.DatabaseName(dbName),
+		podexec.DatabaseName(dbName),
 		query)
 	if err != nil {
 		return nil, err
@@ -190,13 +190,13 @@ func GetReplicationSlotLsnsOnPod(
 	for _, slot := range slots {
 		query := fmt.Sprintf("SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = '%v'",
 			slot)
-		restartLsn, _, err := exec.QueryInInstancePod(
+		restartLsn, _, err := podexec.QueryInInstancePod(
 			ctx, crudClient, kubeInterface, restConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: pod.Namespace,
 				PodName:   pod.Name,
 			},
-			exec.DatabaseName(dbName),
+			podexec.DatabaseName(dbName),
 			query)
 		if err != nil {
 			return nil, err

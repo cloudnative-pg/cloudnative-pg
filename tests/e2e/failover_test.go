@@ -31,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -88,9 +88,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// Get the walreceiver pid
 			query := "SELECT pid FROM pg_catalog.pg_stat_activity WHERE backend_type = 'walreceiver'"
-			out, _, err := exec.EventuallyExecQueryInInstancePod(
+			out, _, err := podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pausedPod.Namespace,
 					PodName:   pausedPod.Name,
 				}, postgres.PostgresDBName,
@@ -110,9 +110,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// We don't want to wait for the replication timeout.
 			query = fmt.Sprintf("SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				}, postgres.PostgresDBName,
@@ -139,9 +139,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather the current WAL LSN
-			initialLSN, _, err := exec.EventuallyExecQueryInInstancePod(
+			initialLSN, _, err := podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				}, postgres.PostgresDBName,
@@ -152,9 +152,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Execute a checkpoint
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				}, postgres.PostgresDBName,
@@ -172,9 +172,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Eventually(func(g Gomega) {
 				primaryPod, err = podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 				g.Expect(err).ToNot(HaveOccurred())
-				out, _, err := exec.EventuallyExecQueryInInstancePod(
+				out, _, err := podexec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: primaryPod.Namespace,
 						PodName:   primaryPod.Name,
 					}, postgres.PostgresDBName,

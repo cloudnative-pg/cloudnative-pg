@@ -30,7 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -213,9 +213,9 @@ func assertCreateTableWithDataOnSourceCluster(
 				"GRANT SELECT ON %[1]v TO app;",
 			tableName)
 
-		_, _, err = exec.QueryInInstancePod(
+		_, _, err = podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: pod.Namespace,
 				PodName:   pod.Name,
 			},
@@ -241,9 +241,9 @@ func assertTableAndDataOnImportedCluster(
 				tableName,
 				postgres.AppUser,
 			)
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},
@@ -283,9 +283,9 @@ func assertImportRenamesSelectedDatabase(
 		for _, db := range dbList {
 			// Create database
 			createDBQuery := fmt.Sprintf("CREATE DATABASE %v OWNER app", db)
-			_, _, err = exec.QueryInInstancePod(
+			_, _, err = podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},

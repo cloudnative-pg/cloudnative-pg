@@ -34,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -266,7 +266,7 @@ func getPgbouncerPod(namespace, sampleFile string) (*corev1.Pod, error) {
 }
 
 func runShowHelpInPod(pod *corev1.Pod) error {
-	_, _, err := exec.Command(
+	_, _, err := podexec.Command(
 		env.Ctx, env.Interface, env.RestClientConfig, *pod,
 		"pgbouncer", nil, "psql", "-c", "SHOW HELP",
 	)

@@ -33,7 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -342,9 +342,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			for _, pod := range podList.Items {
 				// Wait a few seconds for the GRANT to be replicated
 				Eventually(func(g Gomega) {
-					out, _, err := exec.QueryInInstancePod(
+					out, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},

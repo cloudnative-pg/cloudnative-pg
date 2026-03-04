@@ -28,7 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -82,9 +82,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				"and encoding = pg_char_to_encoding('%s') and datctype = '%s' and datcollate = '%s'",
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -139,7 +139,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, extSpec := range database.Spec.Extensions {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, podexec.DatabaseName(database.Spec.Name),
 						extensionExistsQuery(extSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})
@@ -149,7 +149,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, schemaSpec := range database.Spec.Schemas {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, podexec.DatabaseName(database.Spec.Name),
 						schemaExistsQuery(schemaSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})
@@ -159,7 +159,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, fdwSpec := range database.Spec.FDWs {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, podexec.DatabaseName(database.Spec.Name),
 						fdwExistsQuery(fdwSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})
@@ -169,7 +169,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, serverSpec := range database.Spec.Servers {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, podexec.DatabaseName(database.Spec.Name),
 						foreignServerExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
 				}
 			})

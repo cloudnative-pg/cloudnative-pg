@@ -28,7 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/replicationslot"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -113,9 +113,9 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			query := fmt.Sprintf("SELECT pg_catalog.pg_create_physical_replication_slot('%s')", userPhysicalSlot)
-			_, _, err = exec.QueryInInstancePod(
+			_, _, err = podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},

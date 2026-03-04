@@ -34,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -57,9 +57,9 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
-			out, stdErr, err := exec.QueryInInstancePod(
+			out, stdErr, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.GetName(),
 				},
@@ -79,9 +79,9 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
-			out, stdErr, err := exec.QueryInInstancePod(
+			out, stdErr, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.GetName(),
 				},
@@ -145,7 +145,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// However, PostgreSQL generates significant WAL overhead, temporary files, and index data
 			// during these operations. The fixtures using this function should have at least 3Gi
 			// of storage to ensure sufficient space for data, WAL files, and temporary operations.
-			_, _, err = exec.Command(
+			_, _, err = podexec.Command(
 				env.Ctx, env.Interface, env.RestClientConfig,
 				*primary, specs.PostgresContainerName, &commandTimeout,
 				"psql",
@@ -346,7 +346,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 						primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 						g.Expect(err).ToNot(HaveOccurred())
 
-						stdout, _, err := exec.Command(
+						stdout, _, err := podexec.Command(
 							env.Ctx, env.Interface, env.RestClientConfig,
 							*primary, specs.PostgresContainerName, &commandTimeout,
 							"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names",

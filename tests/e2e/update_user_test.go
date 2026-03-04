@@ -31,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
@@ -89,7 +89,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			timeout := time.Second * 10
 			dsn := services.CreateDSN(rwService, newUser, postgres.AppDBName, newPassword, services.Require, 5432)
 
-			_, _, err := exec.Command(env.Ctx, env.Interface, env.RestClientConfig, *primaryPod,
+			_, _, err := podexec.Command(env.Ctx, env.Interface, env.RestClientConfig, *primaryPod,
 				specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
 			Expect(err).To(HaveOccurred())
@@ -170,9 +170,9 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			query := "SELECT rolpassword IS NULL FROM pg_catalog.pg_authid WHERE rolname='postgres'"
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: primaryPod.Namespace,
 						PodName:   primaryPod.Name,
 					},

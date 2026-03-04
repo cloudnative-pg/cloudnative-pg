@@ -39,7 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -938,9 +938,9 @@ var _ = Describe("Verify Volume Snapshot",
 						"AND application_name = 'cnpg-instance-manager'"
 
 					Eventually(func() (int, error, error) {
-						stdout, _, err := exec.QueryInInstancePod(
+						stdout, _, err := podexec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-							exec.PodLocator{
+							podexec.PodLocator{
 								Namespace: primaryPod.Namespace,
 								PodName:   primaryPod.Name,
 							},

@@ -43,7 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -369,9 +369,9 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		env *environment.TestingEnvironment, primary *corev1.Pod, oldStdOut string, targetMajor int,
 	) {
 		Eventually(func(g Gomega) {
-			stdOut, stdErr, err := exec.EventuallyExecQueryInInstancePod(env.Ctx, env.Client, env.Interface,
+			stdOut, stdErr, err := podexec.EventuallyExecQueryInInstancePod(env.Ctx, env.Client, env.Interface,
 				env.RestClientConfig,
-				exec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, postgres.AppDBName,
+				podexec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, postgres.AppDBName,
 				"SELECT version();", 60, objects.PollingTime)
 			g.Expect(err).ToNot(HaveOccurred(), "failed to execute version query")
 			g.Expect(stdErr).To(BeEmpty(), "unexpected stderr output when checking version")
@@ -389,8 +389,8 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		}
 		timeout := time.Second * 20
 		for _, path := range shouldHaveBeenDeleted {
-			_, stdErr, err := exec.CommandInInstancePod(ctx, client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, &timeout,
+			_, stdErr, err := podexec.CommandInInstancePod(ctx, client, env.Interface, env.RestClientConfig,
+				podexec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, &timeout,
 				"stat", path)
 			Expect(err).To(HaveOccurred(), "path: %s", path)
 			Expect(stdErr).To(ContainSubstring("No such file or directory"), "path: %s", path)
@@ -502,9 +502,9 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
-		oldStdOut, stdErr, err := exec.EventuallyExecQueryInInstancePod(env.Ctx, env.Client, env.Interface,
+		oldStdOut, stdErr, err := podexec.EventuallyExecQueryInInstancePod(env.Ctx, env.Client, env.Interface,
 			env.RestClientConfig,
-			exec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, postgres.AppDBName,
+			podexec.PodLocator{Namespace: primary.GetNamespace(), PodName: primary.GetName()}, postgres.AppDBName,
 			"SELECT version();", 60, objects.PollingTime)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(stdErr).To(BeEmpty())

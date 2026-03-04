@@ -34,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -172,9 +172,9 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			if err != nil {
 				return "", err
 			}
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},

@@ -45,8 +45,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
