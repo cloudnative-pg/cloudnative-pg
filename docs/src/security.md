@@ -338,6 +338,44 @@ to viewing resources. However, if an unauthorized user gains access to the
 Therefore, it's crucial to prevent users from accessing the operator's
 `ServiceAccount` and any other `ServiceAccount` with elevated permissions.
 
+### Restricted RBAC Mode
+
+You can restrict the operator's RBAC permissions by configuring `WATCH_NAMESPACES`
+to the same namespace as the operator deployment. This way all namespaced resource
+policies can be created in a `Role`, and the `ClusterRole` only needs to contain
+`admissionregistration.k8s.io`, `clusterImageCatalogs` and `Nodes` resources.
+
+#### Disable Node Watching
+
+Set `WATCH_NODES` to `false` to disable node access:
+
+When `WATCH_NODES` is set to `false`:
+- The operator will not require `nodes` RBAC permissions
+
+### Known Limitations with Restricted Nodes RBAC
+
+#### SyncReplicaElectionConstraint
+
+`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to enforce deployment constraints for synchronous replicas during election. This feature will not work with restricted RBAC due to lack of node access.
+
+#### PodDisruptionBudget
+
+:::warning
+    When running with restricted RBAC and PodDisruptionBudget (PDB) enabled, node drain operations may fail.
+:::
+
+CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances during voluntary disruptions. However, with restricted RBAC, a critical limitation exists:
+
+- The Kubernetes node drain process requires cluster-level permissions to evict pods protected by PDBs
+- With restricted RBAC, the operator lacks the necessary cluster-wide permissions to properly coordinate with the node drain controller
+- This can result in node drain operations timing out or failing when attempting to evict PostgreSQL pods
+
+**Workarounds:**
+
+1. **Disable PDB**: Set `spec.enablePDB: false` in your `Cluster` specification when using restricted RBAC
+2. **Manual intervention**: Manually delete or scale down PostgreSQL pods before draining nodes
+3. **Use full RBAC**: If node drain automation is critical, consider using the default cluster-wide RBAC configuration
+
 ### Calls to the API server made by the instance manager
 
 The instance manager, which is the entry point of the operand container, needs
