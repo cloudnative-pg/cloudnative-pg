@@ -27,7 +27,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,6 +38,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/imagecatalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -162,7 +164,32 @@ func createMajorUpgradeJob(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
+	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for new major version",
+			"requestedMajor", requestedMajor)
+
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions for major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions for major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
@@ -185,7 +212,7 @@ func createMajorUpgradeJob(
 		"primary", true)
 
 	if err := c.Create(ctx, job); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
@@ -220,7 +247,7 @@ func majorVersionUpgradeHandleCompletion(
 
 		if err := c.Delete(ctx, &pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
-			if !errors.IsNotFound(err) {
+			if !apierrs.IsNotFound(err) {
 				return nil, err
 			}
 		}
@@ -237,6 +264,30 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
+	// Resolve extensions for the new major version.
+	// This ensures that extension images match the upgraded PostgreSQL version.
+	// If extension resolution fails (e.g., catalog doesn't have extensions for new version),
+	// we fail the major upgrade completion to avoid leaving the cluster in an inconsistent state.
+	exts, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
+			"requestedMajor", requestedMajor)
+
+		// Set the cluster phase to indicate image catalog error
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions after major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions after major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
 	// Reset timeline ID to 1 after major upgrade to match pg_upgrade behavior.
 	// This prevents replicas from restoring incompatible timeline history files
 	// from the pre-upgrade cluster in object storage.
@@ -247,6 +298,7 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
+			Extensions:   exts,
 		}),
 		status.SetTimelineID(1),
 	); err != nil {
@@ -279,6 +331,33 @@ func registerPhase(
 		status.SetPhase(phase, reason),
 		status.SetClusterReadyCondition,
 	)
+}
+
+// resolveExtensionsForMajorVersion resolves the extension configuration for the upgraded major version.
+// This function handles both image catalog references and direct image name specifications.
+func resolveExtensionsForMajorVersion(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	requestedMajor int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	// If using imageCatalogRef, resolve extensions from the catalog
+	if cluster.Spec.ImageCatalogRef != nil {
+		catalog, err := imagecatalog.Get(ctx, c, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get catalog: %w", err)
+		}
+
+		exts, err := extensions.ResolveFromCatalog(cluster, catalog, requestedMajor)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve extensions from catalog: %w", err)
+		}
+
+		return exts, nil
+	}
+
+	// If using imageName directly, extensions must be fully specified in cluster spec
+	return extensions.ValidateWithoutCatalog(cluster)
 }
 
 // getPrimarySerial tries to obtain the primary serial from a group of PVCs

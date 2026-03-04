@@ -7,8 +7,10 @@ title: Security
 # Security
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-This section contains information about security for CloudNativePG,
-that are analyzed at 3 different layers: Code, Container and Cluster.
+CloudNativePG is designed to be secure by default, following the "Least Privilege"
+principle across all layers of the stack. This document outlines our security
+governance, supply chain integrity, and the technical controls analyzed at three
+distinct layers: Code, Container, and Cluster.
 
 :::warning
     The information contained in this page must not exonerate you from
@@ -22,6 +24,33 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
     blog article to get a better understanding and context of the approach EDB
     has taken with security in CloudNativePG.
 :::
+
+---
+
+## Governance and Trust
+
+### Vulnerability Reporting
+
+:::important
+Please do not report security vulnerabilities through public GitHub issues.
+:::
+
+CloudNativePG follows a coordinated disclosure model. For instructions on how to
+report a vulnerability privately, please refer to our
+[Security Policy on GitHub](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/SECURITY.md).
+
+### Release Integrity and Supply Chain
+
+CloudNativePG follows the [OpenSSF Software Producer Security (OSPS) Baseline](https://baseline.openssf.org/).
+All official release assets, including Kubernetes manifests and container
+images, are cryptographically signed and verifiable.
+
+For quick-start instructions on verifying these assets during installation,
+see the [Installation Guide](installation_upgrade.md#verifying-release-assets).
+Detailed information on our [Signatures](#image-signatures) and [Attestations](#attestations)
+can be found below.
+
+---
 
 ## Code
 
@@ -106,7 +135,7 @@ command with the image digest:
 
 ```shell
 cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
-  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 ```
 
@@ -120,9 +149,11 @@ traceability:
   comprehensive list of software artifacts included in the image or used during
   its build process, formatted using the
   [in-toto SPDX predicate standard](https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md).
-- **[Provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/):**
-  Metadata detailing how the image was built, following the [SLSA Provenance](https://slsa.dev)
-  framework.
+- **Provenance:** Metadata detailing the build process, generated via the
+  [SLSA GitHub Generator Github action](https://github.com/slsa-framework/slsa-github-generator).
+  This provides [SLSA Level 3 assurance](https://slsa.dev/spec/v1.0/levels)
+  that the artifact was built on a trusted, isolated GitHub Actions runner
+  directly from the project's source.
 
 You can retrieve the SBOM for a specific image and platform using the following
 command:
@@ -135,11 +166,24 @@ docker buildx imagetools inspect <IMAGE> \
 This command outputs the SBOM in JSON format, providing a detailed view of the
 software components and build dependencies.
 
-For the provenance, use:
+For the build-level provenance, use:
 
 ```shell
 docker buildx imagetools inspect <IMAGE> \
   --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
+```
+
+#### Verifying SLSA provenance
+
+You can verify SLSA Level 3 provenance using
+[`slsa-verifier`](https://github.com/slsa-framework/slsa-verifier).
+
+To verify a container image, pass its digest reference:
+
+```shell
+slsa-verifier verify-image \
+  ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
 ```
 
 ### Guidelines and Frameworks for Container Security
@@ -381,9 +425,9 @@ privileges. Proper permissions must be assigned by the Kubernetes platform
 and/or administrators. The PostgreSQL containers run with a read-only root
 filesystem (i.e. no writable layer).
 
-The operator manages the setting of security contexts for all pods and 
-containers of a PostgreSQL cluster. The [Seccomp Profile](https://kubernetes.io/docs/tutorials/security/seccomp/) 
-to be used for the PostgreSQL containers can be configured with the 
+The operator manages the setting of security contexts for all pods and
+containers of a PostgreSQL cluster. The [Seccomp Profile](https://kubernetes.io/docs/tutorials/security/seccomp/)
+to be used for the PostgreSQL containers can be configured with the
 `spec.seccompProfile` section of the `Cluster` resource. If this section is left
 blank, the containers will use a seccompProfile `Type` of `RuntimeDefault`, that
 is, the container runtime default.

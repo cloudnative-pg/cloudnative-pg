@@ -68,8 +68,8 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		if !IsLocal() {
-			Skip("PodMonitor test only runs on Local deployment")
+		if !(IsKind() || IsK3D()) {
+			Skip("This test only runs on kind or k3d clusters")
 		}
 	})
 

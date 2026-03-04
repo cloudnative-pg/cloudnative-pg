@@ -337,17 +337,25 @@ Options supported are:
   - push:
     * oldest K8S_VERSION x oldest POSTGRES_VERSION
     * latest K8S_VERSION x latest POSTGRES_VERSION
-    * no cloud providers
+    * no non-kind engines
   - main:
     * each K8S_VERSION x oldest POSTGRES_VERSION
     * each K8S_VERSION x latest POSTGRES_VERSION
     * latest K8S_VERSION x each POSTGRES_VERSION
-    * On cloud providers: latest K8S_VERSION x latest POSTGRES_VERSION
+    * On non-kind engines: latest K8S_VERSION x latest POSTGRES_VERSION
   - pull_request:
     * same as `main`
   - schedule:
     * same as `main`
-    * On cloud providers: each K8S_VERSION x latest POSTGRES_VERSION
+    * On non-kind engines: each K8S_VERSION x latest POSTGRES_VERSION
+
+- limit (`l` for short)
+  Restrict the test run to specific engines. Default value is `kind`.
+  Available engines: `kind`, `k3d`, `eks`, `aks`, `gke`, `openshift`.
+  Multiple engines can be specified as a comma-separated list.
+  Note that `eks`, `aks`, `gke`, and `openshift` require additional
+  secrets that are not available in the main repository and will be
+  silently skipped when those secrets are not configured.
 
 - feature_type (`type` or `ft` for short)
   A label to select a subset of E2E tests to be run, divided by functionality.

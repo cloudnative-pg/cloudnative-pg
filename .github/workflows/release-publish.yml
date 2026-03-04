@@ -11,7 +11,7 @@ permissions: read-all
 
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
+  GOLANG_VERSION: "1.26.0"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     needs:
       - check-version
     steps:
@@ -81,13 +82,26 @@ jobs:
             --out-file /src/release_notes.md \
             /src/docs/src/${{ env.FILE }}
       -
+        name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
+        # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
+        # how to use cosign.
+      -
+        name: Sign yaml files
+        run: |
+          cosign sign-blob releases/cnpg-${{ env.VERSION }}.yaml \
+          --bundle releases/cnpg-${{ env.VERSION }}.sigstore.json --yes
+      -
         name: Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           body_path: release_notes.md
           draft: false
           name: v${{ env.TAG }}
-          files: releases/cnpg-${{ env.VERSION }}.yaml
+          files: |
+            releases/cnpg-${{ env.VERSION }}.yaml
+            releases/cnpg-${{ env.VERSION }}.sigstore.json
           make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
           prerelease: ${{ needs.check-version.outputs.is_stable == 'false' || needs.check-version.outputs.is_rc == 'true' }}
         env:
@@ -108,6 +122,8 @@ jobs:
       author_email: ${{ steps.build-meta.outputs.author_email }}
       platforms: ${{ env.PLATFORMS }}
       olm_img: ${{ steps.olm-image.outputs.olm_image }}
+      hashes: ${{ steps.hashes.outputs.hashes }}
+      images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
     steps:
       -
         name: Checkout
@@ -117,7 +133,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -161,6 +177,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
+        id: goreleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
@@ -173,12 +190,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Build checksum file
+        id: hashes
+        env:
+          ARTIFACTS: "${{ steps.goreleaser.outputs.artifacts }}"
+        shell: bash
+        run: |
+          checksum_file=$(echo "$ARTIFACTS" | jq -r '.[] | select (.type=="Checksum") | .path')
+          echo "hashes=$(cat $checksum_file | base64 -w0)" >> "$GITHUB_OUTPUT"
+
       -
         name: Publish Krew
         if: |
           needs.check-version.outputs.is_latest == 'true' &&
           needs.check-version.outputs.is_stable == 'true'
-        uses: rajatjindal/krew-release-bot@3d9faef30a82761d610544f62afddca00993eef9 # v0.0.47
+        uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
@@ -243,6 +270,58 @@ jobs:
           ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
           echo "olm_image=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_OUTPUT
+      -
+        name: Prepare images matrix
+        id: images_matrix
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
+        shell: bash
+        run: |
+          images_matrix=$(echo "$BAKE_METADATA" |
+            jq -r -c '
+              del(.[].["containerimage.descriptor", "buildx.build.ref"])
+              | to_entries
+              | map({variant: .key} + .value + {"image.name": (.value["image.name"] | split(",")[0] | sub(":[^/]+$"; ""))})
+            '
+          )
+          echo "images_matrix=${images_matrix}" >> "$GITHUB_OUTPUT"
+
+  provenance-binaries:
+    name: Add provenance to binaries
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    # NOTE: pinned by tag, not SHA — the SLSA generator's builder-fetch.sh
+    # resolves the binary download URL from the git ref and breaks with SHA pins.
+    # See: https://github.com/slsa-framework/slsa-github-generator/issues/4216
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.release-binaries.outputs.hashes }}"
+      upload-assets: true
+
+  provenance-images:
+    name: Provenance for images
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.release-binaries.outputs.images_matrix) }}
+    # NOTE: pinned by tag, not SHA — see comment on provenance-binaries above.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ matrix['image.name'] }}
+      digest: ${{ matrix['containerimage.digest'] }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -272,7 +351,7 @@ jobs:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true

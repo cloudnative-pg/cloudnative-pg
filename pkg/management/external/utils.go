@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,8 +77,8 @@ func getSecretKeyRefFileName(
 	serverName string,
 	selector *corev1.SecretKeySelector,
 ) string {
-	directory := path.Join(getExternalSecretsPath(), serverName)
-	filePath := path.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
+	directory := filepath.Join(getExternalSecretsPath(), serverName)
+	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
 	return filePath
 }
 
@@ -104,13 +104,13 @@ func dumpSecretKeyRefToFile(
 		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
 	}
 
-	directory := path.Join(getExternalSecretsPath(), serverName)
+	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return "", err
 	}
 
-	filePath := path.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0o600) // #nosec
+	filePath := filepath.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
+	f, err := os.OpenFile(filepath.Clean(filePath), os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return "", err
 	}
@@ -128,8 +128,8 @@ func dumpSecretKeyRefToFile(
 
 // getPgPassFilePath gets the path where the pgpass file will be stored
 func getPgPassFilePath(serverName string) string {
-	directory := path.Join(getExternalSecretsPath(), serverName)
-	filePath := path.Join(directory, "pgpass")
+	directory := filepath.Join(getExternalSecretsPath(), serverName)
+	filePath := filepath.Join(directory, "pgpass")
 	return filePath
 }
 
@@ -141,11 +141,11 @@ func createPgPassFile(
 ) (string, error) {
 	pgpassLine := pgpass.NewConnectionInfo(connectionParameters, password)
 
-	directory := path.Join(getExternalSecretsPath(), serverName)
+	directory := filepath.Join(getExternalSecretsPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return "", err
 	}
-	filePath := path.Join(directory, "pgpass")
+	filePath := filepath.Join(directory, "pgpass")
 
 	return filePath, pgpass.From(pgpassLine).Write(filePath)
 }

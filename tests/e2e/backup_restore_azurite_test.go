@@ -45,8 +45,8 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		if !(IsLocal() || IsGKE() || IsOpenshift()) {
-			Skip("This test is only executed on gke, openshift and local")
+		if !(IsKind() || IsK3D() || IsGKE() || IsOpenshift()) {
+			Skip("This test only runs on kind, k3d, gke, or openshift clusters")
 		}
 	})
 

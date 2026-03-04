@@ -32,7 +32,7 @@ kubectl rollout status deployment \
 ### Using the `cnpg` plugin for `kubectl`
 
 You can use the `cnpg` plugin to override the default configuration options
-that are in the static manifests. 
+that are in the static manifests.
 
 For example, to generate the default latest manifest but change the watch
 namespaces to only be a specific namespace, you could run:
@@ -44,7 +44,7 @@ kubectl cnpg install generate \
 ```
 
 Please refer to ["`cnpg` plugin"](./kubectl-plugin.md#generation-of-installation-manifests) documentation
-for a more comprehensive example. 
+for a more comprehensive example.
 
 :::warning
     If you are deploying CloudNativePG on GKE and get an error (`... failed to
@@ -358,3 +358,110 @@ that apply declarative changes to enable or disable hibernation.
 The `hibernate status` command has been removed, as its purpose is now
 fulfilled by the standard `status` command.
 
+## Verifying release assets
+
+CloudNativePG cryptographically signs all official release assets. Verifying these
+signatures ensures the assets originate from the official repository and were
+published through our automated release workflow.
+
+:::info
+Refer to the ["Release integrity and supply chain" section](security.md#release-integrity-and-supply-chain)
+for more information.
+:::
+
+### Prerequisites
+
+- **Signature verification:** [cosign](https://github.com/sigstore/cosign) CLI
+- **SBOM and Provenance:** [Docker Buildx](https://docs.docker.com/build/install-buildx/)
+  (included in Docker Desktop and modern Docker versions)
+
+### Verifying the Operator YAML Deployment
+
+When installing via a direct YAML manifest, you should verify the manifest file
+using the corresponding bundle (the `.sigstore.json` file) provided on the
+[GitHub Release page](https://github.com/cloudnative-pg/cloudnative-pg/releases).
+
+Run the following command:
+
+```bash
+cosign verify-blob \
+  cnpg-{version}.yaml \
+  --bundle cnpg-{version}.sigstore.json \
+  --certificate-identity-regexp "^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+#### Verifying SLSA provenance
+
+To verify a release binary, download both the artifact and the provenance file
+(`multiple.intoto.jsonl`) from the
+[GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+then run:
+
+```shell
+slsa-verifier verify-artifact <ARTIFACT> \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/cloudnative-pg/cloudnative-pg
+```
+
+### Verifying the operator container images
+
+Run the following command to verify the signature of the CloudNativePG operator
+images:
+
+```bash
+cosign verify ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/.github/workflows/release-publish.yml@refs/tags/v" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+We provide OCI attestations for full transparency. To inspect the Software Bill
+of Materials (SBOM) or build provenance, use the `docker buildx imagetools`
+command:
+
+To view the Software Bill of Materials (SBOM) in SPDX format:
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+```
+
+To inspect the SLSA Provenance (build details):
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/cloudnative-pg:{tag} \
+  --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
+```
+
+:::info
+Refer to ["Verifying SLSA provenance"](security.md#verifying-slsa-provenance)
+for SLSA Build Level 3 compliance verification.
+:::
+
+### Verifying PostgreSQL operand images
+
+CloudNativePG maintains container images for all supported PostgreSQL versions
+as part of the [`postgres-containers` project](https://github.com/cloudnative-pg/postgres-containers)
+(also called operand images).
+
+To verify the signature of a specific operand image:
+
+```bash
+cosign verify ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/postgres-containers/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+To view the Software Bill of Materials (SBOM) in SPDX format:
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+```
+
+To inspect the SLSA Provenance (Build details):
+
+```bash
+docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
+  --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
+```

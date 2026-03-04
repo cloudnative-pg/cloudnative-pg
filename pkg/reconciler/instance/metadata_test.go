@@ -73,7 +73,7 @@ var _ = Describe("object metadata test", func() {
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
-		// nolint: dupl
+		//nolint: dupl
 		It("Should update the role labels when the primary and the replica switch roles", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
@@ -150,7 +150,7 @@ var _ = Describe("object metadata test", func() {
 			Expect(oldReplicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
-		// nolint: dupl
+		//nolint: dupl
 		It("should not perform any changes if everything is ok", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
@@ -193,7 +193,6 @@ var _ = Describe("object metadata test", func() {
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
-		//nolint: dupl
 		It("should update existing instances with the old role label", func() {
 			cluster := &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{

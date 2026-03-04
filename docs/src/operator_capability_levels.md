@@ -61,20 +61,24 @@ creates the following resources: `Pod`, `Service`, `Secret`,
 
 ### Override of operand images through the CRD
 
-The operator is designed to support any operand container image with
-PostgreSQL inside.
-By default, the operator uses the latest available minor
-version of the latest stable major version supported by the PostgreSQL
-community and published on ghcr.io.
-You can use any compatible image of PostgreSQL supporting the
-primary/standby architecture directly by setting the `imageName`
-attribute in the CR. The operator also supports `imagePullSecrets`
-to access private container registries, and it supports digests and
-tags for finer control of container image immutability.
-If you prefer not to specify an image name, you can leverage
-[image catalogs](image_catalog.md) by simply referencing the PostgreSQL
-major version. Moreover, image catalogs enable you to effortlessly create
-custom catalogs, directing to images based on your specific requirements.
+The operator supports any operand container image containing PostgreSQL.
+While it defaults to the latest stable minor version of the most recent
+community-supported major version on `ghcr.io`, you can override this by
+setting the `.spec.imageName` attribute in the `Cluster` resource.
+This direct method supports `imagePullSecrets` for private registries and
+allows the use of both tags and SHA256 digests to ensure container
+immutability.
+
+Alternatively, you can leverage [image catalogs](image_catalog.md) to manage
+images more effectively by simply referencing a PostgreSQL major version.
+This approach is superior for production environments because it centralizes
+the management of your image supply chain.
+
+Beyond just the core PostgreSQL engine, image catalogs now allow you to define
+[extension volumes](imagevolume_extensions.md) alongside the operand image,
+ensuring that the database and its associated modules are always compatible,
+version-aligned, and treated as a single cohesive unit across your entire
+infrastructure.
 
 ### Labels and annotations
 
@@ -169,6 +173,20 @@ authentication rules in the `postgresql` section of the CR.
 CloudNativePG supports
 [management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
 using the `.spec.managed.roles` stanza.
+
+### Configuration of Postgres extensions
+
+CloudNativePG provides declarative support for managing PostgreSQL extensions
+by mounting them as read-only [extension volumes](imagevolume_extensions.md) in
+each pod. Since version 1.29, the recommended approach is to leverage [image
+catalogs](image_catalog.md), which allow the operator to automatically resolve
+image references and directory paths based on the PostgreSQL version.
+Image volumes require the `extension_control_path` parameter (PostgreSQL 18+)
+and the `ImageVolume` feature (Kubernetes 1.35+, or 1.33+ with feature gate).
+If these requirements are not met, extensions must be included directly in the
+operand image.
+Once available on the system, the [`Database` resource](declarative_database_management.md#managing-extensions-in-a-database)
+automates the `CREATE EXTENSION` SQL lifecycle.
 
 ### Pod security standards
 
@@ -318,31 +336,37 @@ or a subsequent switchover of the cluster.
 
 ### Upgrade of the managed workload
 
-The operand can be upgraded using a declarative configuration approach as
-part of changing the CR and, in particular, the `imageName` parameter.
-This is normally initiated by security updates or Postgres minor version updates.
-In the presence of standby servers, the operator performs rolling updates
-starting from the replicas. It does this by dropping the existing pod and creating a new
-one with the new requested operand image that reuses the underlying storage.
-Depending on the value of the `primaryUpdateStrategy`, the operator proceeds
-with a switchover before updating the former primary (`unsupervised`). Or, it waits
-for the user to manually issue the switchover procedure (`supervised`) by way of the
-`cnpg` plugin for kubectl.
-The setting to use depends on the business requirements, as the operation
-might generate some downtime for the applications. This downtime can range from a few seconds to
-minutes, based on the actual database workload.
+The operand is upgraded through a declarative approach by updating the
+`Cluster` resource, specifically via the `.spec.imageName` parameter or by
+updating the version reference in an [image catalog](image_catalog.md).
+This process is typically triggered by security patches or new PostgreSQL minor
+versions. In clusters with standby servers, the operator performs a rolling
+update starting with the replicas; it deletes the existing pods and replaces
+them with new ones using the updated image while reusing the underlying
+storage. Depending on the `primaryUpdateStrategy`, the operator can
+automatically perform a switchover before updating the former primary
+(`unsupervised`) or wait for a manual switchover initiated by the user via the
+`cnpg` plugin (`supervised`).
+This strategy allows organizations to balance business requirements against the
+brief downtime, ranging from seconds to minutes depending on workload, required
+for the switchover.
 
 ### Offline In-Place Major Upgrades of PostgreSQL
 
 CloudNativePG supports declarative offline in-place major upgrades when a new
-operand container image with a higher PostgreSQL major version is applied to a
-cluster. The upgrade can be triggered by updating the image tag via the
-`.spec.imageName` option or by using an image catalog to manage version
-changes. During the upgrade, all cluster pods are shut down to ensure data
-consistency. A new job is then created to validate the upgrade conditions,
-execute `pg_upgrade`, and create new directories for `PGDATA`, WAL files, and
-tablespaces if needed. Once the upgrade is complete, replicas are re-created.
-Failed upgrades can be rolled back.
+operand container image with a higher PostgreSQL major version is applied.
+This upgrade can be triggered by updating the `.spec.imageName` directly or by
+selecting a higher major version within an image catalog. The use of image
+catalogs is particularly beneficial here, as it ensures that any associated
+[extension volumes](imagevolume_extensions.md) are simultaneously updated to
+versions compatible with the new PostgreSQL major version.
+
+During the process, the operator shuts down all cluster pods to maintain data
+consistency and initiates a job to validate upgrade conditions and execute
+`pg_upgrade`. This job creates the necessary new directories for `PGDATA`, WAL
+files, and tablespaces before re-creating the replicas. This structured
+workflow provides a reliable path for major version transitions and supports
+rollbacks in the event of a failure.
 
 ### Display cluster availability status during upgrade
 
@@ -664,10 +688,6 @@ CloudNativePG transparently and natively supports:
   which provides a means for logging execution plans of slow statements
   automatically, without having to manually run `EXPLAIN` (helpful for tracking
   down un-optimized queries)
-- The [`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots),
-  which makes logical replication slots usable across a physical failover,
-  ensuring resilience in change data capture (CDC) contexts based on PostgreSQL's
-  native logical replication
 
 ### Audit
 

@@ -1038,6 +1038,9 @@ type ImageInfo struct {
 	Image string `json:"image"`
 	// MajorVersion is the major version of the image
 	MajorVersion int `json:"majorVersion"`
+	// Extensions contains the container image extensions available for the current Image
+	// +optional
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
 // SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
@@ -1466,6 +1469,8 @@ type PostgresConfiguration struct {
 
 	// The configuration of the extensions to be added
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
@@ -1477,8 +1482,8 @@ type ExtensionConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// The image containing the extension, required
-	// +kubebuilder:validation:XValidation:rule="has(self.reference)",message="An image reference is required"
+	// The image containing the extension.
+	// +optional
 	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 
 	// The list of directories inside the image which should be added to extension_control_path.

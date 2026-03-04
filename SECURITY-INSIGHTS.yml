@@ -1,60 +1,222 @@
 header:
   schema-version: 2.2.0
-  last-updated: '2026-02-23'
-  last-reviewed: '2026-02-23'
+  last-updated: '2026-02-25'
+  last-reviewed: '2026-02-25'
   url: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/SECURITY-INSIGHTS.yml
 
 project:
   name: CloudNativePG
+  homepage: https://cloudnative-pg.io
+  roadmap: https://github.com/orgs/cloudnative-pg/projects/1
+  steward:
+    uri: https://www.cncf.io/
+    comment: CloudNativePG is a Cloud Native Computing Foundation project.
   administrators:
     - name: Gabriele Bartolini
+      email: gabriele.bartolini@enterprisedb.com
       primary: true
     - name: Francesco Canovai
+      email: francesco.canovai@enterprisedb.com
       primary: false
     - name: Leonardo Cecchi
+      email: leonardo.cecchi@enterprisedb.com
       primary: false
     - name: Jonathan Gonzalez V.
       primary: false
     - name: Marco Nenciarini
+      email: marco.nenciarini@enterprisedb.com
       primary: false
     - name: Armando Ruocco
+      email: armando.ruocco@enterprisedb.com
       primary: false
     - name: Philippe Scorsolini
+      email: philippe.scorsolini@upbound.io
       primary: false
   repositories:
     - name: CloudNativePG
       url: https://github.com/cloudnative-pg/cloudnative-pg
+      comment: Main repository for the CloudNativePG project
+
+    # Auxiliary repositories
+    - name: Artifacts
+      url: https://github.com/cloudnative-pg/artifacts
       comment: |
-        Main repository for the CloudNativePG project
+        Artifacts produced by CloudNativePG including YAML manifests, OLM
+        bundles, image catalogs
+    - name: Barman Cloud plugin
+      url: https://github.com/cloudnative-pg/plugin-barman-cloud
+      comment: Barman Cloud CNPG-I plugin for CloudNativePG
+    - name: Charts
+      url: https://github.com/cloudnative-pg/charts
+      comment: Official Helm charts for CloudNativePG projects
+    - name: CNPG Playground
+      url: https://github.com/cloudnative-pg/cnpg-playground
+      comment: |
+        Local Learning Environment designed for learning and experimenting with
+        CloudNativePG using Docker and Kind.
+    - name: Documentation
+      url: https://github.com/cloudnative-pg/docs
+      comment: |
+        Repository for building and maintaining the CloudNativePG documentation
+    - name: Governance
+      url: https://github.com/cloudnative-pg/governance
+      comment: Repository containing governance documents for CloudNativePG
+    - name: PostgreSQL Container Images
+      url: https://github.com/cloudnative-pg/postgres-containers
+      comment: |
+        Maintenance scripts for generating immutable application containers for
+        all supported PostgreSQL major versions
+    - name: PostgreSQL Extensions Container Images
+      url: https://github.com/cloudnative-pg/postgres-extensions-containers
+      comment: |
+        Maintenance scripts for building immutable container images containing
+        PostgreSQL extensions supported by CloudNativePG
+    - name: Website
+      url: https://github.com/cloudnative-pg/cloudnative-pg.github.io
+      comment: CloudNativePG website
+
+  documentation:
+    code-of-conduct: https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md
+    # OSPS-DO-01.01, OSPS-SA-02.01
+    detailed-guide: https://cloudnative-pg.io/docs/current/
+    # OSPS-SA-01.01
+    design: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/technical-architecture.md
+    quickstart-guide: https://cloudnative-pg.io/docs/current/quickstart
+    release-process: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/contribute/release_procedure.md
+    # OSPS-DO-03.01
+    signature-verification: https://github.com/cloudnative-pg/postgres-containers?tab=readme-ov-file#security
+    # OSPS-DO-04.01, OSPS-DO-05.01
+    support-policy: https://cloudnative-pg.io/docs/current/supported_releases
+
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
+    policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy
+    contact:
+      name: Alias to a private mailing list in Google Groups containing just the maintainers of the project
+      email: security@cloudnative-pg.io
+      primary: true
 
 repository:
   url: https://github.com/cloudnative-pg/cloudnative-pg
   status: active
   accepts-change-request: true
   accepts-automated-change-request: false
+  no-third-party-packages: false
   core-team:
     - name: Gabriele Bartolini
+      email: gabriele.bartolini@enterprisedb.com
       primary: true
     - name: Francesco Canovai
+      email: francesco.canovai@enterprisedb.com
       primary: false
     - name: Leonardo Cecchi
+      email: leonardo.cecchi@enterprisedb.com
       primary: false
     - name: Jonathan Gonzalez V.
       primary: false
     - name: Marco Nenciarini
+      email: marco.nenciarini@enterprisedb.com
       primary: false
     - name: Armando Ruocco
+      email: armando.ruocco@enterprisedb.com
       primary: false
     - name: Philippe Scorsolini
+      email: philippe.scorsolini@upbound.io
       primary: false
+  documentation:
+    # OSPS-DO-02.01, OSPS-GV-03.01, OSPS-DO-07.01, OSPS-GV-03.02, OSPS-DO-03.02
+    contributing-guide: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CONTRIBUTING.md
+    review-policy: https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute#about-our-development-workflow
+    # OSPS-VM-02.01, OSPS-VM-01.01, OSPS-VM-03.01, OSPS-VM-04.01
+    security-policy: https://github.com/cloudnative-pg/cloudnative-pg/security/policy
+    # OSPS-QA-04.01, OSPS-GV-01.01, OSPS-GV-01.02
+    governance: https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md
+    # OSPS-DO-06.01
+    dependency-management-policy: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/DEPENDENCIES.md
   license:
     url: https://www.apache.org/licenses/LICENSE-2.0
     expression: Apache-2.0
+
+  release:
+    changelog: https://github.com/cloudnative-pg/cloudnative-pg/releases/tag/{version}
+    automated-pipeline: true
+    distribution-points:
+      - uri: https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg
+        comment: GitHub packages for CloudNativePG
+      - uri: https://github.com/cloudnative-pg/artifacts/blob/release-{version}/manifests/operator-manifest.yaml
+        comment: Kubernetes manifests
+
   security:
+    tools:
+      - name: Dependabot
+        type: SCA
+        rulesets: ["default"]
+        results: {}
+        integration:
+          adhoc: true
+          ci: false
+          release: false
+      - name: Renovate
+        type: SCA
+        rulesets: ["default"]
+        results: {}
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+      - name: Snyk
+        type: SAST
+        rulesets: ["default"]
+        results: {}
+        comment: |
+          Performs both Static Code Analysis (Snyk Code) and Vulnerability
+          Scanning (Snyk Open Source).
+        integration:
+          adhoc: true
+          ci: true
+          release: true
+      - name: Cosign
+        type: container
+        rulesets: ["default"]
+        results: {}
+        comment: Used to cryptographically sign container images (operator and operand).
+        integration:
+          adhoc: true
+          ci: true
+          release: true
+      - name: CodeQL
+        type: SAST
+        rulesets: ["default"]
+        results: {}
+        comment: Performs static analysis of Go code on pushes, PRs, and weekly schedules.
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+      - name: GitHub Code Scanning
+        type: SAST
+        rulesets: ["default"]
+        results: {}
+        comment: Ingests SARIF results from Snyk for integrated GitHub security alerts.
+        integration:
+          adhoc: true
+          ci: true
+          release: true
+      - name: SLSA GitHub Generator Action
+        type: automated-tooling
+        rulesets: ["default"]
+        comment: >-
+          Generates non-falsifiable SLSA Level 3 provenance attestations for
+          release assets. This ensures that the binary artifacts and images are traced
+          back to the specific source commit and build environment without manual
+          intervention.
+
+        integration:
+          adhoc: false
+          ci: true
+          release: true
+
     assessments:
       self:
-        comment: |
-          Self assessment has not yet been completed.
+        comment: Self assessment has not yet been completed.

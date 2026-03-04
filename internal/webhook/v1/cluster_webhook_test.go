@@ -5624,6 +5624,59 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].BadValue).To(Equal("/usr/lib/postgresql/lib"))
 	})
 
+	It("returns errors for duplicate LdLibraryPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/opt/custom/lib",
+								"/usr/lib/postgresql/lib",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].ld_library_path[2]"))
+		Expect(err[0].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns an error for empty LdLibraryPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/valid/path",
+								"",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].ld_library_path[1]"))
+	})
+
 	It("returns errors for duplicates in both ExtensionControlPath and DynamicLibraryPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

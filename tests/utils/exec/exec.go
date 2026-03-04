@@ -34,7 +34,7 @@ import (
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 
-	. "github.com/onsi/gomega" // nolint
+	. "github.com/onsi/gomega" //nolint
 )
 
 // ContainerLocator contains the necessary data to find a container on a pod

@@ -22,11 +22,14 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 )
 
 // RefreshReplicaConfiguration writes the PostgreSQL correct
@@ -37,12 +40,15 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	cluster *apiv1.Cluster,
 	cli client.Client,
 ) (changed bool, err error) {
-	// TODO: Remove this code when enough time has passed since 1.21 release
-	//       This is due to the operator switching from postgresql.auto.conf
-	//       to override.conf for coordinating replication configuration
-	changed, err = instance.migratePostgresAutoConfFile(ctx)
+	// Ensure postgresql.conf includes custom.conf and override.conf, which
+	// are essential for the cluster to operate correctly. See: #5747
+	changed, err = configfile.EnsureIncludes(
+		path.Join(instance.PgData, "postgresql.conf"),
+		constants.PostgresqlCustomConfigurationFile,
+		constants.PostgresqlOverrideConfigurationFile,
+	)
 	if err != nil {
-		return changed, err
+		return changed, fmt.Errorf("ensuring include directives in postgresql.conf: %w", err)
 	}
 
 	primary, err := instance.IsPrimary()

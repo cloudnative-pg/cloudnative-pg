@@ -141,7 +141,7 @@ func (v *PoolerCustomValidator) getAdmissionWarnings(r *apiv1.Pooler) admission.
 	}
 
 	if r.Spec.PgBouncer != nil &&
-		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" { //nolint:staticcheck
+		r.Spec.PgBouncer.AuthQuerySecret != nil && r.Spec.PgBouncer.AuthQuerySecret.Name != "" {
 		warns = append(
 			warns,
 			"The .spec.pgbouncer.authQuerySecret field has been deprecated")

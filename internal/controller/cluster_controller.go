@@ -269,7 +269,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit,gocyclo
+//
+//nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -1003,6 +1004,14 @@ func (r *ClusterReconciler) reconcilePods(
 		return r.createPrimaryInstance(ctx, cluster)
 	}
 
+	// Handle instances marked as unrecoverable before waiting for pods to be ready.
+	// This ensures pods annotated with alpha.cnpg.io/unrecoverable=true are
+	// deleted even when they can't report their status (e.g., postgres process
+	// not running, startup probe failing).
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
@@ -1021,11 +1030,6 @@ func (r *ClusterReconciler) reconcilePods(
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 		}
 		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
-	}
-
-	// Are there nodes to be removed? Remove one of them
-	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
-		return res, err
 	}
 
 	// Should we scale down the cluster?

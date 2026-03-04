@@ -366,7 +366,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			})
 		})
 
-		Context("Lag-control in startup & readiness probes", func() {
+		Context("Lag-control in startup & readiness probes", Serial, func() {
 			var (
 				namespace         string
 				namespacePrefix   string

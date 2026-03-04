@@ -2,6 +2,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/cloudnative-pg/cloudnative-pg.svg)][latest-release]
 [![GitHub License](https://img.shields.io/github/license/cloudnative-pg/cloudnative-pg)][license]
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9933/badge)][openssf]
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/9933/baseline)][openssf]
 [![OpenSSF Scorecard Badge][openssf-scorecard-badge]][openssf-socrecard-view]
 [![Documentation][documentation-badge]][documentation]
 [![Stack Overflow](https://img.shields.io/badge/stackoverflow-cloudnative--pg-blue?logo=stackoverflow&logoColor=%23F48024&link=https%3A%2F%2Fstackoverflow.com%2Fquestions%2Ftagged%2Fcloudnative-pg)][stackoverflow]

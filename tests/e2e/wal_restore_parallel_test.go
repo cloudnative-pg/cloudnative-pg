@@ -54,8 +54,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if !IsLocal() {
-			Skip("This test is only run on local cluster")
+		if !(IsKind() || IsK3D()) {
+			Skip("This test only runs on kind or k3d clusters")
 		}
 	})
 

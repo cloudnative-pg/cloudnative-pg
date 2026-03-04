@@ -2850,6 +2850,16 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		}
 		sanitizedVolumeNames.Put(sanitizedName)
 
+		if r.Spec.ImageCatalogRef == nil && v.ImageVolumeSource.Reference == "" {
+			result = append(result,
+				field.Invalid(
+					basePath.Child("image", "reference"),
+					v.ImageVolumeSource.Reference,
+					fmt.Sprintf("Image reference for extension `%s` must be set when no image catalog is configured", v.Name),
+				),
+			)
+		}
+
 		controlPaths := stringset.New()
 		for j, path := range v.ExtensionControlPath {
 			if validateErr := ensureNotEmptyOrDuplicate(
@@ -2874,6 +2884,19 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 			}
 
 			libraryPaths.Put(path)
+		}
+
+		ldLibraryPaths := stringset.New()
+		for j, path := range v.LdLibraryPath {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				basePath.Child("ld_library_path").Index(j),
+				ldLibraryPaths,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+
+			ldLibraryPaths.Put(path)
 		}
 	}
 
