@@ -195,6 +195,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `backup-restore`                  |
 | `snapshot`                        |
 | `operator`                        |
+| `reduced-rbac-operator`           |
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
@@ -309,7 +310,7 @@ Only users who have `write` permission to the repository can use this command.
 
 **For external contributors:** You can run local e2e tests using:
 - `FEATURE_TYPE=smoke,basic make e2e-test-kind` for smoke and basic tests
-- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only  
+- `TEST_DEPTH=0 make e2e-test-kind` for critical tests only
 - `TEST_DEPTH=1 make e2e-test-kind` for critical and high priority tests
 
 > NOTE:
