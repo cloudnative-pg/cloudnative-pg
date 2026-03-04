@@ -143,22 +143,20 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
       helm)
         CONTROLLER_IMG="${CONTROLLER_IMG}" \
         POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}"
-        make -C "${ROOT_DIR}" deploy-from-helm
-        kubectl wait --for=condition=Available --timeout=2m \
-          -n cnpg-system deployments \
-          cnpg-cloudnative-pg
+        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+        "${ROOT_DIR}/hack/setup-cluster.sh" deploy
         ;;
       sources|*)
-          CONTROLLER_IMG="${CONTROLLER_IMG}" \
-          POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-          PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-          make -C "${ROOT_DIR}" deploy
-          kubectl wait --for=condition=Available --timeout=2m \
-            -n cnpg-system deployments \
-            cnpg-controller-manager
+        CONTROLLER_IMG="${CONTROLLER_IMG}" \
+        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+        make -C "${ROOT_DIR}" deploy
         ;;
     esac
+#  CONTROLLER_IMG="${CONTROLLER_IMG}" \
+#  POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+#  PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+#  make -C "${ROOT_DIR}" deploy
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,
