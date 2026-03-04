@@ -17,8 +17,8 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package exec provides functions to execute commands inside pods or from local
-package exec
+// Package podexec provides functions to execute commands inside pods
+package podexec
 
 import (
 	"context"

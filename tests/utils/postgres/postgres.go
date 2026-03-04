@@ -34,8 +34,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 )
 
 const (
@@ -63,9 +63,9 @@ func CountReplicas(
 	retryTimeout int,
 ) (int, error) {
 	query := "SELECT count(*) FROM pg_catalog.pg_stat_replication"
-	stdOut, _, err := exec.EventuallyExecQueryInInstancePod(
+	stdOut, _, err := podexec.EventuallyExecQueryInInstancePod(
 		ctx, crudClient, kubeInterface, restConfig,
-		exec.PodLocator{
+		podexec.PodLocator{
 			Namespace: pod.Namespace,
 			PodName:   pod.Name,
 		}, AppDBName,

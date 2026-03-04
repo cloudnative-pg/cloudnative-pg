@@ -31,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -93,9 +93,9 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 		By("corrupting primary pod by removing PGDATA", func() {
 			cmd := fmt.Sprintf("find %v/base/* -type f -delete", specs.PgDataPath)
-			_, _, err = exec.CommandInInstancePod(
+			_, _, err = podexec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   oldPrimaryPodName,
 				}, nil,

@@ -32,7 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -67,9 +67,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("filling the WAL volume", func() {
 			timeout := time.Minute * 5
 
-			_, _, err := exec.CommandInInstancePod(
+			_, _, err := podexec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -82,9 +82,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
 			query := "CREATE TABLE diskspace AS SELECT generate_series(1, 1000000);"
-			_, _, err := exec.QueryInInstancePod(
+			_, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -93,9 +93,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			Expect(err).To(HaveOccurred())
 
 			query = "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
-			_, _, err = exec.QueryInInstancePod(
+			_, _, err = podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -178,9 +178,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("writing some WAL", func() {
 			query := "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
 			checkpointGracePeriod := time.Duration(testTimeouts[timeouts.ClusterIsReadyQuick]) * time.Second
-			_, _, err := exec.QueryInInstancePodWithTimeout(
+			_, _, err := podexec.QueryInInstancePodWithTimeout(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},

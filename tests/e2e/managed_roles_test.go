@@ -34,7 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
@@ -99,9 +99,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						FROM pg_catalog.pg_auth_members GROUP BY member
 					) mem ON member = oid
 					WHERE rolname =` + pq.QuoteLiteral(roleName)
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -120,9 +120,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func(g Gomega) {
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},
@@ -165,9 +165,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					userWithPerpetualPass)
 
 				for _, q := range []string{query, query2} {
-					stdout, _, err := exec.QueryInInstancePod(
+					stdout, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: primaryPod.Namespace,
 							PodName:   primaryPod.Name,
 						},
@@ -493,9 +493,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
 					username, pq.QuoteLiteral(newPassword))
 
-				_, _, err = exec.QueryInInstancePod(
+				_, _, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},

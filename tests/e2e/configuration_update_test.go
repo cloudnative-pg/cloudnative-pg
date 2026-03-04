@@ -41,7 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -291,7 +291,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			// Connection should fail now because we are not supplying a password
 			By("verify that connections with an empty password fail by default", func() {
 				commandTimeout := time.Second * 10
-				_, _, err := exec.Command(env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
+				_, _, err := podexec.Command(env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
 					specs.PostgresContainerName, &commandTimeout,
 					"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1",
 				)
@@ -558,9 +558,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 				// take pg postmaster start time
 				query := "select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
-				stdout, _, cmdErr := exec.EventuallyExecQueryInInstancePod(
+				stdout, _, cmdErr := podexec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: pod.Namespace,
 						PodName:   pod.Name,
 					}, postgres.PostgresDBName,

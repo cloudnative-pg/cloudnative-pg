@@ -40,7 +40,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
@@ -202,9 +202,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				Eventually(func() (int, error) {
-					stdout, stderr, err := exec.QueryInInstancePod(
+					stdout, stderr, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
@@ -222,9 +222,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					"Pod %v should have updated its config", pod.Name)
 
 				Eventually(func() (int, error, error) {
-					stdout, _, err := exec.QueryInInstancePod(
+					stdout, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
@@ -260,12 +260,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 
 			query := "CREATE TABLE IF NOT EXISTS postswitch(i int);"
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primary.Namespace,
 					PodName:   primary.Name,
-				}, exec.DatabaseName(databaseName),
+				}, podexec.DatabaseName(databaseName),
 				query,
 				RetryTimeout,
 				PollingTime,
@@ -278,13 +278,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			for _, pod := range podList.Items {
 				Eventually(func() (string, error) {
-					out, _, err := exec.QueryInInstancePod(
+					out, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
-						exec.DatabaseName(databaseName),
+						podexec.DatabaseName(databaseName),
 						"SELECT count(*) = 0 FROM postswitch")
 					return strings.TrimSpace(out), err
 				}, 240).Should(BeEquivalentTo("t"),
@@ -554,12 +554,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 
 			query := "CREATE TABLE IF NOT EXISTS to_restore AS VALUES (1),(2);"
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primary.Namespace,
 					PodName:   primary.Name,
-				}, exec.DatabaseName(databaseName),
+				}, podexec.DatabaseName(databaseName),
 				query,
 				RetryTimeout,
 				PollingTime,
@@ -587,9 +587,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// A file called data.tar.gz should be available on minio
 			Eventually(func() (int, error, error) {
-				out, _, err := exec.CommandInContainer(
+				out, _, err := podexec.CommandInContainer(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.ContainerLocator{
+					podexec.ContainerLocator{
 						Namespace:     minioEnv.Namespace,
 						PodName:       minioEnv.Client.Name,
 						ContainerName: "mc",
@@ -692,13 +692,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
-				exec.DatabaseName(databaseName),
+				podexec.DatabaseName(databaseName),
 				"SELECT count(*) FROM to_restore")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
@@ -706,13 +706,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// we expect a promotion. We can't enforce "2" because the timeline
 			// ID will also depend on the history files existing in the cloud
 			// storage and we don't know the status of that.
-			out, _, err = exec.QueryInInstancePod(
+			out, _, err = podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
-				exec.DatabaseName(databaseName),
+				podexec.DatabaseName(databaseName),
 				"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strconv.Atoi(strings.Trim(out, "\n"))).To(
@@ -720,13 +720,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// Restored standbys should soon attach themselves to restored primary
 			Eventually(func() (string, error) {
-				out, _, err = exec.QueryInInstancePod(
+				out, _, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: upgradeNamespace,
 						PodName:   primary,
 					},
-					exec.DatabaseName(databaseName),
+					podexec.DatabaseName(databaseName),
 					"SELECT count(*) FROM pg_catalog.pg_stat_replication")
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
