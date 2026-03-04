@@ -440,8 +440,8 @@ func (c QueryRunner) computeMetrics(conn *sql.DB) ([]prometheus.Metric, error) {
 		return nil, err
 	}
 
-	columnData := make([]interface{}, len(columns))
-	scanArgs := make([]interface{}, len(columns))
+	columnData := make([]any, len(columns))
+	scanArgs := make([]any, len(columns))
 	for i := range columnData {
 		scanArgs[i] = &columnData[i]
 	}
@@ -475,7 +475,7 @@ func (c QueryRunner) computeMetrics(conn *sql.DB) ([]prometheus.Metric, error) {
 
 // Collect the list of labels from the database, and returns true if the
 // label extraction succeeded, false otherwise
-func (c QueryRunner) listLabels(columns []string, columnData []interface{}) ([]string, bool) {
+func (c QueryRunner) listLabels(columns []string, columnData []any) ([]string, bool) {
 	var labels []string
 	for idx, columnName := range columns {
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
@@ -496,7 +496,7 @@ func (c QueryRunner) listLabels(columns []string, columnData []interface{}) ([]s
 // createMetricsFromColumns generates Prometheus metrics from the result columns
 func (c QueryRunner) createMetricsFromColumns(
 	columns []string,
-	columnData []interface{},
+	columnData []any,
 	labels []string,
 ) []prometheus.Metric {
 	var computedMetrics []prometheus.Metric
@@ -588,7 +588,7 @@ func (c QueryRunner) describe(ch chan<- *prometheus.Desc) {
 
 // createConstMetric reports to the prometheus library a constant metric
 func (c QueryRunner) createConstMetric(
-	mapping MetricMap, value interface{}, variableLabels []string,
+	mapping MetricMap, value any, variableLabels []string,
 ) prometheus.Metric {
 	if mapping.Conversion == nil {
 		log.Warning("Missing conversion while parsing value",
