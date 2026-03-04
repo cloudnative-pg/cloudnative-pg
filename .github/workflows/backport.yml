@@ -77,6 +77,7 @@ jobs:
         branch: [release-1.25, release-1.27, release-1.28]
     env:
       PR: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ matrix.branch }}
     outputs:
       commit: ${{ steps.check_commits.outputs.commit }}
     steps:
@@ -86,7 +87,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Install Go
@@ -100,7 +101,6 @@ jobs:
         id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ matrix.branch }}
         run: |
           commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
           if [ -z "${commit}" ]
@@ -123,9 +123,8 @@ jobs:
         name: cherry pick
         env:
           COMMIT: ${{ steps.check_commits.outputs.commit }}
-          BRANCH: ${{ matrix.branch }}
         if: |
-          contains( github.event.pull_request.labels.*.name, matrix.branch ) && env.COMMIT != ''
+          contains( github.event.pull_request.labels.*.name, env.BRANCH ) && env.COMMIT != ''
         run: |
           git config user.email "${AUTHOR_EMAIL}"
           git config user.name "${AUTHOR_NAME}"
