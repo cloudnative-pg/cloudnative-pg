@@ -50,14 +50,14 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 
 		// The walreceiver of a standby that wasn't promoted may try to reconnect
 		// before the rw service endpoints are updated. In this case, the walreceiver
-		// can be stuck for waiting for the connection to be established for a time that
+		// can be stuck waiting for the connection to be established for a time that
 		// depends on the tcp_syn_retries sysctl. Since by default
 		// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
 		// restarting the walreceiver.
-		if !(IsKind() || IsK3D()) {
-			maxReattachTime = 180
-			maxFailoverTime = 30
-		}
+		// This applies to all environments including Kind/K3D, since the topology
+		// spread constraint distributes pods across different nodes.
+		maxReattachTime = 180
+		maxFailoverTime = 30
 	})
 
 	Context("with async replicas cluster (without HA Replication Slots)", func() {
