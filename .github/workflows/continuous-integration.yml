@@ -55,17 +55,19 @@ jobs:
     permissions:
       actions: write
     name: smoke test release-* branches when it's a scheduled run
-    if: github.event_name == 'schedule'
+    #if: github.event_name == 'schedule'
     strategy:
       fail-fast: false
       matrix:
         branch: [release-1.25, release-1.27, release-1.28]
+    env:
+      BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           workflow: continuous-integration
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
 
   # Detects if we should skip the workflow due to being duplicated. Exceptions:
   #   1. it's on 'main' branch
