@@ -141,6 +141,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   ensure_image_pull_secret
   case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
       helm)
+        kubectl get crd -o name | grep postgresql.cnpg.io | xargs kubectl delete || :
         CONTROLLER_IMG="${CONTROLLER_IMG}" \
         POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
         PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
