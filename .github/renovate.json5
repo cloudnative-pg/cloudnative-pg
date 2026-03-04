@@ -271,6 +271,9 @@
     },
     {
       groupName: 'SLSA actions no-digest',
+      matchDatasources: [
+        'github-tags',
+      ],
       matchPackageNames: [
         'slsa-framework{/,}**',
       ],
