@@ -92,7 +92,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		rollingUpgradeNamespace = "rolling-upgrade"
 		onlineUpgradeNamespace  = "online-upgrade"
 
-		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
+		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml"
 
 		// This is a cluster of the previous version, created before the operator upgrade
 		clusterName1 = "cluster1"

@@ -60,6 +60,7 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))? currentValue=(?<currentValue>[^\\s]+?)\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentDigest>.+?)["\']?\\s',
       ],
     },
     {
@@ -265,6 +266,17 @@
         'kindest{/,}**',
         'getwoke{/,}**',
         'jonasbn/github-action-spellcheck'
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      groupName: 'SLSA actions no-digest',
+      matchDatasources: [
+        'github-tags',
+      ],
+      matchPackageNames: [
+        'slsa-framework{/,}**',
       ],
       pinDigests: false,
       separateMajorMinor: false,

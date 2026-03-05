@@ -63,8 +63,6 @@ func (r *PoolerReconciler) updateOwnedObjects(
 }
 
 // updateDeployment update the deployment or create it when needed
-//
-//nolint:dupl
 func (r *PoolerReconciler) updateDeployment(
 	ctx context.Context,
 	pooler *apiv1.Pooler,

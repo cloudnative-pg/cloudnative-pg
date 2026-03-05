@@ -22,7 +22,7 @@ package utils
 import (
 	"database/sql"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -56,7 +56,7 @@ func parseVersionNum(versionNum string) (*semver.Version, error) {
 // GetMajorVersionFromPgData read the PG_VERSION file in the data directory
 // returning the major version of the database
 func GetMajorVersionFromPgData(pgData string) (int, error) {
-	content, err := os.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
+	content, err := os.ReadFile(filepath.Clean(filepath.Join(pgData, "PG_VERSION")))
 	if err != nil {
 		return 0, err
 	}

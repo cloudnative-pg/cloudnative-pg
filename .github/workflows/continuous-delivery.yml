@@ -38,7 +38,7 @@ permissions: read-all
 # set up environment variables to be used across all the jobs
 env:
   # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
+  GOLANG_VERSION: "1.26.0"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.31.0"
@@ -877,7 +877,7 @@ jobs:
           install /tmp/k3d /usr/local/bin/k3d
           k3d version
       - name: Install kubectl
-        uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4.0.0
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
         with:
           version: ${{ env.K8S_VERSION }}
       - name: Prepare patch for customization
