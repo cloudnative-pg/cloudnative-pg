@@ -380,8 +380,9 @@ The operator manages most of the [configuration options for PgBouncer](https://w
 allowing you to modify only a subset of them.
 
 :::warning
-    You are responsible for correctly setting the value of each option, as the
-    operator doesn't validate them.
+The operator passes these settings directly to PgBouncer without validation.
+To prevent configuration errors or crash loops, ensure each parameter is
+supported by your specific PgBouncer image version.
 :::
 
 These are the PgBouncer options you can customize, with links to the PgBouncer
@@ -396,8 +397,7 @@ are the ones directly set by PgBouncer.
 - [`client_login_timeout`](https://www.pgbouncer.org/config.html#client_login_timeout)
 - [`client_tls_ciphers`](https://www.pgbouncer.org/config.html#client_tls_ciphers)
 - [`client_tls_sslmode`](https://www.pgbouncer.org/config.html#client_tls_sslmode)
-- [`client_tls13_ciphers`](https://www.pgbouncer.org/config.html#client_tls13_ciphers):
-  requires >= PgBouncer 1.25.0
+- [`client_tls13_ciphers`](https://www.pgbouncer.org/config.html#client_tls13_ciphers) (1.25+)
 - [`default_pool_size`](https://www.pgbouncer.org/config.html#default_pool_size)
 - [`disable_pqexec`](https://www.pgbouncer.org/config.html#disable_pqexec)
 - [`dns_max_ttl`](https://www.pgbouncer.org/config.html#dns_max_ttl)
@@ -435,8 +435,7 @@ are the ones directly set by PgBouncer.
 - [`server_reset_query_always`](https://www.pgbouncer.org/config.html#server_reset_query_always)
 - [`server_round_robin`](https://www.pgbouncer.org/config.html#server_round_robin)
 - [`server_tls_ciphers`](https://www.pgbouncer.org/config.html#server_tls_ciphers)
-- [`server_tls13_ciphers`](https://www.pgbouncer.org/config.html#server_tls13_ciphers):
-  requires >= PgBouncer 1.25.0
+- [`server_tls13_ciphers`](https://www.pgbouncer.org/config.html#server_tls13_ciphers) (1.25+)
 - [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
 - [`server_tls_sslmode`](https://www.pgbouncer.org/config.html#server_tls_sslmode)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
