@@ -83,7 +83,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
@@ -97,7 +97,7 @@ jobs:
           check-latest: true
       -
         name: Check commits
-        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

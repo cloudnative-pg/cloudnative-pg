@@ -1085,7 +1085,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.aksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
-      GIT_REF:  ${{ needs.evaluate_options.outputs.git_ref }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
@@ -1151,8 +1151,6 @@ jobs:
       -
         name: Create AKS cluster
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        env:
-          MATRIX_ID: ${{ env.MATRIX }}
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -1161,7 +1159,7 @@ jobs:
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             # name of the AKS cluster
-            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_ID}" | tr -d '_.-' )"
+            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )"
             echo "AZURE_AKS=${AZURE_AKS}" >> $GITHUB_ENV
 
             # gather the storage account Key
@@ -1170,7 +1168,7 @@ jobs:
             echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
 
             # name of the cluster's blob container in the storage account
-            AZURE_BLOB_CONTAINER="$( echo "${MATRIX_ID}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
+            AZURE_BLOB_CONTAINER="$( echo "${MATRIX}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
             echo "AZURE_BLOB_CONTAINER=${AZURE_BLOB_CONTAINER}" >> $GITHUB_ENV
 
             # create and login to the AKS cluster
@@ -1304,7 +1302,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: test-failure-contexts-${{ env.MATRIX}}
+          name: test-failure-contexts-${{ env.MATRIX }}
           path: |
             tests/*/out/
           retention-days: 7
@@ -1688,7 +1686,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cluster-logs-${{ env.MATRIX}}
+          name: cluster-logs-${{ env.MATRIX }}
           path: |
             tests/e2e/cluster_logs/**
           retention-days: 7
@@ -1886,10 +1884,7 @@ jobs:
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
           SHORT_ID=$( echo "${MATRIX}" | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          delim=$(uuidgen)
-          echo "CLUSTER_NAME<<${delim}" >> $GITHUB_ENV
-          echo "${E2E_SUFFIX}-${GITHUB_RUN_NUMBER}-${SHORT_ID}" >> $GITHUB_ENV
-          echo "${delim}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${E2E_SUFFIX}-${GITHUB_RUN_NUMBER}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'

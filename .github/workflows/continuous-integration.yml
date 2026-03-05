@@ -899,10 +899,10 @@ jobs:
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr bundle.Dockerfile *.zip bundle/
 
       - name: Test bundle
         run: |
-          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${{ env.OPP_SCRIPT_VERSION }}/ci/scripts/opp.sh") ${{ env.TEST }} operators/cloudnative-pg/${{ env.VERSION }}/
+          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh") "${TEST}" "operators/cloudnative-pg/${VERSION}/"
