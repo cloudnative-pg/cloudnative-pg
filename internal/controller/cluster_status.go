@@ -62,7 +62,7 @@ type managedResources struct {
 func (resources *managedResources) runningJobNames() []string {
 	result := make([]string, 0, len(resources.jobs.Items))
 	for _, job := range resources.jobs.Items {
-		if !utils.JobHasOneCompletion(job) {
+		if !utils.JobHasOneCompletion(job) && !utils.IsJobFailed(job) {
 			result = append(result, job.Name)
 		}
 	}

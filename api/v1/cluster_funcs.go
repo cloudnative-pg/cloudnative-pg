@@ -1310,6 +1310,12 @@ func (cluster *Cluster) IsInplaceRestartPhase() bool {
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
 }
 
+// IsScalingPhase returns true if the cluster is in a phase related to instance creation
+func (cluster *Cluster) IsScalingPhase() bool {
+	return cluster.Status.Phase == PhaseFirstPrimary ||
+		cluster.Status.Phase == PhaseCreatingReplica
+}
+
 // GetTablespaceConfiguration returns the tablespaceConfiguration for the given name
 // otherwise return nil
 func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
