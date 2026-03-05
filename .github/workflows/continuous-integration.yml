@@ -60,12 +60,14 @@ jobs:
       fail-fast: false
       matrix:
         branch: [release-1.25, release-1.27, release-1.28]
+    env:
+      BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           workflow: continuous-integration
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
 
   # Detects if we should skip the workflow due to being duplicated. Exceptions:
   #   1. it's on 'main' branch
@@ -282,6 +284,8 @@ jobs:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
+    env:
+      ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -293,18 +297,16 @@ jobs:
           check-latest: true
 
       - name: Run unit tests
-        env:
-          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
           make test
 
       - name: Coverage Summary
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           go tool cover -func=cover.out -o coverage.out
 
       - name: Publish unit test summary on the latest k8s version
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
 
@@ -441,8 +443,11 @@ jobs:
         id: build-meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
+          commit_sha="${COMMIT_REF}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
@@ -453,9 +458,9 @@ jobs:
 
           # extract branch name
           branch_name=${GITHUB_REF#refs/heads/}
-          if [[ ${{ github.event_name }} == 'pull_request' ]]
+          if [[ "${EVENT_NAME}" == 'pull_request' ]]
           then
-            branch_name=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
+            branch_name=$(gh pr view "${PR_NUMBER}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           # extract tag from branch name
@@ -480,7 +485,7 @@ jobs:
           BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "${{ env.HEAD_REPO }}" != "${{ env.BASE_REPO }}" ]]
+          if [[ "${HEAD_REPO}" != "${BASE_REPO}" ]]
           then
             echo "PUSH=false" >> $GITHUB_ENV
           fi
@@ -639,8 +644,10 @@ jobs:
         if: |
           env.SIGN_IMAGES == 'true' &&
           env.PUSH == 'true'
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
@@ -870,6 +877,7 @@ jobs:
       OPP_PRODUCTION_TYPE: "k8s"
       OPP_CONTAINER_OPT: "-t"
       OPP_RELEASE_INDEX_NAME: "catalog_tmp"
+      TEST: ${{ matrix.test }}
     steps:
       - name: Checkout community-operators
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -891,10 +899,10 @@ jobs:
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr bundle.Dockerfile *.zip bundle/
 
       - name: Test bundle
         run: |
-          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${{ env.OPP_SCRIPT_VERSION }}/ci/scripts/opp.sh") ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
+          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh") "${TEST}" "operators/cloudnative-pg/${VERSION}/"
