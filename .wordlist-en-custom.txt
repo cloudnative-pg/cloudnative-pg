@@ -160,6 +160,7 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExcludedSnapshots
 ExtensionConfiguration
 ExtensionSpec
 ExtensionStatus

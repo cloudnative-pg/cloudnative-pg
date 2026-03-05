@@ -1573,3 +1573,9 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
+
+// HasExcludedSnapshot returns true if the given VolumeSnapshot name is
+// in the excluded snapshots list
+func (cluster *Cluster) HasExcludedSnapshot(snapshotName string) bool {
+	return slices.Contains(cluster.Status.ExcludedSnapshots, snapshotName)
+}

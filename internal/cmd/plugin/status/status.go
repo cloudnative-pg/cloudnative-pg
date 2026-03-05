@@ -144,6 +144,7 @@ func Status(
 		status.printCertificatesStatus()
 	}
 	if !hibernated {
+		status.printExcludedSnapshotsStatus()
 		status.printBackupStatus()
 		status.printBasebackupStatus(verbosity)
 		status.printReplicaStatus(verbosity)
@@ -519,6 +520,22 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
 	fmt.Println()
 
 	return errs
+}
+
+func (fullStatus *PostgresqlStatus) printExcludedSnapshotsStatus() {
+	snapshots := fullStatus.Cluster.Status.ExcludedSnapshots
+	if len(snapshots) == 0 {
+		return
+	}
+
+	fmt.Println(aurora.Yellow("Excluded Snapshots"))
+	status := tabby.New()
+	status.AddHeader("Snapshot Name")
+	for _, snap := range snapshots {
+		status.AddLine(snap)
+	}
+	status.Print()
+	fmt.Println()
 }
 
 func (fullStatus *PostgresqlStatus) printBackupStatus() {

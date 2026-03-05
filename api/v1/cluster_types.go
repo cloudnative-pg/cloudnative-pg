@@ -1030,6 +1030,13 @@ type ClusterStatus struct {
 	// SystemID is the latest detected PostgreSQL SystemID
 	// +optional
 	SystemID string `json:"systemID,omitempty"`
+
+	// ExcludedSnapshots is a list of VolumeSnapshot names that the operator
+	// will skip when selecting a snapshot for new replicas, falling back to
+	// pg_basebackup when none remain. Snapshots are added here automatically
+	// when a recovery job fails, or manually via the cnpg plugin.
+	// +optional
+	ExcludedSnapshots []string `json:"excludedSnapshots,omitempty"`
 }
 
 // ImageInfo contains the information about a PostgreSQL image

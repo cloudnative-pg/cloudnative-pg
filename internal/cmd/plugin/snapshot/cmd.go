@@ -20,8 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package snapshot
 
 import (
-	"errors"
-	"fmt"
+	"context"
 
 	"github.com/spf13/cobra"
 
@@ -31,19 +30,41 @@ import (
 // NewCmd implements the `snapshot` subcommand
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "snapshot CLUSTER",
-		Short:   "DEPRECATED (use `backup -m volumeSnapshot` instead)",
-		Long:    "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
-		GroupID: plugin.GroupIDDatabase,
+		Use:     "snapshot",
+		Short:   "Manage VolumeSnapshot exclusions for a cluster",
+		GroupID: plugin.GroupIDCluster,
+	}
+
+	cmd.AddCommand(newEnableCmd())
+	cmd.AddCommand(newDisableCmd())
+
+	return cmd
+}
+
+func newEnableCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "enable CLUSTER SNAPSHOT",
+		Short: "Re-enable a previously excluded VolumeSnapshot for replica creation",
+		Args:  plugin.RequiresArguments(2),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
-		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Println("This command was replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`")
-			fmt.Println("IMPORTANT: if you are using VolumeSnapshots on 1.20, you should upgrade to the latest minor release")
-			return errors.New("command removed")
+		RunE: func(_ *cobra.Command, args []string) error {
+			return Enable(context.Background(), plugin.Client, plugin.Namespace, args[0], args[1])
 		},
 	}
+}
 
-	return cmd
+func newDisableCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "disable CLUSTER SNAPSHOT",
+		Short: "Exclude a VolumeSnapshot from being used for replica creation",
+		Args:  plugin.RequiresArguments(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+		RunE: func(_ *cobra.Command, args []string) error {
+			return Disable(context.Background(), plugin.Client, plugin.Namespace, args[0], args[1])
+		},
+	}
 }
