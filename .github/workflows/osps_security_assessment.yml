@@ -22,7 +22,7 @@ jobs:
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
-          token: ${{ secrets.REPO_GHA_PAT }}
+          token: ${{ secrets.PVTR_OSPS_TOKEN }}
           catalog: "osps-baseline"
           upload-sarif: "true"
 
