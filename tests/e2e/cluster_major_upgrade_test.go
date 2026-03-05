@@ -55,7 +55,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade), func() {
+var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tests.LabelPostgresMajorUpgrade), func() {
 	const (
 		level                  = tests.Medium
 		namespacePrefix        = "cluster-major-upgrade"
@@ -452,6 +452,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		}
 
 		cluster := scenario.startingCluster
+		clusterutils.AddTopologySpreadConstraint(cluster)
 		err := env.Client.Create(env.Ctx, cluster)
 		Expect(err).NotTo(HaveOccurred())
 		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady],

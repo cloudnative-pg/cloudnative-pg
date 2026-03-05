@@ -52,8 +52,8 @@ import (
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	. "github.com/onsi/ginkgo/v2" // nolint
-	. "github.com/onsi/gomega"    // nolint
+	. "github.com/onsi/ginkgo/v2" //nolint
+	. "github.com/onsi/gomega"    //nolint
 )
 
 const (

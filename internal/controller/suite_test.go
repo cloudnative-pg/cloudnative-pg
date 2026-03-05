@@ -213,7 +213,7 @@ func newFakeCNPGCluster(
 			},
 		},
 	}
-	// nolint: lll
+	//nolint: lll
 	// https://github.com/kubernetes-sigs/controller-runtime/blob/c3c1f058a9a080581e8fe99c004fcc792b2aff07/pkg/client/fake/doc.go#L30
 	for _, mutator := range mutators {
 		mutator(cluster)
@@ -374,7 +374,7 @@ func generateFakeInitDBJobsWithDefaultClient(k8sClient client.Client, cluster *a
 func generateClusterPVC(
 	c client.Client,
 	cluster *apiv1.Cluster,
-	status persistentvolumeclaim.PVCStatus, // nolint:unparam
+	status persistentvolumeclaim.PVCStatus, //nolint:unparam
 ) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
@@ -478,7 +478,7 @@ type (
 func (f fakeClientWithIndexAdapter) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	var optsWithoutMatchingFields []client.ListOption
 	// matchingFields rely on indexes that we don't have on the default kube client
-	var matchingFields []client.ListOption // nolint:prealloc
+	var matchingFields []client.ListOption
 	for _, opt := range opts {
 		_, ok := opt.(client.MatchingFields)
 		if !ok {

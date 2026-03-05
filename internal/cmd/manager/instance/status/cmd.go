@@ -135,5 +135,5 @@ func executeRequest(ctx context.Context, scheme string) (*http.Response, error) 
 		return nil, err
 	}
 	httpClient := common.NewHTTPClient(connectionTimeout, requestTimeout)
-	return httpClient.Do(req) // nolint:gosec
+	return httpClient.Do(req) //nolint:gosec
 }

@@ -62,7 +62,6 @@ var _ = Describe("Deployment", func() {
 				DeploymentStrategy: &appsv1.DeploymentStrategy{
 					Type: appsv1.RollingUpdateDeploymentStrategyType,
 				},
-				//nolint:staticcheck // Using deprecated type during deprecation period
 				Monitoring: &apiv1.PoolerMonitoringConfiguration{
 					EnablePodMonitor: true,
 				},
