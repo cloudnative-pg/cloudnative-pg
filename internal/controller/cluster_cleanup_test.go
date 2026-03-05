@@ -21,6 +21,7 @@ package controller
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,46 @@ var _ = Describe("cluster_cleanup", func() {
 		err := cli.Get(ctx, client.ObjectKeyFromObject(&jobList.Items[0]), &batchv1.Job{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
+		err = cli.Get(ctx, client.ObjectKeyFromObject(&jobList.Items[1]), &batchv1.Job{})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should NOT delete failed jobs (left for troubleshooting)", func(ctx SpecContext) {
+		jobList := &batchv1.JobList{Items: []batchv1.Job{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "failed-job", Namespace: "test"},
+				Spec: batchv1.JobSpec{
+					Completions: ptr.To(int32(1)),
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 0,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "running-job", Namespace: "test"},
+				Spec: batchv1.JobSpec{
+					Completions: ptr.To(int32(1)),
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 0,
+				},
+			},
+		}}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(jobList).Build()
+		r.Client = cli
+		r.cleanupCompletedJobs(ctx, *jobList)
+
+		By("verifying failed job is NOT deleted (kept for troubleshooting)")
+		err := cli.Get(ctx, client.ObjectKeyFromObject(&jobList.Items[0]), &batchv1.Job{})
+		Expect(err).ToNot(HaveOccurred())
+
+		By("verifying running job is not deleted")
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&jobList.Items[1]), &batchv1.Job{})
 		Expect(err).ToNot(HaveOccurred())
 	})
