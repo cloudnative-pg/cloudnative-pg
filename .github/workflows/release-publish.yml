@@ -74,11 +74,14 @@ jobs:
           echo "FILE=${file}" >> $GITHUB_ENV
       -
         name: Generate release notes
+        env:
+          TAG: ${{ env.TAG }}
+          FILE: ${{ env.FILE }}
         run: |
           docker run --rm -v $(pwd):/src mist/submark \
-            submark -O --h2 "Version ${{ env.TAG }}" \
+            submark -O --h2 "Version ${TAG}" \
             --out-file /src/release_notes.md \
-            /src/docs/src/${{ env.FILE }}
+            "/src/docs/src/${FILE}"
       -
         name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
@@ -87,9 +90,11 @@ jobs:
         # how to use cosign.
       -
         name: Sign yaml files
+        env:
+          VERSION: ${{ env.VERSION }}
         run: |
-          cosign sign-blob releases/cnpg-${{ env.VERSION }}.yaml \
-          --bundle releases/cnpg-${{ env.VERSION }}.sigstore.json --yes
+          cosign sign-blob "releases/cnpg-${VERSION}.yaml" \
+          --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
@@ -138,14 +143,16 @@ jobs:
       -
         name: Build meta
         id: build-meta
+        env:
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          commit_sha=${{ github.sha }}
+          commit_sha="${COMMIT_SHA}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           tag="${GITHUB_REF#refs/tags/v}"
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}")
-          author_email=$(git show -s --format='%ae' "${commit_sha}")
+          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
@@ -253,8 +260,10 @@ jobs:
         # how to use cosign.
       -
         name: Sign images
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
@@ -415,8 +424,8 @@ jobs:
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
@@ -487,9 +496,12 @@ jobs:
           fetch-depth: 0
       -
         name: Configure git user
+        env:
+          AUTHOR_EMAIL: ${{ needs.release-binaries.outputs.author_email }}
+          AUTHOR_NAME: ${{ needs.release-binaries.outputs.author_name }}
         run: |
-          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
-          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -498,8 +510,8 @@ jobs:
       -
         name: Copy the bundle
         run: |
-          mkdir -p "bundles/${{ env.VERSION }}"
-          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          mkdir -p "bundles/${VERSION}"
+          cp -R bundle/* "bundles/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
       -
         name: Prepare commit message
@@ -510,7 +522,7 @@ jobs:
           # Skip creating the commit if there are no changes
           [ -n "$(git status -s)" ] || exit 0
 
-          git add bundles/${{ env.VERSION }}
+          git add "bundles/${VERSION}"
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
