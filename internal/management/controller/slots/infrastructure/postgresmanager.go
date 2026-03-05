@@ -31,13 +31,29 @@ import (
 
 // List the available replication slots
 func List(ctx context.Context, db *sql.DB, config *apiv1.ReplicationSlotsConfiguration) (ReplicationSlotList, error) {
-	rows, err := db.QueryContext(
-		ctx,
-		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
-            xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin
-            FROM pg_catalog.pg_replication_slots
-            WHERE NOT temporary AND slot_type = 'physical'`,
-	)
+	// Try to select the 'synced' column (PG 17+), fallback if not available
+	query := `SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
+		xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin,
+		CASE WHEN column_name IS NOT NULL THEN synced ELSE NULL END AS synced
+		FROM pg_catalog.pg_replication_slots
+		LEFT JOIN information_schema.columns ON table_name = 'pg_replication_slots' AND column_name = 'synced'
+		WHERE NOT temporary`
+
+	// If this fails (older PG), fallback to query without synced
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		// fallback: no synced column, PG < 17
+		rows, err = db.QueryContext(
+			ctx,
+			`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
+				xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin
+			FROM pg_catalog.pg_replication_slots
+			WHERE NOT temporary`,
+		)
+		if err != nil {
+			return ReplicationSlotList{}, err
+		}
+	}
 	if err != nil {
 		return ReplicationSlotList{}, err
 	}
@@ -46,17 +62,43 @@ func List(ctx context.Context, db *sql.DB, config *apiv1.ReplicationSlotsConfigu
 	}()
 
 	var status ReplicationSlotList
+	columns, _ := rows.Columns()
+	hasSynced := false
+	for _, col := range columns {
+		if col == "synced" {
+			hasSynced = true
+			break
+		}
+	}
 	for rows.Next() {
 		var slot ReplicationSlot
-		err := rows.Scan(
-			&slot.SlotName,
-			&slot.Type,
-			&slot.Active,
-			&slot.RestartLSN,
-			&slot.HoldsXmin,
-		)
-		if err != nil {
-			return ReplicationSlotList{}, err
+		var synced sql.NullBool
+		if hasSynced {
+			err := rows.Scan(
+				&slot.SlotName,
+				&slot.Type,
+				&slot.Active,
+				&slot.RestartLSN,
+				&slot.HoldsXmin,
+				&synced,
+			)
+			if err != nil {
+				return ReplicationSlotList{}, err
+			}
+			if synced.Valid {
+				slot.Synced = &synced.Bool
+			}
+		} else {
+			err := rows.Scan(
+				&slot.SlotName,
+				&slot.Type,
+				&slot.Active,
+				&slot.RestartLSN,
+				&slot.HoldsXmin,
+			)
+			if err != nil {
+				return ReplicationSlotList{}, err
+			}
 		}
 
 		slot.IsHA = strings.HasPrefix(slot.SlotName, config.HighAvailability.GetSlotPrefix())
