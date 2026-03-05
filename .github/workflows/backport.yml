@@ -110,19 +110,14 @@ jobs:
           fi
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
-          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
+          author_name=$(git show -s --format='%an' "${commit}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit}" | head -n1)
 
           echo "commit=${commit}" >> $GITHUB_OUTPUT
           echo "cherry-pick commit ${commit} to branch ${BRANCH}"
 
-          echo "AUTHOR_NAME<<${delim}" >> $GITHUB_ENV
-          ${author_name}" >> $GITHUB_ENV
-          echo "${delim}" >> $GITHUB_ENV
-
-          echo "AUTHOR_EMAIL<<${delim}" >> $GITHUB_ENV
-          ${author_email}" >> $GITHUB_ENV
-          echo "${delim}" >> $GITHUB_ENV
+          echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
+          echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
       -
         name: cherry pick
         env:
