@@ -1573,3 +1573,19 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 	return cluster.Spec.PostgresConfiguration.Synchronous.FailoverQuorum
 }
+
+// GetPodSelectorIPs builds a map from podSelectorRef names to their resolved
+// pod IPs, using status data populated by the operator. Returns nil when
+// no podSelectorRefs are defined in the spec.
+func (cluster *Cluster) GetPodSelectorIPs() map[string][]string {
+	if len(cluster.Spec.PodSelectorRefs) == 0 {
+		return nil
+	}
+
+	result := make(map[string][]string, len(cluster.Status.PodSelectorRefs))
+	for i := range cluster.Status.PodSelectorRefs {
+		ref := &cluster.Status.PodSelectorRefs[i]
+		result[ref.Name] = ref.IPs
+	}
+	return result
+}

@@ -436,6 +436,77 @@ In the above example we are enabling access for the `app` user to the `app`
 database using MD5 password authentication (you can use `scram-sha-256`
 if you prefer) via a secure channel (`hostssl`).
 
+### Dynamic address resolution with `podSelectorRefs`
+
+In dynamic Kubernetes environments, pod IPs change constantly, making it
+impractical to manually specify them in `pg_hba` rules. The `podSelectorRefs` field
+lets you define named pod label selectors that can be referenced in `pg_hba`
+rules using the `${podselector:<name>}` syntax in the address field.
+
+The operator resolves matching pod IPs and stores them in the cluster status.
+The instance manager then expands each `pg_hba` line containing a pod selector
+reference into one line per matched pod IP, using `/32` masks for IPv4 and
+`/128` masks for IPv6 addresses.
+
+For example, suppose you have application pods with the label `app: myapp` and
+monitoring pods with the label `role: monitoring`. You can define selectors and
+reference them in `pg_hba` rules as follows:
+
+```yaml
+podSelectorRefs:
+  - name: app-pods
+    selector:
+      matchLabels:
+        app: myapp
+  - name: monitoring
+    selector:
+      matchLabels:
+        role: monitoring
+postgresql:
+  pg_hba:
+    - "hostssl mydb myuser ${podselector:app-pods} scram-sha-256"
+    - "hostssl postgres monitor ${podselector:monitoring} scram-sha-256"
+```
+
+If the `app-pods` selector matches two pods with IPs `10.0.0.5` and `10.0.0.12`,
+and the `monitoring` selector matches one pod with IP `10.0.1.3`, the resulting
+`pg_hba.conf` entries will be:
+
+```text
+hostssl mydb myuser 10.0.0.5/32 scram-sha-256
+hostssl mydb myuser 10.0.0.12/32 scram-sha-256
+hostssl postgres monitor 10.0.1.3/32 scram-sha-256
+```
+
+The `${podselector:<name>}` syntax is only recognized in the address field of
+host-type entries (`host`, `hostssl`, `hostnossl`, `hostgssenc`, `hostnogssenc`).
+It has no special meaning in the `database` or `user` fields. PostgreSQL would
+reject an unresolved `${podselector:<name>}` token as an invalid address,
+providing a fail-safe if the operator fails to expand it.
+
+:::info
+Pod selectors are restricted to the cluster's own namespace. Cross-namespace
+selection is not supported for security reasons.
+:::
+
+:::warning
+When a selector matches zero pods, the corresponding `pg_hba` lines referencing
+it are omitted from `pg_hba.conf`. Ensure that your default rules provide
+appropriate fallback access.
+:::
+
+The operator watches for pod changes (creation, deletion, IP changes) and
+automatically updates the resolved IPs in the cluster status. The instance
+manager picks up these changes, regenerates `pg_hba.conf`, and reloads
+PostgreSQL.
+
+Selector names must follow the pattern `^[a-z]([a-z0-9-]*[a-z0-9])?$` and
+each `${podselector:<name>}` reference in a `pg_hba` rule must correspond to
+a defined entry in `podSelectorRefs`. The webhook validates both constraints.
+
+For a complete example, see
+[`cluster-example-pod-selector-refs.yaml`](samples/cluster-example-pod-selector-refs.yaml).
+
 ### LDAP Configuration
 
 Under the `postgres` section of the cluster spec there is an optional `ldap` section available to define an LDAP

@@ -31,6 +31,11 @@ your PostgreSQL cluster.
    A basic cluster that uses the default storage class and custom parameters for
    the `postgresql.conf` and `pg_hba.conf` files.
 
+**Cluster with dynamic pg_hba address resolution**
+:  [`cluster-example-pod-selector-refs.yaml`](samples/cluster-example-pod-selector-refs.yaml)
+   A cluster that uses `podSelectorRefs` to dynamically resolve pod IPs in
+   `pg_hba` rules via the `${podselector:<name>}` syntax.
+
 **Cluster with customized storage class**
 : [`cluster-storage-class.yaml`](samples/cluster-storage-class.yaml):
    A basic cluster that uses a specified storage class of `standard`.
