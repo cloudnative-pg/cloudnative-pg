@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/cloudnative-pg/machinery/pkg/api"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -202,15 +204,20 @@ var _ = Describe("Role synchronizer tests", func() {
 		err              error
 		roleSynchronizer RoleSynchronizer
 	)
-
+	const (
+		secretName                        = "vinci-secret-name"
+		secretNameWithUpdates             = "vinci-secret-with-updates-name"
+		secretInDBName                    = "vinci-secret-in-db-name"
+		wantedLogStatementSuppressionStmt = "SET LOCAL log_statement = 'none'"
+		wantedLogPreventionStmt           = "SET LOCAL log_min_error_statement = 'PANIC'"
+	)
+	testDate := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)
 	BeforeEach(func() {
 		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() {
 			Expect(mock.ExpectationsWereMet()).To(Succeed())
 		})
-
-		testDate := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)
 
 		rowsInMockDatabase := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
@@ -230,14 +237,56 @@ var _ = Describe("Role synchronizer tests", func() {
 			AddRow("role_to_test1", true, true, false, false, false, false, -1, []byte("12345"),
 				nil, false, []byte("This is a role to test with"), 11, []byte("{}")).
 			AddRow("role_to_test2", true, true, false, false, false, false, -1, []byte("12345"),
-				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole}"))
+				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole}")).
+			AddRow("role_with_pass", false, true, false, false, false, false, -1, []byte(password),
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             testDate,
+					InfinityModifier: pgtype.Finite,
+				}, false, []byte(""), 11, []byte("{}"))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rowsInMockDatabase)
+
+		// define various secrets as test cases to show failure modes
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte("foo_bar"),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretInDB := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretInDBName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte("role_with_pass"),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretWithUpdates := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretNameWithUpdates,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte("role_to_test1"),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(&secret, &secretWithUpdates, &secretInDB).
+			Build()
 
 		roleSynchronizer = RoleSynchronizer{
 			instance: &fakeInstanceData{
-				Instance: postgres.NewInstance().WithNamespace("default"),
+				Instance: postgres.NewInstance().WithNamespace("vinci-namespace"),
 				db:       db,
 			},
+			client: cl,
 		}
 	})
 
@@ -267,6 +316,148 @@ var _ = Describe("Role synchronizer tests", func() {
 					SecretResourceVersion: "",
 				},
 			}))
+		})
+
+		It("it will update a role password if the password secret resourceVersion changed", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "role_to_test1",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
+						PasswordSecret: &api.LocalObjectReference{
+							Name: secretNameWithUpdates,
+						},
+					},
+				},
+			}
+			var secret corev1.Secret
+			Expect(roleSynchronizer.client.Get(ctx,
+				client.ObjectKey{Namespace: namespace, Name: secretName},
+				&secret)).To(Succeed())
+			mock.ExpectBegin()
+			mock.ExpectExec(wantedLogStatementSuppressionStmt).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectExec(wantedLogPreventionStmt).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			alterStmt := fmt.Sprintf(
+				"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
+					"CONNECTION LIMIT -1 PASSWORD '%s'",
+				"role_to_test1", password)
+			mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+			rows := mock.NewRows([]string{"xmin"}).AddRow("11")
+			mock.ExpectCommit()
+			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+			mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID:         11, // defined in the mock query to the DB above
+					SecretResourceVersion: "1" + secret.ResourceVersion,
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("it will update a role password if the password was changed in the DB", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "role_to_test1",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
+						PasswordSecret: &api.LocalObjectReference{
+							Name: secretNameWithUpdates,
+						},
+					},
+				},
+			}
+			var secret corev1.Secret
+			Expect(roleSynchronizer.client.Get(ctx,
+				client.ObjectKey{Namespace: namespace, Name: secretName},
+				&secret)).To(Succeed())
+			mock.ExpectBegin()
+			mock.ExpectExec(wantedLogStatementSuppressionStmt).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectExec(wantedLogPreventionStmt).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			alterStmt := fmt.Sprintf(
+				"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
+					"CONNECTION LIMIT -1 PASSWORD '%s'",
+				"role_to_test1", password)
+			mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+			mock.ExpectCommit()
+			// xmin set to 12 where the old value was 11
+			rows := mock.NewRows([]string{"xmin"}).AddRow("13")
+			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+			mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID:         12, // defined in the mock query to the DB above
+					SecretResourceVersion: secret.ResourceVersion,
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("it will not update a role password if role is in sync with the DB", func(ctx context.Context) {
+			validUntil := metav1.NewTime(testDate)
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:    "role_with_pass",
+						Ensure:  apiv1.EnsurePresent,
+						Inherit: ptr.To(true),
+						PasswordSecret: &api.LocalObjectReference{
+							Name: secretInDBName,
+						},
+						ValidUntil:      &validUntil,
+						ConnectionLimit: -1,
+					},
+				},
+			}
+			var secret corev1.Secret
+			Expect(roleSynchronizer.client.Get(ctx,
+				client.ObjectKey{Namespace: namespace, Name: secretInDBName},
+				&secret)).To(Succeed())
+			_, unreconciled, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_with_pass": {
+					TransactionID:         11,
+					SecretResourceVersion: secret.ResourceVersion,
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(unreconciled).To(BeEmpty())
+		})
+
+		It("it will not update a role password if the secret cannot be retrieved", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "role_to_test1",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
+						PasswordSecret: &api.LocalObjectReference{
+							Name: "not-findable",
+						},
+					},
+				},
+			}
+			_, unreconciled, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID:         11, // defined in the mock query to the DB above
+					SecretResourceVersion: "11",
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(unreconciled).To(HaveLen(1))
+			Expect(unreconciled["role_to_test1"]).To(HaveLen(1))
+			Expect(unreconciled["role_to_test1"][0]).To(ContainSubstring("failed to get password secret"))
 		})
 
 		It("it will ignore ensure:absent roles in spec missing from DB", func(ctx context.Context) {
@@ -727,7 +918,7 @@ var (
 	password = rand.String(12)
 )
 
-var _ = DescribeTable("role secrets test",
+var _ = DescribeTable("getPassword test",
 	func(
 		roleConfig *apiv1.RoleConfiguration,
 		expectedResult passwordSecret,
@@ -799,7 +990,7 @@ var _ = DescribeTable("role secrets test",
 		passwordSecret{},
 		false,
 	),
-	Entry("Cannot extract credentials if role's secretName does not match a secret",
+	Entry("Throws error if role's secretName does not match a secret",
 		&apiv1.RoleConfiguration{
 			Name: userName,
 			PasswordSecret: &apiv1.LocalObjectReference{
@@ -807,7 +998,7 @@ var _ = DescribeTable("role secrets test",
 			},
 		},
 		passwordSecret{},
-		false,
+		true,
 	),
 	Entry("Throws error if secret username does not match role name",
 		&apiv1.RoleConfiguration{
