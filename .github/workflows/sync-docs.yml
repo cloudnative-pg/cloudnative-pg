@@ -20,4 +20,4 @@ jobs:
           repository: cloudnative-pg/docs
           token: ${{ secrets.REPO_GHA_PAT }}
           event-type: cnpg-docs-release
-          client-payload: '{"tag": "${{ github.event.inputs.version }}"}'
+          client-payload: ${{ format('{{"tag":{0}}}', toJSON(github.event.inputs.version)) }}
