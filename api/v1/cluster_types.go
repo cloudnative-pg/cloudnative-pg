@@ -277,6 +277,15 @@ type ClusterSpec struct {
 	// +optional
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
+	// PodSelectorRefs defines named pod label selectors that can be referenced
+	// in pg_hba rules using the ${podselector:<name>} syntax in the address field.
+	// The operator resolves matching pod IPs and the instance manager expands
+	// pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	PodSelectorRefs []PodSelectorRef `json:"podSelectorRefs,omitempty"`
+
 	// Replication slots management configuration
 	// +kubebuilder:default:={"highAvailability":{"enabled":true}}
 	// +optional
@@ -841,6 +850,11 @@ type ClusterStatus struct {
 	// TablespacesStatus reports the state of the declarative tablespaces in the cluster
 	// +optional
 	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
+
+	// PodSelectorRefs contains the resolved pod IPs for each named selector
+	// defined in spec.podSelectorRefs.
+	// +optional
+	PodSelectorRefs []PodSelectorRefStatus `json:"podSelectorRefs,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
@@ -1421,6 +1435,32 @@ type SynchronousReplicaConfiguration struct {
 	FailoverQuorum bool `json:"failoverQuorum"`
 }
 
+// PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+// Pods matching the selector in the Cluster's namespace will have their IPs
+// resolved and made available for pg_hba address expansion via the ${podselector:<name>} syntax.
+type PodSelectorRef struct {
+	// Name is the identifier used to reference this selector in pg_hba rules
+	// via the ${podselector:<name>} syntax in the address field.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z]([a-z0-9_-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Selector is a label selector that identifies the pods whose IPs
+	// should be resolved. Only pods in the Cluster's namespace are considered.
+	Selector metav1.LabelSelector `json:"selector"`
+}
+
+// PodSelectorRefStatus contains the resolved pod IPs for a named selector.
+type PodSelectorRefStatus struct {
+	// Name corresponds to the name in the spec's PodSelectorRef.
+	Name string `json:"name"`
+
+	// IPs is the list of pod IPs matching the selector.
+	// Each IP is a single address (no CIDR notation).
+	// +optional
+	IPs []string `json:"ips,omitempty"`
+}
+
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
@@ -1432,7 +1472,9 @@ type PostgresConfiguration struct {
 	Synchronous *SynchronousReplicaConfiguration `json:"synchronous,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
-	// to the pg_hba.conf file)
+	// to the pg_hba.conf file).
+	// Use the "${podselector:<name>}" syntax to reference a pod selector;
+	// the rule will be expanded for each Pod IP matching that selector.
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
 
