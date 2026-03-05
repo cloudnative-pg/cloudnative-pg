@@ -62,12 +62,16 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance.PgData = pgdata
 		instance.SocketDirectory = socketDir
 
+		// Use a PID that is guaranteed not to exist on any system.
+		// The Linux kernel pid_max is at most 4194304 (2^22),
+		// so 5000000 is safely above any possible real PID and
+		// well within the range of a 32-bit int.
 		pidFile := filepath.Join(pgdata, PostgresqlPidFile)
-		err := os.WriteFile(pidFile, []byte("1234"), 0o400)
+		err := os.WriteFile(pidFile, []byte("5000000"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		lockFile := filepath.Join(socketDir, PostgresqlPidFile)
-		err = os.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("1234"), 0o400)
+		err = os.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("5000000"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		process, err := instance.CheckForExistingPostmaster(GetPostgresExecutableName())
