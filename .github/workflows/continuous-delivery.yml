@@ -340,8 +340,8 @@ jobs:
           commit_message=${commit_message//$'\r'/'%0D'}
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}")
-          author_email=$(git show -s --format='%ae' "${commit_sha}")
+          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # extract branch name
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]

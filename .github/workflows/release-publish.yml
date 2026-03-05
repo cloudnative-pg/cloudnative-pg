@@ -151,8 +151,8 @@ jobs:
           tag="${GITHUB_REF#refs/tags/v}"
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}")
-          author_email=$(git show -s --format='%ae' "${commit_sha}")
+          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
@@ -163,13 +163,8 @@ jobs:
           echo "IMAGE_TAG=${tag}" >> $GITHUB_ENV
           echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
-          delim=$(uuidgen)
-          echo "author_name<<${delim}" >> $GITHUB_OUTPUT
-          echo "${author_name}" >> $GITHUB_OUTPUT
-          echo "${delim}" >> $GITHUB_OUTPUT
-          echo "author_email<<${delim}" >> $GITHUB_OUTPUT
-          echo "${author_email}" >> $GITHUB_OUTPUT
-          echo "${delim}" >> $GITHUB_OUTPUT
+          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
+          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
       -
         name: Import GPG key
         id: import_gpg
