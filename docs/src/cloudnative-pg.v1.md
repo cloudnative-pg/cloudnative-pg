@@ -577,7 +577,7 @@ _Appears in:_
 | `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
 | `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
 | `postgresql` _[PostgresConfiguration](#postgresconfiguration)_ | Configuration of the PostgreSQL server |  |  |  |
-| `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:<name>\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
+| `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:NAME\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
 | `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability\: \{ enabled:true \} \} |  |
 | `bootstrap` _[BootstrapConfiguration](#bootstrapconfiguration)_ | Instructions to bootstrap this cluster |  |  |  |
 | `replica` _[ReplicaClusterConfiguration](#replicaclusterconfiguration)_ | Replica cluster configuration |  |  |  |
@@ -1742,9 +1742,7 @@ _Appears in:_
 
 
 
-PodSelectorRef defines a named pod label selector for use in pg_hba rules.
-Pods matching the selector in the Cluster's namespace will have their IPs
-resolved and made available for pg_hba address expansion via the ${podselector:<name>} syntax.
+
 
 
 
@@ -1754,7 +1752,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | Name is the identifier used to reference this selector in pg_hba rules<br />via the $\{podselector:<name>\} syntax in the address field. | True |  | MinLength: 1 <br />Pattern: `^[a-z]([a-z0-9_-]*[a-z0-9])?$` <br /> |
+| `name` _string_ | Name is the identifier used to reference this selector in pg_hba rules<br />via the $\{podselector:NAME\} syntax in the address field. | True |  | MinLength: 1 <br />Pattern: `^[a-z]([a-z0-9_-]*[a-z0-9])?$` <br /> |
 | `selector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ | Selector is a label selector that identifies the pods whose IPs<br />should be resolved. Only pods in the Cluster's namespace are considered. | True |  |  |
 
 
@@ -1987,7 +1985,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `parameters` _object (keys:string, values:string)_ | PostgreSQL configuration options (postgresql.conf) |  |  |  |
 | `synchronous` _[SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)_ | Configuration of the PostgreSQL synchronous replication feature |  |  |  |
-| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the "$\{podselector:<name>\}" syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
+| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the $\{podselector:NAME\} syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
 | `pg_ident` _string array_ | PostgreSQL User Name Maps rules (lines to be appended<br />to the pg_ident.conf file) |  |  |  |
 | `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |

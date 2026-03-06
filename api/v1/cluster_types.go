@@ -278,7 +278,7 @@ type ClusterSpec struct {
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// PodSelectorRefs defines named pod label selectors that can be referenced
-	// in pg_hba rules using the ${podselector:<name>} syntax in the address field.
+	// in pg_hba rules using the ${podselector:NAME} syntax in the address field.
 	// The operator resolves matching pod IPs and the instance manager expands
 	// pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
 	// +optional
@@ -1437,10 +1437,12 @@ type SynchronousReplicaConfiguration struct {
 
 // PodSelectorRef defines a named pod label selector for use in pg_hba rules.
 // Pods matching the selector in the Cluster's namespace will have their IPs
-// resolved and made available for pg_hba address expansion via the ${podselector:<name>} syntax.
+// resolved and made available for pg_hba address expansion via the
+// ${podselector:NAME} syntax.
+
 type PodSelectorRef struct {
 	// Name is the identifier used to reference this selector in pg_hba rules
-	// via the ${podselector:<name>} syntax in the address field.
+	// via the ${podselector:NAME} syntax in the address field.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^[a-z]([a-z0-9_-]*[a-z0-9])?$`
 	Name string `json:"name"`
@@ -1473,7 +1475,7 @@ type PostgresConfiguration struct {
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
 	// to the pg_hba.conf file).
-	// Use the "${podselector:<name>}" syntax to reference a pod selector;
+	// Use the ${podselector:NAME} syntax to reference a pod selector;
 	// the rule will be expanded for each Pod IP matching that selector.
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
