@@ -61,6 +61,11 @@ const (
 	// hibernation condition that is used when the operator is waiting for a Pod
 	// to be deleted
 	HibernationConditionReasonWaitingPodsDeletion = "WaitingPodsDeletion"
+
+	// HibernationConditionReasonWaitingForHealthy is the value of the
+	// hibernation condition that is used when the cluster is not healthy
+	// and hibernation cannot proceed yet
+	HibernationConditionReasonWaitingForHealthy = "WaitingForHealthy"
 )
 
 // ErrInvalidHibernationValue is raised when the hibernation annotation has
@@ -90,6 +95,12 @@ func EnrichStatus(
 	// won't be completely created.
 	// We should stop the enrich status only when the cluster is unhealthy and the process hasn't already started
 	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationOngoing(cluster) {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    HibernationConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  HibernationConditionReasonWaitingForHealthy,
+			Message: "Waiting for the cluster to be healthy before proceeding with hibernation",
+		})
 		return
 	}
 
@@ -127,7 +138,22 @@ func isHibernationEnabled(cluster *apiv1.Cluster) bool {
 	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
 }
 
-// isHibernationOngoing check if the cluster is doing the hibernation process
+// isHibernationOngoing checks if the cluster has already started the
+// hibernation process (i.e. pod deletion has begun or completed).
+// It excludes informational states like WaitingForHealthy that should
+// not bypass the healthy-phase safety guard.
 func isHibernationOngoing(cluster *apiv1.Cluster) bool {
-	return meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType) != nil
+	condition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+	if condition == nil {
+		return false
+	}
+
+	switch condition.Reason {
+	case HibernationConditionReasonDeletingPods,
+		HibernationConditionReasonWaitingPodsDeletion,
+		HibernationConditionReasonHibernated:
+		return true
+	default:
+		return false
+	}
 }
