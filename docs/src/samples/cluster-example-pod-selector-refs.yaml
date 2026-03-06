@@ -6,7 +6,7 @@ spec:
   instances: 3
 
   # Define named pod label selectors for dynamic pg_hba address resolution.
-  # The operator resolves matching pod IPs and expands ${podselector:<name>}
+  # The operator resolves matching pod IPs and expands ${podselector:NAME}
   # references in pg_hba rules into one line per IP with /32 (IPv4) or /128 (IPv6) masks.
   podSelectorRefs:
     - name: app-pods
@@ -23,7 +23,7 @@ spec:
       max_worker_processes: "60"
 
     pg_hba:
-      # These rules use ${podselector:<name>} syntax to reference podSelectorRefs.
+      # These rules use ${podselector:NAME} syntax to reference podSelectorRefs.
       # Each reference is expanded to one line per matching pod IP.
       - "hostssl mydb myuser ${podselector:app-pods} scram-sha-256"
       - "hostssl postgres monitor ${podselector:monitoring} scram-sha-256"

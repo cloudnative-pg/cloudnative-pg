@@ -277,7 +277,7 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 )
 
 // hbaTemplate is the template used to create the HBA configuration.
-// The "expandRule" function expands ${podselector:<name>} references
+// The "expandRule" function expands ${podselector:NAME} references
 // inline, producing one output line per matched pod IP.
 var hbaTemplate = template.Must(
 	template.New("pg_hba.conf").
@@ -600,13 +600,13 @@ type HBAOptions struct {
 	// LDAPConfigString is the optional LDAP configuration block.
 	LDAPConfigString string
 	// SelectorIPs maps podSelectorRef names to resolved pod IPs.
-	// When non-nil, ${podselector:<name>} tokens in the address field are
+	// When non-nil, ${podselector:NAME} tokens in the address field are
 	// expanded to one line per IP with /32 (IPv4) or /128 (IPv6) masks.
 	SelectorIPs map[string][]string
 }
 
 // CreateHBARules produces the final pg_hba.conf content from the given
-// user-defined rules and rendering options. ${podselector:<name>} tokens
+// user-defined rules and rendering options. ${podselector:NAME} tokens
 // in user rules are expanded inline by the template's "expandRule" function.
 func CreateHBARules(hbaLines []string, opts HBAOptions) (string, error) {
 	var hbaContent bytes.Buffer
