@@ -19,6 +19,7 @@ Systems) objects in the database and be queried via SQL.
 
 The CloudNativePG Community maintains container images that are built on top
 of the maintained [PostgreSQL Container images](https://github.com/cloudnative-pg/postgres-containers).
+
 For more information, please visit:
 
 - The [`postgis-containers` project in GitHub](https://github.com/cloudnative-pg/postgis-containers)
@@ -80,7 +81,7 @@ metadata:
   name: postgis-example
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgis:18.3-3.6.2-system-trixie
   bootstrap:
     initdb:
       postInitTemplateSQL:
