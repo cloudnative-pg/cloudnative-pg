@@ -25,7 +25,9 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -60,6 +62,7 @@ func GetCandidateStorageSourceForPrimary(
 // to be used to create a replica PVC
 func GetCandidateStorageSourceForReplica(
 	ctx context.Context,
+	c client.Client,
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
@@ -94,6 +97,7 @@ func GetCandidateStorageSourceForReplica(
 
 	if result := getCandidateSourceFromBackupList(
 		ctx,
+		c,
 		cluster,
 		backupList,
 	); result != nil {
@@ -109,13 +113,32 @@ func GetCandidateStorageSourceForReplica(
 	}
 
 	// Try using the backup the Cluster has been bootstrapped from
-	return getCandidateSourceFromClusterDefinition(cluster)
+	result := getCandidateSourceFromClusterDefinition(cluster)
+	if result == nil {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	exists, err := storageSourceExistsInNamespace(ctx, c, cluster.Namespace, result)
+	if err != nil {
+		contextLogger.Error(err, "Error while checking if storage source exists, falling back to pg_basebackup")
+		return nil
+	}
+	if !exists {
+		contextLogger.Info(
+			"Bootstrap VolumeSnapshot no longer exists, falling back to pg_basebackup for replica creation",
+		)
+		return nil
+	}
+
+	return result
 }
 
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
 func getCandidateSourceFromBackupList(
 	ctx context.Context,
+	c client.Client,
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
@@ -170,9 +193,21 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		contextLogger.Debug("found a backup that is a valid storage source candidate")
+		candidate := getCandidateSourceFromBackup(backup)
+		exists, err := storageSourceExistsInNamespace(ctx, c, cluster.Namespace, candidate)
+		if err != nil {
+			contextLogger.Error(err, "Error while checking if backup snapshot exists, skipping backup",
+				"backup", backup.Name)
+			continue
+		}
+		if !exists {
+			contextLogger.Info("Backup VolumeSnapshot no longer exists, skipping backup",
+				"backup", backup.Name)
+			continue
+		}
 
-		return getCandidateSourceFromBackup(backup)
+		contextLogger.Debug("found a backup that is a valid storage source candidate")
+		return candidate
 	}
 
 	return nil
@@ -200,6 +235,53 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 	}
 
 	return &result
+}
+
+// snapshotReferences returns all VolumeSnapshot references contained in this
+// StorageSource, filtering out entries with empty names or non-snapshot API groups.
+func (s *StorageSource) snapshotReferences() []corev1.TypedLocalObjectReference {
+	isSnapshot := func(ref corev1.TypedLocalObjectReference) bool {
+		return ref.Name != "" && ref.APIGroup != nil && *ref.APIGroup == volumesnapshotv1.GroupName
+	}
+
+	var refs []corev1.TypedLocalObjectReference
+	if isSnapshot(s.DataSource) {
+		refs = append(refs, s.DataSource)
+	}
+	if s.WALSource != nil && isSnapshot(*s.WALSource) {
+		refs = append(refs, *s.WALSource)
+	}
+	for _, ref := range s.TablespaceSource {
+		if isSnapshot(ref) {
+			refs = append(refs, ref)
+		}
+	}
+
+	return refs
+}
+
+// storageSourceExistsInNamespace checks whether the VolumeSnapshots referenced
+// in the given StorageSource still exist in the specified namespace.
+// This function is called during each reconciliation loop; since the client
+// reads from the informer cache, these lookups are local and do not generate
+// additional requests to the API server.
+func storageSourceExistsInNamespace(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	source *StorageSource,
+) (bool, error) {
+	for _, ref := range source.snapshotReferences() {
+		var vs volumesnapshotv1.VolumeSnapshot
+		if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: ref.Name}, &vs); err != nil {
+			if apierrs.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+
+	return true, nil
 }
 
 // getCandidateSourceFromClusterDefinition gets a candidate storage source
