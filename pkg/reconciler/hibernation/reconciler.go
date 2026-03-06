@@ -53,6 +53,11 @@ func Reconcile(
 	case HibernationConditionReasonWaitingPodsDeletion:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 
+	case HibernationConditionReasonWaitingForHealthy:
+		// The cluster is not healthy yet, let the reconciliation loop
+		// continue so the cluster can recover and eventually be hibernated
+		return nil, nil
+
 	default:
 		return &ctrl.Result{}, nil
 	}
