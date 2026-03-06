@@ -133,6 +133,29 @@ var _ = Describe("Reconcile resources", func() {
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
+	It("lets the reconciliation loop proceed when the cluster is waiting to be healthy", func(ctx SpecContext) {
+		mock := &clientMock{}
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: HibernationOn,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   HibernationConditionType,
+						Status: metav1.ConditionFalse,
+						Reason: HibernationConditionReasonWaitingForHealthy,
+					},
+				},
+			},
+		}
+		// A Reconcile with a nil return will allow cluster reconciliation to proceed
+		Expect(Reconcile(ctx, mock, &cluster, nil)).To(BeNil())
+		Expect(mock.deletedPods).To(BeEmpty())
+	})
+
 	It("deletes the primary pod if available", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
