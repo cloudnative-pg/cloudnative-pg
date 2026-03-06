@@ -191,6 +191,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Parse input to env
         env:
