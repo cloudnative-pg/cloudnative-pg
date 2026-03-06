@@ -40,7 +40,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
-  OPP_SCRIPT_VERSION: "e1de0e6d6ebddc0f4fc6f7f4cec2a6f6cd57c926"
+  OPP_SCRIPT_VERSION: "fbac22ff0c713188bdcea36791b70fb3999e6e03"
 
 defaults:
   run:
