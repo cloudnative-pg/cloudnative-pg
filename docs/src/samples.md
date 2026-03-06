@@ -34,7 +34,7 @@ your PostgreSQL cluster.
 **Cluster with dynamic pg_hba address resolution**
 :  [`cluster-example-pod-selector-refs.yaml`](samples/cluster-example-pod-selector-refs.yaml)
    A cluster that uses `podSelectorRefs` to dynamically resolve pod IPs in
-   `pg_hba` rules via the `${podselector:<name>}` syntax.
+   `pg_hba` rules via the `${podselector:NAME}` syntax.
 
 **Cluster with customized storage class**
 : [`cluster-storage-class.yaml`](samples/cluster-storage-class.yaml):

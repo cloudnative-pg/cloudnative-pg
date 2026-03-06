@@ -2906,7 +2906,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 }
 
 // validatePodSelectorRefs checks that podSelectorRefs names are unique and
-// that ${podselector:<name>} references in pg_hba lines correspond to defined selectors.
+// that ${podselector:NAME} references in pg_hba lines correspond to defined selectors.
 func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field.ErrorList {
 	var allErrors field.ErrorList
 	path := field.NewPath("spec", "podSelectorRefs")
@@ -2922,7 +2922,7 @@ func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field
 				path.Index(i).Child("selector"))...)
 	}
 
-	// Check that ${podselector:<name>} references in pg_hba correspond to defined selectors
+	// Check that ${podselector:NAME} references in pg_hba correspond to defined selectors
 	hbaPath := field.NewPath("spec", "postgresql", "pg_hba")
 	for i, rule := range r.Spec.PostgresConfiguration.PgHBA {
 		if err := hba.ValidateLine(rule, knownSelectors); err != nil {
