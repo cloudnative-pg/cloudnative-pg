@@ -1161,7 +1161,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1187,11 +1187,6 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters()),
 		).
 		Watches(
-			&corev1.Node{},
-			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
-			builder.WithPredicates(r.nodesPredicate()),
-		).
-		Watches(
 			&apiv1.ImageCatalog{},
 			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
@@ -1200,8 +1195,18 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&apiv1.ClusterImageCatalog{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	// Conditionally watch node resource
+	if configuration.Current.WatchNodes {
+		controllerBuilder = controllerBuilder.Watches(
+			&corev1.Node{},
+			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
+			builder.WithPredicates(r.nodesPredicate()),
+		)
+	}
+
+	return controllerBuilder.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and
@@ -1256,6 +1261,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
+	// This is not used when WatchNodes is false
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&corev1.Pod{},
