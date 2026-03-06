@@ -464,7 +464,7 @@ jobs:
           fi
 
           # extract tag from branch name
-          tag_name=$(echo "$branch_name" | tr / -)
+          tag_name=$(echo "$branch_name" | tr / - | head -c 50)
 
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
