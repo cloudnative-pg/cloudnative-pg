@@ -441,7 +441,7 @@ if you prefer) via a secure channel (`hostssl`).
 In dynamic Kubernetes environments, pod IPs change constantly, making it
 impractical to manually specify them in `pg_hba` rules. The `podSelectorRefs` field
 lets you define named pod label selectors that can be referenced in `pg_hba`
-rules using the `${podselector:<name>}` syntax in the address field.
+rules using the `${podselector:NAME}` syntax in the address field.
 
 The operator resolves matching pod IPs and stores them in the cluster status.
 The instance manager then expands each `pg_hba` line containing a pod selector
