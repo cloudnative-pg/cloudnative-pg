@@ -67,7 +67,7 @@ func NewPluginReconciler(
 	return &PluginReconciler{
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
-		Recorder:          mgr.GetEventRecorderFor("cloudnative-pg-plugin"),
+		Recorder:          mgr.GetEventRecorderFor("cloudnative-pg-plugin"), //nolint:staticcheck
 		Plugins:           plugins,
 		OperatorNamespace: operatorNamespace,
 	}
