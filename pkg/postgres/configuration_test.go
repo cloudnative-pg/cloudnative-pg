@@ -258,18 +258,54 @@ var _ = Describe("pg_hba.conf generation", func() {
 	}
 
 	It("insert the spec configuration between an header and a footer when the version can not be parsed", func() {
-		Expect(CreateHBARules(specRules, "md5", "")).To(
+		Expect(CreateHBARules(specRules, HBAOptions{DefaultAuthenticationMethod: "md5"})).To(
 			ContainSubstring("\ntwo\n"))
 	})
 
 	It("really use the passed default authentication method", func() {
-		Expect(CreateHBARules(specRules, "this-one", "")).To(
+		Expect(CreateHBARules(specRules, HBAOptions{DefaultAuthenticationMethod: "this-one"})).To(
 			ContainSubstring("\nhost all all all this-one\n"))
 	})
 
 	It("really uses the ldapConfigString", func() {
-		Expect(CreateHBARules(specRules, "defaultAuthenticationMethod", "ldapConfigString")).To(
+		Expect(CreateHBARules(specRules, HBAOptions{
+			DefaultAuthenticationMethod: "defaultAuthenticationMethod",
+			LDAPConfigString:            "ldapConfigString",
+		})).To(
 			ContainSubstring("\nldapConfigString\n"))
+	})
+
+	It("expands podselector references inline", func() {
+		rules := []string{
+			"hostssl mydb myuser ${podselector:app} scram-sha-256",
+			"host all all 10.244.0.0/16 md5",
+		}
+		result, err := CreateHBARules(rules, HBAOptions{
+			DefaultAuthenticationMethod: "md5",
+			SelectorIPs: map[string][]string{
+				"app": {"10.0.0.5", "10.0.0.12"},
+			},
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result).To(ContainSubstring("\nhostssl mydb myuser 10.0.0.5/32 scram-sha-256\n"))
+		Expect(result).To(ContainSubstring("\nhostssl mydb myuser 10.0.0.12/32 scram-sha-256\n"))
+		Expect(result).To(ContainSubstring("\nhost all all 10.244.0.0/16 md5\n"))
+	})
+
+	It("omits podselector lines when selector matches no pods", func() {
+		rules := []string{
+			"hostssl mydb myuser ${podselector:empty} scram-sha-256",
+			"host all all 10.244.0.0/16 md5",
+		}
+		result, err := CreateHBARules(rules, HBAOptions{
+			DefaultAuthenticationMethod: "md5",
+			SelectorIPs: map[string][]string{
+				"empty": {},
+			},
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result).NotTo(ContainSubstring("podselector"))
+		Expect(result).To(ContainSubstring("\nhost all all 10.244.0.0/16 md5\n"))
 	})
 })
 

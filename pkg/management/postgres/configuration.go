@@ -120,8 +120,11 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 
 	return postgres.CreateHBARules(
 		cluster.Spec.PostgresConfiguration.PgHBA,
-		defaultAuthenticationMethod,
-		buildLDAPConfigString(cluster, ldapBindPassword))
+		postgres.HBAOptions{
+			DefaultAuthenticationMethod: defaultAuthenticationMethod,
+			LDAPConfigString:            buildLDAPConfigString(cluster, ldapBindPassword),
+			SelectorIPs:                 cluster.GetPodSelectorIPs(),
+		})
 }
 
 // RefreshPGHBA generates and writes down the pg_hba.conf file

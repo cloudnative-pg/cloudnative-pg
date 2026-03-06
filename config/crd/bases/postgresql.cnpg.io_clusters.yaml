@@ -4338,6 +4338,77 @@ spec:
                         type: string
                     type: object
                 type: object
+              podSelectorRefs:
+                description: |-
+                  PodSelectorRefs defines named pod label selectors that can be referenced
+                  in pg_hba rules using the ${podselector:NAME} syntax in the address field.
+                  The operator resolves matching pod IPs and the instance manager expands
+                  pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
+                items:
+                  properties:
+                    name:
+                      description: |-
+                        Name is the identifier used to reference this selector in pg_hba rules
+                        via the ${podselector:NAME} syntax in the address field.
+                      minLength: 1
+                      pattern: ^[a-z]([a-z0-9_-]*[a-z0-9])?$
+                      type: string
+                    selector:
+                      description: |-
+                        Selector is a label selector that identifies the pods whose IPs
+                        should be resolved. Only pods in the Cluster's namespace are considered.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - name
+                  - selector
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               postgresGID:
                 default: 26
                 description: The GID of the `postgres` user inside the image, defaults
@@ -4501,7 +4572,9 @@ spec:
                   pg_hba:
                     description: |-
                       PostgreSQL Host Based Authentication rules (lines to be appended
-                      to the pg_hba.conf file)
+                      to the pg_hba.conf file).
+                      Use the ${podselector:NAME} syntax to reference a pod selector;
+                      the rule will be expanded for each Pod IP matching that selector.
                     items:
                       type: string
                     type: array
@@ -7112,6 +7185,28 @@ spec:
                   required:
                   - name
                   - version
+                  type: object
+                type: array
+              podSelectorRefs:
+                description: |-
+                  PodSelectorRefs contains the resolved pod IPs for each named selector
+                  defined in spec.podSelectorRefs.
+                items:
+                  description: PodSelectorRefStatus contains the resolved pod IPs
+                    for a named selector.
+                  properties:
+                    ips:
+                      description: |-
+                        IPs is the list of pod IPs matching the selector.
+                        Each IP is a single address (no CIDR notation).
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: Name corresponds to the name in the spec's PodSelectorRef.
+                      type: string
+                  required:
+                  - name
                   type: object
                 type: array
               poolerIntegrations:
