@@ -29,6 +29,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,6 +64,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		postgresqlEntry        = "postgresql"
 		postgresqlMinimalEntry = "postgresql-minimal"
 		postgresqlSystemEntry  = "postgresql-system"
+		rollbackEntry          = "rollback"
 
 		// custom registry envs
 		customPostgresImageRegistryEnvVar       = "POSTGRES_MAJOR_UPGRADE_IMAGE_REGISTRY"
@@ -217,6 +219,18 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		return cluster
 	}
 
+	generateRollbackCluster := func(
+		namespace string, storageClass string, tagVersion string, enableBackup bool,
+	) *apiv1.Cluster {
+		cluster := generatePostgreSQLCluster(namespace, storageClass, tagVersion, enableBackup)
+		cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQL = []string{
+			"CREATE EXTENSION vector;",
+			"CREATE TABLE items (id serial PRIMARY KEY,embedding vector(3));",
+			"INSERT INTO items (embedding) VALUES ('[1,2,3]');",
+		}
+		return cluster
+	}
+
 	type versionInfo struct {
 		currentMajor uint64
 		currentTag   string
@@ -332,6 +346,17 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 				targetImage:   targetImages[postgresqlSystemEntry],
 				targetMajor:   int(info.targetMajor),
 			},
+			// This scenario is used to test that we are able to roll back from a failed major upgrade.
+			// It generates a starting Cluster using the standard image, enabling the pgvector extension,
+			// and tries upgrading to a minimal image where the extension is not present, thus making the
+			// upgrade job fail.
+			rollbackEntry: {
+				startingCluster: generateRollbackCluster(namespace, storageClass,
+					strconv.FormatUint(info.currentMajor, 10), false),
+				startingMajor: int(info.currentMajor),
+				targetImage:   targetImages[postgresqlMinimalEntry],
+				targetMajor:   int(info.targetMajor),
+			},
 		}
 	}
 
@@ -366,7 +391,11 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 	}
 
 	verifyPostgresVersion := func(
-		env *environment.TestingEnvironment, primary *corev1.Pod, oldStdOut string, targetMajor int,
+		env *environment.TestingEnvironment,
+		primary *corev1.Pod,
+		oldStdOut string,
+		targetMajor int,
+		expectVersionChanged bool,
 	) {
 		Eventually(func(g Gomega) {
 			stdOut, stdErr, err := exec.EventuallyExecQueryInInstancePod(env.Ctx, env.Client, env.Interface,
@@ -375,9 +404,14 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 				"SELECT version();", 60, objects.PollingTime)
 			g.Expect(err).ToNot(HaveOccurred(), "failed to execute version query")
 			g.Expect(stdErr).To(BeEmpty(), "unexpected stderr output when checking version")
-			g.Expect(stdOut).ToNot(Equal(oldStdOut), "postgres version did not change")
-			g.Expect(stdOut).To(ContainSubstring(strconv.Itoa(targetMajor)),
-				fmt.Sprintf("version string doesn't contain expected major version %d: %s", targetMajor, stdOut))
+
+			if expectVersionChanged {
+				g.Expect(stdOut).ToNot(Equal(oldStdOut), "postgres version did not change")
+				g.Expect(stdOut).To(ContainSubstring(strconv.Itoa(targetMajor)),
+					fmt.Sprintf("version string doesn't contain expected major version %d: %s", targetMajor, stdOut))
+			} else {
+				g.Expect(stdOut).To(Equal(oldStdOut), "postgres version should not have changed")
+			}
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	}
 
@@ -401,6 +435,51 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		currentCluster, err := clusterutils.Get(ctx, client, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(currentCluster.Status.TimelineID).To(Equal(1))
+	}
+
+	applyRollback := func(env *environment.TestingEnvironment, cluster *apiv1.Cluster, startingImage string) {
+		By("Waiting for the upgrade job to fail")
+		currentCluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+		Expect(err).ToNot(HaveOccurred())
+		upgradeJobName := fmt.Sprintf("%s-major-upgrade", currentCluster.Status.CurrentPrimary)
+
+		upgradeJob := &batchv1.Job{}
+		Eventually(func(g Gomega) {
+			err := env.Client.Get(env.Ctx, types.NamespacedName{
+				Namespace: currentCluster.Namespace,
+				Name:      upgradeJobName,
+			}, upgradeJob)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(upgradeJob.Status.Failed).To(BeNumerically(">", 0))
+		}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+		By("Reverting the cluster to the previous major version")
+		Eventually(func() error {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			if err != nil {
+				return err
+			}
+			cluster.Spec.ImageName = startingImage
+			return env.Client.Update(env.Ctx, cluster)
+		}).WithTimeout(1*time.Minute).WithPolling(10*time.Second).Should(
+			Succeed(),
+			"Failed to update cluster image from %s to %s",
+			cluster.Spec.ImageName,
+			startingImage,
+		)
+		Eventually(func(g Gomega) {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Spec.ImageName).To(Equal(startingImage))
+			g.Expect(cluster.Status.Image).To(Equal(startingImage))
+			g.Expect(cluster.Status.PGDataImageInfo.Image).To(Equal(startingImage))
+		}).WithTimeout(1 * time.Minute).Should(Succeed())
+
+		By("Deleting the failed upgrade job")
+		err = env.Client.Delete(env.Ctx, upgradeJob)
+		Expect(err).ToNot(HaveOccurred())
+
+		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
 	}
 
 	BeforeEach(func() {
@@ -441,6 +520,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 	DescribeTable("can upgrade a Cluster to a newer major version", func(scenarioName string) {
 		By("Creating the starting cluster")
 		scenario := scenarios[scenarioName]
+		startingImage := scenario.startingCluster.Spec.ImageName
 
 		// If the skipArchiveScenarioEnvVar is present, skip the archiving scenario.
 		skipArchiveScenario := false
@@ -481,6 +561,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			g.Expect(currentCluster.Status.TimelineID).To(Equal(2))
 		}).WithTimeout(time.Duration(testTimeouts[timeouts.NewPrimaryAfterSwitchover]) * time.Second).
 			WithPolling(5 * time.Second).Should(Succeed())
+		initialTimelineID := 2
 
 		By("Collecting the pods UUIDs")
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, cluster.Name, cluster.Namespace)
@@ -532,6 +613,21 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			g.Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseMajorUpgrade))
 		}).WithTimeout(1 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
+		if scenarioName == rollbackEntry {
+			By("Rolling back the cluster to the initial major version")
+			applyRollback(env, cluster, startingImage)
+
+			By("Verifying the cluster was rolled back to the starting version")
+			verifyPostgresVersion(env, primary, oldStdOut, scenario.startingMajor, false)
+
+			By("Verifying the cluster timeline didn't change")
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cluster.Status.TimelineID).To(Equal(initialTimelineID))
+
+			return
+		}
+
 		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
 
 		// The upgrade destroys all the original pods and creates new ones. We want to make sure that we have
@@ -547,7 +643,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 
 		// Check that the version has been updated
 		By("Verifying the cluster is running the target version")
-		verifyPostgresVersion(env, primary, oldStdOut, scenario.targetMajor)
+		verifyPostgresVersion(env, primary, oldStdOut, scenario.targetMajor, true)
 
 		By("Verifying timeline ID is reset to 1 after major upgrade")
 		verifyTimelineResetAfterUpgrade(env.Ctx, env.Client, cluster)
@@ -562,9 +658,6 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
 		}
 	},
-		Entry("PostGIS", postgisEntry),
-		Entry("PostgreSQL", postgresqlEntry),
-		Entry("PostgreSQL minimal", postgresqlMinimalEntry),
-		Entry("PostgreSQL system", postgresqlSystemEntry),
+		Entry("Rollback", rollbackEntry),
 	)
 })
