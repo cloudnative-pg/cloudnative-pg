@@ -322,7 +322,7 @@ jobs:
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Build meta
@@ -863,6 +863,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.k3dTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
