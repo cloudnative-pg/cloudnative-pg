@@ -1439,7 +1439,6 @@ type SynchronousReplicaConfiguration struct {
 // Pods matching the selector in the Cluster's namespace will have their IPs
 // resolved and made available for pg_hba address expansion via the
 // ${podselector:NAME} syntax.
-
 type PodSelectorRef struct {
 	// Name is the identifier used to reference this selector in pg_hba rules
 	// via the ${podselector:NAME} syntax in the address field.
