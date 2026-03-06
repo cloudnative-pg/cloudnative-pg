@@ -763,6 +763,15 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	// Clean up Pending PVCs whose VolumeSnapshot dataSource has been deleted.
+	// This must run before the running jobs check, because a stuck restore Job
+	// referencing such a PVC would block reconciliation indefinitely.
+	if res, err := persistentvolumeclaim.DeletePVCsWithMissingVolumeSnapshots(
+		ctx, r.Client, resources.pvcs.Items, resources.jobs.Items,
+	); err != nil || !res.IsZero() {
+		return res, err
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
