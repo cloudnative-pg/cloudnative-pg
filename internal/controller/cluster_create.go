@@ -446,13 +446,30 @@ func (r *ClusterReconciler) serviceReconciler(
 		shouldUpdate = true
 	}
 
+	// we check if the service spec has changed, preserving Kubernetes-managed fields
+	patchedSpec := proposed.Spec.DeepCopy()
+	patchedSpec.ClusterIP = livingService.Spec.ClusterIP
+	patchedSpec.ClusterIPs = livingService.Spec.ClusterIPs
+	if livingService.Spec.HealthCheckNodePort != 0 && patchedSpec.HealthCheckNodePort == 0 {
+		patchedSpec.HealthCheckNodePort = livingService.Spec.HealthCheckNodePort
+	}
+	// preserve Kubernetes-assigned NodePort values when not explicitly set
+	for i := range patchedSpec.Ports {
+		if patchedSpec.Ports[i].NodePort == 0 && i < len(livingService.Spec.Ports) {
+			patchedSpec.Ports[i].NodePort = livingService.Spec.Ports[i].NodePort
+		}
+	}
+	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
+		livingService.Spec = *patchedSpec
+		shouldUpdate = true
+	}
+
 	if !shouldUpdate {
 		return nil
 	}
 
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
 		contextLogger.Info("reconciling service")
-		// we update to ensure that we substitute the selectors
 		return r.Update(ctx, &livingService)
 	}
 
