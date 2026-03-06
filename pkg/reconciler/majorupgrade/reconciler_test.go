@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -105,46 +106,54 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 })
 
 var _ = Describe("Major upgrade rollback handling", func() {
-	It("deletes the job and requeues when the image is rolled back", func(ctx SpecContext) {
-		job := buildFailedUpgradeJob()
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "cluster-example",
-			},
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:15",
-			},
-			Status: apiv1.ClusterStatus{
-				Image: "postgres:16",
-				PGDataImageInfo: &apiv1.ImageInfo{
-					Image:        "postgres:15",
-					MajorVersion: 15,
+	DescribeTable("deletes the job and resets the image when the user rolls back",
+		func(
+			ctx SpecContext, specImage, statusImage, pgDataImage string, pgDataMajor int, expectedImage string,
+		) {
+			job := buildFailedUpgradeJob()
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-example",
 				},
-			},
-		}
+				Spec: apiv1.ClusterSpec{
+					ImageName: specImage,
+				},
+				Status: apiv1.ClusterStatus{
+					Image: statusImage,
+					PGDataImageInfo: &apiv1.ImageInfo{
+						Image:        pgDataImage,
+						MajorVersion: pgDataMajor,
+					},
+				},
+			}
 
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
-			WithRuntimeObjects(job, cluster).
-			WithStatusSubresource(cluster).
-			Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithRuntimeObjects(job, cluster).
+				WithStatusSubresource(cluster).
+				Build()
 
-		result, err := handleRollbackIfNeeded(ctx, fakeClient, cluster, job)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result).ToNot(BeNil())
-		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+			result, err := handleRollbackIfNeeded(ctx, fakeClient, record.NewFakeRecorder(10), cluster, job)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
 
-		// the job has been deleted
-		var tempJob batchv1.Job
-		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
-		Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
+			// the job has been deleted
+			var tempJob batchv1.Job
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
+			Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
 
-		// Status.Image has been reset to the pre-upgrade image
-		var updatedCluster apiv1.Cluster
-		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updatedCluster)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedCluster.Status.Image).To(Equal("postgres:15"))
-	})
+			// Status.Image has been reset to the pre-upgrade image
+			var updatedCluster apiv1.Cluster
+			err = fakeClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updatedCluster)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedCluster.Status.Image).To(Equal(expectedImage))
+		},
+		Entry("reverted to previous major version",
+			"postgres:15", "postgres:16", "postgres:15", 15, "postgres:15"),
+		Entry("changed to same-major image during upgrade",
+			"postgres:16.1", "postgres:17", "postgres:16.0", 16, "postgres:16.0"),
+	)
 
 	It("does nothing when the requested version is still higher", func(ctx SpecContext) {
 		job := buildFailedUpgradeJob()
@@ -169,7 +178,7 @@ var _ = Describe("Major upgrade rollback handling", func() {
 			WithStatusSubresource(cluster).
 			Build()
 
-		result, err := handleRollbackIfNeeded(ctx, fakeClient, cluster, job)
+		result, err := handleRollbackIfNeeded(ctx, fakeClient, record.NewFakeRecorder(10), cluster, job)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeNil())
 

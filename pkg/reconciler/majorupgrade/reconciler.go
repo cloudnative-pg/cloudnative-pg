@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,6 +56,7 @@ var ErrNoPrimaryPVCFound = fmt.Errorf("no primary PVC found")
 func Reconcile(
 	ctx context.Context,
 	c client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -67,7 +69,7 @@ func Reconcile(
 			return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
 		}
 
-		if result, err := handleRollbackIfNeeded(ctx, c, cluster, majorUpgradeJob); result != nil || err != nil {
+		if result, err := handleRollbackIfNeeded(ctx, c, recorder, cluster, majorUpgradeJob); result != nil || err != nil {
 			return result, err
 		}
 
@@ -324,9 +326,14 @@ func majorVersionUpgradeHandleCompletion(
 // while the upgrade job is still running (or has failed). If the requested
 // major version is no longer higher than PGDataImageInfo.MajorVersion,
 // the job is deleted so the cluster can restart on the old version.
+//
+// NOTE: this function runs regardless of job status, including while the
+// job is still actively executing. If the user reverts the image mid-upgrade,
+// the running job will be terminated.
 func handleRollbackIfNeeded(
 	ctx context.Context,
 	c client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	job *batchv1.Job,
 ) (*ctrl.Result, error) {
@@ -371,6 +378,9 @@ func handleRollbackIfNeeded(
 		contextLogger.Error(err, "Unable to reset status image after rollback")
 		return nil, err
 	}
+
+	recorder.Eventf(cluster, "Normal", "MajorUpgradeRollback",
+		"Cleaned up failed upgrade job, rolling back to major version %d", requestedMajor)
 
 	return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }

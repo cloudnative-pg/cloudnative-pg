@@ -752,6 +752,7 @@ func (r *ClusterReconciler) reconcileResources(
 	if result, err := majorupgrade.Reconcile(
 		ctx,
 		r.Client,
+		r.Recorder,
 		cluster,
 		resources.instances.Items,
 		resources.pvcs.Items,
