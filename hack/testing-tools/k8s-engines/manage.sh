@@ -137,13 +137,13 @@ case "$ACTION" in
             exit 1
         fi
         CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
+        source "${COMMON_DIR}/20-utils-k8s.sh"
         case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
                 helm)
-                    source "${COMMON_DIR}/20-utils-k8s.sh"
+
                     deploy_operator_from_helm
                     ;;
                 sources|*)
-                    source "${COMMON_DIR}/20-utils-k8s.sh"
                     deploy_operator_from_sources
                     ;;
             esac
