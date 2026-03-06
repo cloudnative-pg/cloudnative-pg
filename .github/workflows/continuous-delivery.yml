@@ -322,7 +322,7 @@ jobs:
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Build meta
@@ -413,7 +413,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
+        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -863,6 +863,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.k3dTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+      GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
