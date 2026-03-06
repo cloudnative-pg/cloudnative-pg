@@ -357,6 +357,20 @@ spec:
                       Additional parameters to be passed to PgBouncer - please check
                       the CNPG documentation for a list of options you can configure
                     type: object
+                  pauseDuringSwitchover:
+                    default: false
+                    description: |-
+                      PauseDuringSwitchover when true, automatically pauses this pooler
+                      during switchover/failover operations on the referenced cluster
+                      to minimize client connection failures.
+                    type: boolean
+                  pauseDuringSwitchoverTimeout:
+                    default: 120s
+                    description: |-
+                      PauseDuringSwitchoverTimeout is the maximum duration to keep the pooler
+                      paused during switchover. If the switchover doesn't complete within
+                      this time, the pooler will be automatically resumed.
+                    type: string
                   paused:
                     default: false
                     description: |-
@@ -9296,6 +9310,14 @@ spec:
                 description: The number of pods trying to be scheduled
                 format: int32
                 type: integer
+              pausedForSwitchover:
+                description: PausedForSwitchover indicates this pooler was automatically
+                  paused for switchover
+                type: boolean
+              pausedForSwitchoverTimestamp:
+                description: PausedForSwitchoverTimestamp is when this pooler was
+                  paused (RFC3339Micro)
+                type: string
               secrets:
                 description: The resource version of the config object
                 properties:

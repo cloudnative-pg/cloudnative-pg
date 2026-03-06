@@ -19,7 +19,11 @@ SPDX-License-Identifier: Apache-2.0
 
 package v1
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 // IsPaused returns whether all database should be paused or not.
 func (in PgBouncerSpec) IsPaused() bool {
@@ -113,4 +117,18 @@ func (in *Pooler) GetResourcesRequirements() corev1.ResourceRequirements {
 	}
 
 	return *in.Spec.Template.Spec.Resources
+}
+
+// ShouldPauseDuringSwitchover returns whether this pooler should be
+// automatically paused during switchover/failover.
+func (in *PgBouncerSpec) ShouldPauseDuringSwitchover() bool {
+	return in != nil && in.PauseDuringSwitchover != nil && *in.PauseDuringSwitchover
+}
+
+// GetPauseDuringSwitchoverTimeout returns the configured timeout or the default (120s).
+func (in *PgBouncerSpec) GetPauseDuringSwitchoverTimeout() time.Duration {
+	if in != nil && in.PauseDuringSwitchoverTimeout != nil {
+		return in.PauseDuringSwitchoverTimeout.Duration
+	}
+	return 120 * time.Second
 }
