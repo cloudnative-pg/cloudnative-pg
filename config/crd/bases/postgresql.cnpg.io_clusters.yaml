@@ -4341,19 +4341,15 @@ spec:
               podSelectorRefs:
                 description: |-
                   PodSelectorRefs defines named pod label selectors that can be referenced
-                  in pg_hba rules using the ${podselector:<name>} syntax in the address field.
+                  in pg_hba rules using the ${podselector:NAME} syntax in the address field.
                   The operator resolves matching pod IPs and the instance manager expands
                   pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
                 items:
-                  description: |-
-                    PodSelectorRef defines a named pod label selector for use in pg_hba rules.
-                    Pods matching the selector in the Cluster's namespace will have their IPs
-                    resolved and made available for pg_hba address expansion via the ${podselector:<name>} syntax.
                   properties:
                     name:
                       description: |-
                         Name is the identifier used to reference this selector in pg_hba rules
-                        via the ${podselector:<name>} syntax in the address field.
+                        via the ${podselector:NAME} syntax in the address field.
                       minLength: 1
                       pattern: ^[a-z]([a-z0-9_-]*[a-z0-9])?$
                       type: string
@@ -4577,7 +4573,7 @@ spec:
                     description: |-
                       PostgreSQL Host Based Authentication rules (lines to be appended
                       to the pg_hba.conf file).
-                      Use the "${podselector:<name>}" syntax to reference a pod selector;
+                      Use the ${podselector:NAME} syntax to reference a pod selector;
                       the rule will be expanded for each Pod IP matching that selector.
                     items:
                       type: string
