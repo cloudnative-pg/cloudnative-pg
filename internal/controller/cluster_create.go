@@ -1253,7 +1253,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
 
 	// If we can bootstrap this replica from a pre-existing source, we do it
-	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
 	if storageSource != nil {
 		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
 	}
