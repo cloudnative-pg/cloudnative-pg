@@ -194,7 +194,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 
 		By("creating the roleBinding", func() {
-			roleBinding := pgbouncer.RoleBinding(pooler)
+			roleBinding := pgbouncer.RoleBinding(pooler, pooler.GetServiceAccountName())
 			err := env.poolerReconciler.Create(ctx, &roleBinding)
 			Expect(err).ToNot(HaveOccurred())
 		})
