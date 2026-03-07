@@ -2678,6 +2678,72 @@ var _ = Describe("unix permissions identifiers change validation", func() {
 	})
 })
 
+var _ = Describe("cross-namespace databases change validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("rejects disabling cross-namespace databases once enabled", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+		result := v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.enableCrossNamespaceDatabases"))
+	})
+
+	It("allows enabling cross-namespace databases", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+	})
+
+	It("allows keeping cross-namespace databases enabled", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: true,
+			},
+		}
+		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+	})
+
+	It("allows keeping cross-namespace databases disabled", func() {
+		oldCluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				EnableCrossNamespaceDatabases: false,
+			},
+		}
+		Expect(v.validateCrossNamespaceDatabasesChange(cluster, oldCluster)).To(BeEmpty())
+	})
+})
+
 var _ = Describe("promotion token validation", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
