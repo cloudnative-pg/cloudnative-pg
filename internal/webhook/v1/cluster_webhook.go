@@ -2850,6 +2850,16 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		}
 		sanitizedVolumeNames.Put(sanitizedName)
 
+		if v.ImageVolumeSource.Reference == "" {
+			result = append(result,
+				field.Invalid(
+					basePath.Child("image", "reference"),
+					v.ImageVolumeSource.Reference,
+					fmt.Sprintf("Image reference for extension %q is required", v.Name),
+				),
+			)
+		}
+
 		controlPaths := stringset.New()
 		for j, path := range v.ExtensionControlPath {
 			if validateErr := ensureNotEmptyOrDuplicate(

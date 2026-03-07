@@ -5772,6 +5772,53 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extensions[2].name"))
 		Expect(err[0].BadValue).To(Equal("pg-stat"))
 	})
+
+	It("returns an error when image reference is empty", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extone",
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].image.reference"))
+	})
+
+	It("returns errors for multiple extensions with empty image references", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extone",
+						},
+						{
+							Name: "exttwo",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "exttwo:latest",
+							},
+						},
+						{
+							Name: "extthree",
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].image.reference"))
+		Expect(err[1].Field).To(ContainSubstring("extensions[2].image.reference"))
+	})
 })
 
 var _ = Describe("getInTreeBarmanWarnings", func() {
