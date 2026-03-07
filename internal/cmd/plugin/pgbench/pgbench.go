@@ -161,7 +161,8 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 							Args:            cmd.pgBenchCommandArgs,
 						},
 					},
-					NodeSelector: cmd.buildNodeSelector(),
+					NodeSelector:     cmd.buildNodeSelector(),
+					ImagePullSecrets: buildImagePullSecrets(cluster),
 				},
 			},
 		},
@@ -172,6 +173,18 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 	}
 
 	return result
+}
+
+func buildImagePullSecrets(cluster *apiv1.Cluster) []corev1.LocalObjectReference {
+	if len(cluster.Spec.ImagePullSecrets) == 0 {
+		return nil
+	}
+
+	secrets := make([]corev1.LocalObjectReference, len(cluster.Spec.ImagePullSecrets))
+	for i, s := range cluster.Spec.ImagePullSecrets {
+		secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+	}
+	return secrets
 }
 
 func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
