@@ -366,7 +366,7 @@ consistency and initiates a job to validate upgrade conditions and execute
 `pg_upgrade`. This job creates the necessary new directories for `PGDATA`, WAL
 files, and tablespaces before re-creating the replicas. This structured
 workflow provides a reliable path for major version transitions and supports
-rollbacks in the event of a failure.
+automatic rollback cleanup when the user reverts the image after a failure.
 
 ### Display cluster availability status during upgrade
 
