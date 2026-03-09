@@ -26,33 +26,35 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ensureCIDR", func() {
+var _ = Describe("hostCIDR", func() {
 	It("adds /32 suffix to IPv4 address", func() {
-		Expect(ensureCIDR("10.0.0.1")).To(Equal("10.0.0.1/32"))
-		Expect(ensureCIDR("192.168.1.1")).To(Equal("192.168.1.1/32"))
-		Expect(ensureCIDR("0.0.0.0")).To(Equal("0.0.0.0/32"))
+		Expect(hostCIDR("10.0.0.1")).To(Equal("10.0.0.1/32"))
+		Expect(hostCIDR("192.168.1.1")).To(Equal("192.168.1.1/32"))
+		Expect(hostCIDR("0.0.0.0")).To(Equal("0.0.0.0/32"))
 	})
 
 	It("adds /128 suffix to IPv6 address", func() {
-		Expect(ensureCIDR("2001:db8::1")).To(Equal("2001:db8::1/128"))
-		Expect(ensureCIDR("::1")).To(Equal("::1/128"))
-		Expect(ensureCIDR("fe80::1")).To(Equal("fe80::1/128"))
+		Expect(hostCIDR("2001:db8::1")).To(Equal("2001:db8::1/128"))
+		Expect(hostCIDR("::1")).To(Equal("::1/128"))
+		Expect(hostCIDR("fe80::1")).To(Equal("fe80::1/128"))
 	})
 
-	It("preserves existing IPv4 CIDR mask", func() {
-		Expect(ensureCIDR("10.0.0.0/24")).To(Equal("10.0.0.0/24"))
-		Expect(ensureCIDR("192.168.1.0/16")).To(Equal("192.168.1.0/16"))
-		Expect(ensureCIDR("0.0.0.0/0")).To(Equal("0.0.0.0/0"))
+	It("normalizes fully expanded IPv6 addresses", func() {
+		Expect(hostCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334")).
+			To(Equal("2001:db8:85a3::8a2e:370:7334/128"))
 	})
 
-	It("preserves existing IPv6 CIDR mask", func() {
-		Expect(ensureCIDR("2001:db8::/64")).To(Equal("2001:db8::/64"))
-		Expect(ensureCIDR("::/0")).To(Equal("::/0"))
+	It("returns CIDR notation unchanged", func() {
+		Expect(hostCIDR("10.0.0.0/24")).To(Equal("10.0.0.0/24"))
+		Expect(hostCIDR("192.168.1.0/16")).To(Equal("192.168.1.0/16"))
+		Expect(hostCIDR("0.0.0.0/0")).To(Equal("0.0.0.0/0"))
+		Expect(hostCIDR("2001:db8::/64")).To(Equal("2001:db8::/64"))
+		Expect(hostCIDR("::/0")).To(Equal("::/0"))
 	})
 
 	It("returns invalid input unchanged", func() {
-		Expect(ensureCIDR("invalid")).To(Equal("invalid"))
-		Expect(ensureCIDR("")).To(Equal(""))
+		Expect(hostCIDR("invalid")).To(Equal("invalid"))
+		Expect(hostCIDR("")).To(Equal(""))
 	})
 })
 
@@ -136,13 +138,22 @@ var _ = Describe("ExpandLine", func() {
 		}))
 	})
 
-	It("preserves existing CIDR mask", func() {
+	It("passes through CIDR notation in expansion", func() {
 		result := ExpandLine("host all all ${podselector:myapp} md5", map[string][]string{
 			"myapp": {"10.0.0.0/24", "2001:db8::/64"},
 		})
 		Expect(result).To(Equal([]string{
 			"host all all 10.0.0.0/24 md5",
 			"host all all 2001:db8::/64 md5",
+		}))
+	})
+
+	It("normalizes fully expanded IPv6 in expansion", func() {
+		result := ExpandLine("host all all ${podselector:myapp} md5", map[string][]string{
+			"myapp": {"2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
+		})
+		Expect(result).To(Equal([]string{
+			"host all all 2001:db8:85a3::8a2e:370:7334/128 md5",
 		}))
 	})
 

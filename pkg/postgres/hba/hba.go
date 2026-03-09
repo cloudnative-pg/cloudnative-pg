@@ -22,7 +22,6 @@ package hba
 import (
 	"net"
 	"regexp"
-	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 )
@@ -95,29 +94,30 @@ func ExpandLine(line string, selectorIPs map[string][]string) []string {
 
 	result := make([]string, len(ips))
 	for i, ip := range ips {
-		result[i] = line[:match[0]] + ensureCIDR(ip) + line[match[1]:]
+		result[i] = line[:match[0]] + hostCIDR(ip) + line[match[1]:]
 	}
 
 	return result
 }
 
-// ensureCIDR ensures the IP has a CIDR suffix.
-// Returns the IP with /32 for IPv4 or /128 for IPv6 if no mask is present.
-func ensureCIDR(ip string) string {
-	if strings.Contains(ip, "/") {
-		return ip
-	}
-
+// hostCIDR converts an IP address string to canonical host CIDR notation
+// (/32 for IPv4, /128 for IPv6) using the standard library for proper
+// formatting and normalization.
+func hostCIDR(ip string) string {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
 		return ip
 	}
 
+	bits := 128
 	if parsed.To4() != nil {
-		return ip + "/32"
+		bits = 32
 	}
 
-	return ip + "/128"
+	return (&net.IPNet{
+		IP:   parsed,
+		Mask: net.CIDRMask(bits, bits),
+	}).String()
 }
 
 func commentWithError(line string, err error) string {
