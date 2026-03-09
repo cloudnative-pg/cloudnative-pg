@@ -1576,9 +1576,9 @@ func (cluster *Cluster) IsFailoverQuorumActive() bool {
 
 // GetPodSelectorIPs builds a map from podSelectorRef names to their resolved
 // pod IPs, using status data populated by the operator. Returns nil when
-// no podSelectorRefs are defined in the spec.
+// no resolved podSelectorRefs are present in the status.
 func (cluster *Cluster) GetPodSelectorIPs() map[string][]string {
-	if len(cluster.Spec.PodSelectorRefs) == 0 {
+	if len(cluster.Status.PodSelectorRefs) == 0 {
 		return nil
 	}
 
