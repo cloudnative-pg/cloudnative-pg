@@ -456,7 +456,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -549,7 +549,7 @@ jobs:
           rm -fr manifests/operator-manifest.yaml
       -
         name: Prepare the operator manifest
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
         with:
           name: operator-manifest.yaml
           path: manifests
@@ -770,7 +770,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -796,7 +796,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: kind-logs-${{ env.MATRIX }}
           path: kind-logs/
@@ -804,7 +804,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -815,7 +815,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -959,7 +959,7 @@ jobs:
           fi
       - name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -980,14 +980,14 @@ jobs:
       - # Archive logs for failed test cases if there are any
         name: Archive K3D logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: k3d-logs-${{ env.MATRIX }}
           path: k3d-logs/
           retention-days: 7
       - name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -996,7 +996,7 @@ jobs:
           if-no-files-found: ignore
       - name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1274,7 +1274,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1299,7 +1299,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1309,7 +1309,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1648,7 +1648,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1673,7 +1673,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1683,7 +1683,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1996,7 +1996,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2021,7 +2021,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2031,7 +2031,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2299,7 +2299,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2324,7 +2324,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2334,7 +2334,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2390,7 +2390,7 @@ jobs:
         run: mkdir test-artifacts
 
       - name: Download all artifacts to the directory
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
         with:
           path: test-artifacts
           pattern: testartifacts-*
@@ -2414,7 +2414,7 @@ jobs:
 
       - name: If there is an overflow summary, archive it
         if: steps.generate-summary.outputs.Overflow
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
           path: ${{ steps.generate-summary.outputs.Overflow }}
