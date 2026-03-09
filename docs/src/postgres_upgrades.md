@@ -146,9 +146,10 @@ If the upgrade is successful, CloudNativePG:
     may want to run `ANALYZE` on your databases to update them.
 :::
 
-If the upgrade fails, you must manually revert the major version change in the
-cluster's configuration and delete the upgrade job, as CloudNativePG cannot
-automatically decide the rollback.
+If the upgrade fails, revert the image in the cluster's configuration to the
+previous major version. The operator detects the rollback and automatically
+deletes the failed upgrade job, allowing the cluster to restart on the original
+version.
 
 :::info[Important]
     This process **protects your existing database from data loss**, as no data
