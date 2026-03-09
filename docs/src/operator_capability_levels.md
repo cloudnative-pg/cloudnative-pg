@@ -335,14 +335,19 @@ minutes, based on the actual database workload.
 ### Offline In-Place Major Upgrades of PostgreSQL
 
 CloudNativePG supports declarative offline in-place major upgrades when a new
-operand container image with a higher PostgreSQL major version is applied to a
-cluster. The upgrade can be triggered by updating the image tag via the
-`.spec.imageName` option or by using an image catalog to manage version
-changes. During the upgrade, all cluster pods are shut down to ensure data
-consistency. A new job is then created to validate the upgrade conditions,
-execute `pg_upgrade`, and create new directories for `PGDATA`, WAL files, and
-tablespaces if needed. Once the upgrade is complete, replicas are re-created.
-Failed upgrades can be rolled back.
+operand container image with a higher PostgreSQL major version is applied.
+This upgrade can be triggered by updating the `.spec.imageName` directly or by
+selecting a higher major version within an image catalog. The use of image
+catalogs is particularly beneficial here, as it ensures that any associated
+[extension volumes](imagevolume_extensions.md) are simultaneously updated to
+versions compatible with the new PostgreSQL major version.
+
+During the process, the operator shuts down all cluster pods to maintain data
+consistency and initiates a job to validate upgrade conditions and execute
+`pg_upgrade`. This job creates the necessary new directories for `PGDATA`, WAL
+files, and tablespaces before re-creating the replicas. This structured
+workflow provides a reliable path for major version transitions and supports
+automatic rollback cleanup when the user reverts the image after a failure.
 
 ### Display cluster availability status during upgrade
 

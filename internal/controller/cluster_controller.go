@@ -745,6 +745,24 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Major upgrade reconciliation runs before the running-jobs guard
+	// because it owns the upgrade job lifecycle. A failed upgrade job
+	// (BackoffLimit=0) would otherwise block rollback detection.
+	if result, err := majorupgrade.Reconcile(
+		ctx,
+		r.Client,
+		r.Recorder,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+		resources.jobs.Items,
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
+	} else if result != nil {
+		return *result, err
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -808,20 +826,6 @@ func (r *ClusterReconciler) reconcileResources(
 		resources.pvcs.Items,
 	); err != nil || !res.IsZero() {
 		return res, err
-	}
-
-	// In-place Postgres major version upgrades
-	if result, err := majorupgrade.Reconcile(
-		ctx,
-		r.Client,
-		cluster,
-		resources.instances.Items,
-		resources.pvcs.Items,
-		resources.jobs.Items,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
-	} else if result != nil {
-		return *result, err
 	}
 
 	// Reconcile Pods
