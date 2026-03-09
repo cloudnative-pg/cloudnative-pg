@@ -111,6 +111,39 @@ var _ = Describe("clusterMatchesPod", func() {
 		Expect(clusterMatchesPod(cluster, pod)).To(BeTrue())
 	})
 
+	It("matches using matchExpressions", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"myapp", "otherapp"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		matchingPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app": "myapp"},
+			},
+		}
+		nonMatchingPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app": "unrelated"},
+			},
+		}
+		Expect(clusterMatchesPod(cluster, matchingPod)).To(BeTrue())
+		Expect(clusterMatchesPod(cluster, nonMatchingPod)).To(BeFalse())
+	})
+
 	It("skips invalid selectors without erroring", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
