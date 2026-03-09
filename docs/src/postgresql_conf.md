@@ -515,7 +515,7 @@ automatically updates the resolved IPs in the cluster status. The instance
 manager picks up these changes, regenerates `pg_hba.conf`, and reloads
 PostgreSQL.
 
-Selector names must follow the pattern `^[a-z]([a-z0-9-]*[a-z0-9])?$` and
+Selector names must follow the pattern `^[a-z]([a-z0-9_-]*[a-z0-9])?$` and
 each `${podselector:NAME}` reference in a `pg_hba` rule must correspond to
 a defined entry in `podSelectorRefs`. The webhook validates both constraints.
 
