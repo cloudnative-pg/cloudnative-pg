@@ -2914,6 +2914,9 @@ func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field
 	// Validate selectors and collect known names
 	knownSelectors := stringset.New()
 	for i, ref := range r.Spec.PodSelectorRefs {
+		if knownSelectors.Has(ref.Name) {
+			allErrors = append(allErrors, field.Duplicate(path.Index(i).Child("name"), ref.Name))
+		}
 		knownSelectors.Put(ref.Name)
 
 		allErrors = append(allErrors,

@@ -4345,6 +4345,11 @@ spec:
                   The operator resolves matching pod IPs and the instance manager expands
                   pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
                 items:
+                  description: |-
+                    PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+                    Pods matching the selector in the Cluster's namespace will have their IPs
+                    resolved and made available for pg_hba address expansion via the
+                    ${podselector:NAME} syntax.
                   properties:
                     name:
                       description: |-
@@ -7209,6 +7214,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               poolerIntegrations:
                 description: The integration needed by poolers referencing the cluster
                 properties:

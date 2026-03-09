@@ -854,6 +854,8 @@ type ClusterStatus struct {
 	// PodSelectorRefs contains the resolved pod IPs for each named selector
 	// defined in spec.podSelectorRefs.
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	PodSelectorRefs []PodSelectorRefStatus `json:"podSelectorRefs,omitempty"`
 
 	// The timeline of the Postgres cluster

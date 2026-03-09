@@ -481,10 +481,10 @@ If the operator detects pods with IPs `10.0.0.5`, `10.0.0.12` (App), and
 follows:
 
 ```text
-# hostssl mydb myuser ${podselector:app-pods} scram-sha-256
+# Expanded from: hostssl mydb myuser ${podselector:app-pods} scram-sha-256
 hostssl mydb myuser 10.0.0.5/32 scram-sha-256
 hostssl mydb myuser 10.0.0.12/32 scram-sha-256
-# "hostssl postgres monitor ${podselector:monitoring} scram-sha-256"
+# Expanded from: hostssl postgres monitor ${podselector:monitoring} scram-sha-256
 hostssl postgres monitor 10.0.1.3/32 scram-sha-256
 ```
 
@@ -500,24 +500,16 @@ hostssl postgres monitor 10.0.1.3/32 scram-sha-256
 - **Reactivity:** The operator watches for pod lifecycle events (creation,
   deletion, or IP updates). Updates trigger an automatic configuration
   regeneration and a PostgreSQL `reload`.
-- **Validation:** Selector names must be DNS-compliant
-  (`^[a-z]([a-z0-9-]*[a-z0-9])?$`). The admission webhook will reject any
-  reference to an undefined selector name.
+- **Validation:** Selector names must follow the pattern
+  `^[a-z]([a-z0-9_-]*[a-z0-9])?$` and each `${podselector:NAME}` reference
+  in a `pg_hba` rule must correspond to a defined entry in `podSelectorRefs`.
+  The webhook validates both constraints.
 
 :::warning
 When a selector matches zero pods, the corresponding `pg_hba` lines referencing
 it are omitted from `pg_hba.conf`. Ensure that your default rules provide
 appropriate fallback access.
 :::
-
-The operator watches for pod changes (creation, deletion, IP changes) and
-automatically updates the resolved IPs in the cluster status. The instance
-manager picks up these changes, regenerates `pg_hba.conf`, and reloads
-PostgreSQL.
-
-Selector names must follow the pattern `^[a-z]([a-z0-9_-]*[a-z0-9])?$` and
-each `${podselector:NAME}` reference in a `pg_hba` rule must correspond to
-a defined entry in `podSelectorRefs`. The webhook validates both constraints.
 
 For a complete example, see
 [`cluster-example-pod-selector-refs.yaml`](samples/cluster-example-pod-selector-refs.yaml).

@@ -21,6 +21,7 @@ package podselector
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -72,7 +73,7 @@ func Reconcile(
 			client.InNamespace(cluster.Namespace),
 			client.MatchingLabelsSelector{Selector: selector},
 		); err != nil {
-			return err
+			return fmt.Errorf("listing pods for selector %q: %w", ref.Name, err)
 		}
 
 		// Collect unique IPs from non-terminating pods (including all

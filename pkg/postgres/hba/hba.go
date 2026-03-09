@@ -65,6 +65,8 @@ func (e *ErrPodSelectorNotFound) Error() string {
 var descriptorReference = regexp.MustCompile(`\${([^:]+):([^}]+)}`)
 
 // ExpandLine expands descriptor references in an HBA line.
+// Only the first descriptor reference is expanded; lines with multiple
+// references should be rejected by ValidateLine before reaching this point.
 // Returns one line per expanded value.
 // If the line has no descriptor reference, returns a slice
 // containing just the original line.
