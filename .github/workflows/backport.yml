@@ -91,6 +91,7 @@ jobs:
           token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Install Go
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version-file: go.mod
