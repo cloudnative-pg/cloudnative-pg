@@ -92,6 +92,45 @@ var _ = Describe("ExternalPodsPredicate", func() {
 		Expect(pred.UpdateFunc(event.UpdateEvent{ObjectOld: oldPod, ObjectNew: newPod})).To(BeTrue())
 	})
 
+	It("passes updates where only labels changed", func() {
+		oldPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "external-pod",
+				Labels: map[string]string{"app": "myapp"},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}}},
+		}
+		newPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "external-pod",
+				Labels: map[string]string{"app": "otherapp"},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}}},
+		}
+		Expect(pred.UpdateFunc(event.UpdateEvent{ObjectOld: oldPod, ObjectNew: newPod})).To(BeTrue())
+	})
+
+	It("passes updates when DeletionTimestamp transitions to non-nil", func() {
+		now := metav1.Now()
+		oldPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "external-pod",
+				Labels: map[string]string{"app": "myapp"},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}}},
+		}
+		newPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "external-pod",
+				Labels:            map[string]string{"app": "myapp"},
+				DeletionTimestamp: &now,
+				Finalizers:        []string{"test-finalizer"},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.1"}}},
+		}
+		Expect(pred.UpdateFunc(event.UpdateEvent{ObjectOld: oldPod, ObjectNew: newPod})).To(BeTrue())
+	})
+
 	It("filters out updates where nothing relevant changed", func() {
 		oldPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

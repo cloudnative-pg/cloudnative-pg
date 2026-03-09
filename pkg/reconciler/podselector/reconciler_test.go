@@ -180,6 +180,150 @@ var _ = Describe("Reconcile", func() {
 		Expect(cluster.Status.PodSelectorRefs[0].IPs).To(ConsistOf("10.0.0.5"))
 	})
 
+	It("collects both IPv4 and IPv6 from dual-stack pods", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+			},
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dual-stack-pod",
+				Namespace: namespace,
+				Labels:    map[string]string{"app": "myapp"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "c", Image: "img"}},
+			},
+			Status: corev1.PodStatus{
+				PodIPs: []corev1.PodIP{{IP: "10.0.0.5"}, {IP: "fd00::5"}},
+			},
+		}
+		fakeClient := newFakeClient(cluster, pod)
+
+		err := Reconcile(context.Background(), fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.PodSelectorRefs).To(HaveLen(1))
+		Expect(cluster.Status.PodSelectorRefs[0].IPs).To(ConsistOf("10.0.0.5", "fd00::5"))
+	})
+
+	It("resolves multiple selectors simultaneously", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+					{
+						Name: "monitoring",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"role": "monitor"},
+						},
+					},
+				},
+			},
+		}
+		appPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "app-pod",
+				Namespace: namespace,
+				Labels:    map[string]string{"app": "myapp"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "c", Image: "img"}},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.5"}}},
+		}
+		monPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mon-pod",
+				Namespace: namespace,
+				Labels:    map[string]string{"role": "monitor"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "c", Image: "img"}},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.1.3"}}},
+		}
+		fakeClient := newFakeClient(cluster, appPod, monPod)
+
+		err := Reconcile(context.Background(), fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.PodSelectorRefs).To(HaveLen(2))
+		Expect(cluster.Status.PodSelectorRefs[0].Name).To(Equal("app-pods"))
+		Expect(cluster.Status.PodSelectorRefs[0].IPs).To(ConsistOf("10.0.0.5"))
+		Expect(cluster.Status.PodSelectorRefs[1].Name).To(Equal("monitoring"))
+		Expect(cluster.Status.PodSelectorRefs[1].IPs).To(ConsistOf("10.0.1.3"))
+	})
+
+	It("skips pods with no IP assigned", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+			},
+		}
+		podWithIP := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ready-pod",
+				Namespace: namespace,
+				Labels:    map[string]string{"app": "myapp"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "c", Image: "img"}},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: "10.0.0.5"}}},
+		}
+		podWithoutIP := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pending-pod",
+				Namespace: namespace,
+				Labels:    map[string]string{"app": "myapp"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "c", Image: "img"}},
+			},
+			Status: corev1.PodStatus{PodIPs: []corev1.PodIP{{IP: ""}}},
+		}
+		fakeClient := newFakeClient(cluster, podWithIP, podWithoutIP)
+
+		err := Reconcile(context.Background(), fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.PodSelectorRefs).To(HaveLen(1))
+		Expect(cluster.Status.PodSelectorRefs[0].IPs).To(ConsistOf("10.0.0.5"))
+	})
+
 	It("does nothing when no selectors are defined and status is empty", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

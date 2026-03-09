@@ -126,6 +126,16 @@ var _ = Describe("ExpandLine", func() {
 		}))
 	})
 
+	It("expands mixed IPv4 and IPv6 from dual-stack pods", func() {
+		result := ExpandLine("host all all ${podselector:myapp} md5", map[string][]string{
+			"myapp": {"10.0.0.1", "2001:db8::1"},
+		})
+		Expect(result).To(Equal([]string{
+			"host all all 10.0.0.1/32 md5",
+			"host all all 2001:db8::1/128 md5",
+		}))
+	})
+
 	It("preserves existing CIDR mask", func() {
 		result := ExpandLine("host all all ${podselector:myapp} md5", map[string][]string{
 			"myapp": {"10.0.0.0/24", "2001:db8::/64"},
