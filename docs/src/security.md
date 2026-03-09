@@ -324,11 +324,28 @@ permission management.
    to contain permissions and restrict access more effectively.
 :::
 
+##### Namespaced Deployment
+
+CloudNativePG supports namespaced deployment mode, where the operator only manages
+resources within a specific namespace. When enabled via the `NAMESPACED` configuration
+option, RBAC permissions can be significantly restricted:
+
+- The `ClusterRole` can be limited to only access admission controllers
+- All other permissions can be restricted to a namespaced `Role`
+
+This approach provides enhanced security isolation by preventing the operator from
+accessing cluster-scoped resources or resources in other namespaces. For detailed
+configuration instructions, refer to the [Namespaced Deployment section](operator_conf.md#namespaced-deployment)
+in the operator configuration documentation.
+
 #### Why Are ClusterRole Permissions Needed?
 
-The operator currently requires `ClusterRole` permissions to read `nodes` and
+In cluster-wide mode, the operator requires `ClusterRole` permissions to read `nodes` and
 `ClusterImageCatalog` objects. All other permissions can be namespace-scoped (i.e., `Role`) or
 cluster-wide (i.e., `ClusterRole`).
+
+However, in namespaced deployment mode, these cluster-scoped permissions are not required,
+allowing for a more restrictive RBAC policy.
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
 they will only have `get`, `list`, and `watch` permissions, which are limited

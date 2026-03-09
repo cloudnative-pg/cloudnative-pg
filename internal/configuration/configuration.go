@@ -22,6 +22,7 @@ SPDX-License-Identifier: Apache-2.0
 package configuration
 
 import (
+	"errors"
 	"path"
 	"strings"
 	"time"
@@ -32,7 +33,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var configurationLog = log.WithName("configuration")
+var (
+	configurationLog = log.WithName("configuration")
+	// ErrNamespaceEmpty is raised when the namespace is empty in namespaced deployment
+	ErrNamespaceEmpty = errors.New(
+		"NAMESPACED mode requires both OPERATOR_NAMESPACE and WATCH_NAMESPACE to be set to the same non-empty value. " +
+			"Please ensure both environment variables are configured correctly")
+	// ErrNamespaceMismatch is raised when the OperatorNamespace and WatchNamespace is not equal in namespaced deployment
+	ErrNamespaceMismatch = errors.New(
+		"NAMESPACED mode requires OPERATOR_NAMESPACE and WATCH_NAMESPACE to be equal. " +
+			"Currently they are set to different values. " +
+			"Please set both to the same namespace where the operator is deployed")
+)
 
 const (
 	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
@@ -95,6 +107,10 @@ type Data struct {
 
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
+
+	// Namespaced defines if the operator should only access and listen to resources within
+	// its own namespace. Default false
+	Namespaced bool `json:"namespaced" env:"NAMESPACED"`
 
 	// OperatorPullSecretName is the pull secret used to download the
 	// pull secret name
@@ -194,6 +210,7 @@ func newDefaultConfig() *Data {
 		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
+		Namespaced:              false,
 	}
 }
 
@@ -252,6 +269,34 @@ func (config *Data) GetIncludePlugins() []string {
 	}
 
 	return result
+}
+
+// Validate validates configuration parameters and combinations.
+// If validation fails it returns an error.
+func (config *Data) Validate() error {
+	if err := config.validateNamespacedConfiguration(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ValidateNamespacedConfiguration validates that when namespaced mode is enabled,
+// the operator namespace and watch namespace must be equal and non-empty
+func (config *Data) validateNamespacedConfiguration() error {
+	if !config.Namespaced {
+		return nil
+	}
+
+	if config.OperatorNamespace == "" || config.WatchNamespace == "" {
+		return ErrNamespaceEmpty
+	}
+
+	if config.OperatorNamespace != config.WatchNamespace {
+		return ErrNamespaceMismatch
+	}
+
+	return nil
 }
 
 func cleanNamespaceList(namespaces string) (result []string) {

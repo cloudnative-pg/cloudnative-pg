@@ -179,6 +179,12 @@ func RunController(
 
 	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
+	// Validate configuration combination
+	if err := conf.Validate(); err != nil {
+		setupLog.Error(err, "invalid configuration")
+		return err
+	}
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err

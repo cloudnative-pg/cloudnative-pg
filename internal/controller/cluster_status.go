@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -116,9 +117,13 @@ func (r *ClusterReconciler) getManagedResources(
 		return nil, err
 	}
 
-	nodes, err := r.getNodes(ctx)
-	if err != nil {
-		return nil, err
+	// If operator is configured in namespaced mode, set as empty list.
+	var nodes map[string]corev1.Node
+	if !configuration.Current.Namespaced {
+		nodes, err = r.getNodes(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &managedResources{
@@ -241,6 +246,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.instances.Items,
 		resources.nodes,
 		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+		configuration.Current.Namespaced,
 	)
 
 	// Services
@@ -786,16 +792,27 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	return nil
 }
 
-// getPodsTopology returns a map with all the information about the pods topology
+// getPodsTopology returns a map with all the information about the pods topology.
+// In namespaced deployment, the operator doesn't have access to node information,
+// so topology extraction fails and returns an empty topology.
 func getPodsTopology(
 	ctx context.Context,
 	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
 	topology apiv1.SyncReplicaElectionConstraints,
+	namespaced bool,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
 	nodesMap := make(map[string][]apiv1.PodName)
+
+	// In namespaced mode, the operator doesn't have access to node information,
+	// so we cannot extract topology. Return empty topology with SuccessfullyExtracted=false.
+	// Note: syncReplicaElectionConstraint is blocked by webhook validation in namespaced mode.
+	if namespaced {
+		contextLogger.Debug("namespaced deployment mode: topology extraction not available without node access")
+		return apiv1.Topology{SuccessfullyExtracted: false}
+	}
 
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
@@ -806,7 +823,7 @@ func getPodsTopology(
 			// - the node could have been drained
 			// - others
 			contextLogger.Debug("node not found, skipping pod topology matching")
-			return apiv1.Topology{}
+			return apiv1.Topology{SuccessfullyExtracted: false}
 		}
 
 		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)

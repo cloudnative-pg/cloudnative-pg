@@ -142,3 +142,7 @@ and the following suite of E2E tests are performed on that cluster:
 
 * **Major version upgrade**
   * Upgrade to the latest major version
+
+* **Namespaced deployment**
+  * Operator configured to namespaced deployment with reduced RBAC
+  * Node drain while operator is configured in namespaced deployment
