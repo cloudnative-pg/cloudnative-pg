@@ -96,6 +96,10 @@ type Data struct {
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
+	// WatchNodes defines if the operator should watch and manage node resources.
+	// When false, the operator will not monitor node events or handle node-related operations.
+	WatchNodes bool `json:"watchNodes" env:"WATCH_NODES"`
+
 	// OperatorPullSecretName is the pull secret used to download the
 	// pull secret name
 	OperatorPullSecretName string `json:"operatorPullSecretName" env:"PULL_SECRET_NAME"`
@@ -194,6 +198,7 @@ func newDefaultConfig() *Data {
 		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
+		WatchNodes:              true,
 	}
 }
 
