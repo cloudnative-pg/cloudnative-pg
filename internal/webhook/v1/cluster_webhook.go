@@ -2822,7 +2822,29 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				value,
 			)
 		}
+
 		return nil
+	}
+
+	validatePathList := func(
+		paths []string,
+		fieldPath *field.Path,
+	) field.ErrorList {
+		var result field.ErrorList
+		pathSet := stringset.New()
+
+		for j, path := range paths {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				fieldPath.Index(j),
+				pathSet,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+			}
+			pathSet.Put(path)
+		}
+
+		return result
 	}
 
 	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
@@ -2865,44 +2887,10 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 			)
 		}
 
-		controlPaths := stringset.New()
-		for j, path := range v.ExtensionControlPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("extension_control_path").Index(j),
-				controlPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			controlPaths.Put(path)
-		}
-
-		libraryPaths := stringset.New()
-		for j, path := range v.DynamicLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("dynamic_library_path").Index(j),
-				libraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			libraryPaths.Put(path)
-		}
-
-		ldLibraryPaths := stringset.New()
-		for j, path := range v.LdLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("ld_library_path").Index(j),
-				ldLibraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			ldLibraryPaths.Put(path)
-		}
+		result = append(result, validatePathList(v.ExtensionControlPath, basePath.Child("extension_control_path"))...)
+		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
+		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
+		result = append(result, validatePathList(v.Path, basePath.Child("path"))...)
 	}
 
 	return result

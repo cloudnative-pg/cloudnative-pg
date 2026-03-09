@@ -103,6 +103,12 @@ spec:
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                             type: string
+                          path:
+                            description: A list of directories inside the image which
+                              should be added to PATH.
+                            items:
+                              type: string
+                            type: array
                         required:
                         - name
                         type: object

@@ -350,6 +350,47 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 	})
 
+	Context("Extensions enabled, PATH undefined", func() {
+		It("should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			path := getPathFromEnv(instance.buildPostgresEnv())
+			Expect(path).To(Equal("PATH=/my/default/path"))
+		})
+	})
+
+	Context("Extensions enabled, PATH defined", func() {
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/bindir"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/bindir"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
+		BeforeEach(func() {
+			// Update the spec
+			cluster.Spec.PostgresConfiguration.Extensions[0].Path = []string{"/bindir", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].Path = []string{"./bindir", "./sample/"}
+			// Update the status
+			cluster.Status.PGDataImageInfo.Extensions[0].Path = []string{"/bindir", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].Path = []string{"./bindir", "./sample/"}
+		})
+
+		It("should be defined", func() {
+			GinkgoT().Setenv("PATH", "")
+
+			path := getPathFromEnv(instance.buildPostgresEnv())
+			Expect(path).To(Equal(fmt.Sprintf("PATH=%s", finalPaths)))
+		})
+		It("should retain existing values", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			path := getPathFromEnv(instance.buildPostgresEnv())
+			Expect(path).To(BeEquivalentTo(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
+		})
+	})
+
 	Context("Extensions disabled", func() {
 		BeforeEach(func() {
 			cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
@@ -359,20 +400,34 @@ var _ = Describe("buildPostgresEnv", func() {
 			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
 			Expect(ldLibraryPath).To(BeEmpty())
 		})
+		It("PATH should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			path := getPathFromEnv(instance.buildPostgresEnv())
+			Expect(path).To(Equal("PATH=/my/default/path"))
+		})
 	})
 })
 
-func getLibraryPathFromEnv(envs []string) string {
-	var ldLibraryPath string
+func getLibraryPathFromEnv(env []string) string {
+	return getValueFromEnv(env, "LD_LIBRARY_PATH=")
+}
+
+func getPathFromEnv(env []string) string {
+	return getValueFromEnv(env, "PATH=")
+}
+
+func getValueFromEnv(envs []string, prefix string) string {
+	var value string
 
 	for i := len(envs) - 1; i >= 0; i-- {
-		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
-			ldLibraryPath = envs[i]
+		if strings.HasPrefix(envs[i], prefix) {
+			value = envs[i]
 			break
 		}
 	}
 
-	return ldLibraryPath
+	return value
 }
 
 var _ = Describe("GetPrimaryConnInfo", func() {

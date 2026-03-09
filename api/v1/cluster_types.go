@@ -1556,6 +1556,10 @@ type ExtensionConfiguration struct {
 	// The list of directories inside the image which should be added to ld_library_path.
 	// +optional
 	LdLibraryPath []string `json:"ld_library_path,omitempty"`
+
+	// A list of directories inside the image which should be added to PATH.
+	// +optional
+	Path []string `json:"path,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
