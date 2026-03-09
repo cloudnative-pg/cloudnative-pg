@@ -154,10 +154,6 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
         make -C "${ROOT_DIR}" deploy
         ;;
     esac
-#  CONTROLLER_IMG="${CONTROLLER_IMG}" \
-#  POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-#  PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-#  make -C "${ROOT_DIR}" deploy
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

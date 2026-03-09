@@ -259,6 +259,7 @@ function deploy_fluentd() {
 # released versions or when source build is not required.
 function deploy_operator_from_helm() {
   echo -e "${bright}Deploying CNPG operator from Helm chart...${reset}"
+  ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
   make -C "${ROOT_DIR}" manifests
   # TODO: This needs to be removed once the crds are synced in the cloudnative-pg/charts repository
   ${K8S_CLI} apply --server-side -k "${ROOT_DIR}/config/helm"
@@ -268,9 +269,15 @@ function deploy_operator_from_helm() {
   retry 3 helm upgrade --install cnpg \
     --namespace cnpg-system \
     --set crds.create=false \
+    --set config.create=false \
+    --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config" \
     --create-namespace \
     --set image.repository="${controller_img%:*}" \
     --set image.tag="${controller_img##*:}" \
+    --set "additionalEnv[0].name=POSTGRES_IMAGE_NAME" \
+    --set "additionalEnv[0].value=${POSTGRES_IMAGE_NAME}" \
+    --set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME" \
+    --set "additionalEnv[1].value=${PGBOUNCER_IMAGE_NAME}" \
     cnpg/cloudnative-pg
   echo -e "${bright}Operator deployment using helm initiated.${reset}"
 }
