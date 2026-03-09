@@ -112,7 +112,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       packages: write
       contents: write
