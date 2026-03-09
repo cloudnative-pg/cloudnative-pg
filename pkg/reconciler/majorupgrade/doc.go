@@ -23,8 +23,9 @@ SPDX-License-Identifier: Apache-2.0
 // The upgrade process consists of the following steps:
 //
 //  1. Delete all Pods in the cluster.
-//  2. Create and initiate the major upgrade job.
+//  2. Create and initiate the major upgrade job (BackoffLimit=0, no retries).
 //  3. Wait for the job to complete.
 //  4. If the upgrade job completes successfully, start new Pods for the upgraded version.
-//     Otherwise, stop and wait for input by the user.
+//     If the user reverts the image to the previous major version, the operator
+//     automatically deletes the failed upgrade job and lets the cluster restart.
 package majorupgrade

@@ -32,11 +32,6 @@ on:
 
 permissions: read-all
 
-# set up environment variables to be used across all the jobs
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.26.0"
-
 jobs:
   duplicate_runs:
     runs-on: ubuntu-24.04
@@ -71,7 +66,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
       with:
-        go-version: ${{ env.GOLANG_VERSION }}
+        go-version-file: go.mod
         check-latest: true
 
     # Initializes the CodeQL tools for scanning.

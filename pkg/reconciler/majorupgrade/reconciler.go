@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,6 +56,7 @@ var ErrNoPrimaryPVCFound = fmt.Errorf("no primary PVC found")
 func Reconcile(
 	ctx context.Context,
 	c client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -63,7 +65,16 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx)
 
 	if majorUpgradeJob := getMajorUpdateJob(jobs); majorUpgradeJob != nil {
-		return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
+		if utils.JobHasOneCompletion(*majorUpgradeJob) {
+			return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
+		}
+
+		if result, err := handleRollbackIfNeeded(ctx, c, recorder, cluster, majorUpgradeJob); result != nil || err != nil {
+			return result, err
+		}
+
+		contextLogger.Info("Major upgrade job not completed.")
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
@@ -231,11 +242,6 @@ func majorVersionUpgradeHandleCompletion(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if !utils.JobHasOneCompletion(*job) {
-		contextLogger.Info("Major upgrade job not completed.")
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
 	for _, pvc := range pvcs {
 		if pvc.GetDeletionTimestamp() != nil {
 			continue
@@ -314,6 +320,69 @@ func majorVersionUpgradeHandleCompletion(
 	}
 
 	return &ctrl.Result{Requeue: true}, nil
+}
+
+// handleRollbackIfNeeded checks whether the user rolled back the image
+// while the upgrade job is still running (or has failed). If the requested
+// major version is no longer higher than PGDataImageInfo.MajorVersion,
+// the job is deleted so the cluster can restart on the old version.
+//
+// NOTE: this function runs regardless of job status, including while the
+// job is still actively executing. If the user reverts the image mid-upgrade,
+// the running job will be terminated.
+func handleRollbackIfNeeded(
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	cluster *apiv1.Cluster,
+	job *batchv1.Job,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
+	// Equal major version is also treated as a rollback: the user changed
+	// to a same-major image, so the in-progress upgrade is no longer wanted.
+	if cluster.Status.PGDataImageInfo == nil || requestedMajor > cluster.Status.PGDataImageInfo.MajorVersion {
+		return nil, nil
+	}
+
+	contextLogger.Info("Image rolled back during major upgrade, cleaning up the upgrade job",
+		"requestedMajor", requestedMajor,
+		"pgDataMajor", cluster.Status.PGDataImageInfo.MajorVersion)
+
+	if job.GetDeletionTimestamp() != nil {
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if err := c.Delete(ctx, job, &client.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+	}); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return nil, err
+		}
+	}
+
+	// reconcileImage set Status.Image to the upgrade target but left
+	// PGDataImageInfo unchanged. Reset it so pods use the correct image.
+	if err := status.PatchWithOptimisticLock(
+		ctx,
+		c,
+		cluster,
+		status.SetImage(cluster.Status.PGDataImageInfo.Image),
+	); err != nil {
+		contextLogger.Error(err, "Unable to reset status image after rollback")
+		return nil, err
+	}
+
+	recorder.Eventf(cluster, "Normal", "MajorUpgradeRollback",
+		"Cleaned up failed upgrade job, rolling back to major version %d", requestedMajor)
+
+	return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 // registerPhase sets a phase into the cluster

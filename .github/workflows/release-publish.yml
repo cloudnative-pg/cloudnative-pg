@@ -10,8 +10,6 @@ on:
 permissions: read-all
 
 env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.26.0"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -76,11 +74,14 @@ jobs:
           echo "FILE=${file}" >> $GITHUB_ENV
       -
         name: Generate release notes
+        env:
+          TAG: ${{ env.TAG }}
+          FILE: ${{ env.FILE }}
         run: |
           docker run --rm -v $(pwd):/src mist/submark \
-            submark -O --h2 "Version ${{ env.TAG }}" \
+            submark -O --h2 "Version ${TAG}" \
             --out-file /src/release_notes.md \
-            /src/docs/src/${{ env.FILE }}
+            "/src/docs/src/${FILE}"
       -
         name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
@@ -89,9 +90,11 @@ jobs:
         # how to use cosign.
       -
         name: Sign yaml files
+        env:
+          VERSION: ${{ env.VERSION }}
         run: |
-          cosign sign-blob releases/cnpg-${{ env.VERSION }}.yaml \
-          --bundle releases/cnpg-${{ env.VERSION }}.sigstore.json --yes
+          cosign sign-blob "releases/cnpg-${VERSION}.yaml" \
+          --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
@@ -135,19 +138,21 @@ jobs:
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Build meta
         id: build-meta
+        env:
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          commit_sha=${{ github.sha }}
+          commit_sha="${COMMIT_SHA}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           tag="${GITHUB_REF#refs/tags/v}"
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}")
-          author_email=$(git show -s --format='%ae' "${commit_sha}")
+          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
@@ -217,22 +222,22 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       -
         name: Login to ghcr.io
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
+        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -255,8 +260,10 @@ jobs:
         # how to use cosign.
       -
         name: Sign images
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
@@ -346,21 +353,21 @@ jobs:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login to ghcr.io
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -417,8 +424,8 @@ jobs:
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
@@ -489,9 +496,12 @@ jobs:
           fetch-depth: 0
       -
         name: Configure git user
+        env:
+          AUTHOR_EMAIL: ${{ needs.release-binaries.outputs.author_email }}
+          AUTHOR_NAME: ${{ needs.release-binaries.outputs.author_name }}
         run: |
-          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
-          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -500,8 +510,8 @@ jobs:
       -
         name: Copy the bundle
         run: |
-          mkdir -p "bundles/${{ env.VERSION }}"
-          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          mkdir -p "bundles/${VERSION}"
+          cp -R bundle/* "bundles/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
       -
         name: Prepare commit message
@@ -512,7 +522,7 @@ jobs:
           # Skip creating the commit if there are no changes
           [ -n "$(git status -s)" ] || exit 0
 
-          git add bundles/${{ env.VERSION }}
+          git add "bundles/${VERSION}"
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit

@@ -28,14 +28,17 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -48,8 +51,9 @@ import (
 type PluginReconciler struct {
 	client.Client
 
-	Scheme  *runtime.Scheme
-	Plugins repository.Interface
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+	Plugins  repository.Interface
 
 	OperatorNamespace string
 }
@@ -63,6 +67,7 @@ func NewPluginReconciler(
 	return &PluginReconciler{
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
+		Recorder:          mgr.GetEventRecorderFor("cloudnative-pg-plugin"), //nolint:staticcheck
 		Plugins:           plugins,
 		OperatorNamespace: operatorNamespace,
 	}
@@ -79,9 +84,6 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var service corev1.Service
 	if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
-		// TODO(leonardoce): use a finalizer to detect when a plugin service
-		// is removed, and remove the corresponding plugin from the pool
-
 		// This also happens when you delete a resource in k8s
 		if apierrs.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -101,6 +103,24 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if len(pluginName) == 0 {
 		contextLogger.Info("Detected service whose plugin name label is empty, skipping")
 		return ctrl.Result{}, nil
+	}
+
+	// Handle deletion
+	if !service.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, r.handleDeletion(ctx, &service, pluginName)
+	}
+
+	// Add finalizer if not present
+	if !controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
+		contextLogger.Debug("Adding finalizer to plugin service")
+		controllerutil.AddFinalizer(&service, utils.PluginFinalizerName)
+		if err := r.Update(ctx, &service); err != nil {
+			contextLogger.Error(err, "Error while adding finalizer to plugin service")
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Eventf(&service, "Normal", "FinalizerAdded",
+			"Added finalizer to manage plugin %s lifecycle", pluginName)
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	res, err := r.reconcile(ctx, &service, pluginName)
@@ -137,6 +157,8 @@ func (r *PluginReconciler) reconcile(
 	if err != nil {
 		contextLogger.Error(err, "Error while getting server secret for plugin",
 			"secretName", pluginServerSecret)
+		r.Recorder.Eventf(service, "Warning", "ServerSecretNotFound",
+			"Failed to get server secret %s: %v", pluginServerSecret, err)
 		return ctrl.Result{}, err
 	}
 
@@ -152,6 +174,8 @@ func (r *PluginReconciler) reconcile(
 	if err != nil {
 		contextLogger.Error(err, "Error while getting client secret for plugin",
 			"secretName", pluginClientSecret)
+		r.Recorder.Eventf(service, "Warning", "ClientSecretNotFound",
+			"Failed to get client secret %s: %v", pluginClientSecret, err)
 		return ctrl.Result{}, err
 	}
 
@@ -168,6 +192,8 @@ func (r *PluginReconciler) reconcile(
 			"Detected service whose plugin port annotation content is not correct, retrying",
 			"pluginPortString", pluginPortString,
 		)
+		r.Recorder.Eventf(service, "Warning", "InvalidPortAnnotation",
+			"Invalid port annotation %q: %v", pluginPortString, err)
 		return ctrl.Result{}, err
 	}
 
@@ -179,6 +205,8 @@ func (r *PluginReconciler) reconcile(
 	if err != nil {
 		contextLogger.Error(err, "Error while parsing client key and certificate for mTLS authentication",
 			"secretName", clientSecret.Name)
+		r.Recorder.Eventf(service, "Warning", "InvalidClientCertificate",
+			"Failed to parse client certificate from secret %s: %v", clientSecret.Name, err)
 		return ctrl.Result{}, err
 	}
 
@@ -195,6 +223,8 @@ func (r *PluginReconciler) reconcile(
 		if block == nil {
 			err := fmt.Errorf("no valid PEM block found in server certificate from secret %q", serverSecret.Name)
 			secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+			r.Recorder.Eventf(service, "Warning", "InvalidServerCertificate",
+				"No valid PEM block found in server certificate from secret %s", serverSecret.Name)
 			return ctrl.Result{}, err
 		}
 
@@ -209,6 +239,8 @@ func (r *PluginReconciler) reconcile(
 		}
 
 		secretLogger.Error(err, "Error while parsing server certificate for mTLS authentication")
+		r.Recorder.Eventf(service, "Warning", "InvalidServerCertificate",
+			"Failed to parse server certificate from secret %s: %v", serverSecret.Name, err)
 		return ctrl.Result{}, err
 	}
 
@@ -240,12 +272,42 @@ func (r *PluginReconciler) reconcile(
 			return ctrl.Result{}, nil
 		}
 		contextLogger.Error(err, "Error while registering plugin")
+		r.Recorder.Eventf(service, "Warning", "PluginRegistrationFailed",
+			"Failed to register plugin %s at %s: %v", pluginName, pluginAddress, err)
 		return ctrl.Result{}, err
 	}
 
 	contextLogger.Info("Registered plugin")
+	r.Recorder.Eventf(service, "Normal", "PluginRegistered",
+		"Successfully registered plugin %s at %s", pluginName, pluginAddress)
 
 	return ctrl.Result{}, nil
+}
+
+func (r *PluginReconciler) handleDeletion(
+	ctx context.Context,
+	service *corev1.Service,
+	pluginName string,
+) error {
+	contextLogger := log.FromContext(ctx).WithValues("pluginName", pluginName)
+
+	if controllerutil.ContainsFinalizer(service, utils.PluginFinalizerName) {
+		contextLogger.Info("Removing plugin from pool due to service deletion")
+		r.Recorder.Eventf(service, "Normal", "PluginCleanup",
+			"Removing plugin %s from pool due to service deletion", pluginName)
+		r.Plugins.ForgetPlugin(pluginName)
+
+		contextLogger.Debug("Removing finalizer from plugin service")
+		controllerutil.RemoveFinalizer(service, utils.PluginFinalizerName)
+		if err := r.Update(ctx, service); err != nil {
+			contextLogger.Error(err, "Error while removing finalizer from plugin service")
+			r.Recorder.Eventf(service, "Warning", "FinalizerRemovalFailed",
+				"Failed to remove finalizer: %v. Check RBAC permissions or API server connectivity", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *PluginReconciler) getSecret(
@@ -296,6 +358,10 @@ func (r *PluginReconciler) mapSecretToPlugin(ctx context.Context, obj client.Obj
 
 	return result
 }
+
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // SetupWithManager adds this PluginReconciler to the passed controller manager
 func (r *PluginReconciler) SetupWithManager(

@@ -10,10 +10,6 @@ on:
 
 permissions: read-all
 
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.26.0"
-
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything, except those PR that are created or contain `do not backport` explicitly.
@@ -81,26 +77,28 @@ jobs:
         branch: [release-1.25, release-1.27, release-1.28]
     env:
       PR: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ matrix.branch }}
     outputs:
       commit: ${{ steps.check_commits.outputs.commit }}
     steps:
       -
         name: Checkout code
-        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Install Go
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Check commits
-        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        if: contains( github.event.pull_request.labels.*.name, env.BRANCH )
         id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,30 +109,34 @@ jobs:
             echo "No commit found!"
             exit 0
           fi
+
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit}" | head -n1)
+
           echo "commit=${commit}" >> $GITHUB_OUTPUT
-          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
-          author_name=$(git show -s --format='%an' "${commit}")
+          echo "cherry-pick commit ${commit} to branch ${BRANCH}"
+
           echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
-          author_email=$(git show -s --format='%ae' "${commit}")
           echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
       -
         name: cherry pick
         env:
           COMMIT: ${{ steps.check_commits.outputs.commit }}
         if: |
-          contains( github.event.pull_request.labels.*.name, matrix.branch ) && env.COMMIT != ''
+          contains( github.event.pull_request.labels.*.name, env.BRANCH ) && env.COMMIT != ''
         run: |
-          git config user.email "${{ env.AUTHOR_EMAIL }}"
-          git config user.name "${{ env.AUTHOR_NAME }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
           git fetch
-          git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
+          git cherry-pick -x --mainline 1 "${COMMIT}"
           make fmt vet generate apidoc wordlist-ordered
           if ! git diff --exit-code --quiet
           then
             echo "!!! Generated files need manually handling"
             exit 1
           fi
-          git push
+          git push origin HEAD:"${BRANCH}"
 
   create-tickets:
     name: Create tickets for failures
