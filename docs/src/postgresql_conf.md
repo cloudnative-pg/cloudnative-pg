@@ -441,7 +441,7 @@ if you prefer) via a secure channel (`hostssl`).
 In Kubernetes, pod IPs are ephemeral. Manually updating `pg_hba` rules every
 time a client pod restarts is unsustainable. The `.spec.podSelectorRefs` option
 automates this by allowing you to define **named label selectors** that the
-operator expands into real-time IP addresses.
+operator resolves into up-to-date IP addresses.
 
 #### How it Works
 
@@ -449,9 +449,9 @@ operator expands into real-time IP addresses.
    `labelSelector` for pods.
 2. **Reference Selectors:** Use the `${podselector:NAME}` placeholder in your
    `pg_hba` rules.
-3. **Automatic Expansion:** The CloudNativePG operator monitors matching pods
-   and expands each reference into individual CIDR entries (`/32` for IPv4, `/128`
-   for IPv6) within `pg_hba.conf`.
+3. **Automatic Expansion:** The operator resolves matching pod IPs and the
+   instance manager expands each reference into individual CIDR entries
+   (`/32` for IPv4, `/128` for IPv6) within `pg_hba.conf`.
 
 #### Configuration Example
 
@@ -495,8 +495,6 @@ hostssl postgres monitor 10.0.1.3/32 scram-sha-256
 - **Placement:** The `${podselector:NAME}` syntax is valid **only in the
   address field** of host-type entries (`host`, `hostssl`, `hostnossl`,
   `hostgssenc`, `hostnogssenc`).
-- **Zero Matches:** If a selector matches no pods, the corresponding `pg_hba`
-  lines are omitted from the configuration.
 - **Reactivity:** The operator watches for pod lifecycle events (creation,
   deletion, or IP updates). Updates trigger an automatic configuration
   regeneration and a PostgreSQL `reload`.

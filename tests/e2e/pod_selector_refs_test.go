@@ -22,7 +22,6 @@ package e2e
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,7 +158,6 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 
 					resolvedIPs = cluster.Status.PodSelectorRefs[0].IPs
 				}, RetryTimeout).Should(Succeed())
-				slices.Sort(resolvedIPs)
 			})
 
 			By("verifying pg_hba.conf contains expanded rules with /32 per pod IP", func() {

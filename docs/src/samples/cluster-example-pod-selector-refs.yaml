@@ -19,9 +19,6 @@ spec:
           role: monitoring
 
   postgresql:
-    parameters:
-      max_worker_processes: "60"
-
     pg_hba:
       # These rules use ${podselector:NAME} syntax to reference podSelectorRefs.
       # Each reference is expanded to one line per matching pod IP.

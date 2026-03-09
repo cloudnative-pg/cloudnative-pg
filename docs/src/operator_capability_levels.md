@@ -153,7 +153,7 @@ PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 CloudNativePG supports the declarative definition of `podSelectorRefs` to
 manage `pg_hba.conf` rules dynamically. By using label selectors to identify
 client pods, the operator automatically resolves their ephemeral IP addresses
-and updates the PostgreSQL host-based authentication rules in real-time. This
+and updates the PostgreSQL host-based authentication rules accordingly. This
 ensures that only authorized workloads in the same namespace can connect to the
 database, eliminating the need for manual IP management or static CIDR ranges.
 
