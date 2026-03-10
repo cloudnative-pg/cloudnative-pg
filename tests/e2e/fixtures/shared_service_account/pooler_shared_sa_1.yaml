@@ -7,8 +7,10 @@ spec:
   cluster:
     name: cluster-pooler-shared-sa
   type: rw
-  instances: 1  
+  instances: 1
+
   serviceAccountName: pooler-shared-sa
+
   pgbouncer:
     poolMode: session
     parameters:

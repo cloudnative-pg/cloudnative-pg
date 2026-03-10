@@ -218,7 +218,7 @@ func (r *PoolerReconciler) updateRBAC(
 //   - the ServiceAccount exits
 //   - it contains the ImagePullSecret if required
 //
-// # Any other property of the ServiceAccount is preserved
+// Any other property of the ServiceAccount is preserved.
 //
 // If a custom ServiceAccount is specified via serviceAccountName,
 // this method validates that it exists but does not create or modify it.
