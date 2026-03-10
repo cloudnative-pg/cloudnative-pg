@@ -168,6 +168,38 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		Expect(proposed.HealthCheckNodePort).To(Equal(int32(32000)))
 	})
 
+	It("should preserve AllocateLoadBalancerNodePorts when not set", func() {
+		alloc := true
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		living := corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			Ports:                         []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			AllocateLoadBalancerNodePorts: &alloc,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.AllocateLoadBalancerNodePorts).To(Equal(&alloc))
+	})
+
+	It("should not override explicitly set AllocateLoadBalancerNodePorts", func() {
+		allocTrue := true
+		allocFalse := false
+		proposed := corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			Ports:                         []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			AllocateLoadBalancerNodePorts: &allocFalse,
+		}
+		living := corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			Ports:                         []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			AllocateLoadBalancerNodePorts: &allocTrue,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.AllocateLoadBalancerNodePorts).To(Equal(&allocFalse))
+	})
+
 	It("should match NodePorts by port and protocol, not by index", func() {
 		proposed := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{

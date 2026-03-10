@@ -48,6 +48,9 @@ func PreserveKubernetesDefaults(proposed, living *corev1.ServiceSpec) {
 	if proposed.HealthCheckNodePort == 0 {
 		proposed.HealthCheckNodePort = living.HealthCheckNodePort
 	}
+	if proposed.AllocateLoadBalancerNodePorts == nil {
+		proposed.AllocateLoadBalancerNodePorts = living.AllocateLoadBalancerNodePorts
+	}
 
 	preservePortDefaults(proposed.Ports, living.Ports)
 }
