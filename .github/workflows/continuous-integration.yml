@@ -41,6 +41,7 @@ env:
   SIGN_IMAGES: "true"
   # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
   OPP_SCRIPT_VERSION: "fbac22ff0c713188bdcea36791b70fb3999e6e03"
+  RUNS_ON: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
 
 defaults:
   run:
@@ -863,7 +864,7 @@ jobs:
       matrix:
         test: [ kiwi, lemon, orange ]
     name: Run OLM ${{ matrix.test }} test
-    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
+    runs-on: ${{ env.RUNS_ON }}
     needs:
       - buildx
       - olm-bundle
