@@ -20,6 +20,6 @@
 ##
 
 # renovate: datasource=docker depName=rancher/k3s extractVersion=^(?<version>v\d+\.\d+\.\d+)-k3s\d+$
-K3D_NODE_DEFAULT_VERSION=v1.35.0
+K3D_NODE_DEFAULT_VERSION=v1.35.2
 export K8S_VERSION=${K8S_VERSION:-$K3D_NODE_DEFAULT_VERSION}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-local-path}
