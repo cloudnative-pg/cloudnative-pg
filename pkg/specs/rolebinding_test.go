@@ -41,4 +41,30 @@ var _ = Describe("Role binding", func() {
 		Expect(roleBinding.Name).To(Equal(cluster.Name))
 		Expect(roleBinding.Namespace).To(Equal(cluster.Namespace))
 	})
+
+	It("references the cluster ServiceAccount in subjects", func() {
+		roleBinding := CreateRoleBinding(cluster.ObjectMeta, cluster.GetServiceAccountName())
+		Expect(roleBinding.Subjects).To(HaveLen(1))
+		Expect(roleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
+		Expect(roleBinding.Subjects[0].Name).To(Equal(cluster.Name))
+		Expect(roleBinding.Subjects[0].Namespace).To(Equal(cluster.Namespace))
+	})
+
+	It("references a custom ServiceAccount in subjects when specified", func() {
+		customCluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "thistest",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName: "shared-sa",
+			},
+		}
+		roleBinding := CreateRoleBinding(customCluster.ObjectMeta, customCluster.GetServiceAccountName())
+		Expect(roleBinding.Name).To(Equal("thistest"))
+		Expect(roleBinding.Subjects).To(HaveLen(1))
+		Expect(roleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
+		Expect(roleBinding.Subjects[0].Name).To(Equal("shared-sa"))
+		Expect(roleBinding.Subjects[0].Namespace).To(Equal("default"))
+	})
 })

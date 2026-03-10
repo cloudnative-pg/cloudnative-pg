@@ -26,6 +26,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1437,5 +1438,25 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		err := env.clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("not found"))
+	})
+
+	It("should create RoleBinding referencing the custom ServiceAccount", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		cluster.Spec.ServiceAccountName = "shared-sa"
+
+		err := env.clusterReconciler.createRoleBinding(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		var rb rbacv1.RoleBinding
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: namespace,
+		}, &rb)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rb.Subjects).To(HaveLen(1))
+		Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
+		Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
+		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
 	})
 })

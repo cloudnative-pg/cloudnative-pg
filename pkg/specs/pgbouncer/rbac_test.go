@@ -72,6 +72,21 @@ var _ = Describe("Pooler ServiceAccount, Role, and RoleBinding", func() {
 			roleBinding := RoleBinding(pooler, pooler.GetServiceAccountName())
 			Expect(roleBinding.Name).To(Equal(pooler.Name))
 			Expect(roleBinding.Namespace).To(Equal(pooler.Namespace))
+			Expect(roleBinding.Subjects).To(HaveLen(1))
+			Expect(roleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(roleBinding.Subjects[0].Name).To(Equal(pooler.Name))
+			Expect(roleBinding.Subjects[0].Namespace).To(Equal(pooler.Namespace))
+		})
+
+		It("references custom ServiceAccount in subjects when specified", func() {
+			customPooler := pooler.DeepCopy()
+			customPooler.Spec.ServiceAccountName = "custom-sa"
+			roleBinding := RoleBinding(customPooler, customPooler.GetServiceAccountName())
+			Expect(roleBinding.Name).To(Equal(pooler.Name))
+			Expect(roleBinding.Subjects).To(HaveLen(1))
+			Expect(roleBinding.Subjects[0].Kind).To(Equal("ServiceAccount"))
+			Expect(roleBinding.Subjects[0].Name).To(Equal("custom-sa"))
+			Expect(roleBinding.Subjects[0].Namespace).To(Equal(pooler.Namespace))
 		})
 	})
 })
