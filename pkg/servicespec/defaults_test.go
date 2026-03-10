@@ -226,8 +226,10 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		}
 		living := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
-				{Name: "custom", Port: 8080, Protocol: corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt32(8080), NodePort: 30001},
+				{
+					Name: "custom", Port: 8080, Protocol: corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt32(8080), NodePort: 30001,
+				},
 			},
 		}
 		PreserveKubernetesDefaults(&proposed, &living)
@@ -239,14 +241,18 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 	It("should not override explicitly set Protocol and TargetPort", func() {
 		proposed := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
-				{Name: "custom", Port: 8080, Protocol: corev1.ProtocolUDP,
-					TargetPort: intstr.FromInt32(9090)},
+				{
+					Name: "custom", Port: 8080, Protocol: corev1.ProtocolUDP,
+					TargetPort: intstr.FromInt32(9090),
+				},
 			},
 		}
 		living := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
-				{Name: "custom", Port: 8080, Protocol: corev1.ProtocolUDP,
-					TargetPort: intstr.FromInt32(8080), NodePort: 30001},
+				{
+					Name: "custom", Port: 8080, Protocol: corev1.ProtocolUDP,
+					TargetPort: intstr.FromInt32(8080), NodePort: 30001,
+				},
 			},
 		}
 		PreserveKubernetesDefaults(&proposed, &living)

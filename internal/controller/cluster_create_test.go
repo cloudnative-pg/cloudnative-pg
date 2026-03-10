@@ -1347,8 +1347,10 @@ var _ = Describe("Service Reconciling", func() {
 				existingService.Spec.SessionAffinity = corev1.ServiceAffinityNone
 				existingService.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
 				existingService.Spec.Ports = []corev1.ServicePort{
-					{Port: 80, Protocol: corev1.ProtocolTCP,
-						TargetPort: intstr.FromInt32(80), NodePort: 31234},
+					{
+						Port: 80, Protocol: corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt32(80), NodePort: 31234,
+					},
 				}
 				existingService.Spec.HealthCheckNodePort = 30000
 				err := serviceClient.Update(ctx, existingService)
