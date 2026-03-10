@@ -343,38 +343,55 @@ Therefore, it's crucial to prevent users from accessing the operator's
 You can restrict the operator's RBAC permissions by configuring `WATCH_NAMESPACES`
 to the same namespace as the operator deployment. This way all namespaced resource
 policies can be created in a `Role`, and the `ClusterRole` only needs to contain
-`admissionregistration.k8s.io`, `clusterImageCatalogs` and `Nodes` resources.
+- admissionregistration.k8s.io resources (mutatingwebhookconfigurations,
+validatingwebhookconfigurations) with get, patch verbs
+- postgresql.cnpg.io/clusterimagecatalogs with get, list, watch verbs
+- nodes with get, list, watch verbs"
 
 #### Disable Node Watching
 
 Set `WATCH_NODES` to `false` to disable node access:
 
 When `WATCH_NODES` is set to `false`:
-- The operator will not require `nodes` RBAC permissions
+- The operator will not require nodes resource permissions with get, list, watch verbs
 
 ### Known Limitations with Restricted Nodes RBAC
 
 #### SyncReplicaElectionConstraint
 
-`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to enforce deployment constraints for synchronous replicas during election. This feature will not work with restricted RBAC due to lack of node access.
+`cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint` is used to
+enforce deployment constraints for synchronous replicas during election.
+This feature will not work with restricted RBAC because the operator needs to
+read node labels (specified in nodeLabelsAntiAffinity) to determine pod topology.
+Without get, list, and watch permissions on the nodes resource, the operator
+cannot extract label values from nodes where pods are scheduled, making it
+impossible to enforce topology-based synchronous replica election constraints.
 
 #### PodDisruptionBudget
 
 :::warning
-    When running with restricted RBAC and PodDisruptionBudget (PDB) enabled, node drain operations may fail.
+    When running with restricted RBAC and PodDisruptionBudget (PDB) enabled,
+    node drain operations may fail.
 :::
 
-CloudNativePG creates PodDisruptionBudgets to protect PostgreSQL instances during voluntary disruptions. However, with restricted RBAC, a critical limitation exists:
+CloudNativePG creates `PodDisruptionBudget` to protect PostgreSQL instances
+during voluntary disruptions. However, with restricted RBAC, a critical limitation exists:
 
-- The Kubernetes node drain process requires cluster-level permissions to evict pods protected by PDBs
-- With restricted RBAC, the operator lacks the necessary cluster-wide permissions to properly coordinate with the node drain controller
-- This can result in node drain operations timing out or failing when attempting to evict PostgreSQL pods
+- The Kubernetes node drain process requires cluster-level permissions to evict
+ pods protected by PDBs
+- With restricted RBAC, the operator lacks the necessary cluster-wide
+permissions to properly coordinate with the node drain controller
+- This can result in node drain operations timing out or failing when
+attempting to evict PostgreSQL pods
 
 **Workarounds:**
 
-1. **Disable PDB**: Set `spec.enablePDB: false` in your `Cluster` specification when using restricted RBAC
-2. **Manual intervention**: Manually delete or scale down PostgreSQL pods before draining nodes
-3. **Use full RBAC**: If node drain automation is critical, consider using the default cluster-wide RBAC configuration
+1. **Disable PDB**: Set `spec.enablePDB: false` in your `Cluster` specification
+when using restricted RBAC
+2. **Manual intervention**: Manually delete or scale down PostgreSQL pods before
+draining nodes
+3. **Use full RBAC**: If node drain automation is critical, consider using the
+default cluster-wide RBAC configuration
 
 ### Calls to the API server made by the instance manager
 

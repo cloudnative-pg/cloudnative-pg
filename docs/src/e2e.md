@@ -59,8 +59,8 @@ and the following suite of E2E tests are performed on that cluster:
      * Operator High Availability
 
 * **Reduced RBAC deployment:**
-  * Operator configured with reduced RBAC
-  * Node drain while operator is configured without node RBAC
+  * Operator Deployment
+  * Node drain
 
 * **Observability:**
      * Metrics collection
