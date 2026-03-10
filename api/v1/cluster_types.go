@@ -330,7 +330,7 @@ type ClusterSpec struct {
 	// +optional
 	ServiceAccountTemplate *ServiceAccountTemplate `json:"serviceAccountTemplate,omitempty"`
 
-	// Name of an existing ServiceAccount to use for the cluster.
+	// Name of an existing ServiceAccount in the same namespace to use for the cluster.
 	// When specified, the operator will not create a new ServiceAccount
 	// but will use the provided one. This is useful for sharing a single
 	// ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).
@@ -338,6 +338,8 @@ type ClusterSpec struct {
 	// Mutually exclusive with ServiceAccountTemplate.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceAccountName is immutable"
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=253
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
