@@ -1306,6 +1306,78 @@ var _ = Describe("Service Reconciling", func() {
 				Expect(updatedService.Spec.Selector).To(Equal(proposedService.Spec.Selector))
 			})
 
+			It("should update the service spec when using patch strategy and spec fields change", func() {
+				existingService := proposedService.DeepCopy()
+				existingService.Annotations = map[string]string{
+					utils.UpdateStrategyAnnotation: string(apiv1.ServiceUpdateStrategyPatch),
+				}
+				existingService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				existingService.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				proposedService.Annotations = map[string]string{
+					utils.UpdateStrategyAnnotation: string(apiv1.ServiceUpdateStrategyPatch),
+				}
+				proposedService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				proposedService.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8", "172.16.0.0/12"}
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Spec.LoadBalancerSourceRanges).To(Equal([]string{"10.0.0.0/8", "172.16.0.0/12"}))
+			})
+
+			It("should not trigger unnecessary updates when only Kubernetes-managed fields differ", func() {
+				singleStack := corev1.IPFamilyPolicySingleStack
+				clusterPolicy := corev1.ServiceInternalTrafficPolicyCluster
+				existingService := proposedService.DeepCopy()
+				existingService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				existingService.Spec.ClusterIP = "10.96.0.1"
+				existingService.Spec.ClusterIPs = []string{"10.96.0.1"}
+				existingService.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+				existingService.Spec.IPFamilyPolicy = &singleStack
+				existingService.Spec.InternalTrafficPolicy = &clusterPolicy
+				existingService.Spec.SessionAffinity = corev1.ServiceAffinityNone
+				existingService.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+				existingService.Spec.Ports = []corev1.ServicePort{
+					{Port: 80, Protocol: corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt32(80), NodePort: 31234},
+				}
+				existingService.Spec.HealthCheckNodePort = 30000
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				proposedService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				proposedService.Spec.Ports = []corev1.ServicePort{{Port: 80}}
+				proposedService.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Spec.ClusterIP).To(Equal("10.96.0.1"))
+				Expect(updatedService.Spec.Ports[0].NodePort).To(Equal(int32(31234)))
+				Expect(updatedService.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+				Expect(updatedService.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt32(80)))
+				Expect(updatedService.Spec.HealthCheckNodePort).To(Equal(int32(30000)))
+				Expect(updatedService.Spec.IPFamilies).To(Equal([]corev1.IPFamily{corev1.IPv4Protocol}))
+				Expect(updatedService.Spec.IPFamilyPolicy).To(Equal(&singleStack))
+				Expect(updatedService.Spec.InternalTrafficPolicy).To(Equal(&clusterPolicy))
+				Expect(updatedService.Spec.SessionAffinity).To(Equal(corev1.ServiceAffinityNone))
+			})
+
 			It("should preserve existing labels and annotations added by third parties", func() {
 				existingService := proposedService.DeepCopy()
 				existingService.Labels = map[string]string{"custom-label": "value"}
