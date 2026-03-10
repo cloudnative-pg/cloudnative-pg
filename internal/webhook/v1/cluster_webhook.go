@@ -2890,7 +2890,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		result = append(result, validatePathList(v.ExtensionControlPath, basePath.Child("extension_control_path"))...)
 		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
 		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
-		result = append(result, validatePathList(v.Path, basePath.Child("path"))...)
+		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
 	}
 
 	return result

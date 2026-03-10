@@ -1559,7 +1559,7 @@ type ExtensionConfiguration struct {
 
 	// A list of directories inside the image which should be added to PATH.
 	// +optional
-	Path []string `json:"path,omitempty"`
+	BinPath []string `json:"bin_path,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

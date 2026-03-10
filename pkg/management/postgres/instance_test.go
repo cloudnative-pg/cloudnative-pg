@@ -370,11 +370,11 @@ var _ = Describe("buildPostgresEnv", func() {
 
 		BeforeEach(func() {
 			// Update the spec
-			cluster.Spec.PostgresConfiguration.Extensions[0].Path = []string{"/bindir", "sample/"}
-			cluster.Spec.PostgresConfiguration.Extensions[1].Path = []string{"./bindir", "./sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
 			// Update the status
-			cluster.Status.PGDataImageInfo.Extensions[0].Path = []string{"/bindir", "sample/"}
-			cluster.Status.PGDataImageInfo.Extensions[1].Path = []string{"./bindir", "./sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
 		})
 
 		It("should be defined", func() {

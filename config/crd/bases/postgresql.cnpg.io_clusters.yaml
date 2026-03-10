@@ -4443,6 +4443,12 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: A list of directories inside the image which
+                            should be added to PATH.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.
@@ -4489,12 +4495,6 @@ spec:
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
-                        path:
-                          description: A list of directories inside the image which
-                            should be added to PATH.
-                          items:
-                            type: string
-                          type: array
                       required:
                       - name
                       type: object
@@ -7089,6 +7089,12 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: A list of directories inside the image which
+                            should be added to PATH.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.
@@ -7135,12 +7141,6 @@ spec:
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
-                        path:
-                          description: A list of directories inside the image which
-                            should be added to PATH.
-                          items:
-                            type: string
-                          type: array
                       required:
                       - name
                       type: object

@@ -768,8 +768,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 }
 
 // buildPostgresEnv builds the environment variables that should be used by PostgreSQL
-// to run the main process, taking care of adding any library path that is needed for
-// extensions.
+// to run the main process, taking care of adding any path that is needed for extensions.
 func (instance *Instance) buildPostgresEnv() []string {
 	env := instance.Env
 	if env == nil {
@@ -786,11 +785,11 @@ func (instance *Instance) buildPostgresEnv() []string {
 
 	// Collect additional library paths and binary paths
 	additionalLibraryPaths := collectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
-	additionalPaths := collectPaths(cluster.Status.PGDataImageInfo.Extensions)
+	additionalBinPaths := collectBinPaths(cluster.Status.PGDataImageInfo.Extensions)
 
 	// If there are no additional paths, we use the environment variables
 	// of the current process
-	if len(additionalLibraryPaths) == 0 && len(additionalPaths) == 0 {
+	if len(additionalLibraryPaths) == 0 && len(additionalBinPaths) == 0 {
 		return envMap.StringSlice()
 	}
 
@@ -807,12 +806,12 @@ func (instance *Instance) buildPostgresEnv() []string {
 
 	// We add the additional binary paths after the entries that are already
 	// available.
-	if len(additionalPaths) > 0 {
+	if len(additionalBinPaths) > 0 {
 		currentPath := envMap["PATH"]
 		if currentPath != "" {
 			currentPath += ":"
 		}
-		currentPath += strings.Join(additionalPaths, ":")
+		currentPath += strings.Join(additionalBinPaths, ":")
 		envMap["PATH"] = currentPath
 	}
 
@@ -836,13 +835,13 @@ func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string 
 	return result
 }
 
-// collectPaths returns a list of PATHS which should be added to PATH
+// collectBinPaths returns a list of PATHS which should be added to PATH
 // given an extension
-func collectPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	result := make([]string, 0, len(extensionList))
 
 	for _, extension := range extensionList {
-		for _, binPath := range extension.Path {
+		for _, binPath := range extension.BinPath {
 			result = append(
 				result,
 				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),

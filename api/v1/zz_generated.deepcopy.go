@@ -1344,8 +1344,8 @@ func (in *ExtensionConfiguration) DeepCopyInto(out *ExtensionConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.Path != nil {
-		in, out := &in.Path, &out.Path
+	if in.BinPath != nil {
+		in, out := &in.BinPath, &out.BinPath
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

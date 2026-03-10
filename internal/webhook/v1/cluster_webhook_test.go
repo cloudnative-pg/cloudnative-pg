@@ -5568,7 +5568,7 @@ var _ = Describe("validateExtensions", func() {
 		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 
-	It("returns no error when LdLibraryPath and Path are valid", func() {
+	It("returns no error when LdLibraryPath and BinPath are valid", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5581,7 +5581,7 @@ var _ = Describe("validateExtensions", func() {
 							LdLibraryPath: []string{
 								"/opt/custom/lib",
 							},
-							Path: []string{
+							BinPath: []string{
 								"/opt/custom/bin",
 							},
 						},
@@ -5702,7 +5702,7 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extensions[0].ld_library_path[1]"))
 	})
 
-	It("returns errors for duplicate Path entries", func() {
+	It("returns errors for duplicate BinPath entries", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5712,7 +5712,7 @@ var _ = Describe("validateExtensions", func() {
 							ImageVolumeSource: corev1.ImageVolumeSource{
 								Reference: "extOne",
 							},
-							Path: []string{
+							BinPath: []string{
 								"/usr/local/bin",
 								"/opt/custom/bin",
 								"/usr/local/bin",
@@ -5726,11 +5726,11 @@ var _ = Describe("validateExtensions", func() {
 		err := v.validateExtensions(cluster)
 		Expect(err).To(HaveLen(1))
 		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
-		Expect(err[0].Field).To(ContainSubstring("extensions[0].path[2]"))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[2]"))
 		Expect(err[0].BadValue).To(Equal("/usr/local/bin"))
 	})
 
-	It("returns an error for empty Path entries", func() {
+	It("returns an error for empty BinPath entries", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5740,7 +5740,7 @@ var _ = Describe("validateExtensions", func() {
 							ImageVolumeSource: corev1.ImageVolumeSource{
 								Reference: "extOne",
 							},
-							Path: []string{
+							BinPath: []string{
 								"/valid/path",
 								"",
 							},
@@ -5752,10 +5752,10 @@ var _ = Describe("validateExtensions", func() {
 
 		err := v.validateExtensions(cluster)
 		Expect(err).To(HaveLen(1))
-		Expect(err[0].Field).To(ContainSubstring("extensions[0].path[1]"))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[1]"))
 	})
 
-	It("returns errors for duplicates in both LdLibraryPath and Path", func() {
+	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -5769,7 +5769,7 @@ var _ = Describe("validateExtensions", func() {
 								"/usr/lib/postgresql/lib",
 								"/usr/lib/postgresql/lib",
 							},
-							Path: []string{
+							BinPath: []string{
 								"/usr/lib/postgresql/bin",
 								"/usr/lib/postgresql/bin",
 							},
