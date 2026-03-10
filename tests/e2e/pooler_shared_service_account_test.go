@@ -203,7 +203,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			}, 60).Should(Succeed())
 		})
 
-		By("verifying the non-existent ServiceAccount is not created", func() {
+		By("verifying no ServiceAccount was created with the pooler name", func() {
 			Consistently(func() bool {
 				sa := &corev1.ServiceAccount{}
 				err := env.Client.Get(env.Ctx,
@@ -212,7 +212,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			}, 30, 5).Should(BeTrue(), "ServiceAccount should not be created by operator")
 		})
 
-		By("verifying deployment is NOT created due to validation failure", func() {
+		By("verifying deployment is NOT created due to missing ServiceAccount", func() {
 			Consistently(func() bool {
 				deployment := &appsv1.Deployment{}
 				err := env.Client.Get(env.Ctx,
@@ -223,28 +223,6 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 					deployment)
 				return apierrs.IsNotFound(err)
 			}, 60, 5).Should(BeTrue(), "Deployment should not be created when ServiceAccount doesn't exist")
-		})
-
-		By("verifying pooler remains non-operational", func() {
-			Consistently(func() bool {
-				pooler := &apiv1.Pooler{}
-				err := env.Client.Get(env.Ctx,
-					client.ObjectKey{Namespace: namespace, Name: poolerNonExistsSAName},
-					pooler)
-				if err != nil {
-					return false
-				}
-
-				deployment := &appsv1.Deployment{}
-				err = env.Client.Get(env.Ctx,
-					types.NamespacedName{
-						Namespace: namespace,
-						Name:      poolerNonExistsSAName,
-					},
-					deployment)
-
-				return apierrs.IsNotFound(err)
-			}, 30, 5).Should(BeTrue(), "Pooler should remain non-operational without valid ServiceAccount")
 		})
 	})
 

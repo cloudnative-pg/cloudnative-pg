@@ -382,7 +382,7 @@ metadata:
   name: postgres-cloud-sa
   annotations:
     # AWS IRSA annotation
-    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/PostgresRole
+    eks.amazonaws.com/role-arn: arn:aws:iam:us-east-1:123456789012:role/PostgresRole
 ---
 # Reference it from multiple clusters
 apiVersion: postgresql.cnpg.io/v1
