@@ -4,4 +4,4 @@ kind: ServiceAccount
 metadata:
   name: cluster-shared-sa
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/PostgresRole
+    eks.amazonaws.com/role-arn: arn:aws:iam:us-east-1:123456789012:role/PostgresRole

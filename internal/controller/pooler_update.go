@@ -269,15 +269,15 @@ func (r *PoolerReconciler) updateServiceAccount(
 func (r *PoolerReconciler) validateExistingServiceAccount(ctx context.Context, pooler *apiv1.Pooler) error {
 	var sa corev1.ServiceAccount
 	err := r.Get(ctx, client.ObjectKey{
-		Name:      pooler.GetServiceAccountName(),
+		Name:      pooler.Spec.ServiceAccountName,
 		Namespace: pooler.Namespace,
 	}, &sa)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(pooler, "Warning", "ServiceAccountNotFound",
 				"Specified ServiceAccount %q not found in namespace %q",
-				pooler.GetServiceAccountName(), pooler.Namespace)
-			return fmt.Errorf("serviceAccount %q not found: %w", pooler.GetServiceAccountName(), err)
+				pooler.Spec.ServiceAccountName, pooler.Namespace)
+			return fmt.Errorf("serviceAccount %q not found: %w", pooler.Spec.ServiceAccountName, err)
 		}
 		return fmt.Errorf("while validating existing service account: %w", err)
 	}
