@@ -6192,3 +6192,151 @@ var _ = Describe("failoverQuorum validation", func() {
 		Expect(errList).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("podSelectorRefs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts a valid configuration", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:app-pods} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts an empty configuration", func() {
+		cluster := &apiv1.Cluster{}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects undefined pod selector in pg_hba", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:undefined-ref} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(result[0].Detail).To(ContainSubstring("undefined-ref"))
+	})
+
+	It("rejects duplicate podSelectorRefs names", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "other"},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+	})
+
+	It("rejects invalid label selector", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "bad-selector",
+						Selector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: "InvalidOperator",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects multiple podselector references in a single pg_hba line", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app1",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "one"},
+						},
+					},
+					{
+						Name: "app2",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "two"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all ${podselector:app1} ${podselector:app2} md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+	})
+
+	It("accepts defined but unreferenced selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all 10.0.0.0/8 md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+})

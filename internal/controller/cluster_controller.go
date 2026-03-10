@@ -60,6 +60,7 @@ import (
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/podselector"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -319,6 +320,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			return *res, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
+	}
+
+	// Resolve podSelectorRefs to pod IPs and update cluster status
+	if err := podselector.Reconcile(ctx, r.Client, cluster); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Ensure we have the required global objects
@@ -1194,6 +1200,13 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
+		).
+		// Watch external (non-owned) pods for podSelectorRefs IP resolution.
+		// Owned pods are already handled by Owns(&corev1.Pod{}) above.
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(podselector.MapExternalPodsToClusters(r.Client)),
+			builder.WithPredicates(podselector.ExternalPodsPredicate()),
 		).
 		Watches(
 			&apiv1.ImageCatalog{},

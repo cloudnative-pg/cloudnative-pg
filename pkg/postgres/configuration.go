@@ -34,6 +34,8 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
@@ -110,9 +112,9 @@ hostssl all cnpg_pooler_pgbouncer all cert map=cnpg_pooler_pgbouncer
 # USER-DEFINED RULES
 #
 
-{{ range $rule := .UserRules }}
-{{ $rule -}}
-{{ end }}
+{{ range $rule := .UserRules }}{{ range $expanded := expandRule $rule $.SelectorIPs }}
+{{ $expanded -}}
+{{ end }}{{ end }}
 
 {{ if .LDAPConfiguration }}
 #
@@ -274,8 +276,14 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 	ExtensionsBaseDirectory = "/extensions"
 )
 
-// hbaTemplate is the template used to create the HBA configuration
-var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateString))
+// hbaTemplate is the template used to create the HBA configuration.
+// The "expandRule" function expands ${podselector:NAME} references
+// inline, producing one output line per matched pod IP.
+var hbaTemplate = template.Must(
+	template.New("pg_hba.conf").
+		Funcs(template.FuncMap{"expandRule": hba.ExpandLine}).
+		Parse(hbaTemplateString),
+)
 
 // identTemplate is the template used to create the HBA configuration
 var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
@@ -585,25 +593,34 @@ var (
 	}
 )
 
-// CreateHBARules will create the content of pg_hba.conf file given
-// the rules set by the cluster spec
-func CreateHBARules(
-	hba []string,
-	defaultAuthenticationMethod, ldapConfigString string,
-) (string, error) {
-	var hbaContent bytes.Buffer
+// HBAOptions holds the configuration for rendering a pg_hba.conf file.
+type HBAOptions struct {
+	// DefaultAuthenticationMethod is the fallback auth method (e.g. "scram-sha-256").
+	DefaultAuthenticationMethod string
+	// LDAPConfigString is the optional LDAP configuration block.
+	LDAPConfigString string
+	// SelectorIPs maps podSelectorRef names to resolved pod IPs.
+	// When non-nil, ${podselector:NAME} tokens in the address field are
+	// expanded to one line per IP with /32 (IPv4) or /128 (IPv6) masks.
+	SelectorIPs map[string][]string
+}
 
-	templateData := struct {
+// CreateHBARules produces the final pg_hba.conf content from the given
+// user-defined rules and rendering options. ${podselector:NAME} tokens
+// in user rules are expanded inline by the template's "expandRule" function.
+func CreateHBARules(hbaLines []string, opts HBAOptions) (string, error) {
+	var hbaContent bytes.Buffer
+	if err := hbaTemplate.Execute(&hbaContent, struct {
 		UserRules                   []string
+		SelectorIPs                 map[string][]string
 		LDAPConfiguration           string
 		DefaultAuthenticationMethod string
 	}{
-		UserRules:                   hba,
-		LDAPConfiguration:           ldapConfigString,
-		DefaultAuthenticationMethod: defaultAuthenticationMethod,
-	}
-
-	if err := hbaTemplate.Execute(&hbaContent, templateData); err != nil {
+		UserRules:                   hbaLines,
+		SelectorIPs:                 opts.SelectorIPs,
+		LDAPConfiguration:           opts.LDAPConfigString,
+		DefaultAuthenticationMethod: opts.DefaultAuthenticationMethod,
+	}); err != nil {
 		return "", err
 	}
 

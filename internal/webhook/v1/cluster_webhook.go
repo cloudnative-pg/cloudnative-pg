@@ -48,6 +48,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -194,6 +195,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
+		v.validatePodSelectorRefs,
 		v.validateExtensions,
 	}
 
@@ -2901,4 +2903,37 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 	}
 
 	return result
+}
+
+// validatePodSelectorRefs checks that podSelectorRefs names are unique and
+// that ${podselector:NAME} references in pg_hba lines correspond to defined selectors.
+func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field.ErrorList {
+	var allErrors field.ErrorList
+	path := field.NewPath("spec", "podSelectorRefs")
+
+	// Validate selectors and collect known names
+	knownSelectors := stringset.New()
+	for i, ref := range r.Spec.PodSelectorRefs {
+		if knownSelectors.Has(ref.Name) {
+			allErrors = append(allErrors, field.Duplicate(path.Index(i).Child("name"), ref.Name))
+		}
+		knownSelectors.Put(ref.Name)
+
+		allErrors = append(allErrors,
+			validation.ValidateLabelSelector(&ref.Selector,
+				validation.LabelSelectorValidationOptions{},
+				path.Index(i).Child("selector"))...)
+	}
+
+	// Check that ${podselector:NAME} references in pg_hba correspond to defined selectors
+	hbaPath := field.NewPath("spec", "postgresql", "pg_hba")
+	for i, rule := range r.Spec.PostgresConfiguration.PgHBA {
+		if err := hba.ValidateLine(rule, knownSelectors); err != nil {
+			allErrors = append(allErrors,
+				field.Invalid(hbaPath.Index(i), rule, err.Error()),
+			)
+		}
+	}
+
+	return allErrors
 }

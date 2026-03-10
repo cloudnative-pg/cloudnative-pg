@@ -54,6 +54,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CIDR
 CIS
 CKA
 CN
@@ -203,6 +204,7 @@ Huß
 IAM
 INPLACE
 IOPS
+IPs
 IPv
 IRSA
 IaC
@@ -347,6 +349,9 @@ PodDisruptionBudgets
 PodMonitor
 PodName
 PodSecurityContext
+PodSelectorRef
+PodSelectorRefStatus
+PodSelectorRefs
 PodSpec
 PodStatus
 PodTemplateSpec
@@ -1212,9 +1217,13 @@ podMonitorRelabelings
 podMonitors
 podName
 podSecurityContext
+podSelectorRefs
 podStatuses
 podmonitor
 podname
+podselector
+podselectorref
+podselectorrefstatus
 podstatus
 podtemplates
 podtemplatespec
