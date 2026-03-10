@@ -26,7 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -51,7 +51,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		namespace,
 		clusterName,
 		tableName string,
-		dbName exec.DatabaseName,
+		dbName podexec.DatabaseName,
 		expectedCount int,
 	) {
 		query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
@@ -62,9 +62,9 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		By(fmt.Sprintf(
 			"querying the %s table in the %s database defined by postInit SQL",
 			tableName, dbName), func() {
-			stdout, _, err := exec.QueryInInstancePod(
+			stdout, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary.Name,
 				}, dbName,
@@ -135,9 +135,9 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
@@ -168,9 +168,9 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := exec.QueryInInstancePod(
+				stdout, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",

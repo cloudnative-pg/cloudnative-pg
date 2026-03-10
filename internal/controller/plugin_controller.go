@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 

@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/cli"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -55,7 +55,7 @@ const (
 // returns an array with all the instances, the primary instance and any error encountered.
 func GetInstancePods(ctx context.Context, clusterName string) ([]corev1.Pod, corev1.Pod, error) {
 	var pods corev1.PodList
-	if err := plugin.Client.List(ctx, &pods, client.InNamespace(plugin.Namespace)); err != nil {
+	if err := cli.Client.List(ctx, &pods, client.InNamespace(cli.Namespace)); err != nil {
 		return nil, corev1.Pod{}, err
 	}
 
@@ -141,11 +141,11 @@ func IsInstanceRunning(
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithName("plugin.IsInstanceRunning")
 	timeout := time.Second * 10
-	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
+	clientInterface := kubernetes.NewForConfigOrDie(cli.Config)
 	stdout, stderr, err := utils.ExecCommand(
 		ctx,
 		clientInterface,
-		plugin.Config,
+		cli.Config,
 		pod,
 		specs.PostgresContainerName,
 		&timeout,

@@ -28,7 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -101,9 +101,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				namespace, destinationClusterName,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: destPrimaryPod.Namespace,
 					PodName:   destPrimaryPod.Name,
 				},
@@ -119,9 +119,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				namespace, sourceClusterName,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = exec.EventuallyExecQueryInInstancePod(
+			_, _, err = podexec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: sourcePrimaryPod.Namespace,
 					PodName:   sourcePrimaryPod.Name,
 				},

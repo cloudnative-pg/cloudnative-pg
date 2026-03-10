@@ -53,7 +53,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/envsubst"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
@@ -189,9 +189,9 @@ func AssertSwitchoverWithHistory(
 			Eventually(func() error {
 				count := 0
 				for _, pod := range pods {
-					out, _, err := exec.CommandInInstancePod(
+					out, _, err := podexec.CommandInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod,
 						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
@@ -309,9 +309,9 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 					}
 				}
 				replicaNamesString := strings.Join(replicaNamesList, ",")
-				out, _, err := exec.QueryInInstancePod(
+				out, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},
@@ -590,15 +590,15 @@ func insertRecordIntoTable(tableName string, value int, conn *sql.DB) {
 
 func QueryMatchExpectationPredicate(
 	pod *corev1.Pod,
-	dbname exec.DatabaseName,
+	dbname podexec.DatabaseName,
 	query string,
 	expectedOutput string,
 ) func(g Gomega) {
 	return func(g Gomega) {
 		// executor
-		stdout, stderr, err := exec.QueryInInstancePod(
+		stdout, stderr, err := podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+			podexec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
 			dbname,
 			query,
 		)
@@ -673,9 +673,9 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string)
 			if err != nil {
 				return "", err
 			}
-			stdout, _, err := exec.QueryInInstancePod(
+			stdout, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -699,9 +699,9 @@ func AssertClusterStandbysAreStreaming(namespace string, clusterName string, tim
 		}
 
 		for _, pod := range standbyPods.Items {
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},
@@ -749,9 +749,9 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 				if err := env.Client.Get(env.Ctx, podNamespacedName, pod); err != nil {
 					return "", err
 				}
-				out, _, err := exec.QueryInInstancePod(
+				out, _, err := podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: pod.Namespace,
 						PodName:   pod.Name,
 					},
@@ -804,9 +804,9 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 		pod := &corev1.Pod{}
 		err := env.Client.Get(env.Ctx, namespacedName, pod)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, err := exec.EventuallyExecQueryInInstancePod(
+		out, _, err := podexec.EventuallyExecQueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: pod.Namespace,
 				PodName:   pod.Name,
 			}, postgres.AppDBName,
@@ -866,9 +866,9 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 		Expect(err).ToNot(HaveOccurred())
 		// Expect write operation to succeed
 		query := "CREATE TABLE IF NOT EXISTS assert_new_primary(var1 text);"
-		_, _, err = exec.EventuallyExecQueryInInstancePod(
+		_, _, err = podexec.EventuallyExecQueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: pod.Namespace,
 				PodName:   pod.Name,
 			}, postgres.AppDBName,
@@ -984,9 +984,9 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
 		Eventually(func() (string, error) {
-			stdOut, stdErr, err := exec.QueryInInstancePod(
+			stdOut, stdErr, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},
@@ -1044,13 +1044,13 @@ func AssertReplicaModeCluster(
 
 	By("checking data have been copied correctly in replica cluster", func() {
 		Eventually(func() (string, error) {
-			stdOut, _, err := exec.QueryInInstancePod(
+			stdOut, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryReplicaCluster.Namespace,
 					PodName:   primaryReplicaCluster.Name,
 				},
-				exec.DatabaseName(srcClusterDBName),
+				podexec.DatabaseName(srcClusterDBName),
 				checkQuery)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 10).Should(BeEquivalentTo("2"))
@@ -1077,13 +1077,13 @@ func AssertReplicaModeCluster(
 
 	By("checking new data have been copied correctly in replica cluster", func() {
 		Eventually(func() (string, error) {
-			stdOut, _, err := exec.QueryInInstancePod(
+			stdOut, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryReplicaCluster.Namespace,
 					PodName:   primaryReplicaCluster.Name,
 				},
-				exec.DatabaseName(srcClusterDBName),
+				podexec.DatabaseName(srcClusterDBName),
 				checkQuery)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 15).Should(BeEquivalentTo("3"))
@@ -1167,12 +1167,12 @@ func AssertDetachReplicaModeCluster(
 			primaryReplicaCluster, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
 				replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			_, _, err = exec.QueryInInstancePod(
+			_, _, err = podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryReplicaCluster.Namespace,
 					PodName:   primaryReplicaCluster.Name,
-				}, exec.DatabaseName(srcDatabaseName),
+				}, podexec.DatabaseName(srcDatabaseName),
 				query,
 			)
 			g.Expect(err).ToNot(HaveOccurred())
@@ -1199,12 +1199,12 @@ func AssertDetachReplicaModeCluster(
 	})
 
 	By("verifying that replica cluster was not modified", func() {
-		outTables, stdErr, err := exec.EventuallyExecQueryInInstancePod(
+		outTables, stdErr, err := podexec.EventuallyExecQueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: primaryReplicaCluster.Namespace,
 				PodName:   primaryReplicaCluster.Name,
-			}, exec.DatabaseName(srcDatabaseName),
+			}, podexec.DatabaseName(srcDatabaseName),
 			"\\dt",
 			RetryTimeout,
 			PollingTime,
@@ -1389,9 +1389,9 @@ func AssertFastFailOver(
 			if err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod); err != nil {
 				return "", err
 			}
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -1465,9 +1465,9 @@ func AssertCreationOfTestDataForTargetDB(
 
 		// Create database
 		createDBQuery := fmt.Sprintf("CREATE DATABASE %v OWNER %v", targetDBName, appUser)
-		_, _, err = exec.QueryInInstancePod(
+		_, _, err = podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: currentPrimary.Namespace,
 				PodName:   currentPrimary.Name,
 			},
@@ -1620,7 +1620,7 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 				"sslrootcert=/etc/secrets/ca/ca.crt "+
 				"dbname=app user=app sslmode=verify-full", clusterName, namespace)
 			timeout := time.Second * 10
-			stdout, stderr, err := exec.Command(
+			stdout, stderr, err := podexec.Command(
 				env.Ctx, env.Interface, env.RestClientConfig,
 				appPod, appPod.Spec.Containers[0].Name, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
@@ -1815,9 +1815,9 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 		AssertDataExpectedCount(env, tableLocator, 2)
 
 		// Restored primary should be on timeline 2
-		out, _, err := exec.QueryInInstancePod(
+		out, _, err := podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: namespace,
 				PodName:   primary,
 			},
@@ -2095,9 +2095,9 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 
 // switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
 func switchWalAndGetLatestArchive(namespace, podName string) string {
-	_, _, err := exec.QueryInInstancePodWithTimeout(
+	_, _, err := podexec.QueryInInstancePodWithTimeout(
 		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-		exec.PodLocator{
+		podexec.PodLocator{
 			Namespace: namespace,
 			PodName:   podName,
 		},
@@ -2108,9 +2108,9 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 	Expect(err).ToNot(HaveOccurred(),
 		"failed to trigger a new wal while executing 'switchWalAndGetLatestArchive'")
 
-	out, _, err := exec.QueryInInstancePod(
+	out, _, err := podexec.QueryInInstancePod(
 		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-		exec.PodLocator{
+		podexec.PodLocator{
 			Namespace: namespace,
 			PodName:   podName,
 		},
@@ -2905,9 +2905,9 @@ func AssertReplicationSlotsOnPod(
 					"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnPrimary)
 		}
 		Eventually(func() (string, error) {
-			stdout, _, err := exec.QueryInInstancePod(
+			stdout, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},

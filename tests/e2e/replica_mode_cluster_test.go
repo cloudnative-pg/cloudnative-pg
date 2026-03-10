@@ -41,7 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -391,9 +391,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
-					stdOut, _, err := exec.QueryInInstancePod(
+					stdOut, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: primaryReplicaCluster.Namespace,
 							PodName:   primaryReplicaCluster.Name,
 						},
@@ -600,9 +600,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 		Expect(err).ToNot(HaveOccurred())
 
-		_, _, err = exec.QueryInInstancePod(
+		_, _, err = podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+			podexec.PodLocator{Namespace: namespace, PodName: primary.Name},
 			"postgres",
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
@@ -616,9 +616,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			g.Expect(err).ToNot(HaveOccurred())
 
 			for _, podA := range podListA.Items {
-				_, _, err = exec.QueryInInstancePod(
+				_, _, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{Namespace: namespace, PodName: podA.Name},
+					podexec.PodLocator{Namespace: namespace, PodName: podA.Name},
 					"postgres",
 					"SELECT * FROM test_replication;",
 				)
@@ -626,9 +626,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			}
 
 			for _, podB := range podListB.Items {
-				_, _, err = exec.QueryInInstancePod(
+				_, _, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{Namespace: namespace, PodName: podB.Name},
+					podexec.PodLocator{Namespace: namespace, PodName: podB.Name},
 					"postgres",
 					"SELECT * FROM test_replication;",
 				)
@@ -641,9 +641,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 		return Eventually(func(g Gomega) {
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			stdout, _, err := exec.QueryInInstancePod(
+			stdout, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+				podexec.PodLocator{Namespace: namespace, PodName: primary.Name},
 				"postgres",
 				"SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()",
 			)
@@ -700,9 +700,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("creating some load on the A cluster", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
-				_, _, err = exec.QueryInInstancePod(
+				_, _, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+					podexec.PodLocator{Namespace: namespace, PodName: primary.Name},
 					"postgres",
 					"CREATE TABLE switchover_load (i int);",
 				)
@@ -710,9 +710,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 
 				go func() {
 					for {
-						_, _, _ = exec.QueryInInstancePod(
+						_, _, _ = podexec.QueryInInstancePod(
 							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-							exec.PodLocator{Namespace: namespace, PodName: primary.Name},
+							podexec.PodLocator{Namespace: namespace, PodName: primary.Name},
 							"postgres",
 							"INSERT INTO switchover_load SELECT generate_series(1, 10000)",
 						)
@@ -813,9 +813,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				Consistently(func(g Gomega) {
 					pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 					g.Expect(err).ToNot(HaveOccurred())
-					stdOut, _, err := exec.QueryInInstancePod(
+					stdOut, _, err := podexec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
@@ -886,9 +886,9 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 	standbys = funk.FilterString(cluster.Status.InstanceNames, func(name string) bool { return name != primary })
 
 	getStreamingInfo := func(podName string) ([]string, error) {
-		stdout, _, err := exec.CommandInInstancePod(
+		stdout, _, err := podexec.CommandInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: namespace,
 				PodName:   podName,
 			},
@@ -931,9 +931,9 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 
 	By("verifying that the new primary is streaming from the source cluster", func() {
 		Eventually(func(g Gomega) {
-			stdout, _, err := exec.CommandInInstancePod(
+			stdout, _, err := podexec.CommandInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary,
 				},

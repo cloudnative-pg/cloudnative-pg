@@ -33,7 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -87,9 +87,9 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			if err != nil {
 				return 0, err
 			}
-			out, _, err := exec.QueryInInstancePod(
+			out, _, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: pod.Namespace,
 					PodName:   pod.Name,
 				},

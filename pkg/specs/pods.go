@@ -39,8 +39,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -510,7 +510,7 @@ func NewInstance(
 
 	contextLogger.Trace("correctly loaded the plugin client for instance evaluation")
 
-	podClientObject, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbEvaluate, &cluster, pod)
+	podClientObject, err := pluginClient.LifecycleHook(ctx, integration.OperationVerbEvaluate, &cluster, pod)
 	if err != nil {
 		return nil, fmt.Errorf("while invoking the lifecycle instance evaluation hook: %w", err)
 	}

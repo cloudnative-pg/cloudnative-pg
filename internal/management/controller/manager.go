@@ -32,7 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"

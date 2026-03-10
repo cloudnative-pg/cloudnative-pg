@@ -42,7 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -100,9 +100,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		if err != nil {
 			return false, err
 		}
-		result, stdErr, err := exec.QueryInInstancePod(
+		result, stdErr, err := podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: namespace,
 				PodName:   primaryPod.Name,
 			}, postgres.AppDBName,
@@ -477,9 +477,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Execute a checkpoint
-				_, _, err = exec.EventuallyExecQueryInInstancePod(
+				_, _, err = podexec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: primaryPod.Namespace,
 						PodName:   primaryPod.Name,
 					}, postgres.PostgresDBName,
@@ -1048,9 +1048,9 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 			for _, pod := range pvcList.Items {
 				for _, tbsConfig := range cluster.Spec.Tablespaces {
 					dataDir := fmt.Sprintf("/var/lib/postgresql/tablespaces/%s/data", tbsConfig.Name)
-					owner, stdErr, err := exec.CommandInInstancePod(
+					owner, stdErr, err := podexec.CommandInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod.Name,
 						}, nil,
@@ -1081,9 +1081,9 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 			for _, instance := range instances.Items {
 				var stdErr string
 				var err error
-				tbsListing, stdErr, err = exec.QueryInInstancePod(
+				tbsListing, stdErr, err = podexec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.PodLocator{
+					podexec.PodLocator{
 						Namespace: namespace,
 						PodName:   instance.Name,
 					}, postgres.AppDBName,
@@ -1110,9 +1110,9 @@ func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content st
 				g.Expect(err).ShouldNot(HaveOccurred())
 			}
 
-			settingValue, stdErr, err := exec.QueryInInstancePod(
+			settingValue, stdErr, err := podexec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
+				podexec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary.Name,
 				}, postgres.AppDBName,
@@ -1136,9 +1136,9 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 	}
 
 	By("checking the temporary table is created into the temporary tablespace", func() {
-		commandOutput, stdErr, err := exec.QueryInInstancePod(
+		commandOutput, stdErr, err := podexec.QueryInInstancePod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
+			podexec.PodLocator{
 				Namespace: namespace,
 				PodName:   primary.Name,
 			}, postgres.AppDBName,

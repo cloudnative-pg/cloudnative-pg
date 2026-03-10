@@ -34,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/podexec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -83,9 +83,9 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 					".*[0-9]$")
 				timeout := 300
 				Eventually(func() (int, error, error) {
-					out, _, err := exec.CommandInInstancePod(
+					out, _, err := podexec.CommandInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
+						podexec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod.GetName(),
 						}, nil,

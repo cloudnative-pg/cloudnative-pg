@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/integration/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -828,7 +828,7 @@ type fakePluginClientRollout struct {
 
 func (f fakePluginClientRollout) LifecycleHook(
 	_ context.Context,
-	_ plugin.OperationVerb,
+	_ integration.OperationVerb,
 	_ k8client.Object,
 	_ k8client.Object,
 ) (k8client.Object, error) {
