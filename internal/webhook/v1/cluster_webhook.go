@@ -682,14 +682,16 @@ func (v *ClusterCustomValidator) validateBootstrapRecoverySource(r *apiv1.Cluste
 
 	// Ensure the external cluster definition has enough information
 	// to be used to recover a data directory
-	if externalCluster.BarmanObjectStore == nil && externalCluster.PluginConfiguration == nil {
+	if externalCluster.ConnectionParameters == nil &&
+		externalCluster.BarmanObjectStore == nil &&
+		externalCluster.PluginConfiguration == nil {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
 				fmt.Sprintf("External cluster %v cannot be used for recovery: "+
-					"both Barman and CNPG-i plugin configurations are missing", r.Spec.Bootstrap.Recovery.Source)))
+					"missing connection parameters, Barman, or CNPG-i configuration", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result
