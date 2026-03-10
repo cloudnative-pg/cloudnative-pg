@@ -24,6 +24,7 @@ import (
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -1381,5 +1382,223 @@ var _ = Describe("Service Reconciling", func() {
 			)
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
+	})
+})
+
+var _ = Describe("getFailedSnapshotDataSources", func() {
+	var (
+		ctx        context.Context
+		cluster    *apiv1.Cluster
+		reconciler *ClusterReconciler
+		fakeClient k8client.Client
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+	})
+
+	It("should return empty map when no jobs exist", func() {
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(BeEmpty())
+	})
+
+	It("should return empty map when no failed jobs exist", func() {
+		runningJob := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "test-cluster",
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				Annotations: map[string]string{
+					utils.SnapshotDataSourceAnnotationName: "snapshot-1",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Active: 1,
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(runningJob).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(BeEmpty())
+	})
+
+	It("should return snapshot name for failed job with annotation", func() {
+		failedJob := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "test-cluster",
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				Annotations: map[string]string{
+					utils.SnapshotDataSourceAnnotationName: "snapshot-1",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(failedJob).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(HaveLen(1))
+		Expect(failedSnapshots["snapshot-1"]).To(BeTrue())
+	})
+
+	It("should not include failed job without snapshot annotation", func() {
+		// This simulates a legacy job without the new annotation
+		failedJob := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "test-cluster",
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				// No annotation
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(failedJob).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(BeEmpty())
+	})
+
+	It("should return multiple failed snapshots", func() {
+		failedJob1 := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "test-cluster",
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				Annotations: map[string]string{
+					utils.SnapshotDataSourceAnnotationName: "snapshot-1",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+		failedJob2 := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-2-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "test-cluster",
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				Annotations: map[string]string{
+					utils.SnapshotDataSourceAnnotationName: "snapshot-2",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(failedJob1, failedJob2).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(HaveLen(2))
+		Expect(failedSnapshots["snapshot-1"]).To(BeTrue())
+		Expect(failedSnapshots["snapshot-2"]).To(BeTrue())
+	})
+
+	It("should not include jobs from other clusters", func() {
+		failedJobOtherCluster := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-cluster-1-snapshot-recovery",
+				Namespace: "default",
+				Labels: map[string]string{
+					utils.ClusterLabelName: "other-cluster", // Different cluster
+					utils.JobRoleLabelName: "snapshot-recovery",
+				},
+				Annotations: map[string]string{
+					utils.SnapshotDataSourceAnnotationName: "snapshot-1",
+				},
+			},
+			Status: batchv1.JobStatus{
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(failedJobOtherCluster).
+			Build()
+		reconciler = &ClusterReconciler{Client: fakeClient}
+
+		failedSnapshots, err := reconciler.getFailedSnapshotDataSources(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(failedSnapshots).To(BeEmpty())
 	})
 })

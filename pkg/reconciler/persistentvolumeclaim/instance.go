@@ -39,9 +39,8 @@ func CreateInstancePVCs(
 	cluster *apiv1.Cluster,
 	source *StorageSource,
 	serial int,
-) error {
-	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
-	return err
+) (ctrl.Result, error) {
+	return reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
 }
 
 // reconcileMultipleInstancesMissingPVCs evaluate multiple instances that may miss some PVCs.
