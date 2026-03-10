@@ -153,9 +153,12 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		restoreCmd)
 
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
-		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
-		if err != nil {
-			return err
+		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
+		if found && server.BarmanObjectStore != nil {
+			envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -224,20 +227,12 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
+	server *apiv1.ExternalCluster,
 ) ([]string, string, error) {
 	contextLogger := log.FromContext(ctx)
-	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
-	if sourceName == "" {
-		return nil, "", fmt.Errorf("recovery source not specified")
-	}
+	contextLogger.Info("Recovering from external cluster", "sourceName", server.Name)
 
-	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
-
-	server, found := cluster.ExternalCluster(sourceName)
-	if !found {
-		return nil, "", fmt.Errorf("missing external cluster: %v", sourceName)
-	}
 	serverName := server.GetServerName()
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
