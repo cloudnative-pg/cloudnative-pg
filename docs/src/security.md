@@ -406,6 +406,13 @@ spec:
     The `serviceAccountName` field is immutable once set. If you need to change
     the `ServiceAccount`, you must recreate the cluster.
 
+!!! Note
+    When multiple clusters share a `ServiceAccount`, the operator creates
+    a separate `Role` and `RoleBinding` for each cluster. The shared
+    `ServiceAccount` accumulates the Kubernetes RBAC permissions of all
+    clusters using it. Each `Role` is narrowly scoped to the specific
+    cluster's resources, so this does not constitute a privilege escalation.
+
 #### Using a shared ServiceAccount with Poolers
 
 The same shared `ServiceAccount` feature is available for `Pooler` resources.
