@@ -234,6 +234,9 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	}
 	serverName := server.GetServerName()
 
+	if server.BarmanObjectStore == nil {
+		return nil, "", nil
+	}
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
