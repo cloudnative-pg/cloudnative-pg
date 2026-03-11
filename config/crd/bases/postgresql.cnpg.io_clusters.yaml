@@ -4443,6 +4443,13 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: |-
+                            A list of directories within the image to be appended to the
+                            PostgreSQL process's `PATH` environment variable.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.
@@ -7083,6 +7090,13 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: |-
+                            A list of directories within the image to be appended to the
+                            PostgreSQL process's `PATH` environment variable.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.

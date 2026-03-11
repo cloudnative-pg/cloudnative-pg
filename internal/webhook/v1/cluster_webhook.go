@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -2825,6 +2826,38 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		return nil
 	}
 
+	validatePathList := func(
+		paths []string,
+		fieldPath *field.Path,
+	) field.ErrorList {
+		var result field.ErrorList
+		pathSet := stringset.New()
+
+		for j, path := range paths {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				fieldPath.Index(j),
+				pathSet,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+				continue
+			}
+
+			if strings.HasPrefix(filepath.Clean(path), "..") {
+				result = append(result, field.Invalid(
+					fieldPath.Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
+				continue
+			}
+
+			pathSet.Put(path)
+		}
+
+		return result
+	}
+
 	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
 		return nil
 	}
@@ -2865,44 +2898,10 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 			)
 		}
 
-		controlPaths := stringset.New()
-		for j, path := range v.ExtensionControlPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("extension_control_path").Index(j),
-				controlPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			controlPaths.Put(path)
-		}
-
-		libraryPaths := stringset.New()
-		for j, path := range v.DynamicLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("dynamic_library_path").Index(j),
-				libraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			libraryPaths.Put(path)
-		}
-
-		ldLibraryPaths := stringset.New()
-		for j, path := range v.LdLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("ld_library_path").Index(j),
-				ldLibraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			ldLibraryPaths.Put(path)
-		}
+		result = append(result, validatePathList(v.ExtensionControlPath, basePath.Child("extension_control_path"))...)
+		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
+		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
+		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
 	}
 
 	return result

@@ -373,6 +373,7 @@ extension image, particularly when:
 - The extension requires additional system libraries.
 - Multiple extensions are bundled in the same image.
 - The image uses a custom directory structure.
+- The extension requires external binaries to function properly.
 
 Following the *"convention over configuration"* paradigm, CloudNativePG allows
 you to finely control the configuration of each extension image through the
@@ -385,9 +386,12 @@ following fields:
   to be appended to PostgreSQL’s `dynamic_library_path`, enabling it to locate
   shared library files for extensions.
 - `ld_library_path`: A list of relative paths within the container image to be
-  appended to the `LD_LIBRARY_PATH` environment variable of the instance
-  manager process, allowing PostgreSQL to locate required system libraries at
+  appended to the `LD_LIBRARY_PATH` environment variable of the Postgres
+  process, allowing PostgreSQL to locate required system libraries at
   runtime.
+- `bin_path`: A list of relative paths within the container image to be
+  appended to the `PATH` environment variable of the Postgres process,
+  allowing PostgreSQL to locate binaries at runtime.
 
 This flexibility enables you to support complex or non-standard extension
 images while maintaining clarity and predictability.
@@ -493,6 +497,46 @@ effect.
 CloudNativePG does not currently trigger this restart automatically; you will
 need to manually restart the cluster (e.g., using `cnpg restart`) after
 modifying `ld_library_path`.
+:::
+
+### Including external binaries
+
+Some extensions might need to provide some binaries required to interact with
+the extension itself. To support these requirements, you can
+package the necessary binaries within your extension container image and make
+them available to PostgreSQL using the `bin_path` field.
+
+For example, if your extension image includes a `bin` directory with the
+required binaries:
+
+```yaml
+# ...
+spec:
+  # ... <snip>
+  postgresql:
+    extensions:
+      - name: my-extension
+        # ... <snip>
+        bin_path:
+          - bin
+        image:
+          reference: # registry path for your extension image
+      # ... <snip>
+    # ... <snip>
+  # ... <snip>
+```
+
+CloudNativePG will append `/extensions/my-extension/bin` to the `PATH` environment
+variable of the Postgres process, allowing PostgreSQL to locate these
+binaries at runtime.
+
+:::warning
+Since `bin_path` must be set when the PostgreSQL process starts,
+changing this value requires a **cluster restart** for the new value to take
+effect.
+CloudNativePG does not currently trigger this restart automatically; you will
+need to manually restart the cluster (e.g., using `cnpg restart`) after
+modifying `bin_path`.
 :::
 
 ## Image Specifications

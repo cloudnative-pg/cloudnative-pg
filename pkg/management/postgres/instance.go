@@ -768,8 +768,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 }
 
 // buildPostgresEnv builds the environment variables that should be used by PostgreSQL
-// to run the main process, taking care of adding any library path that is needed for
-// extensions.
+// to run the main process, taking care of adding any path that is needed for extensions.
 func (instance *Instance) buildPostgresEnv() []string {
 	env := instance.Env
 	if env == nil {
@@ -784,35 +783,76 @@ func (instance *Instance) buildPostgresEnv() []string {
 		return envMap.StringSlice()
 	}
 
-	// If there are no additional library paths, we use the environment variables
-	// of the current process
+	// Collect additional library paths and binary paths
 	additionalLibraryPaths := collectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
-	if len(additionalLibraryPaths) == 0 {
-		return envMap.StringSlice()
-	}
+	additionalBinPaths := collectBinPaths(cluster.Status.PGDataImageInfo.Extensions)
 
 	// We add the additional library paths after the entries that are already
 	// available.
-	currentLibraryPath := envMap["LD_LIBRARY_PATH"]
-	if currentLibraryPath != "" {
-		currentLibraryPath += ":"
+	if len(additionalLibraryPaths) > 0 {
+		currentLibraryPath := envMap["LD_LIBRARY_PATH"]
+		if currentLibraryPath != "" {
+			currentLibraryPath += ":"
+		}
+		currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
+		envMap["LD_LIBRARY_PATH"] = currentLibraryPath
 	}
-	currentLibraryPath += strings.Join(additionalLibraryPaths, ":")
-	envMap["LD_LIBRARY_PATH"] = currentLibraryPath
+
+	// We add the additional binary paths after the entries that are already
+	// available.
+	if len(additionalBinPaths) > 0 {
+		currentPath := envMap["PATH"]
+		if currentPath != "" {
+			currentPath += ":"
+		}
+		currentPath += strings.Join(additionalBinPaths, ":")
+		envMap["PATH"] = currentPath
+	}
 
 	return envMap.StringSlice()
 }
 
-// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
-// given an extension
+// collectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
+// same directory under the extension mount point.
 func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.LdLibraryPath)
+	}
+	result := make([]string, 0, capacity)
 
 	for _, extension := range extensionList {
 		for _, libraryPath := range extension.LdLibraryPath {
 			result = append(
 				result,
 				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
+			)
+		}
+	}
+
+	return result
+}
+
+// collectBinPaths returns a list of paths which should be added to PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
+// same directory under the extension mount point.
+func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.BinPath)
+	}
+	result := make([]string, 0, capacity)
+
+	for _, extension := range extensionList {
+		for _, binPath := range extension.BinPath {
+			result = append(
+				result,
+				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
 			)
 		}
 	}

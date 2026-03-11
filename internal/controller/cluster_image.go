@@ -162,7 +162,8 @@ func extensionConfigEqual(a, b apiv1.ExtensionConfiguration) bool {
 		apiequality.Semantic.DeepEqual(a.ImageVolumeSource, b.ImageVolumeSource) &&
 		slices.Equal(a.ExtensionControlPath, b.ExtensionControlPath) &&
 		slices.Equal(a.DynamicLibraryPath, b.DynamicLibraryPath) &&
-		slices.Equal(a.LdLibraryPath, b.LdLibraryPath)
+		slices.Equal(a.LdLibraryPath, b.LdLibraryPath) &&
+		slices.Equal(a.BinPath, b.BinPath)
 }
 
 func (r *ClusterReconciler) getRequestedImageInfo(

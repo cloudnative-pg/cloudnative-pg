@@ -102,6 +102,9 @@ func ResolveFromCatalog(
 		if len(extension.LdLibraryPath) > 0 {
 			resultExtension.LdLibraryPath = extension.LdLibraryPath
 		}
+		if len(extension.BinPath) > 0 {
+			resultExtension.BinPath = extension.BinPath
+		}
 
 		resolvedExtensions = append(resolvedExtensions, resultExtension)
 	}

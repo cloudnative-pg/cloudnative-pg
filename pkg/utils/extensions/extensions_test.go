@@ -152,6 +152,19 @@ var _ = Describe("ResolveFromCatalog", func() {
 		Expect(exts[0].LdLibraryPath).To(Equal([]string{"/custom/ldpath"}))
 	})
 
+	It("allows cluster spec to override BinPath", func() {
+		cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+			{
+				Name:    "postgis",
+				BinPath: []string{"/custom/bin"},
+			},
+		}
+
+		exts, err := ResolveFromCatalog(cluster, catalog, 16)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exts[0].BinPath).To(Equal([]string{"/custom/bin"}))
+	})
+
 	It("passes through extensions not in catalog when they have a reference", func() {
 		cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
 			{
