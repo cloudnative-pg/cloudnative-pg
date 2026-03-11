@@ -55,7 +55,7 @@ func Reconcile(
 
 	case HibernationConditionReasonWaitingForHealthy:
 		// The cluster is not healthy yet, let the reconciliation loop
-		// continue so the cluster can recover and eventually be hibernated
+		// continue; hibernation will proceed once the cluster becomes healthy
 		return nil, nil
 
 	default:

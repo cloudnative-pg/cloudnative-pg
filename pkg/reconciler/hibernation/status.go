@@ -90,10 +90,9 @@ func EnrichStatus(
 		return
 	}
 
-	// We proceed to hibernate the cluster only when it is ready.
-	// Hibernating a non-ready cluster may be dangerous since the PVCs
-	// won't be completely created.
-	// We should stop the enrich status only when the cluster is unhealthy and the process hasn't already started
+	// We defer hibernation when the cluster is unhealthy and the process
+	// hasn't already started. Hibernating a non-ready cluster may be
+	// dangerous since the PVCs won't be completely created.
 	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationOngoing(cluster) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    HibernationConditionType,
