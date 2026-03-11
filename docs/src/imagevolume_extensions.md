@@ -526,8 +526,8 @@ spec:
   # ... <snip>
 ```
 
-CloudNativePG will set the `PATH` environment variable to include
-`/extensions/my-extension/bin`, allowing PostgreSQL to locate these
+CloudNativePG will append `/extensions/my-extension/bin` to the `PATH` environment
+variable of the Postgres process, allowing PostgreSQL to locate these
 binaries at runtime.
 
 :::important
