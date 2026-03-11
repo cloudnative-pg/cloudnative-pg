@@ -185,12 +185,14 @@ GKE
 GPL
 GUC
 GUCs
+GabriFedi
 Gabriele
 GaugeVec
 GeoSpatial
 Gi
 GitOps
 GoArch
+GoReleaser
 Golang
 GolangCI
 GoogleCredentials
@@ -439,6 +441,7 @@ Ruocco
 SANs
 SAS
 SBOM
+SBOMs
 SCC
 SDK
 SELinux
@@ -582,6 +585,7 @@ addons
 affinityconfiguration
 aks
 albert
+alex
 allTables
 allnamespaces
 alloc
@@ -859,6 +863,7 @@ envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
+ermakov
 eu
 excludePatterns
 executables
@@ -940,6 +945,7 @@ html
 http
 httpGet
 https
+hu
 hugepages
 icu
 icuLocale
@@ -996,6 +1002,7 @@ isready
 issuecomment
 italy
 jdbc
+jmealo
 jobCount
 jq
 json
@@ -1138,6 +1145,7 @@ observability
 observedGeneration
 oc
 ol
+oleg
 olm
 onlineConfiguration
 onlineUpdateEnabled
@@ -1407,6 +1415,7 @@ servicetemplatespec
 serviceupdatestrategy
 sessionToken
 sha
+sharifmshaker
 shm
 shmall
 shmmax
