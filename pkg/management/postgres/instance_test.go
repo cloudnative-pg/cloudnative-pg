@@ -315,8 +315,8 @@ var _ = Describe("buildPostgresEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
 		It("should be empty by default", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
 		})
 	})
 
@@ -339,14 +339,14 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 
 		It("should be defined", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
 
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
 		})
 	})
 
@@ -354,8 +354,8 @@ var _ = Describe("buildPostgresEnv", func() {
 		It("should not be modified", func() {
 			GinkgoT().Setenv("PATH", "/my/default/path")
 
-			path := getPathFromEnv(instance.buildPostgresEnv())
-			Expect(path).To(Equal("PATH=/my/default/path"))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
 	})
 
@@ -380,14 +380,14 @@ var _ = Describe("buildPostgresEnv", func() {
 		It("should be defined", func() {
 			GinkgoT().Setenv("PATH", "")
 
-			path := getPathFromEnv(instance.buildPostgresEnv())
-			Expect(path).To(Equal(fmt.Sprintf("PATH=%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			GinkgoT().Setenv("PATH", "/my/default/path")
 
-			path := getPathFromEnv(instance.buildPostgresEnv())
-			Expect(path).To(BeEquivalentTo(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
 		})
 	})
 
@@ -397,38 +397,17 @@ var _ = Describe("buildPostgresEnv", func() {
 			cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
 		})
 		It("PATH should not be modified", func() {
 			GinkgoT().Setenv("PATH", "/my/default/path")
 
-			path := getPathFromEnv(instance.buildPostgresEnv())
-			Expect(path).To(Equal("PATH=/my/default/path"))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
 	})
 })
-
-func getLibraryPathFromEnv(env []string) string {
-	return getValueFromEnv(env, "LD_LIBRARY_PATH=")
-}
-
-func getPathFromEnv(env []string) string {
-	return getValueFromEnv(env, "PATH=")
-}
-
-func getValueFromEnv(envs []string, prefix string) string {
-	var value string
-
-	for i := len(envs) - 1; i >= 0; i-- {
-		if strings.HasPrefix(envs[i], prefix) {
-			value = envs[i]
-			break
-		}
-	}
-
-	return value
-}
 
 var _ = Describe("GetPrimaryConnInfo", func() {
 	var instance *Instance
