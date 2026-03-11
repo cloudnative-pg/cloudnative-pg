@@ -530,7 +530,7 @@ CloudNativePG will append `/extensions/my-extension/bin` to the `PATH` environme
 variable of the Postgres process, allowing PostgreSQL to locate these
 binaries at runtime.
 
-:::important
+:::warning
 Since `bin_path` must be set when the PostgreSQL process starts,
 changing this value requires a **cluster restart** for the new value to take
 effect.
