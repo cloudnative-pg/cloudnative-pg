@@ -1745,7 +1745,7 @@ _Appears in:_
 PodSelectorRef defines a named pod label selector for use in pg_hba rules.
 Pods matching the selector in the Cluster's namespace will have their IPs
 resolved and made available for pg_hba address expansion via the
-${podselector:NAME} syntax.
+`${podselector:NAME}` syntax.
 
 
 
