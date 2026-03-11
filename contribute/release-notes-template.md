@@ -13,6 +13,11 @@ git checkout main
 git log ${LAST_TAG}.. --oneline --pretty="format:%h;%s" > log.csv
 ```
 -->
+---
+id: v1.XX
+title: Release notes for CloudNativePG 1.XX
+---
+
 # Release notes for CloudNativePG 1.XX
 
 History of user-visible changes in the 1.XX minor release of CloudNativePG.
