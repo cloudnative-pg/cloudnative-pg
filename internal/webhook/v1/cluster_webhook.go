@@ -2840,6 +2840,7 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				path,
 			); validateErr != nil {
 				result = append(result, validateErr)
+				continue
 			}
 			pathSet.Put(path)
 		}
