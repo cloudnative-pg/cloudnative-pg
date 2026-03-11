@@ -7,6 +7,16 @@ metadata:
     cnpg.io/reload: ""
 data:
   queries: |
+    autovacuum_workers:
+      query:
+       SELECT count(*)
+       FROM pg_catalog.pg_stat_activity
+       WHERE backend_type = 'autovacuum worker'
+      metrics:
+        - count:
+            usage: "COUNTER"
+            description: "Number of autovacuum workers currently running"
+
     backends:
       query: |
        SELECT sa.datname
