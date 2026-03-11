@@ -27,7 +27,7 @@ registry_net=registry
 registry_port='5000'
 builder_name=cnpg-builder
 # renovate: datasource=docker depName=registry versioning=docker
-registry_version=3
+REGISTRY_VERSION=3
 
 # ensure_registry: Sets up the local Docker registry container and network.
 function ensure_registry() {
@@ -44,7 +44,7 @@ function ensure_registry() {
   if ! docker inspect "${registry_name}" &>/dev/null; then
     # Container doesn't exist, create it
     echo "- Create registry: ${registry_name}" >&2
-    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:${registry_version} >&2
+    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p ${registry_port}:5000 registry:${REGISTRY_VERSION} >&2
   elif [ "$(docker inspect -f '{{.State.Running}}' "${registry_name}")" != "true" ]; then
     # Container exists but is not running, start it
     echo "- Start registry: ${registry_name}" >&2
