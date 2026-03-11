@@ -386,11 +386,11 @@ following fields:
   to be appended to PostgreSQL’s `dynamic_library_path`, enabling it to locate
   shared library files for extensions.
 - `ld_library_path`: A list of relative paths within the container image to be
-  appended to the `LD_LIBRARY_PATH` environment variable of the instance
-  manager process, allowing PostgreSQL to locate required system libraries at
+  appended to the `LD_LIBRARY_PATH` environment variable of the Postgres
+  process, allowing PostgreSQL to locate required system libraries at
   runtime.
 - `bin_path`: A list of relative paths within the container image to be
-  appended to the `PATH` environment variable of the instance manager process,
+  appended to the `PATH` environment variable of the Postgres process,
   allowing PostgreSQL to locate binaries at runtime.
 
 This flexibility enables you to support complex or non-standard extension
