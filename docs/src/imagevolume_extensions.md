@@ -499,7 +499,7 @@ need to manually restart the cluster (e.g., using `cnpg restart`) after
 modifying `ld_library_path`.
 :::
 
-### Including external Binaries
+### Including external binaries
 
 Some extensions might need to provide some binaries required to interact with
 the extension itself. To support these requirements, you can

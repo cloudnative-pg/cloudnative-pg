@@ -2822,7 +2822,6 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				value,
 			)
 		}
-
 		return nil
 	}
 

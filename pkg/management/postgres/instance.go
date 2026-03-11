@@ -812,8 +812,11 @@ func (instance *Instance) buildPostgresEnv() []string {
 	return envMap.StringSlice()
 }
 
-// collectLibraryPaths returns a list of PATHS which should be added to LD_LIBRARY_PATH
-// given an extension
+// collectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
+// same directory under the extension mount point.
 func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	result := make([]string, 0, len(extensionList))
 
@@ -829,8 +832,11 @@ func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string 
 	return result
 }
 
-// collectBinPaths returns a list of PATHS which should be added to PATH
-// given an extension
+// collectBinPaths returns a list of paths which should be added to PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
+// same directory under the extension mount point.
 func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	result := make([]string, 0, len(extensionList))
 
