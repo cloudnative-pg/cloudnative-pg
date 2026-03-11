@@ -225,6 +225,7 @@ func (v *ClusterCustomValidator) validateClusterChanges(r, old *apiv1.Cluster) (
 		v.validateReplicationSlotsChange,
 		v.validateWALLevelChange,
 		v.validateReplicaClusterChange,
+		v.validateCrossNamespaceDatabasesChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(r, old)...)
@@ -1879,6 +1880,21 @@ func (v *ClusterCustomValidator) validateReplicaClusterChange(r, old *apiv1.Clus
 			field.Forbidden(
 				field.NewPath("spec", "replica", "enabled"),
 				"cannot modify the field while there is an ongoing operation to enable the replica cluster",
+			),
+		}
+	}
+
+	return nil
+}
+
+func (v *ClusterCustomValidator) validateCrossNamespaceDatabasesChange(r, old *apiv1.Cluster) field.ErrorList {
+	// Prevent disabling cross-namespace databases once enabled
+	// This avoids orphaning Database resources in other namespaces
+	if old.Spec.EnableCrossNamespaceDatabases && !r.Spec.EnableCrossNamespaceDatabases {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "enableCrossNamespaceDatabases"),
+				"cannot disable cross-namespace databases once enabled",
 			),
 		}
 	}
