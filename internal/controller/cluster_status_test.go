@@ -585,3 +585,95 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		})
 	})
 })
+
+var _ = Describe("managedResources", func() {
+	Context("runningJobNames", func() {
+		It("should exclude completed jobs", func() {
+			resources := &managedResources{
+				jobs: batchv1.JobList{
+					Items: []batchv1.Job{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "completed-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 1,
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "running-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 0,
+							},
+						},
+					},
+				},
+			}
+
+			names := resources.runningJobNames()
+			Expect(names).To(HaveLen(1))
+			Expect(names).To(ContainElement("running-job"))
+			Expect(names).NotTo(ContainElement("completed-job"))
+		})
+
+		It("should exclude failed jobs", func() {
+			resources := &managedResources{
+				jobs: batchv1.JobList{
+					Items: []batchv1.Job{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "failed-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 0,
+								Conditions: []batchv1.JobCondition{
+									{
+										Type:   batchv1.JobFailed,
+										Status: corev1.ConditionTrue,
+									},
+								},
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "running-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 0,
+							},
+						},
+					},
+				},
+			}
+
+			names := resources.runningJobNames()
+			Expect(names).To(HaveLen(1))
+			Expect(names).To(ContainElement("running-job"))
+			Expect(names).NotTo(ContainElement("failed-job"))
+		})
+
+		It("should return empty when all jobs are completed or failed", func() {
+			resources := &managedResources{
+				jobs: batchv1.JobList{
+					Items: []batchv1.Job{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "completed-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 1,
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "failed-job"},
+							Status: batchv1.JobStatus{
+								Succeeded: 0,
+								Conditions: []batchv1.JobCondition{
+									{
+										Type:   batchv1.JobFailed,
+										Status: corev1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			names := resources.runningJobNames()
+			Expect(names).To(BeEmpty())
+		})
+	})
+})
