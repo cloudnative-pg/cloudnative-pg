@@ -133,6 +133,7 @@ data:
             description: "Number of streaming replicas connected to the instance"
 
     pg_replication_slots:
+      runonserver: "<17.0.0"
       query: |
         SELECT slot_name,
           slot_type,
@@ -157,6 +158,40 @@ data:
         - active:
             usage: "GAUGE"
             description: "Flag indicating whether the slot is active"
+        - pg_wal_lsn_diff:
+            usage: "GAUGE"
+            description: "Replication lag in bytes"
+
+    pg_replication_slots_17:
+      runonserver: ">=17.0.0"
+      query: |
+        SELECT slot_name,
+          slot_type,
+          database,
+          active,
+          EXTRACT(EPOCH FROM inactive_since) AS inactive_since,
+          (CASE pg_catalog.pg_is_in_recovery()
+            WHEN TRUE THEN pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_receive_lsn(), restart_lsn)
+            ELSE pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+          END) as pg_wal_lsn_diff
+        FROM pg_catalog.pg_replication_slots
+        WHERE NOT temporary
+      metrics:
+        - slot_name:
+            usage: "LABEL"
+            description: "Name of the replication slot"
+        - slot_type:
+            usage: "LABEL"
+            description: "Type of the replication slot"
+        - database:
+            usage: "LABEL"
+            description: "Name of the database"
+        - active:
+            usage: "GAUGE"
+            description: "Flag indicating whether the slot is active"
+        - inactive_since:
+            usage: "GAUGE"
+            description: "Epoch of the time when the slot become inactive"
         - pg_wal_lsn_diff:
             usage: "GAUGE"
             description: "Replication lag in bytes"
