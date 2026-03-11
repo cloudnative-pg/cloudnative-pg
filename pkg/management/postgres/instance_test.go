@@ -350,7 +350,7 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 	})
 
-	Context("Extensions enabled, PATH undefined", func() {
+	Context("Extensions enabled, no bin_path configured", func() {
 		It("should not be modified", func() {
 			GinkgoT().Setenv("PATH", "/my/default/path")
 

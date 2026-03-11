@@ -818,7 +818,11 @@ func (instance *Instance) buildPostgresEnv() []string {
 // trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
 // same directory under the extension mount point.
 func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.LdLibraryPath)
+	}
+	result := make([]string, 0, capacity)
 
 	for _, extension := range extensionList {
 		for _, libraryPath := range extension.LdLibraryPath {
@@ -838,7 +842,11 @@ func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string 
 // trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
 // same directory under the extension mount point.
 func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	result := make([]string, 0, len(extensionList))
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.BinPath)
+	}
+	result := make([]string, 0, capacity)
 
 	for _, extension := range extensionList {
 		for _, binPath := range extension.BinPath {

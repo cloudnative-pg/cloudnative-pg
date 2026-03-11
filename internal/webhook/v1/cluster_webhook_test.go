@@ -5755,6 +5755,42 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[1]"))
 	})
 
+	It("returns an error for path traversal in path lists", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../etc",
+							},
+							DynamicLibraryPath: []string{
+								"../escape",
+							},
+							LdLibraryPath: []string{
+								"lib/../../../secret",
+							},
+							BinPath: []string{
+								"../bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(4))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+		Expect(err[2].Field).To(ContainSubstring("ld_library_path[0]"))
+		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
+	})
+
 	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

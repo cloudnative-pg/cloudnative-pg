@@ -61,7 +61,6 @@ spec:
                             description: |-
                               A list of directories within the image to be appended to the
                               PostgreSQL process's `PATH` environment variable.
-                              If empty, the system `PATH` remains unchanged.
                             items:
                               type: string
                             type: array

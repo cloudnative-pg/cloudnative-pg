@@ -1559,7 +1559,6 @@ type ExtensionConfiguration struct {
 
 	// A list of directories within the image to be appended to the
 	// PostgreSQL process's `PATH` environment variable.
-	// If empty, the system `PATH` remains unchanged.
 	// +optional
 	BinPath []string `json:"bin_path,omitempty"`
 }

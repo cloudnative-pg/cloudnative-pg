@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -2841,6 +2842,16 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 				result = append(result, validateErr)
 				continue
 			}
+
+			if strings.HasPrefix(filepath.Clean(path), "..") {
+				result = append(result, field.Invalid(
+					fieldPath.Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
+				continue
+			}
+
 			pathSet.Put(path)
 		}
 
