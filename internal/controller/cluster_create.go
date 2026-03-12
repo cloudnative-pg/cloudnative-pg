@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -421,12 +422,6 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 	var shouldUpdate bool
 
-	// we ensure that the selector perfectly match
-	if !reflect.DeepEqual(proposed.Spec.Selector, livingService.Spec.Selector) {
-		livingService.Spec.Selector = proposed.Spec.Selector
-		shouldUpdate = true
-	}
-
 	// we ensure we've some space to store the labels and the annotations
 	if livingService.Labels == nil {
 		livingService.Labels = make(map[string]string)
@@ -446,13 +441,20 @@ func (r *ClusterReconciler) serviceReconciler(
 		shouldUpdate = true
 	}
 
+	// we check if the service spec has changed, preserving Kubernetes-managed fields
+	patchedSpec := proposed.Spec.DeepCopy()
+	servicespec.PreserveKubernetesDefaults(patchedSpec, &livingService.Spec)
+	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
+		livingService.Spec = *patchedSpec
+		shouldUpdate = true
+	}
+
 	if !shouldUpdate {
 		return nil
 	}
 
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
 		contextLogger.Info("reconciling service")
-		// we update to ensure that we substitute the selectors
 		return r.Update(ctx, &livingService)
 	}
 

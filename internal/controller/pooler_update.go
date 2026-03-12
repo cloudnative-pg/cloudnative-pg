@@ -33,6 +33,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -149,6 +150,7 @@ func (r *PoolerReconciler) reconcileService(
 
 	patchedService := resources.Service.DeepCopy()
 	patchedService.Spec = expectedService.Spec
+	servicespec.PreserveKubernetesDefaults(&patchedService.Spec, &resources.Service.Spec)
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
