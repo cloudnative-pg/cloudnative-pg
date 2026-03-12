@@ -1269,6 +1269,7 @@ postgresqlcnpgiov
 ppc
 pprof
 pre
+prefetched
 preferredDuringSchedulingIgnoredDuringExecution
 preload
 prepended
