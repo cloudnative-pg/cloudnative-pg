@@ -683,6 +683,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+bozkayasalihx
 br
 bs
 builtinLocale
@@ -1315,6 +1316,7 @@ readinessProbe
 readthedocs
 readyInstances
 reconciler
+reconcilers
 reconciliationLoop
 reconciliationStartedAt
 reconciliationTerminatedAt
