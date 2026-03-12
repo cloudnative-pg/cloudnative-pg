@@ -120,8 +120,7 @@ jobs:
       -
         name: Get updated OpenShift versions
         run: |
-          # Match OpenShift 4.14, 4.16-4.19, and 4.20+
-          # Version 4.15 is excluded as it is EOL
+          # Match 4.16-4.19, and 4.20+
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
           grep -Eo 'href.*"4\.(1[46-9]|[2-9][0-9])\.[0-9].*"' | \
           grep -v rc | \

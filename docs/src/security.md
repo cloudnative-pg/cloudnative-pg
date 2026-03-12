@@ -614,7 +614,7 @@ spec:
 #### Security Context Constraints
 
 When running in an environment that is utilizing
-[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
+[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html)
 the operator does not explicitly set the security context of the PostgreSQL
 cluster pods, but rather allows the pods to inherit the restricted Security
 Context Constraints that are already defined.
