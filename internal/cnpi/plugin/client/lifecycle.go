@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -134,7 +135,22 @@ func (data *data) innerLifecycleHook(
 			return nil, err
 		}
 
-		if result == nil || len(result.JsonPatch) == 0 {
+		if result == nil {
+			// There's nothing to mutate
+			continue
+		}
+
+		// Handle requeue behavior - plugin is waiting for a dependency
+		if result.Behavior == lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE {
+			contextLogger.Info("Plugin requested requeue",
+				"plugin", plg.Name(),
+				"requeueAfter", result.RequeueAfter)
+			return nil, &RequeueError{
+				After: time.Duration(result.RequeueAfter) * time.Second,
+			}
+		}
+
+		if len(result.JsonPatch) == 0 {
 			// There's nothing to mutate
 			continue
 		}

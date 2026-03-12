@@ -22,6 +22,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -118,5 +119,78 @@ var _ = Describe("ContainsPluginError", func() {
 
 		result := ContainsPluginError(wrappedErr)
 		Expect(result).To(BeTrue())
+	})
+})
+
+var _ = Describe("RequeueError", func() {
+	It("should return the expected error message", func() {
+		err := &RequeueError{After: 10 * time.Second}
+		Expect(err.Error()).To(Equal("plugin requested requeue"))
+	})
+
+	It("should work with zero duration", func() {
+		err := &RequeueError{}
+		Expect(err.Error()).To(Equal("plugin requested requeue"))
+		Expect(err.After).To(Equal(time.Duration(0)))
+	})
+})
+
+var _ = Describe("IsRequeueError", func() {
+	It("should return false when err is nil", func() {
+		result := IsRequeueError(nil)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return true when error is a direct RequeueError", func() {
+		err := &RequeueError{After: 5 * time.Second}
+		result := IsRequeueError(err)
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return true when RequeueError is wrapped", func() {
+		requeueErr := &RequeueError{After: 5 * time.Second}
+		wrappedErr := fmt.Errorf("context: %w", requeueErr)
+
+		result := IsRequeueError(wrappedErr)
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return false for regular errors", func() {
+		err := errors.New("regular error")
+		result := IsRequeueError(err)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false for plugin errors", func() {
+		err := newPluginError("plugin error")
+		result := IsRequeueError(err)
+		Expect(result).To(BeFalse())
+	})
+})
+
+var _ = Describe("GetRequeueAfter", func() {
+	It("should return zero duration when err is nil", func() {
+		result := GetRequeueAfter(nil)
+		Expect(result).To(Equal(time.Duration(0)))
+	})
+
+	It("should return the duration from RequeueError", func() {
+		err := &RequeueError{After: 15 * time.Second}
+		result := GetRequeueAfter(err)
+		Expect(result).To(Equal(15 * time.Second))
+	})
+
+	It("should return the duration from wrapped RequeueError", func() {
+		requeueErr := &RequeueError{After: 10 * time.Second}
+		wrappedErr := fmt.Errorf("context: %w", requeueErr)
+
+		result := GetRequeueAfter(wrappedErr)
+		Expect(result).To(Equal(10 * time.Second))
+	})
+
+	It("should return zero duration for non-RequeueError", func() {
+		err := errors.New("regular error")
+		result := GetRequeueAfter(err)
+		Expect(result).To(Equal(time.Duration(0)))
 	})
 })

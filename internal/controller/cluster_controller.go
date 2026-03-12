@@ -249,6 +249,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	// Handle plugin requeue requests - this is not an error, just a signal
+	// that the plugin is waiting for a dependency (e.g., a custom resource).
+	if cnpgiClient.IsRequeueError(err) {
+		requeueAfter := cnpgiClient.GetRequeueAfter(err)
+		if requeueAfter == 0 {
+			requeueAfter = 5 * time.Second
+		}
+		contextLogger.Info("Plugin requested requeue", "requeueAfter", requeueAfter)
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+
 	// This code assumes that we always end the reconciliation loop if we encounter an error.
 	// In case that the assumption is false this code could overwrite an error phase.
 	if cnpgiClient.ContainsPluginError(err) {
