@@ -52,6 +52,76 @@ can be found below.
 
 ---
 
+## Trust Model and Security Boundaries
+
+CloudNativePG follows a clear separation of responsibilities between the
+operator and the Kubernetes platform for enforcing security policies.
+
+### Trusted Cluster Resource Writers
+
+Any user with create or update permissions on the `Cluster` custom resource is
+trusted to define the full specification of the PostgreSQL Pods that the
+operator manages. This includes security-sensitive fields such as
+`spec.securityContext`, `spec.podSecurityContext`, and
+`spec.serviceAccountName`. The operator applies these settings as instructed.
+When a Cluster writer does not override them, the operator applies a hardened
+default Pod and container security context (see
+[Pod and Container Security Contexts](#pod-and-container-security-contexts)).
+
+This is consistent with how all Kubernetes operators work: the operator acts as
+a privileged agent that translates high-level intent into low-level Kubernetes
+resources. Granting someone write access to a Cluster resource is equivalent
+to granting them control over the resulting Pods, Services, PVCs, and other
+managed resources.
+
+The same principle applies to [CNPG-I plugins](cnpg_i.md). A plugin hooks into
+the Pod lifecycle and can modify any field of the Pod specification before the
+Pod is created. Installing a plugin is therefore an explicit trust decision
+made by the cluster administrator, on par with granting write access to a
+Cluster resource.
+
+### Kubernetes Admission Control
+
+The operator creates Pods through the standard Kubernetes API, meaning every
+Pod goes through the full admission control chain configured on the cluster.
+This includes
+[Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/)
+(PSA), the built-in Kubernetes mechanism that enforces
+[Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+at the namespace level, as well as any third-party policy engine in use. If a
+namespace enforces the PSA `restricted` or `baseline` profile, the Kubernetes
+API server rejects any Pod that violates the policy, including Pods created by
+the operator.
+
+### RBAC on Custom Resources
+
+Access to CloudNativePG custom resources is governed by standard Kubernetes
+RBAC. Since write access to a Cluster resource implies control over the
+resulting Pods, annotations like `cnpg.io/podPatch` (which applies a
+user-supplied patch to the managed Pods), `cnpg.io/validation`, and
+`cnpg.io/reconciliationLoop` are subject to the same RBAC rules as the
+Cluster resource itself.
+
+In particular, setting `cnpg.io/validation` to `disabled` bypasses the
+operator's own validating admission webhook for that Cluster, including the
+syntactic and applicability checks performed on `cnpg.io/podPatch`.
+CloudNativePG's webhook validation is therefore advisory: it can be turned off
+by the same actor who can write the Cluster, so it is not a security boundary.
+Kubernetes admission control still applies to the resulting Pods regardless of
+this annotation.
+
+### Namespace Isolation
+
+The operator enforces namespace boundaries for all managed resources. Instance
+Pods are always created in the same namespace as their parent Cluster, and that
+namespace is set explicitly and deterministically rather than inferred from any
+other relationship. As an additional safeguard, before creating a managed
+resource the operator verifies that it shares its owning Cluster's namespace and
+aborts with an error on any mismatch, so it cannot be induced to create or own
+resources outside the Cluster's namespace.
+
+---
+
 ## Code
 
 CloudNativePG's source code undergoes systematic static analysis, including

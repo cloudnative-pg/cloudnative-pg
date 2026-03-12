@@ -219,10 +219,19 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/podPatch`
 :   Annotation can be applied on a `Cluster` resource.
 
-    When set to JSON-patch formatted patch, the patch will be applied on the instance Pods.
+    When set to a JSON-patch formatted patch, the patch will be applied to the
+    instance Pods. The patch can modify any field of the Pod specification,
+    including security-sensitive fields. The operator validates only that the
+    patch is syntactically correct and applicable.
+
+    As with all Cluster fields that affect Pod specifications, enforcement of
+    security constraints is delegated to the Kubernetes admission control chain.
+    See the
+    [Trust Model and Security Boundaries](security.md#trust-model-and-security-boundaries)
+    section for details.
 
     **⚠️ WARNING:** This feature may introduce discrepancies between the
-    operator’s expectations and Kubernetes behavior. Use with caution and only as a
+    operator's expectations and Kubernetes behavior. Use with caution and only as a
     last resort.
 
     **IMPORTANT**: adding or changing this annotation won't trigger a rolling deployment
