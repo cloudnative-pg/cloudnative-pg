@@ -59,6 +59,20 @@ creates the following resources: `Pod`, `Service`, `Secret`,
 `ConfigMap`,`PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
 `RoleBinding`, and `Role`.
 
+You define a PostgreSQL cluster (operand) using the `Cluster` custom resource
+in a fully declarative way. The PostgreSQL version is determined by the operand
+container image defined in the CR, which is automatically fetched from the
+requested registry.
+When deploying an operand, the operator also creates the following resources:
+`Pod`, `Service`, `Secret`, `ConfigMap`, `PersistentVolumeClaim`,
+`PodDisruptionBudget`, `ServiceAccount`, `RoleBinding`, and `Role`.
+
+You can optionally provide a pre-existing ServiceAccount for both `Cluster` and
+`Pooler` resources. This shared ServiceAccount support enables seamless
+integration with cloud-native identity providers allowing you to manage IAM
+roles and permissions at the infrastructure level rather than on a per-cluster
+basis.
+
 ### Override of operand images through the CRD
 
 The operator supports any operand container image containing PostgreSQL.
