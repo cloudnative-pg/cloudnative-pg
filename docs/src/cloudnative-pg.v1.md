@@ -989,6 +989,7 @@ _Appears in:_
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
 | `ld_library_path` _string array_ | The list of directories inside the image which should be added to ld_library_path. |  |  |  |
+| `bin_path` _string array_ | A list of directories within the image to be appended to the<br />PostgreSQL process's `PATH` environment variable. |  |  |  |
 
 
 #### ExtensionSpec
