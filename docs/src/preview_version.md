@@ -20,8 +20,8 @@ intended for public testing prior to the final release.
 
 ## Current Preview Version
 
-There are currently no preview versions available.
 <!--
+There are currently no preview versions available.
 -->
 The current preview version is **1.29.0-rc1**.
 
