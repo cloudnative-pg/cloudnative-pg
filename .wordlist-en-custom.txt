@@ -1060,6 +1060,7 @@ lm
 localeCType
 localeCollate
 localeProvider
+loadBalancerSourceRanges
 localhost
 localobjectreference
 locktype
