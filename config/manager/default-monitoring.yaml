@@ -362,7 +362,7 @@ data:
             description: "Time at which these statistics were last reset"
 
     pg_stat_database:
-    runonserver: "<18.0.0"
+      runonserver: "<18.0.0"
       query: |
         SELECT datname
           , xact_commit
@@ -433,7 +433,8 @@ data:
             this database, in milliseconds"
 
     pg_stat_database_18:
-    runonserver: ">=18.0.0"
+      runonserver: ">=18.0.0"
+      name: pg_stat_database
       query: |
         SELECT datname
           , xact_commit
