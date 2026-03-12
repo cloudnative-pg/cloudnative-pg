@@ -20,15 +20,19 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"context"
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -313,4 +317,216 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
+})
+
+// fakePluginClientLifecycle is a fake plugin client for testing lifecycle hooks.
+type fakePluginClientLifecycle struct {
+	pluginClient.Client
+	returnedError error
+}
+
+func (f fakePluginClientLifecycle) LifecycleHook(
+	_ context.Context,
+	_ plugin.OperationVerb,
+	_ k8client.Object,
+	_ k8client.Object,
+) (k8client.Object, error) {
+	return nil, f.returnedError
+}
+
+var _ = Describe("ensureInstancesAreCreated early lifecycle hook", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("returns error from lifecycle hook before PVC checks", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			// Cluster wants 3 instances but only 2 exist
+			cluster.Spec.Instances = 2
+			cluster.Status.LatestGeneratedNode = 2
+			cluster.Status.ReadyInstances = 2
+		})
+
+		By("creating the cluster resources with 2 pods and a dangling PVC for instance 3")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		// Create PVC for instance 3 (the one to be created)
+		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		pvcs = append(pvcs, thirdInstancePVCGroup...)
+
+		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcs},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          false,
+					Pod:                &instances[0],
+					MightBeUnavailable: false,
+				},
+				{
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          true,
+					Pod:                &instances[1],
+					MightBeUnavailable: false,
+				},
+			},
+		}
+
+		By("setting up a plugin client that returns a requeue error")
+		fakePlugin := fakePluginClientLifecycle{
+			returnedError: &pluginClient.RequeueError{After: 10 * time.Second},
+		}
+		ctxWithPlugin := pluginClient.SetPluginClientInContext(ctx, fakePlugin)
+
+		By("calling ensureInstancesAreCreated and verifying the requeue error is returned")
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(
+			ctxWithPlugin,
+			cluster,
+			managedResources,
+			statusList,
+		)
+		Expect(err).To(HaveOccurred())
+		Expect(pluginClient.IsRequeueError(err)).To(BeTrue())
+		Expect(res.IsZero()).To(BeTrue())
+	})
+
+	It("continues normally when no plugin client is in context", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 2
+			cluster.Status.LatestGeneratedNode = 2
+			cluster.Status.ReadyInstances = 2
+		})
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		pvcs = append(pvcs, thirdInstancePVCGroup...)
+
+		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcs},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          false,
+					Pod:                &instances[0],
+					MightBeUnavailable: false,
+				},
+				{
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          true,
+					Pod:                &instances[1],
+					MightBeUnavailable: false,
+				},
+			},
+		}
+
+		By("calling ensureInstancesAreCreated without plugin client")
+		res, err := env.clusterReconciler.ensureInstancesAreCreated(
+			ctx,
+			cluster,
+			managedResources,
+			statusList,
+		)
+
+		By("verifying that it proceeds to create the instance")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
+
+		var expectedPod corev1.Pod
+		instanceName := specs.GetInstanceName(cluster.Name, 3)
+		err = env.clusterReconciler.Get(ctx, types.NamespacedName{
+			Name:      instanceName,
+			Namespace: cluster.Namespace,
+		}, &expectedPod)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("createPrimaryInstance early lifecycle hook", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("returns error from lifecycle hook before updating status", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 1
+			// LatestGeneratedNode must be 0 to enter createPrimaryInstance
+			cluster.Status.LatestGeneratedNode = 0
+		})
+
+		By("setting up a plugin client that returns a requeue error")
+		fakePlugin := fakePluginClientLifecycle{
+			returnedError: &pluginClient.RequeueError{After: 5 * time.Second},
+		}
+		ctxWithPlugin := pluginClient.SetPluginClientInContext(ctx, fakePlugin)
+
+		By("calling createPrimaryInstance and verifying the requeue error is returned")
+		res, err := env.clusterReconciler.createPrimaryInstance(ctxWithPlugin, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(pluginClient.IsRequeueError(err)).To(BeTrue())
+		Expect(res.IsZero()).To(BeTrue())
+
+		By("verifying that LatestGeneratedNode was not updated")
+		var updatedCluster apiv1.Cluster
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.LatestGeneratedNode).To(Equal(0))
+	})
+
+	It("proceeds normally when no plugin client is in context", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 1
+			cluster.Status.LatestGeneratedNode = 0
+		})
+
+		By("calling createPrimaryInstance without plugin client")
+		_, _ = env.clusterReconciler.createPrimaryInstance(ctx, cluster)
+
+		By("verifying that LatestGeneratedNode was updated (proving lifecycle hook didn't block)")
+		var updatedCluster apiv1.Cluster
+		err := env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.LatestGeneratedNode).To(Equal(1))
+	})
 })
