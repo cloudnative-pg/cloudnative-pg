@@ -19,7 +19,12 @@ SPDX-License-Identifier: Apache-2.0
 
 package servicespec
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"slices"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 // PreserveKubernetesDefaults copies Kubernetes-managed fields from the living
 // service spec into the proposed one, so that a DeepEqual comparison only
@@ -27,11 +32,11 @@ import corev1 "k8s.io/api/core/v1"
 func PreserveKubernetesDefaults(proposed, living *corev1.ServiceSpec) {
 	// Always assigned by Kubernetes
 	proposed.ClusterIP = living.ClusterIP
-	proposed.ClusterIPs = living.ClusterIPs
+	proposed.ClusterIPs = slices.Clone(living.ClusterIPs)
 
 	// Defaulted at creation time
 	if len(proposed.IPFamilies) == 0 {
-		proposed.IPFamilies = living.IPFamilies
+		proposed.IPFamilies = slices.Clone(living.IPFamilies)
 	}
 	if proposed.IPFamilyPolicy == nil {
 		proposed.IPFamilyPolicy = living.IPFamilyPolicy
@@ -42,6 +47,9 @@ func PreserveKubernetesDefaults(proposed, living *corev1.ServiceSpec) {
 	if proposed.SessionAffinity == "" {
 		proposed.SessionAffinity = living.SessionAffinity
 	}
+	if proposed.SessionAffinityConfig == nil {
+		proposed.SessionAffinityConfig = living.SessionAffinityConfig
+	}
 	if proposed.ExternalTrafficPolicy == "" {
 		proposed.ExternalTrafficPolicy = living.ExternalTrafficPolicy
 	}
@@ -50,6 +58,9 @@ func PreserveKubernetesDefaults(proposed, living *corev1.ServiceSpec) {
 	}
 	if proposed.AllocateLoadBalancerNodePorts == nil {
 		proposed.AllocateLoadBalancerNodePorts = living.AllocateLoadBalancerNodePorts
+	}
+	if proposed.TrafficDistribution == nil {
+		proposed.TrafficDistribution = living.TrafficDistribution
 	}
 
 	preservePortDefaults(proposed.Ports, living.Ports)
@@ -83,7 +94,7 @@ func preservePortDefaults(proposed, living []corev1.ServicePort) {
 		if proposed[i].Protocol == "" {
 			proposed[i].Protocol = lp.Protocol
 		}
-		if proposed[i].TargetPort.IntValue() == 0 && proposed[i].TargetPort.StrVal == "" {
+		if proposed[i].TargetPort == (intstr.IntOrString{}) {
 			proposed[i].TargetPort = lp.TargetPort
 		}
 		if proposed[i].NodePort == 0 {

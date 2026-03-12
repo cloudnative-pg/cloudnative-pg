@@ -125,6 +125,45 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		Expect(proposed.SessionAffinity).To(Equal(corev1.ServiceAffinityClientIP))
 	})
 
+	It("should preserve SessionAffinityConfig when not set", func() {
+		timeoutSeconds := int32(3600)
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		living := corev1.ServiceSpec{
+			Type:            corev1.ServiceTypeClusterIP,
+			Ports:           []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			SessionAffinity: corev1.ServiceAffinityClientIP,
+			SessionAffinityConfig: &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: &timeoutSeconds},
+			},
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.SessionAffinityConfig).To(Equal(living.SessionAffinityConfig))
+	})
+
+	It("should not override explicitly set SessionAffinityConfig", func() {
+		timeout1 := int32(1800)
+		timeout2 := int32(3600)
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			SessionAffinityConfig: &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: &timeout1},
+			},
+		}
+		living := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			SessionAffinityConfig: &corev1.SessionAffinityConfig{
+				ClientIP: &corev1.ClientIPConfig{TimeoutSeconds: &timeout2},
+			},
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.SessionAffinityConfig.ClientIP.TimeoutSeconds).To(Equal(&timeout1))
+	})
+
 	It("should preserve ExternalTrafficPolicy when not set", func() {
 		proposed := corev1.ServiceSpec{
 			Type:  corev1.ServiceTypeLoadBalancer,
@@ -198,6 +237,38 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		}
 		PreserveKubernetesDefaults(&proposed, &living)
 		Expect(proposed.AllocateLoadBalancerNodePorts).To(Equal(&allocFalse))
+	})
+
+	It("should preserve TrafficDistribution when not set", func() {
+		dist := "PreferClose"
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		living := corev1.ServiceSpec{
+			Type:                corev1.ServiceTypeClusterIP,
+			Ports:               []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			TrafficDistribution: &dist,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.TrafficDistribution).To(Equal(&dist))
+	})
+
+	It("should not override explicitly set TrafficDistribution", func() {
+		proposedDist := "PreferClose"
+		livingDist := "other"
+		proposed := corev1.ServiceSpec{
+			Type:                corev1.ServiceTypeClusterIP,
+			Ports:               []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			TrafficDistribution: &proposedDist,
+		}
+		living := corev1.ServiceSpec{
+			Type:                corev1.ServiceTypeClusterIP,
+			Ports:               []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			TrafficDistribution: &livingDist,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.TrafficDistribution).To(Equal(&proposedDist))
 	})
 
 	It("should match NodePorts by port and protocol, not by index", func() {
@@ -290,6 +361,24 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		PreserveKubernetesDefaults(&proposed, &living)
 		Expect(proposed.Ports[0].Protocol).To(Equal(corev1.ProtocolUDP))
 		Expect(proposed.Ports[0].TargetPort).To(Equal(intstr.FromInt32(9090)))
+	})
+
+	It("should not override explicitly set named string TargetPort", func() {
+		proposed := corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{Name: "custom", Port: 8080, TargetPort: intstr.FromString("http")},
+			},
+		}
+		living := corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "custom", Port: 8080, Protocol: corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt32(8080), NodePort: 30001,
+				},
+			},
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.Ports[0].TargetPort).To(Equal(intstr.FromString("http")))
 	})
 
 	It("should match ports with empty protocol against TCP living ports", func() {
