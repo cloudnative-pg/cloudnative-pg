@@ -142,15 +142,23 @@ instructions on how to select or override catalog extensions within a cluster.
 
 ## CloudNativePG Catalogs
 
+
 The CloudNativePG project maintains `ClusterImageCatalog` manifests for all
 supported images.
 
-These catalogs are regularly updated and published in the
-[artifacts repository](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs).
+These catalogs are regularly updated and published in two distinct locations
+within the [artifacts repository](https://github.com/cloudnative-pg/artifacts/tree/main):
 
-Each catalog corresponds to a specific combination of image type (e.g.
-`minimal`) and Debian release (e.g. `trixie`). It lists the most up-to-date
-container images for every supported PostgreSQL major version.
+- **[`image-catalogs`](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs):**
+  core catalog definitions for base image types.
+
+- **[`image-catalogs-extensions`](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs-extensions):**
+  identical to the above catalogs, with the key difference that the `minimal`
+  image type includes extension definitions.
+
+Each catalog corresponds to a specific combination of image type and Debian
+release (e.g., `trixie`). It lists the most up-to-date container images for
+every supported PostgreSQL major version.
 
 :::important
 To ensure maximum security and immutability, all images within official
@@ -160,7 +168,7 @@ just tags.
 
 ### Version Compatibility
 
-While standard catalogs work with older versions of the operator, **catalogs
+While core catalogs work with older versions of the operator, **catalogs
 containing an `extensions` section are only compatible with CloudNativePG 1.29
 or later**. Using a catalog with extension definitions on an older operator
 will result in those definitions being rejected.
