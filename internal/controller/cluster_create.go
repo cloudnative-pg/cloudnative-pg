@@ -43,6 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -1359,6 +1361,19 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 			"unusable", cluster.Status.UnusablePVC,
 		)
 		return ctrl.Result{}, nil
+	}
+
+	// Call lifecycle hook early to allow plugins to signal if they're not ready.
+	// This must happen before PVC readiness checks to avoid deadlocks where:
+	// 1. PVC uses WaitForFirstConsumer and stays unbound
+	// 2. Plugin returns REQUEUE (e.g., waiting for a custom resource)
+	// 3. Without this early check, we'd wait for PVC forever
+	if pluginClient := cnpgiClient.GetPluginClientFromContext(ctx); pluginClient != nil {
+		_, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbCreate, cluster, instanceToCreate)
+		if err != nil {
+			// Return the error - the controller will handle REQUEUE errors appropriately
+			return ctrl.Result{}, err
+		}
 	}
 
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&

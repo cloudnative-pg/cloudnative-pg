@@ -19,7 +19,10 @@ SPDX-License-Identifier: Apache-2.0
 
 package client
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrPluginNotLoaded is raised when the plugin that should manage the backup
@@ -70,4 +73,33 @@ func wrapAsPluginErrorIfNeeded(err error) error {
 	}
 
 	return &pluginError{innerErr: err}
+}
+
+// RequeueError is returned when a plugin requests the reconciliation to be
+// requeued without treating it as an error condition. This is useful when
+// a plugin is waiting for a dependency (e.g., a custom resource) to be created.
+type RequeueError struct {
+	// After specifies how long to wait before requeuing.
+	// If zero, the operator's default requeue interval is used.
+	After time.Duration
+}
+
+func (e *RequeueError) Error() string {
+	return "plugin requested requeue"
+}
+
+// IsRequeueError checks if the provided error is a RequeueError.
+func IsRequeueError(err error) bool {
+	var requeueErr *RequeueError
+	return errors.As(err, &requeueErr)
+}
+
+// GetRequeueAfter extracts the requeue duration from a RequeueError.
+// Returns zero duration if the error is not a RequeueError.
+func GetRequeueAfter(err error) time.Duration {
+	var requeueErr *RequeueError
+	if errors.As(err, &requeueErr) {
+		return requeueErr.After
+	}
+	return 0
 }
