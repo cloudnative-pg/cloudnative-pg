@@ -62,6 +62,14 @@ type connectionProvider interface {
 	ConnectionPool() pool.Pooler
 }
 
+// dbTask represents a database initialization task that can be executed in parallel
+type dbTask struct {
+	name     string
+	db       *sql.DB
+	queries  []string
+	refsPath string
+}
+
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
 	// The data directory where to generate the new cluster
@@ -330,26 +338,35 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 		}
 	}
 
-	// Execute the custom set of init queries for the `postgres` database
+	// Execute the custom set of init queries for the `postgres` database in parallel with template1
 	log.Info("Executing post-init SQL instructions")
-	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
-		return err
-	}
-	if err = info.executeSQLRefs(dbSuperUser, info.PostInitSQLRefsFolder); err != nil {
-		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+
+	// Collect all database tasks that can run in parallel
+	tasks := []dbTask{
+		{
+			name:     "postgres",
+			db:       dbSuperUser,
+			queries:  info.PostInitSQL,
+			refsPath: info.PostInitSQLRefsFolder,
+		},
 	}
 
+	// Get template database connection
 	dbTemplate, err := instance.GetTemplateDB()
 	if err != nil {
 		return fmt.Errorf("while getting template database: %w", err)
 	}
-	// Execute the custom set of init queries for the `template1` database
-	log.Info("Executing post-init template SQL instructions")
-	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
-		return fmt.Errorf("could not execute init Template queries: %w", err)
-	}
-	if err = info.executeSQLRefs(dbTemplate, info.PostInitTemplateSQLRefsFolder); err != nil {
-		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+
+	tasks = append(tasks, dbTask{
+		name:     "template1",
+		db:       dbTemplate,
+		queries:  info.PostInitTemplateSQL,
+		refsPath: info.PostInitTemplateSQLRefsFolder,
+	})
+
+	// Execute postgres and template1 tasks in parallel
+	if err = info.executeTasksInParallel(tasks); err != nil {
+		return err
 	}
 
 	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
@@ -391,6 +408,62 @@ func (info InitInfo) ConfigureNewInstance(instance connectionProvider) error {
 
 	if err = info.executeSQLRefs(appDB, info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+	}
+
+	return nil
+}
+
+// executeTasksInParallel executes multiple database initialization tasks in parallel
+func (info InitInfo) executeTasksInParallel(tasks []dbTask) error {
+	type taskResult struct {
+		name string
+		err  error
+	}
+
+	results := make(chan taskResult, len(tasks))
+
+	// Execute each task in a goroutine
+	for _, task := range tasks {
+		// Capture task in local variable for goroutine
+		t := task
+		go func() {
+			log.Info("Executing post-init SQL for database", "database", t.name)
+
+			// Execute inline queries
+			if err := info.executeQueries(t.db, t.queries); err != nil {
+				results <- taskResult{name: t.name, err: fmt.Errorf("inline queries: %w", err)}
+				return
+			}
+
+			// Execute SQL from referenced files
+			if err := info.executeSQLRefs(t.db, t.refsPath); err != nil {
+				results <- taskResult{name: t.name, err: fmt.Errorf("SQL refs: %w", err)}
+				return
+			}
+
+			results <- taskResult{name: t.name, err: nil}
+		}()
+	}
+
+	// Collect results from all tasks
+	var errors []error
+	for i := 0; i < len(tasks); i++ {
+		result := <-results
+		if result.err != nil {
+			errors = append(errors, fmt.Errorf("database %s: %w", result.name, result.err))
+			log.Error(result.err, "Failed to execute post-init SQL", "database", result.name)
+		} else {
+			log.Info("Successfully executed post-init SQL", "database", result.name)
+		}
+	}
+
+	// Return all errors if any occurred
+	if len(errors) > 0 {
+		combinedErr := errors[0]
+		for i := 1; i < len(errors); i++ {
+			combinedErr = fmt.Errorf("%v; %w", combinedErr, errors[i])
+		}
+		return fmt.Errorf("parallel execution failed: %w", combinedErr)
 	}
 
 	return nil
