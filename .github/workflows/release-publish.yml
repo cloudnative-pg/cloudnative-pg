@@ -181,6 +181,9 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
+        name: Install Syft
+        uses: anchore/sbom-action/download-syft@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1
+      -
         name: Run GoReleaser
         id: goreleaser
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
