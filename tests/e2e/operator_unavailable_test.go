@@ -179,11 +179,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 				wg := sync.WaitGroup{}
 				wg.Add(1)
-				wg.Add(1)
-				go func() {
+				wg.Go(func() {
 					_ = podutils.Delete(env.Ctx, env.Client, operatorNamespace, operatorPodName, quickDelete)
-					wg.Done()
-				}()
+				})
 				go func() {
 					_ = podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 					wg.Done()
