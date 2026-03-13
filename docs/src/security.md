@@ -367,10 +367,11 @@ specifying the `serviceAccountName` field in the cluster specification. This
 enables one-time IAM configuration that works across all clusters using that
 `ServiceAccount`.
 
-!!! Important
-    When using a shared `ServiceAccount`, you are responsible for creating and
-    managing the `ServiceAccount` yourself. The operator will validate that the
-    specified `ServiceAccount` exists but will not create or modify it.
+:::important
+When using a shared `ServiceAccount`, you are responsible for creating and
+managing the `ServiceAccount` yourself. The operator will validate that the
+specified `ServiceAccount` exists but will not create or modify it.
+:::
 
 Here's an example of using a shared `ServiceAccount`:
 
@@ -396,22 +397,25 @@ spec:
     size: 100Gi
 ```
 
-!!! Note
-    The `serviceAccountName` field is mutually exclusive with
-    `serviceAccountTemplate`. You can either let the operator manage the
-    `ServiceAccount` (optionally customizing it with `serviceAccountTemplate`)
-    or reference an existing one with `serviceAccountName`, but not both.
+:::note
+The `serviceAccountName` field is mutually exclusive with
+`serviceAccountTemplate`. You can either let the operator manage the
+`ServiceAccount` (optionally customizing it with `serviceAccountTemplate`)
+or reference an existing one with `serviceAccountName`, but not both.
+:::
 
-!!! Warning
-    The `serviceAccountName` field is immutable once set. If you need to change
-    the `ServiceAccount`, you must recreate the cluster.
+:::warning
+The `serviceAccountName` field is immutable once set. If you need to change
+the `ServiceAccount`, you must recreate the cluster.
+:::
 
-!!! Note
-    When multiple clusters share a `ServiceAccount`, the operator creates
-    a separate `Role` and `RoleBinding` for each cluster. The shared
-    `ServiceAccount` accumulates the Kubernetes RBAC permissions of all
-    clusters using it. Each `Role` is narrowly scoped to the specific
-    cluster's resources, so this does not constitute a privilege escalation.
+:::note
+When multiple clusters share a `ServiceAccount`, the operator creates
+a separate `Role` and `RoleBinding` for each cluster. The shared
+`ServiceAccount` accumulates the Kubernetes RBAC permissions of all
+clusters using it. Each `Role` is narrowly scoped to the specific
+cluster's resources, so this does not constitute a privilege escalation.
+:::
 
 #### Using a shared ServiceAccount with Poolers
 
@@ -434,10 +438,11 @@ spec:
     poolMode: session
 ```
 
-!!! Warning
-    As with clusters, the `serviceAccountName` field on poolers is immutable
-    once set. If you need to change the `ServiceAccount`, you must recreate
-    the pooler.
+:::warning
+As with clusters, the `serviceAccountName` field on poolers is immutable
+once set. If you need to change the `ServiceAccount`, you must recreate
+the pooler.
+:::
 
 For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
