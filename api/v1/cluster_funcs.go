@@ -1410,16 +1410,13 @@ func (cluster *Cluster) IsReadServiceEnabled() bool {
 		return true
 	}
 
-	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeR)
+	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, DisabledDefaultServiceSelectorTypeR)
 }
 
 // IsReadWriteServiceEnabled checks if the read-write service is enabled for the cluster.
-// It returns false if the read-write service is listed in the DisabledDefaultServices slice.
+// The read-write service cannot be disabled, so this always returns true.
 func (cluster *Cluster) IsReadWriteServiceEnabled() bool {
-	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
-		return true
-	}
-	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRW)
+	return true
 }
 
 // IsReadOnlyServiceEnabled checks if the read-only service is enabled for the cluster.
@@ -1429,7 +1426,7 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 		return true
 	}
 
-	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
+	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, DisabledDefaultServiceSelectorTypeRO)
 }
 
 // GetRecoverySourcePlugin returns the configuration of the plugin being
