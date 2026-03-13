@@ -103,6 +103,25 @@ expected outage.
 Enabling a new configuration option to delay failover provides a mechanism to
 prevent premature failover for short-lived network or node instability.
 
+:::warning[Important Relationship with smartShutdownTimeout]
+The `.spec.failoverDelay` value must be significantly larger than `.spec.smartShutdownTimeout`
+to ensure controlled shutdown operations complete before failover is considered.
+A recommended ratio is at least 5:1, meaning `failoverDelay` should be at least
+5 times larger than `smartShutdownTimeout`. This prevents premature failover
+during planned maintenance operations or controlled shutdowns.
+
+### Preventing Split-Brain Scenarios
+
+This relationship is critical to prevent **split-brain scenarios** that can occur when:
+
+1. **Smart shutdown fails** due to open connections blocking the shutdown process
+2. **The former primary remains running** but is unable to accept new connections during the smart shutdown attempt
+3. **Failover triggers prematurely** because `failoverDelay` is too short
+4. **Two primaries operate simultaneously** - the original primary (still running but blocked) and the newly promoted replica
+
+When smart shutdown fails due to long-running transactions, or connections kept open by a connection pooler, PostgreSQL waits for those transactions to complete before proceeding. If `failoverDelay` expires during this waiting period, the cluster may incorrectly assume the primary is unhealthy and promote a replica, leading to data inconsistency and potential corruption.
+:::
+
 ## Failover Quorum (Quorum-based Failover)
 
 Failover quorum is a mechanism that enhances data durability and safety during
