@@ -162,6 +162,13 @@ func (r *PluginReconciler) reconcile(
 		return ctrl.Result{}, err
 	}
 
+	// Validate that server secret contains required certificate key
+	if _, hasCert := serverSecret.Data[corev1.TLSCertKey]; !hasCert {
+		err := fmt.Errorf("server secret %q is missing required key %q", serverSecret.Name, corev1.TLSCertKey)
+		contextLogger.Error(err, "Invalid server secret for plugin")
+		return ctrl.Result{}, err
+	}
+
 	pluginClientSecret := service.Annotations[utils.PluginClientSecretAnnotationName]
 	if len(pluginClientSecret) == 0 {
 		contextLogger.Info("Detected service whose client secret annotation is empty, skipping")
@@ -176,6 +183,18 @@ func (r *PluginReconciler) reconcile(
 			"secretName", pluginClientSecret)
 		r.Recorder.Eventf(service, "Warning", "ClientSecretNotFound",
 			"Failed to get client secret %s: %v", pluginClientSecret, err)
+		return ctrl.Result{}, err
+	}
+
+	// Validate that client secret contains required keys
+	if _, hasCert := clientSecret.Data[corev1.TLSCertKey]; !hasCert {
+		err := fmt.Errorf("client secret %q is missing required key %q", clientSecret.Name, corev1.TLSCertKey)
+		contextLogger.Error(err, "Invalid client secret for plugin")
+		return ctrl.Result{}, err
+	}
+	if _, hasKey := clientSecret.Data[corev1.TLSPrivateKeyKey]; !hasKey {
+		err := fmt.Errorf("client secret %q is missing required key %q", clientSecret.Name, corev1.TLSPrivateKeyKey)
+		contextLogger.Error(err, "Invalid client secret for plugin")
 		return ctrl.Result{}, err
 	}
 
@@ -194,6 +213,13 @@ func (r *PluginReconciler) reconcile(
 		)
 		r.Recorder.Eventf(service, "Warning", "InvalidPortAnnotation",
 			"Invalid port annotation %q: %v", pluginPortString, err)
+		return ctrl.Result{}, err
+	}
+
+	// Validate port range
+	if pluginPort < 1 || pluginPort > 65535 {
+		err := fmt.Errorf("plugin port %d is outside valid range (1-65535)", pluginPort)
+		contextLogger.Error(err, "Invalid plugin port annotation")
 		return ctrl.Result{}, err
 	}
 
