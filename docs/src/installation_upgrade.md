@@ -4,8 +4,6 @@ sidebar_position: 50
 title: Installation and upgrades
 ---
 
-{abra:cadabra}
-
 # Installation and upgrades
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
