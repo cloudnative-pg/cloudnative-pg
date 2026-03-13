@@ -382,7 +382,7 @@ jobs:
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser
-          version: v2
+          version: v2.10.2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
@@ -477,7 +477,7 @@ jobs:
           needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
-          version: v2
+          version: v2.10.2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
