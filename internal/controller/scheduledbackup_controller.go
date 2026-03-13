@@ -219,6 +219,41 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
+	if now.After(nextTime) {
+		contextLogger.Info(
+			"Skipping missed backup schedules",
+			"lastCheckTime", scheduledBackup.Status.LastCheckTime.Time,
+			"now", now,
+		)
+
+		origScheduled := scheduledBackup.DeepCopy()
+
+		scheduledBackup.Status.LastCheckTime = &metav1.Time{
+			Time: now,
+		}
+
+		nextTime = schedule.Next(now)
+		scheduledBackup.Status.NextScheduleTime = &metav1.Time{
+			Time: nextTime,
+		}
+		scheduledBackup.Status.LastScheduleTime = nil
+
+		if err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {
+			if apierrs.IsConflict(err) {
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
+		}
+
+		event.Eventf(
+			scheduledBackup,
+			"Normal",
+			"BackupSchedule",
+			"Skipped missed backup windows, next backup scheduled for %v", nextTime,
+		)
+
+		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
+	}
 	return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false)
 }
 
