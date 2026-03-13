@@ -28,6 +28,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,8 +61,13 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 			AssertCreateCluster(namespace, clusterName, clusterFile, env)
 		})
 
-		By("creating a shared ServiceAccount", func() {
+		By("creating a shared ServiceAccount with operator pull secrets", func() {
 			CreateResourceFromFile(namespace, sharedSAFile)
+			operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secrets.CopyOperatorPullSecretToServiceAccount(
+				env.Ctx, env.Client, operatorDeployment, namespace, sharedSAName,
+			)).To(Succeed())
 		})
 
 		By("creating pooler using shared ServiceAccount", func() {
