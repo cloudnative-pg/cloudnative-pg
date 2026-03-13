@@ -182,4 +182,77 @@ var _ = Describe("PostgresManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("ListLogicalSlotsWithSyncStatus", func() {
+		const expectedSQL = "^SELECT (.+) FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'"
+
+		It("should successfully list logical replication slots with synced and failover status", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+				AddRow("sub_slot1", "pgoutput", true, "0/1234", true, true).
+				AddRow("sub_slot2", "pgoutput", false, "0/5678", false, true).
+				AddRow("external_sub", "pgoutput", false, "0/9ABC", false, false)
+
+			mock.ExpectQuery(expectedSQL).
+				WillReturnRows(rows)
+
+			result, err := ListLogicalSlotsWithSyncStatus(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(3))
+
+			Expect(result[0].SlotName).To(Equal("sub_slot1"))
+			Expect(result[0].Plugin).To(Equal("pgoutput"))
+			Expect(result[0].Active).To(BeTrue())
+			Expect(result[0].RestartLSN).To(Equal("0/1234"))
+			Expect(result[0].Synced).To(BeTrue())
+			Expect(result[0].Failover).To(BeTrue())
+
+			Expect(result[1].SlotName).To(Equal("sub_slot2"))
+			Expect(result[1].Synced).To(BeFalse())
+			Expect(result[1].Failover).To(BeTrue())
+
+			// External subscription slot - synced=false, failover=false
+			Expect(result[2].SlotName).To(Equal("external_sub"))
+			Expect(result[2].Synced).To(BeFalse())
+			Expect(result[2].Failover).To(BeFalse())
+		})
+
+		It("should return error when database query fails", func(ctx SpecContext) {
+			mock.ExpectQuery(expectedSQL).
+				WillReturnError(errors.New("mock error"))
+
+			_, err := ListLogicalSlotsWithSyncStatus(ctx, db)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should return empty slice when no logical slots exist", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"})
+
+			mock.ExpectQuery(expectedSQL).
+				WillReturnRows(rows)
+
+			result, err := ListLogicalSlotsWithSyncStatus(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+	})
+
+	Context("DeleteLogicalSlot", func() {
+		const expectedSQL = "SELECT pg_catalog.pg_drop_replication_slot"
+
+		It("should successfully delete a logical replication slot", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).WithArgs("sub_slot1").
+				WillReturnResult(sqlmock.NewResult(1, 1))
+
+			err := DeleteLogicalSlot(ctx, db, "sub_slot1")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should return error when the database execution fails", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).WithArgs("sub_slot1").
+				WillReturnError(errors.New("mock error"))
+
+			err := DeleteLogicalSlot(ctx, db, "sub_slot1")
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })
