@@ -465,4 +465,3 @@ To inspect the SLSA Provenance (Build details):
 docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
   --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
 ```
-
