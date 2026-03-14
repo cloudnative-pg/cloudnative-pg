@@ -135,9 +135,11 @@ func deleteAllPodsInMajorUpgradePreparation(
 	jobs []batchv1.Job,
 ) (*ctrl.Result, error) {
 	foundSomethingToDelete := false
+	waitingForDeletion := false
 
 	for _, pod := range instances {
 		if pod.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
@@ -149,6 +151,7 @@ func deleteAllPodsInMajorUpgradePreparation(
 
 	for _, job := range jobs {
 		if job.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
@@ -160,8 +163,8 @@ func deleteAllPodsInMajorUpgradePreparation(
 		}
 	}
 
-	if foundSomethingToDelete {
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	if foundSomethingToDelete || waitingForDeletion {
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return nil, nil
