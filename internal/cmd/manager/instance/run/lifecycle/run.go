@@ -80,7 +80,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// If the system initialization failed, we return an error and let
 		// the instance manager quit.
 		if i.systemInitialization.Err() != nil {
-			return err
+			return i.systemInitialization.Err()
 		}
 
 		// The lifecycle loop will call us even when PostgreSQL is fenced.
