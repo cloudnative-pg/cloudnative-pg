@@ -405,11 +405,14 @@ jobs:
     name: Create remote PR for OperatorHub
     runs-on: ubuntu-24.04
     needs:
+      - check-version
       - release-binaries
       - olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success'
+      needs.olm-bundle.result == 'success' &&
+      needs.check-version.outputs.is_latest == 'true' &&
+      needs.check-version.outputs.is_stable == 'true'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     steps:
@@ -430,6 +433,12 @@ jobs:
           mkdir -p "operators/cloudnative-pg/${VERSION}"
           cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+
+      - name: Add replaces field to CSV
+        run: |
+          CSV_FILE="operators/cloudnative-pg/${VERSION}/manifests/cloudnative-pg.clusterserviceversion.yaml"
+          PREVIOUS_VERSION=$(ls -d operators/cloudnative-pg/[0-9]* | sort -V | tail -2 | head -1 | xargs basename)
+          sed -i "s/^  name: cloudnative-pg\.v${VERSION}/  replaces: cloudnative-pg.v${PREVIOUS_VERSION}\n  name: cloudnative-pg.v${VERSION}/" "${CSV_FILE}"
 
       - name: Create Remote Pull Request
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
