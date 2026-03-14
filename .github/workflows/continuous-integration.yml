@@ -345,6 +345,26 @@ jobs:
             exit 1
           fi
 
+  docs-build:
+    name: Verify documentation builds
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.docs-changed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Build documentation
+        run: |
+          docker run --rm \
+            -v ./docs/src:/website/docs \
+            ghcr.io/cloudnative-pg/docs:latest \
+            yarn build
+
   crd:
     name: Verify CRD is up to date
     needs:
