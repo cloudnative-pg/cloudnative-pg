@@ -12,9 +12,6 @@ on:
 jobs:
   pull-request:
     runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: write
-      contents: write
     steps:
       -
         name: Checkout
@@ -36,7 +33,7 @@ jobs:
         uses: repo-sync/pull-request@572331753c3787dee4a6c0b6719c889af9646b81 # v2.12
         with:
           destination_branch: ${{ env.DEST }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GHA_PAT }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
           pr_label: release
           pr_title: "Version tag to ${{ env.TAG }}"
