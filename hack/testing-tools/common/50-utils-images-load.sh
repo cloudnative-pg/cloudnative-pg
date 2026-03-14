@@ -89,15 +89,3 @@ function build_and_load_operator_image_from_sources() {
 
   docker buildx rm "${builder_name}"
 }
-
-function deploy_operator_from_sources() {
-    echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
-
-    # Attempt to delete the namespace first (ignore errors if it doesn't exist)
-    ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
-
-    # Run the make target from the project root directory
-    make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
-
-    echo -e "${bright}Operator deployment initiated.${reset}"
-}

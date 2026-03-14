@@ -139,14 +139,21 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   kubectl delete namespace cnpg-system || :
   kubectl create namespace cnpg-system
   ensure_image_pull_secret
-
-  CONTROLLER_IMG="${CONTROLLER_IMG}" \
-    POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-    PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-    make -C "${ROOT_DIR}" deploy
-  kubectl wait --for=condition=Available --timeout=2m \
-    -n cnpg-system deployments \
-    cnpg-controller-manager
+  case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
+      helm)
+        kubectl delete -f "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" --ignore-not-found || :
+        CONTROLLER_IMG="${CONTROLLER_IMG}" \
+        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+        "${ROOT_DIR}/hack/setup-cluster.sh" deploy
+        ;;
+      sources|*)
+        CONTROLLER_IMG="${CONTROLLER_IMG}" \
+        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+        make -C "${ROOT_DIR}" deploy
+        ;;
+    esac
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

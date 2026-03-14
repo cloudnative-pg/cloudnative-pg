@@ -288,6 +288,9 @@ make e2e-test-existing-cluster
 In addition to the environment variables for the script,
 the following ones can be defined:
 
+* `CNPG_DEPLOYMENT_METHOD`: deployment method for the operator. Options are:
+  - `sources` (default): Build and deploy from current source code using `make deploy`
+  - `helm`: Deploy using the official Helm chart from `cloudnative-pg/charts` repository
 * `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after

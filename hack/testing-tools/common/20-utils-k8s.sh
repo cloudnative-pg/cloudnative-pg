@@ -254,4 +254,44 @@ function deploy_fluentd() {
   done
 }
 
+# Deploy the CNPG operator from the official Helm chart repository
+# instead of building from source. This is useful for testing against
+# released versions or when source build is not required.
+function deploy_operator_from_helm() {
+  echo -e "${bright}Deploying CNPG operator from Helm chart...${reset}"
+  ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
+  make -C "${ROOT_DIR}" manifests
+  # TODO: This needs to be removed once the crds are synced in the cloudnative-pg/charts repository
+  ${K8S_CLI} apply --server-side -k "${ROOT_DIR}/config/helm"
+  # add the CNPG Helm repository and install the operator
+  local controller_img="${CONTROLLER_IMG:-$(print_image)}"
+  helm repo add cnpg https://cloudnative-pg.github.io/charts
+  retry 3 helm upgrade --install cnpg \
+    --namespace cnpg-system \
+    --set crds.create=false \
+    --set config.create=false \
+    --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config" \
+    --create-namespace \
+    --set image.repository="${controller_img%:*}" \
+    --set image.tag="${controller_img##*:}" \
+    --set "additionalEnv[0].name=POSTGRES_IMAGE_NAME" \
+    --set "additionalEnv[0].value=${POSTGRES_IMAGE_NAME}" \
+    --set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME" \
+    --set "additionalEnv[1].value=${PGBOUNCER_IMAGE_NAME}" \
+    cnpg/cloudnative-pg
+  echo -e "${bright}Operator deployment using helm initiated.${reset}"
+}
+
+function deploy_operator_from_sources() {
+    echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
+
+    # Attempt to delete the namespace first (ignore errors if it doesn't exist)
+    ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
+
+    # Run the make target from the project root directory
+    make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
+
+    echo -e "${bright}Operator deployment initiated.${reset}"
+}
+
 
