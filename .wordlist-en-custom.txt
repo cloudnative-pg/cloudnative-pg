@@ -418,6 +418,7 @@ ReadWriteOnce
 RedHat
 RelabelConfig
 ReplicaClusterConfiguration
+ReplicaFailingReplication
 ReplicaSet
 ReplicationSlotsConfiguration
 ReplicationSlotsHAConfiguration
