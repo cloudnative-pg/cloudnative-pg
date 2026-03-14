@@ -1,0 +1,113 @@
+title: CloudNativePG Operator Project Self-Assessment
+metadata:
+  id: CNPG.OPERATOR
+  description: Threat catalog for CloudNativePG Operator security assessment
+  version: v2026.03-1
+  author:
+    id: cnpg-maintainers
+    name: CloudNativePG Maintainers
+    type: Human
+  mapping-references:
+    - id: CCC
+      title: Common Cloud Controls Core
+      version: v2025.10
+      url: https://github.com/finos/common-cloud-controls/releases/download/v2025.10/CCC.Core_v2025.10.yaml
+      description: |
+        Foundational repository of reusable security controls, capabilities,
+        and threat models maintained by FINOS.
+
+imported-capabilities:
+  - reference-id: CCC
+    entries:
+      - reference-id: CCC.Core.CP01
+        remarks: Encryption in Transit Enabled by Default
+      - reference-id: CCC.Core.CP06
+        remarks: Database access control
+      - reference-id: CCC.Core.CP08
+        remarks: |
+          Data Replication: PostgreSQL native streaming replication,
+          including synchronous (quorum and priority).
+      - reference-id: CCC.Core.CP09
+        remarks: Metrics publication via native Prometheus exporter
+      - reference-id: CCC.Core.CP10
+        remarks: |
+          Log Publication: Database log publication via stdout in JSON format.
+          No log is stored on volumes. Each component logs on a different channel
+          (e.g. audit logs are on a different channel).
+      - reference-id: CCC.Core.CP11
+        remarks: |
+          Backup: PostgreSQL continuous online backup support through
+          CNPG-I plugins. Support for native volume snapshots, both
+          online and offline.
+      - reference-id: CCC.Core.CP12
+        remarks: |
+          Recovery: PostgreSQL Point In Time Recovery (PITR) support through
+          CNPG-I plugins and volume snapshots.
+      - reference-id: CCC.Core.CP14
+        remarks: API access, only via CNPG-I
+      - reference-id: CCC.Core.CP19
+        remarks: Resource scaling, primarily on-demand
+      - reference-id: CCC.Core.CP22
+        remarks: |
+          Location Lock-In: Postgres workloads can be assigned on specific
+          locations, such as nodes or availability zones, via taints/tolerations,
+          node selectors and topology constraints
+      - reference-id: CCC.Core.CP23
+        remarks: Network access rules # TODO: define threats here
+      - reference-id: CCC.Core.CP26
+        remarks: Persistent storage # TODO: define threats here
+      - reference-id: CCC.Core.CP28
+        remarks: Command Line Interface (via the `cnpg` plugin for `kubectl``) # TODO: define threats here
+      - reference-id: CCC.Core.CP29
+        remarks: |
+          Active Ingestion: both at the operator level via CNPG-I
+          and at the database level through logical replication
+
+imported-threats:
+  - reference-id: CCC
+    entries:
+      - reference-id: CCC.Core.TH18
+        remarks: |
+          Encryption Key is Misused: the operator integrates with standard PKI
+          practices and solutions. As a result, how the keys are generated might
+          not always be under the operator control (e.g. BYO certificates or
+          cert-manager integration).
+      - reference-id: CCC.Core.TH01
+        remarks: |
+          Access is Granted to Unauthorized Users: by default, CloudNativePG
+          disables network access to the `postgres` database user. It automatically
+          creates a database owner user who can only operate inside that. Additional
+          users can be created. Their credentials are stored in secrets and their
+          access must be protected by the end user. CloudNativePG also supports
+          mTLS authentication via certificates, which must be protected by the
+          end user.
+      - reference-id: CCC.Core.TH03
+        remarks: |
+          Deployment Region Network is Untrusted: TODO
+      - reference-id: CCC.Core.TH05
+        remarks: |
+          Interference with Replication Processes (both replication and recovery): TODO
+      - reference-id: CCC.Core.TH06
+        remarks: |
+          Data is lost or corrupted: TODO (THIS MUST BE COVERED WELL!)
+      - reference-id: CCC.Core.TH07
+        remarks: |
+          Logs are Tampered With or Deleted: TODO
+      - reference-id: CCC.Core.TH09
+        remarks: |
+          Runtime Logs are Read by Unauthorized Entities: TODO
+      - reference-id: CCC.Core.TH10
+        remarks: |
+          State-change Events are Read by Unauthorized Entities: TODO
+      - reference-id: CCC.Core.TH12
+        remarks: |
+          Resource Constraints are Exhausted: TODO (VERY IMPORTANT - e.g. WAL volume)
+      - reference-id: CCC.Core.TH15
+        remarks: |
+          Automated Enumeration and Reconnaissance by Non-human Entities: TODO
+      - reference-id: CCC.Core.TH16
+        remarks: |
+          Publications are Disabled (metrics and logging): TODO
+      - reference-id: CCC.Core.TH16
+        remarks: |
+          Responses are Generated for Unauthorized Requests: TODO
