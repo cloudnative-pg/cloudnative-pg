@@ -188,6 +188,10 @@ var _ = Describe("Webhook certificate validation", func() {
 			Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 			Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 
+			// Verify that the webhook secret contains the CA certificate
+			Expect(webhookSecret.Data).To(HaveKey(CACertKey))
+			Expect(webhookSecret.Data[CACertKey]).To(Equal(caSecret.Data[CACertKey]))
+
 			pair, err := ParseServerSecret(webhookSecret)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -254,6 +258,10 @@ var _ = Describe("Webhook certificate validation", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(serverSecret.Data).To(Not(BeEquivalentTo(currentServerSecret.Data)))
 
+			// Verify that the renewed secret now includes the CA certificate
+			Expect(currentServerSecret.Data).To(HaveKey(CACertKey))
+			Expect(currentServerSecret.Data[CACertKey]).To(Equal(caSecret.Data[CACertKey]))
+
 			pair, err := ParseServerSecret(currentServerSecret)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -271,9 +279,9 @@ var _ = Describe("TLS certificates injection", func() {
 
 	// Create a CA and the pki secret
 	ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
-	// TODO: caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc", CertTypeServer, nil)
-	webhookSecret := webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
+	// Use GenerateWebhookCertificateSecret to include the CA certificate
+	webhookSecret := webhookPair.GenerateWebhookCertificateSecret(pki.OperatorNamespace, pki.SecretName, ca.Certificate)
 
 	kubeClient := generateFakeClient()
 
@@ -297,7 +305,8 @@ var _ = Describe("TLS certificates injection", func() {
 		err = kubeClient.Get(ctx, client.ObjectKey{Name: pki.MutatingWebhookConfigurationName}, &updatedWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+		// Now it should use the CA certificate from ca.crt instead of tls.crt
+		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data[CACertKey]))
 	})
 
 	It("inject the pki certificate in the validating pki", func(ctx SpecContext) {
@@ -314,7 +323,8 @@ var _ = Describe("TLS certificates injection", func() {
 		err = kubeClient.Get(ctx, client.ObjectKey{Name: pki.ValidatingWebhookConfigurationName}, &updatedWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+		// Now it should use the CA certificate from ca.crt instead of tls.crt
+		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data[CACertKey]))
 	})
 })
 
@@ -363,7 +373,8 @@ var _ = Describe("Webhook environment creation", func() {
 			client.ObjectKey{Name: pki.MutatingWebhookConfigurationName},
 			&updatedMutatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+		// The CABundle should now contain the CA certificate, not the server certificate
+		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data[CACertKey]))
 
 		updatedValidatingWebhook := admissionregistrationv1.ValidatingWebhookConfiguration{}
 		err = kubeClient.Get(
@@ -371,6 +382,7 @@ var _ = Describe("Webhook environment creation", func() {
 			client.ObjectKey{Name: pki.ValidatingWebhookConfigurationName},
 			&updatedValidatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+		// The CABundle should now contain the CA certificate, not the server certificate
+		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data[CACertKey]))
 	})
 })
