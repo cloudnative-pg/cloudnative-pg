@@ -27,7 +27,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,8 +55,13 @@ var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		By("creating a shared ServiceAccount", func() {
+		By("creating a shared ServiceAccount with operator pull secrets", func() {
 			CreateResourceFromFile(namespace, sharedSAFile)
+			operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secrets.CopyOperatorPullSecretToServiceAccount(
+				env.Ctx, env.Client, operatorDeployment, namespace, sharedSAName,
+			)).To(Succeed())
 		})
 
 		By("creating cluster using shared ServiceAccount", func() {
