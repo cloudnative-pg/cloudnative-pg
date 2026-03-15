@@ -1677,6 +1677,8 @@ _Appears in:_
 | `parameters` _object (keys:string, values:string)_ | Additional parameters to be passed to PgBouncer - please check<br />the CNPG documentation for a list of options you can configure |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
 | `paused` _boolean_ | When set to `true`, PgBouncer will disconnect from the PostgreSQL<br />server, first waiting for all queries to complete, and pause all new<br />client connections until this value is set to `false` (default). Internally,<br />the operator calls PgBouncer's `PAUSE` and `RESUME` commands. |  | false |  |
+| `pauseDuringSwitchover` _boolean_ | PauseDuringSwitchover when true, automatically pauses this pooler<br />during switchover/failover operations on the referenced cluster<br />to minimize client connection failures. |  | false |  |
+| `pauseDuringSwitchoverTimeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | PauseDuringSwitchoverTimeout is the maximum duration to keep the pooler<br />paused during switchover. If the switchover doesn't complete within<br />this time, the pooler will be automatically resumed. |  | 120s |  |
 
 
 #### PluginConfiguration
@@ -1956,6 +1958,8 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `secrets` _[PoolerSecrets](#poolersecrets)_ | The resource version of the config object |  |  |  |
 | `instances` _integer_ | The number of pods trying to be scheduled |  |  |  |
+| `pausedForSwitchover` _boolean_ | PausedForSwitchover indicates this pooler was automatically paused for switchover |  |  |  |
+| `pausedForSwitchoverTimestamp` _string_ | PausedForSwitchoverTimestamp is when this pooler was paused (RFC3339Micro) |  |  |  |
 
 
 #### PoolerType
