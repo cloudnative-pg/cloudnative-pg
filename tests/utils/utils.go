@@ -23,10 +23,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"text/tabwriter"
+	"time"
 
 	"github.com/cheynewallace/tabby"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -94,15 +98,67 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 		clusterInfo.AddLine("Job status", fmt.Sprintf("%#v", job.Status))
 	}
 
+	allPodList := &corev1.PodList{}
+	_ = crudClient.List(ctx, allPodList, client.InNamespace(namespace))
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("All namespace pods:")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for i := range allPodList.Items {
+		pod := &allPodList.Items[i]
+		clusterInfo.AddLine("Pod name", pod.Name)
+		clusterInfo.AddLine("Pod phase", pod.Status.Phase)
+		clusterInfo.AddLine("Pod node", pod.Spec.NodeName)
+		if pod.Status.Reason != "" {
+			clusterInfo.AddLine("Pod reason", pod.Status.Reason)
+		}
+		if pod.Status.Message != "" {
+			clusterInfo.AddLine("Pod message", pod.Status.Message)
+		}
+		for _, cond := range pod.Status.Conditions {
+			if cond.Status == corev1.ConditionFalse {
+				clusterInfo.AddLine(
+					fmt.Sprintf("Condition %s", cond.Type),
+					fmt.Sprintf("%s: %s", cond.Reason, cond.Message),
+				)
+			}
+		}
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.State.Waiting != nil {
+				clusterInfo.AddLine(
+					fmt.Sprintf("Container %s waiting", cs.Name),
+					fmt.Sprintf("%s: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message),
+				)
+			}
+		}
+		clusterInfo.AddLine("---", "---")
+	}
+
 	pvcList, _ := storage.GetPVCList(ctx, crudClient, cluster.GetNamespace())
 	clusterInfo.AddLine()
 	clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
 	clusterInfo.AddLine("Available Cluster PVCCount", cluster.Status.PVCCount)
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
-	for _, pvc := range pvcList.Items {
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
 		clusterInfo.AddLine("PVC name", pvc.Name)
 		clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+		if pvc.Spec.StorageClassName != nil {
+			clusterInfo.AddLine("PVC storage class", *pvc.Spec.StorageClassName)
+		}
+		if pvc.Spec.VolumeName != "" {
+			clusterInfo.AddLine("PVC volume", pvc.Spec.VolumeName)
+		}
+		if node, ok := pvc.Annotations["volume.kubernetes.io/selected-node"]; ok {
+			clusterInfo.AddLine("PVC selected node", node)
+		}
+		for _, cond := range pvc.Status.Conditions {
+			clusterInfo.AddLine(
+				fmt.Sprintf("PVC condition %s", cond.Type),
+				fmt.Sprintf("%s: %s", cond.Reason, cond.Message),
+			)
+		}
 		clusterInfo.AddLine("---", "---")
 	}
 
@@ -119,6 +175,40 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 			clusterInfo.AddLine("Snapshot ready to use", "false")
 		}
 		clusterInfo.AddLine("---", "---")
+	}
+
+	eventList := &eventsv1.EventList{}
+	_ = crudClient.List(ctx, eventList, client.InNamespace(namespace))
+	if len(eventList.Items) > 0 {
+		sort.Slice(eventList.Items, func(i, j int) bool {
+			ti := eventList.Items[i].CreationTimestamp.Time
+			tj := eventList.Items[j].CreationTimestamp.Time
+			if eventList.Items[i].EventTime.Time != (time.Time{}) {
+				ti = eventList.Items[i].EventTime.Time
+			}
+			if eventList.Items[j].EventTime.Time != (time.Time{}) {
+				tj = eventList.Items[j].EventTime.Time
+			}
+			return ti.Before(tj)
+		})
+		clusterInfo.AddLine()
+		clusterInfo.AddLine("Namespace events:")
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Time", "Type", "Reason", "Object", "Message")
+		for i := range eventList.Items {
+			ev := &eventList.Items[i]
+			eventTime := ev.CreationTimestamp.Time
+			if ev.EventTime.Time != (time.Time{}) {
+				eventTime = ev.EventTime.Time
+			}
+			clusterInfo.AddLine(
+				eventTime.Format(time.RFC3339),
+				ev.Type,
+				ev.Reason,
+				fmt.Sprintf("%s/%s", ev.Regarding.Kind, ev.Regarding.Name),
+				ev.Note,
+			)
+		}
 	}
 
 	// do not remove, this is needed to ensure that the writer cache is always flushed.
