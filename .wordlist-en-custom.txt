@@ -1058,10 +1058,10 @@ livenessProbe
 livenessProbeTimeout
 livenessprobe
 lm
+loadBalancerSourceRanges
 localeCType
 localeCollate
 localeProvider
-loadBalancerSourceRanges
 localhost
 localobjectreference
 locktype
@@ -1270,8 +1270,8 @@ postgresqlcnpgiov
 ppc
 pprof
 pre
-prefetched
 preferredDuringSchedulingIgnoredDuringExecution
+prefetched
 preload
 prepended
 primaryUpdateMethod
