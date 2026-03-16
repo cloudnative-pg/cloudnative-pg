@@ -59,6 +59,9 @@ func PreserveKubernetesDefaults(proposed, living *corev1.ServiceSpec) {
 	if proposed.AllocateLoadBalancerNodePorts == nil {
 		proposed.AllocateLoadBalancerNodePorts = living.AllocateLoadBalancerNodePorts
 	}
+	if proposed.LoadBalancerClass == nil {
+		proposed.LoadBalancerClass = living.LoadBalancerClass
+	}
 	if proposed.TrafficDistribution == nil {
 		proposed.TrafficDistribution = living.TrafficDistribution
 	}

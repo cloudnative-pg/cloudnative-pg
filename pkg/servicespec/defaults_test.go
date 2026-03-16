@@ -239,6 +239,38 @@ var _ = Describe("PreserveKubernetesDefaults", func() {
 		Expect(proposed.AllocateLoadBalancerNodePorts).To(Equal(&allocFalse))
 	})
 
+	It("should preserve LoadbalancerClass when not set", func() {
+		lbClass := "load-balancer-class"
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		living := corev1.ServiceSpec{
+			Type:               corev1.ServiceTypeLoadBalancer,
+			Ports:             []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			LoadBalancerClass: &lbClass,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.LoadBalancerClass).To(Equal(&lbClass))
+	})
+
+	It("should not override explicitly set LoadBalancerClass", func() {
+		proposedLBClass := "proposed-load-balancer-class"
+		livingLBClass := "living-load-balancer-class"
+		proposed := corev1.ServiceSpec{
+			Type:              corev1.ServiceTypeLoadBalancer,
+			Ports:             []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			LoadBalancerClass: &proposedLBClass,
+		}
+		living := corev1.ServiceSpec{
+			Type:              corev1.ServiceTypeLoadBalancer,
+			Ports:             []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+			LoadBalancerClass: &livingLBClass,
+		}
+		PreserveKubernetesDefaults(&proposed, &living)
+		Expect(proposed.LoadBalancerClass).To(Equal(&proposedLBClass))
+	})
+
 	It("should preserve TrafficDistribution when not set", func() {
 		dist := "PreferClose"
 		proposed := corev1.ServiceSpec{
