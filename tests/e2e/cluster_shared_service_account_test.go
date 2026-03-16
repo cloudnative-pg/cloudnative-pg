@@ -28,7 +28,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -69,18 +68,10 @@ var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 		})
 
 		By("verifying cluster pods use the shared ServiceAccount", func() {
-			podList, err := pods.List(env.Ctx, env.Client, namespace)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, cluster1Name)
 			Expect(err).ToNot(HaveOccurred())
 
-			cluster1Pods := []corev1.Pod{}
 			for _, pod := range podList.Items {
-				if pod.Labels["cnpg.io/cluster"] == cluster1Name {
-					cluster1Pods = append(cluster1Pods, pod)
-				}
-			}
-			Expect(cluster1Pods).ToNot(BeEmpty())
-
-			for _, pod := range cluster1Pods {
 				Expect(pod.Spec.ServiceAccountName).To(Equal(sharedSAName),
 					"Pod %s should use shared ServiceAccount %s", pod.Name, sharedSAName)
 			}
