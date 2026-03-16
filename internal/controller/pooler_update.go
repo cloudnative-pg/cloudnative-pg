@@ -140,6 +140,7 @@ func (r *PoolerReconciler) reconcileService(
 
 	if resources.Service == nil {
 		contextLog.Info("Creating the service")
+		servicespec.SetLastApplied(&expectedService.ObjectMeta, &expectedService.Spec)
 		err := r.Create(ctx, expectedService)
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
@@ -148,15 +149,18 @@ func (r *PoolerReconciler) reconcileService(
 		return nil
 	}
 
+	lastApplied := servicespec.GetLastApplied(resources.Service.Annotations)
 	patchedService := resources.Service.DeepCopy()
-	patchedService.Spec = expectedService.Spec
-	servicespec.PreserveKubernetesDefaults(&patchedService.Spec, &resources.Service.Spec)
+	servicespec.ApplyProposedChanges(&patchedService.Spec, &expectedService.Spec, lastApplied)
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
 		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
 		return nil
 	}
+
+	// Store the proposed spec for future three-way merges
+	servicespec.SetLastApplied(&patchedService.ObjectMeta, &expectedService.Spec)
 
 	contextLog.Info("Updating the service metadata")
 

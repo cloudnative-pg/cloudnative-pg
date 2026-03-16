@@ -201,7 +201,12 @@ var _ = Describe("cluster_create unit tests", func() {
 				Expect(afterChangesService.Spec.Selector).ToNot(Equal(before.Spec.Selector))
 				Expect(afterChangesService.Spec.Selector).To(Equal(expectedLabels))
 				Expect(afterChangesService.Labels).To(Equal(before.Labels))
-				Expect(afterChangesService.Annotations).To(Equal(before.Annotations))
+				// The reconciler now stores a lastAppliedServiceSpec annotation
+				// for three-way merge, so we check that original annotations are preserved
+				for k, v := range before.Annotations {
+					Expect(afterChangesService.Annotations).To(HaveKeyWithValue(k, v))
+				}
+				Expect(afterChangesService.Annotations).To(HaveKey(utils.LastAppliedSpecAnnotationName))
 			}
 
 			var readOnlyService, readWriteService, readService, anyService *corev1.Service
