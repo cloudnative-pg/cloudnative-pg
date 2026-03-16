@@ -145,7 +145,9 @@ func deleteAllPodsInMajorUpgradePreparation(
 
 		foundSomethingToDelete = true
 		if err := c.Delete(ctx, &pod); err != nil {
-			return nil, err
+			if !apierrs.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
@@ -159,7 +161,9 @@ func deleteAllPodsInMajorUpgradePreparation(
 		if err := c.Delete(ctx, &job, &client.DeleteOptions{
 			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 		}); err != nil {
-			return nil, err
+			if !apierrs.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
