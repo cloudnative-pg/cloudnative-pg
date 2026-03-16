@@ -70,6 +70,7 @@ var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 		By("verifying cluster pods use the shared ServiceAccount", func() {
 			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, cluster1Name)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(podList.Items).ToNot(BeEmpty())
 
 			for _, pod := range podList.Items {
 				Expect(pod.Spec.ServiceAccountName).To(Equal(sharedSAName),
