@@ -161,7 +161,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func runSubCommand(
+func runSubCommand( //nolint: gocyclo,gocognit
 	ctx context.Context,
 	instance *postgres.Instance,
 	pprofServer bool,
@@ -395,8 +395,13 @@ func runSubCommand(
 	contextLogger.Info("starting controller-runtime manager")
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		contextLogger.Error(err, "unable to run controller-runtime manager")
-		if hasSpace, checkErr := instance.CheckHasDiskSpaceForWAL(ctx); checkErr == nil && !hasSpace {
+		if errors.Is(err, postgres.ErrNoFreeWALSpace) {
 			return makeUnretryableError(postgres.ErrNoFreeWALSpace)
+		}
+		if hasSpace, checkErr := instance.CheckHasDiskSpaceForWAL(ctx); checkErr == nil && !hasSpace {
+			contextLogger.Warning("Detected low WAL disk space, but the manager error is not WAL-space related",
+				"originalError", err)
+			return makeUnretryableError(fmt.Errorf("%w: %w", postgres.ErrNoFreeWALSpace, err))
 		}
 		return makeUnretryableError(err)
 	}
