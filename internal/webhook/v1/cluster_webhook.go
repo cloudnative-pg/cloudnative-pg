@@ -1432,15 +1432,17 @@ func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.
 	}
 
 	// When using a backup catalog, we can identify the backup to be restored
-	// only if the PITR is time-based. If the PITR is not time-based, the user
-	// need to specify a backup ID.
+	// only if the PITR is time-based or targetImmediate is set (which uses
+	// the latest available backup). If the PITR is label-based (targetName
+	// or targetXID), the user must specify a backup ID.
 	// If we use a dataSource, the operator will directly access the backup
 	// and a backupID is not needed.
 
-	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
+	// validate BackupID is defined when TargetName or TargetXID are set
+	// (targetImmediate is excluded: when no backupID is given, the operator
+	// automatically selects the latest available backup from the catalog)
 	labelBasedPITR := recoveryTarget.TargetName != "" ||
-		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil
+		recoveryTarget.TargetXID != ""
 	recoveryFromSnapshot := r.Spec.Bootstrap.Recovery.VolumeSnapshots != nil
 	if labelBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
 		result = append(result, field.Required(
