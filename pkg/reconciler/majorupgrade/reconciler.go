@@ -133,20 +133,25 @@ func deleteAllPodsInMajorUpgradePreparation(
 	jobs []batchv1.Job,
 ) (*ctrl.Result, error) {
 	foundSomethingToDelete := false
+	waitingForDeletion := false
 
 	for _, pod := range instances {
 		if pod.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
 		foundSomethingToDelete = true
 		if err := c.Delete(ctx, &pod); err != nil {
-			return nil, err
+			if !errors.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
 	for _, job := range jobs {
 		if job.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
@@ -154,12 +159,14 @@ func deleteAllPodsInMajorUpgradePreparation(
 		if err := c.Delete(ctx, &job, &client.DeleteOptions{
 			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 		}); err != nil {
-			return nil, err
+			if !errors.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
-	if foundSomethingToDelete {
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	if foundSomethingToDelete || waitingForDeletion {
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return nil, nil
