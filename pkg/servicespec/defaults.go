@@ -47,8 +47,8 @@ func SetLastApplied(object *metav1.ObjectMeta, spec *corev1.ServiceSpec) {
 
 // ApplyProposedChanges computes an RFC 7386 JSON Merge Patch between the
 // last-applied spec (from annotations) and proposed, then applies it to target.
-// The Selector is replaced wholesale and Kubernetes-assigned port defaults
-// (NodePort, Protocol, TargetPort) are restored after the merge.
+// Kubernetes-assigned port defaults (NodePort, Protocol, TargetPort) are
+// restored after the merge.
 func ApplyProposedChanges(target, proposed *corev1.ServiceSpec, annotations map[string]string) error {
 	livingPorts := make([]corev1.ServicePort, len(target.Ports))
 	copy(livingPorts, target.Ports)
@@ -78,12 +78,6 @@ func ApplyProposedChanges(target, proposed *corev1.ServiceSpec, annotations map[
 		return err
 	}
 	*target = merged
-
-	// RFC 7386 merges maps per-key; replace selector wholesale since
-	// the operator always declares the complete desired selector.
-	if proposed.Selector != nil {
-		target.Selector = proposed.Selector
-	}
 
 	// Restore Kubernetes-assigned port defaults (NodePort, Protocol,
 	// TargetPort) that are not controlled by the operator.
