@@ -1027,6 +1027,7 @@ livenessProbe
 livenessProbeTimeout
 livenessprobe
 lm
+loadBalancerSourceRanges
 localeCType
 localeCollate
 localeProvider
@@ -1224,6 +1225,7 @@ ppc
 pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
+prefetched
 preload
 prepended
 primaryUpdateMethod
