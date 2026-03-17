@@ -21,30 +21,14 @@ package servicespec
 
 import (
 	"encoding/json"
-	"reflect"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// GetLastApplied reads the last-applied service spec from a service's annotations.
-// Returns nil if the annotation is absent or cannot be parsed.
-func GetLastApplied(annotations map[string]string) *corev1.ServiceSpec {
-	raw, ok := annotations[utils.LastAppliedSpecAnnotationName]
-	if !ok {
-		return nil
-	}
-
-	spec := &corev1.ServiceSpec{}
-	if err := json.Unmarshal([]byte(raw), spec); err != nil {
-		return nil
-	}
-
-	return spec
-}
 
 // SetLastApplied stores the proposed service spec as a JSON annotation,
 // enabling three-way merge on future reconciliations.
@@ -61,59 +45,59 @@ func SetLastApplied(object *metav1.ObjectMeta, spec *corev1.ServiceSpec) {
 	object.Annotations[utils.LastAppliedSpecAnnotationName] = string(raw)
 }
 
-// ApplyProposedChanges performs a three-way merge of service specs:
-//   - target: copy of the living service spec (base for the merge)
-//   - proposed: the desired spec built by the operator
-//   - lastApplied: the spec we last applied (nil on first reconciliation)
-//
-// For each field:
-//   - proposed non-zero → apply it (user/operator wants this value)
-//   - proposed zero, lastApplied non-zero → intentional removal → clear from target
-//   - proposed zero, lastApplied zero (or nil) → never set by us → preserve from target
-//   - bool fields are always copied from proposed (Go cannot distinguish unset from false)
-func ApplyProposedChanges(target, proposed, lastApplied *corev1.ServiceSpec) {
-	// Save original ports before overlay so we can preserve
-	// Kubernetes-assigned values (NodePort, Protocol, TargetPort)
-	livingPorts := target.Ports
+// ApplyProposedChanges computes an RFC 7386 JSON Merge Patch between the
+// last-applied spec (from annotations) and proposed, then applies it to target.
+// The Selector is replaced wholesale and Kubernetes-assigned port defaults
+// (NodePort, Protocol, TargetPort) are restored after the merge.
+func ApplyProposedChanges(target, proposed *corev1.ServiceSpec, annotations map[string]string) error {
+	livingPorts := make([]corev1.ServicePort, len(target.Ports))
+	copy(livingPorts, target.Ports)
 
-	tv := reflect.ValueOf(target).Elem()
-	pv := reflect.ValueOf(proposed).Elem()
-
-	hasLastApplied := lastApplied != nil
-	var lv reflect.Value
-	if hasLastApplied {
-		lv = reflect.ValueOf(lastApplied).Elem()
+	proposedJSON, err := json.Marshal(proposed)
+	if err != nil {
+		return err
 	}
 
-	st := reflect.TypeOf(proposed).Elem()
-	for i := range pv.NumField() {
-		// Skip unexported fields to avoid reflect panics
-		if !st.Field(i).IsExported() {
-			continue
-		}
-
-		pf := pv.Field(i)
-
-		// Bool fields are always copied because Go cannot distinguish
-		// "not set" (false) from "explicitly set to false"
-		if pf.Kind() == reflect.Bool {
-			tv.Field(i).Set(pf)
-			continue
-		}
-
-		if !pf.IsZero() {
-			// Proposed has a value → apply it
-			tv.Field(i).Set(pf)
-		} else if hasLastApplied && !lv.Field(i).IsZero() {
-			// Proposed is zero but we previously applied a non-zero value
-			// → intentional removal → clear from target
-			tv.Field(i).Set(reflect.Zero(tv.Field(i).Type()))
-		}
-		// else: both proposed and lastApplied are zero → never set by us → preserve living
+	targetJSON, err := json.Marshal(target)
+	if err != nil {
+		return err
 	}
 
-	// Restore Kubernetes-assigned port defaults for matching ports
+	patchJSON, err := buildPatchJSON(annotations[utils.LastAppliedSpecAnnotationName], proposedJSON)
+	if err != nil {
+		return err
+	}
+
+	mergedJSON, err := jsonpatch.MergePatch(targetJSON, patchJSON)
+	if err != nil {
+		return err
+	}
+
+	var merged corev1.ServiceSpec
+	if err := json.Unmarshal(mergedJSON, &merged); err != nil {
+		return err
+	}
+	*target = merged
+
+	// RFC 7386 merges maps per-key; replace selector wholesale since
+	// the operator always declares the complete desired selector.
+	if proposed.Selector != nil {
+		target.Selector = proposed.Selector
+	}
+
+	// Restore Kubernetes-assigned port defaults (NodePort, Protocol,
+	// TargetPort) that are not controlled by the operator.
 	preservePortDefaults(target.Ports, livingPorts)
+
+	return nil
+}
+
+func buildPatchJSON(lastAppliedJSON string, proposedJSON []byte) ([]byte, error) {
+	if lastAppliedJSON == "" {
+		return proposedJSON, nil
+	}
+
+	return jsonpatch.CreateMergePatch([]byte(lastAppliedJSON), proposedJSON)
 }
 
 // preservePortDefaults preserves Kubernetes-defaulted and Kubernetes-assigned

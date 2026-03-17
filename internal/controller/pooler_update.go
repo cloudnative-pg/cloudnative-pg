@@ -149,9 +149,14 @@ func (r *PoolerReconciler) reconcileService(
 		return nil
 	}
 
-	lastApplied := servicespec.GetLastApplied(resources.Service.Annotations)
 	patchedService := resources.Service.DeepCopy()
-	servicespec.ApplyProposedChanges(&patchedService.Spec, &expectedService.Spec, lastApplied)
+	if err := servicespec.ApplyProposedChanges(
+		&patchedService.Spec,
+		&expectedService.Spec,
+		resources.Service.Annotations,
+	); err != nil {
+		return err
+	}
 	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&

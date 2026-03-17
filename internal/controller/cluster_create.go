@@ -444,9 +444,10 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	// Three-way merge: start from living spec, overlay proposed changes,
 	// and use last-applied annotation to detect intentional field removals
-	lastApplied := servicespec.GetLastApplied(livingService.Annotations)
 	patchedSpec := livingService.Spec.DeepCopy()
-	servicespec.ApplyProposedChanges(patchedSpec, &proposed.Spec, lastApplied)
+	if err := servicespec.ApplyProposedChanges(patchedSpec, &proposed.Spec, livingService.Annotations); err != nil {
+		return err
+	}
 	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
 		livingService.Spec = *patchedSpec
 		shouldUpdate = true

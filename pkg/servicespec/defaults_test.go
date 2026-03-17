@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package servicespec
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -27,9 +28,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// annotationsFrom builds an annotations map with lastAppliedSpec from a ServiceSpec.
+// Pass nil to simulate no last-applied annotation.
+func annotationsFrom(spec *corev1.ServiceSpec) map[string]string {
+	if spec == nil {
+		return nil
+	}
+	meta := metav1.ObjectMeta{}
+	SetLastApplied(&meta, spec)
+	return meta.Annotations
+}
 
 // fullyPopulatedServiceSpec returns a ServiceSpec with every field set to a
 // non-zero value. This is used by reflection-based tests to verify that
@@ -84,7 +98,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		proposed := corev1.ServiceSpec{}
 		original := target.DeepCopy()
 
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 
 		tv := reflect.ValueOf(target)
 		ov := reflect.ValueOf(*original)
@@ -101,12 +115,6 @@ var _ = Describe("ApplyProposedChanges", func() {
 				continue
 			}
 
-			if tf.Kind() == reflect.Bool {
-				Expect(tf.Bool()).To(BeFalse(),
-					fmt.Sprintf("bool field %s should be copied from proposed (false)", field.Name))
-				continue
-			}
-
 			Expect(tf.Interface()).To(Equal(of.Interface()),
 				fmt.Sprintf("field %s should be preserved when proposed is empty", field.Name))
 		}
@@ -116,7 +124,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		target := corev1.ServiceSpec{}
 		proposed := fullyPopulatedServiceSpec()
 
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 
 		tv := reflect.ValueOf(target)
 		pv := reflect.ValueOf(proposed)
@@ -143,7 +151,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		proposed := fullyPopulatedServiceSpec()
 		original := target.DeepCopy()
 
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 
 		tv := reflect.ValueOf(target)
 		ov := reflect.ValueOf(*original)
@@ -182,7 +190,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "postgres", Port: 5432, Protocol: corev1.ProtocolTCP},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30002)), "metrics should get NodePort 30002")
 		Expect(target.Ports[1].NodePort).To(Equal(int32(30001)), "postgres should get NodePort 30001")
 	})
@@ -198,7 +206,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "postgres", Port: 5432, Protocol: corev1.ProtocolTCP, NodePort: 32000},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].NodePort).To(Equal(int32(32000)))
 	})
 
@@ -214,7 +222,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "metrics", Port: 9187, Protocol: corev1.ProtocolTCP},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
 		Expect(target.Ports[1].NodePort).To(Equal(int32(0)), "new port should have no NodePort")
 	})
@@ -233,7 +241,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "custom", Port: 8080},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
 		Expect(target.Ports[0].TargetPort).To(Equal(intstr.FromInt32(8080)))
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
@@ -256,7 +264,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].Protocol).To(Equal(corev1.ProtocolUDP))
 		Expect(target.Ports[0].TargetPort).To(Equal(intstr.FromInt32(9090)))
 	})
@@ -275,7 +283,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "custom", Port: 8080, TargetPort: intstr.FromString("http")},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].TargetPort).To(Equal(intstr.FromString("http")))
 	})
 
@@ -290,7 +298,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "postgres", Port: 5432},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
 		Expect(target.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
 	})
@@ -307,7 +315,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 				{Name: "postgres", Port: 5432, Protocol: corev1.ProtocolTCP},
 			},
 		}
-		ApplyProposedChanges(&target, &proposed, nil)
+		Expect(ApplyProposedChanges(&target, &proposed, nil)).To(Succeed())
 		Expect(target.Ports).To(HaveLen(1))
 		Expect(target.Ports[0].Name).To(Equal("postgres"))
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
@@ -328,7 +336,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 			Type:  corev1.ServiceTypeLoadBalancer,
 			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
 		}
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 		Expect(target.LoadBalancerSourceRanges).To(BeNil(),
 			"should be cleared because lastApplied had it but proposed doesn't")
 	})
@@ -350,7 +358,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 			Type:  corev1.ServiceTypeLoadBalancer,
 			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
 		}
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 		Expect(target.LoadBalancerClass).To(Equal(&lbClass),
 			"should be preserved because neither lastApplied nor proposed set it")
 	})
@@ -360,7 +368,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		proposed := corev1.ServiceSpec{}
 		target := fullyPopulatedServiceSpec()
 
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 
 		tv := reflect.ValueOf(target)
 		st := reflect.TypeOf(target)
@@ -372,12 +380,6 @@ var _ = Describe("ApplyProposedChanges", func() {
 			if field.Name == "Ports" {
 				Expect(target.Ports).To(BeNil(),
 					fmt.Sprintf("field %s should be cleared (was in lastApplied, not in proposed)", field.Name))
-				continue
-			}
-
-			if tf.Kind() == reflect.Bool {
-				Expect(tf.Bool()).To(BeFalse(),
-					fmt.Sprintf("bool field %s should be false (from proposed)", field.Name))
 				continue
 			}
 
@@ -399,7 +401,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		proposed := corev1.ServiceSpec{
 			Type: corev1.ServiceTypeLoadBalancer,
 		}
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 		Expect(target.LoadBalancerClass).To(Equal(&lbClass),
 			"provider-set field must survive: neither lastApplied nor proposed touched it")
 		Expect(target.ClusterIP).To(Equal("10.96.0.1"))
@@ -417,7 +419,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		proposed := corev1.ServiceSpec{
 			Type: corev1.ServiceTypeLoadBalancer,
 		}
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 		Expect(target.LoadBalancerSourceRanges).To(BeNil(),
 			"we owned this field (in lastApplied), so removing from proposed should clear it")
 	})
@@ -440,7 +442,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 			Type:  corev1.ServiceTypeLoadBalancer,
 			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
 		}
-		ApplyProposedChanges(&target, &proposed, &lastApplied)
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
 		Expect(target.LoadBalancerClass).To(Equal(&lbClass))
 		Expect(target.InternalTrafficPolicy).To(Equal(&internalPolicy))
 		Expect(target.ClusterIP).To(Equal("10.96.0.1"))
@@ -461,7 +463,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 		}
 
 		target1 := living.DeepCopy()
-		ApplyProposedChanges(target1, &proposed1, nil)
+		Expect(ApplyProposedChanges(target1, &proposed1, nil)).To(Succeed())
 		Expect(target1.LoadBalancerSourceRanges).To(Equal([]string{"10.0.0.0/8"}))
 		Expect(target1.ClusterIP).To(Equal("10.96.0.1"))
 		Expect(target1.Ports[0].NodePort).To(Equal(int32(30001)))
@@ -472,7 +474,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 			Ports:                    []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
 		}
 		target2 := target1.DeepCopy()
-		ApplyProposedChanges(target2, &proposed2, &proposed1)
+		Expect(ApplyProposedChanges(target2, &proposed2, annotationsFrom(&proposed1))).To(Succeed())
 		Expect(target2.LoadBalancerSourceRanges).To(Equal([]string{"172.16.0.0/12"}))
 		Expect(target2.ClusterIP).To(Equal("10.96.0.1"))
 
@@ -481,7 +483,7 @@ var _ = Describe("ApplyProposedChanges", func() {
 			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
 		}
 		target3 := target2.DeepCopy()
-		ApplyProposedChanges(target3, &proposed3, &proposed2)
+		Expect(ApplyProposedChanges(target3, &proposed3, annotationsFrom(&proposed2))).To(Succeed())
 		Expect(target3.LoadBalancerSourceRanges).To(BeNil(),
 			"ranges should be cleared after being removed from proposed")
 		Expect(target3.ClusterIP).To(Equal("10.96.0.1"),
@@ -491,30 +493,22 @@ var _ = Describe("ApplyProposedChanges", func() {
 	})
 })
 
-var _ = Describe("GetLastApplied / SetLastApplied", func() {
-	It("should round-trip a service spec through annotations", func() {
+var _ = Describe("SetLastApplied", func() {
+	It("should store a JSON annotation that round-trips through ApplyProposedChanges", func() {
 		spec := fullyPopulatedServiceSpec()
 		meta := metav1.ObjectMeta{}
 
 		SetLastApplied(&meta, &spec)
+		Expect(meta.Annotations).To(HaveKey(utils.LastAppliedSpecAnnotationName))
 
-		result := GetLastApplied(meta.Annotations)
-		Expect(result).NotTo(BeNil())
+		raw := meta.Annotations[utils.LastAppliedSpecAnnotationName]
+		Expect(raw).NotTo(BeEmpty())
+
+		var result corev1.ServiceSpec
+		Expect(json.Unmarshal([]byte(raw), &result)).To(Succeed())
 		Expect(result.Type).To(Equal(spec.Type))
 		Expect(result.LoadBalancerSourceRanges).To(Equal(spec.LoadBalancerSourceRanges))
 		Expect(result.Ports).To(HaveLen(len(spec.Ports)))
 		Expect(result.LoadBalancerClass).To(Equal(spec.LoadBalancerClass))
-	})
-
-	It("should return nil for missing annotation", func() {
-		annotations := make(map[string]string)
-		Expect(GetLastApplied(annotations)).To(BeNil())
-	})
-
-	It("should return nil for invalid JSON", func() {
-		annotations := map[string]string{
-			"cnpg.io/lastAppliedSpec": "not-json",
-		}
-		Expect(GetLastApplied(annotations)).To(BeNil())
 	})
 })
