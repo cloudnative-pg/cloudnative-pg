@@ -189,6 +189,58 @@ var _ = Describe("Major upgrade rollback handling", func() {
 	})
 })
 
+var _ = Describe("deleteAllPodsInMajorUpgradePreparation", func() {
+	It("deletes pods and requeues when pods have no deletion timestamp", func(ctx SpecContext) {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example-1",
+				Namespace: "default",
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(&pod).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, []corev1.Pod{pod}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("requeues when pods are still terminating", func(ctx SpecContext) {
+		now := metav1.Now()
+		terminatingPod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "cluster-example-1",
+				Namespace:         "default",
+				DeletionTimestamp: &now,
+				Finalizers:        []string{"test-finalizer"},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, []corev1.Pod{terminatingPod}, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(*result).To(Equal(ctrl.Result{RequeueAfter: 10 * time.Second}))
+	})
+
+	It("returns nil when no pods or jobs exist", func(ctx SpecContext) {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+
+		result, err := deleteAllPodsInMajorUpgradePreparation(ctx, fakeClient, nil, nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+	})
+})
+
 var _ = Describe("Major upgrade job definition", func() {
 	It("sets BackoffLimit to 0", func() {
 		cluster := &apiv1.Cluster{
