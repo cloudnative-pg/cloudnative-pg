@@ -251,10 +251,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Handle plugin requeue requests - this is not an error, just a signal
 	// that the plugin is waiting for a dependency (e.g., a custom resource).
+	const defaultPluginRequeueInterval = 5 * time.Second
 	if cnpgiClient.IsRequeueError(err) {
 		requeueAfter := cnpgiClient.GetRequeueAfter(err)
 		if requeueAfter == 0 {
-			requeueAfter = 5 * time.Second
+			requeueAfter = defaultPluginRequeueInterval
 		}
 		contextLogger.Info("Plugin requested requeue", "requeueAfter", requeueAfter)
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil

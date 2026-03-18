@@ -72,6 +72,25 @@ var _ = Describe("wrapAsPluginErrorIfNeeded", func() {
 		Expect(result).To(Equal(wrappedPluginErr))
 		Expect(ContainsPluginError(result)).To(BeTrue())
 	})
+
+	It("should not wrap a RequeueError as a plugin error", func() {
+		requeueErr := &RequeueError{After: 5 * time.Second}
+
+		result := wrapAsPluginErrorIfNeeded(requeueErr)
+		Expect(result).To(Equal(requeueErr))
+		Expect(IsRequeueError(result)).To(BeTrue())
+		Expect(ContainsPluginError(result)).To(BeFalse())
+	})
+
+	It("should not wrap a wrapped RequeueError as a plugin error", func() {
+		requeueErr := &RequeueError{After: 5 * time.Second}
+		wrappedErr := fmt.Errorf("context: %w", requeueErr)
+
+		result := wrapAsPluginErrorIfNeeded(wrappedErr)
+		Expect(result).To(Equal(wrappedErr))
+		Expect(IsRequeueError(result)).To(BeTrue())
+		Expect(ContainsPluginError(result)).To(BeFalse())
+	})
 })
 
 var _ = Describe("ContainsPluginError", func() {
@@ -123,12 +142,12 @@ var _ = Describe("ContainsPluginError", func() {
 })
 
 var _ = Describe("RequeueError", func() {
-	It("should return the expected error message", func() {
+	It("should return the expected error message with duration", func() {
 		err := &RequeueError{After: 10 * time.Second}
-		Expect(err.Error()).To(Equal("plugin requested requeue"))
+		Expect(err.Error()).To(Equal("plugin requested requeue after 10s"))
 	})
 
-	It("should work with zero duration", func() {
+	It("should return the expected error message with zero duration", func() {
 		err := &RequeueError{}
 		Expect(err.Error()).To(Equal("plugin requested requeue"))
 		Expect(err.After).To(Equal(time.Duration(0)))

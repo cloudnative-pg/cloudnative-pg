@@ -21,6 +21,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -71,6 +72,9 @@ func wrapAsPluginErrorIfNeeded(err error) error {
 	if ContainsPluginError(err) {
 		return err
 	}
+	if IsRequeueError(err) {
+		return err
+	}
 
 	return &pluginError{innerErr: err}
 }
@@ -85,6 +89,9 @@ type RequeueError struct {
 }
 
 func (e *RequeueError) Error() string {
+	if e.After > 0 {
+		return fmt.Sprintf("plugin requested requeue after %s", e.After)
+	}
 	return "plugin requested requeue"
 }
 

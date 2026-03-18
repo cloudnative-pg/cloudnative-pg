@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"google.golang.org/grpc"
@@ -45,6 +46,7 @@ type fakeLifecycleClient struct {
 	lifecycleHookError error
 	labelInjector      map[string]string
 	capabilities       []*lifecycle.OperatorLifecycleCapabilities
+	overrideResponse   *lifecycle.OperatorLifecycleResponse
 }
 
 func newFakeLifecycleClient(
@@ -76,6 +78,10 @@ func (f *fakeLifecycleClient) LifecycleHook(
 ) (*lifecycle.OperatorLifecycleResponse, error) {
 	defRes := &lifecycle.OperatorLifecycleResponse{
 		JsonPatch: nil,
+	}
+
+	if f.overrideResponse != nil {
+		return f.overrideResponse, f.lifecycleHookError
 	}
 
 	if f.lifecycleHookError != nil {
@@ -219,6 +225,63 @@ var _ = Describe("LifecycleHook", func() {
 		podModified, ok := obj.(*corev1.Pod)
 		Expect(ok).To(BeTrue())
 		Expect(podModified.Labels).To(Equal(map[string]string{"other": "stuff"}))
+	})
+})
+
+var _ = Describe("LifecycleHook BEHAVIOR_REQUEUE", func() {
+	var (
+		d            *data
+		clusterObj   k8client.Object
+		capabilities = []*lifecycle.OperatorLifecycleCapabilities{
+			{
+				Group: "",
+				Kind:  "Pod",
+				OperationTypes: []*lifecycle.OperatorOperationType{
+					{
+						Type: lifecycle.OperatorOperationType_TYPE_CREATE,
+					},
+				},
+			},
+		}
+	)
+
+	BeforeEach(func() {
+		d = &data{
+			plugins: []connection.Interface{
+				&fakeConnection{
+					name: "test-requeue",
+				},
+			},
+		}
+
+		clusterObj = &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+	})
+
+	It("should return a RequeueError that is not a pluginError", func(ctx SpecContext) {
+		f := &fakeLifecycleClient{
+			capabilities: capabilities,
+			overrideResponse: &lifecycle.OperatorLifecycleResponse{
+				Behavior:     lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE,
+				RequeueAfter: 10,
+			},
+		}
+		f.set(d.plugins[0].(*fakeConnection))
+
+		pod := &corev1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Pod",
+			},
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+
+		_, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		Expect(err).To(HaveOccurred())
+		Expect(IsRequeueError(err)).To(BeTrue())
+		Expect(ContainsPluginError(err)).To(BeFalse())
+		Expect(GetRequeueAfter(err)).To(Equal(10 * time.Second))
 	})
 })
 

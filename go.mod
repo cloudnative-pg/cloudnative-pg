@@ -41,7 +41,7 @@ require (
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/term v0.40.0
-	google.golang.org/grpc v1.79.2
+	google.golang.org/grpc v1.79.3
 	k8s.io/api v0.35.2
 	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/apimachinery v0.35.2
@@ -130,4 +130,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
 
-replace github.com/cloudnative-pg/cnpg-i => github.com/gabriele-wolfox/cnpg-i v0.0.0-20260312162736-e7b5559ed110
+replace github.com/cloudnative-pg/cnpg-i => github.com/gabriele-wolfox/cnpg-i v0.0.0-20260318104457-fae0bbbc85b7

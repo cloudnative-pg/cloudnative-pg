@@ -1146,6 +1146,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// 2. Plugin returning REQUEUE (e.g., waiting for a custom resource)
 	// 3. Next reconciliation seeing LatestGeneratedNode != 0 with no PVCs -> unrecoverable
 	// We use LatestGeneratedNode+1 since we know this will be the next serial.
+	// NOTE: specs.NewInstance internally calls the Evaluate lifecycle hook,
+	// so two lifecycle calls happen in sequence here (Evaluate then Create).
 	if pluginClient := cnpgiClient.GetPluginClientFromContext(ctx); pluginClient != nil {
 		nextSerial := cluster.Status.LatestGeneratedNode + 1
 		tempPod, err := specs.NewInstance(ctx, *cluster, nextSerial, true)
