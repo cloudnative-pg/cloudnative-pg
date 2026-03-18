@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
@@ -340,6 +341,68 @@ var _ = Describe("ensureInstancesAreCreated early lifecycle hook", func() {
 		env = buildTestEnvironment()
 	})
 
+	It("propagates non-requeue errors from lifecycle hook", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 2
+			cluster.Status.LatestGeneratedNode = 2
+			cluster.Status.ReadyInstances = 2
+		})
+
+		By("creating the cluster resources with a dangling PVC for instance 3")
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		pvcs = append(pvcs, thirdInstancePVCGroup...)
+
+		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcs},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					IsPrimary:   false,
+					Pod:         &instances[0],
+				},
+				{
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
+					IsPodReady:  true,
+					IsPrimary:   true,
+					Pod:         &instances[1],
+				},
+			},
+		}
+
+		By("setting up a plugin client that returns a regular error")
+		fakePlugin := fakePluginClientLifecycle{
+			returnedError: fmt.Errorf("gRPC connection failed"),
+		}
+		ctxWithPlugin := pluginClient.SetPluginClientInContext(ctx, fakePlugin)
+
+		By("calling ensureInstancesAreCreated and verifying the error propagates")
+		_, err := env.clusterReconciler.ensureInstancesAreCreated(
+			ctxWithPlugin,
+			cluster,
+			managedResources,
+			statusList,
+		)
+		Expect(err).To(HaveOccurred())
+		Expect(pluginClient.IsRequeueError(err)).To(BeFalse())
+		Expect(err.Error()).To(ContainSubstring("gRPC connection failed"))
+	})
+
 	It("returns error from lifecycle hook before PVC checks", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
@@ -478,6 +541,35 @@ var _ = Describe("createPrimaryInstance early lifecycle hook", func() {
 	var env *testingEnvironment
 	BeforeEach(func() {
 		env = buildTestEnvironment()
+	})
+
+	It("propagates non-requeue errors from lifecycle hook", func(ctx SpecContext) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 1
+			cluster.Status.LatestGeneratedNode = 0
+		})
+
+		By("setting up a plugin client that returns a regular error")
+		fakePlugin := fakePluginClientLifecycle{
+			returnedError: fmt.Errorf("plugin unavailable"),
+		}
+		ctxWithPlugin := pluginClient.SetPluginClientInContext(ctx, fakePlugin)
+
+		By("calling createPrimaryInstance and verifying the error propagates")
+		_, err := env.clusterReconciler.createPrimaryInstance(ctxWithPlugin, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(pluginClient.IsRequeueError(err)).To(BeFalse())
+		Expect(err.Error()).To(ContainSubstring("plugin unavailable"))
+
+		By("verifying that LatestGeneratedNode was not updated")
+		var updatedCluster apiv1.Cluster
+		err = env.client.Get(ctx, types.NamespacedName{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.LatestGeneratedNode).To(Equal(0))
 	})
 
 	It("returns error from lifecycle hook before updating status", func(ctx SpecContext) {

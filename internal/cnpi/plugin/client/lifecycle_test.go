@@ -283,6 +283,75 @@ var _ = Describe("LifecycleHook BEHAVIOR_REQUEUE", func() {
 		Expect(ContainsPluginError(err)).To(BeFalse())
 		Expect(GetRequeueAfter(err)).To(Equal(10 * time.Second))
 	})
+
+	It("should return a RequeueError with zero duration when RequeueAfter is 0", func(ctx SpecContext) {
+		f := &fakeLifecycleClient{
+			capabilities: capabilities,
+			overrideResponse: &lifecycle.OperatorLifecycleResponse{
+				Behavior:     lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE,
+				RequeueAfter: 0,
+			},
+		}
+		f.set(d.plugins[0].(*fakeConnection))
+
+		pod := &corev1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Pod",
+			},
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+
+		_, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		Expect(err).To(HaveOccurred())
+		Expect(IsRequeueError(err)).To(BeTrue())
+		Expect(GetRequeueAfter(err)).To(Equal(time.Duration(0)))
+	})
+
+	It("should pass through negative RequeueAfter for the controller to handle", func(ctx SpecContext) {
+		f := &fakeLifecycleClient{
+			capabilities: capabilities,
+			overrideResponse: &lifecycle.OperatorLifecycleResponse{
+				Behavior:     lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE,
+				RequeueAfter: -5,
+			},
+		}
+		f.set(d.plugins[0].(*fakeConnection))
+
+		pod := &corev1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Pod",
+			},
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+
+		_, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		Expect(err).To(HaveOccurred())
+		Expect(IsRequeueError(err)).To(BeTrue())
+		Expect(GetRequeueAfter(err)).To(Equal(-5 * time.Second))
+	})
+
+	It("should not interfere with BEHAVIOR_CONTINUE responses", func(ctx SpecContext) {
+		mapInjector := map[string]string{"requeue-test": "value"}
+		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
+		f.set(d.plugins[0].(*fakeConnection))
+
+		pod := &corev1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Pod",
+			},
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+
+		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(obj).ToNot(BeNil())
+		podModified, ok := obj.(*corev1.Pod)
+		Expect(ok).To(BeTrue())
+		Expect(podModified.Labels).To(Equal(mapInjector))
+	})
 })
 
 func createJSONPatchForLabels(originalInstance, instance *corev1.Pod) ([]byte, error) {

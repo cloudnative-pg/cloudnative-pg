@@ -254,7 +254,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	const defaultPluginRequeueInterval = 5 * time.Second
 	if cnpgiClient.IsRequeueError(err) {
 		requeueAfter := cnpgiClient.GetRequeueAfter(err)
-		if requeueAfter == 0 {
+		if requeueAfter <= 0 {
 			requeueAfter = defaultPluginRequeueInterval
 		}
 		contextLogger.Info("Plugin requested requeue", "requeueAfter", requeueAfter)
