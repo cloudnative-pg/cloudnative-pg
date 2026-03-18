@@ -290,7 +290,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest-16-cores
     permissions:
       contents: read
       packages: write
@@ -680,6 +680,8 @@ jobs:
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "kind"
     steps:
+      - name: Check CPU count
+        run: nproc
       -
         name: Cleanup Disk
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
