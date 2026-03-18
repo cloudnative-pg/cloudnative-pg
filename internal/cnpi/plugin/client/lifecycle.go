@@ -78,25 +78,7 @@ func (data *data) innerLifecycleHook(
 	}
 	object.GetObjectKind().SetGroupVersionKind(gvk)
 
-	var invokablePlugin []connection.Interface
-	for _, plg := range data.plugins {
-		for _, capability := range plg.LifecycleCapabilities() {
-			if capability.Group != gvk.Group || capability.Kind != gvk.Kind {
-				continue
-			}
-
-			contained := slices.ContainsFunc(capability.OperationTypes, func(ot *lifecycle.OperatorOperationType) bool {
-				return ot.GetType() == typedOperationType
-			})
-
-			if !contained {
-				continue
-			}
-
-			invokablePlugin = append(invokablePlugin, plg)
-		}
-	}
-
+	invokablePlugin := data.findInvokablePlugins(gvk.Group, gvk.Kind, typedOperationType)
 	if len(invokablePlugin) == 0 {
 		return object, nil
 	}
@@ -129,45 +111,15 @@ func (data *data) innerLifecycleHook(
 			ClusterDefinition: serializedCluster,
 			ObjectDefinition:  serializedObject,
 		}
-		result, err := plg.LifecycleClient().LifecycleHook(ctx, req)
+
+		var patchedObject []byte
+		patchedObject, err = data.invokeLifecyclePlugin(ctx, plg, req)
 		if err != nil {
-			contextLogger.Error(err, "Error while calling LifecycleHook")
 			return nil, err
 		}
-
-		if result == nil {
-			// There's nothing to mutate
-			continue
+		if patchedObject != nil {
+			serializedObject = patchedObject
 		}
-
-		// Handle requeue behavior - plugin is waiting for a dependency
-		if result.Behavior == lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE {
-			contextLogger.Info("Plugin requested requeue",
-				"plugin", plg.Name(),
-				"requeueAfter", result.RequeueAfter)
-			return nil, &RequeueError{
-				After: time.Duration(result.RequeueAfter) * time.Second,
-			}
-		}
-
-		if len(result.JsonPatch) == 0 {
-			// There's nothing to mutate
-			continue
-		}
-
-		patch, err := jsonpatch.DecodePatch(result.JsonPatch)
-		if err != nil {
-			contextLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
-			return nil, err
-		}
-
-		responseObj, err := patch.Apply(serializedObject)
-		if err != nil {
-			contextLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
-			return nil, err
-		}
-
-		serializedObject = responseObj
 	}
 
 	if reflect.DeepEqual(serializedObject, serializedObjectOrig) {
@@ -185,4 +137,72 @@ func (data *data) innerLifecycleHook(
 	}
 
 	return mutatedObject.(client.Object), nil
+}
+
+// findInvokablePlugins returns the plugins that support the given group, kind, and operation type.
+func (data *data) findInvokablePlugins(
+	group, kind string,
+	operationType lifecycle.OperatorOperationType_Type,
+) []connection.Interface {
+	var result []connection.Interface
+	for _, plg := range data.plugins {
+		for _, capability := range plg.LifecycleCapabilities() {
+			if capability.Group != group || capability.Kind != kind {
+				continue
+			}
+
+			contained := slices.ContainsFunc(capability.OperationTypes, func(ot *lifecycle.OperatorOperationType) bool {
+				return ot.GetType() == operationType
+			})
+			if contained {
+				result = append(result, plg)
+			}
+		}
+	}
+	return result
+}
+
+// invokeLifecyclePlugin calls a single plugin's lifecycle hook and processes the response.
+// Returns the patched object bytes if the plugin provided a JSON patch, nil if there was nothing to mutate.
+func (data *data) invokeLifecyclePlugin(
+	ctx context.Context,
+	plg connection.Interface,
+	req *lifecycle.OperatorLifecycleRequest,
+) ([]byte, error) {
+	contextLogger := log.FromContext(ctx).WithName("lifecycle_hook")
+
+	result, err := plg.LifecycleClient().LifecycleHook(ctx, req)
+	if err != nil {
+		contextLogger.Error(err, "Error while calling LifecycleHook")
+		return nil, err
+	}
+
+	if result == nil || (len(result.JsonPatch) == 0 &&
+		result.Behavior != lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE) {
+		return nil, nil
+	}
+
+	// Handle requeue behavior - plugin is waiting for a dependency
+	if result.Behavior == lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE {
+		contextLogger.Info("Plugin requested requeue",
+			"plugin", plg.Name(),
+			"requeueAfter", result.RequeueAfter)
+		return nil, &RequeueError{
+			After: time.Duration(result.RequeueAfter) * time.Second,
+		}
+	}
+
+	patch, err := jsonpatch.DecodePatch(result.JsonPatch)
+	if err != nil {
+		contextLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
+		return nil, err
+	}
+
+	responseObj, err := patch.Apply(req.ObjectDefinition)
+	if err != nil {
+		contextLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
+		return nil, err
+	}
+
+	return responseObj, nil
 }
