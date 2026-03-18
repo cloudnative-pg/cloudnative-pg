@@ -97,7 +97,7 @@ jobs:
           --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           body_path: release_notes.md
           draft: false
@@ -424,7 +424,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
 
@@ -516,7 +516,7 @@ jobs:
           git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
       -
