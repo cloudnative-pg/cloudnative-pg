@@ -889,6 +889,9 @@ jobs:
       OPP_RELEASE_INDEX_NAME: "catalog_tmp"
       TEST: ${{ matrix.test }}
     steps:
+      - name: Check CPU count
+        run: nproc
+
       - name: Checkout community-operators
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
