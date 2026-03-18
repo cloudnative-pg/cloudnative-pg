@@ -87,7 +87,7 @@ func ApplyProposedChanges(target, proposed *corev1.ServiceSpec, annotations map[
 }
 
 func buildPatchJSON(lastAppliedJSON string, proposedJSON []byte) ([]byte, error) {
-	if lastAppliedJSON == "" {
+	if lastAppliedJSON == "" || !json.Valid([]byte(lastAppliedJSON)) {
 		return proposedJSON, nil
 	}
 

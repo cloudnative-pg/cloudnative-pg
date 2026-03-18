@@ -457,10 +457,9 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
-	// Store the proposed spec for future three-way merges
-	servicespec.SetLastApplied(&livingService.ObjectMeta, &proposed.Spec)
-
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		// Store the proposed spec for future three-way merges
+		servicespec.SetLastApplied(&livingService.ObjectMeta, &proposed.Spec)
 		contextLogger.Info("reconciling service")
 		return r.Update(ctx, &livingService)
 	}

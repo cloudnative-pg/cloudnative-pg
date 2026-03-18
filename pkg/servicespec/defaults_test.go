@@ -450,6 +450,24 @@ var _ = Describe("ApplyProposedChanges", func() {
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
 	})
 
+	It("should degrade gracefully when lastApplied annotation contains invalid JSON", func() {
+		target := corev1.ServiceSpec{
+			Type:      corev1.ServiceTypeLoadBalancer,
+			ClusterIP: "10.96.0.1",
+			Ports:     []corev1.ServicePort{{Port: 5432, Name: "postgres", NodePort: 30001}},
+		}
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		annotations := map[string]string{
+			utils.LastAppliedSpecAnnotationName: "not-valid-json{{{",
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotations)).To(Succeed())
+		Expect(target.ClusterIP).To(Equal("10.96.0.1"))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
+	})
+
 	It("should handle multi-reconciliation cycle: add → update → remove", func() {
 		living := corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeLoadBalancer,
