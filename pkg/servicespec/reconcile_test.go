@@ -468,6 +468,149 @@ var _ = Describe("ApplyProposedChanges", func() {
 		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
 	})
 
+	It("should add a port when proposed introduces one not in lastApplied", func() {
+		lastApplied := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		target := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres", NodePort: 30001, Protocol: corev1.ProtocolTCP}},
+		}
+		proposed := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres"},
+				{Port: 9187, Name: "metrics"},
+			},
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
+		Expect(target.Ports).To(HaveLen(2))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)),
+			"existing port should keep its NodePort")
+		Expect(target.Ports[1].Name).To(Equal("metrics"))
+	})
+
+	It("should remove a port when lastApplied had it but proposed does not", func() {
+		lastApplied := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres"},
+				{Port: 9187, Name: "metrics"},
+			},
+		}
+		target := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres", NodePort: 30001, Protocol: corev1.ProtocolTCP},
+				{Port: 9187, Name: "metrics", NodePort: 30002, Protocol: corev1.ProtocolTCP},
+			},
+		}
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
+		Expect(target.Ports).To(HaveLen(1))
+		Expect(target.Ports[0].Name).To(Equal("postgres"))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
+	})
+
+	It("should preserve an externally-added port not in lastApplied or proposed", func() {
+		lastApplied := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		target := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres", NodePort: 30001, Protocol: corev1.ProtocolTCP},
+				{Port: 8080, Name: "sidecar", NodePort: 30099, Protocol: corev1.ProtocolTCP},
+			},
+		}
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
+		// The three-way patch from lastApplied→proposed doesn't mention port 8080,
+		// so MergePatch preserves it from the target.
+		Expect(target.Ports).To(HaveLen(2))
+		Expect(target.Ports[0].Name).To(Equal("postgres"))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
+		Expect(target.Ports[1].Name).To(Equal("sidecar"))
+		Expect(target.Ports[1].NodePort).To(Equal(int32(30099)))
+	})
+
+	It("should preserve NodePort, Protocol, and TargetPort with lastApplied when proposed omits them", func() {
+		lastApplied := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		target := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{
+				Port: 5432, Name: "postgres",
+				Protocol: corev1.ProtocolTCP, TargetPort: intstr.FromInt32(5432), NodePort: 30001,
+			}},
+		}
+		proposed := corev1.ServiceSpec{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{Port: 5432, Name: "postgres"}},
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
+		Expect(target.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+		Expect(target.Ports[0].TargetPort).To(Equal(intstr.FromInt32(5432)))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30001)))
+	})
+
+	It("should handle port reordering between proposed and living", func() {
+		lastApplied := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres"},
+				{Port: 9187, Name: "metrics"},
+			},
+		}
+		target := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres", NodePort: 30001, Protocol: corev1.ProtocolTCP},
+				{Port: 9187, Name: "metrics", NodePort: 30002, Protocol: corev1.ProtocolTCP},
+			},
+		}
+		proposed := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 9187, Name: "metrics"},
+				{Port: 5432, Name: "postgres"},
+			},
+		}
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&lastApplied))).To(Succeed())
+		Expect(target.Ports).To(HaveLen(2))
+		Expect(target.Ports[0].Name).To(Equal("metrics"))
+		Expect(target.Ports[0].NodePort).To(Equal(int32(30002)))
+		Expect(target.Ports[1].Name).To(Equal("postgres"))
+		Expect(target.Ports[1].NodePort).To(Equal(int32(30001)))
+	})
+
+	It("should be idempotent when target, proposed, and lastApplied match", func() {
+		spec := corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Port: 5432, Name: "postgres", Protocol: corev1.ProtocolTCP, NodePort: 30001},
+			},
+			ClusterIP:                "10.96.0.1",
+			LoadBalancerSourceRanges: []string{"10.0.0.0/8"},
+		}
+		target := *spec.DeepCopy()
+		proposed := *spec.DeepCopy()
+		original := *spec.DeepCopy()
+
+		Expect(ApplyProposedChanges(&target, &proposed, annotationsFrom(&spec))).To(Succeed())
+		Expect(target).To(Equal(original))
+	})
+
 	It("should handle multi-reconciliation cycle: add → update → remove", func() {
 		living := corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeLoadBalancer,

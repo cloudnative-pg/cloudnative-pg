@@ -95,7 +95,7 @@ func buildPatchJSON(lastAppliedJSON string, proposedJSON []byte) ([]byte, error)
 }
 
 // preservePortDefaults preserves Kubernetes-defaulted and Kubernetes-assigned
-// fields in service ports, matching by the strategic merge key (Port, Protocol).
+// fields in service ports, matching by port number and protocol.
 func preservePortDefaults(proposed, living []corev1.ServicePort) {
 	type portKey struct {
 		port     int32
