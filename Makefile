@@ -225,8 +225,27 @@ install: manifests kustomize ## Install CRDs into a cluster.
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
+deploy-with-manifest: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
 	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
+
+deploy-with-helm: manifests ## Deploy controller using Helm by adding the CNPG repo and installing the Operator
+	# TODO: The crd.create=false flag and the kustomize for the config/helm will be removed once the crds are synced in the cloudnative-pg/charts repository
+	set -e ;\
+	kubectl apply --server-side -k config/helm ;\
+	helm repo add cnpg https://cloudnative-pg.github.io/charts ;\
+	helm upgrade --install cnpg \
+		--namespace cnpg-system \
+		--set crds.create=false \
+		--set config.create=false \
+		--set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config" \
+		--create-namespace \
+		--set image.repository="$${CONTROLLER_IMG%:*}" \
+		--set image.tag="$${CONTROLLER_IMG##*:}" \
+		--set "additionalEnv[0].name=POSTGRES_IMAGE_NAME" \
+		--set "additionalEnv[0].value=${POSTGRES_IMAGE_NAME}" \
+		--set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME" \
+		--set "additionalEnv[1].value=${PGBOUNCER_IMAGE_NAME}" \
+		cnpg/cloudnative-pg
 
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\

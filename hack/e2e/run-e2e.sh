@@ -33,6 +33,7 @@ CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+CNPG_DEPLOYMENT_METHOD="${CNPG_DEPLOYMENT_METHOD:-sources}"
 
 # Override pgbouncer image repository if PGBOUNCER_IMG_REPOSITORY is set
 if [ -n "${PGBOUNCER_IMG_REPOSITORY:-}" ]; then
@@ -139,21 +140,28 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   kubectl delete namespace cnpg-system || :
   kubectl create namespace cnpg-system
   ensure_image_pull_secret
-  case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
+  case "${CNPG_DEPLOYMENT_METHOD}" in
       helm)
-        kubectl delete -f "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" --ignore-not-found || :
-        CONTROLLER_IMG="${CONTROLLER_IMG}" \
-        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-        "${ROOT_DIR}/hack/setup-cluster.sh" deploy
+          kubectl delete -f "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" --ignore-not-found || :
+          method="helm"
         ;;
-      sources|*)
-        CONTROLLER_IMG="${CONTROLLER_IMG}" \
-        POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-        PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-        make -C "${ROOT_DIR}" deploy
+      manifest)
+          method="manifest"
         ;;
-    esac
+      *)
+          echo -e "${bright}Error: Deployment method not supported: ${CNPG_DEPLOYMENT_METHOD}${reset}" >&2
+          exit 1
+        ;;
+  esac
+
+  CONTROLLER_IMG="${CONTROLLER_IMG}" \
+    POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+    PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+    make -C "${ROOT_DIR}" "deploy-with-${method}"
+
+#  kubectl wait --for=condition=Available --timeout=2m \
+#    -n cnpg-system deployments \
+#    cnpg-controller-manager
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

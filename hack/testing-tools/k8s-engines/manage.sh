@@ -68,7 +68,6 @@ export CLUSTER_ENGINE
 # Source necessary common files to define paths, constants, and utility functions
 source "${COMMON_DIR}/00-paths.sh"
 source "${COMMON_DIR}/10-config.sh"
-source "${COMMON_DIR}/20-utils-k8s.sh"
 source "${COMMON_DIR}/40-utils-registry.sh"
 source "${COMMON_DIR}/50-utils-images-load.sh"
 
@@ -136,20 +135,11 @@ case "$ACTION" in
             echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
             exit 1
         fi
-        CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
         source "${COMMON_DIR}/20-utils-k8s.sh"
-        case "${CNPG_DEPLOYMENT_METHOD:-sources}" in
-                helm)
-
-                    deploy_operator_from_helm
-                    ;;
-                sources|*)
-                    deploy_operator_from_sources
-                    ;;
-            esac
-         kubectl wait --for=condition=Available --timeout=2m \
-          -n cnpg-system deployment \
-          -l app.kubernetes.io/name=cloudnative-pg
+        deploy_operator_from_source "${CNPG_DEPLOYMENT_METHOD:-manifest}"
+#        ${K8S_CLI} wait --for=condition=Available --timeout=2m \
+#          -n cnpg-system deployment \
+#          -l app.kubernetes.io/name=cloudnative-pg
         ;;
 
     load-helper-images)
