@@ -820,6 +820,105 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	})
 })
 
+var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
+	const (
+		oldOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.0"
+		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.1"
+	)
+
+	makePodWithBootstrapImage := func(name, image string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{Name: specs.BootstrapControllerContainerName, Image: image},
+				},
+			},
+		}
+	}
+
+	It("returns false when all pods have the same operator image and same hash", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+				{Pod: makePodWithBootstrapImage("pod-2", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("returns false when all pods have the same operator image but different hashes", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+				{Pod: makePodWithBootstrapImage("pod-2", oldOperatorImage), LoadedConfigurationHash: "hash-b"},
+				{Pod: makePodWithBootstrapImage("pod-3", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("returns true when operator versions differ and each group has uniform hashes", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", newOperatorImage), LoadedConfigurationHash: "hash-new"},
+				{Pod: makePodWithBootstrapImage("pod-2", oldOperatorImage), LoadedConfigurationHash: "hash-old"},
+				{Pod: makePodWithBootstrapImage("pod-3", oldOperatorImage), LoadedConfigurationHash: "hash-old"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeTrue())
+	})
+
+	It("returns false when same operator version has different hashes (config propagation)", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", newOperatorImage), LoadedConfigurationHash: "hash-new"},
+				{Pod: makePodWithBootstrapImage("pod-2", oldOperatorImage), LoadedConfigurationHash: "hash-old-a"},
+				{Pod: makePodWithBootstrapImage("pod-3", oldOperatorImage), LoadedConfigurationHash: "hash-old-b"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("returns false with an empty status list", func() {
+		statusList := postgres.PostgresqlStatusList{}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("skips pods with nil Pod or empty config hash", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: nil, LoadedConfigurationHash: "hash-a"},
+				{Pod: makePodWithBootstrapImage("pod-2", oldOperatorImage), LoadedConfigurationHash: ""},
+				{Pod: makePodWithBootstrapImage("pod-3", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("returns false when config propagation is in progress during an operator upgrade", func() {
+		// New-image pods have different hashes (config still propagating),
+		// so the non-uniformity is not purely from the algorithm change
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", newOperatorImage), LoadedConfigurationHash: "hash-new-stale"},
+				{Pod: makePodWithBootstrapImage("pod-2", newOperatorImage), LoadedConfigurationHash: "hash-new-current"},
+				{Pod: makePodWithBootstrapImage("pod-3", oldOperatorImage), LoadedConfigurationHash: "hash-old"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("returns false with a single pod", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: makePodWithBootstrapImage("pod-1", oldOperatorImage), LoadedConfigurationHash: "hash-a"},
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+})
+
 type fakePluginClientRollout struct {
 	pluginClient.Client
 	returnedPod   *corev1.Pod

@@ -336,6 +336,50 @@ func isInstanceNeedingRollout(
 	return rollout{}
 }
 
+// isConfigNonUniformityFromUpgrade checks whether the configuration hash
+// non-uniformity across pods is caused by an operator upgrade that changed
+// the hash algorithm. It returns true only when multiple operator versions
+// are present and each version group is internally uniform — meaning the
+// non-uniformity is structural (different algorithms) and will never
+// self-resolve without restarting or upgrading the remaining pods.
+func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusList) bool {
+	// Map each operator bootstrap image to the config hash observed for
+	// that version. If pods running the same operator version report
+	// different hashes, the non-uniformity is from config propagation
+	// and will resolve on its own.
+	hashByImage := make(map[string]string, len(instancesStatus.Items))
+	for i := range instancesStatus.Items {
+		pod := instancesStatus.Items[i].Pod
+		if pod == nil {
+			continue
+		}
+		opImage, err := specs.GetBootstrapControllerImageName(*pod)
+		if err != nil {
+			continue
+		}
+		configHash := instancesStatus.Items[i].LoadedConfigurationHash
+		if configHash == "" {
+			continue
+		}
+		if existing, ok := hashByImage[opImage]; ok {
+			if existing != configHash {
+				// Same operator version, different configs: still propagating
+				return false
+			}
+		} else {
+			hashByImage[opImage] = configHash
+		}
+	}
+
+	// Deadlock only when multiple operator versions are present,
+	// each with internally uniform but mutually different hashes.
+	// Note: this function is only called when IsUniform() returned false,
+	// which guarantees that different hashes exist globally. If each
+	// operator-image group is internally uniform and there are 2+ groups,
+	// the hash difference must come from between groups.
+	return len(hashByImage) > 1
+}
+
 // isPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
 // with its expected state defined inside the cluster struct.
 //
