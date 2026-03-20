@@ -67,7 +67,8 @@ imported-capabilities:
       - reference-id: CCC.Core.CP12
         remarks: |
           Recovery: PostgreSQL Point In Time Recovery (PITR) support through
-          CNPG-I plugins and volume snapshots.
+          CNPG-I plugins (including WAL archive restoration from object
+          stores) and volume snapshots.
       - reference-id: CCC.Core.CP14
         remarks: |
           API Access: the primary API is the Kubernetes API via CRDs (Cluster,
@@ -133,7 +134,8 @@ imported-capabilities:
           operational commands including cluster status, promotion, restart,
           fencing, maintenance mode, backup requests, hibernation,
           certificate generation, psql sessions, logical replication
-          management, diagnostic reports, and performance benchmarking.
+          management, diagnostic reports, and performance benchmarking
+          tools (pgbench job creation).
       - reference-id: CCC.Core.CP29
         remarks: |
           Active Ingestion: both at the operator level via CNPG-I
@@ -158,17 +160,17 @@ imported-threats:
           restricting database-level CONNECT privileges as needed.
       - reference-id: CCC.Core.TH02
         remarks: |
-          Data is Intercepted in Transit: ssl is forced on as a fixed
+          Data is Intercepted in Transit: TLS is forced on as a fixed
           parameter, but ssl_min_protocol_version and ssl_max_protocol_version
           are user-overridable defaults (not fixed), so a single Cluster spec
           change can downgrade TLS to 1.0 with no webhook rejection. The
           catch-all pg_hba rule uses `host` (not `hostssl`), meaning non-TLS
-          connections are accepted if the client does not negotiate SSL.
+          connections are accepted if the client does not negotiate TLS.
           Streaming replication and PgBouncer connections use fixed `hostssl`
           rules requiring certificates. Local Unix socket connections are
           unencrypted by nature. Users are responsible for not weakening TLS
           version settings and for deploying NetworkPolicies to restrict
-          network access.
+          network access and/or monitor traffic.
       - reference-id: CCC.Core.TH03
         remarks: |
           Deployment Region Network is Untrusted: the TLS posture described
@@ -185,7 +187,8 @@ imported-threats:
           PostgreSQL sources via ExternalCluster definitions. Logical
           replication (publications and subscriptions) can replicate data
           to arbitrary PostgreSQL endpoints. WAL archiving sends data to
-          object stores configured via CNPG-I plugins. Users are responsible
+          object stores configured via CNPG-I plugins or the built-in
+          barman-cloud integration (.spec.backup). Users are responsible
           for verifying that replication targets, object store destinations,
           and external cluster endpoints are trusted and properly secured.
       - reference-id: CCC.Core.TH05
@@ -195,10 +198,10 @@ imported-threats:
           pg_hba rules) and encrypted with TLS (defaulting to 1.3, but the
           TLS version can be overridden by users). The WAL archive command
           is a fixed operator-controlled parameter that cannot be overridden
-          by users. WAL archiving is handled via CNPG-I plugins (the in-tree
-          Barman Cloud code is
-          deprecated and will be removed in a future version), which manage
-          TLS and credentials stored in Kubernetes secrets. Plugins may
+          by users. WAL archiving is handled via CNPG-I plugins (the
+          in-tree Barman Cloud code is deprecated and will be removed in
+          a future version), which manage TLS and credentials stored
+          in Kubernetes secrets. Plugins may
           implement different backup and archiving strategies. The operator
           detects replication lag and failures via continuous monitoring and
           pod readiness probes, triggering automatic failover when the primary
@@ -212,9 +215,9 @@ imported-threats:
           protections. Continuous WAL archiving (archive_timeout defaults to
           5min but can be overridden) enables PITR. Volume snapshots offer
           faster RTO for large databases. Synchronous replication (quorum or
-          priority-based) achieves RPO=0 when enabled. Failover quorum applies
-          Dynamo-style consistency checks (R+W>N) to prevent promotion unless
-          all committed data is preserved. The operator uses two-phase failover
+          priority-based) achieves RPO=0 when enabled. Failover quorum
+          prevents promotion unless it is guaranteed that the promoted
+          instance has all committed data. The operator uses two-phase failover
           with fencing to prevent split-brain, and pg_rewind to realign
           demoted primaries with the new timeline (pg_rewind can fail, in
           which case a full re-clone is needed; pg_rewind requires
@@ -222,8 +225,8 @@ imported-threats:
           by users, breaking this recovery path). A primary Pod Disruption
           Budget is always created; a replica PDB is only created for clusters
           with 3+ instances. Full-page writes are enabled by default but can
-          be overridden by users. The instance
-          manager checks for sufficient WAL disk space before starting
+          be overridden by users. The instance manager checks for
+          sufficient WAL disk space before starting
           PostgreSQL and after it exits; if less than 1 WAL segment of free
           space is available, it refuses to start and exits with a dedicated
           exit code so the operator avoids restarting the instance. Users are
@@ -344,10 +347,10 @@ imported-threats:
           monitoring queries can be added via ConfigMaps and Secrets; these
           execute on a connection authenticated as the postgres superuser, so
           ConfigMap/Secret RBAC in the cluster namespace is a critical
-          security boundary. PostgreSQL logging is always active via the
-          logpipe streaming to
-          stdout in JSON format. Users can configure log verbosity via
-          PostgreSQL parameters (log_statement, log_duration) and PGAudit
+          security boundary. PostgreSQL logging is always active via
+          the logpipe streaming to stdout in JSON format. Users can
+          configure log verbosity via PostgreSQL parameters
+          (log_statement, log_duration) and PGAudit
           settings. Disruption of metrics or logging would require pod-level
           or network-level interference, which should be mitigated through
           Kubernetes RBAC and NetworkPolicies.
@@ -360,12 +363,12 @@ imported-threats:
           authentication for replication and PgBouncer, and a configurable
           default authentication method (scram-sha-256 for PostgreSQL 14+,
           md5 for older versions). The catch-all pg_hba rule requires password
-          authentication (trust
-          mode is not the default), but users can add custom pg_hba rules
-          before the catch-all, including trust-based rules, with no webhook
-          validation preventing it. Users are responsible for providing
-          appropriate custom pg_hba rules, avoiding trust-based
-          authentication, managing PostgreSQL role permissions, and monitoring
+          authentication (trust mode is not the default), but users can
+          add custom pg_hba rules before the catch-all, including
+          trust-based rules, with no webhook validation preventing it.
+          Users are responsible for providing appropriate custom pg_hba
+          rules, avoiding trust-based authentication, managing PostgreSQL
+          role permissions, and monitoring
           failed connection attempts in PostgreSQL logs.
       - reference-id: CCC.Core.TH18
         remarks: |
@@ -393,8 +396,8 @@ capabilities:
       The operator provides automated failover when the primary becomes
       unhealthy, using a two-phase procedure with fencing to prevent
       split-brain. Planned switchovers allow graceful primary transitions
-      with minimal downtime. Failover quorum provides Dynamo-style
-      consistency checks (R+W>N) to prevent data loss during promotion.
+      with minimal downtime. Failover quorum prevents promotion unless
+      it is guaranteed that the promoted instance has all committed data.
 
   - id: CNPG.CP02
     title: Admission Webhooks
@@ -457,8 +460,8 @@ capabilities:
     title: Scheduled Backups
     description: |
       The ScheduledBackup CRD provides cron-based backup scheduling,
-      supporting both object store backups via CNPG-I plugins and
-      volume snapshot backups.
+      supporting object store backups via CNPG-I plugins or the
+      built-in barman-cloud integration, and volume snapshot backups.
 
 threats:
   - id: CNPG.TH01
