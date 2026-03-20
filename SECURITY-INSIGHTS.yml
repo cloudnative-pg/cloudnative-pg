@@ -219,4 +219,9 @@ repository:
 
     assessments:
       self:
-        comment: Self assessment has not yet been completed.
+        evidence-url:
+          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-assessment.yaml
+        comment: >-
+          Gemara-compatible threat self-assessment covering capabilities
+          and threats mapped to FINOS Common Cloud Controls (CCC) Core
+          v2025.10.
