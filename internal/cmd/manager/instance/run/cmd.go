@@ -68,10 +68,6 @@ import (
 var (
 	scheme = runtime.NewScheme()
 
-	// errNoFreeWALSpace is returned when there isn't enough disk space
-	// available to store at least two WAL files.
-	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
-
 	// errWALArchivePluginNotAvailable is returned when the configured
 	// WAL archiving plugin is not available or cannot be found.
 	errWALArchivePluginNotAvailable = fmt.Errorf("WAL archive plugin not available")
@@ -127,7 +123,7 @@ func NewCmd() *cobra.Command {
 				return runSubCommand(ctx, instance, pprofHTTPServer, skipNameValidation)
 			})
 
-			if errors.Is(err, errNoFreeWALSpace) {
+			if errors.Is(err, postgres.ErrNoFreeWALSpace) {
 				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
 			}
 			if errors.Is(err, errWALArchivePluginNotAvailable) {
@@ -179,15 +175,6 @@ func runSubCommand(
 		"version", versions.Version,
 		"build", versions.Info,
 		"skipNameValidation", skipNameValidation)
-
-	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
-	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
-	} else if !hasDiskSpaceForWals {
-		contextLogger.Info("Detected low-disk space condition, avoid starting the instance")
-		return errNoFreeWALSpace
-	}
 
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -409,16 +396,24 @@ func runSubCommand(
 	contextLogger.Info("starting controller-runtime manager")
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		contextLogger.Error(err, "unable to run controller-runtime manager")
+		if errors.Is(err, postgres.ErrNoFreeWALSpace) {
+			return makeUnretryableError(postgres.ErrNoFreeWALSpace)
+		}
+		if hasSpace, checkErr := instance.CheckHasDiskSpaceForWAL(ctx); checkErr == nil && !hasSpace {
+			contextLogger.Warning("Detected low WAL disk space, but the manager error is not WAL-space related",
+				"originalError", err)
+			return makeUnretryableError(fmt.Errorf("%w: %w", postgres.ErrNoFreeWALSpace, err))
+		}
 		return makeUnretryableError(err)
 	}
 
 	contextLogger.Info("Checking for free disk space for WALs after PostgreSQL finished")
-	hasDiskSpaceForWals, err = instance.CheckHasDiskSpaceForWAL(ctx)
+	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
 		contextLogger.Info("Detected low-disk space condition")
-		return makeUnretryableError(errNoFreeWALSpace)
+		return makeUnretryableError(postgres.ErrNoFreeWALSpace)
 	}
 
 	if instance.Cluster != nil {
