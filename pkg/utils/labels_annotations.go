@@ -236,6 +236,11 @@ const (
 	// UpdateStrategyAnnotation is the name of the annotation used to indicate how to update the given resource
 	UpdateStrategyAnnotation = MetadataNamespace + "/updateStrategy"
 
+	// LastAppliedSpecAnnotationName is the name of the annotation containing
+	// the last applied spec, used for three-way merge during reconciliation
+	// to detect intentional field removals
+	LastAppliedSpecAnnotationName = MetadataNamespace + "/lastAppliedSpec"
+
 	// PluginClientSecretAnnotationName is the name of the annotation containing
 	// the secret containing the TLS credentials that the operator should use to
 	// connect to the plugin
