@@ -84,6 +84,13 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return nil
 		}
 
+		if hasDiskSpace, err := i.instance.CheckHasDiskSpaceForWAL(postgresContext); err != nil {
+			contextLogger.Error(err, "Error checking WAL disk space, skipping")
+		} else if !hasDiskSpace {
+			contextLogger.Info("Not enough WAL disk space, avoid starting PostgreSQL")
+			return postgres.ErrNoFreeWALSpace
+		}
+
 		i.instance.LogPgControldata(postgresContext, "postmaster start up")
 		defer i.instance.LogPgControldata(postgresContext, "postmaster has exited")
 
