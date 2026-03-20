@@ -1,0 +1,593 @@
+title: CloudNativePG Operator Project Self-Assessment
+metadata:
+  id: CNPG.OPERATOR
+  type: ThreatCatalog
+  gemara-version: "0.20.0"
+  description: Threat catalog for CloudNativePG Operator security assessment
+  version: v2026.03-1
+  author:
+    id: cnpg-maintainers
+    name: CloudNativePG Maintainers
+    type: Human
+  mapping-references:
+    - id: CCC
+      title: Common Cloud Controls Core
+      version: v2025.10
+      url: https://github.com/finos/common-cloud-controls/releases/download/v2025.10/CCC.Core_v2025.10.yaml
+      description: |
+        Foundational repository of reusable security controls, capabilities,
+        and threat models maintained by FINOS.
+
+imported-capabilities:
+  - reference-id: CCC
+    entries:
+      - reference-id: CCC.Core.CP01
+        remarks: Encryption in Transit Enabled by Default
+      - reference-id: CCC.Core.CP02
+        remarks: |
+          Encryption at Rest: the operator does not manage encryption at
+          rest directly. It is delegated entirely to the underlying storage
+          provider for PGDATA, WAL, and tablespace volumes, and to the
+          object store provider for backups and WAL archives.
+      - reference-id: CCC.Core.CP03
+        remarks: |
+          Access Log Publication: PGAudit integration is supported when
+          the pgaudit extension is configured. Audit logs are emitted as
+          a separate JSON channel on stdout, distinct from regular
+          PostgreSQL logs.
+      - reference-id: CCC.Core.CP06
+        remarks: |
+          Access Control: database-level access is controlled via pg_hba.conf
+          with fixed rules for replication and PgBouncer, and user-defined
+          rules for application access. Kubernetes RBAC governs access to
+          CRDs, secrets, and pod operations. The operator creates per-cluster
+          service accounts with namespace-scoped RBAC roles for instance
+          managers.
+      - reference-id: CCC.Core.CP07
+        remarks: |
+          Event Publication: the operator emits Kubernetes events for
+          failovers, switchovers, promotions, backup completions, and
+          other lifecycle state changes.
+      - reference-id: CCC.Core.CP08
+        remarks: |
+          Data Replication: PostgreSQL native streaming replication,
+          including synchronous (quorum and priority).
+      - reference-id: CCC.Core.CP09
+        remarks: Metrics publication via native Prometheus exporter
+      - reference-id: CCC.Core.CP10
+        remarks: |
+          Log Publication: Database log publication via stdout in JSON format.
+          No log is stored on volumes. Each component logs on a different channel
+          (e.g. audit logs are on a different channel).
+      - reference-id: CCC.Core.CP11
+        remarks: |
+          Backup: PostgreSQL continuous online backup support through
+          CNPG-I plugins. Support for native volume snapshots, both
+          online and offline.
+      - reference-id: CCC.Core.CP12
+        remarks: |
+          Recovery: PostgreSQL Point In Time Recovery (PITR) support through
+          CNPG-I plugins (including WAL archive restoration from object
+          stores) and volume snapshots.
+      - reference-id: CCC.Core.CP14
+        remarks: |
+          API Access: the primary API is the Kubernetes API via CRDs (Cluster,
+          Backup, Pooler, Database, Publication, Subscription, etc.). The
+          CNPG-I plugin interface provides an extension API for backup,
+          WAL archiving, and other pluggable operations.
+      - reference-id: CCC.Core.CP18
+        remarks: |
+          Resource Versioning: the operator supports PostgreSQL major
+          version upgrades via pg_upgrade Jobs, and ImageCatalog /
+          ClusterImageCatalog CRDs to control which PostgreSQL images
+          are allowed. Minor version upgrades are performed via rolling
+          updates.
+      - reference-id: CCC.Core.CP19
+        remarks: |
+          Resource Scaling: the operator supports horizontal scaling by
+          changing the instance count in the Cluster spec, and vertical
+          scaling by modifying CPU/memory resource requests and limits.
+          Scaling is on-demand only, with no built-in auto-scaling.
+      - reference-id: CCC.Core.CP20
+        remarks: |
+          Resource Tagging: the operator manages Kubernetes labels and
+          annotations on pods, services, PVCs, and other resources to
+          identify cluster membership, instance roles (primary/replica),
+          and operational state. Users can add custom labels and
+          annotations via the Cluster spec.
+      - reference-id: CCC.Core.CP21
+        remarks: |
+          Resource Replication: the operator supports replica clusters
+          that replicate from external PostgreSQL sources or from other
+          CloudNativePG clusters via streaming replication or WAL
+          shipping, enabling cross-cluster and cross-region topologies.
+          Distributed topology support allows promoting replica clusters
+          to primary.
+      - reference-id: CCC.Core.CP22
+        remarks: |
+          Location Lock-In: Postgres workloads can be assigned on specific
+          locations, such as nodes or availability zones, via taints/tolerations,
+          node selectors and topology constraints
+      - reference-id: CCC.Core.CP23
+        remarks: |
+          Network Access Rules: the operator creates ClusterIP services for
+          read-write (primary only), read-only (replicas only), and read
+          (all ready instances). The any-service (including non-ready) is
+          not created by default. All default services including read-write
+          can be disabled, and users can define additional custom services
+          using managed service templates. Database-level access is
+          controlled via pg_hba.conf with fixed rules enforcing certificate
+          authentication for streaming replication and PgBouncer connections.
+          Users can add custom pg_hba rules, including pod selector references.
+          The operator does not create NetworkPolicies.
+      - reference-id: CCC.Core.CP26
+        remarks: |
+          Persistent Storage: the operator manages PVCs for PGDATA, an optional
+          separate WAL volume, and per-tablespace volumes. Storage class
+          selection and full PVC template customization are supported. Online
+          volume expansion is enabled by default. Encryption at rest is
+          delegated entirely to the underlying storage provider.
+      - reference-id: CCC.Core.CP28
+        remarks: |
+          Command Line Interface: the `cnpg` kubectl plugin provides
+          operational commands including cluster status, promotion, restart,
+          fencing, maintenance mode, backup requests, hibernation,
+          certificate generation, psql sessions, logical replication
+          management, diagnostic reports, and performance benchmarking
+          tools (pgbench job creation).
+      - reference-id: CCC.Core.CP29
+        remarks: |
+          Active Ingestion: the instance manager in every pod receives
+          instructions from the operator via Cluster status fields
+          (target primary, phase, secret/configmap versions, topology),
+          annotations (fencing), HTTP endpoints (backup mode, online
+          upgrades), and promotion tokens. At the operator level,
+          CNPG-I plugins provide data ingestion capabilities. At the
+          database level, logical replication subscriptions enable
+          data ingestion from external sources.
+
+imported-threats:
+  - reference-id: CCC
+    entries:
+      - reference-id: CCC.Core.TH01
+        remarks: |
+          Access is Granted to Unauthorized Users: by default, CloudNativePG
+          disables password-based authentication for the `postgres` superuser by
+          setting its password to NULL. The superuser remains accessible via local
+          Unix socket (peer authentication) and could be reached over the network
+          if custom pg_hba rules with certificate or trust authentication are
+          added. The operator automatically creates a database owner user for the
+          application database. Additional users can be created. Their credentials
+          are stored in Kubernetes secrets and their access must be protected by
+          the end user. CloudNativePG also supports mTLS authentication via
+          certificates, which must be protected by the end user. Users are
+          responsible for managing pg_hba rules, protecting credentials, and
+          restricting database-level CONNECT privileges as needed.
+      - reference-id: CCC.Core.TH02
+        remarks: |
+          Data is Intercepted in Transit: TLS is forced on as a fixed
+          parameter, but ssl_min_protocol_version and ssl_max_protocol_version
+          are user-overridable defaults (not fixed), so a single Cluster spec
+          change can downgrade TLS to 1.0 with no webhook rejection. The
+          catch-all pg_hba rule uses `host` (not `hostssl`), meaning non-TLS
+          connections are accepted if the client does not negotiate TLS.
+          Streaming replication and PgBouncer connections use fixed `hostssl`
+          rules requiring certificates. Local Unix socket connections are
+          unencrypted by nature. Users are responsible for not weakening TLS
+          version settings and for deploying NetworkPolicies to restrict
+          network access and/or monitor traffic.
+      - reference-id: CCC.Core.TH03
+        remarks: |
+          Deployment Region Network is Untrusted: the TLS posture described
+          in TH02 applies equally to cross-region deployments. Cross-region
+          replica clusters use the same TLS configuration via ExternalCluster
+          definitions. The operator does not create NetworkPolicies. Network
+          segmentation at the Kubernetes layer is the user's responsibility,
+          including firewall rules and security groups for cross-region
+          deployments.
+      - reference-id: CCC.Core.TH04
+        remarks: |
+          Data is Replicated to Untrusted or External Locations: the
+          operator supports replica clusters that stream data from external
+          PostgreSQL sources via ExternalCluster definitions. Logical
+          replication (publications and subscriptions) can replicate data
+          to arbitrary PostgreSQL endpoints. WAL archiving sends data to
+          object stores configured via CNPG-I plugins or the built-in
+          barman-cloud integration (.spec.backup). Users are responsible
+          for verifying that replication targets, object store destinations,
+          and external cluster endpoints are trusted and properly secured.
+      - reference-id: CCC.Core.TH05
+        remarks: |
+          Interference with Replication Processes: streaming replication is
+          authenticated via mandatory client certificates (fixed hostssl
+          pg_hba rules) and encrypted with TLS (defaulting to 1.3, but the
+          TLS version can be overridden by users). The WAL archive command
+          is a fixed operator-controlled parameter that cannot be overridden
+          by users. WAL archiving is handled via CNPG-I plugins (the
+          in-tree Barman Cloud code is deprecated and will be removed in
+          a future version), which manage TLS and credentials stored in
+          Kubernetes secrets. Plugins may implement different backup and
+          archiving strategies. The operator detects replication lag and
+          failures via continuous monitoring and pod readiness probes,
+          triggering automatic failover when the primary
+          becomes unhealthy. Logical replication connections also use TLS.
+          Users are responsible for configuring reliable object store
+          destinations, monitoring replication lag, and regularly testing
+          recovery procedures.
+      - reference-id: CCC.Core.TH06
+        remarks: |
+          Data is Lost or Corrupted: CloudNativePG provides several
+          protections. Continuous WAL archiving (archive_timeout defaults to
+          5min but can be overridden) enables PITR. Volume snapshots offer
+          faster RTO for large databases. Synchronous replication (quorum or
+          priority-based) achieves RPO=0 when enabled. Failover quorum
+          prevents promotion unless it is guaranteed that the promoted
+          instance has all committed data. The operator uses two-phase failover
+          with fencing to prevent split-brain, and pg_rewind to realign
+          demoted primaries with the new timeline (pg_rewind can fail, in
+          which case a full re-clone is needed; pg_rewind requires
+          wal_log_hints, which is enabled by default but can be overridden
+          by users, breaking this recovery path). A primary Pod Disruption
+          Budget is always created; a replica PDB is only created for clusters
+          with 3+ instances. Full-page writes are enabled by default but can
+          be overridden by users. The instance manager checks for sufficient
+          WAL disk space before starting PostgreSQL and after it exits; if
+          less than 1 WAL segment of free space is available, it refuses
+          to start and exits with a dedicated exit code so the operator
+          avoids restarting the instance. Users are responsible for
+          enabling synchronous replication and failover quorum
+          for zero data loss, configuring WAL archiving to reliable object
+          stores, sizing WAL volumes appropriately, not weakening defaults
+          like full_page_writes and archive_timeout, and regularly testing
+          recovery.
+      - reference-id: CCC.Core.TH07
+        remarks: |
+          Logs are Tampered With or Deleted: all logs (PostgreSQL, PGAudit,
+          instance manager, operator) are streamed directly to stdout in JSON
+          format with no intermediate spool on any volume. The operator
+          suppresses password logging during credential operations (CREATE/ALTER
+          ROLE). No built-in log integrity mechanisms such as checksums or
+          signatures are provided. Users are responsible for deploying log
+          aggregation with tamper-evident storage, encrypting logs in transit
+          and at rest, and controlling access via Kubernetes RBAC on the
+          pods/log subresource.
+      - reference-id: CCC.Core.TH08
+        remarks: |
+          Runtime Metrics are Manipulated: the Prometheus metrics endpoint
+          on each instance (port 9187) has no authentication by default.
+          An attacker with network access could not directly modify the
+          metrics served, but a compromised pod or sidecar could interfere
+          with the metrics server process. The operator metrics endpoint
+          (port 8080) is similarly unauthenticated. Users are responsible
+          for deploying NetworkPolicies to restrict access to metrics ports
+          and for validating metrics integrity in their monitoring pipeline.
+      - reference-id: CCC.Core.TH09
+        remarks: |
+          Runtime Logs are Read by Unauthorized Entities: log access is
+          controlled entirely by Kubernetes RBAC on the pods/log subresource.
+          PostgreSQL logs may contain query text, usernames, database names,
+          and error messages. PGAudit logs (when enabled) include full SQL
+          statements and parameter values. No log redaction is performed by the
+          operator. Separate log channels exist for PostgreSQL, PGAudit, WAL
+          archiving, and instance management, all emitted as JSON to stdout.
+          Users are responsible for restricting pods/log RBAC permissions,
+          tuning log_statement and pgaudit settings to control what is logged,
+          and securing centralized log aggregation backends.
+      - reference-id: CCC.Core.TH10
+        remarks: |
+          State-change Events are Read by Unauthorized Entities: the operator
+          emits standard Kubernetes events for failovers, switchovers, and
+          replica promotions. These events contain pod names and role
+          transitions, revealing cluster topology. The Cluster status
+          subresource exposes the current primary, target primary, instance
+          states, and topology information. Events and status are not
+          encrypted beyond etcd-level encryption. Users are responsible for
+          restricting RBAC on events and clusters/status resources, and
+          securing any external event aggregation pipelines.
+      - reference-id: CCC.Core.TH11
+        remarks: |
+          Publications are Incorrectly Triggered: logical replication
+          publications and subscriptions are managed as declarative CRDs.
+          A user with write access to Publication or Subscription resources
+          could create replication streams that exfiltrate data to external
+          endpoints. No admission webhooks exist for Publication or
+          Subscription CRDs, so validation is limited to CRD schema and
+          controller-level reconciliation checks. Users are responsible for
+          restricting RBAC on Publication and Subscription resources to
+          authorized personnel.
+      - reference-id: CCC.Core.TH12
+        remarks: |
+          Resource Constraints are Exhausted: the instance manager checks for
+          WAL disk space before starting PostgreSQL, requiring at least 1 WAL
+          segment of free space; if insufficient, it refuses to start and
+          exits with a dedicated exit code. A separate WAL volume can be
+          configured independently from PGDATA. Pod Disruption Budgets prevent
+          simultaneous eviction beyond safe thresholds. CPU and memory
+          requests/limits are configurable via the Cluster spec. Users are
+          responsible for sizing storage volumes, configuring resource
+          requests/limits, setting appropriate max_connections, monitoring disk
+          usage and WAL generation rates, and ensuring WAL archiving keeps pace
+          with WAL production to prevent accumulation.
+      - reference-id: CCC.Core.TH13
+        remarks: |
+          Resource Tags are Manipulated: the operator uses Kubernetes labels
+          and annotations to identify instance roles (primary/replica),
+          cluster membership, and operational state. These labels drive
+          service endpoint selection and operator reconciliation logic.
+          Manipulation of labels by a user with pod write access could
+          misdirect traffic or disrupt failover decisions. Users are
+          responsible for restricting RBAC on pod label/annotation
+          modifications in cluster namespaces.
+      - reference-id: CCC.Core.TH14
+        remarks: |
+          Older Resource Versions are Used: the operator supports multiple
+          PostgreSQL major versions via ImageCatalog and ClusterImageCatalog
+          CRDs. Running outdated PostgreSQL versions with known
+          vulnerabilities is a risk. The operator does not enforce minimum
+          version policies. Users are responsible for maintaining supported
+          PostgreSQL versions and performing timely major version upgrades.
+      - reference-id: CCC.Core.TH15
+        remarks: |
+          Automated Enumeration and Reconnaissance by Non-human Entities: the
+          operator exposes a webhook server (port 9443, TLS, authenticated) and
+          a metrics endpoint (port 8080, no TLS, no authentication). Each
+          instance exposes a Prometheus metrics endpoint (port 9187, optional
+          TLS, no authentication) and a status endpoint (port 8000, TLS, no
+          authentication). Metrics reveal WAL counts, replication status, backup
+          history, database names, PostgreSQL version, and cluster topology.
+          PostgreSQL listens on port 5432 with TLS and authentication. No rate
+          limiting is implemented. Users are responsible for deploying
+          NetworkPolicies to restrict access to metrics and status ports, and
+          implementing authentication at the network or proxy layer if metrics
+          are exposed externally.
+      - reference-id: CCC.Core.TH16
+        remarks: |
+          Publications are Disabled (metrics and logging): the built-in
+          Prometheus exporter runs on every instance (port 9187) and the
+          server process cannot be disabled. It connects as the postgres
+          superuser via local Unix socket and drops to the pg_monitor role
+          via SET ROLE for custom monitoring queries; built-in instance
+          metrics use the superuser connection directly. It provides read-only
+          access and caches results for a configurable TTL (default 30s). Custom
+          monitoring queries can be added via ConfigMaps and Secrets; these
+          execute on a connection authenticated as the postgres superuser, so
+          ConfigMap/Secret RBAC in the cluster namespace is a critical
+          security boundary. PostgreSQL logging is always active via
+          the logpipe streaming to stdout in JSON format. Users can
+          configure log verbosity via PostgreSQL parameters (log_statement,
+          log_duration) and PGAudit settings. Disruption of metrics or
+          logging would require pod-level or network-level interference,
+          which should be mitigated through Kubernetes RBAC and
+          NetworkPolicies.
+      - reference-id: CCC.Core.TH17
+        remarks: |
+          Responses are Generated for Unauthorized Requests: the operator uses
+          validating and mutating admission webhooks (port 9443, TLS) to reject
+          invalid or unauthorized Cluster configurations. Database connections
+          are controlled via pg_hba.conf with fixed rules enforcing certificate
+          authentication for replication and PgBouncer, and a configurable
+          default authentication method (scram-sha-256 for PostgreSQL 14+,
+          md5 for older versions). The catch-all pg_hba rule requires password
+          authentication (trust mode is not the default), but users can
+          add custom pg_hba rules before the catch-all, including
+          trust-based rules, with no webhook validation preventing it.
+          Users are responsible for providing appropriate custom pg_hba
+          rules, avoiding trust-based authentication, managing
+          PostgreSQL role permissions, and monitoring failed connection
+          attempts in PostgreSQL logs.
+      - reference-id: CCC.Core.TH18
+        remarks: |
+          Encryption Key is Misused: the operator integrates with standard PKI
+          practices and solutions. As a result, how the keys are generated might
+          not always be under the operator control (e.g. BYO certificates or
+          cert-manager integration).
+      - reference-id: CCC.Core.TH19
+        remarks: |
+          Metrics are Read by Unauthorized Entities: the Prometheus metrics
+          endpoints on both the operator (port 8080) and instances (port
+          9187) have no authentication by default. Metrics expose operational
+          details including WAL counts, replication status, backup history,
+          database names, PostgreSQL version, and cluster topology. Optional
+          TLS can be enabled for the instance metrics endpoint but
+          authentication is not available. Users are responsible for
+          deploying NetworkPolicies to restrict access and for implementing
+          authentication at the network or proxy layer if metrics are
+          exposed beyond the cluster.
+
+capabilities:
+  - id: CNPG.CP01
+    title: Automated Failover and Switchover
+    description: |
+      The operator provides automated failover when the primary becomes
+      unhealthy, using a two-phase procedure with fencing to prevent
+      split-brain. Planned switchovers allow graceful primary transitions
+      with minimal downtime. Failover quorum prevents promotion unless
+      it is guaranteed that the promoted instance has all committed data.
+
+  - id: CNPG.CP02
+    title: Admission Webhooks
+    description: |
+      Validating and mutating admission webhooks are deployed for core CRDs
+      (Cluster, Backup, Database, Pooler, ScheduledBackup) with
+      failurePolicy set to Fail. Webhooks cover create and update
+      operations only (not delete). Publication, Subscription,
+      ImageCatalog, and ClusterImageCatalog CRDs do not have admission
+      webhooks. Webhooks enforce configuration validity and set defaults.
+
+  - id: CNPG.CP03
+    title: Connection Pooling
+    description: |
+      The Pooler CRD manages PgBouncer-based connection pooling deployments,
+      including Deployments, Services, and RBAC resources. PgBouncer
+      authenticates to PostgreSQL via client certificates.
+
+  - id: CNPG.CP04
+    title: Declarative Database Objects
+    description: |
+      The operator manages declarative databases, publications, and
+      subscriptions as dedicated CRDs, and managed roles within the
+      Cluster spec. These are reconciled continuously to match the
+      desired state.
+
+  - id: CNPG.CP05
+    title: Pod Security Hardening
+    description: |
+      PostgreSQL pods run as non-root with a read-only root filesystem,
+      all Linux capabilities dropped, privilege escalation disabled, and
+      seccomp profiles applied. These are defaults that can be weakened
+      via the Cluster spec SecurityContext field. The operator creates
+      per-cluster service accounts with namespace-scoped RBAC roles.
+
+  - id: CNPG.CP06
+    title: Hibernation and Fencing
+    description: |
+      Clusters can be hibernated to suspend all instances while preserving
+      PVCs, and resumed later. Individual instances can be fenced to
+      isolate them from the cluster without deletion.
+
+  - id: CNPG.CP07
+    title: Health Probes
+    description: |
+      The instance manager configures startup, readiness, and liveness
+      probes for PostgreSQL pods via the status port (8000, TLS). These
+      probes drive Kubernetes service endpoint updates and detect
+      instance failures.
+
+  - id: CNPG.CP08
+    title: Rolling Updates
+    description: |
+      The operator performs rolling updates of PostgreSQL instances when
+      the pod spec changes (image upgrades, configuration changes
+      requiring restart), updating replicas first and the primary last
+      via a switchover to minimize downtime.
+
+  - id: CNPG.CP09
+    title: Scheduled Backups
+    description: |
+      The ScheduledBackup CRD provides cron-based backup scheduling,
+      supporting object store backups via CNPG-I plugins or the
+      built-in barman-cloud integration, and volume snapshot backups.
+
+threats:
+  - id: CNPG.TH01
+    title: Supply Chain Compromise of Container Images
+    description: |
+      Tampered or vulnerable container images for PostgreSQL or the operator
+      could introduce malicious code or known vulnerabilities. CloudNativePG
+      publishes container images with cosign signatures using keyless OIDC
+      authentication, generates SBOM attestations in SPDX format, and achieves
+      SLSA Build Level 3 provenance for both binaries and container images.
+      ImageCatalog and ClusterImageCatalog CRDs restrict which PostgreSQL
+      images are allowed, but the operator does not verify cosign signatures
+      at deploy time. Users must integrate image verification into their
+      admission pipeline (e.g., via Kyverno or Sigstore policy-controller).
+    capabilities:
+      - reference-id: CNPG.OPERATOR
+        entries:
+          - reference-id: CNPG.CP05
+      - reference-id: CCC
+        entries:
+          - reference-id: CCC.Core.CP18
+
+  - id: CNPG.TH02
+    title: Kubernetes Secret Exposure
+    description: |
+      Database credentials, replication certificates, cloud provider
+      credentials for object store access (AWS keys, Azure storage
+      keys, GCP application credentials), and other sensitive material
+      are stored in Kubernetes Secrets, which are base64-encoded but
+      not encrypted at the application level. Compromise of etcd, RBAC
+      misconfiguration, or excessive permissions on secrets in the cluster
+      namespace could expose all credentials simultaneously. The operator does
+      not provide built-in credential rotation. Users are responsible for
+      enabling etcd encryption at rest, restricting RBAC on secrets, using
+      external secret managers if needed, and implementing credential rotation
+      procedures.
+    capabilities:
+      - reference-id: CNPG.OPERATOR
+        entries:
+          - reference-id: CNPG.CP01
+          - reference-id: CNPG.CP03
+          - reference-id: CNPG.CP04
+      - reference-id: CCC
+        entries:
+          - reference-id: CCC.Core.CP06
+
+  - id: CNPG.TH03
+    title: Internal Certificate Lifecycle Weaknesses
+    description: |
+      The operator manages an internal PKI with operator-level and per-cluster
+      CA certificates. Both CA and leaf certificates default to 90-day validity,
+      with renewal triggered 7 days before expiry. Operator-level certificates
+      are checked on a periodic 1-hour schedule; per-cluster certificates are
+      checked during the normal event-driven reconciliation loop. No CRL or
+      OCSP is supported, so there is no mechanism to revoke compromised
+      certificates before their natural expiry. The ssl_crl_file PostgreSQL
+      parameter is fixed by the operator (preventing user configuration) but
+      no CRL file is managed, leaving no path to certificate revocation short
+      of secret deletion. Key rotation requires deleting and recreating
+      certificate secrets, triggering a temporary disruption. Users can bring
+      their own certificates or integrate with cert-manager for external CA
+      management. Certificate duration and renewal threshold are configurable
+      via operator environment variables.
+    capabilities:
+      - reference-id: CCC
+        entries:
+          - reference-id: CCC.Core.CP01
+
+  - id: CNPG.TH04
+    title: Untrusted Plugin Execution via CNPG-I
+    description: |
+      CNPG-I plugins perform privileged operations including backup, WAL
+      archiving, lifecycle hooks, reconciliation hooks, cluster mutations,
+      and PostgreSQL configuration enrichment. Remote plugins communicate
+      over gRPC with mutual TLS (minimum TLS 1.3), but local sidecar plugins
+      use unencrypted Unix domain sockets within the pod. No plugin binary
+      verification, signature checking, or sandboxing is provided. Plugins
+      declare their capabilities and the operator only invokes advertised
+      operations, but a compromised plugin can claim any capability. Users
+      are responsible for vetting plugin sources, restricting which images
+      run as sidecars, and auditing plugin behavior.
+    capabilities:
+      - reference-id: CNPG.OPERATOR
+        entries:
+          - reference-id: CNPG.CP01
+          - reference-id: CNPG.CP05
+          - reference-id: CNPG.CP09
+      - reference-id: CCC
+        entries:
+          - reference-id: CCC.Core.CP11
+          - reference-id: CCC.Core.CP12
+
+  - id: CNPG.TH05
+    title: Operator Privilege Escalation
+    description: |
+      The operator runs with a cluster-scoped ClusterRole that includes
+      permissions across all watched namespaces: pods and pods/exec
+      (create, delete, get, list, patch, watch), secrets (create, delete,
+      get, list, patch, update, watch), roles and rolebindings (create,
+      get, list, patch, update, watch), mutating and validating webhook
+      configurations (get, patch), plus management of deployments, jobs,
+      PVCs, services, serviceaccounts, PDBs, volumesnapshots, configmaps,
+      and all CNPG custom resources. Compromise of the operator pod or its
+      service account token grants control over all managed PostgreSQL
+      clusters across all namespaces, including the ability to modify
+      admission webhooks. Instance managers use per-cluster service
+      accounts with namespace-scoped RBAC roles, though some resources
+      (backups, databases, publications, subscriptions) are not restricted
+      by name and can be accessed across clusters in the same namespace.
+      Users are responsible for restricting network access to the operator
+      pod, monitoring service account token usage, and considering
+      namespace isolation to limit blast radius.
+    capabilities:
+      - reference-id: CNPG.OPERATOR
+        entries:
+          - reference-id: CNPG.CP01
+          - reference-id: CNPG.CP02
+          - reference-id: CNPG.CP04
+          - reference-id: CNPG.CP05
+          - reference-id: CNPG.CP08
+          - reference-id: CNPG.CP09
+      - reference-id: CCC
+        entries:
+          - reference-id: CCC.Core.CP06
