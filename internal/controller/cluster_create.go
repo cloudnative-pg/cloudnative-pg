@@ -401,6 +401,7 @@ func (r *ClusterReconciler) serviceReconciler(
 			return nil
 		}
 		contextLogger.Info("creating service")
+		servicespec.SetLastApplied(&proposed.ObjectMeta, &proposed.Spec)
 		return r.Create(ctx, proposed)
 	}
 	if err != nil {
@@ -441,9 +442,12 @@ func (r *ClusterReconciler) serviceReconciler(
 		shouldUpdate = true
 	}
 
-	// we check if the service spec has changed, preserving Kubernetes-managed fields
-	patchedSpec := proposed.Spec.DeepCopy()
-	servicespec.PreserveKubernetesDefaults(patchedSpec, &livingService.Spec)
+	// Three-way merge: start from living spec, overlay proposed changes,
+	// and use last-applied annotation to detect intentional field removals
+	patchedSpec := livingService.Spec.DeepCopy()
+	if err := servicespec.ApplyProposedChanges(patchedSpec, &proposed.Spec, livingService.Annotations); err != nil {
+		return err
+	}
 	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
 		livingService.Spec = *patchedSpec
 		shouldUpdate = true
@@ -454,6 +458,8 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		// Store the proposed spec for future three-way merges
+		servicespec.SetLastApplied(&livingService.ObjectMeta, &proposed.Spec)
 		contextLogger.Info("reconciling service")
 		return r.Update(ctx, &livingService)
 	}
