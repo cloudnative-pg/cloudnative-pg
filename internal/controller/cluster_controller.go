@@ -1088,10 +1088,10 @@ func (r *ClusterReconciler) reconcilePods(
 	// proceed with a rolling update to upgrade the instance manager
 	// to a version that reports the configuration status.
 	// If all pods report their configuration, wait until all instances
-	// report the same configuration — unless the non-uniformity is caused
+	// report the same configuration, unless the non-uniformity is caused
 	// by an operator upgrade that changed the hash algorithm. In that case
-	// configs will never converge on their own; proceeding to the rolling
-	// update (or in-place upgrade) is the only way to break the deadlock.
+	// configuration hashes will never converge on their own; proceeding
+	// to the rolling update (or in-place upgrade) is the only way forward.
 	if uniform := report.IsUniform(); uniform != nil && !*uniform {
 		if !isConfigNonUniformityFromUpgrade(instancesStatus) {
 			contextLogger.Debug(
@@ -1100,7 +1100,7 @@ func (r *ClusterReconciler) reconcilePods(
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 		contextLogger.Info(
-			"Configuration non-uniformity caused by operator upgrade, proceeding with rolling update",
+			"Configuration non-uniformity caused by operator upgrade, proceeding with upgrade",
 			"configurationReport", report)
 	}
 
