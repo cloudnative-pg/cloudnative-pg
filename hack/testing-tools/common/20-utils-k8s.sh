@@ -274,31 +274,3 @@ function deploy_operator_from_source() {
 
   echo -e "${bright}Operator deployment using ${method} initiated.${reset}"
 }
-
-# Deploy the CNPG operator from the official Helm chart repository
-# instead of building from source. This is useful for testing against
-# released versions or when source build is not required.
-function deploy_operator_from_source_with_helm() {
-  echo -e "${bright}Deploying CNPG operator from Helm chart...${reset}"
-
-  ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
-
-  # Add the CNPG Helm repository and install the operator
-  make -C "${ROOT_DIR}" helm-deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
-
-  echo -e "${bright}Operator deployment using Helm initiated.${reset}"
-}
-
-function deploy_operator_from_sources_with_manifest() {
-  echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
-
-  # Attempt to delete the namespace first (ignore errors if it doesn't exist)
-  ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
-
-  # Run the make target from the project root directory
-  make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
-
-  echo -e "${bright}Operator deployment from source initiated.${reset}"
-}
-
-

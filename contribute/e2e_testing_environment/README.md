@@ -161,7 +161,7 @@ The script can be configured through the following environment variables:
    From `0` (only critical tests) to `4` (all the tests), default `2`
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
   can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
-* `CNPG_DEPLOYMENT_METHOD`: the deployment method to choose between `sources` and `helm`; default `sources`.
+* `CNPG_DEPLOYMENT_METHOD`: the deployment method to choose between `manifest` and `helm`; default `manifest`.
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -290,8 +290,8 @@ In addition to the environment variables for the script,
 the following ones can be defined:
 
 * `CNPG_DEPLOYMENT_METHOD`: deployment method for the operator. Options are:
-  - `sources` (default): Build and deploy from current source code using `make deploy`
-  - `helm`: Deploy using the official Helm chart from `cloudnative-pg/charts` repository using `make helm-deploy`
+  - `manifest` (default): Build and deploy from current source code using `make deploy-with-manifest`
+  - `helm`: Deploy using the official Helm chart from `cloudnative-pg/charts` repository using `make deploy-with-helm`
 * `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
