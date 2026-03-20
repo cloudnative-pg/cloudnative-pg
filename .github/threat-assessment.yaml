@@ -119,8 +119,7 @@ imported-capabilities:
           controlled via pg_hba.conf with fixed rules enforcing certificate
           authentication for streaming replication and PgBouncer connections.
           Users can add custom pg_hba rules, including pod selector references.
-          The operator does not create NetworkPolicies. Network segmentation
-          is delegated to the Kubernetes network layer.
+          The operator does not create NetworkPolicies.
       - reference-id: CCC.Core.CP26
         remarks: |
           Persistent Storage: the operator manages PVCs for PGDATA, an optional
@@ -138,8 +137,14 @@ imported-capabilities:
           tools (pgbench job creation).
       - reference-id: CCC.Core.CP29
         remarks: |
-          Active Ingestion: both at the operator level via CNPG-I
-          and at the database level through logical replication subscriptions.
+          Active Ingestion: the instance manager in every pod receives
+          instructions from the operator via Cluster status fields
+          (target primary, phase, secret/configmap versions, topology),
+          annotations (fencing), HTTP endpoints (backup mode, online
+          upgrades), and promotion tokens. At the operator level,
+          CNPG-I plugins provide data ingestion capabilities. At the
+          database level, logical replication subscriptions enable
+          data ingestion from external sources.
 
 imported-threats:
   - reference-id: CCC
