@@ -205,11 +205,11 @@ imported-threats:
           is a fixed operator-controlled parameter that cannot be overridden
           by users. WAL archiving is handled via CNPG-I plugins (the
           in-tree Barman Cloud code is deprecated and will be removed in
-          a future version), which manage TLS and credentials stored
-          in Kubernetes secrets. Plugins may
-          implement different backup and archiving strategies. The operator
-          detects replication lag and failures via continuous monitoring and
-          pod readiness probes, triggering automatic failover when the primary
+          a future version), which manage TLS and credentials stored in
+          Kubernetes secrets. Plugins may implement different backup and
+          archiving strategies. The operator detects replication lag and
+          failures via continuous monitoring and pod readiness probes,
+          triggering automatic failover when the primary
           becomes unhealthy. Logical replication connections also use TLS.
           Users are responsible for configuring reliable object store
           destinations, monitoring replication lag, and regularly testing
@@ -230,12 +230,12 @@ imported-threats:
           by users, breaking this recovery path). A primary Pod Disruption
           Budget is always created; a replica PDB is only created for clusters
           with 3+ instances. Full-page writes are enabled by default but can
-          be overridden by users. The instance manager checks for
-          sufficient WAL disk space before starting
-          PostgreSQL and after it exits; if less than 1 WAL segment of free
-          space is available, it refuses to start and exits with a dedicated
-          exit code so the operator avoids restarting the instance. Users are
-          responsible for enabling synchronous replication and failover quorum
+          be overridden by users. The instance manager checks for sufficient
+          WAL disk space before starting PostgreSQL and after it exits; if
+          less than 1 WAL segment of free space is available, it refuses
+          to start and exits with a dedicated exit code so the operator
+          avoids restarting the instance. Users are responsible for
+          enabling synchronous replication and failover quorum
           for zero data loss, configuring WAL archiving to reliable object
           stores, sizing WAL volumes appropriately, not weakening defaults
           like full_page_writes and archive_timeout, and regularly testing
@@ -354,11 +354,11 @@ imported-threats:
           ConfigMap/Secret RBAC in the cluster namespace is a critical
           security boundary. PostgreSQL logging is always active via
           the logpipe streaming to stdout in JSON format. Users can
-          configure log verbosity via PostgreSQL parameters
-          (log_statement, log_duration) and PGAudit
-          settings. Disruption of metrics or logging would require pod-level
-          or network-level interference, which should be mitigated through
-          Kubernetes RBAC and NetworkPolicies.
+          configure log verbosity via PostgreSQL parameters (log_statement,
+          log_duration) and PGAudit settings. Disruption of metrics or
+          logging would require pod-level or network-level interference,
+          which should be mitigated through Kubernetes RBAC and
+          NetworkPolicies.
       - reference-id: CCC.Core.TH17
         remarks: |
           Responses are Generated for Unauthorized Requests: the operator uses
@@ -372,9 +372,9 @@ imported-threats:
           add custom pg_hba rules before the catch-all, including
           trust-based rules, with no webhook validation preventing it.
           Users are responsible for providing appropriate custom pg_hba
-          rules, avoiding trust-based authentication, managing PostgreSQL
-          role permissions, and monitoring
-          failed connection attempts in PostgreSQL logs.
+          rules, avoiding trust-based authentication, managing
+          PostgreSQL role permissions, and monitoring failed connection
+          attempts in PostgreSQL logs.
       - reference-id: CCC.Core.TH18
         remarks: |
           Encryption Key is Misused: the operator integrates with standard PKI
