@@ -134,6 +134,10 @@ var (
 
 	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
+
+	// ErrNoFreeWALSpace is returned when there isn't enough disk space
+	// available to store at least two WAL files.
+	ErrNoFreeWALSpace = errors.New("no free disk space for WALs")
 )
 
 // Instance represent a PostgreSQL instance to be executed
