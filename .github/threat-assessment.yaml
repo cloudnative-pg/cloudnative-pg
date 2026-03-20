@@ -139,7 +139,7 @@ imported-capabilities:
       - reference-id: CCC.Core.CP29
         remarks: |
           Active Ingestion: both at the operator level via CNPG-I
-          and at the database level through logical replication
+          and at the database level through logical replication subscriptions.
 
 imported-threats:
   - reference-id: CCC
