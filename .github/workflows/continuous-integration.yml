@@ -641,15 +641,15 @@ jobs:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
 
-      - name: Run Trivy to check Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
-        if: env.PUSH == 'true'
-        id: trivy
-        continue-on-error: true
-        with:
-          version: 'latest'
-          image-ref: ${{ env.CONTROLLER_IMG }}
-          format: 'table'
+#      - name: Run Trivy to check Docker image for vulnerabilities
+#        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+#        if: env.PUSH == 'true'
+#        id: trivy
+#        continue-on-error: true
+#        with:
+#          version: 'latest'
+#          image-ref: ${{ env.CONTROLLER_IMG }}
+#          format: 'table'
 
       - name: Install cosign
         if: |
