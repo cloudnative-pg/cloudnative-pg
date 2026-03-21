@@ -9,13 +9,14 @@ title: Benchmarking
 
 The CNPG kubectl plugin provides an easy way for benchmarking a PostgreSQL deployment in Kubernetes using CloudNativePG.
 
-Benchmarking is focused on two aspects:
+Benchmarking is focused on three aspects:
 
 - the **database**, by relying on [pgbench](https://www.postgresql.org/docs/current/pgbench.html)
+- the **database (OLTP)**, by relying on [sysbench](https://github.com/akopytov/sysbench)
 - the **storage**, by relying on [fio](https://fio.readthedocs.io/en/latest/fio_doc.html)
 
 :::info[IMPORTANT]
-    `pgbench` and `fio` must be run in a staging or pre-production environment.
+    `pgbench`, `sysbench`, and `fio` must be run in a staging or pre-production environment.
     Do not use these plugins in a production environment, as it might have
     catastrophic consequences on your databases and the other
     workloads/applications that run in the same shared environment.
@@ -123,6 +124,93 @@ job-name   1/1           15s        41s
 Once the job is completed the results can be gathered by executing:
 ```
 kubectl logs job/pgbench-job -n <namespace>
+```
+
+### sysbench
+
+The `kubectl` CNPG plugin command `sysbench` executes a user-defined
+[sysbench](https://github.com/akopytov/sysbench) job against an existing
+Postgres Cluster.
+
+Through the `--dry-run` flag you can generate the manifest of the job for later
+modification/execution.
+
+A common command structure with `sysbench` is the following:
+
+```shell
+kubectl cnpg sysbench \
+  -n <namespace> <cluster-name> \
+  --job-name <sysbench-job> \
+  --db-name <db-name> \
+  -- <sysbench options>
+```
+
+:::info[IMPORTANT]
+    Please refer to the [`sysbench` documentation](https://github.com/akopytov/sysbench)
+    for information about the specific options to be used in your jobs.
+:::
+
+This example creates a job that initializes the sysbench OLTP tables in the
+`app` database of a `Cluster` named `cluster-example`, with 4 tables of
+10000 rows each:
+
+```shell
+kubectl cnpg sysbench \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 prepare
+```
+
+You can see the progress of the job with:
+
+```shell
+kubectl logs jobs/<job-name>
+```
+
+The following example runs a sysbench OLTP read/write benchmark for 30 seconds
+with 4 threads:
+
+```shell
+kubectl cnpg sysbench \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 --time=30 --threads=4 --report-interval=1 run
+```
+
+After benchmarking, clean up the sysbench tables:
+
+```shell
+kubectl cnpg sysbench \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 cleanup
+```
+
+By default, the plugin uses the `perconalab/sysbench:1.1` container image.
+You can override this with the `--sysbench-image` flag:
+
+```shell
+kubectl cnpg sysbench \
+  --sysbench-image my-registry/sysbench:custom \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 run
+```
+
+By default, jobs do not expire. You can enable automatic deletion with the
+`--ttl` flag. The job will be deleted after the specified duration (in seconds).
+
+```shell
+kubectl cnpg sysbench \
+  --ttl 600 \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 --time=30 run
+```
+
+If you want to run a `sysbench` job on a specific worker node, you can use
+the `--node-selector` option:
+
+```shell
+kubectl cnpg sysbench \
+  --node-selector workload=benchmark \
+  cluster-example \
+  -- oltp_read_write --tables=4 --table-size=10000 run
 ```
 
 ### fio
