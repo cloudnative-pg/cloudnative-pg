@@ -33,15 +33,21 @@ func NewCmd() *cobra.Command {
 	run := &sysbenchRun{}
 
 	sysBenchCmd := &cobra.Command{
-		Use:     "sysbench CLUSTER [-- SYSBENCH_COMMAND_ARGS...]",
+		Use:     "sysbench <cluster-name> [-- sysbench_command_args...]",
 		Short:   "Creates a sysbench job",
-		Args:    validateCommandArgs,
+		Args:    plugin.RequiresArguments(1),
 		Long:    "Creates a sysbench job to run against the specified Postgres Cluster.",
 		GroupID: plugin.GroupIDMiscellaneous,
 		Example: jobExample,
 
-		// RunE - returns an error, Cobra will print the error message and the usage message from the original command
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.ArgsLenAtDash() > 1 {
+				return fmt.Errorf("sysbench_command_args should be passed after the -- delimiter")
+			}
 			run.clusterName = args[0]
 			run.sysbenchCommandArgs = args[1:]
 
@@ -53,7 +59,7 @@ func NewCmd() *cobra.Command {
 		&run.jobName,
 		"job-name",
 		"",
-		"Name of the job, defaulting to: CLUSTER-sysbench-xxxx",
+		"Name of the job, defaulting to: cluster-name-sysbench-xxxx",
 	)
 
 	sysBenchCmd.Flags().StringVar(
@@ -91,16 +97,4 @@ func NewCmd() *cobra.Command {
 	)
 
 	return sysBenchCmd
-}
-
-func validateCommandArgs(cmd *cobra.Command, args []string) error {
-	if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
-		return err
-	}
-
-	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("SYSBENCH_COMMAND_ARGS should be passed after the -- delimiter")
-	}
-
-	return nil
 }
