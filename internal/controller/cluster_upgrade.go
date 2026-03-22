@@ -336,6 +336,47 @@ func isInstanceNeedingRollout(
 	return rollout{}
 }
 
+// isConfigNonUniformityFromUpgrade returns true when config hash differences
+// across pods are caused by an operator upgrade (different hash algorithms)
+// rather than config propagation. It groups pods by operator version (using
+// both bootstrap image and executable hash) and checks whether each group
+// is internally uniform.
+func isConfigNonUniformityFromUpgrade(instancesStatus postgres.PostgresqlStatusList) bool {
+	type versionKey struct {
+		image          string
+		executableHash string
+	}
+	hashByVersion := make(map[versionKey]string, len(instancesStatus.Items))
+	for i := range instancesStatus.Items {
+		pod := instancesStatus.Items[i].Pod
+		if pod == nil {
+			continue
+		}
+		opImage, err := specs.GetBootstrapControllerImageName(*pod)
+		if err != nil {
+			continue
+		}
+		configHash := instancesStatus.Items[i].LoadedConfigurationHash
+		if configHash == "" {
+			continue
+		}
+		key := versionKey{
+			image:          opImage,
+			executableHash: instancesStatus.Items[i].ExecutableHash,
+		}
+		if existing, ok := hashByVersion[key]; ok {
+			if existing != configHash {
+				// Same version, different hashes: config still propagating
+				return false
+			}
+		} else {
+			hashByVersion[key] = configHash
+		}
+	}
+
+	return len(hashByVersion) > 1
+}
+
 // isPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
 // with its expected state defined inside the cluster struct.
 //
