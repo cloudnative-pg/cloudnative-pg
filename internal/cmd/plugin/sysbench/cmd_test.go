@@ -140,3 +140,33 @@ var _ = Describe("getJobName", func() {
 		Expect(cmd.getJobName()).To(HavePrefix("my-cluster-sysbench-"))
 	})
 })
+
+var _ = Describe("validateSysbenchArgs", func() {
+	It("valid args should pass validation", func() {
+		args := []string{
+			"--threads=4",
+			"--tables=10",
+			"--table-size=1000",
+		}
+		Expect(validateSysbenchArgs(args)).To(Succeed())
+	})
+	It("single blocked arg should fail validation", func() {
+		args := []string{
+			"--threads=4",
+			"--pgsql-host=localhost", // This should be blocked
+			"--table-size=1000",
+		}
+		Expect(validateSysbenchArgs(args)).To(MatchError(
+			"the following flags are managed automatically and cannot be overridden: --pgsql-host=localhost"))
+	})
+	It("multiple blocked args should fail validation", func() {
+		args := []string{
+			"--threads=4",
+			"--pgsql-host=localhost",  // This should be blocked
+			"--pgsql-password=secret", // This should also be blocked
+			"--table-size=1000",
+		}
+		Expect(validateSysbenchArgs(args)).To(MatchError(
+			"the following flags are managed automatically and cannot be overridden: --pgsql-host=localhost, --pgsql-password=secret"))
+	})
+})
