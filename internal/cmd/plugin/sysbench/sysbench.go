@@ -66,8 +66,41 @@ var jobExample = `
   kubectl-cnpg sysbench cluster-example -- oltp_read_write --tables=4 --table-size=10000 cleanup
 `
 
+var blockedSysbenchArgs = []string{
+	"--db-driver",
+	"--pgsql-host",
+	"--pgsql-port",
+	"--pgsql-db",
+	"--pgsql-user",
+	"--pgsql-password",
+}
+
+func validateSysbenchArgs(args []string) error {
+	var blockedFound []string
+
+	for _, arg := range args {
+		for _, blocked := range blockedSysbenchArgs {
+			if strings.HasPrefix(arg, blocked) {
+				blockedFound = append(blockedFound, arg)
+				break // Don't check other blocked flags for this arg
+			}
+		}
+	}
+
+	if len(blockedFound) > 0 {
+		return fmt.Errorf("the following flags are managed automatically and cannot be overridden: %s",
+			strings.Join(blockedFound, ", "))
+	}
+
+	return nil
+}
+
 // Method executes the sysbench command, creating a job with the specified parameters and printing the result.
 func (cmd *sysbenchRun) execute(ctx context.Context) error {
+	if err := validateSysbenchArgs(cmd.sysbenchCommandArgs); err != nil {
+		return err
+	}
+
 	cluster, err := cmd.getCluster(ctx)
 	if err != nil {
 		return err
