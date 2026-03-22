@@ -33,7 +33,7 @@ var _ = Describe("NewCmd", func() {
 	It("should create a cobra.Command with correct defaults", func() {
 		cmd := NewCmd()
 
-		Expect(cmd.Use).To(Equal("sysbench CLUSTER [-- SYSBENCH_COMMAND_ARGS...]"))
+		Expect(cmd.Use).To(Equal("sysbench <cluster-name> [-- sysbench_command_args...]"))
 		Expect(cmd.Short).To(Equal("Creates a sysbench job"))
 		Expect(cmd.Example).To(Equal(jobExample))
 
