@@ -17,8 +17,6 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package sysbench implements the kubectl-cnpg sysbench sub-command
-
 package sysbench
 
 import (
@@ -60,7 +58,7 @@ var jobExample = `
   kubectl-cnpg sysbench cluster-example -- oltp_read_write --tables=4 --table-size=10000 prepare
 
   # Run the benchmark with 4 threads for 30 seconds
-  kubectl-cnpg sysbench cluster-example -- oltp_read_write --tables=4 --table-size=10000 --time=30 --threads=4 --report-interval=1 run
+  kubectl-cnpg sysbench cluster-example -- oltp_read_write --tables=4 --table-size=10000 --time=30 --threads=4 run
 
   # Cleanup the sysbench tables after benchmarking
   kubectl-cnpg sysbench cluster-example -- oltp_read_write --tables=4 --table-size=10000 cleanup
@@ -134,14 +132,15 @@ func (cmd *sysbenchRun) getCluster(ctx context.Context) (*apiv1.Cluster, error) 
 }
 
 func (cmd *sysbenchRun) buildArgs() []string {
-	connArgs := []string{
+	connArgs := make([]string, 0, 6+len(cmd.sysbenchCommandArgs))
+	connArgs = append(connArgs,
 		"--db-driver=pgsql",
 		fmt.Sprintf("--pgsql-host=%s%s", cmd.clusterName, apiv1.ServiceReadWriteSuffix),
 		"--pgsql-port=5432",
 		fmt.Sprintf("--pgsql-db=%s", cmd.dbName),
 		"--pgsql-user=$(PGUSER)",         // resolved from env var
 		"--pgsql-password=$(PGPASSWORD)", // resolved from env var
-	}
+	)
 	return append(connArgs, cmd.sysbenchCommandArgs...)
 }
 
