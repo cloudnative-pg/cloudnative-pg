@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -166,7 +166,8 @@ var _ = Describe("validateSysbenchArgs", func() {
 			"--pgsql-password=secret", // This should also be blocked
 			"--table-size=1000",
 		}
-		Expect(validateSysbenchArgs(args)).To(MatchError(
-			"the following flags are managed automatically and cannot be overridden: --pgsql-host=localhost, --pgsql-password=secret"))
+		expectedErr := "the following flags are managed automatically and cannot be overridden: " +
+			"--pgsql-host=localhost, --pgsql-password=secret"
+		Expect(validateSysbenchArgs(args)).To(MatchError(expectedErr))
 	})
 })
