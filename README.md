@@ -101,6 +101,10 @@ CloudNativePG can be extended via the [CNPG-I plugin interface](https://github.c
 - [Mastodon](https://mastodon.social/@CloudNativePG)
 - [Bluesky](https://bsky.app/profile/cloudnativepg.bsky.social)
 
+## Community Meetings
+
+Everyone is welcome! No invitation is needed. More information on the [main GitHub project page](https://github.com/cloudnative-pg/#cloudnativepg-community-meetings)
+
 ## Resources
 
 - [Roadmap](ROADMAP.md)
