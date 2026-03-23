@@ -23,8 +23,13 @@ package extensions
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // ResolveFromCatalog returns a list of requested Extensions from a Catalog for a given
@@ -130,4 +135,77 @@ func ValidateWithoutCatalog(cluster *apiv1.Cluster) ([]apiv1.ExtensionConfigurat
 	}
 
 	return extensions, nil
+}
+
+// CollectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
+// same directory under the extension mount point.
+func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.LdLibraryPath)
+	}
+	result := make([]string, 0, capacity)
+
+	for _, extension := range extensionList {
+		for _, libraryPath := range extension.LdLibraryPath {
+			result = append(
+				result,
+				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
+			)
+		}
+	}
+
+	return result
+}
+
+// CollectBinPaths returns a list of paths which should be added to PATH
+// given a list of extensions.
+// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
+// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
+// same directory under the extension mount point.
+func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+	capacity := 0
+	for _, ext := range extensionList {
+		capacity += len(ext.BinPath)
+	}
+	result := make([]string, 0, capacity)
+
+	for _, extension := range extensionList {
+		for _, binPath := range extension.BinPath {
+			result = append(
+				result,
+				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
+			)
+		}
+	}
+
+	return result
+}
+
+
+// GetExtensionEnvVars returns a list of environment variables
+// derived from the given extensions' library and binary paths.
+func GetExtensionEnvVars(extList []apiv1.ExtensionConfiguration) []corev1.EnvVar {
+	var result []corev1.EnvVar
+
+	libraryPaths := CollectLibraryPaths(extList)
+	if len(libraryPaths) > 0 {
+		result = append(result, corev1.EnvVar{
+			Name:  "LD_LIBRARY_PATH",
+			Value: strings.Join(libraryPaths, ":"),
+		})
+	}
+
+	binPaths := CollectBinPaths(extList)
+	if len(binPaths) > 0 {
+		result = append(result, corev1.EnvVar{
+			Name:  "PATH",
+			Value: strings.Join(binPaths, ":"),
+		})
+	}
+
+	return result
 }
