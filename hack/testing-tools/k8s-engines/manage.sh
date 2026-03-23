@@ -118,26 +118,33 @@ case "$ACTION" in
         ;;
 
     load-from-sources)
-        LOAD_VENDOR_SCRIPT="${VENDOR_DIR}/load.sh"
-
-        if [ -f "${LOAD_VENDOR_SCRIPT}" ]; then
-            source "${LOAD_VENDOR_SCRIPT}"
-            load_operator_image_vendor_specific
+        if [[ "${OPERATOR_DEPLOY_MODE:-SOURCE}" != "SOURCE" ]]; then
+            echo "Skipping image build: OPERATOR_DEPLOY_MODE=${OPERATOR_DEPLOY_MODE}"
         else
-            build_and_load_operator_image_from_sources
+            LOAD_VENDOR_SCRIPT="${VENDOR_DIR}/load.sh"
+
+            if [ -f "${LOAD_VENDOR_SCRIPT}" ]; then
+                source "${LOAD_VENDOR_SCRIPT}"
+                load_operator_image_vendor_specific
+            else
+                build_and_load_operator_image_from_sources
+            fi
         fi
         ;;
 
     deploy-from-sources)
-        # Ensure CONTROLLER_IMG is defined
-        CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
-        if [ -z "$CONTROLLER_IMG" ]; then
-            echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
-            exit 1
-        fi
-
         source "${COMMON_DIR}/20-utils-k8s.sh"
-        deploy_operator_from_sources
+
+        if [[ "${OPERATOR_DEPLOY_MODE:-SOURCE}" != "SOURCE" ]]; then
+            deploy_operator_from_version "${OPERATOR_DEPLOY_MODE}"
+        else
+            CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
+            if [ -z "$CONTROLLER_IMG" ]; then
+                echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
+                exit 1
+            fi
+            deploy_operator_from_sources
+        fi
         ;;
 
     load-helper-images)
@@ -195,6 +202,7 @@ case "$ACTION" in
         echo "NODES:                      ${NODES:-<not explicitly set>}"
         echo "ENABLE_APISERVER_AUDIT:     ${ENABLE_APISERVER_AUDIT:-false}"
         echo "ENABLE_FLUENTD:             ${ENABLE_FLUENTD:-false}"
+        echo "OPERATOR_DEPLOY_MODE:       ${OPERATOR_DEPLOY_MODE:-SOURCE}"
 
         # --- IMAGE & BUILD ARTIFACTS ---
         echo ""

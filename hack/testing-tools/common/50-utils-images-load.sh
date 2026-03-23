@@ -101,3 +101,21 @@ function deploy_operator_from_sources() {
 
     echo -e "${bright}Operator deployment initiated.${reset}"
 }
+
+function deploy_operator_from_version() {
+    local version="${1:?version is required}"
+    local base_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases"
+    local manifest_url
+
+    if [[ "${version}" == "main" ]]; then
+        manifest_url="${base_url}/cnpg-latest.yaml"
+    else
+        manifest_url="${base_url}/cnpg-${version}.yaml"
+    fi
+
+    echo -e "${bright}Deploying operator version '${version}'${reset}"
+    ${K8S_CLI} delete ns cnpg-system 2>/dev/null || true
+    ${K8S_CLI} apply --server-side -f "${manifest_url}" # avoids last-applied-configuration annotation exceeding the 262144 byte limit on large CRDs
+
+    echo -e "${bright}Operator deployment initiated.${reset}"
+}

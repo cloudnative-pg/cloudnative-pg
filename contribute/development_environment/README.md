@@ -188,6 +188,17 @@ This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
 
+Alternatively, you can deploy a published release instead of building from
+sources by using the `-o` flag:
+
+```shell
+# Deploy the latest published operator
+./hack/setup-cluster.sh -o main create deploy
+
+# Deploy a specific release
+./hack/setup-cluster.sh -o 1.28.1 create deploy
+```
+
 *Note:* For a list of options, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go
