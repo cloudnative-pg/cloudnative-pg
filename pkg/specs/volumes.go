@@ -153,7 +153,7 @@ func createPostgresVolumes(
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	result = append(result, createExtensionVolumes(extensions)...)
+	result = append(result, CreateExtensionVolumes(extensions)...)
 
 	return result
 }
@@ -284,7 +284,7 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster, extensions []apiv1.Extens
 		}
 	}
 
-	volumeMounts = append(volumeMounts, createExtensionVolumeMounts(extensions)...)
+	volumeMounts = append(volumeMounts, CreateExtensionVolumeMounts(extensions)...)
 
 	return volumeMounts
 }
@@ -340,7 +340,9 @@ func getExtensions(cluster *apiv1.Cluster) []apiv1.ExtensionConfiguration {
 	return cluster.Status.PGDataImageInfo.Extensions
 }
 
-func createExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.Volume {
+// CreateExtensionVolumes creates the extensions' ImageVolumes that are used
+// by PostgreSQL Pods
+func CreateExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.Volume {
 	extensionVolumes := make([]corev1.Volume, 0, len(extensions))
 	for _, extension := range extensions {
 		extensionVolumes = append(extensionVolumes,
@@ -356,7 +358,9 @@ func createExtensionVolumes(extensions []apiv1.ExtensionConfiguration) []corev1.
 	return extensionVolumes
 }
 
-func createExtensionVolumeMounts(extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
+// CreateExtensionVolumeMounts creates the extensions' ImageVolumeMounts that are used
+// by PostgreSQL Pods
+func CreateExtensionVolumeMounts(extensions []apiv1.ExtensionConfiguration) []corev1.VolumeMount {
 	extensionVolumeMounts := make([]corev1.VolumeMount, 0, len(extensions))
 	for _, extension := range extensions {
 		extensionVolumeMounts = append(extensionVolumeMounts,

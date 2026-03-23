@@ -185,7 +185,6 @@ func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	return result
 }
 
-
 // GetExtensionEnvVars returns a list of environment variables
 // derived from the given extensions' library and binary paths.
 func GetExtensionEnvVars(extList []apiv1.ExtensionConfiguration) []corev1.EnvVar {
