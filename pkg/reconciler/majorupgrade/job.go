@@ -55,17 +55,24 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 }
 
 // createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version.
-// The extensions parameter specifies the new-version extensions for the main container,
+// The extension parameter specifies the new-version extensions for the main container,
 // while the init container uses old extensions from PGDataImageInfo (it runs with the old image).
 func createMajorUpgradeJobDefinition(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	newExtensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
-	// The init container runs the old image and needs old extensions
-	var oldExtensions []apiv1.ExtensionConfiguration
+	// The init container runs the old image and needs old extensions.
+	// Since we have to mount ImageVolumes for both new and old extensions, we
+	// need to rename the old extensions to avoid conflicts.
+	var renamedOldExtensions []apiv1.ExtensionConfiguration
 	if cluster.Status.PGDataImageInfo != nil {
-		oldExtensions = cluster.Status.PGDataImageInfo.Extensions
+		oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+		renamedOldExtensions = make([]apiv1.ExtensionConfiguration, len(oldExtensions))
+		for i := range oldExtensions {
+			renamedOldExtensions[i] = *oldExtensions[i].DeepCopy()
+			renamedOldExtensions[i].Name = "old-" + oldExtensions[i].Name
+		}
 	}
 
 	prepareCommand := []string{
@@ -79,9 +86,9 @@ func createMajorUpgradeJobDefinition(
 		Name:            "prepare",
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Env:             extensions.GetExtensionEnvVars(oldExtensions),
+		Env:             extensions.GetExtensionEnvVars(renamedOldExtensions),
 		Command:         prepareCommand,
-		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
+		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, renamedOldExtensions),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: specs.GetSecurityContext(cluster),
 	}
@@ -97,6 +104,14 @@ func createMajorUpgradeJobDefinition(
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))
+
+	// Mount old extension Volumes
+	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+		specs.CreateExtensionVolumes(renamedOldExtensions)...)
+	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
+		specs.CreateExtensionVolumeMounts(renamedOldExtensions)...)
+	job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env,
+		extensions.GetExtensionEnvVars(renamedOldExtensions)...)
 
 	return job
 }
