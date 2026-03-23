@@ -114,7 +114,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		AfterAll(func() {
-			if namespace == "" {
+			if CurrentSpecReport().State.Is(types.SpecStateSkipped) {
 				return
 			}
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
