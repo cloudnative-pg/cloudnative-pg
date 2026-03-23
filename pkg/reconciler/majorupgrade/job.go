@@ -27,6 +27,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 const jobMajorUpgrade = "major-upgrade"
@@ -59,7 +60,7 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 func createMajorUpgradeJobDefinition(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
-	extensions []apiv1.ExtensionConfiguration,
+	newExtensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
 	// The init container runs the old image and needs old extensions
 	var oldExtensions []apiv1.ExtensionConfiguration
@@ -78,6 +79,7 @@ func createMajorUpgradeJobDefinition(
 		Name:            "prepare",
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+		Env:             extensions.GetExtensionEnvVars(oldExtensions),
 		Command:         prepareCommand,
 		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
 		Resources:       cluster.Spec.Resources,
@@ -91,7 +93,7 @@ func createMajorUpgradeJobDefinition(
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, extensions)
+	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, newExtensions)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))

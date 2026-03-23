@@ -32,6 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 type postInitFolder string
@@ -330,13 +331,14 @@ func CreatePrimaryJob(
 	nodeSerial int,
 	role jobRole,
 	initCommand []string,
-	extensions []apiv1.ExtensionConfiguration,
+	extList []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
 	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
+	envConfig.EnvVars = append(envConfig.EnvVars, extensions.GetExtensionEnvVars(extList)...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -370,7 +372,7 @@ func CreatePrimaryJob(
 				Spec: corev1.PodSpec{
 					Hostname: jobName,
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster, extensions),
+						createBootstrapContainer(cluster, extList),
 					},
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
@@ -381,12 +383,12 @@ func CreatePrimaryJob(
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,
 							Command:         initCommand,
-							VolumeMounts:    CreatePostgresVolumeMounts(cluster, extensions),
+							VolumeMounts:    CreatePostgresVolumeMounts(cluster, extList),
 							Resources:       cluster.Spec.Resources,
 							SecurityContext: GetSecurityContext(&cluster),
 						},
 					},
-					Volumes:                   createPostgresVolumes(&cluster, instanceName, extensions),
+					Volumes:                   createPostgresVolumes(&cluster, instanceName, extList),
 					SecurityContext:           GetPodSecurityContext(&cluster),
 					Affinity:                  CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:               cluster.Spec.Affinity.Tolerations,

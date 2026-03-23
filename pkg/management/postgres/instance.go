@@ -57,6 +57,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -788,8 +789,8 @@ func (instance *Instance) buildPostgresEnv() []string {
 	}
 
 	// Collect additional library paths and binary paths
-	additionalLibraryPaths := collectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
-	additionalBinPaths := collectBinPaths(cluster.Status.PGDataImageInfo.Extensions)
+	additionalLibraryPaths := extensions.CollectLibraryPaths(cluster.Status.PGDataImageInfo.Extensions)
+	additionalBinPaths := extensions.CollectBinPaths(cluster.Status.PGDataImageInfo.Extensions)
 
 	// We add the additional library paths after the entries that are already
 	// available.
@@ -817,54 +818,6 @@ func (instance *Instance) buildPostgresEnv() []string {
 	setExtensionEnvVars(cluster.Status.PGDataImageInfo.Extensions, envMap)
 
 	return envMap.StringSlice()
-}
-
-// collectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
-// given a list of extensions.
-// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
-// trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
-// same directory under the extension mount point.
-func collectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	capacity := 0
-	for _, ext := range extensionList {
-		capacity += len(ext.LdLibraryPath)
-	}
-	result := make([]string, 0, capacity)
-
-	for _, extension := range extensionList {
-		for _, libraryPath := range extension.LdLibraryPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
-			)
-		}
-	}
-
-	return result
-}
-
-// collectBinPaths returns a list of paths which should be added to PATH
-// given a list of extensions.
-// NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
-// trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
-// same directory under the extension mount point.
-func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
-	capacity := 0
-	for _, ext := range extensionList {
-		capacity += len(ext.BinPath)
-	}
-	result := make([]string, 0, capacity)
-
-	for _, extension := range extensionList {
-		for _, binPath := range extension.BinPath {
-			result = append(
-				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
-			)
-		}
-	}
-
-	return result
 }
 
 // dedicatedExtensionEnvVars lists environment variables that are managed
