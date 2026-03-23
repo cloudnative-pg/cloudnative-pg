@@ -46,7 +46,7 @@ export MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/mi
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
 
 # Define the default deployment method for the operator image.
-export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-"sources"}
+export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-"manifest"}
 
 # Validate that required images were successfully extracted
 if [ -z "${POSTGRES_IMG}" ]; then
