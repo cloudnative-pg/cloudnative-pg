@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
@@ -62,17 +63,20 @@ func createMajorUpgradeJobDefinition(
 	nodeSerial int,
 	newExtensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
-	// The init container runs the old image and needs old extensions.
 	// Since we have to mount ImageVolumes for both new and old extensions, we
-	// need to rename the old extensions to avoid conflicts.
-	var renamedOldExtensions []apiv1.ExtensionConfiguration
+	// rename the new extensions with a prefix to avoid conflicts. This keeps
+	// old extensions at their original mount paths, so the old PGDATA's
+	// configuration (dynamic_library_path, extension_control_path) works
+	// without modification.
+	renamedNewExtensions := make([]apiv1.ExtensionConfiguration, len(newExtensions))
+	for i := range newExtensions {
+		renamedNewExtensions[i] = *newExtensions[i].DeepCopy()
+		renamedNewExtensions[i].Name = postgres.UpgradeTargetExtensionPrefix + newExtensions[i].Name
+	}
+
+	var oldExtensions []apiv1.ExtensionConfiguration
 	if cluster.Status.PGDataImageInfo != nil {
-		oldExtensions := cluster.Status.PGDataImageInfo.Extensions
-		renamedOldExtensions = make([]apiv1.ExtensionConfiguration, len(oldExtensions))
-		for i := range oldExtensions {
-			renamedOldExtensions[i] = *oldExtensions[i].DeepCopy()
-			renamedOldExtensions[i].Name = "old-" + oldExtensions[i].Name
-		}
+		oldExtensions = cluster.Status.PGDataImageInfo.Extensions
 	}
 
 	prepareCommand := []string{
@@ -86,9 +90,9 @@ func createMajorUpgradeJobDefinition(
 		Name:            "prepare",
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Env:             extensions.GetExtensionEnvVars(renamedOldExtensions),
+		Env:             extensions.GetExtensionEnvVars(oldExtensions),
 		Command:         prepareCommand,
-		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, renamedOldExtensions),
+		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: specs.GetSecurityContext(cluster),
 	}
@@ -100,18 +104,40 @@ func createMajorUpgradeJobDefinition(
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, newExtensions)
+	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, renamedNewExtensions)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))
 
 	// Mount old extension Volumes
 	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
-		specs.CreateExtensionVolumes(renamedOldExtensions)...)
+		specs.CreateExtensionVolumes(oldExtensions)...)
 	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
-		specs.CreateExtensionVolumeMounts(renamedOldExtensions)...)
-	job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env,
-		extensions.GetExtensionEnvVars(renamedOldExtensions)...)
+		specs.CreateExtensionVolumeMounts(oldExtensions)...)
+	job.Spec.Template.Spec.Containers[0].Env = mergeEnvVars(
+		job.Spec.Template.Spec.Containers[0].Env,
+		extensions.GetExtensionEnvVars(oldExtensions),
+	)
 
 	return job
+}
+
+// mergeEnvVars merges additional env vars into an existing list.
+// If an env var with the same name already exists, their values are
+// combined with ":".
+func mergeEnvVars(existing, additional []corev1.EnvVar) []corev1.EnvVar {
+	for _, add := range additional {
+		found := false
+		for i, env := range existing {
+			if env.Name == add.Name {
+				existing[i].Value = env.Value + ":" + add.Value
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, add)
+		}
+	}
+	return existing
 }
