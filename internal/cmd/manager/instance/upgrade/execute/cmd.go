@@ -51,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -399,6 +400,16 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	// https://github.com/postgres/postgres/commit/f36e5774
 	tmpCluster := cluster.DeepCopy()
 	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
+
+	// Rename extensions to match the renamed mount paths used by the upgrade job.
+	// Target-version extensions are mounted with a prefix to avoid conflicts
+	// with source-version extensions that keep their original names.
+	if tmpCluster.Status.PGDataImageInfo != nil {
+		for i := range tmpCluster.Status.PGDataImageInfo.Extensions {
+			tmpCluster.Status.PGDataImageInfo.Extensions[i].Name = postgresConfig.UpgradeTargetExtensionPrefix +
+				tmpCluster.Status.PGDataImageInfo.Extensions[i].Name
+		}
+	}
 
 	pgMajorVersion, err := postgresutils.GetMajorVersionFromPgData(destDir)
 	if err != nil {

@@ -274,6 +274,12 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
 	ExtensionsBaseDirectory = "/extensions"
+
+	// UpgradeTargetExtensionPrefix is prepended to extension names during a major
+	// upgrade so that the target-version extension volumes can coexist with the
+	// source-version ones without path conflicts. The source-version extensions
+	// keep their original names, preserving the existing PGDATA configuration.
+	UpgradeTargetExtensionPrefix = "upgrade-target-"
 )
 
 // hbaTemplate is the template used to create the HBA configuration.
