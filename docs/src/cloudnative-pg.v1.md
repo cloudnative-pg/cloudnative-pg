@@ -996,14 +996,15 @@ _Appears in:_
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
 | `ld_library_path` _string array_ | The list of directories inside the image which should be added to ld_library_path. |  |  |  |
 | `bin_path` _string array_ | A list of directories within the image to be appended to the<br />PostgreSQL process's `PATH` environment variable. |  |  |  |
-| `env` _[ExtensionEnvVar](#extensionenvvar) array_ | Custom environment variables for the extension. |  |  |  |
+| `env` _[ExtensionEnvVar](#extensionenvvar) array_ | Env is a list of custom environment variables to be set in the<br />PostgreSQL process for this extension. It is the responsibility of the<br />cluster administrator to ensure the variables are correct for the<br />specific extension. Note that changes to these variables require<br />a manual cluster restart to take effect. |  |  |  |
 
 
 #### ExtensionEnvVar
 
 
 
-ExtensionEnvVar defines an environment variable for an extension.
+ExtensionEnvVar defines an environment variable for a specific extension
+image volume.
 
 
 
@@ -1013,8 +1014,8 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | The name of the environment variable. | True |  | MinLength: 1 <br /> |
-| `value` _string_ | The value of the environment variable.<br />Supports placeholder expansion. Available placeholders:<br />- $\{image_root\} resolves to the extension's mount path. | True |  | MinLength: 1 <br /> |
+| `name` _string_ | Name of the environment variable to be injected into the<br />PostgreSQL process. | True |  | MinLength: 1 <br /> |
+| `value` _string_ | Value of the environment variable. CloudNativePG performs a direct<br />replacement of this value, with support for placeholder expansion.<br />The $\{`image_root`\} placeholder resolves to the absolute mount path<br />of the extension's volume (e.g., `/extensions/my-extension`). This<br />is particularly useful for allowing applications or libraries to<br />locate specific directories within the mounted image. | True |  | MinLength: 1 <br /> |
 
 
 #### ExtensionSpec
