@@ -542,66 +542,60 @@ need to manually restart the cluster (e.g., using `cnpg restart`) after
 modifying `bin_path`.
 :::
 
-### Including environment variables
+### Environment variables for extensions
 
-Some extensions might need to specify an environment variable to work.
-For example, to set the `FOO` environment variable:
+Certain extensions require specific environment variables to be set within the
+PostgreSQL process to function correctly. You can define these variables using
+the `env` field within the extension's configuration.
 
-```yaml
-# ...
-spec:
-  # ... <snip>
-  postgresql:
-    extensions:
-      - name: my-extension
-        # ... <snip>
-        env:
-          - name: FOO
-            value: foo_value
-        image:
-          reference: # registry path for your extension image
-      # ... <snip>
-    # ... <snip>
-  # ... <snip>
-```
-
-CloudNativePG will set `FOO: foo_value` in environment of the Postgres process.
-
-The `value` field supports placeholder expansion. Currently, the following
-placeholders are supported:
-
-* `${image_root}`: resolves to the extension's mount path.
-
-For example, to use the `${image_root}` placeholder in the `value` field:
+The following example demonstrates how to set a static variable (`FOO`) and a
+variable using a placeholder (`BAR`):
 
 ```yaml
 # ...
 spec:
   # ... <snip>
   postgresql:
+    # ... <snip>
     extensions:
       - name: my-extension
-        # ... <snip>
+        image:
+          reference: "ghcr.io/org/my-extension:latest"
         env:
           - name: FOO
-            value: "${image_root}/foo_value"
-        image:
-          reference: # registry path for your extension image
+            value: "static_value"
+          - name: BAR
+            value: "${image_root}/lib"
       # ... <snip>
-    # ... <snip>
-  # ... <snip>
+# ...
 ```
 
-This will resolve to `/extensions/my-extension/foo_value` and CloudNativePG will
-set `FOO: /extensions/my-extension/foo_value` in the environment.
+#### Dynamic Placeholder Expansion
+
+The `value` field supports placeholder expansion to allow for dynamic
+configuration based on the extension's environment.
+The following placeholders are currently supported:
+
+| Placeholder | Description |
+| :--- | :--- |
+| `${image_root}` | Resolves to the absolute mount path of the extension's volume (e.g., `/extensions/my-extension`). |
+
+The `${image_root}` placeholder is particularly useful when an application or a
+shared library within the extension image needs an environment variable to
+point to a specific subdirectory or file inside its own mounted volume.
+
+In the example above, if the extension is mounted at
+`/extensions/my-extension`, the variable `BAR` will resolve to
+`/extensions/my-extension/lib`, allowing the library to locate its
+dependencies regardless of the specific mount path chosen by the operator.
 
 :::warning
-Since `env` must be set when the PostgreSQL process starts,
-changing this value requires a **cluster restart** for the new value to take
-effect.
-CloudNativePG does not currently trigger this restart automatically; you will
-need to manually restart the cluster (e.g., using `cnpg restart`) after
-modifying `env`.
+**Manual Restart Required**: Because environment variables are injected when
+the PostgreSQL process starts, any changes to the `env` section **require a
+cluster restart**. CloudNativePG does **not** automatically trigger a rollout
+for these changes. After updating the `env` field in your manifest, you must
+manually restart the cluster (e.g., using `kubectl cnpg restart`) for the new
+values to take effect.
 :::
 
 ## Image Specifications
