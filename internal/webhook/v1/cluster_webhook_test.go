@@ -5859,6 +5859,76 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
 	})
 
+	It("returns an error for forbidden env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "PATH",
+									Value: "/my/binary/path",
+								},
+								{
+									Name:  "LD_LIBRARY_PATH",
+									Value: "/my/library/path",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[0].name"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[1].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
+	It("returns an error for duplicate env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "FOO",
+									Value: "foo",
+								},
+								{
+									Name:  "FOO",
+									Value: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("FOO"))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
 	It("returns an error when extension names collide after underscore sanitization", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

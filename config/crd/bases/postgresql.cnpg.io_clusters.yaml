@@ -4457,6 +4457,28 @@ spec:
                           items:
                             type: string
                           type: array
+                        env:
+                          description: Custom environment variables for the extension.
+                          items:
+                            description: ExtensionEnvVar defines an environment variable
+                              for an extension.
+                            properties:
+                              name:
+                                description: The name of the environment variable.
+                                minLength: 1
+                                type: string
+                              value:
+                                description: |-
+                                  The value of the environment variable.
+                                  Supports placeholder expansion. Available placeholders:
+                                  - ${image_root} resolves to the extension's mount path.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
+                          type: array
                         extension_control_path:
                           description: |-
                             The list of directories inside the image which should be added to extension_control_path.
@@ -7103,6 +7125,28 @@ spec:
                             If not defined, defaults to "/lib".
                           items:
                             type: string
+                          type: array
+                        env:
+                          description: Custom environment variables for the extension.
+                          items:
+                            description: ExtensionEnvVar defines an environment variable
+                              for an extension.
+                            properties:
+                              name:
+                                description: The name of the environment variable.
+                                minLength: 1
+                                type: string
+                              value:
+                                description: |-
+                                  The value of the environment variable.
+                                  Supports placeholder expansion. Available placeholders:
+                                  - ${image_root} resolves to the extension's mount path.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
                           type: array
                         extension_control_path:
                           description: |-

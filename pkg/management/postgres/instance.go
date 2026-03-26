@@ -813,6 +813,9 @@ func (instance *Instance) buildPostgresEnv() []string {
 		envMap["PATH"] = currentPath
 	}
 
+	// Set custom environment variables from extensions.
+	setExtensionEnvVars(cluster.Status.PGDataImageInfo.Extensions, envMap)
+
 	return envMap.StringSlice()
 }
 
@@ -862,6 +865,24 @@ func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	}
 
 	return result
+}
+
+// extensionEnvPlaceholders returns the placeholder replacements for an extension.
+func extensionEnvPlaceholders(extensionName string) *strings.Replacer {
+	return strings.NewReplacer(
+		"${image_root}", filepath.Join(postgres.ExtensionsBaseDirectory, extensionName),
+	)
+}
+
+// setExtensionEnvVars sets custom environment variables given a list of extensions,
+// expanding supported placeholders in the values.
+func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
+	for _, extension := range extensionList {
+		replacer := extensionEnvPlaceholders(extension.Name)
+		for _, envVar := range extension.Env {
+			envMap[envVar.Name] = replacer.Replace(envVar.Value)
+		}
+	}
 }
 
 // WithActiveInstance execute the internal function while this

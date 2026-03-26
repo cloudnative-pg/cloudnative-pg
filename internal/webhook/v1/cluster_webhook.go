@@ -2902,6 +2902,38 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
 		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
 		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
+		result = append(result, validateExtensionEnvVars(v.Env, basePath)...)
+	}
+
+	return result
+}
+
+func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.Path) field.ErrorList {
+	var result field.ErrorList
+	envNames := stringset.New()
+	envFieldPath := basePath.Child("env")
+
+	dedicatedFields := map[string]string{
+		"PATH":            basePath.Child("bin_path").String(),
+		"LD_LIBRARY_PATH": basePath.Child("ld_library_path").String(),
+	}
+
+	for i, envVar := range envVars {
+		envPath := envFieldPath.Index(i)
+
+		// Block env vars that have dedicated fields
+		if dedicatedField, ok := dedicatedFields[envVar.Name]; ok {
+			result = append(result, field.Forbidden(
+				envPath.Child("name"),
+				fmt.Sprintf("%s must be configured via %s", envVar.Name, dedicatedField),
+			))
+		}
+
+		// Check for duplicate names
+		if envNames.Has(envVar.Name) {
+			result = append(result, field.Duplicate(envPath.Child("name"), envVar.Name))
+		}
+		envNames.Put(envVar.Name)
 	}
 
 	return result

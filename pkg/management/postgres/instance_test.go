@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -406,6 +407,60 @@ var _ = Describe("buildPostgresEnv", func() {
 			env := instance.buildPostgresEnv()
 			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
+	})
+})
+
+var _ = Describe("setExtensionEnvVars", func() {
+	var envMap envmap.EnvironmentMap
+	BeforeEach(func() {
+		envMap = envmap.EnvironmentMap{
+			"BAR_ENV": "bar_value",
+			"BAZ_ENV": "baz_value",
+		}
+	})
+
+	It("should add the extension's env variables", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "foo_value"))
+	})
+
+	It("should expand placeholders", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "${image_root}/foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
 	})
 })
 

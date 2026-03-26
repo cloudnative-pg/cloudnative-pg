@@ -1561,6 +1561,24 @@ type ExtensionConfiguration struct {
 	// PostgreSQL process's `PATH` environment variable.
 	// +optional
 	BinPath []string `json:"bin_path,omitempty"`
+
+	// Custom environment variables for the extension.
+	// +optional
+	Env []ExtensionEnvVar `json:"env,omitempty"`
+}
+
+// ExtensionEnvVar defines an environment variable for an extension.
+type ExtensionEnvVar struct {
+	// The name of the environment variable.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// The value of the environment variable.
+	// Supports placeholder expansion. Available placeholders:
+	// - ${image_root} resolves to the extension's mount path.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
