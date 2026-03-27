@@ -589,6 +589,31 @@ In the example above, if the extension is mounted at
 `/extensions/my-extension/lib`, allowing the library to locate its
 dependencies regardless of the specific mount path chosen by the operator.
 
+#### Precedence and Conflict Resolution
+
+Environment variables for the PostgreSQL process can be defined in multiple
+places. When the same variable name appears in more than one location, the
+following precedence order applies (highest priority last):
+
+1. **`spec.env` / `spec.envFrom`**: Variables defined at the cluster level are
+   injected by Kubernetes into the container environment and serve as the base.
+2. **Extension `env`**: Variables defined in the `env` field of each extension
+   override any cluster-level variable with the same name.
+3. **Extension order**: If multiple extensions define the same variable, the
+   extension listed last in the `extensions` array takes precedence.
+
+CloudNativePG emits a warning in the instance manager logs when an extension
+environment variable overwrites a value that was already set by a previous
+extension, to help diagnose potential conflicts.
+
+:::warning
+**Reserved variables**: Environment variables reserved for operator usage
+(names starting with `PG` or `CNPG_`, plus `POD_NAME`, `NAMESPACE`, and
+`CLUSTER_NAME`) and variables managed by dedicated fields (`PATH` via
+`bin_path`, `LD_LIBRARY_PATH` via `ld_library_path`) cannot be set through
+the `env` field and are silently skipped at runtime.
+:::
+
 :::warning
 **Manual Restart Required**: Because environment variables are injected when
 the PostgreSQL process starts, any changes to the `env` section **require a

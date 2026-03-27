@@ -886,6 +886,9 @@ var dedicatedExtensionEnvVars = map[string]bool{
 // As a defense-in-depth measure, env vars that are reserved for operator usage
 // or managed via dedicated fields are silently skipped.
 func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
+	// Track which extension set each variable, to detect cross-extension conflicts.
+	setBy := make(map[string]string)
+
 	for _, extension := range extensionList {
 		replacer := extensionEnvPlaceholders(extension.Name)
 		for _, envVar := range extension.Env {
@@ -894,7 +897,17 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 					"extension", extension.Name, "variable", envVar.Name)
 				continue
 			}
+
+			if prev, ok := setBy[envVar.Name]; ok {
+				log.Warning("Extension environment variable overrides value from a previous extension",
+					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
+			} else if _, exists := envMap[envVar.Name]; exists {
+				log.Warning("Extension environment variable overrides a cluster-level value",
+					"variable", envVar.Name, "extension", extension.Name)
+			}
+
 			envMap[envVar.Name] = replacer.Replace(envVar.Value)
+			setBy[envVar.Name] = extension.Name
 		}
 	}
 }
