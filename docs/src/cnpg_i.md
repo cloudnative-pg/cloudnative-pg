@@ -41,7 +41,7 @@ CNPG-I is inspired by the Kubernetes
 The operator communicates with registered plugins using **gRPC**, following the
 [CNPG-I protocol](https://github.com/cloudnative-pg/cnpg-i/blob/main/docs/protocol.md).
 
-CloudNativePG discovers plugins **at startup**. You can register them in one of two ways:
+CloudNativePG discovers plugins in one of two ways:
 
 - Sidecar container – run the plugin inside the operator’s Deployment
 - Standalone Deployment – run the plugin as a separate workload in the same
@@ -89,11 +89,6 @@ spec:
 Running a plugin as its own Deployment decouples its lifecycle from the
 operator’s and allows independent scaling. In this setup, the plugin exposes a
 TCP gRPC endpoint behind a Service, with **mTLS** for secure communication.
-
-:::warning
-    CloudNativePG does **not** discover plugins dynamically. If you deploy a new
-    plugin, you must **restart the operator** to detect it.
-:::
 
 Example Deployment:
 
