@@ -2921,6 +2921,15 @@ func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.P
 	for i, envVar := range envVars {
 		envPath := envFieldPath.Index(i)
 
+		// Block env vars that are reserved for operator usage
+		if isReservedEnvironmentVariable(envVar.Name) {
+			result = append(result, field.Invalid(
+				envPath.Child("name"),
+				envVar.Name,
+				"the usage of this environment variable is reserved for the operator",
+			))
+		}
+
 		// Block env vars that have dedicated fields
 		if dedicatedField, ok := dedicatedFields[envVar.Name]; ok {
 			result = append(result, field.Forbidden(
