@@ -1568,6 +1568,8 @@ type ExtensionConfiguration struct {
 	// specific extension. Note that changes to these variables require
 	// a manual cluster restart to take effect.
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Env []ExtensionEnvVar `json:"env,omitempty"`
 }
 
