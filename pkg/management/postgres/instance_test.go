@@ -463,6 +463,31 @@ var _ = Describe("setExtensionEnvVars", func() {
 		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
 	})
 
+	It("should unescape $${...} to literal ${...}", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "ESCAPED",
+						Value: "$${not_expanded}",
+					},
+					{
+						Name:  "MIXED",
+						Value: "${image_root}/$${literal}",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("ESCAPED", "${not_expanded}"))
+		Expect(envMap).To(HaveKeyWithValue("MIXED", "/extensions/foo/${literal}"))
+	})
+
 	It("should skip reserved environment variables", func() {
 		envMap["PATH"] = "/usr/bin"
 		envMap["LD_LIBRARY_PATH"] = "/usr/lib"

@@ -1588,6 +1588,8 @@ type ExtensionEnvVar struct {
 	// of the extension's volume (e.g., `/extensions/my-extension`). This
 	// is particularly useful for allowing applications or libraries to
 	// locate specific directories within the mounted image.
+	// Unrecognized placeholders are rejected. To include a literal ${...}
+	// in the value, escape it as $${...}.
 	//
 	// +kubebuilder:validation:MinLength=1
 	Value string `json:"value"`

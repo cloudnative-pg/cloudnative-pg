@@ -46,3 +46,37 @@ var _ = Describe("IsReservedEnvironmentVariable", func() {
 		Entry("FOO", "FOO"),
 	)
 })
+
+var _ = Describe("FindUnknownPlaceholders", func() {
+	It("returns nil for values without placeholders", func() {
+		Expect(FindUnknownPlaceholders("/some/path")).To(BeNil())
+	})
+
+	It("returns nil for known placeholders", func() {
+		Expect(FindUnknownPlaceholders("${image_root}/lib")).To(BeNil())
+	})
+
+	It("detects unknown placeholders", func() {
+		Expect(FindUnknownPlaceholders("${image_rot}/lib")).To(Equal([]string{"${image_rot}"}))
+	})
+
+	It("detects multiple unknown placeholders", func() {
+		Expect(FindUnknownPlaceholders("${foo}/${bar}")).To(Equal([]string{"${foo}", "${bar}"}))
+	})
+
+	It("reports only unknown placeholders when mixed with known ones", func() {
+		Expect(FindUnknownPlaceholders("${image_root}/${typo}")).To(Equal([]string{"${typo}"}))
+	})
+
+	It("ignores escaped placeholders", func() {
+		Expect(FindUnknownPlaceholders("$${not_a_placeholder}")).To(BeNil())
+	})
+
+	It("ignores escaped known placeholders", func() {
+		Expect(FindUnknownPlaceholders("$${image_root}")).To(BeNil())
+	})
+
+	It("detects unknown after escaped", func() {
+		Expect(FindUnknownPlaceholders("$${escaped}/${unknown}")).To(Equal([]string{"${unknown}"}))
+	})
+})

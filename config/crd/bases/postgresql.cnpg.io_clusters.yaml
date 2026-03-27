@@ -4484,6 +4484,8 @@ spec:
                                   of the extension's volume (e.g., `/extensions/my-extension`). This
                                   is particularly useful for allowing applications or libraries to
                                   locate specific directories within the mounted image.
+                                  Unrecognized placeholders are rejected. To include a literal ${...}
+                                  in the value, escape it as $${...}.
                                 minLength: 1
                                 type: string
                             required:
@@ -7168,6 +7170,8 @@ spec:
                                   of the extension's volume (e.g., `/extensions/my-extension`). This
                                   is particularly useful for allowing applications or libraries to
                                   locate specific directories within the mounted image.
+                                  Unrecognized placeholders are rejected. To include a literal ${...}
+                                  in the value, escape it as $${...}.
                                 minLength: 1
                                 type: string
                             required:

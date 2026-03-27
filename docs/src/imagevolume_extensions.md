@@ -589,6 +589,11 @@ In the example above, if the extension is mounted at
 `/extensions/my-extension/lib`, allowing the library to locate its
 dependencies regardless of the specific mount path chosen by the operator.
 
+Unrecognized placeholders (e.g., `${typo}`) are rejected at admission time.
+If you need a literal `${...}` in a value, escape it by doubling the dollar
+sign: `$${...}`. For example, a value of `$${not_expanded}` will produce the
+literal string `${not_expanded}`.
+
 #### Precedence and Conflict Resolution
 
 Environment variables for the PostgreSQL process can be defined in multiple
@@ -611,7 +616,7 @@ extension, to help diagnose potential conflicts.
 (names starting with `PG` or `CNPG_`, plus `POD_NAME`, `NAMESPACE`, and
 `CLUSTER_NAME`) and variables managed by dedicated fields (`PATH` via
 `bin_path`, `LD_LIBRARY_PATH` via `ld_library_path`) cannot be set through
-the `env` field and are silently skipped at runtime.
+the `env` field and are rejected at admission time.
 :::
 
 :::warning

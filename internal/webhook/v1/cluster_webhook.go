@@ -2913,6 +2913,15 @@ func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.P
 			))
 		}
 
+		// Check for unknown placeholders in values
+		if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+			result = append(result, field.Invalid(
+				envPath.Child("value"),
+				envVar.Value,
+				fmt.Sprintf("unsupported placeholder(s): %s; supported: ${image_root}", strings.Join(unknown, ", ")),
+			))
+		}
+
 		// Check for duplicate names
 		if envNames.Has(envVar.Name) {
 			result = append(result, field.Duplicate(envPath.Child("name"), envVar.Name))

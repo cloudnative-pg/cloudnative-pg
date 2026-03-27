@@ -868,8 +868,11 @@ func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 }
 
 // extensionEnvPlaceholders returns the placeholder replacements for an extension.
+// The $${...} escape sequence produces a literal ${...} in the output.
+// Keep placeholder names in sync with knownPlaceholders in pkg/postgres/environment.go.
 func extensionEnvPlaceholders(extensionName string) *strings.Replacer {
 	return strings.NewReplacer(
+		"$${", "${",
 		"${image_root}", filepath.Join(postgres.ExtensionsBaseDirectory, extensionName),
 	)
 }
@@ -896,6 +899,11 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 				log.Warning("Skipping reserved environment variable from extension",
 					"extension", extension.Name, "variable", envVar.Name)
 				continue
+			}
+
+			if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+				log.Warning("Extension environment variable contains unknown placeholders",
+					"extension", extension.Name, "variable", envVar.Name, "unknownPlaceholders", unknown)
 			}
 
 			if prev, ok := setBy[envVar.Name]; ok {

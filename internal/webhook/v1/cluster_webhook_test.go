@@ -5957,6 +5957,69 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
 	})
 
+	It("returns an error for unknown placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "GOOD",
+									Value: "${image_root}/lib",
+								},
+								{
+									Name:  "BAD",
+									Value: "${image_rot}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].value"))
+	})
+
+	It("accepts escaped placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "LITERAL",
+									Value: "$${not_a_placeholder}",
+								},
+								{
+									Name:  "MIXED",
+									Value: "$${escaped}/${image_root}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(BeEmpty())
+	})
+
 	It("returns an error when extension names collide after underscore sanitization", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

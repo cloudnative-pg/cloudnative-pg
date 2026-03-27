@@ -1015,7 +1015,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ | Name of the environment variable to be injected into the<br />PostgreSQL process. | True |  | MinLength: 1 <br />Pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$` <br /> |
-| `value` _string_ | Value of the environment variable. CloudNativePG performs a direct<br />replacement of this value, with support for placeholder expansion.<br />The $\{`image_root`\} placeholder resolves to the absolute mount path<br />of the extension's volume (e.g., `/extensions/my-extension`). This<br />is particularly useful for allowing applications or libraries to<br />locate specific directories within the mounted image. | True |  | MinLength: 1 <br /> |
+| `value` _string_ | Value of the environment variable. CloudNativePG performs a direct<br />replacement of this value, with support for placeholder expansion.<br />The $\{`image_root`\} placeholder resolves to the absolute mount path<br />of the extension's volume (e.g., `/extensions/my-extension`). This<br />is particularly useful for allowing applications or libraries to<br />locate specific directories within the mounted image.<br />Unrecognized placeholders are rejected. To include a literal $\{...\}<br />in the value, escape it as $$\{...\}. | True |  | MinLength: 1 <br /> |
 
 
 #### ExtensionSpec
