@@ -589,10 +589,12 @@ In the example above, if the extension is mounted at
 `/extensions/my-extension/lib`, allowing the library to locate its
 dependencies regardless of the specific mount path chosen by the operator.
 
+:::tip
 Unrecognized placeholders (e.g., `${typo}`) are rejected at admission time.
 If you need a literal `${...}` in a value, escape it by doubling the dollar
 sign: `$${...}`. For example, a value of `$${not_expanded}` will produce the
 literal string `${not_expanded}`.
+:::
 
 #### Precedence and Conflict Resolution
 
@@ -611,7 +613,7 @@ CloudNativePG emits a warning in the instance manager logs when an extension
 environment variable overwrites a value that was already set by a previous
 extension, to help diagnose potential conflicts.
 
-:::warning
+:::important
 **Reserved variables**: Environment variables reserved for operator usage
 (names starting with `PG` or `CNPG_`, plus `POD_NAME`, `NAMESPACE`, and
 `CLUSTER_NAME`) and variables managed by dedicated fields (`PATH` via
