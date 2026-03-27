@@ -88,6 +88,7 @@ spec:
                                     Name of the environment variable to be injected into the
                                     PostgreSQL process.
                                   minLength: 1
+                                  pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
                                   type: string
                                 value:
                                   description: |-

@@ -1579,6 +1579,7 @@ type ExtensionEnvVar struct {
 	// Name of the environment variable to be injected into the
 	// PostgreSQL process.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
 	Name string `json:"name"`
 
 	// Value of the environment variable. CloudNativePG performs a direct
