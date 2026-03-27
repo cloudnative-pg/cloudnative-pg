@@ -3908,16 +3908,6 @@ var _ = Describe("Environment variables validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	When("an environment variable is given", func() {
-		It("detects if it is valid", func() {
-			Expect(isReservedEnvironmentVariable("PGDATA")).To(BeTrue())
-		})
-
-		It("detects if it is not valid", func() {
-			Expect(isReservedEnvironmentVariable("LC_ALL")).To(BeFalse())
-		})
-	})
-
 	When("a ClusterSpec is given", func() {
 		It("detects if the environment variable list is correct", func() {
 			cluster := &apiv1.Cluster{

@@ -462,6 +462,40 @@ var _ = Describe("setExtensionEnvVars", func() {
 		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
 		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
 	})
+
+	It("should skip reserved environment variables", func() {
+		envMap["PATH"] = "/usr/bin"
+		envMap["LD_LIBRARY_PATH"] = "/usr/lib"
+
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PATH", Value: "/evil/path"},
+					{Name: "LD_LIBRARY_PATH", Value: "/evil/lib"},
+					{Name: "PGDATA", Value: "/evil/data"},
+					{Name: "CNPG_SECRET", Value: "stolen"},
+					{Name: "POD_NAME", Value: "fake"},
+					{Name: "NAMESPACE", Value: "fake"},
+					{Name: "CLUSTER_NAME", Value: "fake"},
+					{Name: "SAFE_VAR", Value: "allowed"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("PATH", "/usr/bin"))
+		Expect(envMap).To(HaveKeyWithValue("LD_LIBRARY_PATH", "/usr/lib"))
+		Expect(envMap).NotTo(HaveKey("PGDATA"))
+		Expect(envMap).NotTo(HaveKey("CNPG_SECRET"))
+		Expect(envMap).NotTo(HaveKey("POD_NAME"))
+		Expect(envMap).NotTo(HaveKey("NAMESPACE"))
+		Expect(envMap).NotTo(HaveKey("CLUSTER_NAME"))
+		Expect(envMap).To(HaveKeyWithValue("SAFE_VAR", "allowed"))
+	})
 })
 
 var _ = Describe("GetPrimaryConnInfo", func() {

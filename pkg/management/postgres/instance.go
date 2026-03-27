@@ -874,12 +874,26 @@ func extensionEnvPlaceholders(extensionName string) *strings.Replacer {
 	)
 }
 
+// dedicatedExtensionEnvVars lists environment variables that are managed
+// via dedicated extension fields and must not be overridden by custom env vars.
+var dedicatedExtensionEnvVars = map[string]bool{
+	"PATH":            true,
+	"LD_LIBRARY_PATH": true,
+}
+
 // setExtensionEnvVars sets custom environment variables given a list of extensions,
 // expanding supported placeholders in the values.
+// As a defense-in-depth measure, env vars that are reserved for operator usage
+// or managed via dedicated fields are silently skipped.
 func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
 	for _, extension := range extensionList {
 		replacer := extensionEnvPlaceholders(extension.Name)
 		for _, envVar := range extension.Env {
+			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedExtensionEnvVars[envVar.Name] {
+				log.Warning("Skipping reserved environment variable from extension",
+					"extension", extension.Name, "variable", envVar.Name)
+				continue
+			}
 			envMap[envVar.Name] = replacer.Replace(envVar.Value)
 		}
 	}

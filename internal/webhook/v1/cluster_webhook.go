@@ -267,7 +267,7 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	for i := range r.Spec.Env {
-		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+		if postgres.IsReservedEnvironmentVariable(r.Spec.Env[i].Name) {
 			result = append(
 				result,
 				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
@@ -278,31 +278,6 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	}
 
 	return result
-}
-
-// isReservedEnvironmentVariable detects if a certain environment variable
-// is reserved for the usage of the operator
-func isReservedEnvironmentVariable(name string) bool {
-	name = strings.ToUpper(name)
-
-	switch {
-	case strings.HasPrefix(name, "CNPG_"):
-		return true
-
-	case strings.HasPrefix(name, "PG"):
-		return true
-
-	case name == "POD_NAME":
-		return true
-
-	case name == "NAMESPACE":
-		return true
-
-	case name == "CLUSTER_NAME":
-		return true
-	}
-
-	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb
@@ -2922,7 +2897,7 @@ func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.P
 		envPath := envFieldPath.Index(i)
 
 		// Block env vars that are reserved for operator usage
-		if isReservedEnvironmentVariable(envVar.Name) {
+		if postgres.IsReservedEnvironmentVariable(envVar.Name) {
 			result = append(result, field.Invalid(
 				envPath.Child("name"),
 				envVar.Name,
