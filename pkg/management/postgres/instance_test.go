@@ -521,6 +521,36 @@ var _ = Describe("setExtensionEnvVars", func() {
 		Expect(envMap).NotTo(HaveKey("CLUSTER_NAME"))
 		Expect(envMap).To(HaveKeyWithValue("SAFE_VAR", "allowed"))
 	})
+
+	It("should let the last extension win when multiple define the same variable", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "ext1",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext1:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext1"},
+					{Name: "ONLY_EXT1", Value: "ext1_value"},
+				},
+			},
+			{
+				Name: "ext2",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext2:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext2"},
+					{Name: "ONLY_EXT2", Value: "ext2_value"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("SHARED", "from_ext2"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT1", "ext1_value"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT2", "ext2_value"))
+	})
 })
 
 var _ = Describe("GetPrimaryConnInfo", func() {
