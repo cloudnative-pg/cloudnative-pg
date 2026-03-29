@@ -20,20 +20,47 @@ SPDX-License-Identifier: Apache-2.0
 package postgres
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-// placeholderRegexp matches ${...} patterns in env var values.
-var placeholderRegexp = regexp.MustCompile(`\$\{([^}]+)\}`)
-
-// escapedPlaceholderRegexp matches $${...} escape sequences.
-var escapedPlaceholderRegexp = regexp.MustCompile(`\$\$\{[^}]+\}`)
+// envPlaceholderRegexp matches one or more dollar signs followed by {name}.
+// The number of dollar signs determines whether it is a placeholder or an
+// escape sequence: an odd count means the last $ starts a real placeholder,
+// while an even count means all dollars are escape pairs and the braces are
+// literal.
+var envPlaceholderRegexp = regexp.MustCompile(`(\$+)\{([^}]+)\}`)
 
 // knownPlaceholders is the set of supported placeholders in extension env var values.
-// Keep in sync with extensionEnvPlaceholders in pkg/management/postgres/instance.go.
 var knownPlaceholders = map[string]bool{
 	"image_root": true,
+}
+
+// ExpandEnvPlaceholders expands supported placeholders in value for the given
+// extension and unescapes $$ pairs preceding braces.
+func ExpandEnvPlaceholders(value string, extensionName string) string {
+	return envPlaceholderRegexp.ReplaceAllStringFunc(value, func(match string) string {
+		dollars := 0
+		for dollars < len(match) && match[dollars] == '$' {
+			dollars++
+		}
+		prefix := strings.Repeat("$", dollars/2)
+		if dollars%2 == 0 {
+			// Even: all dollars are escape pairs, braces are literal.
+			return prefix + match[dollars:]
+		}
+		// Odd: last $ starts a real placeholder.
+		// NOTE: cases here must match the entries in knownPlaceholders above.
+		name := match[dollars+1 : len(match)-1]
+		switch name {
+		case "image_root":
+			return prefix + filepath.Join(ExtensionsBaseDirectory, extensionName)
+		default:
+			// Unknown placeholder: leave as-is (runtime warns separately).
+			return match
+		}
+	})
 }
 
 // IsReservedEnvironmentVariable detects if a certain environment variable
@@ -64,13 +91,11 @@ func IsReservedEnvironmentVariable(name string) bool {
 // FindUnknownPlaceholders returns the list of unrecognized ${...} placeholders
 // found in the given value. Escaped placeholders ($${...}) are ignored.
 func FindUnknownPlaceholders(value string) []string {
-	// Strip escaped placeholders before scanning for unescaped ones.
-	stripped := escapedPlaceholderRegexp.ReplaceAllString(value, "")
-	matches := placeholderRegexp.FindAllStringSubmatch(stripped, -1)
 	var unknown []string
-	for _, match := range matches {
-		if !knownPlaceholders[match[1]] {
-			unknown = append(unknown, "${"+match[1]+"}")
+	for _, match := range envPlaceholderRegexp.FindAllStringSubmatch(value, -1) {
+		// Only odd dollar counts are real placeholders.
+		if len(match[1])%2 == 1 && !knownPlaceholders[match[2]] {
+			unknown = append(unknown, "${"+match[2]+"}")
 		}
 	}
 	return unknown

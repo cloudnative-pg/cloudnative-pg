@@ -867,16 +867,6 @@ func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	return result
 }
 
-// extensionEnvPlaceholders returns the placeholder replacements for an extension.
-// The $${...} escape sequence produces a literal ${...} in the output.
-// Keep placeholder names in sync with knownPlaceholders in pkg/postgres/environment.go.
-func extensionEnvPlaceholders(extensionName string) *strings.Replacer {
-	return strings.NewReplacer(
-		"$${", "${",
-		"${image_root}", filepath.Join(postgres.ExtensionsBaseDirectory, extensionName),
-	)
-}
-
 // dedicatedExtensionEnvVars lists environment variables that are managed
 // via dedicated extension fields and must not be overridden by custom env vars.
 var dedicatedExtensionEnvVars = map[string]bool{
@@ -893,7 +883,6 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 	setBy := make(map[string]string)
 
 	for _, extension := range extensionList {
-		replacer := extensionEnvPlaceholders(extension.Name)
 		for _, envVar := range extension.Env {
 			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedExtensionEnvVars[envVar.Name] {
 				log.Warning("Skipping reserved environment variable from extension",
@@ -914,7 +903,7 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 					"variable", envVar.Name, "extension", extension.Name)
 			}
 
-			envMap[envVar.Name] = replacer.Replace(envVar.Value)
+			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name)
 			setBy[envVar.Name] = extension.Name
 		}
 	}

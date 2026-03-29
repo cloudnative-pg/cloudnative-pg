@@ -79,4 +79,46 @@ var _ = Describe("FindUnknownPlaceholders", func() {
 	It("detects unknown after escaped", func() {
 		Expect(FindUnknownPlaceholders("$${escaped}/${unknown}")).To(Equal([]string{"${unknown}"}))
 	})
+
+	It("detects unknown in $$${unknown} (literal $ plus placeholder)", func() {
+		Expect(FindUnknownPlaceholders("$$${unknown}")).To(Equal([]string{"${unknown}"}))
+	})
+
+	It("ignores $$$${unknown} (fully escaped)", func() {
+		Expect(FindUnknownPlaceholders("$$$${unknown}")).To(BeNil())
+	})
+})
+
+var _ = Describe("ExpandEnvPlaceholders", func() {
+	It("expands image_root to the extension mount path", func() {
+		Expect(ExpandEnvPlaceholders("${image_root}/lib", "my-ext")).To(Equal("/extensions/my-ext/lib"))
+	})
+
+	It("unescapes $${...} to literal ${...}", func() {
+		Expect(ExpandEnvPlaceholders("$${not_expanded}", "my-ext")).To(Equal("${not_expanded}"))
+	})
+
+	It("handles mixed escaped and expanded placeholders", func() {
+		Expect(ExpandEnvPlaceholders("${image_root}/$${literal}", "my-ext")).To(Equal("/extensions/my-ext/${literal}"))
+	})
+
+	It("preserves $${image_root} as literal", func() {
+		Expect(ExpandEnvPlaceholders("$${image_root}", "my-ext")).To(Equal("${image_root}"))
+	})
+
+	It("expands $$${image_root} to literal $ plus expanded path", func() {
+		Expect(ExpandEnvPlaceholders("$$${image_root}", "my-ext")).To(Equal("$/extensions/my-ext"))
+	})
+
+	It("preserves $$$${image_root} as $${image_root}", func() {
+		Expect(ExpandEnvPlaceholders("$$$${image_root}", "my-ext")).To(Equal("$${image_root}"))
+	})
+
+	It("does not alter bare $$ without braces", func() {
+		Expect(ExpandEnvPlaceholders("plain $$text", "my-ext")).To(Equal("plain $$text"))
+	})
+
+	It("leaves unknown placeholders as-is", func() {
+		Expect(ExpandEnvPlaceholders("${unknown}", "my-ext")).To(Equal("${unknown}"))
+	})
 })
