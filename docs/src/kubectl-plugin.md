@@ -1071,9 +1071,6 @@ process (psql) connected to an existing Postgres cluster, as if you were running
 it from the actual pod. This means that you will be using the `postgres` user and connect
 to the `postgres` database.
 
-This command will start `kubectl exec`, and the `kubectl` executable must be
-reachable in your `PATH` variable to correctly work.
-
 :::info[Important]
     As you will be connecting as `postgres` user, in production environments this
     method should be used with extreme care, by authorized personnel only.
