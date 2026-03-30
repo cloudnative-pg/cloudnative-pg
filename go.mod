@@ -12,7 +12,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.5.0
-	github.com/cloudnative-pg/cnpg-i v0.3.1
+	github.com/cloudnative-pg/cnpg-i v0.4.0
 	github.com/cloudnative-pg/machinery v0.3.3
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.11
@@ -129,5 +129,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
-
-replace github.com/cloudnative-pg/cnpg-i => github.com/gabriele-wolfox/cnpg-i v0.0.0-20260318104457-fae0bbbc85b7
