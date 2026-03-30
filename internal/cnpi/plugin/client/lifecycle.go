@@ -184,6 +184,10 @@ func (data *data) invokeLifecyclePlugin(
 
 	// Handle requeue behavior - plugin is waiting for a dependency
 	if result.Behavior == lifecycle.OperatorLifecycleResponse_BEHAVIOR_REQUEUE {
+		if len(result.JsonPatch) > 0 {
+			contextLogger.Debug("Plugin requested requeue with a JSON patch, patch will be ignored",
+				"plugin", plg.Name())
+		}
 		contextLogger.Info("Plugin requested requeue",
 			"plugin", plg.Name(),
 			"requeueAfter", result.RequeueAfter)
