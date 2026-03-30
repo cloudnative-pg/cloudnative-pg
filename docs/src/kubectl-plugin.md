@@ -1107,8 +1107,8 @@ postgres=# \q
 This command will start `kubectl exec`, and the `kubectl` executable must be
 reachable in your `PATH` variable to correctly work.
 
-By default, the `postgres` database will be used. You can pass additional
-arguments to `psql` after the `--` delimiter. For example, to connect to a
+By default, the `postgres` database will be used. Any option supported by
+`psql` can be passed after the `--` delimiter. For example, to connect to a
 specific database:
 
 ```console
