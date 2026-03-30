@@ -121,8 +121,8 @@ func (c EnvConfig) IsEnvEqual(container corev1.Container) bool {
 
 // CreatePodEnvConfig returns the hash of pod env configuration
 func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
-	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
-	// function in `cluster_webhook.go` too.
+	// When adding an environment variable here, remember to change the `IsReservedEnvironmentVariable`
+	// function in `pkg/postgres/environment.go` too.
 	config := EnvConfig{
 		EnvVars: []corev1.EnvVar{
 			{

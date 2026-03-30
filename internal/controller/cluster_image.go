@@ -163,7 +163,8 @@ func extensionConfigEqual(a, b apiv1.ExtensionConfiguration) bool {
 		slices.Equal(a.ExtensionControlPath, b.ExtensionControlPath) &&
 		slices.Equal(a.DynamicLibraryPath, b.DynamicLibraryPath) &&
 		slices.Equal(a.LdLibraryPath, b.LdLibraryPath) &&
-		slices.Equal(a.BinPath, b.BinPath)
+		slices.Equal(a.BinPath, b.BinPath) &&
+		apiequality.Semantic.DeepEqual(a.Env, b.Env)
 }
 
 func (r *ClusterReconciler) getRequestedImageInfo(
