@@ -1034,11 +1034,12 @@ the configuration settings.
 
 The `kubectl cnpg psql CLUSTER` command starts a new PostgreSQL interactive front-end
 process (psql) connected to an existing Postgres cluster, as if you were running
-it from the actual pod. This means that you will be using the `postgres` user.
+it from the actual pod. This means that you will be using the `postgres` user and connecting
+to the `postgres` database.
 
 :::info[Important]
-    As you will be connecting as `postgres` user, in production environments this
-    method should be used with extreme care, by authorized personnel only.
+As you will be connecting as `postgres` user, in production environments this
+method should be used with extreme care, by authorized personnel only.
 :::
 
 ```console
@@ -1071,6 +1072,29 @@ postgres=# \q
 
 This command will start `kubectl exec`, and the `kubectl` executable must be
 reachable in your `PATH` variable to correctly work.
+
+By default, the `postgres` database will be used. Any option supported by
+`psql` can be passed after the `--` delimiter. For example, to connect to a
+specific database:
+
+```console
+$ kubectl cnpg psql cluster-example -- app
+
+psql (18.3 (Debian 18.3-1.pgdg110+1))
+Type "help" for help.
+
+app=#
+```
+
+Also, you can directly execute a query with the psql option `-c`.
+
+```console
+$ kubectl cnpg psql cluster-example -- -c "SELECT pg_is_in_recovery();"
+ pg_is_in_recovery
+-------------------
+ f
+(1 row)
+```
 
 ### Snapshotting a Postgres cluster
 
