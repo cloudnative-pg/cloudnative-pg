@@ -1072,8 +1072,8 @@ it from the actual pod. This means that you will be using the `postgres` user an
 to the `postgres` database.
 
 :::info[Important]
-    As you will be connecting as `postgres` user, in production environments this
-    method should be used with extreme care, by authorized personnel only.
+As you will be connecting as `postgres` user, in production environments this
+method should be used with extreme care, by authorized personnel only.
 :::
 
 ```console
@@ -1108,19 +1108,19 @@ By default, the `postgres` database will be used. You can specify the database
 you want to connect right after the `--` delimiter. For example:
 
 ```console
-$ kubectl cnpg psql cluster-example -- app                               
+$ kubectl cnpg psql cluster-example -- app
 
 psql (18.3 (Debian 18.3-1.pgdg110+1))
 Type "help" for help.
 
-app=# 
+app=#
 ```
 
 Also, you can directly write the request you want to execute with the psql option `-c ̀.
 
 ```console
 $ kubectl cnpg psql cluster-example -- -c "SELECT pg_is_in_recovery();"
- pg_is_in_recovery 
+ pg_is_in_recovery
 -------------------
  f
 (1 row)
