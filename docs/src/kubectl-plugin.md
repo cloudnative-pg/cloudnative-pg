@@ -1119,7 +1119,7 @@ app=#
 Also, you can directly write the request you want to execute with the psql option `-c ̀.
 
 ```console
-$ kubectl cnpg psql cluster-example -- -c "select pg_is_in_recovery();"
+$ kubectl cnpg psql cluster-example -- -c "SELECT pg_is_in_recovery();"
  pg_is_in_recovery 
 -------------------
  f
