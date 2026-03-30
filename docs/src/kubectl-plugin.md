@@ -1116,7 +1116,7 @@ Type "help" for help.
 app=#
 ```
 
-Also, you can directly write the request you want to execute with the psql option `-c ̀.
+Also, you can directly execute a query with the psql option `-c`.
 
 ```console
 $ kubectl cnpg psql cluster-example -- -c "SELECT pg_is_in_recovery();"
