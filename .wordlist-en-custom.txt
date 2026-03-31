@@ -161,6 +161,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExtensionConfiguration
+ExtensionEnvVar
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
@@ -859,6 +860,7 @@ executables
 expirations
 extensibility
 extensionconfiguration
+extensionenvvar
 extensionspec
 externalCluster
 externalClusterName
