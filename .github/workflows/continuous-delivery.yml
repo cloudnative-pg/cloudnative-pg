@@ -274,13 +274,16 @@ jobs:
           fi
 
       - name: Set runner based on organization
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
         id: set-runner
         run: |
-          if [[ "${{ github.repository_owner }}" == "cloudnative-pg" ]]; then
+          if [[ "${REPO_OWNER}" == "cloudnative-pg" ]]; then
             echo "runs_on=ubuntu-latest-16-cores" >> $GITHUB_OUTPUT
           else
             echo "runs_on=ubuntu-24.04" >> $GITHUB_OUTPUT
           fi
+
   buildx:
     name: Build containers
     needs:
@@ -290,7 +293,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     permissions:
       contents: read
       packages: write
@@ -312,8 +315,6 @@ jobs:
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
     steps:
-      - name: Check CPU count
-        run: nproc
       -
         name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -650,7 +651,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: "${{ needs.evaluate_options.outputs.runs_on }}"
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -680,8 +681,6 @@ jobs:
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "kind"
     steps:
-      - name: Check CPU count
-        run: nproc
       -
         name: Cleanup Disk
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
