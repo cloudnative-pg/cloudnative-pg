@@ -28,7 +28,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 const jobMajorUpgrade = "major-upgrade"
@@ -90,7 +89,6 @@ func createMajorUpgradeJobDefinition(
 		Name:            "prepare",
 		Image:           cluster.Status.PGDataImageInfo.Image,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Env:             extensions.GetExtensionEnvVars(oldExtensions),
 		Command:         prepareCommand,
 		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
 		Resources:       cluster.Spec.Resources,
@@ -114,30 +112,6 @@ func createMajorUpgradeJobDefinition(
 		specs.CreateExtensionVolumes(oldExtensions)...)
 	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
 		specs.CreateExtensionVolumeMounts(oldExtensions)...)
-	job.Spec.Template.Spec.Containers[0].Env = mergeEnvVars(
-		job.Spec.Template.Spec.Containers[0].Env,
-		extensions.GetExtensionEnvVars(oldExtensions),
-	)
 
 	return job
-}
-
-// mergeEnvVars merges additional env vars into an existing list.
-// If an env var with the same name already exists, their values are
-// combined with ":".
-func mergeEnvVars(existing, additional []corev1.EnvVar) []corev1.EnvVar {
-	for _, add := range additional {
-		found := false
-		for i, env := range existing {
-			if env.Name == add.Name {
-				existing[i].Value = env.Value + ":" + add.Value
-				found = true
-				break
-			}
-		}
-		if !found {
-			existing = append(existing, add)
-		}
-	}
-	return existing
 }

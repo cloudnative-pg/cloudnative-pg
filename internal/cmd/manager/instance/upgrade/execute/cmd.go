@@ -56,6 +56,7 @@ import (
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // NewCmd creates the cobra command
@@ -162,6 +163,10 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 		return err
 	}
 	instance.SetCluster(&cluster)
+
+	if err := setupExtensionEnvironment(&cluster); err != nil {
+		return fmt.Errorf("error while setting up extension environment: %w", err)
+	}
 
 	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
@@ -567,6 +572,57 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 		err := os.Rename(oldPath, newPath)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// setupExtensionEnvironment merges extension library and binary paths into the
+// process environment (LD_LIBRARY_PATH and PATH). During a major upgrade, both
+// old and new (renamed) extension paths are needed because pg_upgrade starts
+// both old and new PostgreSQL servers.
+func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil
+	}
+
+	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+
+	// Build the list of new (renamed) extensions. During the upgrade, new
+	// extension volumes are mounted with the UpgradeTargetExtensionPrefix
+	// to avoid conflicts with old extension volumes.
+	renamedNewExtensions := make([]apiv1.ExtensionConfiguration, len(oldExtensions))
+	for i, ext := range oldExtensions {
+		renamedNewExtensions[i] = ext
+		renamedNewExtensions[i].Name = postgresConfig.UpgradeTargetExtensionPrefix + ext.Name
+	}
+
+	allExtensions := make([]apiv1.ExtensionConfiguration, 0, len(oldExtensions)+len(renamedNewExtensions))
+	allExtensions = append(allExtensions, oldExtensions...)
+	allExtensions = append(allExtensions, renamedNewExtensions...)
+
+	additionalLibraryPaths := extensions.CollectLibraryPaths(allExtensions)
+	if len(additionalLibraryPaths) > 0 {
+		currentPath := os.Getenv("LD_LIBRARY_PATH")
+		if currentPath != "" {
+			currentPath += ":"
+		}
+		currentPath += strings.Join(additionalLibraryPaths, ":")
+		if err := os.Setenv("LD_LIBRARY_PATH", currentPath); err != nil {
+			return fmt.Errorf("while setting LD_LIBRARY_PATH: %w", err)
+		}
+	}
+
+	additionalBinPaths := extensions.CollectBinPaths(allExtensions)
+	if len(additionalBinPaths) > 0 {
+		currentPath := os.Getenv("PATH")
+		if currentPath != "" {
+			currentPath += ":"
+		}
+		currentPath += strings.Join(additionalBinPaths, ":")
+		if err := os.Setenv("PATH", currentPath); err != nil {
+			return fmt.Errorf("while setting PATH: %w", err)
 		}
 	}
 

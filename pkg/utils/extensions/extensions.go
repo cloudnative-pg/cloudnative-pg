@@ -24,9 +24,6 @@ package extensions
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
-
-	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -180,30 +177,6 @@ func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
 			)
 		}
-	}
-
-	return result
-}
-
-// GetExtensionEnvVars returns a list of environment variables
-// derived from the given extensions' library and binary paths.
-func GetExtensionEnvVars(extList []apiv1.ExtensionConfiguration) []corev1.EnvVar {
-	var result []corev1.EnvVar
-
-	libraryPaths := CollectLibraryPaths(extList)
-	if len(libraryPaths) > 0 {
-		result = append(result, corev1.EnvVar{
-			Name:  "LD_LIBRARY_PATH",
-			Value: strings.Join(libraryPaths, ":"),
-		})
-	}
-
-	binPaths := CollectBinPaths(extList)
-	if len(binPaths) > 0 {
-		result = append(result, corev1.EnvVar{
-			Name:  "PATH",
-			Value: strings.Join(binPaths, ":"),
-		})
 	}
 
 	return result
