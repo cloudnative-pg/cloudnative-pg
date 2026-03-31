@@ -471,9 +471,7 @@ jobs:
       # upgrade test
         name: Build binary for upgrade test
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
           version: v2
@@ -494,9 +492,7 @@ jobs:
         name: Build and push image for upgrade test
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         id: build-prime
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
