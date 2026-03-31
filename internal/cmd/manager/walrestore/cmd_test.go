@@ -225,3 +225,102 @@ var _ = Describe("validateTimelineHistoryFile", func() {
 		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
 	})
 })
+
+var _ = Describe("validateWALSegmentTimeline", func() {
+	It("should allow non-WAL files to pass through", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "00000001.history", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow any WAL during bootstrap when CurrentPrimary is empty", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "",
+				TimelineID:     0,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow primary to download any timeline WAL", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "primary-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow target primary to download any timeline WAL", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "old-primary",
+				TargetPrimary:  "new-primary",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "new-primary")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should allow replica to download current timeline WAL", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000030000000000000048", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should reject old-timeline WAL for replica", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should reject old-timeline WAL with timeline 2 when cluster is on timeline 3", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000020000000000000010", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
+
+	It("should allow any WAL when cluster timeline is not yet known", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "primary-pod",
+				TimelineID:     0,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
