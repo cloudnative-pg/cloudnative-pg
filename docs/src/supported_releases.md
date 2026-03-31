@@ -89,7 +89,7 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.29.x          | Yes                  | 30 Mar 2026  | ~  Sep 2026     | 1.33, 1.34, 1.35              | 1.32, 1.31, 1.30, 1.29    | 14 - 18                     |
+| 1.29.x          | Yes                  | 31 Mar 2026  | ~  Sep 2026     | 1.33, 1.34, 1.35              | 1.32, 1.31, 1.30, 1.29    | 14 - 18                     |
 | 1.28.x          | Yes                  |  9 Dec 2025  | 30 Jun 2026     | 1.32, 1.33, 1.34              | 1.35, 1.31, 1.30, 1.29    | 14 - 18                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 18                     |
 
@@ -129,6 +129,7 @@ version of PostgreSQL, we might not be able to help you.
 |---------|--------------|-------------|
 | 1.30.0  | ~ Jun, 2026  | ~ Dec, 2026 |
 | 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
+| 1.32.0  | ~ Dec, 2026  | ~ Jun, 2027 |
 
 :::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
