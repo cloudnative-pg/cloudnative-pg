@@ -32,7 +32,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 type postInitFolder string
@@ -338,7 +337,6 @@ func CreatePrimaryJob(
 	version, _ := cluster.GetPostgresqlMajorVersion()
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
-	envConfig.EnvVars = append(envConfig.EnvVars, extensions.GetExtensionEnvVars(extList)...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
