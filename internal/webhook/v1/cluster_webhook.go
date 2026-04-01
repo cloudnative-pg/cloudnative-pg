@@ -267,7 +267,7 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	for i := range r.Spec.Env {
-		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+		if postgres.IsReservedEnvironmentVariable(r.Spec.Env[i].Name) {
 			result = append(
 				result,
 				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
@@ -278,31 +278,6 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	}
 
 	return result
-}
-
-// isReservedEnvironmentVariable detects if a certain environment variable
-// is reserved for the usage of the operator
-func isReservedEnvironmentVariable(name string) bool {
-	name = strings.ToUpper(name)
-
-	switch {
-	case strings.HasPrefix(name, "CNPG_"):
-		return true
-
-	case strings.HasPrefix(name, "PG"):
-		return true
-
-	case name == "POD_NAME":
-		return true
-
-	case name == "NAMESPACE":
-		return true
-
-	case name == "CLUSTER_NAME":
-		return true
-	}
-
-	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb
@@ -2902,6 +2877,56 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
 		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
 		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
+		result = append(result, validateExtensionEnvVars(v.Env, basePath)...)
+	}
+
+	return result
+}
+
+func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.Path) field.ErrorList {
+	var result field.ErrorList
+	envNames := stringset.New()
+	envFieldPath := basePath.Child("env")
+
+	dedicatedFields := map[string]string{
+		"PATH":            basePath.Child("bin_path").String(),
+		"LD_LIBRARY_PATH": basePath.Child("ld_library_path").String(),
+	}
+
+	for i, envVar := range envVars {
+		envPath := envFieldPath.Index(i)
+
+		// Block env vars that are reserved for operator usage
+		if postgres.IsReservedEnvironmentVariable(envVar.Name) {
+			result = append(result, field.Invalid(
+				envPath.Child("name"),
+				envVar.Name,
+				"the usage of this environment variable is reserved for the operator",
+			))
+		}
+
+		// Block env vars that have dedicated fields
+		if dedicatedField, ok := dedicatedFields[envVar.Name]; ok {
+			result = append(result, field.Forbidden(
+				envPath.Child("name"),
+				fmt.Sprintf("%s must be configured via %s", envVar.Name, dedicatedField),
+			))
+		}
+
+		// Check for unknown placeholders in values
+		if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+			result = append(result, field.Invalid(
+				envPath.Child("value"),
+				envVar.Value,
+				fmt.Sprintf("unsupported placeholder(s): %s; supported: ${image_root}", strings.Join(unknown, ", ")),
+			))
+		}
+
+		// Check for duplicate names
+		if envNames.Has(envVar.Name) {
+			result = append(result, field.Duplicate(envPath.Child("name"), envVar.Name))
+		}
+		envNames.Put(envVar.Name)
 	}
 
 	return result

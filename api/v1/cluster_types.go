@@ -1561,6 +1561,38 @@ type ExtensionConfiguration struct {
 	// PostgreSQL process's `PATH` environment variable.
 	// +optional
 	BinPath []string `json:"bin_path,omitempty"`
+
+	// Env is a list of custom environment variables to be set in the
+	// PostgreSQL process for this extension. It is the responsibility of the
+	// cluster administrator to ensure the variables are correct for the
+	// specific extension. Note that changes to these variables require
+	// a manual cluster restart to take effect.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Env []ExtensionEnvVar `json:"env,omitempty"`
+}
+
+// ExtensionEnvVar defines an environment variable for a specific extension
+// image volume.
+type ExtensionEnvVar struct {
+	// Name of the environment variable to be injected into the
+	// PostgreSQL process.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	Name string `json:"name"`
+
+	// Value of the environment variable. CloudNativePG performs a direct
+	// replacement of this value, with support for placeholder expansion.
+	// The ${`image_root`} placeholder resolves to the absolute mount path
+	// of the extension's volume (e.g., `/extensions/my-extension`). This
+	// is particularly useful for allowing applications or libraries to
+	// locate specific directories within the mounted image.
+	// Unrecognized placeholders are rejected. To include a literal ${...}
+	// in the value, escape it as $${...}.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

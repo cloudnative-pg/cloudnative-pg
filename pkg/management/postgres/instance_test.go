@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -406,6 +407,149 @@ var _ = Describe("buildPostgresEnv", func() {
 			env := instance.buildPostgresEnv()
 			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
+	})
+})
+
+var _ = Describe("setExtensionEnvVars", func() {
+	var envMap envmap.EnvironmentMap
+	BeforeEach(func() {
+		envMap = envmap.EnvironmentMap{
+			"BAR_ENV": "bar_value",
+			"BAZ_ENV": "baz_value",
+		}
+	})
+
+	It("should add the extension's env variables", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "foo_value"))
+	})
+
+	It("should expand placeholders", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "${image_root}/foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
+	})
+
+	It("should unescape $${...} to literal ${...}", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "ESCAPED",
+						Value: "$${not_expanded}",
+					},
+					{
+						Name:  "MIXED",
+						Value: "${image_root}/$${literal}",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("ESCAPED", "${not_expanded}"))
+		Expect(envMap).To(HaveKeyWithValue("MIXED", "/extensions/foo/${literal}"))
+	})
+
+	It("should skip reserved environment variables", func() {
+		envMap["PATH"] = "/usr/bin"
+		envMap["LD_LIBRARY_PATH"] = "/usr/lib"
+
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PATH", Value: "/evil/path"},
+					{Name: "LD_LIBRARY_PATH", Value: "/evil/lib"},
+					{Name: "PGDATA", Value: "/evil/data"},
+					{Name: "CNPG_SECRET", Value: "stolen"},
+					{Name: "POD_NAME", Value: "fake"},
+					{Name: "NAMESPACE", Value: "fake"},
+					{Name: "CLUSTER_NAME", Value: "fake"},
+					{Name: "SAFE_VAR", Value: "allowed"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("PATH", "/usr/bin"))
+		Expect(envMap).To(HaveKeyWithValue("LD_LIBRARY_PATH", "/usr/lib"))
+		Expect(envMap).NotTo(HaveKey("PGDATA"))
+		Expect(envMap).NotTo(HaveKey("CNPG_SECRET"))
+		Expect(envMap).NotTo(HaveKey("POD_NAME"))
+		Expect(envMap).NotTo(HaveKey("NAMESPACE"))
+		Expect(envMap).NotTo(HaveKey("CLUSTER_NAME"))
+		Expect(envMap).To(HaveKeyWithValue("SAFE_VAR", "allowed"))
+	})
+
+	It("should let the last extension win when multiple define the same variable", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "ext1",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext1:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext1"},
+					{Name: "ONLY_EXT1", Value: "ext1_value"},
+				},
+			},
+			{
+				Name: "ext2",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext2:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext2"},
+					{Name: "ONLY_EXT2", Value: "ext2_value"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("SHARED", "from_ext2"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT1", "ext1_value"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT2", "ext2_value"))
 	})
 })
 
