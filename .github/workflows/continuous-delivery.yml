@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.27, release-1.28]
+        branch: [release-1.25, release-1.28, release-1.29]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
