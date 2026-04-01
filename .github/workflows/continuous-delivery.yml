@@ -238,6 +238,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      runs_on: ${{ steps.set-runner.outputs.runs_on }}
     steps:
       - name: From command
         env:
@@ -272,6 +273,17 @@ jobs:
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
           fi
 
+      - name: Set runner based on organization
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+        id: set-runner
+        run: |
+          if [[ "${REPO_OWNER}" == "cloudnative-pg" ]]; then
+            echo "runs_on=ubuntu-latest-16-cores" >> $GITHUB_OUTPUT
+          else
+            echo "runs_on=ubuntu-24.04" >> $GITHUB_OUTPUT
+          fi
+
   buildx:
     name: Build containers
     needs:
@@ -281,7 +293,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     permissions:
       contents: read
       packages: write
@@ -639,7 +651,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -834,7 +846,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
