@@ -258,7 +258,7 @@ function deploy_operator_from_source() {
   local method=""
   method="${1}"
 
-  if [[ "${method}" != "helm" ]] || [[ "${method}" != "manifest" ]]
+  if [[ "${method}" != "helm" ]] && [[ "${method}" != "manifest" ]]
   then
     echo -e "${bright}Error: Deployment method not supported: ${CNPG_DEPLOYMENT_METHOD}${reset}" >&2
     exit 1
