@@ -191,6 +191,7 @@ GeoSpatial
 Gi
 GitOps
 GoArch
+GoReleaser
 Golang
 GolangCI
 GoogleCredentials
@@ -434,6 +435,7 @@ Ruocco
 SANs
 SAS
 SBOM
+SBOMs
 SCC
 SDK
 SELinux
@@ -577,6 +579,7 @@ addons
 affinityconfiguration
 aks
 albert
+alex
 allTables
 allnamespaces
 alloc
@@ -854,6 +857,7 @@ envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
+ermakov
 eu
 excludePatterns
 executables
@@ -936,6 +940,7 @@ html
 http
 httpGet
 https
+hu
 hugepages
 icu
 icuLocale
@@ -992,6 +997,7 @@ isready
 issuecomment
 italy
 jdbc
+jmealo
 jobCount
 jq
 json
@@ -1134,6 +1140,7 @@ observability
 observedGeneration
 oc
 ol
+oleg
 olm
 onlineConfiguration
 onlineUpdateEnabled
@@ -1297,6 +1304,7 @@ readinessProbe
 readthedocs
 readyInstances
 reconciler
+reconcilers
 reconciliationLoop
 reconnection
 recoverability
@@ -1397,6 +1405,7 @@ servicetemplatespec
 serviceupdatestrategy
 sessionToken
 sha
+sharifmshaker
 shm
 shmall
 shmmax
