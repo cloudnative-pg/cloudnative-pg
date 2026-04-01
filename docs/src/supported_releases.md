@@ -89,8 +89,8 @@ Git tags for versions are prefixed with `v`.
 <!-- TODO: Complete dates and versions below -->
 | Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.28.x          | Yes                  |  9 Dec 2025  | ~  Jun 2026     | 1.32, 1.33, 1.34              | 1.31, 1.30, 1.29          | 14 - 18                     |
-| 1.27.x          | Yes                  | 12 Aug 2025  |  9 Mar 2026     | 1.31, 1.32, 1.33              | 1.30, 1.29                | 13 - 18                     |
+| 1.29.x          | Yes                  | 31 Mar 2026  | ~  Sep 2026     | 1.33, 1.34, 1.35              | 1.32, 1.31, 1.30, 1.29    | 14 - 18                     |
+| 1.28.x          | Yes                  |  9 Dec 2025  | 30 Jun 2026     | 1.32, 1.33, 1.34              | 1.35, 1.31, 1.30, 1.29    | 14 - 18                     |
 | main            | No, development only |              |                 |                               |                           | 13 - 18                     |
 
 The list of supported Kubernetes versions in the table depends on what
@@ -127,9 +127,9 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.29.0  | ~ Mar, 2026  | ~ Sep, 2026 |
 | 1.30.0  | ~ Jun, 2026  | ~ Dec, 2026 |
 | 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
+| 1.32.0  | ~ Dec, 2026  | ~ Jun, 2027 |
 
 :::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
@@ -146,10 +146,11 @@ version of PostgreSQL, we might not be able to help you.
 
 ## Old releases
 
-| Version         | Release date      | End of life         | Compatible Kubernetes versions |
+| Version         | Release date      | End of life         | Supported Kubernetes versions  |
 |-----------------|-------------------|---------------------|--------------------------------|
-| 1.26.x          | May 23, 2025      | 12 Nov 2025         | 1.30, 1.31, 1.32, 1.33         |
-| 1.25.x          | Dec 23, 2024      | 22 Aug 2025         | 1.29, 1.30, 1.31, 1.32         |
+| 1.27.x          | August, 12 2025   | March 9, 2026       | 1.31, 1.32, 1.33               |
+| 1.26.x          | May 23, 2025      | November 12, 2025   | 1.30, 1.31, 1.32, 1.33         |
+| 1.25.x          | Dec 23, 2024      | August 22, 2025     | 1.29, 1.30, 1.31, 1.32         |
 | 1.24.x          | Aug 22, 2024      | May 23, 2025        | 1.28, 1.29, 1.30, 1.31         |
 | 1.23.x          | April 24, 2024    | November 24, 2024   | 1.27, 1.28, 1.29               |
 | 1.22.x          | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28               |
