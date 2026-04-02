@@ -438,7 +438,7 @@ jobs:
         run: |
           CSV_FILE="operators/cloudnative-pg/${VERSION}/manifests/cloudnative-pg.clusterserviceversion.yaml"
           PREVIOUS_VERSION=$(ls -d operators/cloudnative-pg/[0-9]* | sort -V | tail -2 | head -1 | xargs basename)
-          sed -i "s/^  name: cloudnative-pg\.v${VERSION}/  replaces: cloudnative-pg.v${PREVIOUS_VERSION}\n  name: cloudnative-pg.v${VERSION}/" "${CSV_FILE}"
+          sed -i "s/^  relatedImages:/  replaces: cloudnative-pg.v${PREVIOUS_VERSION}\n  relatedImages:/" "${CSV_FILE}"
 
       - name: Create Remote Pull Request
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
