@@ -94,9 +94,10 @@ This mirrors the behavior of Kubernetes Persistent Volumes.
 
 :::note
 If a role owns objects (tables, schemas, etc.), a `delete` policy will fail to
-drop the role until those objects are reassigned or dropped. The Kubernetes
-resource will remain in a `Terminating` state until the database allows the
-`DROP ROLE` command to succeed.
+drop the role until those objects are reassigned or dropped.
+<!-- TODO: at the moment this is not working -->
+The Kubernetes resource will remain in a `Terminating` state until the database
+allows the `DROP ROLE` command to succeed.
 :::
 
 ### Status of `Role` resources
