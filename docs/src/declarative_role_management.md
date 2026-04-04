@@ -16,12 +16,90 @@ required in PostgreSQL instances:
 
 This process is described in the ["Bootstrap"](bootstrap.md) section.
 
-With the `managed` stanza in the cluster spec, CloudNativePG now provides full
-lifecycle management for roles specified in `.spec.managed.roles`.
+CloudNativePG provides full lifecycle management for roles. You can define
+roles either as **standalone `Role` resources** (recommended) or via the
+**`managed` stanza** within the `Cluster` spec.
 
+## The `Role` Resource (CRD)
+
+The `Role` Custom Resource provides a dedicated, Kubernetes-native way to
+manage PostgreSQL database roles, adhering to the
+[PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
+
+This is the recommended approach for modern environments and
+GitOps workflows, as it decouples role lifecycle from the cluster
+infrastructure.
+
+:::tip
+Please refer to the [API reference](cloudnative-pg.v1.md#roleconfiguration) for
+the full list of attributes you can define for each role.
+:::
+
+### Example Manifest
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Role
+metadata:
+  name: role-dante
+spec:
+  cluster:
+    name: cluster-example
+  name: dante
+  ensure: present
+  comment: "Dante Alighieri"
+  login: true
+  superuser: false
+  createdb: true
+  roleReclaimPolicy: delete
+  inRoles:
+    - pg_monitor
+  passwordSecret:
+    name: cluster-example-dante
+```
+
+### Role Reclaim Policy
+
+The `roleReclaimPolicy` field determines the behavior when the Kubernetes
+`Role` object is deleted:
+
+- **`retain` (default):** The role is left in the database.
+- **`delete`:** The role is dropped from the database.
+
+### Status of `Role` resources
+
+The `Role` resource includes a dedicated `status` section for per-role
+observability:
+
+```yaml
+status:
+  applied: true
+  observedGeneration: 3
+  conditions:
+  - lastTransitionTime: "2026-04-04T15:06:23Z"
+    message: "2051"
+    reason: ChangeDetected
+    status: "True"
+    type: PasswordSecretChange
+```
+
+If a `Role` CRD targets a name already managed in the Cluster spec, the
+`applied` field will be `false` with the message:
+
+```
+role is already managed by the CNPG cluster
+````
+
+---
+
+## Inline Managed Roles
+
+With the `managed` stanza in the cluster spec, CloudNativePG provides
+management for roles specified in `.spec.managed.roles`.
 This feature enables declarative management of existing roles, as well as the
-creation of new roles if they are not already present in the database. Role
-creation will occur *after* the database bootstrapping is complete.
+creation of new roles if they are not already present.
+
+### Example Manifest
 
 An example manifest for a cluster with declarative role management can be found
 in the file [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml).
@@ -46,8 +124,11 @@ spec:
 
 The role specification in `.spec.managed.roles` adheres to the
 [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
+
+:::tip
 Please refer to the [API reference](cloudnative-pg.v1.md#roleconfiguration) for
 the full list of attributes you can define for each role.
+:::
 
 A few points are worth noting:
 
