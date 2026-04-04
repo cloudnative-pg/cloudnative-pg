@@ -37,13 +37,11 @@ var _ = Describe("Executed", func() {
 	It("correctly waits between goroutines", func() {
 		i := NewExecuted()
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer GinkgoRecover()
 			i.Wait()
 			Expect(i.done).To(BeTrue())
-		}()
+		})
 		Expect(i.done).To(BeFalse())
 		i.Broadcast()
 		Expect(i.done).To(BeTrue())
