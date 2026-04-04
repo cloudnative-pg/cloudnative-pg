@@ -400,6 +400,17 @@ resource:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
+kind: Role
+metadata:
+  name: freddie-app
+spec:
+  cluster:
+    name: freddie
+  name: app
+  login: true
+  replication: true
+---
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: freddie
@@ -417,12 +428,6 @@ spec:
         - CREATE TABLE n (i SERIAL PRIMARY KEY, m INTEGER)
         - INSERT INTO n (m) (SELECT generate_series(1, 10000))
         - ALTER TABLE n OWNER TO app
-
-  managed:
-    roles:
-      - name: app
-        login: true
-        replication: true
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Publication
