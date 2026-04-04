@@ -1,4 +1,4 @@
----
+o--
 id: declarative_role_management
 sidebar_position: 230
 title: PostgreSQL Role management
@@ -78,6 +78,9 @@ spec:
   passwordSecret:
     name: cluster-example-dante
 ```
+
+An example manifest for a role definition can be found in the file
+[`role-examples.yaml`](samples/role-examples.yaml).
 
 ### Role Reclaim Policy
 

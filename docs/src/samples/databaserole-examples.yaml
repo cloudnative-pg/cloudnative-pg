@@ -1,12 +1,11 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: role-app
+  name: cluster-example-app
 spec:
   cluster:
     name: cluster-example
   name: app
-  createdb: true
   login: true
 ---
 apiVersion: postgresql.cnpg.io/v1
