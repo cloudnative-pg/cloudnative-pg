@@ -96,7 +96,7 @@ main() {
   # --- ARGUMENT PARSING ---
   # Parse command-line options (-k, -n, etc.) using getopt
   if ! getopt -T > /dev/null; then
-    parsed_opts=$(getopt -o e:k:n:o:r -l "engine:,k8s-version:,nodes:,operator-deploy-mode:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:s:r -l "engine:,k8s-version:,nodes:,source:,registry" -- "$@") || usage
   else
     parsed_opts=$(getopt e:k:n:o:r "$@") || usage
   fi
