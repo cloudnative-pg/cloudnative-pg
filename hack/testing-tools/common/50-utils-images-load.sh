@@ -107,10 +107,11 @@ function deploy_operator_from_version() {
     local base_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${version}/releases"
     local manifest_url
 
-    if [[ "${version}" == "main" ]]; then
-        manifest_url="${base_url}/cnpg-latest.yaml"
-    else
-        manifest_url="${base_url}/cnpg-${version}.yaml"
+    manifest_url="${base_url}/cnpg-${version}.yaml"
+    if  ! curl --silent --head --fail "${manifest_url}" > /dev/null 2>&1; then
+        echo -e "${bright}Error: Manifest not found at ${manifest_url}${reset}" >&2
+        echo -e "${bright}Please verify the version: ${version}${reset}" >&2
+        exit 1
     fi
 
     echo -e "${bright}Deploying operator version '${version}'${reset}"
