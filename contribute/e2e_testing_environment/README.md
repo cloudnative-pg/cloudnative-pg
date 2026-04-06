@@ -59,7 +59,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 | -e    / --engine <CLUSTER_ENGINE>   | Use the specified Kubernetes engine (e.g., `-e k3d`). (Env: `CLUSTER_ENGINE`)                                   |
 | -k    / --k8s-version <K8S_VERSION> | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    / --nodes \<NODES>            | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
-| -o    / --operator-deploy-mode \<MODE> | Controls how the operator is deployed. Use `SOURCE` (default) to build from the local worktree, `main` to deploy the latest published manifest, or an exact version such as `1.28.1` to deploy that release. (Env: `OPERATOR_DEPLOY_MODE`) |
+| -s    / --source \<SOURCE> | Controls which release of the operator is deployed. Use `source` (default) to build from the local worktree or an exact version such as `1.28.1` to deploy that release. (Env: `SOURCE`) |
 
 > **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
 > images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,
