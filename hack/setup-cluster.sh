@@ -98,7 +98,7 @@ main() {
   if ! getopt -T > /dev/null; then
     parsed_opts=$(getopt -o e:k:n:s:r -l "engine:,k8s-version:,nodes:,source:,registry" -- "$@") || usage
   else
-    parsed_opts=$(getopt e:k:n:o:r "$@") || usage
+    parsed_opts=$(getopt e:k:n:s:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
 
