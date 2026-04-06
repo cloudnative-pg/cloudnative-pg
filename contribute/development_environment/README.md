@@ -196,7 +196,7 @@ sources by using the `-o` flag:
 ./hack/setup-cluster.sh -s source create deploy
 
 # Deploy a specific release
-./hack/setup-cluster.sh -o 1.28.1 create deploy
+./hack/setup-cluster.sh -s 1.28.1 create deploy
 ```
 
 *Note:* For a list of options, run `./hack/setup-cluster.sh`.
