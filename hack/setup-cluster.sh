@@ -131,9 +131,9 @@ main() {
           usage
         fi
         ;;
-      -o | --operator-deploy-mode)
+      -s | --source)
         shift
-        export OPERATOR_DEPLOY_MODE="${1}"
+        export SOURCE="${1}"
         shift
         ;;
       -r | --registry)
