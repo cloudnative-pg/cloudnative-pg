@@ -119,7 +119,7 @@ case "$ACTION" in
 
     load-from-sources)
         if [[ "${SOURCE:-source}" != "source" ]]; then
-            echo "Skipping image build: OPERATOR_DEPLOY_MODE=${OPERATOR_DEPLOY_MODE}"
+            echo "Skipping image build: SOURCE=${SOURCE}"
         else
             LOAD_VENDOR_SCRIPT="${VENDOR_DIR}/load.sh"
 
