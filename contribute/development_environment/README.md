@@ -192,8 +192,8 @@ Alternatively, you can deploy a published release instead of building from
 sources by using the `-o` flag:
 
 ```shell
-# Deploy the latest published operator
-./hack/setup-cluster.sh -o main create deploy
+# Deploy the latest built operator from source
+./hack/setup-cluster.sh -s source create deploy
 
 # Deploy a specific release
 ./hack/setup-cluster.sh -o 1.28.1 create deploy
