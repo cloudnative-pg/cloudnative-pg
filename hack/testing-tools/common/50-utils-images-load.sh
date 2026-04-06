@@ -104,7 +104,7 @@ function deploy_operator_from_sources() {
 
 function deploy_operator_from_version() {
     local version="${1:?version is required}"
-    local base_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases"
+    local base_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${version}/releases"
     local manifest_url
 
     if [[ "${version}" == "main" ]]; then
