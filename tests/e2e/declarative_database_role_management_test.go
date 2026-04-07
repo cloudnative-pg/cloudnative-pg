@@ -205,7 +205,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 		When("Role CR reclaim policy is set to delete", func() {
 			It("can manage a declarative role and delete it in Postgres", func() {
 				roleManifest := fixturesDir +
-					"/declarative_roles/role-with-delete-reclaim-policy.yaml.template"
+					"/declarative_roles/databaserole-with-delete-reclaim-policy.yaml.template"
 				assertTestDeclarativeRole(roleManifest,
 					false)
 			})

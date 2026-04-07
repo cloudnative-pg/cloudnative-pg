@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -109,7 +110,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 					RoleConfiguration: role.Spec.RoleConfiguration,
 				}.toDatabaseRole()
 				if err := roles.Delete(ctx, db, dbRole); err != nil {
-					return ctrl.Result{}, err
+					return r.failedReconciliation(ctx, &role, err)
 				}
 			}
 
@@ -128,6 +129,10 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return res, err
 	}
 
+	if res, err := r.detectMissingPasswordSecret(ctx, &role); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	passVersion, err := r.reconcileRole(
 		ctx,
 		&role,
@@ -137,6 +142,24 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return r.succeededReconciliation(ctx, &role, passVersion)
+}
+
+func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(ctx context.Context, role *apiv1.DatabaseRole) (ctrl.Result, error) {
+	// No password secret is configured, we can continue the reconciliation loop
+	if role.Spec.GetRoleSecretName() == "" {
+		return ctrl.Result{}, nil
+	}
+
+	secretObjectKey := types.NamespacedName{
+		Namespace: role.Namespace,
+		Name:      role.Spec.GetRoleSecretName(),
+	}
+	var secret corev1.Secret
+	if err := r.Client.Get(ctx, secretObjectKey, &secret); err != nil {
+		return r.failedReconciliation(ctx, role, err)
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // shouldReconcile checks if the role should be reconciled by this instance.
