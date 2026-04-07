@@ -83,7 +83,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		return err
 	}
 
-	var roleList apiv1.RoleList
+	var roleList apiv1.DatabaseRoleList
 	if err := r.List(ctx, &roleList, client.InNamespace(namespacedName.Namespace)); err != nil {
 		return err
 	}

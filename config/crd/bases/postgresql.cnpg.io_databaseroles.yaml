@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: roles.postgresql.cnpg.io
+  name: databaseroles.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
   names:
-    kind: Role
-    listKind: RoleList
-    plural: roles
-    singular: role
+    kind: DatabaseRole
+    listKind: DatabaseRoleList
+    plural: databaseroles
+    singular: databaserole
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: Role is the Schema for the databases API
+        description: DatabaseRole is the Schema for the databases API
         properties:
           apiVersion:
             description: |-
@@ -54,7 +54,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: RoleSpec represents a role in Postgres
+            description: DatabaseRoleSpec represents a role in Postgres
             properties:
               bypassrls:
                 description: |-
@@ -178,7 +178,7 @@ spec:
             - name
             type: object
           status:
-            description: RoleState defines the observed state of a Role
+            description: DatabaseRoleState defines the observed state of a Role
             properties:
               applied:
                 description: Applied is true if the role was reconciled correctly

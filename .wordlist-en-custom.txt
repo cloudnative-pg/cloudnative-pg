@@ -128,7 +128,11 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRoleList
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleState
+DatabaseRoleStatus
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -434,12 +438,8 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
-RoleList
 RoleReclaimDelete
 RoleReclaimRetain
-RoleSpec
-RoleState
-RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
 RoleStatusReconciled

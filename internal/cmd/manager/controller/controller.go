@@ -264,11 +264,11 @@ func RunController(
 		return err
 	}
 
-	if err = (&controller.RoleReconciler{
+	if err = (&controller.DatabaseRoleReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Role")
+		setupLog.Error(err, "unable to create controller", "controller", "DatabaseRole")
 		return err
 	}
 

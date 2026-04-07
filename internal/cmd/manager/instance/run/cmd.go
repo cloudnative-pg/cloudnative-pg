@@ -200,7 +200,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 						instance.GetNamespaceName(): {},
 					},
 				},
-				&apiv1.Role{}: {
+				&apiv1.DatabaseRole{}: {
 					Namespaces: map[string]cache.Config{
 						instance.GetNamespaceName(): {},
 					},
@@ -286,7 +286,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 
 	// role reconciler
-	roleReconciler := controller.NewRoleReconciler(mgr, instance)
+	roleReconciler := controller.NewDatabaseRoleReconciler(mgr, instance)
 	if err := roleReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create role controller")
 		return err

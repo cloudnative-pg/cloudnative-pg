@@ -38,8 +38,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// RoleReconciler reconciles a Role object defined by apiv1.Role (rather than in spec.managed)
-type RoleReconciler struct {
+// DatabaseRoleReconciler reconciles a Role object defined by apiv1.Role (rather than in spec.managed)
+type DatabaseRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
@@ -48,14 +48,14 @@ type RoleReconciler struct {
 
 // errClusterIsManagingRole is raised when a certain PostgreSQL role
 // is already managed by the cluster in the cluster.spec.managed.roles section
-var errClusterIsManagingRole = fmt.Errorf("role is already managed by the CNPG cluster")
+var errClusterIsManagingRole = fmt.Errorf("database role is already managed by the CNPG cluster")
 
-// roleReconciliationInterval is the time between the
+// databaseRoleReconciliationInterval is the time between the
 // role reconciliation loop failures
-const roleReconciliationInterval = 30 * time.Second
+const databaseRoleReconciliationInterval = 30 * time.Second
 
 // Reconcile is the role reconciliation loop
-func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("Reconciliation loop start")
@@ -64,7 +64,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}()
 
 	// Get the role object
-	var role apiv1.Role
+	var role apiv1.DatabaseRole
 	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
@@ -101,7 +101,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	} else {
 		// This role is being deleted
 		if controllerutil.ContainsFinalizer(&role, utils.RoleFinalizerName) {
-			if role.Spec.ReclaimPolicy == apiv1.RoleReclaimDelete {
+			if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
 				dbRole := roleAdapter{
 					RoleConfiguration: role.Spec.RoleConfiguration,
 				}.toDatabaseRole()
@@ -120,7 +120,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	if res, err := detectConflictingManagers(ctx, r.Client, &role, &apiv1.RoleList{}); err != nil ||
+	if res, err := detectConflictingManagers(ctx, r.Client, &role, &apiv1.DatabaseRoleList{}); err != nil ||
 		!res.IsZero() {
 		return res, err
 	}
@@ -139,7 +139,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // shouldReconcile checks if the role should be reconciled by this instance.
 // Returns nil, nil if reconciliation should proceed.
 // Returns a non-nil result or error if reconciliation should stop.
-func (r *RoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.Role) (*ctrl.Result, error) {
+func (r *DatabaseRoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.DatabaseRole) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// This is not for me!
@@ -166,12 +166,12 @@ func (r *RoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.Role) 
 
 	// This is not for me, at least now
 	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return &ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
+		return &ctrl.Result{RequeueAfter: databaseRoleReconciliationInterval}, nil
 	}
 
 	// Still not for me, we're waiting for a switchover
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		return &ctrl.Result{RequeueAfter: roleReconciliationInterval}, nil
+		return &ctrl.Result{RequeueAfter: databaseRoleReconciliationInterval}, nil
 	}
 
 	// If the role is already managed by the cluster, we stop the
@@ -192,7 +192,7 @@ func (r *RoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.Role) 
 
 // isAlreadyReconciled checks if the role has already been reconciled
 // and the password secret has not changed
-func (r *RoleReconciler) isAlreadyReconciled(role *apiv1.Role) bool {
+func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) bool {
 	latestObservedSecretPasswordResourceVersion := ""
 	if latestSecretChange := meta.FindStatusCondition(
 		role.Status.Conditions,
@@ -206,9 +206,9 @@ func (r *RoleReconciler) isAlreadyReconciled(role *apiv1.Role) bool {
 }
 
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
-func (r *RoleReconciler) failedReconciliation(
+func (r *DatabaseRoleReconciler) failedReconciliation(
 	ctx context.Context,
-	role *apiv1.Role,
+	role *apiv1.DatabaseRole,
 	err error,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -222,14 +222,14 @@ func (r *RoleReconciler) failedReconciliation(
 	}
 
 	return ctrl.Result{
-		RequeueAfter: roleReconciliationInterval,
+		RequeueAfter: databaseRoleReconciliationInterval,
 	}, nil
 }
 
 // succeededReconciliation marks the reconciliation as succeeded
-func (r *RoleReconciler) succeededReconciliation(
+func (r *DatabaseRoleReconciler) succeededReconciliation(
 	ctx context.Context,
-	role *apiv1.Role,
+	role *apiv1.DatabaseRole,
 	passVersion string,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -243,31 +243,31 @@ func (r *RoleReconciler) succeededReconciliation(
 	}
 
 	return ctrl.Result{
-		RequeueAfter: roleReconciliationInterval,
+		RequeueAfter: databaseRoleReconciliationInterval,
 	}, nil
 }
 
-// NewRoleReconciler creates a new role reconciler
-func NewRoleReconciler(
+// NewDatabaseRoleReconciler creates a new role reconciler
+func NewDatabaseRoleReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
-) *RoleReconciler {
-	return &RoleReconciler{
+) *DatabaseRoleReconciler {
+	return &DatabaseRoleReconciler{
 		Client:   mgr.GetClient(),
 		instance: instance,
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Role{}).
+		For(&apiv1.DatabaseRole{}).
 		Named("instance-role-reconciler").
 		Complete(r)
 }
 
 // GetCluster gets the managed cluster through the client
-func (r *RoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
+func (r *DatabaseRoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := r.Get(ctx,
 		types.NamespacedName{
@@ -298,7 +298,7 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 	return false
 }
 
-func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.Role) (string, error) {
+func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, error) {
 	contextLogger := log.FromContext(ctx)
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
