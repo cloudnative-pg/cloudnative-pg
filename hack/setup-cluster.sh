@@ -50,7 +50,7 @@ NODES=${NODES:-3}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-n <nodes>] [-o <mode>] <command>
+Usage: $0 [-k <version>] [-n <nodes>] [-s <source>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -78,12 +78,12 @@ Options:
                           Used only during "create" command. Default: 3
                           Env: NODES
 
-    -o|--operator-deploy-mode
-        <MODE>            Controls how the operator is deployed. Use 'SOURCE'
-                          (default) to build and deploy from the local worktree,
-                          'main' to deploy the latest published manifest, or an
-                          exact version such as '1.28.1' to deploy that release.
-                          Env: OPERATOR_DEPLOY_MODE
+    -s|--source
+      <SOURCE>            Controls which version of  operator is deployed. 
+                          Use 'source (default) to build and deploy from the 
+                          local worktree or an exact version such as '1.28.1' to 
+                          deploy that release.
+                          Env: SOURCE
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.

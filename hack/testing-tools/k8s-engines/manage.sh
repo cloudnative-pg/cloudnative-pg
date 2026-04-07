@@ -135,8 +135,8 @@ case "$ACTION" in
     deploy-from-sources)
         source "${COMMON_DIR}/20-utils-k8s.sh"
 
-        if [[ "${OPERATOR_DEPLOY_MODE:-SOURCE}" != "SOURCE" ]]; then
-            deploy_operator_from_version "${OPERATOR_DEPLOY_MODE}"
+        if [[ "${SOURCE:-source}" != "source" ]]; then
+            deploy_operator_from_version "${SOURCE}"
         else
             CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
             if [ -z "$CONTROLLER_IMG" ]; then
@@ -202,7 +202,7 @@ case "$ACTION" in
         echo "NODES:                      ${NODES:-<not explicitly set>}"
         echo "ENABLE_APISERVER_AUDIT:     ${ENABLE_APISERVER_AUDIT:-false}"
         echo "ENABLE_FLUENTD:             ${ENABLE_FLUENTD:-false}"
-        echo "OPERATOR_DEPLOY_MODE:       ${OPERATOR_DEPLOY_MODE:-SOURCE}"
+        echo "SOURCE:       ${SOURCE:-source}"
 
         # --- IMAGE & BUILD ARTIFACTS ---
         echo ""
