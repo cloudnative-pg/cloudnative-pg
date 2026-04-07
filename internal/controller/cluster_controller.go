@@ -566,7 +566,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
-	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	res, err = setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+	if err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	return ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, "")
 }
 
 // evaluatePodReadinessGuards short-circuits the reconciliation loop with a
@@ -905,11 +910,6 @@ func (r *ClusterReconciler) reconcileResources(
 	// PhaseInplacePrimaryRestart will be patched to healthy in instance manager
 	if cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	// When everything is reconciled, update the status
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	r.cleanupCompletedJobs(ctx, resources.jobs)
