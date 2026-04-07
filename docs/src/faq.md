@@ -493,7 +493,7 @@ can control migrations using the `app` user, without requiring *superuser*
 access.
 
 Teams can then create another user for read-write operations through the
-["Declarative role management"](declarative_role_management.md) feature
+["Declarative role management"](declarative_database_role_management.md) feature
 and assign the required `GRANT` to the tables.
 
 <!--
