@@ -133,7 +133,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 	})
 })
 
-var _ = Describe("demoteOldPrimaryLabel", func() {
+var _ = Describe("ensureOldPrimaryLabelIsDemoted", func() {
 	var env *testingEnvironment
 
 	BeforeEach(func() {
@@ -171,11 +171,9 @@ var _ = Describe("demoteOldPrimaryLabel", func() {
 			}
 		}
 
-		resources := &managedResources{
-			instances: corev1.PodList{Items: []corev1.Pod{primary, replica1, replica2}},
-		}
+		pods := []corev1.Pod{primary, replica1, replica2}
 
-		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", pods)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Verify the old primary's label was changed to replica on the API server
@@ -198,11 +196,7 @@ var _ = Describe("demoteOldPrimaryLabel", func() {
 		replica := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
 		Expect(env.client.Create(ctx, &replica)).To(Succeed())
 
-		resources := &managedResources{
-			instances: corev1.PodList{Items: []corev1.Pod{replica}},
-		}
-
-		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", []corev1.Pod{replica})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -213,11 +207,7 @@ var _ = Describe("demoteOldPrimaryLabel", func() {
 		pod := makePod("cluster-1", namespace, specs.ClusterRoleLabelReplica)
 		Expect(env.client.Create(ctx, &pod)).To(Succeed())
 
-		resources := &managedResources{
-			instances: corev1.PodList{Items: []corev1.Pod{pod}},
-		}
-
-		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", []corev1.Pod{pod})
 		Expect(err).ToNot(HaveOccurred())
 
 		var updated corev1.Pod
