@@ -35,8 +35,8 @@ const (
 	// LabelDeclarativeDatabases is a label for selecting the declarative databases test
 	LabelDeclarativeDatabases = "declarative-databases"
 
-	// LabelDeclarativeRoles is a label for selecting the declarative roles test
-	LabelDeclarativeRoles = "declarative-roles"
+	// LabelDeclarativeDatabaseRoles is a label for selecting the declarative roles test
+	LabelDeclarativeDatabaseRoles = "declarative-database-roles"
 
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"

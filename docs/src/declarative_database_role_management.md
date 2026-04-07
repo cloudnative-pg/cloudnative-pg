@@ -17,12 +17,12 @@ required in PostgreSQL instances:
 This process is described in the ["Bootstrap"](bootstrap.md) section.
 
 CloudNativePG provides full lifecycle management for roles. You can define
-roles either as **standalone `Role` resources** (recommended) or via the
+roles either as **standalone `DatabaseRole` resources** (recommended) or via the
 **`managed` stanza** within the `Cluster` spec.
 
-## The `Role` Resource (CRD)
+## The `DatabaseRole` Resource (CRD)
 
-The `Role` Custom Resource provides a dedicated, Kubernetes-native way to
+The `DatabaseRole` Custom Resource provides a dedicated, Kubernetes-native way to
 manage PostgreSQL database roles, adhering to the
 [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
 
@@ -39,7 +39,7 @@ the full list of attributes you can define for each role.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
-kind: Role
+kind: DatabaseRole
 metadata:
   name: role-dante
 spec:
@@ -83,11 +83,11 @@ status:
     type: PasswordSecretChange
 ```
 
-If a `Role` CRD targets a name already managed in the Cluster spec, the
+If a `DatabaseRole` CRD targets a name already managed in the Cluster spec, the
 `applied` field will be `false` with the message:
 
 ```
-role is already managed by the CNPG cluster
+database role is already managed by the CNPG cluster
 ````
 
 ---

@@ -99,6 +99,6 @@ resources:
   controller: true
   domain: cnpg.io
   group: postgresql
-  kind: Role
+  kind: DatabaseRole
   path: github.com/cloudnative-pg/cloudnative-pg/api/v1
   version: v1

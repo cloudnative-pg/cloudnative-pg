@@ -42,20 +42,20 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// RoleReconciler reconciles a Role object
-type RoleReconciler struct {
+// DatabaseRoleReconciler reconciles a Role object
+type DatabaseRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
 
 // Reconcile implements the main reconciliation loop for Role objects
-func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	var role apiv1.Role
+	var role apiv1.DatabaseRole
 	if err := r.Get(ctx, req.NamespacedName, &role); err != nil {
 		// This also happens when you delete a Role resource in k8s. If
 		// that's the case, let's just wait for the Kubernetes garbage collector
@@ -114,7 +114,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 // SetupWithManager setup this controller inside the controller manager
-func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	rolesSecretsPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return hasReloadLabelSet(e.Object)
@@ -132,7 +132,7 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconci
 
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
-		For(&apiv1.Role{}).
+		For(&apiv1.DatabaseRole{}).
 		Named("role").
 		Watches(
 			&corev1.Secret{},
@@ -143,7 +143,7 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconci
 }
 
 // mapSecretToRole returns a function mapping secrets events to the roles using them
-func (r *RoleReconciler) mapSecretToRole() handler.MapFunc {
+func (r *DatabaseRoleReconciler) mapSecretToRole() handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) (result []reconcile.Request) {
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
@@ -151,7 +151,7 @@ func (r *RoleReconciler) mapSecretToRole() handler.MapFunc {
 		}
 
 		// get all the clusters handled by the operator in the configmap namespace
-		var roles apiv1.RoleList
+		var roles apiv1.DatabaseRoleList
 		if err := r.List(ctx, &roles,
 			client.InNamespace(secret.Namespace),
 		); err != nil {
@@ -173,7 +173,7 @@ func (r *RoleReconciler) mapSecretToRole() handler.MapFunc {
 }
 
 // getRolesUsingSecret get a list of roles which are using the passed secret
-func getRolesUsingSecret(roles apiv1.RoleList, secret *corev1.Secret) (requests []types.NamespacedName) {
+func getRolesUsingSecret(roles apiv1.DatabaseRoleList, secret *corev1.Secret) (requests []types.NamespacedName) {
 	for _, role := range roles.Items {
 		if role.Spec.PasswordSecret != nil && role.Spec.PasswordSecret.Name == secret.Name {
 			requests = append(requests,

@@ -760,7 +760,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	// instance of the cluster. CreateRole will create a corev1.Role
 	// resource allowing access to all the secrets that are referred
 	// by them.
-	var roleList apiv1.RoleList
+	var roleList apiv1.DatabaseRoleList
 
 	if err := r.List(
 		ctx,
