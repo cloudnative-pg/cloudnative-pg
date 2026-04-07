@@ -78,6 +78,12 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Namespace: req.Namespace,
 		Name:      role.Spec.PasswordSecret.Name,
 	}, &secret); err != nil {
+		// There's no need to fill the operator log with errors
+		// if the secret still doesn't exist.
+		if apierrs.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
 		return ctrl.Result{}, fmt.Errorf(
 			"while getting secret %q referred by role %q: %w",
 			role.Spec.PasswordSecret.Name,
