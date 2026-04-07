@@ -1228,8 +1228,8 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Watches(
-			&apiv1.Role{},
-			handler.EnqueueRequestsFromMapFunc(r.mapRolesToClusters()),
+			&apiv1.DatabaseRole{},
+			handler.EnqueueRequestsFromMapFunc(r.mapDatabaseRolesToClusters()),
 		).
 		Complete(r)
 }
@@ -1351,10 +1351,10 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 	// find all the Roles pointing to a cluster.
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
-		&apiv1.Role{},
+		&apiv1.DatabaseRole{},
 		roleKey,
 		func(rawObj client.Object) []string {
-			role := rawObj.(*apiv1.Role)
+			role := rawObj.(*apiv1.DatabaseRole)
 			if role.Spec.ClusterRef.Name == "" {
 				return nil
 			}
@@ -1465,10 +1465,10 @@ func (r *ClusterReconciler) mapPoolersToClusters() handler.MapFunc {
 	}
 }
 
-// mapRolesToClusters returns a function mapping roles to their corresponding cluster
-func (r *ClusterReconciler) mapRolesToClusters() handler.MapFunc {
+// mapDatabaseRolesToClusters returns a function mapping roles to their corresponding cluster
+func (r *ClusterReconciler) mapDatabaseRolesToClusters() handler.MapFunc {
 	return func(_ context.Context, obj client.Object) []reconcile.Request {
-		role, ok := obj.(*apiv1.Role)
+		role, ok := obj.(*apiv1.DatabaseRole)
 		if !ok || role.Spec.ClusterRef.Name == "" {
 			return nil
 		}

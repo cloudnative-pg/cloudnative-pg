@@ -46,9 +46,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Set of tests in which we use the role CRD to add new roles on an existing cluster
+// Set of tests in which we use the DatabaseRole CRD to add new roles on an existing cluster
 var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.LabelBasic,
-	tests.LabelDeclarativeRoles), func() {
+	tests.LabelDeclarativeDatabaseRoles), func() {
 	const (
 		clusterManifest = fixturesDir + "/declarative_roles/cluster.yaml.template"
 		level           = tests.Medium
@@ -110,7 +110,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			}, 30).Should(BeEquivalentTo(expectedRoles))
 		}
 
-		assertRoleHasExpectedFields := func(namespace, primaryPod string, role apiv1.Role) {
+		assertRoleHasExpectedFields := func(namespace, primaryPod string, role apiv1.DatabaseRole) {
 			boolPtrToSQL := func(b *bool) string {
 				if b == nil {
 					return "NULL"
@@ -145,17 +145,17 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			retainOnDeletion bool,
 		) {
 			var (
-				role           apiv1.Role
+				role           apiv1.DatabaseRole
 				roleObjectName string
 			)
-			By("applying Role CRD manifest", func() {
+			By("applying DatabaseRole CRD manifest", func() {
 				CreateResourceFromFile(namespace, roleManifest)
 				roleObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, roleManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			By("ensuring the Role CRD succeeded reconciliation", func() {
+			By("ensuring the DatabaseRole CRD succeeded reconciliation", func() {
 				// get role object
-				role = apiv1.Role{}
+				role = apiv1.DatabaseRole{}
 				roleNamespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      roleObjectName,
@@ -213,7 +213,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 		When("Role CR reclaim policy is set to retain", func() {
 			It("can manage a declarative role and release it", func() {
-				roleManifest := fixturesDir + "/declarative_roles/role.yaml.template"
+				roleManifest := fixturesDir + "/declarative_roles/databaserole.yaml.template"
 				assertTestDeclarativeRole(roleManifest, true)
 			})
 		})
@@ -222,8 +222,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			It("will make sure that only one is managing it", func() {
 				var (
 					pgRoleName string
-					firstRole  *apiv1.Role
-					secondRole *apiv1.Role
+					firstRole  *apiv1.DatabaseRole
+					secondRole *apiv1.DatabaseRole
 				)
 
 				By("choosing a random postgresql user name", func() {
@@ -231,10 +231,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				})
 
 				By("applying a manifest for it", func() {
-					firstRole = &apiv1.Role{}
+					firstRole = &apiv1.DatabaseRole{}
 					firstRole.Name = fmt.Sprintf("first-%s", pgRoleName)
 					firstRole.Namespace = namespace
-					firstRole.Spec = apiv1.RoleSpec{
+					firstRole.Spec = apiv1.DatabaseRoleSpec{
 						RoleConfiguration: apiv1.RoleConfiguration{
 							Name:   pgRoleName,
 							Ensure: apiv1.EnsurePresent,
@@ -243,7 +243,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						ClusterRef: corev1.LocalObjectReference{
 							Name: clusterName,
 						},
-						ReclaimPolicy: apiv1.RoleReclaimDelete,
+						ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
 					}
 					Expect(env.Client.Create(env.Ctx, firstRole)).To(Succeed())
 				})
@@ -262,10 +262,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				})
 
 				By("applying the same Role CR but with a different object name", func() {
-					secondRole = &apiv1.Role{}
+					secondRole = &apiv1.DatabaseRole{}
 					secondRole.Name = fmt.Sprintf("second-%s", pgRoleName)
 					secondRole.Namespace = namespace
-					secondRole.Spec = apiv1.RoleSpec{
+					secondRole.Spec = apiv1.DatabaseRoleSpec{
 						RoleConfiguration: apiv1.RoleConfiguration{
 							Name:   pgRoleName,
 							Ensure: apiv1.EnsurePresent,
@@ -274,7 +274,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						ClusterRef: corev1.LocalObjectReference{
 							Name: clusterName,
 						},
-						ReclaimPolicy: apiv1.RoleReclaimDelete,
+						ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
 					}
 					Expect(env.Client.Create(env.Ctx, secondRole)).To(Succeed())
 				})
@@ -302,7 +302,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 		When("Role CR is managing the password of the PostgreSQL role", func() {
 			It("updates the password inside the PostgreSQL catalog", func() {
 				var (
-					role            *apiv1.Role
+					role            *apiv1.DatabaseRole
 					passwordSecret  *corev1.Secret
 					pgRoleName      string
 					secretName      string
@@ -312,12 +312,12 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 				By("creating a Role CR without a password secret specified", func() {
 					pgRoleName = fmt.Sprintf("password-test-role-%d", funk.RandomInt(0, 9999))
-					role = &apiv1.Role{
+					role = &apiv1.DatabaseRole{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      fmt.Sprintf("password-test-role-%s", pgRoleName),
 							Namespace: namespace,
 						},
-						Spec: apiv1.RoleSpec{
+						Spec: apiv1.DatabaseRoleSpec{
 							RoleConfiguration: apiv1.RoleConfiguration{
 								Name:   pgRoleName,
 								Ensure: apiv1.EnsurePresent,
@@ -326,7 +326,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 							ClusterRef: corev1.LocalObjectReference{
 								Name: clusterName,
 							},
-							ReclaimPolicy: apiv1.RoleReclaimDelete,
+							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
 						},
 					}
 					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
@@ -445,15 +445,15 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 		It("marks roles already managed as failed", func() {
 			var (
-				petrarcaRole *apiv1.Role
-				aristoRole   *apiv1.Role
+				petrarcaRole *apiv1.DatabaseRole
+				aristoRole   *apiv1.DatabaseRole
 			)
 
 			By("creating a declarative role named 'petrarca'", func() {
-				petrarcaRole = &apiv1.Role{}
+				petrarcaRole = &apiv1.DatabaseRole{}
 				petrarcaRole.Name = "role-petrarca"
 				petrarcaRole.Namespace = namespace
-				petrarcaRole.Spec = apiv1.RoleSpec{
+				petrarcaRole.Spec = apiv1.DatabaseRoleSpec{
 					RoleConfiguration: apiv1.RoleConfiguration{
 						Name:   "petrarca",
 						Ensure: apiv1.EnsurePresent,
@@ -462,7 +462,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					ClusterRef: corev1.LocalObjectReference{
 						Name: clusterName,
 					},
-					ReclaimPolicy: apiv1.RoleReclaimDelete,
+					ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
 				}
 				Expect(env.Client.Create(env.Ctx, petrarcaRole)).To(Succeed())
 			})
@@ -481,10 +481,10 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			})
 
 			By("creating a declarative role named 'ariosto'", func() {
-				aristoRole = &apiv1.Role{}
+				aristoRole = &apiv1.DatabaseRole{}
 				aristoRole.Name = "role-ariosto"
 				aristoRole.Namespace = namespace
-				aristoRole.Spec = apiv1.RoleSpec{
+				aristoRole.Spec = apiv1.DatabaseRoleSpec{
 					RoleConfiguration: apiv1.RoleConfiguration{
 						Name:   "ariosto",
 						Ensure: apiv1.EnsurePresent,
@@ -493,7 +493,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					ClusterRef: corev1.LocalObjectReference{
 						Name: clusterName,
 					},
-					ReclaimPolicy: apiv1.RoleReclaimDelete,
+					ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
 				}
 				Expect(env.Client.Create(env.Ctx, aristoRole)).To(Succeed())
 			})
@@ -536,14 +536,14 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			})
 			By("creating the role", func() {
 				roleManifest := fixturesDir +
-					"/declarative_roles/role-with-delete-reclaim-policy.yaml.template"
+					"/declarative_roles/databaserole-with-delete-reclaim-policy.yaml.template"
 				roleObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, roleManifest)
 				Expect(err).NotTo(HaveOccurred())
 				CreateResourceFromFile(namespace, roleManifest)
 			})
 			By("ensuring the role is reconciled successfully", func() {
 				// get role object
-				roleObj := &apiv1.Role{}
+				roleObj := &apiv1.DatabaseRole{}
 				roleNamespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      roleObjectName,

@@ -18,31 +18,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.
+// DatabaseRoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.
 // +enum
-type RoleReclaimPolicy string
+type DatabaseRoleReclaimPolicy string
 
 const (
-	// RoleReclaimDelete means the Role will be deleted from Kubernetes on release
+	// DatabaseRoleReclaimDelete means the Role will be deleted from Kubernetes on release
 	// from its claim.
-	RoleReclaimDelete RoleReclaimPolicy = "delete"
+	DatabaseRoleReclaimDelete DatabaseRoleReclaimPolicy = "delete"
 
-	// RoleReclaimRetain means the Role will be left in its current phase for manual
+	// DatabaseRoleReclaimRetain means the Role will be left in its current phase for manual
 	// reclamation by the administrator. The default policy is Retain.
-	RoleReclaimRetain RoleReclaimPolicy = "retain"
+	DatabaseRoleReclaimRetain DatabaseRoleReclaimPolicy = "retain"
 )
 
-// RoleConditionType defines types of role conditions
-type RoleConditionType string
+// DatabaseRoleConditionType defines types of role conditions
+type DatabaseRoleConditionType string
 
 const (
 	// ConditionPasswordSecretChange is true when the all the instances of the
 	// cluster report the same System ID.
-	ConditionPasswordSecretChange RoleConditionType = "PasswordSecretChange"
+	ConditionPasswordSecretChange DatabaseRoleConditionType = "PasswordSecretChange"
 )
 
-// RoleSpec represents a role in Postgres
-type RoleSpec struct {
+// DatabaseRoleSpec represents a role in Postgres
+type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
 	RoleConfiguration `json:",inline"`
@@ -54,12 +54,12 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Enum=delete;retain
 	// +kubebuilder:default:=retain
 	// +optional
-	ReclaimPolicy RoleReclaimPolicy `json:"roleReclaimPolicy,omitempty"`
+	ReclaimPolicy DatabaseRoleReclaimPolicy `json:"roleReclaimPolicy,omitempty"`
 }
 
-// RoleState defines the observed state of a Role
+// DatabaseRoleState defines the observed state of a Role
 // TODO: the existing RoleStatus in the cluster managed roles, does more than we need
-type RoleState struct {
+type DatabaseRoleState struct {
 	// A sequence number representing the latest
 	// desired state that was synchronized
 	// +optional
@@ -90,24 +90,24 @@ type RoleState struct {
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest message"
 
-// Role is the Schema for the databases API
-type Role struct {
+// DatabaseRole is the Schema for the databases API
+type DatabaseRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RoleSpec  `json:"spec,omitempty"`
-	Status RoleState `json:"status,omitempty"`
+	Spec   DatabaseRoleSpec  `json:"spec,omitempty"`
+	Status DatabaseRoleState `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// RoleList contains a list of Roles
-type RoleList struct {
+// DatabaseRoleList contains a list of Roles
+type DatabaseRoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Role `json:"items"`
+	Items           []DatabaseRole `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Role{}, &RoleList{})
+	SchemeBuilder.Register(&DatabaseRole{}, &DatabaseRoleList{})
 }

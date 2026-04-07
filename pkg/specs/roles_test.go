@@ -304,10 +304,10 @@ var _ = Describe("Secrets", func() {
 	})
 })
 
-var _ = Describe("Roles", func() {
-	crdRoles := []apiv1.Role{
+var _ = Describe("Database Roles", func() {
+	crdRoles := []apiv1.DatabaseRole{
 		{
-			Spec: apiv1.RoleSpec{
+			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{
 					PasswordSecret: &apiv1.LocalObjectReference{
 						Name: "my_secret5",
@@ -317,7 +317,7 @@ var _ = Describe("Roles", func() {
 			},
 		},
 		{
-			Spec: apiv1.RoleSpec{
+			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{
 					Name: "role6",
 				},
@@ -378,10 +378,10 @@ var _ = Describe("Roles", func() {
 	})
 })
 
-var _ = Describe("CRD role secret name", func() {
+var _ = Describe("CRD database role secret name", func() {
 	It("should be empty when password is disabled", func() {
-		role := apiv1.Role{
-			Spec: apiv1.RoleSpec{
+		role := apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{
 					DisablePassword: true,
 					PasswordSecret:  &apiv1.LocalObjectReference{},
@@ -392,15 +392,15 @@ var _ = Describe("CRD role secret name", func() {
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret is nil", func() {
-		role := apiv1.Role{
-			Spec: apiv1.RoleSpec{},
+		role := apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{},
 		}
 		secrets := crdRoleSecretName(role)
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret name is empty", func() {
-		role := apiv1.Role{
-			Spec: apiv1.RoleSpec{
+		role := apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{
 					PasswordSecret: &apiv1.LocalObjectReference{},
 				},
@@ -410,8 +410,8 @@ var _ = Describe("CRD role secret name", func() {
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should work properly when the password secret name is set", func() {
-		role := apiv1.Role{
-			Spec: apiv1.RoleSpec{
+		role := apiv1.DatabaseRole{
+			Spec: apiv1.DatabaseRoleSpec{
 				RoleConfiguration: apiv1.RoleConfiguration{
 					PasswordSecret: &apiv1.LocalObjectReference{
 						Name: "secret-name",

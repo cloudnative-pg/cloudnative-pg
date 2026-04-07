@@ -19,20 +19,20 @@ import (
 )
 
 // SetAsFailed sets the publication as failed with the given error
-func (r *Role) SetAsFailed(err error) {
+func (r *DatabaseRole) SetAsFailed(err error) {
 	r.Status.Applied = ptr.To(false)
 	r.Status.Message = err.Error()
 }
 
 // SetAsApplied sets the subscription as working correctly
-func (r *Role) SetAsApplied() {
+func (r *DatabaseRole) SetAsApplied() {
 	r.Status.Message = ""
 	r.Status.Applied = ptr.To(true)
 	r.Status.ObservedGeneration = r.Generation
 }
 
 // GetRoleInherit returns the inherit attribute of a roleConfiguration
-func (roleSpec *RoleSpec) GetRoleInherit() bool {
+func (roleSpec *DatabaseRoleSpec) GetRoleInherit() bool {
 	if roleSpec.Inherit != nil {
 		return *roleSpec.Inherit
 	}
@@ -40,7 +40,7 @@ func (roleSpec *RoleSpec) GetRoleInherit() bool {
 }
 
 // GetRoleSecretName gets the name of the secret holding the role password
-func (roleSpec *RoleSpec) GetRoleSecretName() string {
+func (roleSpec *DatabaseRoleSpec) GetRoleSecretName() string {
 	if roleSpec.PasswordSecret == nil {
 		return ""
 	}
@@ -48,42 +48,42 @@ func (roleSpec *RoleSpec) GetRoleSecretName() string {
 }
 
 // GetRoleName gets the role name
-func (roleSpec *RoleSpec) GetRoleName() string {
+func (roleSpec *DatabaseRoleSpec) GetRoleName() string {
 	return roleSpec.Name
 }
 
 // ShouldDisablePassword checks if the password should be disabled in Postgres
-func (roleSpec *RoleSpec) ShouldDisablePassword() bool {
+func (roleSpec *DatabaseRoleSpec) ShouldDisablePassword() bool {
 	return roleSpec.DisablePassword
 }
 
 // HasReconciliations returns true if the role has been reconciled at least once
-func (r *Role) HasReconciliations() bool {
+func (r *DatabaseRole) HasReconciliations() bool {
 	return r.Status.ObservedGeneration > 0
 }
 
 // MustHaveManagedResourceExclusivity detects conflicting roles
-func (roleList *RoleList) MustHaveManagedResourceExclusivity(role *Role) error {
+func (roleList *DatabaseRoleList) MustHaveManagedResourceExclusivity(role *DatabaseRole) error {
 	pointers := toSliceWithPointers(roleList.Items)
 	return ensureManagedResourceExclusivity(role, pointers)
 }
 
 // GetClusterRef returns the cluster reference of the role
-func (r *Role) GetClusterRef() corev1.LocalObjectReference {
+func (r *DatabaseRole) GetClusterRef() corev1.LocalObjectReference {
 	return r.Spec.ClusterRef
 }
 
 // GetManagedObjectName returns the name of the managed role object
-func (r *Role) GetManagedObjectName() string {
+func (r *DatabaseRole) GetManagedObjectName() string {
 	return r.Spec.Name
 }
 
 // GetStatusMessage returns the status message of the role
-func (r *Role) GetStatusMessage() string {
+func (r *DatabaseRole) GetStatusMessage() string {
 	return r.Status.Message
 }
 
 // SetStatusObservedGeneration sets the observed generation of the role
-func (r *Role) SetStatusObservedGeneration(obsGeneration int64) {
+func (r *DatabaseRole) SetStatusObservedGeneration(obsGeneration int64) {
 	r.Status.ObservedGeneration = obsGeneration
 }

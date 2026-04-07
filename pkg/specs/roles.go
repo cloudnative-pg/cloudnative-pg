@@ -44,7 +44,7 @@ type RoleOptions struct {
 	// Roles is the list of PostgreSQL roles. It is used to grant
 	// the instance manager permissions to read the secrets that
 	// contain the roles' password.
-	Roles []apiv1.Role
+	Roles []apiv1.DatabaseRole
 }
 
 // CreateRole create a role with the permissions needed by the instance manager
@@ -252,7 +252,24 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 				"postgresql.cnpg.io",
 			},
 			Resources: []string{
-				"roles",
+				"failoverquorums/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+				"watch",
+			},
+			ResourceNames: []string{
+				opts.Cluster.Name,
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"databaseroles",
 			},
 			Verbs: []string{
 				"get",
@@ -267,30 +284,13 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 				"postgresql.cnpg.io",
 			},
 			Resources: []string{
-				"roles/status",
+				"databaseroles/status",
 			},
 			Verbs: []string{
 				"get",
 				"patch",
 				"update",
 				"watch",
-			},
-		},
-		{
-			APIGroups: []string{
-				"postgresql.cnpg.io",
-			},
-			Resources: []string{
-				"failoverquorums/status",
-			},
-			Verbs: []string{
-				"get",
-				"patch",
-				"update",
-				"watch",
-			},
-			ResourceNames: []string{
-				opts.Cluster.Name,
 			},
 		},
 	}
@@ -522,7 +522,7 @@ func managedRolesSecrets(cluster *apiv1.Cluster) []string {
 	return secretNames
 }
 
-func customResourceRolesSecrets(roles []apiv1.Role) []string {
+func customResourceRolesSecrets(roles []apiv1.DatabaseRole) []string {
 	result := make([]string, 0, len(roles))
 
 	for _, r := range roles {
@@ -534,7 +534,7 @@ func customResourceRolesSecrets(roles []apiv1.Role) []string {
 	return result
 }
 
-func crdRoleSecretName(role apiv1.Role) string {
+func crdRoleSecretName(role apiv1.DatabaseRole) string {
 	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
 		return ""
 	}
