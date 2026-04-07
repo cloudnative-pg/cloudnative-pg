@@ -186,7 +186,7 @@ authentication rules in the `postgresql` section of the CR.
 ### Configuration of Postgres roles, users, and groups
 
 CloudNativePG supports
-[management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
+[management of PostgreSQL roles, users, and groups through declarative configuration](declarative_database_role_management.md)
 using the `.spec.managed.roles` stanza.
 
 ### Configuration of Postgres extensions
