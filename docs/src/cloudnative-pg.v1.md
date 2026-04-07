@@ -19,12 +19,12 @@ Package v1 contains API Schema definitions for the postgresql v1 API group
 - [Cluster](#cluster)
 - [ClusterImageCatalog](#clusterimagecatalog)
 - [Database](#database)
+- [DatabaseRole](#databaserole)
+- [DatabaseRoleList](#databaserolelist)
 - [FailoverQuorum](#failoverquorum)
 - [ImageCatalog](#imagecatalog)
 - [Pooler](#pooler)
 - [Publication](#publication)
-- [Role](#role)
-- [RoleList](#rolelist)
 - [ScheduledBackup](#scheduledbackup)
 - [Subscription](#subscription)
 
@@ -831,6 +831,65 @@ _Appears in:_
 | `retain` | DatabaseReclaimRetain means the database will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
 
 
+#### DatabaseRole
+
+
+
+DatabaseRole is the Schema for the databases API
+
+
+
+_Appears in:_
+
+- [DatabaseRoleList](#databaserolelist)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `DatabaseRole` | True | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `spec` _[DatabaseRoleSpec](#databaserolespec)_ |  | True |  |  |
+| `status` _[DatabaseRoleState](#databaserolestate)_ |  | True |  |  |
+
+
+
+
+#### DatabaseRoleList
+
+
+
+DatabaseRoleList contains a list of Roles
+
+
+
+
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
+| `kind` _string_ | `DatabaseRoleList` | True | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
+| `items` _[DatabaseRole](#databaserole) array_ |  | True |  |  |
+
+
+#### DatabaseRoleReclaimPolicy
+
+_Underlying type:_ _string_
+
+DatabaseRoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleSpec](#databaserolespec)
+
+| Field | Description |
+| --- | --- |
+| `delete` | DatabaseRoleReclaimDelete means the Role will be deleted from Kubernetes on release<br />from its claim.<br /> |
+| `retain` | DatabaseRoleReclaimRetain means the Role will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
+
+
 #### DatabaseRoleRef
 
 
@@ -846,6 +905,60 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ |  |  |  |  |
+
+
+#### DatabaseRoleSpec
+
+
+
+DatabaseRoleSpec represents a role in Postgres
+
+
+
+_Appears in:_
+
+- [DatabaseRole](#databaserole)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the role | True |  |  |
+| `comment` _string_ | Description of the role |  |  |  |
+| `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
+| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
+| `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
+| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
+| `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
+| `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
+| `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
+| `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |
+| `createdb` _boolean_ | When set to `true`, the role being defined will be allowed to create<br />new databases. Specifying `false` (default) will deny a role the<br />ability to create databases. |  |  |  |
+| `createrole` _boolean_ | Whether the role will be permitted to create, alter, drop, comment<br />on, change the security label for, and grant or revoke membership in<br />other roles. Default is `false`. |  |  |  |
+| `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
+| `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
+| `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
+| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
+| `roleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
+
+
+#### DatabaseRoleState
+
+
+
+DatabaseRoleState defines the observed state of a Role
+
+
+
+_Appears in:_
+
+- [DatabaseRole](#databaserole)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `observedGeneration` _integer_ | A sequence number representing the latest<br />desired state that was synchronized |  |  |  |
+| `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
+| `message` _string_ | Message is the reconciliation error message |  |  |  |
+| `passwordState` _[PasswordState](#passwordstate)_ | PasswordState holds the last applied version of the passwordSecret, and<br />the last transaction ID of the role in postgres | True |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
 
 
 #### DatabaseSpec
@@ -942,12 +1055,12 @@ a Role in a PostgreSQL instance
 _Appears in:_
 
 - [DatabaseObjectSpec](#databaseobjectspec)
+- [DatabaseRoleSpec](#databaserolespec)
 - [DatabaseSpec](#databasespec)
 - [ExtensionSpec](#extensionspec)
 - [FDWSpec](#fdwspec)
 - [OptionSpec](#optionspec)
 - [RoleConfiguration](#roleconfiguration)
-- [RoleSpec](#rolespec)
 - [SchemaSpec](#schemaspec)
 - [ServerSpec](#serverspec)
 
@@ -1617,8 +1730,8 @@ PasswordState represents the state of the password of a managed RoleConfiguratio
 
 _Appears in:_
 
+- [DatabaseRoleState](#databaserolestate)
 - [ManagedRoles](#managedroles)
-- [RoleState](#rolestate)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2380,29 +2493,6 @@ _Appears in:_
 | `synchronizeLogicalDecoding` _boolean_ | When enabled, the operator automatically manages synchronization of logical<br />decoding (replication) slots across high-availability clusters.<br />Requires one of the following conditions:<br />- PostgreSQL version 17 or later<br />- PostgreSQL version < 17 with pg_failover_slots extension enabled |  |  |  |
 
 
-#### Role
-
-
-
-Role is the Schema for the databases API
-
-
-
-_Appears in:_
-
-- [RoleList](#rolelist)
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `Role` | True | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `spec` _[RoleSpec](#rolespec)_ |  | True |  |  |
-| `status` _[RoleState](#rolestate)_ |  | True |  |  |
-
-
-
-
 #### RoleConfiguration
 
 
@@ -2418,8 +2508,8 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 
 _Appears in:_
 
+- [DatabaseRoleSpec](#databaserolespec)
 - [ManagedConfiguration](#managedconfiguration)
-- [RoleSpec](#rolespec)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2438,96 +2528,6 @@ _Appears in:_
 | `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
 | `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
-
-
-#### RoleList
-
-
-
-RoleList contains a list of Roles
-
-
-
-
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
-| `kind` _string_ | `RoleList` | True | | |
-| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `items` _[Role](#role) array_ |  | True |  |  |
-
-
-#### RoleReclaimPolicy
-
-_Underlying type:_ _string_
-
-RoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.
-
-
-
-_Appears in:_
-
-- [RoleSpec](#rolespec)
-
-| Field | Description |
-| --- | --- |
-| `delete` | RoleReclaimDelete means the Role will be deleted from Kubernetes on release<br />from its claim.<br /> |
-| `retain` | RoleReclaimRetain means the Role will be left in its current phase for manual<br />reclamation by the administrator. The default policy is Retain.<br /> |
-
-
-#### RoleSpec
-
-
-
-RoleSpec represents a role in Postgres
-
-
-
-_Appears in:_
-
-- [Role](#role)
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `name` _string_ | Name of the role | True |  |  |
-| `comment` _string_ | Description of the role |  |  |  |
-| `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
-| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
-| `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
-| `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
-| `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |
-| `inherit` _boolean_ | Whether a role "inherits" the privileges of roles it is a member of.<br />Default is `true`. |  | true |  |
-| `disablePassword` _boolean_ | DisablePassword indicates that a role's password should be set to NULL in Postgres |  |  |  |
-| `superuser` _boolean_ | Whether the role is a `superuser` who can override all access<br />restrictions within the database - superuser status is dangerous and<br />should be used only when really needed. You must yourself be a<br />superuser to create a new superuser. Defaults is `false`. |  |  |  |
-| `createdb` _boolean_ | When set to `true`, the role being defined will be allowed to create<br />new databases. Specifying `false` (default) will deny a role the<br />ability to create databases. |  |  |  |
-| `createrole` _boolean_ | Whether the role will be permitted to create, alter, drop, comment<br />on, change the security label for, and grant or revoke membership in<br />other roles. Default is `false`. |  |  |  |
-| `login` _boolean_ | Whether the role is allowed to log in. A role having the `login`<br />attribute can be thought of as a user. Roles without this attribute<br />are useful for managing database privileges, but are not users in<br />the usual sense of the word. Default is `false`. |  |  |  |
-| `replication` _boolean_ | Whether a role is a replication role. A role must have this<br />attribute (or be a superuser) in order to be able to connect to the<br />server in replication mode (physical or logical replication) and in<br />order to be able to create or drop replication slots. A role having<br />the `replication` attribute is a very highly privileged role, and<br />should only be used on roles actually used for replication. Default<br />is `false`. |  |  |  |
-| `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
-| `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
-| `roleReclaimPolicy` _[RoleReclaimPolicy](#rolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
-
-
-#### RoleState
-
-
-
-RoleState defines the observed state of a Role
-
-
-
-_Appears in:_
-
-- [Role](#role)
-
-| Field | Description | Required | Default | Validation |
-| --- | --- | --- | --- | --- |
-| `observedGeneration` _integer_ | A sequence number representing the latest<br />desired state that was synchronized |  |  |  |
-| `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
-| `message` _string_ | Message is the reconciliation error message |  |  |  |
-| `passwordState` _[PasswordState](#passwordstate)_ | PasswordState holds the last applied version of the passwordSecret, and<br />the last transaction ID of the role in postgres | True |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
 
 
 #### RoleStatus

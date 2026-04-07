@@ -128,7 +128,11 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
 DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
 DatabaseRoleSpec
 DatabaseRoleState
@@ -439,6 +443,7 @@ RoleBinding
 RoleConfiguration
 RoleReclaimDelete
 RoleReclaimRetain
+RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
 RoleStatusReconciled
@@ -807,7 +812,12 @@ databaseReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaserolespec
+databaserolestate
 databasespec
 databasestatus
 datacenter
