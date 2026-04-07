@@ -141,7 +141,10 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return r.succeededReconciliation(ctx, &role, passVersion)
 }
 
-func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(ctx context.Context, role *apiv1.DatabaseRole) (ctrl.Result, error) {
+func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+) (ctrl.Result, error) {
 	// No password secret is configured, we can continue the reconciliation loop
 	if role.Spec.GetRoleSecretName() == "" {
 		return ctrl.Result{}, nil
@@ -152,7 +155,7 @@ func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(ctx context.Context
 		Name:      role.Spec.GetRoleSecretName(),
 	}
 	var secret corev1.Secret
-	if err := r.Client.Get(ctx, secretObjectKey, &secret); err != nil {
+	if err := r.Get(ctx, secretObjectKey, &secret); err != nil {
 		return r.failedReconciliation(ctx, role, err)
 	}
 
