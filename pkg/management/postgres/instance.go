@@ -813,6 +813,9 @@ func (instance *Instance) buildPostgresEnv() []string {
 		envMap["PATH"] = currentPath
 	}
 
+	// Set custom environment variables from extensions.
+	setExtensionEnvVars(cluster.Status.PGDataImageInfo.Extensions, envMap)
+
 	return envMap.StringSlice()
 }
 
@@ -862,6 +865,48 @@ func collectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 	}
 
 	return result
+}
+
+// dedicatedExtensionEnvVars lists environment variables that are managed
+// via dedicated extension fields and must not be overridden by custom env vars.
+var dedicatedExtensionEnvVars = map[string]bool{
+	"PATH":            true,
+	"LD_LIBRARY_PATH": true,
+}
+
+// setExtensionEnvVars sets custom environment variables given a list of extensions,
+// expanding supported placeholders in the values.
+// As a defense-in-depth measure, env vars that are reserved for operator usage
+// or managed via dedicated fields are silently skipped.
+func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
+	// Track which extension set each variable, to detect cross-extension conflicts.
+	setBy := make(map[string]string)
+
+	for _, extension := range extensionList {
+		for _, envVar := range extension.Env {
+			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedExtensionEnvVars[envVar.Name] {
+				log.Warning("Skipping reserved environment variable from extension",
+					"extension", extension.Name, "variable", envVar.Name)
+				continue
+			}
+
+			if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+				log.Warning("Extension environment variable contains unknown placeholders",
+					"extension", extension.Name, "variable", envVar.Name, "unknownPlaceholders", unknown)
+			}
+
+			if prev, ok := setBy[envVar.Name]; ok {
+				log.Warning("Extension environment variable overrides value from a previous extension",
+					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
+			} else if _, exists := envMap[envVar.Name]; exists {
+				log.Warning("Extension environment variable overrides a cluster-level value",
+					"variable", envVar.Name, "extension", extension.Name)
+			}
+
+			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name)
+			setBy[envVar.Name] = extension.Name
+		}
+	}
 }
 
 // WithActiveInstance execute the internal function while this

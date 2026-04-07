@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.27, release-1.28]
+        branch: [release-1.25, release-1.28, release-1.29]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
@@ -238,6 +238,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      runs_on: ${{ steps.set-runner.outputs.runs_on }}
     steps:
       - name: From command
         env:
@@ -272,6 +273,17 @@ jobs:
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
           fi
 
+      - name: Set runner based on organization
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+        id: set-runner
+        run: |
+          if [[ "${REPO_OWNER}" == "cloudnative-pg" ]]; then
+            echo "runs_on=ubuntu-latest-16-cores" >> $GITHUB_OUTPUT
+          else
+            echo "runs_on=ubuntu-24.04" >> $GITHUB_OUTPUT
+          fi
+
   buildx:
     name: Build containers
     needs:
@@ -281,7 +293,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     permissions:
       contents: read
       packages: write
@@ -472,9 +484,7 @@ jobs:
       # upgrade test
         name: Build binary for upgrade test
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
           version: v2
@@ -495,9 +505,7 @@ jobs:
         name: Build and push image for upgrade test
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         id: build-prime
-        if: |
-          always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4'
+        if: needs.evaluate_options.outputs.test_level == '4'
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -643,7 +651,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.kindMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -838,7 +846,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.k3dMatrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ needs.evaluate_options.outputs.runs_on }}
     env:
       # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}

@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.27, release-1.28]
+        branch: [release-1.25, release-1.28, release-1.29]
     env:
       BRANCH: ${{ matrix.branch }}
     steps:
@@ -430,7 +430,7 @@ jobs:
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       actions: read
       contents: read
@@ -873,7 +873,7 @@ jobs:
       matrix:
         test: [ kiwi, lemon, orange ]
     name: Run OLM ${{ matrix.test }} test
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     needs:
       - buildx
       - olm-bundle

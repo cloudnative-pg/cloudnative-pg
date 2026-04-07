@@ -374,6 +374,7 @@ extension image, particularly when:
 - Multiple extensions are bundled in the same image.
 - The image uses a custom directory structure.
 - The extension requires external binaries to function properly.
+- The extension requires setting specific environment variables.
 
 Following the *"convention over configuration"* paradigm, CloudNativePG allows
 you to finely control the configuration of each extension image through the
@@ -392,6 +393,8 @@ following fields:
 - `bin_path`: A list of relative paths within the container image to be
   appended to the `PATH` environment variable of the Postgres process,
   allowing PostgreSQL to locate binaries at runtime.
+- `env`: A list of `name` and `value` pairs to be set as environment variables within
+  the Postgres process.
 
 This flexibility enables you to support complex or non-standard extension
 images while maintaining clarity and predictability.
@@ -537,6 +540,94 @@ effect.
 CloudNativePG does not currently trigger this restart automatically; you will
 need to manually restart the cluster (e.g., using `cnpg restart`) after
 modifying `bin_path`.
+:::
+
+### Environment variables for extensions
+
+Certain extensions require specific environment variables to be set within the
+PostgreSQL process to function correctly. You can define these variables using
+the `env` field within the extension's configuration.
+
+The following example demonstrates how to set a static variable (`FOO`) and a
+variable using a placeholder (`BAR`):
+
+```yaml
+# ...
+spec:
+  # ... <snip>
+  postgresql:
+    # ... <snip>
+    extensions:
+      - name: my-extension
+        image:
+          reference: "ghcr.io/org/my-extension:latest"
+        env:
+          - name: FOO
+            value: "static_value"
+          - name: BAR
+            value: "${image_root}/lib"
+      # ... <snip>
+# ...
+```
+
+#### Dynamic Placeholder Expansion
+
+The `value` field supports placeholder expansion to allow for dynamic
+configuration based on the extension's environment.
+The following placeholders are currently supported:
+
+| Placeholder | Description |
+| :--- | :--- |
+| `${image_root}` | Resolves to the absolute mount path of the extension's volume (e.g., `/extensions/my-extension`). |
+
+The `${image_root}` placeholder is particularly useful when an application or a
+shared library within the extension image needs an environment variable to
+point to a specific subdirectory or file inside its own mounted volume.
+
+In the example above, if the extension is mounted at
+`/extensions/my-extension`, the variable `BAR` will resolve to
+`/extensions/my-extension/lib`, allowing the library to locate its
+dependencies regardless of the specific mount path chosen by the operator.
+
+:::tip
+Unrecognized placeholders (e.g., `${typo}`) are rejected at admission time.
+If you need a literal `${...}` in a value, escape it by doubling the dollar
+sign: `$${...}`. For example, a value of `$${not_expanded}` will produce the
+literal string `${not_expanded}`.
+:::
+
+#### Precedence and Conflict Resolution
+
+Environment variables for the PostgreSQL process can be defined in multiple
+places. When the same variable name appears in more than one location, the
+following precedence order applies (highest priority last):
+
+1. **`spec.env` / `spec.envFrom`**: Variables defined at the cluster level are
+   injected by Kubernetes into the container environment and serve as the base.
+2. **Extension `env`**: Variables defined in the `env` field of each extension
+   override any cluster-level variable with the same name.
+3. **Extension order**: If multiple extensions define the same variable, the
+   extension listed last in the `extensions` array takes precedence.
+
+CloudNativePG emits a warning in the instance manager logs when an extension
+environment variable overwrites a value that was already set by a previous
+extension, to help diagnose potential conflicts.
+
+:::important
+**Reserved variables**: Environment variables reserved for operator usage
+(names starting with `PG` or `CNPG_`, plus `POD_NAME`, `NAMESPACE`, and
+`CLUSTER_NAME`) and variables managed by dedicated fields (`PATH` via
+`bin_path`, `LD_LIBRARY_PATH` via `ld_library_path`) cannot be set through
+the `env` field and are rejected at admission time.
+:::
+
+:::warning
+**Manual Restart Required**: Because environment variables are injected when
+the PostgreSQL process starts, any changes to the `env` section **require a
+cluster restart**. CloudNativePG does **not** automatically trigger a rollout
+for these changes. After updating the `env` field in your manifest, you must
+manually restart the cluster (e.g., using `kubectl cnpg restart`) for the new
+values to take effect.
 :::
 
 ## Image Specifications

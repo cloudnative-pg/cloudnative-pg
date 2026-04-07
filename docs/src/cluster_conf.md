@@ -91,6 +91,12 @@ Use this field only in case of
 
 ## Environment variables
 
+:::important
+Environment variables reserved for operator usage (names starting with `PG` or
+`CNPG_`, plus `POD_NAME`, `NAMESPACE`, and `CLUSTER_NAME`) cannot be set
+through the `env` and `envFrom` fields and are rejected at admission time.
+:::
+
 You can customize some system behavior using environment variables. One example
 is the `LDAPCONF` variable, which can point to a custom LDAP configuration
 file. Another example is the `TZ` environment variable, which represents the
