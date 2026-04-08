@@ -223,7 +223,7 @@ the application database.
 
 :::info[Important]
     If you need to create additional users, please refer to
-    ["Declarative database role management"](declarative_database_role_management.md).
+    ["Declarative database role management"](declarative_role_management.md).
 :::
 
 In case you don't supply any database name, the operator will proceed

@@ -1,4 +1,4 @@
-o--
+---
 id: declarative_role_management
 sidebar_position: 230
 title: PostgreSQL Role management
@@ -21,7 +21,7 @@ This process is described in the ["Bootstrap"](bootstrap.md) section.
 CloudNativePG provides full lifecycle management for PostgreSQL database roles.
 You can define roles either:
 
-1. as [standalone `Role` resources](#the-role-resource) (recommended), or
+1. as [standalone `DatabaseRole` resources](#the-databaserole-resource) (recommended), or
 2. via [the `managed` stanza within the `Cluster` spec](#inline-managed-roles).
 
 ## General Role Configuration Notes
@@ -47,7 +47,7 @@ A few points are worth noting:
 
 -----
 
-## The `DatabaseRole` Resource (CRD)
+## The `DatabaseRole` Resource
 
 The `DatabaseRole` Custom Resource provides a dedicated, Kubernetes-native way to
 manage PostgreSQL database roles.
@@ -85,7 +85,7 @@ An example manifest for a role definition can be found in the file
 ### Role Reclaim Policy
 
 The `roleReclaimPolicy` field defines the "final act" of the operator when a
-`Role` Custom Resource is removed from the Kubernetes API.
+`DatabaseRole` Custom Resource is removed from the Kubernetes API.
 This mirrors the behavior of Kubernetes Persistent Volumes.
 
 - **`retain` (default):** The role is left in the database. This is the safest
@@ -103,9 +103,9 @@ The Kubernetes resource will remain in a `Terminating` state until the database
 allows the `DROP ROLE` command to succeed.
 :::
 
-### Status of `Role` resources
+### Status of `DatabaseRole` resources
 
-The `Role` resource includes a dedicated `status` section for per-role
+The `DatabaseRole` resource includes a dedicated `status` section for per-role
 observability:
 
 ```yaml
@@ -209,20 +209,20 @@ petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" do
 You can use both methods simultaneously for different roles.
 
 However, **the Cluster specification (`managed.roles`) always takes precedence.**
-If a role name exists in both the Cluster spec and a `Role` CRD, the CRD will
+If a role name exists in both the Cluster spec and a `DatabaseRole` CRD, the CRD will
 not be reconciled.
 
-To migrate an inline role to a `Role` CRD:
+To migrate an inline role to a `DatabaseRole` CRD:
 
-1.  Create the `Role` CRD with the desired specification.
+1.  Create the `DatabaseRole` CRD with the desired specification.
 2.  Remove the entry from `.spec.managed.roles` in the `Cluster` manifest.
 3.  The operator will automatically detect the change and hand over management
-    to the standalone `Role` resource.
+    to the standalone `DatabaseRole` resource.
 
 :::important
 In terms of backward compatibility, declarative role management is designed to
 ignore roles that exist in the database but are not included in the spec or a
-`Role` CRD. The lifecycle of these roles will continue to be managed within
+`DatabaseRole` CRD. The lifecycle of these roles will continue to be managed within
 PostgreSQL, allowing CloudNativePG users to adopt this feature at their
 convenience.
 :::
