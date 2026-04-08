@@ -62,7 +62,7 @@ cluster to primary:
 
 - the application user
 - the superuser (if you are using it)
-- any role defined using the [declarative interface](declarative_database_role_management.md)
+- any role defined using the [declarative interface](declarative_role_management.md)
 
 
 If your intention is to seamlessly ensure that the above roles and passwords
