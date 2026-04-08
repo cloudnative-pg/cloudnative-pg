@@ -197,7 +197,7 @@ authentication rules in the `postgresql` section of the CR.
 ### Configuration of Postgres roles, users, and groups
 
 CloudNativePG supports
-[comprehensive management of PostgreSQL roles, users, and groups](declarative_database_role_management.md)
+[comprehensive management of PostgreSQL roles, users, and groups](declarative_role_management.md)
 through two declarative methods:
 
 - The `Role` CRD (Recommended): A standalone resource for granular lifecycle
