@@ -157,6 +157,40 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		})
 	})
 
+	It("should apply cluster-wide serviceTemplate to all default services", func(ctx SpecContext) {
+		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-template.yaml.template"
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		rw := specs.CreateClusterReadWriteService(*cluster)
+		ro := specs.CreateClusterReadOnlyService(*cluster)
+		r := specs.CreateClusterReadService(*cluster)
+
+		By("ensuring all default services have the template's ipFamilyPolicy and labels", func() {
+			for _, svcName := range []string{rw.Name, ro.Name, r.Name} {
+				var service corev1.Service
+				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: svcName}, &service)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(service.Spec.IPFamilyPolicy).ToNot(BeNil(),
+					fmt.Sprintf("service %s should have ipFamilyPolicy set", svcName))
+				Expect(*service.Spec.IPFamilyPolicy).To(Equal(corev1.IPFamilyPolicyPreferDualStack),
+					fmt.Sprintf("service %s should have PreferDualStack", svcName))
+				Expect(service.Spec.IPFamilies).To(ContainElement(corev1.IPv4Protocol))
+				Expect(service.Labels["template-label"]).To(Equal("true"),
+					fmt.Sprintf("service %s should have template-label", svcName))
+				Expect(service.Annotations["template-annotation"]).To(Equal("true"),
+					fmt.Sprintf("service %s should have template-annotation", svcName))
+			}
+		})
+	})
+
 	It("should properly handle replace update strategy", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-replace-strategy.yaml.template"
 		const serviceName = "test-rw"

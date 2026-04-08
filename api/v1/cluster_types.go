@@ -2453,6 +2453,13 @@ type ManagedServices struct {
 	// Additional is a list of additional managed services specified by the user.
 	// +optional
 	Additional []ManagedService `json:"additional,omitempty"`
+	// ServiceTemplate is a template applied to all services created by the
+	// operator, both the default services (rw, ro, r, any) and additional
+	// managed services. For additional services, their own service template
+	// is merged on top of this base template. This allows cluster-wide
+	// configuration of fields like ipFamilyPolicy and ipFamilies.
+	// +optional
+	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 }
 
 // ManagedService represents a specific service managed by the cluster.
