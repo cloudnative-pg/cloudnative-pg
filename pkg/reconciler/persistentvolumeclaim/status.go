@@ -270,7 +270,7 @@ func classifyPVC(
 		return healthy
 	}
 
-	// PVC is resizing without a pod — classify as dangling so a pod is
+	// PVC is resizing without a pod, classify as dangling so a pod is
 	// created.  This is safe because volumes remain usable during
 	// expansion, and filesystem resize actually requires a mounted pod
 	// (kubelet performs it).  Without this, a simultaneous storage +
