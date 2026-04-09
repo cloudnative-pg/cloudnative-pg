@@ -51,7 +51,7 @@ PostgreSQL lifecycle. These include:
 
 - **Configuration & Topology:** `Cluster`, `Pooler`, `ImageCatalog`, and
   `ClusterImageCatalog`.
-- **Identity & Schema:** `Role` and `Database`.
+- **Identity & Schema:** `DatabaseRole` and `Database`.
 - **Business Continuity:** `Backup`, `ScheduledBackup`, `Publication`, and
   `Subscription`.
 - **Runtime Orchestration:** `FailoverQuorum` (used by the operator for
@@ -67,8 +67,8 @@ requested registry.
 The operator orchestrates the deployment by creating and managing standard
 Kubernetes resources (`Pod`, `Service`, `Secret`, `ConfigMap`,
 `PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
-`RoleBinding`, and `Role`) as well as CNPG-specific resources like `Role` and
-`Database` to ensure the database environment matches the desired state.
+`RoleBinding`, and `Role`) as well as CNPG-specific resources like `DatabaseRole`
+and `Database` to ensure the database environment matches the desired state.
 
 You can optionally provide a pre-existing ServiceAccount for both `Cluster` and
 `Pooler` resources. This shared ServiceAccount support enables seamless
@@ -200,7 +200,7 @@ CloudNativePG supports
 [comprehensive management of PostgreSQL roles, users, and groups](declarative_role_management.md)
 through two declarative methods:
 
-- The `Role` CRD (Recommended): A standalone resource for granular lifecycle
+- The `DatabaseRole` CRD (Recommended): A standalone resource for granular lifecycle
   management. It includes a `roleReclaimPolicy` (supporting `retain` or
   `delete`) to define whether the database role should be dropped when the
   Kubernetes resource is removed.

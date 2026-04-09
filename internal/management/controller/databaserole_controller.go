@@ -86,14 +86,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return *result, err
 	}
 
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		return ctrl.Result{},
-			fmt.Errorf("while connecting to the database to reconcile role %v: %w", role, err)
-	}
-
 	// Add the finalizer if we don't have it
-	//nolint:nestif
 	if role.DeletionTimestamp.IsZero() {
 		if controllerutil.AddFinalizer(&role, utils.RoleFinalizerName) {
 			if err := r.Update(ctx, &role); err != nil {
@@ -101,25 +94,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 	} else {
-		// This role is being deleted
-		if controllerutil.ContainsFinalizer(&role, utils.RoleFinalizerName) {
-			if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
-				dbRole := roleAdapter{
-					RoleConfiguration: role.Spec.RoleConfiguration,
-				}.toDatabaseRole()
-				if err := roles.Delete(ctx, db, dbRole); err != nil {
-					return r.failedReconciliation(ctx, &role, err)
-				}
-			}
-
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&role, utils.RoleFinalizerName)
-			if err := r.Update(ctx, &role); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
-		return ctrl.Result{}, nil
+		return r.handleDeletion(ctx, &role)
 	}
 
 	// ensure: absent is not supported for DatabaseRole CRDs. Users should
@@ -148,6 +123,40 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return r.succeededReconciliation(ctx, &role, passVersion)
+}
+
+// handleDeletion processes finalizer removal and optional role deletion
+// when the DatabaseRole is being deleted. Only the ReclaimDelete policy
+// requires a database connection; ReclaimRetain just removes the finalizer.
+func (r *DatabaseRoleReconciler) handleDeletion(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(role, utils.RoleFinalizerName) {
+		return ctrl.Result{}, nil
+	}
+
+	if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
+		db, err := r.instance.GetSuperUserDB()
+		if err != nil {
+			return r.failedReconciliation(ctx, role, fmt.Errorf(
+				"while connecting to the database to delete role %q: %w",
+				role.Spec.Name, err))
+		}
+		dbRole := roleAdapter{
+			RoleConfiguration: role.Spec.RoleConfiguration,
+		}.toDatabaseRole()
+		if err := roles.Delete(ctx, db, dbRole); err != nil {
+			return r.failedReconciliation(ctx, role, err)
+		}
+	}
+
+	controllerutil.RemoveFinalizer(role, utils.RoleFinalizerName)
+	if err := r.Update(ctx, role); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
@@ -360,25 +369,45 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 		return "", fmt.Errorf("while listing roles in postgres: %w", err)
 	}
 
-	dbRole := roleAdapter{
+	// Check if the role already exists in the database to determine the
+	// correct validUntilNullIsInfinity setting
+	var existingDBRole *roles.DatabaseRole
+	for i := range rolesInDB {
+		if rolesInDB[i].Name == role.Spec.Name {
+			existingDBRole = &rolesInDB[i]
+			break
+		}
+	}
+
+	adapter := roleAdapter{
 		RoleConfiguration: role.Spec.RoleConfiguration,
-	}.toDatabaseRole()
-	passwordVersion, err := dbRole.ApplyPassword(ctx, r.Client, &role.Spec, r.instance.GetNamespaceName())
+	}
+	// When updating an existing role that has a non-null ValidUntil in the
+	// database, a nil ValidUntil in the spec should translate to
+	// VALID UNTIL 'infinity' (PostgreSQL cannot restore a NULL ValidUntil).
+	if existingDBRole != nil {
+		adapter.validUntilNullIsInfinity = existingDBRole.ValidUntil.Valid
+	}
+	dbRole := adapter.toDatabaseRole()
+
+	passwordVersion, err := dbRole.ApplyPassword(
+		ctx, r.Client, &role.Spec, r.instance.GetNamespaceName(),
+	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)
 	}
-	for _, r := range rolesInDB {
-		if r.Name == role.Spec.Name {
-			toGrant, toRevoke, err := roles.GetRoleMembershipDiff(ctx, db, role.Spec.InRoles, dbRole)
-			if err != nil {
-				return "", fmt.Errorf("while getting the membership updates required: %w", err)
-			}
-			err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke)
-			if err != nil {
-				return "", fmt.Errorf("while getting the membership updates required: %w", err)
-			}
-			return passwordVersion, roles.Update(ctx, db, dbRole)
+
+	if existingDBRole != nil {
+		toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
+			ctx, db, role.Spec.InRoles, dbRole,
+		)
+		if err != nil {
+			return "", fmt.Errorf("while getting the membership updates required: %w", err)
 		}
+		if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke); err != nil {
+			return "", fmt.Errorf("while updating membership: %w", err)
+		}
+		return passwordVersion, roles.Update(ctx, db, dbRole)
 	}
 
 	return passwordVersion, roles.Create(ctx, db, dbRole)
