@@ -242,6 +242,13 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 		return false
 	}
 
+	// If no password secret is configured, the condition comparison is
+	// irrelevant — a stale condition from a previously-configured secret
+	// must not cause a perpetual reconciliation loop.
+	if role.Spec.GetRoleSecretName() == "" {
+		return role.Generation == role.Status.ObservedGeneration
+	}
+
 	latestObservedSecretPasswordResourceVersion := ""
 	if latestSecretChange := meta.FindStatusCondition(
 		role.Status.Conditions,

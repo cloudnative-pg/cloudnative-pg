@@ -23,7 +23,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 )
 
-// roleAdapter is an intermediary structure used to adapt a apiv1.RoleSpec
+// roleAdapter is an intermediary structure used to adapt a apiv1.RoleConfiguration
 // to a roles.DatabaseRole.
 type roleAdapter struct {
 	apiv1.RoleConfiguration

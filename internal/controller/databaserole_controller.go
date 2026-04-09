@@ -42,7 +42,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// DatabaseRoleReconciler reconciles a Role object
+// DatabaseRoleReconciler reconciles a DatabaseRole object
 type DatabaseRoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
