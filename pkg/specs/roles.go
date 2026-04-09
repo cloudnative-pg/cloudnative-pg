@@ -538,9 +538,5 @@ func crdRoleSecretName(role apiv1.DatabaseRole) string {
 	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
 		return ""
 	}
-	secretName := role.Spec.GetRoleSecretName()
-	if secretName != "" {
-		return secretName
-	}
-	return ""
+	return role.Spec.GetRoleSecretName()
 }
