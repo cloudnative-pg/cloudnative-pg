@@ -185,8 +185,6 @@ spec:
             - message: 'ensure: absent is not supported for DatabaseRole; delete the
                 resource with roleReclaimPolicy: delete instead'
               rule: '!has(self.ensure) || self.ensure != ''absent'''
-            - message: ”name must not be empty”
-              rule: ”size(self.name) > 0”
             - message: the role name postgres is reserved
               rule: self.name != 'postgres'
             - message: the role name streaming_replica is reserved
@@ -195,8 +193,10 @@ spec:
               rule: '!self.name.startsWith(''pg_'')'
             - message: role names starting with cnpg_ are reserved by the operator
               rule: '!self.name.startsWith(''cnpg_'')'
+            - message: role name must not be empty
+              rule: self.name.size() != 0
             - message: passwordSecret and disablePassword are mutually exclusive
-              rule: '!has(self.passwordSecret) || !self.disablePassword'
+              rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
           status:
             description: DatabaseRoleState defines the observed state of a DatabaseRole
             properties:
