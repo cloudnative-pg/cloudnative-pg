@@ -40,4 +40,6 @@ data:
 kind: Secret
 metadata:
   name: cluster-example-dante
+  labels:
+    cnpg.io/reload: "true"
 type: kubernetes.io/basic-auth
