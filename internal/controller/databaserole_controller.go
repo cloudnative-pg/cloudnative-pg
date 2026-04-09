@@ -57,9 +57,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	var role apiv1.DatabaseRole
 	if err := r.Get(ctx, req.NamespacedName, &role); err != nil {
-		// This also happens when you delete a Role resource in k8s. If
-		// that's the case, let's just wait for the Kubernetes garbage collector
-		// to remove all the Pods of the cluster.
+		// Resource has been deleted, nothing to reconcile.
 		if apierrs.IsNotFound(err) {
 			contextLogger.Info("Resource has been deleted")
 			return ctrl.Result{}, nil
@@ -70,6 +68,14 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if role.Spec.PasswordSecret == nil {
+		// If passwordSecret was removed, clear any stale PasswordSecretChange
+		// condition left over from a previously configured secret.
+		if meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange)) != nil {
+			meta.RemoveStatusCondition(&role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
+			if err := r.Status().Update(ctx, &role); err != nil {
+				return ctrl.Result{}, fmt.Errorf("while clearing stale password condition: %w", err)
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -156,7 +162,7 @@ func (r *DatabaseRoleReconciler) mapSecretToRole() handler.MapFunc {
 			return nil
 		}
 
-		// get all the clusters handled by the operator in the configmap namespace
+		// get all the roles in the secret namespace
 		var roles apiv1.DatabaseRoleList
 		if err := r.List(ctx, &roles,
 			client.InNamespace(secret.Namespace),

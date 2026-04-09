@@ -31,14 +31,6 @@ func (r *DatabaseRole) SetAsApplied() {
 	r.Status.ObservedGeneration = r.Generation
 }
 
-// GetRoleInherit returns the inherit attribute of a roleConfiguration
-func (roleSpec *DatabaseRoleSpec) GetRoleInherit() bool {
-	if roleSpec.Inherit != nil {
-		return *roleSpec.Inherit
-	}
-	return true
-}
-
 // GetRoleSecretName gets the name of the secret holding the role password
 func (roleSpec *DatabaseRoleSpec) GetRoleSecretName() string {
 	if roleSpec.PasswordSecret == nil {

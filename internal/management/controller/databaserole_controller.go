@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -111,7 +112,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return res, err
 	}
 
-	passVersion, err := r.reconcileRole(
+	passVersion, transactionID, err := r.reconcileRole(
 		ctx,
 		&role,
 	)
@@ -119,7 +120,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.failedReconciliation(ctx, &role, err)
 	}
 
-	return r.succeededReconciliation(ctx, &role, passVersion)
+	return r.succeededReconciliation(ctx, &role, passVersion, transactionID)
 }
 
 // handleDeletion processes finalizer removal and optional role deletion
@@ -285,12 +286,14 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	passVersion string,
+	transactionID int64,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
 	role.Status.Message = ""
 	role.Status.Applied = ptr.To(true)
 	role.Status.ObservedGeneration = role.Generation
 	role.Status.PasswordState.SecretResourceVersion = passVersion
+	role.Status.PasswordState.TransactionID = transactionID
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
@@ -352,23 +355,51 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 	return false
 }
 
-func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, error) {
+// updateExistingRole applies membership changes, attribute updates, and
+// comment updates to an existing PostgreSQL role.
+func updateExistingRole(
+	ctx context.Context,
+	db *sql.DB,
+	dbRole roles.DatabaseRole,
+	existingDBRole *roles.DatabaseRole,
+) error {
+	toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
+		ctx, db, dbRole.InRoles, dbRole,
+	)
+	if err != nil {
+		return fmt.Errorf("while getting the membership updates required: %w", err)
+	}
+	if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke); err != nil {
+		return fmt.Errorf("while updating membership: %w", err)
+	}
+	if err = roles.Update(ctx, db, dbRole); err != nil {
+		return err
+	}
+	if existingDBRole.Comment != dbRole.Comment {
+		if err = roles.UpdateComment(ctx, db, dbRole); err != nil {
+			return fmt.Errorf("while updating comment: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, int64, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// Guard against reserved roles (belt-and-suspenders with CEL validation on the CRD)
 	if pgpostgres.IsRoleReserved(role.Spec.Name) {
-		return "", fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
+		return "", 0, fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
 	}
 
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		contextLogger.Error(err, "while connecting to postgres", "role", role)
-		return "", fmt.Errorf("while connecting to the database to reconcile role %q: %w", role.Spec.Name, err)
+		return "", 0, fmt.Errorf("while connecting to the database to reconcile role %q: %w", role.Spec.Name, err)
 	}
 
 	rolesInDB, err := roles.List(ctx, db)
 	if err != nil {
-		return "", fmt.Errorf("while listing roles in postgres: %w", err)
+		return "", 0, fmt.Errorf("while listing roles in postgres: %w", err)
 	}
 
 	// Check if the role already exists in the database to determine the
@@ -396,21 +427,21 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 		ctx, r.Client, &role.Spec, r.instance.GetNamespaceName(),
 	)
 	if err != nil {
-		return "", fmt.Errorf("while getting the role password: %w", err)
+		return "", 0, fmt.Errorf("while getting the role password: %w", err)
 	}
 
 	if existingDBRole != nil {
-		toGrant, toRevoke, err := roles.GetRoleMembershipDiff(
-			ctx, db, role.Spec.InRoles, dbRole,
-		)
-		if err != nil {
-			return "", fmt.Errorf("while getting the membership updates required: %w", err)
+		if err := updateExistingRole(ctx, db, dbRole, existingDBRole); err != nil {
+			return "", 0, err
 		}
-		if err = roles.UpdateMembership(ctx, db, dbRole, toGrant, toRevoke); err != nil {
-			return "", fmt.Errorf("while updating membership: %w", err)
-		}
-		return passwordVersion, roles.Update(ctx, db, dbRole)
+	} else if err := roles.Create(ctx, db, dbRole); err != nil {
+		return "", 0, err
 	}
 
-	return passwordVersion, roles.Create(ctx, db, dbRole)
+	transactionID, err := roles.GetLastTransactionID(ctx, db, dbRole)
+	if err != nil {
+		return "", 0, fmt.Errorf("while getting last transaction ID for role %q: %w", role.Spec.Name, err)
+	}
+
+	return passwordVersion, transactionID, nil
 }

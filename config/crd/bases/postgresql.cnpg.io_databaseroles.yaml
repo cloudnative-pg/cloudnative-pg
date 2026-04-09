@@ -185,6 +185,8 @@ spec:
             - message: 'ensure: absent is not supported for DatabaseRole; delete the
                 resource with roleReclaimPolicy: delete instead'
               rule: '!has(self.ensure) || self.ensure != ''absent'''
+            - message: ”name must not be empty”
+              rule: ”size(self.name) > 0”
             - message: the role name postgres is reserved
               rule: self.name != 'postgres'
             - message: the role name streaming_replica is reserved
@@ -196,13 +198,13 @@ spec:
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !self.disablePassword'
           status:
-            description: DatabaseRoleState defines the observed state of a Role
+            description: DatabaseRoleState defines the observed state of a DatabaseRole
             properties:
               applied:
                 description: Applied is true if the role was reconciled correctly
                 type: boolean
               conditions:
-                description: Conditions for cluster object
+                description: Conditions for the DatabaseRole object
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.

@@ -944,7 +944,7 @@ _Appears in:_
 
 
 
-DatabaseRoleState defines the observed state of a Role
+DatabaseRoleState defines the observed state of a DatabaseRole
 
 
 
@@ -958,7 +958,7 @@ _Appears in:_
 | `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
 | `passwordState` _[PasswordState](#passwordstate)_ | PasswordState holds the last applied version of the passwordSecret, and<br />the last transaction ID of the role in postgres | True |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
 #### DatabaseSpec
