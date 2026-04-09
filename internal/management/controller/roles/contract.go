@@ -149,8 +149,8 @@ func (d *DatabaseRole) ApplyPassword(
 		d.password = sql.NullString{}
 		return "", nil
 	case rolePassword.GetRoleSecretName() != "" && rolePassword.ShouldDisablePassword():
-		// this case should be prevented by the validation webhook,
-		// and is an error
+		// For DatabaseRole CRDs this is prevented by CEL validation.
+		// For inline managed roles this is a runtime error.
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
 				rolePassword.GetRoleSecretName())

@@ -193,6 +193,8 @@ spec:
               rule: '!self.name.startsWith(''pg_'')'
             - message: role names starting with cnpg_ are reserved by the operator
               rule: '!self.name.startsWith(''cnpg_'')'
+            - message: passwordSecret and disablePassword are mutually exclusive
+              rule: '!has(self.passwordSecret) || !self.disablePassword'
           status:
             description: DatabaseRoleState defines the observed state of a Role
             properties:

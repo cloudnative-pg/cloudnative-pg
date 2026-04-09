@@ -39,6 +39,9 @@ A few points are worth noting:
 1.  The `ensure` attribute is **not** part of PostgreSQL.
     It enables declarative role management to create and remove roles.
     The two possible values are `present` (the default) and `absent`.
+    Note: `ensure: absent` is only supported for
+    [inline managed roles](#inline-managed-roles). For `DatabaseRole` CRDs,
+    delete the Kubernetes resource with `roleReclaimPolicy: delete` instead.
 2.  The `inherit` attribute is true by default, following PostgreSQL
     conventions.
 3.  The `connectionLimit` attribute defaults to -1, in line with PostgreSQL

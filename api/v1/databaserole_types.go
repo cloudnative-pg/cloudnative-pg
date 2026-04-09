@@ -49,6 +49,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="self.name != 'streaming_replica'",message="the role name streaming_replica is reserved"
 // +kubebuilder:validation:XValidation:rule="!self.name.startsWith('pg_')",message="role names starting with pg_ are reserved by PostgreSQL"
 // +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
+// +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
