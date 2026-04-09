@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,10 +42,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// DatabaseRoleReconciler reconciles a Role object defined by apiv1.Role (rather than in spec.managed)
+// DatabaseRoleReconciler reconciles a DatabaseRole object
 type DatabaseRoleReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
 
 	instance instanceInterface
 }
@@ -74,8 +72,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &role); err != nil {
-		// This is a deleted object, there's nothing
-		// to do since we don't manage any finalizers.
+		// This is a deleted object that has already been finalized.
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
@@ -261,8 +258,6 @@ func (r *DatabaseRoleReconciler) failedReconciliation(
 	oldRole := role.DeepCopy()
 	role.Status.Message = err.Error()
 	role.Status.Applied = ptr.To(false)
-
-	role.Status.Message = err.Error()
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err

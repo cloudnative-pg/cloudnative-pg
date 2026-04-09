@@ -34,7 +34,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: DatabaseRole is the Schema for the databases API
+        description: DatabaseRole is the Schema for the databaseroles API
         properties:
           apiVersion:
             description: |-
