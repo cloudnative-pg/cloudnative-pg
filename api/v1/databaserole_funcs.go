@@ -18,13 +18,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// SetAsFailed sets the publication as failed with the given error
+// SetAsFailed sets the role as failed with the given error
 func (r *DatabaseRole) SetAsFailed(err error) {
 	r.Status.Applied = ptr.To(false)
 	r.Status.Message = err.Error()
 }
 
-// SetAsApplied sets the subscription as working correctly
+// SetAsApplied sets the role as working correctly
 func (r *DatabaseRole) SetAsApplied() {
 	r.Status.Message = ""
 	r.Status.Applied = ptr.To(true)

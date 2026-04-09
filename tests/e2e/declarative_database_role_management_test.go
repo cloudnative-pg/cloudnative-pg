@@ -391,7 +391,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(role.Status.Message).Should(BeEmpty())
 						// check if the transaction ID has been set in the status
 						g.Expect(role.Status.PasswordState.SecretResourceVersion).ShouldNot(BeZero())
-					}, 3000).WithPolling(10 * time.Second).Should(Succeed())
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 				})
 
 				By("checking if we can connect to PostgreSQL using specified password", func() {

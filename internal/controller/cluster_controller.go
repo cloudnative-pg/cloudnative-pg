@@ -73,7 +73,7 @@ const (
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
-	roleKey                       = ".spec.clusterRef.name"
+	roleKey                       = ".spec.cluster.name"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()

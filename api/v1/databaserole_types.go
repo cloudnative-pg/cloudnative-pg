@@ -36,8 +36,8 @@ const (
 type DatabaseRoleConditionType string
 
 const (
-	// ConditionPasswordSecretChange is true when the all the instances of the
-	// cluster report the same System ID.
+	// ConditionPasswordSecretChange is true when the operator detects a change
+	// in the password Secret referenced by the DatabaseRole.
 	ConditionPasswordSecretChange DatabaseRoleConditionType = "PasswordSecretChange"
 )
 
@@ -97,7 +97,7 @@ type DatabaseRoleState struct {
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest message"
 
-// DatabaseRole is the Schema for the databases API
+// DatabaseRole is the Schema for the databaseroles API
 type DatabaseRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -108,7 +108,7 @@ type DatabaseRole struct {
 
 // +kubebuilder:object:root=true
 
-// DatabaseRoleList contains a list of Roles
+// DatabaseRoleList contains a list of DatabaseRoles
 type DatabaseRoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
