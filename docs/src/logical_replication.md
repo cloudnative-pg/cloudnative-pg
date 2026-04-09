@@ -388,7 +388,7 @@ resource:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
-kind: Role
+kind: DatabaseRole
 metadata:
   name: freddie-app
 spec:

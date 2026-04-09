@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	pgpostgres "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -119,6 +120,14 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		return ctrl.Result{}, nil
+	}
+
+	// ensure: absent is not supported for DatabaseRole CRDs. Users should
+	// delete the K8s object with roleReclaimPolicy: delete instead.
+	if role.Spec.Ensure == apiv1.EnsureAbsent {
+		return r.failedReconciliation(ctx, &role, fmt.Errorf(
+			"ensure: absent is not supported for DatabaseRole;"+
+				" delete the resource with roleReclaimPolicy: delete instead"))
 	}
 
 	if res, err := detectConflictingManagers(ctx, r.Client, &role, &apiv1.DatabaseRoleList{}); err != nil ||
@@ -219,6 +228,14 @@ func (r *DatabaseRoleReconciler) shouldReconcile(ctx context.Context, role *apiv
 // isAlreadyReconciled checks if the role has already been reconciled
 // and the password secret has not changed
 func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) bool {
+	// Always reconcile if the object is being deleted, so that the
+	// finalizer logic can run. Kubernetes does not bump metadata.generation
+	// when setting DeletionTimestamp, so the generation check below would
+	// otherwise short-circuit and block finalizer processing forever.
+	if !role.DeletionTimestamp.IsZero() {
+		return false
+	}
+
 	latestObservedSecretPasswordResourceVersion := ""
 	if latestSecretChange := meta.FindStatusCondition(
 		role.Status.Conditions,
@@ -326,6 +343,12 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 
 func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Guard against reserved roles (belt-and-suspenders with CEL validation on the CRD)
+	if pgpostgres.IsRoleReserved(role.Spec.Name) {
+		return "", fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
+	}
+
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		contextLogger.Error(err, "while connecting to postgres", "role", role)

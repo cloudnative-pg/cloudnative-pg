@@ -177,6 +177,22 @@ spec:
             - cluster
             - name
             type: object
+            x-kubernetes-validations:
+            - message: name is immutable
+              rule: self.name == oldSelf.name
+            - message: cluster is immutable
+              rule: self.cluster == oldSelf.cluster
+            - message: 'ensure: absent is not supported for DatabaseRole; delete the
+                resource with roleReclaimPolicy: delete instead'
+              rule: '!has(self.ensure) || self.ensure != ''absent'''
+            - message: the role name postgres is reserved
+              rule: self.name != 'postgres'
+            - message: the role name streaming_replica is reserved
+              rule: self.name != 'streaming_replica'
+            - message: role names starting with pg_ are reserved by PostgreSQL
+              rule: '!self.name.startsWith(''pg_'')'
+            - message: role names starting with cnpg_ are reserved by the operator
+              rule: '!self.name.startsWith(''cnpg_'')'
           status:
             description: DatabaseRoleState defines the observed state of a Role
             properties:
