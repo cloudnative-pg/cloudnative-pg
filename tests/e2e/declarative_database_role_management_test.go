@@ -122,9 +122,9 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				return "FALSE"
 			}
 
-			query := fmt.Sprintf("SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+			query := fmt.Sprintf("SELECT true FROM pg_catalog.pg_roles WHERE rolname=%s and rolcanlogin=%v and rolsuper=%v "+
 				"and rolcreatedb=%v and rolcreaterole=%v and rolinherit is %s and rolreplication=%v "+
-				"and rolbypassrls=%v and rolconnlimit=%v", role.Spec.Name, role.Spec.Login, role.Spec.Superuser,
+				"and rolbypassrls=%v and rolconnlimit=%v", pq.QuoteLiteral(role.Spec.Name), role.Spec.Login, role.Spec.Superuser,
 				role.Spec.CreateDB, role.Spec.CreateRole, boolPtrToSQL(role.Spec.Inherit),
 				role.Spec.Replication, role.Spec.BypassRLS, role.Spec.ConnectionLimit)
 			Eventually(func(g Gomega) {
@@ -142,9 +142,9 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 			if role.Spec.ValidUntil != nil {
 				validUntilQuery := fmt.Sprintf(
-					"SELECT rolvaliduntil='%s' FROM pg_catalog.pg_authid WHERE rolname='%s'",
-					role.Spec.ValidUntil.UTC().Format("2006-01-02T15:04:05+00"),
-					role.Spec.Name)
+					"SELECT rolvaliduntil=%s FROM pg_catalog.pg_authid WHERE rolname=%s",
+					pq.QuoteLiteral(role.Spec.ValidUntil.UTC().Format("2006-01-02T15:04:05+00")),
+					pq.QuoteLiteral(role.Spec.Name))
 				Eventually(func(g Gomega) {
 					stdout, _, err := exec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -157,8 +157,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 			if role.Spec.Comment != "" {
 				commentQuery := fmt.Sprintf(
-					"SELECT pg_catalog.shobj_description(oid, 'pg_authid') FROM pg_catalog.pg_authid WHERE rolname='%s'",
-					role.Spec.Name)
+					"SELECT pg_catalog.shobj_description(oid, 'pg_authid') FROM pg_catalog.pg_authid WHERE rolname=%s",
+					pq.QuoteLiteral(role.Spec.Name))
 				Eventually(func(g Gomega) {
 					stdout, _, err := exec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -254,6 +254,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				pgRoleName := fmt.Sprintf("update-attrs-%d", funk.RandomInt(0, 9999))
 
 				By("creating a role with initial attributes", func() {
+					initialValidUntil := metav1.NewTime(time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC))
 					role = &apiv1.DatabaseRole{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      fmt.Sprintf("role-%s", pgRoleName),
@@ -266,6 +267,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Login:           true,
 								CreateDB:        false,
 								ConnectionLimit: -1,
+								ValidUntil:      &initialValidUntil,
+								Comment:         "initial comment",
 							},
 							ClusterRef: corev1.LocalObjectReference{
 								Name: clusterName,
@@ -291,12 +294,8 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				By("verifying initial attributes in PostgreSQL", func() {
 					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
-					query := fmt.Sprintf(
-						"SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s'"+
-							" and rolcanlogin=true and rolcreatedb=false and rolconnlimit=-1",
-						pgRoleName)
-					Eventually(QueryMatchExpectationPredicate(
-						primaryPodInfo, postgres.PostgresDBName, query, "t"), 30).Should(Succeed())
+
+					assertRoleHasExpectedFields(namespace, primaryPodInfo.Name, *role)
 				})
 
 				By("updating the role attributes", func() {
@@ -309,18 +308,27 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					role.Spec.Login = false
 					role.Spec.CreateDB = true
 					role.Spec.ConnectionLimit = 5
+					updatedValidUntil := metav1.NewTime(time.Date(2050, 6, 15, 12, 0, 0, 0, time.UTC))
+					role.Spec.ValidUntil = &updatedValidUntil
+					role.Spec.Comment = "updated comment"
 					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
 				})
 
 				By("verifying updated attributes in PostgreSQL", func() {
 					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
-					query := fmt.Sprintf(
-						"SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s'"+
-							" and rolcanlogin=false and rolcreatedb=true and rolconnlimit=5",
-						pgRoleName)
-					Eventually(QueryMatchExpectationPredicate(
-						primaryPodInfo, postgres.PostgresDBName, query, "t"), 300).WithPolling(10 * time.Second).Should(Succeed())
+
+					Eventually(func(g Gomega) {
+						roleNamespacedName := types.NamespacedName{
+							Namespace: namespace,
+							Name:      role.Name,
+						}
+						g.Expect(env.Client.Get(env.Ctx, roleNamespacedName, role)).To(Succeed())
+						g.Expect(role.Status.Applied).Should(HaveValue(BeTrue()))
+						g.Expect(role.Status.ObservedGeneration).Should(Equal(role.Generation))
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+
+					assertRoleHasExpectedFields(namespace, primaryPodInfo.Name, *role)
 				})
 
 				By("cleaning up", func() {
