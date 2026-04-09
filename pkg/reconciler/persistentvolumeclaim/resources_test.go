@@ -109,43 +109,7 @@ var _ = Describe("PVCs used by instance", func() {
 	})
 })
 
-var _ = Describe("isFileSystemResizePending", func() {
-	pvcWith := func(conditions ...corev1.PersistentVolumeClaimCondition) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{
-			Status: corev1.PersistentVolumeClaimStatus{Conditions: conditions},
-		}
-	}
-
-	It("returns false when no conditions are present", func() {
-		Expect(isFileSystemResizePending(pvcWith())).To(BeFalse())
-	})
-
-	It("returns false when only Resizing condition is present", func() {
-		Expect(isFileSystemResizePending(pvcWith(
-			corev1.PersistentVolumeClaimCondition{
-				Type: corev1.PersistentVolumeClaimResizing, Status: corev1.ConditionTrue,
-			},
-		))).To(BeFalse())
-	})
-
-	It("returns true when FileSystemResizePending condition is true", func() {
-		Expect(isFileSystemResizePending(pvcWith(
-			corev1.PersistentVolumeClaimCondition{
-				Type: corev1.PersistentVolumeClaimFileSystemResizePending, Status: corev1.ConditionTrue,
-			},
-		))).To(BeTrue())
-	})
-
-	It("returns false when FileSystemResizePending condition is false", func() {
-		Expect(isFileSystemResizePending(pvcWith(
-			corev1.PersistentVolumeClaimCondition{
-				Type: corev1.PersistentVolumeClaimFileSystemResizePending, Status: corev1.ConditionFalse,
-			},
-		))).To(BeFalse())
-	})
-})
-
-var _ = Describe("PVC classification with FileSystemResizePending", func() {
+var _ = Describe("PVC classification with resizing PVCs", func() {
 	clusterName := "myCluster"
 	makeCluster := func() *apiv1.Cluster {
 		return &apiv1.Cluster{
@@ -164,12 +128,31 @@ var _ = Describe("PVC classification with FileSystemResizePending", func() {
 		Expect(cluster.Status.ResizingPVC).Should(BeEmpty())
 	})
 
-	It("classifies resizing PVC without pod and without FileSystemResizePending as resizing", func(ctx SpecContext) {
+	It("classifies resizing PVC without pod and without FileSystemResizePending as dangling", func(ctx SpecContext) {
 		pvc := makePVC(clusterName, "1", "1", NewPgDataCalculator(), true)
 		cluster := makeCluster()
 		EnrichStatus(ctx, cluster, []corev1.Pod{}, []batchv1.Job{}, []corev1.PersistentVolumeClaim{pvc})
+		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.ResizingPVC).Should(BeEmpty())
+	})
+
+	It("classifies resizing PVC as dangling when its pod was deleted during rolling update (#9786)", func(ctx SpecContext) {
+		// Simulate simultaneous storage + resource change:
+		// instance-1 has a running pod (primary), instance-2's pod was deleted
+		// for a rolling update while both PVCs are resizing.
+		pvc1 := makePVC(clusterName, "1", "1", NewPgDataCalculator(), true) // resizing, has pod
+		pvc2 := makePVC(clusterName, "2", "2", NewPgDataCalculator(), true) // resizing, pod deleted
+		cluster := makeCluster()
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{makePod(clusterName, "1", specs.ClusterRoleLabelPrimary)},
+			[]batchv1.Job{},
+			[]corev1.PersistentVolumeClaim{pvc1, pvc2},
+		)
 		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{clusterName + "-1"}))
-		Expect(cluster.Status.DanglingPVC).Should(BeEmpty())
+		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{clusterName + "-2"}))
+		Expect(cluster.Status.Instances).Should(BeEquivalentTo(2))
 	})
 })
 
