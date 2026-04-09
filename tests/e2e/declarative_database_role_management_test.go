@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -138,6 +139,35 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(strings.TrimSpace(stdout)).Should(Equal("t"), "expected role not found")
 			}, 30).Should(Succeed())
+
+			if role.Spec.ValidUntil != nil {
+				validUntilQuery := fmt.Sprintf(
+					"SELECT rolvaliduntil='%s' FROM pg_catalog.pg_authid WHERE rolname='%s'",
+					role.Spec.ValidUntil.UTC().Format("2006-01-02T15:04:05+00"),
+					role.Spec.Name)
+				Eventually(func(g Gomega) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{Namespace: namespace, PodName: primaryPod},
+						"postgres", validUntilQuery)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdout)).Should(Equal("t"), "validUntil mismatch")
+				}, 30).Should(Succeed())
+			}
+
+			if role.Spec.Comment != "" {
+				commentQuery := fmt.Sprintf(
+					"SELECT pg_catalog.shobj_description(oid, 'pg_authid') FROM pg_catalog.pg_authid WHERE rolname='%s'",
+					role.Spec.Name)
+				Eventually(func(g Gomega) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{Namespace: namespace, PodName: primaryPod},
+						"postgres", commentQuery)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdout)).Should(Equal(role.Spec.Comment), "comment mismatch")
+				}, 30).Should(Succeed())
+			}
 		}
 
 		assertTestDeclarativeRole := func(
@@ -215,6 +245,87 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			It("can manage a declarative role and release it", func() {
 				roleManifest := fixturesDir + "/declarative_roles/databaserole.yaml.template"
 				assertTestDeclarativeRole(roleManifest, true)
+			})
+		})
+
+		When("Role CR attributes are updated", func() {
+			It("applies the updated attributes in PostgreSQL", func() {
+				var role *apiv1.DatabaseRole
+				pgRoleName := fmt.Sprintf("update-attrs-%d", funk.RandomInt(0, 9999))
+
+				By("creating a role with initial attributes", func() {
+					role = &apiv1.DatabaseRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      fmt.Sprintf("role-%s", pgRoleName),
+							Namespace: namespace,
+						},
+						Spec: apiv1.DatabaseRoleSpec{
+							RoleConfiguration: apiv1.RoleConfiguration{
+								Name:            pgRoleName,
+								Ensure:          apiv1.EnsurePresent,
+								Login:           true,
+								CreateDB:        false,
+								ConnectionLimit: -1,
+							},
+							ClusterRef: corev1.LocalObjectReference{
+								Name: clusterName,
+							},
+							ReclaimPolicy: apiv1.DatabaseRoleReclaimDelete,
+						},
+					}
+					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
+				})
+
+				By("ensuring the role is reconciled", func() {
+					roleNamespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      role.Name,
+					}
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, roleNamespacedName, role)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(role.Status.Applied).Should(HaveValue(BeTrue()))
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("verifying initial attributes in PostgreSQL", func() {
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					query := fmt.Sprintf(
+						"SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s'"+
+							" and rolcanlogin=true and rolcreatedb=false and rolconnlimit=-1",
+						pgRoleName)
+					Eventually(QueryMatchExpectationPredicate(
+						primaryPodInfo, postgres.PostgresDBName, query, "t"), 30).Should(Succeed())
+				})
+
+				By("updating the role attributes", func() {
+					roleNamespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      role.Name,
+					}
+					Expect(env.Client.Get(env.Ctx, roleNamespacedName, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.Login = false
+					role.Spec.CreateDB = true
+					role.Spec.ConnectionLimit = 5
+					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+				})
+
+				By("verifying updated attributes in PostgreSQL", func() {
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					query := fmt.Sprintf(
+						"SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s'"+
+							" and rolcanlogin=false and rolcreatedb=true and rolconnlimit=5",
+						pgRoleName)
+					Eventually(QueryMatchExpectationPredicate(
+						primaryPodInfo, postgres.PostgresDBName, query, "t"), 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("cleaning up", func() {
+					Expect(objects.Delete(env.Ctx, env.Client, role)).To(Succeed())
+				})
 			})
 		})
 
