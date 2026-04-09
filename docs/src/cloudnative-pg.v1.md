@@ -854,7 +854,7 @@ _Appears in:_
 
 
 
-DatabaseRole is the Schema for the databases API
+DatabaseRole is the Schema for the databaseroles API
 
 
 
@@ -877,7 +877,7 @@ _Appears in:_
 
 
 
-DatabaseRoleList contains a list of Roles
+DatabaseRoleList contains a list of DatabaseRoles
 
 
 
