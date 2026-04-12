@@ -218,78 +218,86 @@ function deploy_operator_from_manifest() {
     wait_operator_ready
 }
 
-# deploy_csi_host_path: Deploys the host path CSI driver and snapshotter components.
+# deploy_csi_host_path: Deploys the host path CSI driver using the distributed
+# DaemonSet deployment, which runs the driver on every node with per-node
+# provisioning, snapshotting, and resizing via --node-deployment sidecars.
 function deploy_csi_host_path() {
   # shellcheck disable=SC2154
-  echo -e "${bright}Deploying CSI Host Path Driver...${reset}"
+  echo -e "${bright}Deploying CSI Host Path Driver (distributed)...${reset}"
 
-  # Base URL for CSI repository manifests
   local CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
+  # TODO: Switch to upstream once kubernetes-csi/csi-driver-host-path#653 is merged
+  local CSI_DISTRIBUTED_URL=https://raw.githubusercontent.com/mnencia/csi-driver-host-path/dev/651-with-resizer/deploy/kubernetes-distributed
 
-  # --- 1. Install External Snapshotter CRDs and Controller (Versions sourced from 10-config.sh) ---
+  # --- 1. Snapshot CRDs (from external-snapshotter) ---
 
-  ## Apply CRDs
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 
-  ## Apply RBAC and Controller
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+  # --- 2. Snapshot-controller with --enable-distributed-snapshotting ---
 
-  # --- 2. Install External Sidecar Components ---
+  ## Apply snapshot-controller RBAC with node read permissions uncommented.
+  ## The upstream RBAC has node get/list/watch commented out by default; distributed
+  ## snapshotting requires them so the controller can match PV nodeAffinity to nodes.
+  ## See https://github.com/kubernetes-csi/external-snapshotter#distributed-snapshotting
+  curl -sSL "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml" |
+    sed 's|^  # - apiGroups: \[""\]|  - apiGroups: [""]|; s|^  #   resources: \["nodes"\]|    resources: ["nodes"]|; s|^  #   verbs: \["get", "list", "watch"\]|    verbs: ["get", "list", "watch"]|' |
+    "${K8S_CLI}" apply -f -
 
-  ## Install external provisioner
+  ## Deploy snapshot-controller with --enable-distributed-snapshotting=true
+  local controller_yaml
+  controller_yaml="$(curl -sSL "${CSI_BASE_URL}/external-snapshotter/${EXTERNAL_SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml")"
+  echo "${controller_yaml}" | sed -e '/args:/a\            - --enable-distributed-snapshotting=true' | "${K8S_CLI}" apply -f -
+
+  # --- 3. Sidecar RBAC ---
+
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-provisioner/"${EXTERNAL_PROVISIONER_VERSION}"/deploy/kubernetes/rbac.yaml
-
-  ## Install external attacher
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-attacher/"${EXTERNAL_ATTACHER_VERSION}"/deploy/kubernetes/rbac.yaml
-
-  ## Install external resizer
+  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
 
-  # --- 3. Install Driver and Plugin ---
+  # --- 4. Driver (distributed DaemonSet) ---
 
-  ## Create a temporary file for the modified plugin deployment. This updates the image tag.
-  local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
-    sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
+  "${K8S_CLI}" apply -f "${CSI_DISTRIBUTED_URL}"/hostpath/csi-hostpath-driverinfo.yaml
 
-  # Apply driver info and plugin deployment
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml
-  "${K8S_CLI}" apply -f "${plugin_file}"
-  rm "${plugin_file}"
+  ## The plugin YAML on this branch already pins a custom hostpathplugin image
+  ## (built from the same branch) carrying the --node-deployment flag, so apply
+  ## it as-is. Once the flag is released upstream, switch back to a sed-pinned
+  ## version of registry.k8s.io/sig-storage/hostpathplugin.
+  "${K8S_CLI}" apply -f "${CSI_DISTRIBUTED_URL}"/hostpath/csi-hostpath-plugin.yaml
 
-  # --- 4. Configure Storage Classes ---
+  ## Cross-node snapshot restore depends on csi-topology-coordinator.
+  "${K8S_CLI}" apply -f "${CSI_DISTRIBUTED_URL}"/hostpath/csi-hostpath-coordinator.yaml
 
-  ## Create VolumeSnapshotClass
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml
+  # --- 5. VolumeSnapshotClass ---
 
-  ## Patch VolumeSnapshotClass to allow snapshots of running PostgreSQL instances
-  ## by ignoring read failures during snapshot creation
+  "${K8S_CLI}" apply -f "${CSI_DISTRIBUTED_URL}"/hostpath/csi-hostpath-snapshotclass.yaml
   "${K8S_CLI}" patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
-  ## Create StorageClass
-  "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
+  # --- 6. StorageClass ---
 
-  ## Annotate the StorageClass to set the default snapshot class
-  "${K8S_CLI}" annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
+  ## Download the upstream example StorageClass and patch it for distributed
+  ## deployment: WaitForFirstConsumer for topology-aware scheduling, kind
+  ## parameter for capacity tracking, and snapshot class annotation.
+  curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/examples/csi-storageclass.yaml" |
+    "${K8S_CLI}" patch --local --type merge -f - -p '{"volumeBindingMode":"WaitForFirstConsumer","parameters":{"kind":"fast"},"metadata":{"annotations":{"storage.kubernetes.io/default-snapshot-class":"csi-hostpath-snapclass"}}}' -o yaml |
+    "${K8S_CLI}" apply -f -
 
-  # Wait for CSI plugin to be ready
-  echo -e "${bright}CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready...${reset}"
+  # --- 7. Wait for DaemonSet ---
+
+  echo -e "${bright}Waiting for CSI DaemonSet to be ready on all nodes...${reset}"
   local ITER=0
   while true; do
     if [[ $ITER -ge 300 ]]; then
-      echo -e "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
+      echo -e "${bright}Timeout: The CSI DaemonSet did not become ready within the expected time.${reset}"
       exit 1
     fi
-    local NUM_SPEC
-    local NUM_STATUS
-    NUM_SPEC=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
-    NUM_STATUS=$("${K8S_CLI}" get statefulset csi-hostpathplugin -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "")
-    if [[ -n "$NUM_SPEC" && "$NUM_SPEC" == "$NUM_STATUS" ]]; then
-      echo -e "${bright}Success: The CSI plugin is deployed and ready.${reset}"
+    local NUM_READY
+    local NUM_DESIRED
+    NUM_READY=$("${K8S_CLI}" get daemonset csi-hostpathplugin -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "")
+    NUM_DESIRED=$("${K8S_CLI}" get daemonset csi-hostpathplugin -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "")
+    if [[ -n "$NUM_READY" && -n "$NUM_DESIRED" && "$NUM_READY" -gt 0 && "$NUM_READY" == "$NUM_DESIRED" ]]; then
+      echo -e "${bright}Success: CSI DaemonSet is ready (${NUM_READY}/${NUM_DESIRED} nodes).${reset}"
       break
     fi
     sleep 1
