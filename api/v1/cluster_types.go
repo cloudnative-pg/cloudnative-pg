@@ -933,6 +933,10 @@ type ClusterStatus struct {
 	// +optional
 	ReadService string `json:"readService,omitempty"`
 
+	// Current list of read-only pods
+	// +optional
+	ReadOnlyService string `json:"readOnlyService,omitempty"`
+
 	// Current phase of the cluster
 	// +optional
 	Phase string `json:"phase,omitempty"`
