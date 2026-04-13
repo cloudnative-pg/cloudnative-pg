@@ -137,9 +137,6 @@ case "$ACTION" in
         fi
         source "${COMMON_DIR}/20-utils-k8s.sh"
         deploy_operator_from_source "${CNPG_DEPLOYMENT_METHOD:-manifest}"
-#        ${K8S_CLI} wait --for=condition=Available --timeout=2m \
-#          -n cnpg-system deployment \
-#          -l app.kubernetes.io/name=cloudnative-pg
         ;;
 
     load-helper-images)
@@ -197,6 +194,7 @@ case "$ACTION" in
         echo "NODES:                      ${NODES:-<not explicitly set>}"
         echo "ENABLE_APISERVER_AUDIT:     ${ENABLE_APISERVER_AUDIT:-false}"
         echo "ENABLE_FLUENTD:             ${ENABLE_FLUENTD:-false}"
+        echo "CNPG_DEPLOYMENT_METHOD"     ${CNPG_DEPLOYMENT_METHOD:-manifest}
 
         # --- IMAGE & BUILD ARTIFACTS ---
         echo ""

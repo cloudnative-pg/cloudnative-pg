@@ -143,13 +143,13 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   case "${CNPG_DEPLOYMENT_METHOD}" in
       helm)
           kubectl delete -f "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" --ignore-not-found || :
-        ;;
+          ;;
       manifest)
-        ;;
+      ;;
       *)
           echo -e "${bright}Error: Deployment method not supported: ${CNPG_DEPLOYMENT_METHOD}${reset}" >&2
           exit 1
-        ;;
+          ;;
   esac
 
   CONTROLLER_IMG="${CONTROLLER_IMG}" \
@@ -157,9 +157,9 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
     PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
     make -C "${ROOT_DIR}" "deploy-with-${CNPG_DEPLOYMENT_METHOD}"
 
-#  kubectl wait --for=condition=Available --timeout=2m \
-#    -n cnpg-system deployments \
-#    cnpg-controller-manager
+  kubectl wait --for=condition=Available --timeout=2m \
+    -n cnpg-system deployments \
+    cnpg-controller-manager
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

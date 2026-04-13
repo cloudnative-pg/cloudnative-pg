@@ -68,6 +68,8 @@ WOKE_VERSION ?= 0.19.0
 OPERATOR_SDK_VERSION ?= v1.42.1
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.64.0
+# renovate: datasource=github-releases depName=helm/helm versioning=loose
+HELM_VERSION ?= v3.20.2
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.16.0
 OPENSHIFT_VERSIONS ?= v4.16-v4.21
@@ -228,7 +230,10 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 deploy-with-manifest: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
 	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
 
-deploy-with-helm: manifests ## Deploy controller using Helm by adding the CNPG repo and installing the Operator
+deploy: deploy-with-manifest ## DEPRECATED: Use deploy-with-manifest instead.
+	@echo "WARNING: 'make deploy' is deprecated. Use 'make deploy-with-manifest or make deploy-with-helm' instead."
+
+deploy-with-helm: manifests helm ## Deploy controller using Helm by adding the CNPG repo and installing the Operator
 	# TODO: The crd.create=false flag and the kustomize for the config/helm will be removed once the crds are synced in the cloudnative-pg/charts repository
 	set -e ;\
 	kubectl apply --server-side -k config/helm ;\
@@ -360,6 +365,18 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
+
+HELM = $(LOCALBIN)/helm
+helm: ## Download helm locally if necessary.
+ifneq ($(shell $(HELM) version --template '{{.Version}}' 2>/dev/null), $(HELM_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSL "https://get.helm.sh/helm-${HELM_VERSION}-$${OS}-$${ARCH}.tar.gz" | tar xz -C $(LOCALBIN) --strip-components=1 $${OS}-$${ARCH}/helm ;\
+	chmod +x $(LOCALBIN)/helm ;\
+	}
+endif
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

@@ -255,22 +255,22 @@ function deploy_fluentd() {
 }
 
 function deploy_operator_from_source() {
-  local method=""
-  method="${1}"
+  local cnpg_deployment_method=""
+  cnpg_deployment_method="${1}"
 
-  if [[ "${method}" != "helm" ]] && [[ "${method}" != "manifest" ]]
+  if [[ "${cnpg_deployment_method}" != "helm" ]] && [[ "${cnpg_deployment_method}" != "manifest" ]]
   then
     echo -e "${bright}Error: Deployment method not supported: ${CNPG_DEPLOYMENT_METHOD}${reset}" >&2
     exit 1
   fi
 
-  echo -e "${bright}Deploying CNPG operator from current worktree using ${method}...${reset}"
+  echo -e "${bright}Deploying CNPG operator from current worktree using ${cnpg_deployment_method}...${reset}"
 
   # Attempt to delete the namespace first (ignore errors if it doesn't exist)
   ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
 
   # Run the make target from the project root directory
-  make -C "${ROOT_DIR}" "deploy-with-${method}" "CONTROLLER_IMG=${CONTROLLER_IMG}"
+  make -C "${ROOT_DIR}" "deploy-with-${cnpg_deployment_method}" "CONTROLLER_IMG=${CONTROLLER_IMG}"
 
-  echo -e "${bright}Operator deployment using ${method} initiated.${reset}"
+  echo -e "${bright}Operator deployment using ${cnpg_deployment_method} initiated.${reset}"
 }

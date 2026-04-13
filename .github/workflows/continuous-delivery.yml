@@ -136,6 +136,7 @@ jobs:
           TEST_LEVEL="4"
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
+          CNPG_DEPLOYMENT_METHOD="manifest"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -218,6 +219,7 @@ jobs:
             TEST_LEVEL="4"
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
+            CNPG_DEPLOYMENT_METHOD="manifest"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "LIMIT=${LIMIT}" >> $GITHUB_ENV
@@ -257,12 +259,14 @@ jobs:
           WD_TEST_LEVEL: ${{ needs.test_arguments.outputs.test_level }}
           WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
           WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
+          WD_CNPG_DEPLOYMENT_METHOD: ${{ needs.test_arguments.outputs.cnpg_deployment_method }}
           IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
           IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
           IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
           IC_TEST_LEVEL: ${{ needs.check_commenter.outputs.test_level }}
           IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
           IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
+          IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
         run: |
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
@@ -271,7 +275,7 @@ jobs:
             echo "TEST_LEVEL=${WD_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
-            echo 'CNPG_DEPLOYMENT_METHOD=${{ needs.test_arguments.outputs.cnpg_deployment_method }}' >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${WD_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
           fi
           if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
             echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
@@ -280,6 +284,7 @@ jobs:
             echo "TEST_LEVEL=${IC_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${IC_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
           fi
 
       - name: Set runner based on organization
