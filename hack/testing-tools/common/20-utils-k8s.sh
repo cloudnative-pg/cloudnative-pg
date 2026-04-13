@@ -82,7 +82,7 @@ function deploy_prometheus_crds() {
 
   # 2. Install only the CRDs required by the Prometheus operator
   # We install into kube-system as that namespace is standard and always exists.
-  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
+  retry 3 helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 
   echo -e "${bright}Prometheus CRDs deployed.${reset}"
 }
