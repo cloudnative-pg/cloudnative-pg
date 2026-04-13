@@ -229,6 +229,11 @@ function deploy_csi_host_path() {
   # TODO: Switch to upstream once kubernetes-csi/csi-driver-host-path#653 is merged
   local CSI_DISTRIBUTED_URL=https://raw.githubusercontent.com/mnencia/csi-driver-host-path/dev/651-with-resizer/deploy/kubernetes-distributed
 
+  ## Remove any existing default StorageClass so csi-hostpath-sc becomes the only default
+  for sc in $("${K8S_CLI}" get storageclass -o json | jq -r '.items[] | select(.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name'); do
+    "${K8S_CLI}" annotate storageclass "$sc" storageclass.kubernetes.io/is-default-class-
+  done
+
   # --- 1. Snapshot CRDs (from external-snapshotter) ---
 
   "${K8S_CLI}" apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
@@ -280,7 +285,7 @@ function deploy_csi_host_path() {
   ## deployment: WaitForFirstConsumer for topology-aware scheduling, kind
   ## parameter for capacity tracking, and snapshot class annotation.
   curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/examples/csi-storageclass.yaml" |
-    "${K8S_CLI}" patch --local --type merge -f - -p '{"volumeBindingMode":"WaitForFirstConsumer","parameters":{"kind":"fast"},"metadata":{"annotations":{"storage.kubernetes.io/default-snapshot-class":"csi-hostpath-snapclass"}}}' -o yaml |
+    "${K8S_CLI}" patch --local --type merge -f - -p '{"volumeBindingMode":"WaitForFirstConsumer","parameters":{"kind":"fast"},"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true","storage.kubernetes.io/default-snapshot-class":"csi-hostpath-snapclass"}}}' -o yaml |
     "${K8S_CLI}" apply -f -
 
   # --- 7. Wait for DaemonSet ---
