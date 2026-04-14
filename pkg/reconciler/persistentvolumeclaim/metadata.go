@@ -82,6 +82,12 @@ func reconcileInstanceRoleLabel(
 		return nil
 	}
 	for _, instanceName := range cluster.Status.InstanceNames {
+		// Any instance that is not the current primary is classified as replica,
+		// including pods temporarily labeled ClusterRoleLabelUnhealthy during a
+		// failover. That label is transient and only exists while
+		// CurrentPrimary != TargetPrimary; the reconcile loop's failover guard
+		// prevents this code from running during that window, so by the time we
+		// get here the old primary has already been demoted and "replica" is correct.
 		instanceRole := specs.ClusterRoleLabelReplica
 		if instanceName == cluster.Status.CurrentPrimary {
 			instanceRole = specs.ClusterRoleLabelPrimary

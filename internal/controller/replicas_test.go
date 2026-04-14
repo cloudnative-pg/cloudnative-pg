@@ -133,7 +133,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 	})
 })
 
-var _ = Describe("ensureOldPrimaryLabelIsDemoted", func() {
+var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 	var env *testingEnvironment
 
 	BeforeEach(func() {
@@ -154,7 +154,7 @@ var _ = Describe("ensureOldPrimaryLabelIsDemoted", func() {
 		return pod
 	}
 
-	It("strips the primary label from the old primary pod", func() {
+	It("changes the primary label from the old primary pod", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
 
@@ -173,15 +173,15 @@ var _ = Describe("ensureOldPrimaryLabelIsDemoted", func() {
 
 		pods := []corev1.Pod{primary, replica1, replica2}
 
-		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", pods)
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", pods)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Verify the old primary's label was changed to replica on the API server
 		var updated corev1.Pod
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&primary), &updated)).To(Succeed())
-		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 		//nolint:staticcheck
-		Expect(updated.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+		Expect(updated.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 
 		// Verify replica pods are unchanged
 		var replica1Updated corev1.Pod
@@ -196,23 +196,23 @@ var _ = Describe("ensureOldPrimaryLabelIsDemoted", func() {
 		replica := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
 		Expect(env.client.Create(ctx, &replica)).To(Succeed())
 
-		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", []corev1.Pod{replica})
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{replica})
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("is a no-op when the old primary already has the replica label", func() {
+	It("is a no-op when the old primary already has the unhealthy label", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
 
-		pod := makePod("cluster-1", namespace, specs.ClusterRoleLabelReplica)
+		pod := makePod("cluster-1", namespace, specs.ClusterRoleLabelUnhealthy)
 		Expect(env.client.Create(ctx, &pod)).To(Succeed())
 
-		err := env.clusterReconciler.ensureOldPrimaryLabelIsDemoted(ctx, "cluster-1", []corev1.Pod{pod})
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{pod})
 		Expect(err).ToNot(HaveOccurred())
 
 		var updated corev1.Pod
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&pod), &updated)).To(Succeed())
-		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
 	})
 })
 

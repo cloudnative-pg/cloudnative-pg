@@ -367,12 +367,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		// Strip the old primary's label on every pass while failover is
-		// in progress. This is retried each second until it succeeds,
+		// Mark the old primary as unhealthy on every pass while failover is
+		// in progress. This retries each second until it succeeds,
 		// complementing the immediate best-effort attempt in replicas.go.
-		err := r.ensureOldPrimaryLabelIsDemoted(ctx, cluster.Status.CurrentPrimary, resources.instances.Items)
+		err := r.markOldPrimaryAsUnhealthy(ctx, cluster.Status.CurrentPrimary, resources.instances.Items)
 		if err != nil {
-			contextLogger.Error(err, "Failed to strip primary label from old primary",
+			contextLogger.Error(
+				err,
+				"Failed to strip primary label from old primary",
 				"oldPrimary", cluster.Status.CurrentPrimary)
 		}
 

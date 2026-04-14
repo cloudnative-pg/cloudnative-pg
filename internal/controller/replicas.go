@@ -141,14 +141,14 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 			return "", err
 		}
 
-		// Strip the primary label from the old primary pod immediately.
-		// This cuts it off from the -rw service, preventing replicas from
-		// reconnecting to it (primary_conninfo uses <cluster>-rw) and
+		// Mark the old primary as unhealthy immediately when failover starts,
+		// removing it from both the -rw and -ro services. This prevents replicas
+		// from reconnecting to it (primary_conninfo uses <cluster>-rw) and
 		// satisfying the synchronous replication quorum on a stale primary.
 		// Best-effort: the failover must proceed even if this fails. The
-		// retryable call in the reconcile loop's failover guard and the
-		// dual-primary detection path will correct labels on subsequent passes.
-		if err := r.ensureOldPrimaryLabelIsDemoted(
+		// retryable call in the reconcile loop's failover guard will correct
+		// the label on subsequent passes.
+		if err := r.markOldPrimaryAsUnhealthy(
 			ctx,
 			cluster.Status.CurrentPrimary,
 			resources.instances.Items,
@@ -196,9 +196,10 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
-// ensureOldPrimaryLabelIsDemoted strips the primary label from the old primary pod,
-// cutting it off from the -rw service when failover starts.
-func (r *ClusterReconciler) ensureOldPrimaryLabelIsDemoted(
+// markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
+// starts, removing it from both the -rw and -ro service selectors until
+// ReconcileMetadata restores the correct label after promotion completes.
+func (r *ClusterReconciler) markOldPrimaryAsUnhealthy(
 	ctx context.Context,
 	oldPrimaryName string,
 	instances []corev1.Pod,
@@ -209,20 +210,22 @@ func (r *ClusterReconciler) ensureOldPrimaryLabelIsDemoted(
 		return pod.Name == oldPrimaryName
 	})
 	if idx == -1 {
-		contextLogger.Warning("Old primary pod not found in managed instances, skipping label demotion",
+		contextLogger.Warning(
+			"Old primary pod not found in managed instances, skipping label demotion",
 			"oldPrimary", oldPrimaryName)
 		return nil
 	}
 
 	oldPrimary := &instances[idx]
-	if role, _ := utils.GetInstanceRole(oldPrimary.Labels); role == specs.ClusterRoleLabelReplica {
+	if role, _ := utils.GetInstanceRole(oldPrimary.Labels); role == specs.ClusterRoleLabelUnhealthy {
 		return nil
 	}
 
-	contextLogger.Info("Stripping primary label from old primary during failover",
+	contextLogger.Info(
+		"Setting primary label to unhealthy in the old primary during failover",
 		"pod", oldPrimary.Name)
 	origPod := oldPrimary.DeepCopy()
-	utils.SetInstanceRole(oldPrimary.ObjectMeta, specs.ClusterRoleLabelReplica)
+	utils.SetInstanceRole(oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
 	return r.Patch(ctx, oldPrimary, client.MergeFrom(origPod))
 }
 

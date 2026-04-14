@@ -201,6 +201,11 @@ func updateRoleLabels(
 		}
 
 	default:
+		// This intentionally overwrites the transient ClusterRoleLabelUnhealthy value
+		// that the failover path sets on the old primary. This function is only reached
+		// once CurrentPrimary == TargetPrimary (the failover guard in the reconcile loop
+		// returns early otherwise), so by the time we get here the old primary has been
+		// demoted and "replica" is the correct label.
 		if !hasRole || podRole != specs.ClusterRoleLabelReplica || !newHasRole ||
 			newPodRole != specs.ClusterRoleLabelReplica {
 			contextLogger.Info("Setting replica label", "pod", instance.Name)
