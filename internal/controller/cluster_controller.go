@@ -536,6 +536,19 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+
+		// If the current primary is ready from the Kubernetes perspective but
+		// its status endpoint is failing, the failure is likely transient (e.g.
+		// a network hiccup between the operator and the pod). Requeue instead
+		// of proceeding with a potentially spurious failover.
+		if cluster.Status.CurrentPrimary != "" &&
+			cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary &&
+			instancesStatus.IsPodReadyAndNotReporting(cluster.Status.CurrentPrimary) {
+			contextLogger.Info(
+				"Primary pod is ready but status endpoint is failing, requeueing",
+				"primaryPodName", cluster.Status.CurrentPrimary)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 	}
 
 	// If the user has requested to hibernate the cluster, we do that before
