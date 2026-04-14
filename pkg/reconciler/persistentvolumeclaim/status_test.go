@@ -47,7 +47,7 @@ var _ = Describe("PVC detection", func() {
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
 			makeClusterPVC("2", false), // has a Job
-			makeClusterPVC("3", true),  // resizing
+			makeClusterPVC("3", true),  // resizing, has a Pod so stays "resizing" (not affected by #9786 fix)
 			makeClusterPVC("4", false), // dangling
 		}
 		cluster := &apiv1.Cluster{
@@ -114,6 +114,23 @@ var _ = Describe("PVC classification with resizing PVCs", func() {
 		EnrichStatus(ctx, cluster, []corev1.Pod{}, []batchv1.Job{}, []corev1.PersistentVolumeClaim{pvc})
 		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{clusterName + "-1"}))
 		Expect(cluster.Status.ResizingPVC).Should(BeEmpty())
+	})
+
+	// isResizing check takes precedence over hasJob: a resizing PVC with
+	// a Job but no Pod is classified as dangling, not initializing.
+	It("classifies resizing PVC with a job but no pod as dangling", func(ctx SpecContext) {
+		pvc := makePVC(clusterName, "1", "1", NewPgDataCalculator(), true)
+		cluster := makeCluster()
+		EnrichStatus(
+			ctx,
+			cluster,
+			[]corev1.Pod{},
+			[]batchv1.Job{makeJob(clusterName, "1")},
+			[]corev1.PersistentVolumeClaim{pvc},
+		)
+		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{clusterName + "-1"}))
+		Expect(cluster.Status.ResizingPVC).Should(BeEmpty())
+		Expect(cluster.Status.InitializingPVC).Should(BeEmpty())
 	})
 
 	It("classifies resizing PVC as dangling when pod was deleted during rollout (#9786)", func(ctx SpecContext) {

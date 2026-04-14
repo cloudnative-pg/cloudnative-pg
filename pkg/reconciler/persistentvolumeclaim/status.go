@@ -62,7 +62,7 @@ const (
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	initializing status = "initializing"
 
-	// List of PVCs with resizing condition that have a running pod.
+	// List of PVCs with resizing condition that have a corresponding pod.
 	// Podless resizing PVCs are classified as dangling instead (see #9786).
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
