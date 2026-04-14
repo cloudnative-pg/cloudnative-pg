@@ -159,7 +159,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
 
   kubectl wait --for=condition=Available --timeout=2m \
     -n cnpg-system deployments \
-    cnpg-controller-manager
+    -l app.kubernetes.io/name=cloudnative-pg
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,
