@@ -90,6 +90,15 @@ function build_and_load_operator_image_from_sources() {
   docker buildx rm "${builder_name}"
 }
 
+function print_operator_image() {
+    local image
+    image=$(${K8S_CLI} get deployment cnpg-controller-manager -n cnpg-system \
+        -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+    if [[ -n "${image}" ]]; then
+        echo -e "${bright}Operator image: ${image}${reset}"
+    fi
+}
+
 function deploy_operator_from_sources() {
     echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
 
@@ -100,6 +109,7 @@ function deploy_operator_from_sources() {
     make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 
     echo -e "${bright}Operator deployment initiated.${reset}"
+    print_operator_image
 }
 
 function deploy_operator_from_manifest() {
@@ -125,4 +135,5 @@ function deploy_operator_from_manifest() {
     ${K8S_CLI} apply --server-side -f "${manifest_url}" # avoids last-applied-configuration annotation exceeding the 262144 byte limit on large CRDs
 
     echo -e "${bright}Operator deployment initiated.${reset}"
+    print_operator_image
 }
