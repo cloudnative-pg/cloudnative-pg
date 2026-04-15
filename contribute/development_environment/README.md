@@ -219,7 +219,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 Now that your system has been validated, you can tear down the local cluster with:
 
 ```shell
-./hack/setup-cluster.sh destroy
+./hack/setup-cluster.sh teardown
 ```
 
 Congratulations, you have a suitable development environment. You are now able

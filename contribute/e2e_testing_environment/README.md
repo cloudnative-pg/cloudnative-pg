@@ -49,7 +49,7 @@ hack/setup-cluster.sh deploy
 To cleanup everything:
 
 ``` shell
-hack/setup-cluster.sh destroy
+hack/setup-cluster.sh teardown
 ```
 
 All flags have corresponding environment variables labeled `(Env:...` in the table below.
