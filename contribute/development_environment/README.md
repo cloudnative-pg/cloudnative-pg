@@ -188,15 +188,18 @@ This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
 
-Alternatively, you can deploy a published release instead of building from
-sources by using the `-o` flag:
+Alternatively, you can deploy a published release or development snapshot
+instead of building from sources by using the `-o` flag:
 
 ```shell
-# Deploy the latest built operator from source
-./hack/setup-cluster.sh -s source create deploy
+# Deploy a specific published release
+./hack/setup-cluster.sh -o 1.28.1 create deploy
 
-# Deploy a specific release
-./hack/setup-cluster.sh -s 1.28.1 create deploy
+# Deploy the latest snapshot from the main branch
+./hack/setup-cluster.sh -o main create deploy
+
+# Deploy the latest snapshot for a release branch
+./hack/setup-cluster.sh -o release-1.28 create deploy
 ```
 
 *Note:* For a list of options, run `./hack/setup-cluster.sh`.

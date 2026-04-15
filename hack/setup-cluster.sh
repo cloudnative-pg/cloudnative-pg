@@ -50,7 +50,7 @@ NODES=${NODES:-3}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-n <nodes>] [-s <source>] <command>
+Usage: $0 [-k <version>] [-n <nodes>] [-o <operator>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -78,12 +78,14 @@ Options:
                           Used only during "create" command. Default: 3
                           Env: NODES
 
-    -s|--source
-      <SOURCE>            Controls which version of  operator is deployed. 
-                          Use 'source (default) to build and deploy from the 
-                          local worktree or an exact version such as '1.28.1' to 
-                          deploy that release.
-                          Env: SOURCE
+    -o|--operator
+      <OPERATOR>          Controls which version of the operator is deployed.
+                          Use 'local' (default) to build and deploy from the
+                          local worktree, an exact version such as '1.28.1' to
+                          deploy that published release, or a branch name such
+                          as 'main' or 'release-1.28' to deploy the latest
+                          snapshot for that branch.
+                          Env: OPERATOR
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -96,9 +98,9 @@ main() {
   # --- ARGUMENT PARSING ---
   # Parse command-line options (-k, -n, etc.) using getopt
   if ! getopt -T > /dev/null; then
-    parsed_opts=$(getopt -o e:k:n:s:r -l "engine:,k8s-version:,nodes:,source:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:o:r -l "engine:,k8s-version:,nodes:,operator:,registry" -- "$@") || usage
   else
-    parsed_opts=$(getopt e:k:n:s:r "$@") || usage
+    parsed_opts=$(getopt e:k:n:o:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
 
@@ -131,9 +133,9 @@ main() {
           usage
         fi
         ;;
-      -s | --source)
+      -o | --operator)
         shift
-        export SOURCE="${1}"
+        export OPERATOR="${1}"
         shift
         ;;
       -r | --registry)
