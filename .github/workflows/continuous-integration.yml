@@ -18,6 +18,8 @@ permissions: read-all
 
 # set up environment variables to be used across all the jobs
 env:
+  # renovate: datasource=golang-version depName=golang versioning=loose
+  GOLANG_VERSION: "1.26.1"
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
   GOLANGCI_LINT_VERSION: "v2.10.1"
   KUBEBUILDER_VERSION: "2.3.1"
@@ -206,7 +208,9 @@ jobs:
       - name: Run govulncheck
         uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
         with:
-          go-version-file: go.mod
+          # This version must be kept since it take precedence over the go-version-file and
+          # if is replaced, the default is stable which is not what we want
+          go-version-input: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
   shellcheck:
