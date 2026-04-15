@@ -246,7 +246,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
-	if cluster.IsReadOnlyServiceEnabled() {
+	if cluster.IsReadOnlyServiceEnabled() && cluster.Spec.Instances > 1 {
 		cluster.Status.ReadOnlyService = cluster.GetServiceReadOnlyName()
 	}
 
