@@ -50,7 +50,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -68,7 +68,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -86,7 +86,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -104,7 +104,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},

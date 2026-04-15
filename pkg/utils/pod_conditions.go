@@ -29,7 +29,7 @@ var utilsLog = log.WithName("utils")
 // IsPodReady check if a Pod is ready or not
 func IsPodReady(pod corev1.Pod) bool {
 	for _, c := range pod.Status.Conditions {
-		if c.Type == corev1.ContainersReady && c.Status == corev1.ConditionTrue {
+		if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
 			return true
 		}
 	}
