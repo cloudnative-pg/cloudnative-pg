@@ -270,12 +270,17 @@ func classifyPVC(
 		return healthy
 	}
 
-	// PVC is resizing without a pod, classify as dangling so a pod is
-	// created.  This is safe because volumes remain usable during
-	// expansion, and filesystem resize actually requires a mounted pod
-	// (kubelet performs it).  Without this, a simultaneous storage +
-	// resource change can leave the PVC orphaned as "resizing" while the
-	// rolling-update-deleted pod is never recreated (see #9786).
+	// A resizing PVC without a pod must be classified as dangling so the
+	// reconciler recreates the pod. Two reasons:
+	//
+	//   1. Filesystem resize requires a mounted pod — kubelet performs it on mount.
+	//
+	//   2. Without a pod, the "resizing" classification is a dead end: a
+	//      simultaneous storage + resource change would leave the PVC orphaned
+	//      because the rolling-update-deleted pod is never recreated (see #9786).
+	//
+	// For online-expandable volumes reason 1 does not apply, but reason 2 still
+	// does; classifying as dangling is always safe here.
 	if isResizing(pvc) {
 		log.FromContext(ctx).Info("PVC resizing without a pod, classifying as dangling",
 			"pvc", pvc.Name)
