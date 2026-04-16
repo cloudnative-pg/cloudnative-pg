@@ -31,7 +31,7 @@ on:
         required: false
         default: 'debug'
       cnpg_deployment_method:
-        description: 'Deployment method for CNPG operator (manifest, helm)'
+        description: 'Deployment method for CNPG operator (manifest, helm) use helm only on Kind and K3D clusters'
         required: false
         default: 'manifest'
   schedule:
