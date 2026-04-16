@@ -50,6 +50,7 @@ Name | Description
 `CREATE_ANY_SERVICE` | When set to `true`, will create `-any` service for the cluster. Default is `false`
 `DRAIN_TAINTS` | Specifies the taint keys that should be interpreted as indicators of node drain. By default, it includes the taints commonly applied by [kubectl](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/), [Cluster Autoscaler](https://github.com/kubernetes/autoscaler), and [Karpenter](https://github.com/aws/karpenter-provider-aws): `node.kubernetes.io/unschedulable`, `ToBeDeletedByClusterAutoscaler`, `karpenter.sh/disrupted`, `karpenter.sh/disruption`.
 `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | When set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
+`ENABLE_WEBHOOK_NAMESPACE_SUFFIX` | When set to `true`, appends `-<OPERATOR_NAMESPACE>` to the default webhook configuration names (e.g. `cnpg-mutating-webhook-configuration-cnpg-team-a`). Required when deploying multiple operator instances in namespaced mode on the same cluster to avoid webhook configuration name collisions. Default is `false`.
 `EXPIRING_CHECK_THRESHOLD` | Determines the threshold, in days, for identifying a certificate as expiring. Default is 7.
 `INCLUDE_PLUGINS` | A comma-separated list of plugins to be always included in the Cluster's reconciliation.
 `INHERITED_ANNOTATIONS` | List of annotation names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
