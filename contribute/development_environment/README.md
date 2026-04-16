@@ -202,6 +202,10 @@ instead of building from sources by using the `-o` flag:
 ./hack/setup-cluster.sh -o release-1.28 create deploy
 ```
 
+Branch snapshots are pulled from the
+[`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+repository.
+
 *Note:* For a list of options, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go

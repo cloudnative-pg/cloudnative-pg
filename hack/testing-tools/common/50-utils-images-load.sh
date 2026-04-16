@@ -90,15 +90,6 @@ function build_and_load_operator_image_from_sources() {
   docker buildx rm "${builder_name}"
 }
 
-function print_operator_image() {
-    local image
-    image=$(${K8S_CLI} get deployment cnpg-controller-manager -n cnpg-system \
-        -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
-    if [[ -n "${image}" ]]; then
-        echo -e "${bright}Operator image: ${image}${reset}"
-    fi
-}
-
 function deploy_operator_from_sources() {
     echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
 
@@ -107,32 +98,6 @@ function deploy_operator_from_sources() {
 
     # Run the make target from the project root directory
     make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
-
-    echo -e "${bright}Operator deployment initiated.${reset}"
-    print_operator_image
-}
-
-function deploy_operator_from_manifest() {
-    local operator="${1:?operator is required}"
-    local manifest_url
-
-    # Semver version (e.g. 1.28.1) -> published release manifest from the main repo
-    # Branch name (e.g. main, release-1.28) -> snapshot manifest from the artifacts repo
-    if [[ "${operator}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        manifest_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v${operator}/releases/cnpg-${operator}.yaml"
-    else
-        manifest_url="https://raw.githubusercontent.com/cloudnative-pg/artifacts/${operator}/manifests/operator-manifest.yaml"
-    fi
-
-    if ! curl --silent --head --fail "${manifest_url}" > /dev/null 2>&1; then
-        echo -e "${bright}Error: Manifest not found at ${manifest_url}${reset}" >&2
-        echo -e "${bright}Please verify the operator: ${operator}${reset}" >&2
-        exit 1
-    fi
-
-    echo -e "${bright}Deploying operator from '${operator}'${reset}"
-    ${K8S_CLI} delete ns cnpg-system 2>/dev/null || true
-    ${K8S_CLI} apply --server-side -f "${manifest_url}" # avoids last-applied-configuration annotation exceeding the 262144 byte limit on large CRDs
 
     echo -e "${bright}Operator deployment initiated.${reset}"
     print_operator_image

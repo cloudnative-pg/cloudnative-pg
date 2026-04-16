@@ -50,7 +50,7 @@ NODES=${NODES:-3}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-n <nodes>] [-o <operator>] <command>
+Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
