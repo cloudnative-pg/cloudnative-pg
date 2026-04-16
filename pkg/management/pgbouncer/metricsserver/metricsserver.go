@@ -22,6 +22,7 @@ package metricsserver
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -62,7 +63,7 @@ func Setup(ctx context.Context) error {
 }
 
 // ListenAndServe starts the web server handling metrics
-func ListenAndServe() error {
+func ListenAndServe(tlsConfig *tls.Config) error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle(url.PathMetrics, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
@@ -71,8 +72,18 @@ func ListenAndServe() error {
 		Handler:           serveMux,
 		ReadTimeout:       webserver.DefaultReadTimeout,
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
+		TLSConfig:         tlsConfig,
 	}
-	err := server.ListenAndServe()
+
+	var err error
+	if tlsConfig != nil {
+		// Empty cert/key file paths are intentional: ServeTLS skips loading
+		// from disk when TLSConfig already has GetCertificate set, so passing
+		// "" avoids a redundant (and broken) file read.
+		err = server.ListenAndServeTLS("", "")
+	} else {
+		err = server.ListenAndServe()
+	}
 
 	// The metricsServer has been shut down
 	if errors.Is(err, http.ErrServerClosed) {

@@ -367,6 +367,7 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -1244,10 +1245,12 @@ podtemplatespec
 podtopologylabels
 poolMode
 pooler
+pooler's
 poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
 poolers
 poolersecrets
 poolerspec

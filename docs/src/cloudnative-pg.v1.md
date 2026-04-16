@@ -1912,6 +1912,25 @@ _Appears in:_
 | `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor` |  | false |  |
 | `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion. |  |  |  |
 | `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping. |  |  |  |
+| `tls` _[PoolerMonitoringTLSConfiguration](#poolermonitoringtlsconfiguration)_ | Configure TLS communication for the metrics endpoint.<br />Changing tls.enabled option will force a rollout of all instances. |  |  |  |
+
+
+#### PoolerMonitoringTLSConfiguration
+
+
+
+PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
+for the pooler's monitoring
+
+
+
+_Appears in:_
+
+- [PoolerMonitoringConfiguration](#poolermonitoringconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `enabled` _boolean_ | Enable TLS for the monitoring endpoint.<br />Changing this option will force a rollout of all instances. |  | false |  |
 
 
 #### PoolerSecrets

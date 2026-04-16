@@ -668,6 +668,21 @@ spec:
   - port: metrics
 ```
 
+### TLS for the Metrics Endpoint
+
+The pooler metrics endpoint can be secured with TLS by enabling
+`.spec.monitoring.tls.enabled` on the `Pooler` resource:
+
+```yaml
+spec:
+  pgbouncer:
+    clientTLSSecret:
+      name: <CLIENT_TLS_SECRET>
+  monitoring:
+    tls:
+      enabled: true
+```
+
 ### Deprecation of Automatic `PodMonitor` Creation
 
 :::warning[Feature Deprecation Notice]

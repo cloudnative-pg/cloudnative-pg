@@ -128,6 +128,21 @@ type PoolerMonitoringConfiguration struct {
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+
+	// Configure TLS communication for the metrics endpoint.
+	// Changing tls.enabled option will force a rollout of all instances.
+	// +optional
+	TLSConfig *PoolerMonitoringTLSConfiguration `json:"tls,omitempty"`
+}
+
+// PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
+// for the pooler's monitoring
+type PoolerMonitoringTLSConfiguration struct {
+	// Enable TLS for the monitoring endpoint.
+	// Changing this option will force a rollout of all instances.
+	// +kubebuilder:default:=false
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set
