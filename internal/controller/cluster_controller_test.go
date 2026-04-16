@@ -273,6 +273,59 @@ var _ = Describe("Updating target primary", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
+
+	It("Issue #9786: findInstancePodToCreate selects podless resizing PVC classified as dangling by EnrichStatus",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+				cluster.Spec.Instances = 2
+				cluster.Status.LatestGeneratedNode = 2
+				cluster.Status.ReadyInstances = 1
+			})
+
+			By("creating cluster PVCs and marking them as resizing")
+			pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+			for i := range pvcs {
+				pvcs[i].Status.Phase = corev1.ClaimBound
+				pvcs[i].Status.Conditions = append(pvcs[i].Status.Conditions, corev1.PersistentVolumeClaimCondition{
+					Type:   corev1.PersistentVolumeClaimResizing,
+					Status: corev1.ConditionTrue,
+				})
+			}
+
+			By("creating a pod for instance 1 only (instance 2's pod was deleted during rolling update)")
+			pod1, err := specs.NewInstance(ctx, *cluster, 1, true)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.SetInheritedDataAndOwnership(&pod1.ObjectMeta)
+			Expect(env.client.Create(ctx, pod1)).To(Succeed())
+			pod1.Status = corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
+				},
+			}
+
+			By("running EnrichStatus to classify PVCs")
+			persistentvolumeclaim.EnrichStatus(ctx, cluster, []corev1.Pod{*pod1}, []batchv1.Job{}, pvcs)
+			instance2Name := specs.GetInstanceName(cluster.Name, 2)
+			Expect(cluster.Status.ResizingPVC).Should(HaveLen(1))
+			Expect(cluster.Status.DanglingPVC).Should(Equal([]string{instance2Name}))
+
+			By("verifying findInstancePodToCreate selects the dangling instance for pod creation")
+			statusList := postgres.PostgresqlStatusList{
+				Items: []postgres.PostgresqlStatus{
+					{
+						IsPodReady: true,
+						IsPrimary:  true,
+						Pod:        pod1,
+					},
+				},
+			}
+			instanceToCreate, err := findInstancePodToCreate(ctx, cluster, statusList, pvcs)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(instanceToCreate).ToNot(BeNil())
+			Expect(instanceToCreate.Name).To(Equal(instance2Name))
+		})
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
