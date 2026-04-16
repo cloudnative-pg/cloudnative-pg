@@ -78,11 +78,11 @@ function deploy_prometheus_crds() {
   echo -e "${bright}Starting deployment of Prometheus CRDs...${reset}"
 
   # 1. Add Prometheus Community Helm Repository
-  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  retry 3 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
   # 2. Install only the CRDs required by the Prometheus operator
   # We install into kube-system as that namespace is standard and always exists.
-  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
+  retry 3 helm -n kube-system upgrade --install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 
   echo -e "${bright}Prometheus CRDs deployed.${reset}"
 }
@@ -93,7 +93,7 @@ function deploy_pyroscope() {
   echo -e "${bright}Deploying Pyroscope and enabling pprof profiling on the operator...${reset}"
 
   # 1. Add Pyroscope Helm Repository
-  helm repo add pyroscope-io https://grafana.github.io/helm-charts
+  retry 3 helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
   # 2. Define Pyroscope configuration values and install via Helm
   local values_file="${TEMP_DIR}/pyroscope_values.yaml"
@@ -101,7 +101,7 @@ function deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
+  retry 3 helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   # 3. Create patch file to enable operator profiling annotations
   # These annotations tell Pyroscope's agent what ports and profiles to scrape.
