@@ -11,8 +11,8 @@
   baseBranchPatterns: [
     'main',
     'release-1.25',
-    'release-1.27',
     'release-1.28',
+    'release-1.29',
   ],
   ignorePaths: [
     'docs/**',
@@ -48,6 +48,7 @@
         '/^Makefile$/',
         '/^hack/setup-cluster.sh$/',
         '/^hack/testing-tools/k8s-engines/[^/]+/settings\\.sh$/',
+        '/^hack/testing-tools/common/40-utils-registry\\.sh$/'
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*["\']?(?<currentValue>.+?)["\']?\\s',
@@ -60,6 +61,7 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))? currentValue=(?<currentValue>[^\\s]+?)\\s+[A-Za-z0-9_]+?_VERSION\\s*: \\s*["\']?(?<currentDigest>.+?)["\']?\\s',
       ],
     },
     {
@@ -264,7 +266,19 @@
       matchPackageNames: [
         'kindest{/,}**',
         'getwoke{/,}**',
-        'jonasbn/github-action-spellcheck'
+        'jonasbn/github-action-spellcheck',
+        'registry',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      groupName: 'SLSA actions no-digest',
+      matchDatasources: [
+        'github-tags',
+      ],
+      matchPackageNames: [
+        'slsa-framework{/,}**',
       ],
       pinDigests: false,
       separateMajorMinor: false,

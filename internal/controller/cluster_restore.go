@@ -184,7 +184,6 @@ func ensureOrphanServiceIsNotPresent(
 
 // ensureClusterRestoreCanStart is a function where the plugins can inject their custom logic to tell the
 // restore process to wait before starting the process
-// nolint: revive
 func ensureClusterRestoreCanStart(
 	ctx context.Context,
 	c client.Client,

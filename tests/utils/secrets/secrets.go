@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -109,6 +111,87 @@ func GetCredentials(
 	username := string(secret.Data["username"])
 	password := string(secret.Data["password"])
 	return username, password, nil
+}
+
+// CopyOperatorPullSecretToServiceAccount copies the operator pull secret from
+// the operator namespace to the target namespace and adds it as an
+// imagePullSecret on the specified ServiceAccount. This is needed for shared
+// ServiceAccounts that are not managed by the operator, so they can pull the
+// operator image used by the bootstrap-controller init container.
+// If no operator pull secret exists, this is a no-op.
+func CopyOperatorPullSecretToServiceAccount(
+	ctx context.Context,
+	crudClient client.Client,
+	operatorDeployment appsv1.Deployment,
+	targetNamespace, serviceAccountName string,
+) error {
+	pullSecretName := getOperatorPullSecretName(operatorDeployment)
+	operatorNamespace := operatorDeployment.Namespace
+
+	// Get the operator pull secret
+	var operatorSecret corev1.Secret
+	err := crudClient.Get(ctx, client.ObjectKey{
+		Name:      pullSecretName,
+		Namespace: operatorNamespace,
+	}, &operatorSecret)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("while getting operator pull secret: %w", err)
+	}
+
+	// Copy the secret to the target namespace
+	targetSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pullSecretName,
+			Namespace: targetNamespace,
+		},
+		Data: operatorSecret.Data,
+		Type: operatorSecret.Type,
+	}
+	if err := crudClient.Create(ctx, targetSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("while creating pull secret in target namespace: %w", err)
+	}
+
+	// Add the pull secret to the ServiceAccount
+	var sa corev1.ServiceAccount
+	if err := crudClient.Get(ctx, client.ObjectKey{
+		Name:      serviceAccountName,
+		Namespace: targetNamespace,
+	}, &sa); err != nil {
+		return fmt.Errorf("while getting service account: %w", err)
+	}
+
+	for _, ref := range sa.ImagePullSecrets {
+		if ref.Name == pullSecretName {
+			return nil
+		}
+	}
+
+	original := sa.DeepCopy()
+	sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{
+		Name: pullSecretName,
+	})
+	if err := crudClient.Patch(ctx, &sa, client.MergeFrom(original)); err != nil {
+		return fmt.Errorf("while patching service account with pull secret: %w", err)
+	}
+
+	return nil
+}
+
+// getOperatorPullSecretName reads the PULL_SECRET_NAME env var from the
+// operator deployment, falling back to the default name.
+// NOTE: this only inspects literal env values, not valueFrom references.
+func getOperatorPullSecretName(deployment appsv1.Deployment) string {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		for _, envVar := range container.Env {
+			if envVar.Name == "PULL_SECRET_NAME" && envVar.Value != "" {
+				return envVar.Value
+			}
+		}
+	}
+	return configuration.DefaultOperatorPullSecretName
 }
 
 // CreateObjectStorageSecret generates an Opaque Secret with a given ID and Key

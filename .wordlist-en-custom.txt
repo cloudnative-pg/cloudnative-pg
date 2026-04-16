@@ -54,6 +54,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CIDR
 CIS
 CKA
 CN
@@ -161,6 +162,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExtensionConfiguration
+ExtensionEnvVar
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
@@ -184,12 +186,14 @@ GKE
 GPL
 GUC
 GUCs
+GabriFedi
 Gabriele
 GaugeVec
 GeoSpatial
 Gi
 GitOps
 GoArch
+GoReleaser
 Golang
 GolangCI
 GoogleCredentials
@@ -203,6 +207,7 @@ Huß
 IAM
 INPLACE
 IOPS
+IPs
 IPv
 IRSA
 IaC
@@ -263,6 +268,7 @@ ManagedRolesStatus
 ManagedService
 ManagedServices
 MaxItems
+MaxLength
 MetricDescription
 MetricName
 MetricType
@@ -347,6 +353,9 @@ PodDisruptionBudgets
 PodMonitor
 PodName
 PodSecurityContext
+PodSelectorRef
+PodSelectorRefStatus
+PodSelectorRefs
 PodSpec
 PodStatus
 PodTemplateSpec
@@ -433,6 +442,7 @@ Ruocco
 SANs
 SAS
 SBOM
+SBOMs
 SCC
 SDK
 SELinux
@@ -576,6 +586,7 @@ addons
 affinityconfiguration
 aks
 albert
+alex
 allTables
 allnamespaces
 alloc
@@ -673,6 +684,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+bozkayasalihx
 br
 bs
 builtinLocale
@@ -853,12 +865,15 @@ envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
 ephemeralvolumessizelimitconfiguration
+ermakov
 eu
 excludePatterns
 executables
 expirations
+extName
 extensibility
 extensionconfiguration
+extensionenvvar
 extensionspec
 externalCluster
 externalClusterName
@@ -934,6 +949,7 @@ html
 http
 httpGet
 https
+hu
 hugepages
 icu
 icuLocale
@@ -990,6 +1006,7 @@ isready
 issuecomment
 italy
 jdbc
+jmealo
 jobCount
 jq
 json
@@ -1044,6 +1061,7 @@ livenessProbe
 livenessProbeTimeout
 livenessprobe
 lm
+loadBalancerSourceRanges
 localeCType
 localeCollate
 localeProvider
@@ -1132,6 +1150,7 @@ observability
 observedGeneration
 oc
 ol
+oleg
 olm
 onlineConfiguration
 onlineUpdateEnabled
@@ -1188,6 +1207,7 @@ pgbouncerspec
 pgdata
 pgpass
 pgstatstatements
+pgvector
 phaseReason
 pid
 pinger
@@ -1211,9 +1231,13 @@ podMonitorRelabelings
 podMonitors
 podName
 podSecurityContext
+podSelectorRefs
 podStatuses
 podmonitor
 podname
+podselector
+podselectorref
+podselectorrefstatus
 podstatus
 podtemplates
 podtemplatespec
@@ -1250,6 +1274,7 @@ ppc
 pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
+prefetched
 preload
 prepended
 primaryUpdateMethod
@@ -1294,6 +1319,7 @@ readinessProbe
 readthedocs
 readyInstances
 reconciler
+reconcilers
 reconciliationLoop
 reconciliationStartedAt
 reconciliationTerminatedAt
@@ -1396,6 +1422,7 @@ servicetemplatespec
 serviceupdatestrategy
 sessionToken
 sha
+sharifmshaker
 shm
 shmall
 shmmax
@@ -1405,6 +1432,7 @@ sigs
 sigstore
 singlenamespace
 slotPrefix
+slsa
 smartShutdownTimeout
 snapshotBackupStatus
 snapshotOwnerReference

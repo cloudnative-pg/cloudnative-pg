@@ -169,7 +169,7 @@ Add `--pprof-server=true` to the args list, for example:
       containers:
       - args:
         - controller
-        - --enable-leader-election
+        - --leader-elect
         - --config-map-name=cnpg-controller-manager-config
         - --secret-name=cnpg-controller-manager-config
         - --log-level=info

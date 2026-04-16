@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: clusterimagecatalogs.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -51,6 +51,112 @@ spec:
                 items:
                   description: CatalogImage defines the image and major version
                   properties:
+                    extensions:
+                      description: The configuration of the extensions to be added
+                      items:
+                        description: |-
+                          ExtensionConfiguration is the configuration used to add
+                          PostgreSQL extensions to the Cluster.
+                        properties:
+                          bin_path:
+                            description: |-
+                              A list of directories within the image to be appended to the
+                              PostgreSQL process's `PATH` environment variable.
+                            items:
+                              type: string
+                            type: array
+                          dynamic_library_path:
+                            description: |-
+                              The list of directories inside the image which should be added to dynamic_library_path.
+                              If not defined, defaults to "/lib".
+                            items:
+                              type: string
+                            type: array
+                          env:
+                            description: |-
+                              Env is a list of custom environment variables to be set in the
+                              PostgreSQL process for this extension. It is the responsibility of the
+                              cluster administrator to ensure the variables are correct for the
+                              specific extension. Note that changes to these variables require
+                              a manual cluster restart to take effect.
+                            items:
+                              description: |-
+                                ExtensionEnvVar defines an environment variable for a specific extension
+                                image volume.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name of the environment variable to be injected into the
+                                    PostgreSQL process.
+                                  minLength: 1
+                                  pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                  type: string
+                                value:
+                                  description: |-
+                                    Value of the environment variable. CloudNativePG performs a direct
+                                    replacement of this value, with support for placeholder expansion.
+                                    The ${`image_root`} placeholder resolves to the absolute mount path
+                                    of the extension's volume (e.g., `/extensions/my-extension`). This
+                                    is particularly useful for allowing applications or libraries to
+                                    locate specific directories within the mounted image.
+                                    Unrecognized placeholders are rejected. To include a literal ${...}
+                                    in the value, escape it as $${...}.
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          extension_control_path:
+                            description: |-
+                              The list of directories inside the image which should be added to extension_control_path.
+                              If not defined, defaults to "/share".
+                            items:
+                              type: string
+                            type: array
+                          image:
+                            description: The image containing the extension.
+                            properties:
+                              pullPolicy:
+                                description: |-
+                                  Policy for pulling OCI objects. Possible values are:
+                                  Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+                                  Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+                                  IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+                                  Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+                                type: string
+                              reference:
+                                description: |-
+                                  Required: Image or artifact reference to be used.
+                                  Behaves in the same way as pod.spec.containers[*].image.
+                                  Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+                                  More info: https://kubernetes.io/docs/concepts/containers/images
+                                  This field is optional to allow higher level config management to default or override
+                                  container images in workload controllers like Deployments and StatefulSets.
+                                type: string
+                            type: object
+                          ld_library_path:
+                            description: The list of directories inside the image
+                              which should be added to ld_library_path.
+                            items:
+                              type: string
+                            type: array
+                          name:
+                            description: The name of the extension, required
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     image:
                       description: The image reference
                       type: string

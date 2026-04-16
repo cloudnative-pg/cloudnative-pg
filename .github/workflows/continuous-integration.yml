@@ -18,10 +18,8 @@ permissions: read-all
 
 # set up environment variables to be used across all the jobs
 env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
   # renovate: datasource=github-releases depName=golangci/golangci-lint versioning=loose
-  GOLANGCI_LINT_VERSION: "v2.8.0"
+  GOLANGCI_LINT_VERSION: "v2.10.1"
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.31.0"
@@ -41,7 +39,8 @@ env:
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   SIGN_IMAGES: "true"
-  OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
+  # renovate: datasource=git-refs depName=https://github.com/redhat-openshift-ecosystem/community-operators-pipeline.git versioning=git currentValue=ci/latest
+  OPP_SCRIPT_VERSION: "fbac22ff0c713188bdcea36791b70fb3999e6e03"
 
 defaults:
   run:
@@ -60,13 +59,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.25, release-1.27, release-1.28]
+        branch: [release-1.25, release-1.28, release-1.29]
+    env:
+      BRANCH: ${{ matrix.branch }}
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           workflow: continuous-integration
-          ref: ${{ matrix.branch }}
+          ref: ${{ env.BRANCH }}
 
   # Detects if we should skip the workflow due to being duplicated. Exceptions:
   #   1. it's on 'main' branch
@@ -106,7 +107,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Check for changes
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3.0.3
         id: filter
         # Remember to add new folders in the operator-changed filter if needed
         with:
@@ -161,7 +162,7 @@ jobs:
         with:
           # Disable setup-go caching. Cache is better handled by the golangci-lint action
           cache: false
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Run golangci-lint
@@ -205,7 +206,7 @@ jobs:
       - name: Run govulncheck
         uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
         with:
-          go-version-input: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
   shellcheck:
@@ -283,6 +284,8 @@ jobs:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
+    env:
+      ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -290,22 +293,20 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Run unit tests
-        env:
-          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
           make test
 
       - name: Coverage Summary
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           go tool cover -func=cover.out -o coverage.out
 
       - name: Publish unit test summary on the latest k8s version
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
+        if: env.ENVTEST_K8S_VERSION == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
 
@@ -329,7 +330,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Run make apidoc
@@ -343,6 +344,26 @@ jobs:
             echo "The API documentation doesn't reflect the current API. Please run make apidoc."
             exit 1
           fi
+
+  docs-build:
+    name: Verify documentation builds
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.docs-changed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Build documentation
+        run: |
+          docker run --rm \
+            -v ./docs/src:/website/docs \
+            ghcr.io/cloudnative-pg/docs:latest \
+            yarn build
 
   crd:
     name: Verify CRD is up to date
@@ -364,7 +385,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Run make manifests
@@ -409,7 +430,7 @@ jobs:
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       actions: read
       contents: read
@@ -424,6 +445,7 @@ jobs:
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
+      images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -434,15 +456,18 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Build meta
         id: build-meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
+          commit_sha="${COMMIT_REF}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
@@ -453,13 +478,13 @@ jobs:
 
           # extract branch name
           branch_name=${GITHUB_REF#refs/heads/}
-          if [[ ${{ github.event_name }} == 'pull_request' ]]
+          if [[ "${EVENT_NAME}" == 'pull_request' ]]
           then
-            branch_name=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
+            branch_name=$(gh pr view "${PR_NUMBER}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           # extract tag from branch name
-          tag_name=$(echo "$branch_name" | tr / -)
+          tag_name=$(echo "$branch_name" | tr / - | head -c 50)
 
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
@@ -480,7 +505,7 @@ jobs:
           BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "${{ env.HEAD_REPO }}" != "${{ env.BASE_REPO }}" ]]
+          if [[ "${HEAD_REPO}" != "${BASE_REPO}" ]]
           then
             echo "PUSH=false" >> $GITHUB_ENV
           fi
@@ -491,7 +516,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
 
       - name: Run GoReleaser to build kubectl plugin
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         if: |
           github.event_name == 'schedule' ||
           (
@@ -531,7 +556,7 @@ jobs:
           SLACK_MESSAGE: Building kubernetes plugin failed!
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser
           version: v2
@@ -543,23 +568,23 @@ jobs:
           RACE: "true"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Build and push
-        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
+        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -616,16 +641,6 @@ jobs:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
 
-      - name: Run Trivy to check Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
-        if: env.PUSH == 'true'
-        id: trivy
-        continue-on-error: true
-        with:
-          version: 'latest'
-          image-ref: ${{ env.CONTROLLER_IMG }}
-          format: 'table'
-
       - name: Install cosign
         if: |
           env.SIGN_IMAGES == 'true' &&
@@ -639,12 +654,55 @@ jobs:
         if: |
           env.SIGN_IMAGES == 'true' &&
           env.PUSH == 'true'
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
 
+      - name: Prepare images matrix
+        if: env.PUSH == 'true'
+        id: images_matrix
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
+        shell: bash
+        run: |
+          images_matrix=$(echo "$BAKE_METADATA" |
+            jq -r -c '
+              del(.[].["containerimage.descriptor", "buildx.build.ref"])
+              | to_entries
+              | map({variant: .key} + .value + {"image.name": (.value["image.name"] | split(",")[0] | sub(":[^/]+$"; ""))})
+            '
+          )
+          echo "images_matrix=${images_matrix}" >> "$GITHUB_OUTPUT"
+
+  provenance:
+    name: Provenance for images
+    if: |
+      (always() && !cancelled()) &&
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.push == 'true'
+    needs:
+      - buildx
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.buildx.outputs.images_matrix) }}
+    # NOTE: pinned by tag, not SHA — the SLSA generator's builder-fetch.sh
+    # resolves the binary download URL from the git ref and breaks with SHA pins.
+    # See: https://github.com/slsa-framework/slsa-github-generator/issues/4216
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ matrix['image.name'] }}
+      digest: ${{ matrix['containerimage.digest'] }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -666,7 +724,7 @@ jobs:
           ref: ${{ needs.buildx.outputs.commit }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -674,14 +732,14 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -696,7 +754,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: bundle
           path: |
@@ -721,7 +779,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Setup tools
@@ -729,7 +787,7 @@ jobs:
           make operator-sdk preflight
 
       - name: Loging to container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -744,7 +802,7 @@ jobs:
           --docker-config $HOME/.docker/config.json
 
       - name: Archive the preflight results
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: preflight_results
           path: |
@@ -782,16 +840,16 @@ jobs:
           version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login into docker registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -800,7 +858,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Running Scorecard tests
@@ -815,7 +873,7 @@ jobs:
       matrix:
         test: [ kiwi, lemon, orange ]
     name: Run OLM ${{ matrix.test }} test
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     needs:
       - buildx
       - olm-bundle
@@ -829,6 +887,7 @@ jobs:
       OPP_PRODUCTION_TYPE: "k8s"
       OPP_CONTAINER_OPT: "-t"
       OPP_RELEASE_INDEX_NAME: "catalog_tmp"
+      TEST: ${{ matrix.test }}
     steps:
       - name: Checkout community-operators
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -844,16 +903,16 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Download the bundle
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr bundle.Dockerfile *.zip bundle/
 
       - name: Test bundle
         run: |
-          bash <(curl -sL ${{ env.OPP_SCRIPT_URL }}) ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
+          bash <(curl -sL "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/${OPP_SCRIPT_VERSION}/ci/scripts/opp.sh") "${TEST}" "operators/cloudnative-pg/${VERSION}/"

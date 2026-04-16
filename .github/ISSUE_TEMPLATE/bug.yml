@@ -48,11 +48,11 @@ body:
       label: Version
       description: What is the version of CloudNativePG you are running?
       options:
+        - "1.29 (latest patch)"
         - "1.28 (latest patch)"
-        - "1.27 (latest patch)"
         - "trunk (main)"
+        - "older in 1.29.x"
         - "older in 1.28.x"
-        - "older in 1.27.x"
         - "older minor (unsupported)"
     validations:
       required: true

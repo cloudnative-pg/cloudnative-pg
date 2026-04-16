@@ -445,6 +445,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | The image reference | True |  |  |
 | `major` _integer_ | The PostgreSQL major version of the image. Must be unique within the catalog. | True |  | Minimum: 10 <br /> |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
 
 
 #### CertificatesConfiguration
@@ -576,6 +577,7 @@ _Appears in:_
 | `minSyncReplicas` _integer_ | Minimum number of instances required in synchronous replication with the<br />primary. Undefined or 0 allow writes to complete when no standby is<br />available. |  | 0 | Minimum: 0 <br /> |
 | `maxSyncReplicas` _integer_ | The target value for the synchronous replication quorum, that can be<br />decreased if the number of ready standbys is lower than this.<br />Undefined or 0 disable synchronous replication. |  | 0 | Minimum: 0 <br /> |
 | `postgresql` _[PostgresConfiguration](#postgresconfiguration)_ | Configuration of the PostgreSQL server |  |  |  |
+| `podSelectorRefs` _[PodSelectorRef](#podselectorref) array_ | PodSelectorRefs defines named pod label selectors that can be referenced<br />in pg_hba rules using the $\{podselector:NAME\} syntax in the address field.<br />The operator resolves matching pod IPs and the instance manager expands<br />pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered. |  |  |  |
 | `replicationSlots` _[ReplicationSlotsConfiguration](#replicationslotsconfiguration)_ | Replication slots management configuration |  | \{ highAvailability\: \{ enabled:true \} \} |  |
 | `bootstrap` _[BootstrapConfiguration](#bootstrapconfiguration)_ | Instructions to bootstrap this cluster |  |  |  |
 | `replica` _[ReplicaClusterConfiguration](#replicaclusterconfiguration)_ | Replica cluster configuration |  |  |  |
@@ -585,6 +587,7 @@ _Appears in:_
 | `imagePullSecrets` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference) array_ | The list of pull secrets to be used to pull the images |  |  |  |
 | `storage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage of the instances |  |  |  |
 | `serviceAccountTemplate` _[ServiceAccountTemplate](#serviceaccounttemplate)_ | Configure the generation of the service account |  |  |  |
+| `serviceAccountName` _string_ | Name of an existing ServiceAccount in the same namespace to use for the cluster.<br />When specified, the operator will not create a new ServiceAccount<br />but will use the provided one. This is useful for sharing a single<br />ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).<br />If not specified, a ServiceAccount will be created with the cluster name.<br />Mutually exclusive with ServiceAccountTemplate. |  |  | MaxLength: 253 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 | `walStorage` _[StorageConfiguration](#storageconfiguration)_ | Configuration of the storage for PostgreSQL WAL (Write-Ahead Log) |  |  |  |
 | `ephemeralVolumeSource` _[EphemeralVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#ephemeralvolumesource-v1-core)_ | EphemeralVolumeSource allows the user to configure the source of ephemeral volumes. |  |  |  |
 | `startDelay` _integer_ | The time in seconds that is allowed for a PostgreSQL instance to<br />successfully start up (default 3600).<br />The startup probe failure threshold is derived from this value using the formula:<br />ceiling(startDelay / 10). |  | 3600 |  |
@@ -639,6 +642,7 @@ _Appears in:_
 | `instancesReportedState` _object (keys:[PodName](#podname), values:[InstanceReportedState](#instancereportedstate))_ | The reported state of the instances during the last reconciliation loop |  |  |  |
 | `managedRolesStatus` _[ManagedRoles](#managedroles)_ | ManagedRolesStatus reports the state of the managed roles in the cluster |  |  |  |
 | `tablespacesStatus` _[TablespaceState](#tablespacestate) array_ | TablespacesStatus reports the state of the declarative tablespaces in the cluster |  |  |  |
+| `podSelectorRefs` _[PodSelectorRefStatus](#podselectorrefstatus) array_ | PodSelectorRefs contains the resolved pod IPs for each named selector<br />defined in spec.podSelectorRefs. |  |  |  |
 | `timelineID` _integer_ | The timeline of the Postgres cluster |  |  |  |
 | `topology` _[Topology](#topology)_ | Instances topology. |  |  |  |
 | `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing) |  |  |  |
@@ -980,15 +984,38 @@ PostgreSQL extensions to the Cluster.
 
 _Appears in:_
 
+- [CatalogImage](#catalogimage)
+- [ImageInfo](#imageinfo)
 - [PostgresConfiguration](#postgresconfiguration)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `name` _string_ | The name of the extension, required | True |  | MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
-| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension, required | True |  |  |
+| `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension. |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |
 | `ld_library_path` _string array_ | The list of directories inside the image which should be added to ld_library_path. |  |  |  |
+| `bin_path` _string array_ | A list of directories within the image to be appended to the<br />PostgreSQL process's `PATH` environment variable. |  |  |  |
+| `env` _[ExtensionEnvVar](#extensionenvvar) array_ | Env is a list of custom environment variables to be set in the<br />PostgreSQL process for this extension. It is the responsibility of the<br />cluster administrator to ensure the variables are correct for the<br />specific extension. Note that changes to these variables require<br />a manual cluster restart to take effect. |  |  |  |
+
+
+#### ExtensionEnvVar
+
+
+
+ExtensionEnvVar defines an environment variable for a specific extension
+image volume.
+
+
+
+_Appears in:_
+
+- [ExtensionConfiguration](#extensionconfiguration)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name of the environment variable to be injected into the<br />PostgreSQL process. | True |  | MinLength: 1 <br />Pattern: `^[a-zA-Z_][a-zA-Z0-9_]*$` <br /> |
+| `value` _string_ | Value of the environment variable. CloudNativePG performs a direct<br />replacement of this value, with support for placeholder expansion.<br />The $\{`image_root`\} placeholder resolves to the absolute mount path<br />of the extension's volume (e.g., `/extensions/my-extension`). This<br />is particularly useful for allowing applications or libraries to<br />locate specific directories within the mounted image.<br />Unrecognized placeholders are rejected. To include a literal $\{...\}<br />in the value, escape it as $$\{...\}. | True |  | MinLength: 1 <br /> |
 
 
 #### ExtensionSpec
@@ -1177,6 +1204,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `image` _string_ | Image is the image name | True |  |  |
 | `majorVersion` _integer_ | MajorVersion is the major version of the image | True |  |  |
+| `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | Extensions contains the container image extensions available for the current Image |  |  |  |
 
 
 #### Import
@@ -1732,6 +1760,45 @@ _Appears in:_
 
 
 
+#### PodSelectorRef
+
+
+
+PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+Pods matching the selector in the Cluster's namespace will have their IPs
+resolved and made available for pg_hba address expansion via the
+`${podselector:NAME}` syntax.
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name is the identifier used to reference this selector in pg_hba rules<br />via the $\{podselector:NAME\} syntax in the address field. | True |  | MinLength: 1 <br />Pattern: `^[a-z]([a-z0-9_-]*[a-z0-9])?$` <br /> |
+| `selector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#labelselector-v1-meta)_ | Selector is a label selector that identifies the pods whose IPs<br />should be resolved. Only pods in the Cluster's namespace are considered. | True |  |  |
+
+
+#### PodSelectorRefStatus
+
+
+
+PodSelectorRefStatus contains the resolved pod IPs for a named selector.
+
+
+
+_Appears in:_
+
+- [ClusterStatus](#clusterstatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `name` _string_ | Name corresponds to the name in the spec's PodSelectorRef. | True |  |  |
+| `ips` _string array_ | IPs is the list of pod IPs matching the selector.<br />Each IP is a single address (no CIDR notation). |  |  |  |
+
+
 #### PodStatus
 
 _Underlying type:_ _string_
@@ -1890,6 +1957,7 @@ _Appears in:_
 | `deploymentStrategy` _[DeploymentStrategy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#deploymentstrategy-v1-apps)_ | The deployment strategy to use for pgbouncer to replace existing pods with new ones |  |  |  |
 | `monitoring` _[PoolerMonitoringConfiguration](#poolermonitoringconfiguration)_ | The configuration of the monitoring infrastructure of this pooler.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
 | `serviceTemplate` _[ServiceTemplateSpec](#servicetemplatespec)_ | Template for the Service to be created |  |  |  |
+| `serviceAccountName` _string_ | Name of an existing ServiceAccount in the same namespace to use for the pooler.<br />When specified, the operator will not create a new ServiceAccount<br />but will use the provided one. This is useful for sharing a single<br />ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).<br />If not specified, a ServiceAccount will be created with the pooler name. |  |  | MaxLength: 253 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 
 
 #### PoolerStatus
@@ -1943,7 +2011,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `parameters` _object (keys:string, values:string)_ | PostgreSQL configuration options (postgresql.conf) |  |  |  |
 | `synchronous` _[SynchronousReplicaConfiguration](#synchronousreplicaconfiguration)_ | Configuration of the PostgreSQL synchronous replication feature |  |  |  |
-| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
+| `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file).<br />Use the $\{podselector:NAME\} syntax to reference a pod selector;<br />the rule will be expanded for each Pod IP matching that selector. |  |  |  |
 | `pg_ident` _string array_ | PostgreSQL User Name Maps rules (lines to be appended<br />to the pg_ident.conf file) |  |  |  |
 | `syncReplicaElectionConstraint` _[SyncReplicaElectionConstraints](#syncreplicaelectionconstraints)_ | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be<br />set up. |  |  |  |
 | `shared_preload_libraries` _string array_ | Lists of shared preload libraries to add to the default ones |  |  |  |

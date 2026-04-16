@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.25.0
 
-toolchain go1.25.7
+toolchain go1.26.1
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -11,19 +11,19 @@ require (
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
-	github.com/cloudnative-pg/barman-cloud v0.4.1-0.20260108104508-ced266c145f5
-	github.com/cloudnative-pg/cnpg-i v0.3.1
+	github.com/cloudnative-pg/barman-cloud v0.5.0
+	github.com/cloudnative-pg/cnpg-i v0.5.0
 	github.com/cloudnative-pg/machinery v0.3.3
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.3
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jackc/puddle/v2 v2.2.2
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.4.0
-	github.com/lib/pq v1.11.1
+	github.com/lib/pq v1.12.3
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.28.1
@@ -40,15 +40,15 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/term v0.39.0
-	google.golang.org/grpc v1.78.0
-	k8s.io/api v0.35.1
-	k8s.io/apiextensions-apiserver v0.35.1
-	k8s.io/apimachinery v0.35.1
-	k8s.io/cli-runtime v0.35.1
-	k8s.io/client-go v0.35.1
+	golang.org/x/term v0.42.0
+	google.golang.org/grpc v1.80.0
+	k8s.io/api v0.35.3
+	k8s.io/apiextensions-apiserver v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/cli-runtime v0.35.3
+	k8s.io/client-go v0.35.3
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -112,12 +112,12 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

@@ -40,7 +40,7 @@ func executeRequestWithError[T any](
 ) (*webserver.Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
-	resp, err := cli.Do(req)
+	resp, err := cli.Do(req) //nolint:gosec // URL built from internal pod IP
 	if err != nil {
 		return nil, fmt.Errorf("while executing http request: %w", err)
 	}

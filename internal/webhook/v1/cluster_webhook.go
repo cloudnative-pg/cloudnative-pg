@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,6 +49,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -194,7 +196,9 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePromotionToken,
 		v.validatePluginConfiguration,
 		v.validateLivenessPingerProbe,
+		v.validatePodSelectorRefs,
 		v.validateExtensions,
+		v.validateServiceAccountConfig,
 	}
 
 	for _, validate := range validations {
@@ -263,7 +267,7 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	for i := range r.Spec.Env {
-		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+		if postgres.IsReservedEnvironmentVariable(r.Spec.Env[i].Name) {
 			result = append(
 				result,
 				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
@@ -274,31 +278,6 @@ func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	}
 
 	return result
-}
-
-// isReservedEnvironmentVariable detects if a certain environment variable
-// is reserved for the usage of the operator
-func isReservedEnvironmentVariable(name string) bool {
-	name = strings.ToUpper(name)
-
-	switch {
-	case strings.HasPrefix(name, "CNPG_"):
-		return true
-
-	case strings.HasPrefix(name, "PG"):
-		return true
-
-	case name == "POD_NAME":
-		return true
-
-	case name == "NAMESPACE":
-		return true
-
-	case name == "CLUSTER_NAME":
-		return true
-	}
-
-	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb
@@ -680,14 +659,16 @@ func (v *ClusterCustomValidator) validateBootstrapRecoverySource(r *apiv1.Cluste
 
 	// Ensure the external cluster definition has enough information
 	// to be used to recover a data directory
-	if externalCluster.BarmanObjectStore == nil && externalCluster.PluginConfiguration == nil {
+	if externalCluster.ConnectionParameters == nil &&
+		externalCluster.BarmanObjectStore == nil &&
+		externalCluster.PluginConfiguration == nil {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
 				fmt.Sprintf("External cluster %v cannot be used for recovery: "+
-					"both Barman and CNPG-i plugin configurations are missing", r.Spec.Bootstrap.Recovery.Source)))
+					"missing connection parameters, Barman, or CNPG-i configuration", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result
@@ -2612,7 +2593,7 @@ func getInTreeBarmanWarnings(r *apiv1.Cluster) admission.Warnings {
 		result = append(
 			result,
 			fmt.Sprintf("Native support for Barman Cloud backups and recovery is deprecated and will be "+
-				"completely removed in CloudNativePG 1.29.0. Found usage in: %s. "+
+				"completely removed in CloudNativePG 1.30.0. Found usage in: %s. "+
 				"Please migrate existing clusters to the new Barman Cloud Plugin to ensure a smooth transition.",
 				pathsStr),
 		)
@@ -2820,6 +2801,38 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		return nil
 	}
 
+	validatePathList := func(
+		paths []string,
+		fieldPath *field.Path,
+	) field.ErrorList {
+		var result field.ErrorList
+		pathSet := stringset.New()
+
+		for j, path := range paths {
+			if validateErr := ensureNotEmptyOrDuplicate(
+				fieldPath.Index(j),
+				pathSet,
+				path,
+			); validateErr != nil {
+				result = append(result, validateErr)
+				continue
+			}
+
+			if strings.HasPrefix(filepath.Clean(path), "..") {
+				result = append(result, field.Invalid(
+					fieldPath.Index(j),
+					path,
+					"path must not escape the extension directory",
+				))
+				continue
+			}
+
+			pathSet.Put(path)
+		}
+
+		return result
+	}
+
 	if len(r.Spec.PostgresConfiguration.Extensions) == 0 {
 		return nil
 	}
@@ -2850,32 +2863,119 @@ func (v *ClusterCustomValidator) validateExtensions(r *apiv1.Cluster) field.Erro
 		}
 		sanitizedVolumeNames.Put(sanitizedName)
 
-		controlPaths := stringset.New()
-		for j, path := range v.ExtensionControlPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("extension_control_path").Index(j),
-				controlPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			controlPaths.Put(path)
+		if r.Spec.ImageCatalogRef == nil && v.ImageVolumeSource.Reference == "" {
+			result = append(result,
+				field.Invalid(
+					basePath.Child("image", "reference"),
+					v.ImageVolumeSource.Reference,
+					fmt.Sprintf("Image reference for extension `%s` must be set when no image catalog is configured", v.Name),
+				),
+			)
 		}
 
-		libraryPaths := stringset.New()
-		for j, path := range v.DynamicLibraryPath {
-			if validateErr := ensureNotEmptyOrDuplicate(
-				basePath.Child("dynamic_library_path").Index(j),
-				libraryPaths,
-				path,
-			); validateErr != nil {
-				result = append(result, validateErr)
-			}
-
-			libraryPaths.Put(path)
-		}
+		result = append(result, validatePathList(v.ExtensionControlPath, basePath.Child("extension_control_path"))...)
+		result = append(result, validatePathList(v.DynamicLibraryPath, basePath.Child("dynamic_library_path"))...)
+		result = append(result, validatePathList(v.LdLibraryPath, basePath.Child("ld_library_path"))...)
+		result = append(result, validatePathList(v.BinPath, basePath.Child("bin_path"))...)
+		result = append(result, validateExtensionEnvVars(v.Env, basePath)...)
 	}
 
 	return result
+}
+
+func validateExtensionEnvVars(envVars []apiv1.ExtensionEnvVar, basePath *field.Path) field.ErrorList {
+	var result field.ErrorList
+	envNames := stringset.New()
+	envFieldPath := basePath.Child("env")
+
+	dedicatedFields := map[string]string{
+		"PATH":            basePath.Child("bin_path").String(),
+		"LD_LIBRARY_PATH": basePath.Child("ld_library_path").String(),
+	}
+
+	for i, envVar := range envVars {
+		envPath := envFieldPath.Index(i)
+
+		// Block env vars that are reserved for operator usage
+		if postgres.IsReservedEnvironmentVariable(envVar.Name) {
+			result = append(result, field.Invalid(
+				envPath.Child("name"),
+				envVar.Name,
+				"the usage of this environment variable is reserved for the operator",
+			))
+		}
+
+		// Block env vars that have dedicated fields
+		if dedicatedField, ok := dedicatedFields[envVar.Name]; ok {
+			result = append(result, field.Forbidden(
+				envPath.Child("name"),
+				fmt.Sprintf("%s must be configured via %s", envVar.Name, dedicatedField),
+			))
+		}
+
+		// Check for unknown placeholders in values
+		if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+			result = append(result, field.Invalid(
+				envPath.Child("value"),
+				envVar.Value,
+				fmt.Sprintf("unsupported placeholder(s): %s; supported: ${image_root}", strings.Join(unknown, ", ")),
+			))
+		}
+
+		// Check for duplicate names
+		if envNames.Has(envVar.Name) {
+			result = append(result, field.Duplicate(envPath.Child("name"), envVar.Name))
+		}
+		envNames.Put(envVar.Name)
+	}
+
+	return result
+}
+
+// validatePodSelectorRefs checks that podSelectorRefs names are unique and
+// that ${podselector:NAME} references in pg_hba lines correspond to defined selectors.
+func (v *ClusterCustomValidator) validatePodSelectorRefs(r *apiv1.Cluster) field.ErrorList {
+	var allErrors field.ErrorList
+	path := field.NewPath("spec", "podSelectorRefs")
+
+	// Validate selectors and collect known names
+	knownSelectors := stringset.New()
+	for i, ref := range r.Spec.PodSelectorRefs {
+		if knownSelectors.Has(ref.Name) {
+			allErrors = append(allErrors, field.Duplicate(path.Index(i).Child("name"), ref.Name))
+		}
+		knownSelectors.Put(ref.Name)
+
+		allErrors = append(allErrors,
+			validation.ValidateLabelSelector(&ref.Selector,
+				validation.LabelSelectorValidationOptions{},
+				path.Index(i).Child("selector"))...)
+	}
+
+	// Check that ${podselector:NAME} references in pg_hba correspond to defined selectors
+	hbaPath := field.NewPath("spec", "postgresql", "pg_hba")
+	for i, rule := range r.Spec.PostgresConfiguration.PgHBA {
+		if err := hba.ValidateLine(rule, knownSelectors); err != nil {
+			allErrors = append(allErrors,
+				field.Invalid(hbaPath.Index(i), rule, err.Error()),
+			)
+		}
+	}
+
+	return allErrors
+}
+
+// validateServiceAccountConfig validates the ServiceAccount configuration
+// ensuring that serviceAccountName and serviceAccountTemplate are mutually exclusive.
+func (v *ClusterCustomValidator) validateServiceAccountConfig(r *apiv1.Cluster) field.ErrorList {
+	if r.Spec.ServiceAccountName != "" && r.Spec.ServiceAccountTemplate != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "serviceAccountName"),
+				r.Spec.ServiceAccountName,
+				"serviceAccountName and serviceAccountTemplate are mutually exclusive",
+			),
+		}
+	}
+	return nil
 }

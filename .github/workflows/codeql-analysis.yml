@@ -32,11 +32,6 @@ on:
 
 permissions: read-all
 
-# set up environment variables to be used across all the jobs
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
-
 jobs:
   duplicate_runs:
     runs-on: ubuntu-24.04
@@ -71,12 +66,12 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
       with:
-        go-version: ${{ env.GOLANG_VERSION }}
+        go-version-file: go.mod
         check-latest: true
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4
+      uses: github/codeql-action/init@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4
       with:
         languages: "go"
         build-mode: manual
@@ -93,6 +88,6 @@ jobs:
         make
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4
+      uses: github/codeql-action/analyze@b1bff81932f5cdfc8695c7752dcee935dcd061c8 # v4
       with:
         category: "/language:go"

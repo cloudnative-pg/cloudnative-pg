@@ -27,8 +27,9 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/imagecatalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -53,6 +56,7 @@ var ErrNoPrimaryPVCFound = fmt.Errorf("no primary PVC found")
 func Reconcile(
 	ctx context.Context,
 	c client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -61,7 +65,16 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx)
 
 	if majorUpgradeJob := getMajorUpdateJob(jobs); majorUpgradeJob != nil {
-		return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
+		if utils.JobHasOneCompletion(*majorUpgradeJob) {
+			return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
+		}
+
+		if result, err := handleRollbackIfNeeded(ctx, c, recorder, cluster, majorUpgradeJob); result != nil || err != nil {
+			return result, err
+		}
+
+		contextLogger.Info("Major upgrade job not completed.")
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
@@ -122,20 +135,25 @@ func deleteAllPodsInMajorUpgradePreparation(
 	jobs []batchv1.Job,
 ) (*ctrl.Result, error) {
 	foundSomethingToDelete := false
+	waitingForDeletion := false
 
 	for _, pod := range instances {
 		if pod.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
 		foundSomethingToDelete = true
 		if err := c.Delete(ctx, &pod); err != nil {
-			return nil, err
+			if !apierrs.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
 	for _, job := range jobs {
 		if job.GetDeletionTimestamp() != nil {
+			waitingForDeletion = true
 			continue
 		}
 
@@ -143,12 +161,14 @@ func deleteAllPodsInMajorUpgradePreparation(
 		if err := c.Delete(ctx, &job, &client.DeleteOptions{
 			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 		}); err != nil {
-			return nil, err
+			if !apierrs.IsNotFound(err) {
+				return nil, err
+			}
 		}
 	}
 
-	if foundSomethingToDelete {
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	if foundSomethingToDelete || waitingForDeletion {
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return nil, nil
@@ -162,7 +182,32 @@ func createMajorUpgradeJob(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
+	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for new major version",
+			"requestedMajor", requestedMajor)
+
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions for major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions for major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
@@ -185,7 +230,7 @@ func createMajorUpgradeJob(
 		"primary", true)
 
 	if err := c.Create(ctx, job); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
@@ -204,11 +249,6 @@ func majorVersionUpgradeHandleCompletion(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if !utils.JobHasOneCompletion(*job) {
-		contextLogger.Info("Major upgrade job not completed.")
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
 	for _, pvc := range pvcs {
 		if pvc.GetDeletionTimestamp() != nil {
 			continue
@@ -220,7 +260,7 @@ func majorVersionUpgradeHandleCompletion(
 
 		if err := c.Delete(ctx, &pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
-			if !errors.IsNotFound(err) {
+			if !apierrs.IsNotFound(err) {
 				return nil, err
 			}
 		}
@@ -237,6 +277,30 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
+	// Resolve extensions for the new major version.
+	// This ensures that extension images match the upgraded PostgreSQL version.
+	// If extension resolution fails (e.g., catalog doesn't have extensions for new version),
+	// we fail the major upgrade completion to avoid leaving the cluster in an inconsistent state.
+	exts, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
+			"requestedMajor", requestedMajor)
+
+		// Set the cluster phase to indicate image catalog error
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions after major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions after major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
 	// Reset timeline ID to 1 after major upgrade to match pg_upgrade behavior.
 	// This prevents replicas from restoring incompatible timeline history files
 	// from the pre-upgrade cluster in object storage.
@@ -247,6 +311,7 @@ func majorVersionUpgradeHandleCompletion(
 		status.SetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        jobImage,
 			MajorVersion: requestedMajor,
+			Extensions:   exts,
 		}),
 		status.SetTimelineID(1),
 	); err != nil {
@@ -264,6 +329,69 @@ func majorVersionUpgradeHandleCompletion(
 	return &ctrl.Result{Requeue: true}, nil
 }
 
+// handleRollbackIfNeeded checks whether the user rolled back the image
+// while the upgrade job is still running (or has failed). If the requested
+// major version is no longer higher than PGDataImageInfo.MajorVersion,
+// the job is deleted so the cluster can restart on the old version.
+//
+// NOTE: this function runs regardless of job status, including while the
+// job is still actively executing. If the user reverts the image mid-upgrade,
+// the running job will be terminated.
+func handleRollbackIfNeeded(
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	cluster *apiv1.Cluster,
+	job *batchv1.Job,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
+		return nil, err
+	}
+
+	// Equal major version is also treated as a rollback: the user changed
+	// to a same-major image, so the in-progress upgrade is no longer wanted.
+	if cluster.Status.PGDataImageInfo == nil || requestedMajor > cluster.Status.PGDataImageInfo.MajorVersion {
+		return nil, nil
+	}
+
+	contextLogger.Info("Image rolled back during major upgrade, cleaning up the upgrade job",
+		"requestedMajor", requestedMajor,
+		"pgDataMajor", cluster.Status.PGDataImageInfo.MajorVersion)
+
+	if job.GetDeletionTimestamp() != nil {
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if err := c.Delete(ctx, job, &client.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+	}); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return nil, err
+		}
+	}
+
+	// reconcileImage set Status.Image to the upgrade target but left
+	// PGDataImageInfo unchanged. Reset it so pods use the correct image.
+	if err := status.PatchWithOptimisticLock(
+		ctx,
+		c,
+		cluster,
+		status.SetImage(cluster.Status.PGDataImageInfo.Image),
+	); err != nil {
+		contextLogger.Error(err, "Unable to reset status image after rollback")
+		return nil, err
+	}
+
+	recorder.Eventf(cluster, "Normal", "MajorUpgradeRollback",
+		"Cleaned up failed upgrade job, rolling back to major version %d", requestedMajor)
+
+	return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
 // registerPhase sets a phase into the cluster
 func registerPhase(
 	ctx context.Context,
@@ -279,6 +407,33 @@ func registerPhase(
 		status.SetPhase(phase, reason),
 		status.SetClusterReadyCondition,
 	)
+}
+
+// resolveExtensionsForMajorVersion resolves the extension configuration for the upgraded major version.
+// This function handles both image catalog references and direct image name specifications.
+func resolveExtensionsForMajorVersion(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	requestedMajor int,
+) ([]apiv1.ExtensionConfiguration, error) {
+	// If using imageCatalogRef, resolve extensions from the catalog
+	if cluster.Spec.ImageCatalogRef != nil {
+		catalog, err := imagecatalog.Get(ctx, c, cluster)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get catalog: %w", err)
+		}
+
+		exts, err := extensions.ResolveFromCatalog(cluster, catalog, requestedMajor)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve extensions from catalog: %w", err)
+		}
+
+		return exts, nil
+	}
+
+	// If using imageName directly, extensions must be fully specified in cluster spec
+	return extensions.ValidateWithoutCatalog(cluster)
 }
 
 // getPrimarySerial tries to obtain the primary serial from a group of PVCs

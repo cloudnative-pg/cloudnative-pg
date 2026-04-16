@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: poolers.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -403,6 +403,19 @@ spec:
                     - name
                     type: object
                 type: object
+              serviceAccountName:
+                description: |-
+                  Name of an existing ServiceAccount in the same namespace to use for the pooler.
+                  When specified, the operator will not create a new ServiceAccount
+                  but will use the provided one. This is useful for sharing a single
+                  ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).
+                  If not specified, a ServiceAccount will be created with the pooler name.
+                maxLength: 253
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
+                x-kubernetes-validations:
+                - message: serviceAccountName is immutable
+                  rule: self == oldSelf
               serviceTemplate:
                 description: Template for the Service to be created
                 properties:

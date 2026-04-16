@@ -23,15 +23,21 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"text/tabwriter"
+	"time"
 
 	"github.com/cheynewallace/tabby"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 )
@@ -68,7 +74,8 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	clusterInfo.AddLine("Ready pod number: ", utils2.CountReadyPods(podList.Items))
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
 		clusterInfo.AddLine("Pod name", pod.Name)
 		clusterInfo.AddLine("Pod phase", pod.Status.Phase)
 		if cluster.Status.InstancesReportedState != nil {
@@ -89,9 +96,19 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	_ = crudClient.List(
 		ctx, jobList, client.InNamespace(namespace),
 	)
-	for _, job := range jobList.Items {
+	for i := range jobList.Items {
+		job := &jobList.Items[i]
 		clusterInfo.AddLine("Job name", job.Name)
 		clusterInfo.AddLine("Job status", fmt.Sprintf("%#v", job.Status))
+	}
+
+	allPodList, _ := pods.List(ctx, crudClient, namespace)
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("All namespace pods:")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for i := range allPodList.Items {
+		printPodDiagnostics(clusterInfo, &allPodList.Items[i])
 	}
 
 	pvcList, _ := storage.GetPVCList(ctx, crudClient, cluster.GetNamespace())
@@ -100,10 +117,8 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	clusterInfo.AddLine("Available Cluster PVCCount", cluster.Status.PVCCount)
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
-	for _, pvc := range pvcList.Items {
-		clusterInfo.AddLine("PVC name", pvc.Name)
-		clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
-		clusterInfo.AddLine("---", "---")
+	for i := range pvcList.Items {
+		printPVCDiagnostics(clusterInfo, &pvcList.Items[i])
 	}
 
 	snapshotList, _ := storage.GetSnapshotList(ctx, crudClient, cluster.Namespace)
@@ -111,7 +126,8 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	clusterInfo.AddLine("Cluster Snapshot information: (dumping all snapshot under the namespace)")
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
-	for _, snapshot := range snapshotList.Items {
+	for i := range snapshotList.Items {
+		snapshot := &snapshotList.Items[i]
 		clusterInfo.AddLine("Snapshot name", snapshot.Name)
 		if snapshot.Status.ReadyToUse != nil {
 			clusterInfo.AddLine("Snapshot ready to use", *snapshot.Status.ReadyToUse)
@@ -121,10 +137,100 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 		clusterInfo.AddLine("---", "---")
 	}
 
+	eventList, _ := namespaces.GetEventList(ctx, crudClient, namespace)
+	printNamespaceEvents(clusterInfo, eventList)
+
 	// do not remove, this is needed to ensure that the writer cache is always flushed.
 	clusterInfo.Print()
 
 	return buffer.String()
+}
+
+func printPodDiagnostics(clusterInfo *tabby.Tabby, pod *corev1.Pod) {
+	clusterInfo.AddLine("Pod name", pod.Name)
+	clusterInfo.AddLine("Pod phase", pod.Status.Phase)
+	clusterInfo.AddLine("Pod node", pod.Spec.NodeName)
+	if pod.Status.Reason != "" {
+		clusterInfo.AddLine("Pod reason", pod.Status.Reason)
+	}
+	if pod.Status.Message != "" {
+		clusterInfo.AddLine("Pod message", pod.Status.Message)
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Status == corev1.ConditionFalse {
+			clusterInfo.AddLine(
+				fmt.Sprintf("Condition %s", cond.Type),
+				fmt.Sprintf("%s: %s", cond.Reason, cond.Message),
+			)
+		}
+	}
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.State.Waiting != nil {
+			clusterInfo.AddLine(
+				fmt.Sprintf("Init container %s waiting", cs.Name),
+				fmt.Sprintf("%s: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message),
+			)
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil {
+			clusterInfo.AddLine(
+				fmt.Sprintf("Container %s waiting", cs.Name),
+				fmt.Sprintf("%s: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message),
+			)
+		}
+	}
+	clusterInfo.AddLine("---", "---")
+}
+
+func printPVCDiagnostics(clusterInfo *tabby.Tabby, pvc *corev1.PersistentVolumeClaim) {
+	clusterInfo.AddLine("PVC name", pvc.Name)
+	clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+	if pvc.Spec.StorageClassName != nil {
+		clusterInfo.AddLine("PVC storage class", *pvc.Spec.StorageClassName)
+	}
+	if pvc.Spec.VolumeName != "" {
+		clusterInfo.AddLine("PVC volume", pvc.Spec.VolumeName)
+	}
+	if node, ok := pvc.Annotations["volume.kubernetes.io/selected-node"]; ok {
+		clusterInfo.AddLine("PVC selected node", node)
+	}
+	for _, cond := range pvc.Status.Conditions {
+		clusterInfo.AddLine(
+			fmt.Sprintf("PVC condition %s", cond.Type),
+			fmt.Sprintf("%s: %s", cond.Reason, cond.Message),
+		)
+	}
+	clusterInfo.AddLine("---", "---")
+}
+
+func printNamespaceEvents(clusterInfo *tabby.Tabby, eventList *eventsv1.EventList) {
+	if len(eventList.Items) == 0 {
+		return
+	}
+	eventTimeOf := func(ev *eventsv1.Event) time.Time {
+		if ev.EventTime.Time != (time.Time{}) {
+			return ev.EventTime.Time
+		}
+		return ev.CreationTimestamp.Time
+	}
+	sort.Slice(eventList.Items, func(i, j int) bool {
+		return eventTimeOf(&eventList.Items[i]).Before(eventTimeOf(&eventList.Items[j]))
+	})
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("Namespace events:")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Time", "Type", "Reason", "Object", "Message")
+	for i := range eventList.Items {
+		ev := &eventList.Items[i]
+		clusterInfo.AddLine(
+			eventTimeOf(ev).Format(time.RFC3339),
+			ev.Type,
+			ev.Reason,
+			fmt.Sprintf("%s/%s", ev.Regarding.Kind, ev.Regarding.Name),
+			ev.Note,
+		)
+	}
 }
 
 // ForgeArchiveWalOnMinio instead of using `switchWalCmd` to generate a real WAL archive, directly forges a WAL archive

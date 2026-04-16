@@ -203,7 +203,25 @@ repository:
           adhoc: true
           ci: true
           release: true
+      - name: SLSA GitHub Generator Action
+        type: automated-tooling
+        rulesets: ["default"]
+        comment: >-
+          Generates non-falsifiable SLSA Level 3 provenance attestations for
+          release assets. This ensures that the binary artifacts and images are traced
+          back to the specific source commit and build environment without manual
+          intervention.
+
+        integration:
+          adhoc: false
+          ci: true
+          release: true
 
     assessments:
       self:
-        comment: Self assessment has not yet been completed.
+        evidence-url:
+          - https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/threat-assessment.yaml
+        comment: >-
+          Gemara-compatible threat self-assessment covering capabilities
+          and threats mapped to FINOS Common Cloud Controls (CCC) Core
+          v2025.10.

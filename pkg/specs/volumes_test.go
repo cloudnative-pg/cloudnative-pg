@@ -300,7 +300,7 @@ var _ = Describe("test createVolumesAndVolumeMountsForSQLRefs", func() {
 
 var _ = DescribeTable("test creation of volume mounts",
 	func(cluster apiv1.Cluster, mounts []corev1.VolumeMount) {
-		mts := CreatePostgresVolumeMounts(cluster)
+		mts := CreatePostgresVolumeMounts(cluster, getExtensions(&cluster))
 		Expect(mts).NotTo(BeEmpty())
 		for _, mt := range mounts {
 			Expect(mts).To(ContainElement(mt))
@@ -391,7 +391,7 @@ var _ = DescribeTable("test creation of volume mounts",
 
 var _ = DescribeTable("test creation of volumes",
 	func(cluster apiv1.Cluster, volumes []corev1.Volume) {
-		vols := createPostgresVolumes(&cluster, "pod-1")
+		vols := createPostgresVolumes(&cluster, "pod-1", getExtensions(&cluster))
 		Expect(vols).NotTo(BeEmpty())
 		for _, v := range volumes {
 			Expect(vols).To(ContainElement(v))
@@ -528,6 +528,21 @@ var _ = Describe("ImageVolume Extensions", func() {
 	var cluster apiv1.Cluster
 
 	BeforeEach(func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+			},
+			{
+				Name: "bar",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "bar:dev",
+				},
+			},
+		}
+
 		cluster = apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster-example",
@@ -535,20 +550,12 @@ var _ = Describe("ImageVolume Extensions", func() {
 			},
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
-					Extensions: []apiv1.ExtensionConfiguration{
-						{
-							Name: "foo",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "foo:dev",
-							},
-						},
-						{
-							Name: "bar",
-							ImageVolumeSource: corev1.ImageVolumeSource{
-								Reference: "bar:dev",
-							},
-						},
-					},
+					Extensions: extensionsConfig,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Extensions: extensionsConfig,
 				},
 			},
 		}
@@ -558,13 +565,14 @@ var _ = Describe("ImageVolume Extensions", func() {
 		When("Extensions are disabled", func() {
 			It("shouldn't create Volumes", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
-				extensionVolumes := createExtensionVolumes(&cluster)
+				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
+				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
 				Expect(extensionVolumes).To(BeEmpty())
 			})
 		})
 		When("Extensions are enabled", func() {
 			It("should create a Volume for each Extension", func() {
-				extensionVolumes := createExtensionVolumes(&cluster)
+				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(2))
 				Expect(extensionVolumes[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("foo:dev"))
@@ -572,7 +580,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumes[1].VolumeSource.Image.Reference).To(Equal("bar:dev"))
 			})
 			It("should sanitize extension names with underscores for volume names", func() {
-				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+				extensionsConfig := []apiv1.ExtensionConfiguration{
 					{
 						Name: "pg_ivm",
 						ImageVolumeSource: corev1.ImageVolumeSource{
@@ -580,7 +588,10 @@ var _ = Describe("ImageVolume Extensions", func() {
 						},
 					},
 				}
-				extensionVolumes := createExtensionVolumes(&cluster)
+				cluster.Spec.PostgresConfiguration.Extensions = extensionsConfig
+				cluster.Status.PGDataImageInfo.Extensions = extensionsConfig
+
+				extensionVolumes := createExtensionVolumes(getExtensions(&cluster))
 				Expect(len(extensionVolumes)).To(BeEquivalentTo(1))
 				Expect(extensionVolumes[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumes[0].VolumeSource.Image.Reference).To(Equal("pg_ivm:latest"))
@@ -592,7 +603,8 @@ var _ = Describe("ImageVolume Extensions", func() {
 		When("Extensions are disabled", func() {
 			It("shouldn't create VolumeMounts", func() {
 				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{}
-				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
+				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(extensionVolumeMounts).To(BeEmpty())
 			})
 		})
@@ -602,7 +614,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 					fooMountPath = postgres.ExtensionsBaseDirectory + "/foo"
 					barMountPath = postgres.ExtensionsBaseDirectory + "/bar"
 				)
-				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(2))
 				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-foo"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(fooMountPath))
@@ -610,7 +622,7 @@ var _ = Describe("ImageVolume Extensions", func() {
 				Expect(extensionVolumeMounts[1].MountPath).To(Equal(barMountPath))
 			})
 			It("should sanitize extension names with underscores for volume mount names", func() {
-				cluster.Spec.PostgresConfiguration.Extensions = []apiv1.ExtensionConfiguration{
+				extensionsConfig := []apiv1.ExtensionConfiguration{
 					{
 						Name: "pg_ivm",
 						ImageVolumeSource: corev1.ImageVolumeSource{
@@ -618,7 +630,10 @@ var _ = Describe("ImageVolume Extensions", func() {
 						},
 					},
 				}
-				extensionVolumeMounts := createExtensionVolumeMounts(&cluster)
+				cluster.Spec.PostgresConfiguration.Extensions = extensionsConfig
+				cluster.Status.PGDataImageInfo.Extensions = extensionsConfig
+
+				extensionVolumeMounts := createExtensionVolumeMounts(getExtensions(&cluster))
 				Expect(len(extensionVolumeMounts)).To(BeEquivalentTo(1))
 				Expect(extensionVolumeMounts[0].Name).To(Equal("ext-pg-ivm"))
 				Expect(extensionVolumeMounts[0].MountPath).To(Equal(postgres.ExtensionsBaseDirectory + "/pg_ivm"))

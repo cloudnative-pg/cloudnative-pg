@@ -183,7 +183,7 @@ func (psql *Command) Run() error {
 		return err
 	}
 
-	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) //nolint:gosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -197,7 +197,7 @@ func (psql *Command) Output() ([]byte, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) //nolint:gosec
 	cmd.Stderr = os.Stderr
 	return cmd.Output()
 }

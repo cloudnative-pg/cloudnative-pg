@@ -10,8 +10,6 @@ on:
 permissions: read-all
 
 env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
   REGISTRY: "ghcr.io"
 
 jobs:
@@ -76,11 +74,14 @@ jobs:
           echo "FILE=${file}" >> $GITHUB_ENV
       -
         name: Generate release notes
+        env:
+          TAG: ${{ env.TAG }}
+          FILE: ${{ env.FILE }}
         run: |
           docker run --rm -v $(pwd):/src mist/submark \
-            submark -O --h2 "Version ${{ env.TAG }}" \
+            submark -O --h2 "Version ${TAG}" \
             --out-file /src/release_notes.md \
-            /src/docs/src/${{ env.FILE }}
+            "/src/docs/src/${FILE}"
       -
         name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
@@ -89,12 +90,14 @@ jobs:
         # how to use cosign.
       -
         name: Sign yaml files
+        env:
+          VERSION: ${{ env.VERSION }}
         run: |
-          cosign sign-blob releases/cnpg-${{ env.VERSION }}.yaml \
-          --bundle releases/cnpg-${{ env.VERSION }}.sigstore.json --yes
+          cosign sign-blob "releases/cnpg-${VERSION}.yaml" \
+          --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           body_path: release_notes.md
           draft: false
@@ -109,7 +112,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       packages: write
       contents: write
@@ -122,6 +125,8 @@ jobs:
       author_email: ${{ steps.build-meta.outputs.author_email }}
       platforms: ${{ env.PLATFORMS }}
       olm_img: ${{ steps.olm-image.outputs.olm_image }}
+      hashes: ${{ steps.hashes.outputs.hashes }}
+      images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
     steps:
       -
         name: Checkout
@@ -133,19 +138,21 @@ jobs:
         name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
       -
         name: Build meta
         id: build-meta
+        env:
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          commit_sha=${{ github.sha }}
+          commit_sha="${COMMIT_SHA}"
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           tag="${GITHUB_REF#refs/tags/v}"
 
           # get git user and email
-          author_name=$(git show -s --format='%an' "${commit_sha}")
-          author_email=$(git show -s --format='%ae' "${commit_sha}")
+          author_name=$(git show -s --format='%an' "${commit_sha}" | head -n1)
+          author_email=$(git show -s --format='%ae' "${commit_sha}" | head -n1)
 
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
@@ -161,7 +168,7 @@ jobs:
       -
         name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -174,8 +181,12 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
+        name: Install Syft
+        uses: anchore/sbom-action/download-syft@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1
+      -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        id: goreleaser
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser
           version: v2
@@ -187,12 +198,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Build checksum file
+        id: hashes
+        env:
+          ARTIFACTS: "${{ steps.goreleaser.outputs.artifacts }}"
+        shell: bash
+        run: |
+          checksum_file=$(echo "$ARTIFACTS" | jq -r '.[] | select (.type=="Checksum") | .path')
+          echo "hashes=$(cat $checksum_file | base64 -w0)" >> "$GITHUB_OUTPUT"
+
       -
         name: Publish Krew
         if: |
           needs.check-version.outputs.is_latest == 'true' &&
           needs.check-version.outputs.is_stable == 'true'
-        uses: rajatjindal/krew-release-bot@a7e82ae57ca41a16fca2691ef00e8a8d35bc77d4 # v0.0.50
+        uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
@@ -204,22 +225,22 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       -
         name: Login to ghcr.io
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6
+        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -242,8 +263,10 @@ jobs:
         # how to use cosign.
       -
         name: Sign images
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
         run: |
-          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+          images=$(echo "${BAKE_METADATA}" |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
@@ -257,6 +280,58 @@ jobs:
           ubi_tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
           echo "olm_image=$(echo "$ubi_tags" | tr ',' '\n' | grep -v 'latest' | sed 's/^ *//g' | head -n 1)" >> $GITHUB_OUTPUT
+      -
+        name: Prepare images matrix
+        id: images_matrix
+        env:
+          BAKE_METADATA: ${{ steps.bake-push.outputs.metadata }}
+        shell: bash
+        run: |
+          images_matrix=$(echo "$BAKE_METADATA" |
+            jq -r -c '
+              del(.[].["containerimage.descriptor", "buildx.build.ref"])
+              | to_entries
+              | map({variant: .key} + .value + {"image.name": (.value["image.name"] | split(",")[0] | sub(":[^/]+$"; ""))})
+            '
+          )
+          echo "images_matrix=${images_matrix}" >> "$GITHUB_OUTPUT"
+
+  provenance-binaries:
+    name: Add provenance to binaries
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    # NOTE: pinned by tag, not SHA — the SLSA generator's builder-fetch.sh
+    # resolves the binary download URL from the git ref and breaks with SHA pins.
+    # See: https://github.com/slsa-framework/slsa-github-generator/issues/4216
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: "${{ needs.release-binaries.outputs.hashes }}"
+      upload-assets: true
+
+  provenance-images:
+    name: Provenance for images
+    needs:
+      - release-binaries
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.release-binaries.outputs.images_matrix) }}
+    # NOTE: pinned by tag, not SHA — see comment on provenance-binaries above.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    with:
+      image: ${{ matrix['image.name'] }}
+      digest: ${{ matrix['containerimage.digest'] }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -281,21 +356,21 @@ jobs:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login to ghcr.io
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -318,7 +393,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: bundle
           path: |
@@ -330,11 +405,14 @@ jobs:
     name: Create remote PR for OperatorHub
     runs-on: ubuntu-24.04
     needs:
+      - check-version
       - release-binaries
       - olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success'
+      needs.olm-bundle.result == 'success' &&
+      needs.check-version.outputs.is_latest == 'true' &&
+      needs.check-version.outputs.is_stable == 'true'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     steps:
@@ -346,15 +424,21 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
 
       - name: Copy bundle in the community-operators
         run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          mkdir -p "operators/cloudnative-pg/${VERSION}"
+          cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+
+      - name: Add replaces field to CSV
+        run: |
+          CSV_FILE="operators/cloudnative-pg/${VERSION}/manifests/cloudnative-pg.clusterserviceversion.yaml"
+          PREVIOUS_VERSION=$(ls -d operators/cloudnative-pg/[0-9]* | sort -V | tail -2 | head -1 | xargs basename)
+          sed -i "s/^  relatedImages:/  replaces: cloudnative-pg.v${PREVIOUS_VERSION}\n  relatedImages:/" "${CSV_FILE}"
 
       - name: Create Remote Pull Request
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
@@ -424,19 +508,22 @@ jobs:
           fetch-depth: 0
       -
         name: Configure git user
+        env:
+          AUTHOR_EMAIL: ${{ needs.release-binaries.outputs.author_email }}
+          AUTHOR_NAME: ${{ needs.release-binaries.outputs.author_name }}
         run: |
-          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
-          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+          git config user.email "${AUTHOR_EMAIL}"
+          git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
       -
         name: Copy the bundle
         run: |
-          mkdir -p "bundles/${{ env.VERSION }}"
-          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          mkdir -p "bundles/${VERSION}"
+          cp -R bundle/* "bundles/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
       -
         name: Prepare commit message
@@ -447,7 +534,7 @@ jobs:
           # Skip creating the commit if there are no changes
           [ -n "$(git status -s)" ] || exit 0
 
-          git add bundles/${{ env.VERSION }}
+          git add "bundles/${VERSION}"
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit

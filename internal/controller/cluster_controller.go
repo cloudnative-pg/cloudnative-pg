@@ -60,6 +60,7 @@ import (
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/podselector"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -269,7 +270,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit,gocyclo
+//
+//nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -318,6 +320,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			return *res, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
+	}
+
+	// Resolve podSelectorRefs to pod IPs and update cluster status
+	if err := podselector.Reconcile(ctx, r.Client, cluster); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Ensure we have the required global objects
@@ -744,6 +751,24 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// Major upgrade reconciliation runs before the running-jobs guard
+	// because it owns the upgrade job lifecycle. A failed upgrade job
+	// (BackoffLimit=0) would otherwise block rollback detection.
+	if result, err := majorupgrade.Reconcile(
+		ctx,
+		r.Client,
+		r.Recorder,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+		resources.jobs.Items,
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
+	} else if result != nil {
+		return *result, err
+	}
+
 	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -807,20 +832,6 @@ func (r *ClusterReconciler) reconcileResources(
 		resources.pvcs.Items,
 	); err != nil || !res.IsZero() {
 		return res, err
-	}
-
-	// In-place Postgres major version upgrades
-	if result, err := majorupgrade.Reconcile(
-		ctx,
-		r.Client,
-		cluster,
-		resources.instances.Items,
-		resources.pvcs.Items,
-		resources.jobs.Items,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
-	} else if result != nil {
-		return *result, err
 	}
 
 	// Reconcile Pods
@@ -1003,6 +1014,14 @@ func (r *ClusterReconciler) reconcilePods(
 		return r.createPrimaryInstance(ctx, cluster)
 	}
 
+	// Handle instances marked as unrecoverable before waiting for pods to be ready.
+	// This ensures pods annotated with alpha.cnpg.io/unrecoverable=true are
+	// deleted even when they can't report their status (e.g., postgres process
+	// not running, startup probe failing).
+	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
@@ -1021,11 +1040,6 @@ func (r *ClusterReconciler) reconcilePods(
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 		}
 		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
-	}
-
-	// Are there nodes to be removed? Remove one of them
-	if res, err := r.reconcileUnrecoverableInstances(ctx, cluster, resources); !res.IsZero() || err != nil {
-		return res, err
 	}
 
 	// Should we scale down the cluster?
@@ -1074,12 +1088,20 @@ func (r *ClusterReconciler) reconcilePods(
 	// proceed with a rolling update to upgrade the instance manager
 	// to a version that reports the configuration status.
 	// If all pods report their configuration, wait until all instances
-	// report the same configuration.
+	// report the same configuration, unless the non-uniformity is caused
+	// by an operator upgrade that changed the hash algorithm. In that case
+	// configuration hashes will never converge on their own; proceeding
+	// to the rolling update (or in-place upgrade) is the only way forward.
 	if uniform := report.IsUniform(); uniform != nil && !*uniform {
-		contextLogger.Debug(
-			"Waiting for all Pods to have the same PostgreSQL configuration",
+		if !isConfigNonUniformityFromUpgrade(instancesStatus) {
+			contextLogger.Debug(
+				"Waiting for all Pods to have the same PostgreSQL configuration",
+				"configurationReport", report)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+		}
+		contextLogger.Info(
+			"Configuration non-uniformity caused by operator upgrade, proceeding with upgrade",
 			"configurationReport", report)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	return r.handleRollingUpdate(ctx, cluster, instancesStatus)
@@ -1186,6 +1208,13 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
+		).
+		// Watch external (non-owned) pods for podSelectorRefs IP resolution.
+		// Owned pods are already handled by Owns(&corev1.Pod{}) above.
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(podselector.MapExternalPodsToClusters(r.Client)),
+			builder.WithPredicates(podselector.ExternalPodsPredicate()),
 		).
 		Watches(
 			&apiv1.ImageCatalog{},

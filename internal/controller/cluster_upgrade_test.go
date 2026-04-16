@@ -820,6 +820,122 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	})
 })
 
+var _ = Describe("isConfigNonUniformityFromUpgrade", func() {
+	const (
+		oldOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.0"
+		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:1.27.1"
+		oldExecHash      = "exec-old"
+		newExecHash      = "exec-new"
+	)
+
+	makeStatus := func(
+		name, image, execHash, configHash string,
+	) postgres.PostgresqlStatus {
+		return postgres.PostgresqlStatus{
+			Pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:  specs.BootstrapControllerContainerName,
+							Image: image,
+						},
+					},
+				},
+			},
+			ExecutableHash:          execHash,
+			LoadedConfigurationHash: configHash,
+		}
+	}
+
+	// Positive cases: deadlock detected, bypass should trigger
+
+	It("rolling update with uniform groups", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeTrue())
+	})
+
+	It("in-place upgrade with uniform groups", func() {
+		// Same bootstrap image but different executable hashes from binary replacement
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeTrue())
+	})
+
+	// Negative cases: not a deadlock, should keep waiting
+
+	It("same version, config still propagating", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-b"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("config propagation within old-version group during upgrade", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new"),
+				makeStatus("pod-2", oldOperatorImage, oldExecHash, "hash-old-a"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old-b"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("config propagation within new-version group during upgrade", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", newOperatorImage, newExecHash, "hash-new-stale"),
+				makeStatus("pod-2", newOperatorImage, newExecHash, "hash-new-current"),
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-old"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	// Edge cases
+
+	It("empty status list", func() {
+		statusList := postgres.PostgresqlStatusList{}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("single pod", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				makeStatus("pod-1", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+
+	It("nil Pod and empty config hash are skipped", func() {
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{Pod: nil, LoadedConfigurationHash: "hash-a"},
+				{LoadedConfigurationHash: ""},
+				makeStatus("pod-3", oldOperatorImage, oldExecHash, "hash-a"),
+			},
+		}
+		Expect(isConfigNonUniformityFromUpgrade(statusList)).To(BeFalse())
+	})
+})
+
 type fakePluginClientRollout struct {
 	pluginClient.Client
 	returnedPod   *corev1.Pod

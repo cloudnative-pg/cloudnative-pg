@@ -86,7 +86,6 @@ var (
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
-// nolint:gocognit,gocyclo
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, immediate bool) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -154,11 +153,13 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 			"restore_command = '%s'\n",
 		restoreCmd)
 
-	// nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
-		envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster)
-		if err != nil {
-			return err
+		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
+		if found && server.BarmanObjectStore != nil {
+			envs, config, err = info.createEnvAndConfigForSnapshotRestore(ctx, cli, cluster, &server)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -220,20 +221,12 @@ func (info InitInfo) createEnvAndConfigForSnapshotRestore(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
+	server *apiv1.ExternalCluster,
 ) ([]string, string, error) {
 	contextLogger := log.FromContext(ctx)
-	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
-	if sourceName == "" {
-		return nil, "", fmt.Errorf("recovery source not specified")
-	}
+	contextLogger.Info("Recovering from external cluster", "sourceName", server.Name)
 
-	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
-
-	server, found := cluster.ExternalCluster(sourceName)
-	if !found {
-		return nil, "", fmt.Errorf("missing external cluster: %v", sourceName)
-	}
 	serverName := server.GetServerName()
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
@@ -288,7 +281,7 @@ func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	var envs []string
 	var config string
 
-	// nolint:nestif
+	//nolint:nestif
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
 		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)

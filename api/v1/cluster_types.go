@@ -277,6 +277,15 @@ type ClusterSpec struct {
 	// +optional
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
+	// PodSelectorRefs defines named pod label selectors that can be referenced
+	// in pg_hba rules using the ${podselector:NAME} syntax in the address field.
+	// The operator resolves matching pod IPs and the instance manager expands
+	// pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	PodSelectorRefs []PodSelectorRef `json:"podSelectorRefs,omitempty"`
+
 	// Replication slots management configuration
 	// +kubebuilder:default:={"highAvailability":{"enabled":true}}
 	// +optional
@@ -320,6 +329,18 @@ type ClusterSpec struct {
 	// Configure the generation of the service account
 	// +optional
 	ServiceAccountTemplate *ServiceAccountTemplate `json:"serviceAccountTemplate,omitempty"`
+
+	// Name of an existing ServiceAccount in the same namespace to use for the cluster.
+	// When specified, the operator will not create a new ServiceAccount
+	// but will use the provided one. This is useful for sharing a single
+	// ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).
+	// If not specified, a ServiceAccount will be created with the cluster name.
+	// Mutually exclusive with ServiceAccountTemplate.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceAccountName is immutable"
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=253
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	// +optional
@@ -842,6 +863,13 @@ type ClusterStatus struct {
 	// +optional
 	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
 
+	// PodSelectorRefs contains the resolved pod IPs for each named selector
+	// defined in spec.podSelectorRefs.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	PodSelectorRefs []PodSelectorRefStatus `json:"podSelectorRefs,omitempty"`
+
 	// The timeline of the Postgres cluster
 	// +optional
 	TimelineID int `json:"timelineID,omitempty"`
@@ -1038,6 +1066,9 @@ type ImageInfo struct {
 	Image string `json:"image"`
 	// MajorVersion is the major version of the image
 	MajorVersion int `json:"majorVersion"`
+	// Extensions contains the container image extensions available for the current Image
+	// +optional
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
 // SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
@@ -1418,6 +1449,33 @@ type SynchronousReplicaConfiguration struct {
 	FailoverQuorum bool `json:"failoverQuorum"`
 }
 
+// PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+// Pods matching the selector in the Cluster's namespace will have their IPs
+// resolved and made available for pg_hba address expansion via the
+// `${podselector:NAME}` syntax.
+type PodSelectorRef struct {
+	// Name is the identifier used to reference this selector in pg_hba rules
+	// via the ${podselector:NAME} syntax in the address field.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z]([a-z0-9_-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Selector is a label selector that identifies the pods whose IPs
+	// should be resolved. Only pods in the Cluster's namespace are considered.
+	Selector metav1.LabelSelector `json:"selector"`
+}
+
+// PodSelectorRefStatus contains the resolved pod IPs for a named selector.
+type PodSelectorRefStatus struct {
+	// Name corresponds to the name in the spec's PodSelectorRef.
+	Name string `json:"name"`
+
+	// IPs is the list of pod IPs matching the selector.
+	// Each IP is a single address (no CIDR notation).
+	// +optional
+	IPs []string `json:"ips,omitempty"`
+}
+
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
@@ -1429,7 +1487,9 @@ type PostgresConfiguration struct {
 	Synchronous *SynchronousReplicaConfiguration `json:"synchronous,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
-	// to the pg_hba.conf file)
+	// to the pg_hba.conf file).
+	// Use the ${podselector:NAME} syntax to reference a pod selector;
+	// the rule will be expanded for each Pod IP matching that selector.
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
 
@@ -1466,6 +1526,8 @@ type PostgresConfiguration struct {
 
 	// The configuration of the extensions to be added
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
 }
 
@@ -1477,8 +1539,8 @@ type ExtensionConfiguration struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// The image containing the extension, required
-	// +kubebuilder:validation:XValidation:rule="has(self.reference)",message="An image reference is required"
+	// The image containing the extension.
+	// +optional
 	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 
 	// The list of directories inside the image which should be added to extension_control_path.
@@ -1494,6 +1556,43 @@ type ExtensionConfiguration struct {
 	// The list of directories inside the image which should be added to ld_library_path.
 	// +optional
 	LdLibraryPath []string `json:"ld_library_path,omitempty"`
+
+	// A list of directories within the image to be appended to the
+	// PostgreSQL process's `PATH` environment variable.
+	// +optional
+	BinPath []string `json:"bin_path,omitempty"`
+
+	// Env is a list of custom environment variables to be set in the
+	// PostgreSQL process for this extension. It is the responsibility of the
+	// cluster administrator to ensure the variables are correct for the
+	// specific extension. Note that changes to these variables require
+	// a manual cluster restart to take effect.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Env []ExtensionEnvVar `json:"env,omitempty"`
+}
+
+// ExtensionEnvVar defines an environment variable for a specific extension
+// image volume.
+type ExtensionEnvVar struct {
+	// Name of the environment variable to be injected into the
+	// PostgreSQL process.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	Name string `json:"name"`
+
+	// Value of the environment variable. CloudNativePG performs a direct
+	// replacement of this value, with support for placeholder expansion.
+	// The ${`image_root`} placeholder resolves to the absolute mount path
+	// of the extension's volume (e.g., `/extensions/my-extension`). This
+	// is particularly useful for allowing applications or libraries to
+	// locate specific directories within the mounted image.
+	// Unrecognized placeholders are rejected. To include a literal ${...}
+	// in the value, escape it as $${...}.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

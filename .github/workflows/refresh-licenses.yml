@@ -8,10 +8,6 @@ on:
 
 permissions: read-all
 
-env:
-  # renovate: datasource=golang-version depName=golang versioning=loose
-  GOLANG_VERSION: "1.25.7"
-
 jobs:
   licenses:
     name: Refresh licenses
@@ -23,7 +19,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: ${{ env.GOLANG_VERSION }}
+          go-version-file: go.mod
           check-latest: true
 
       - name: Generate licenses
