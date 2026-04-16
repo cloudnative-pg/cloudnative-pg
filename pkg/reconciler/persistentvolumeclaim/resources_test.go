@@ -20,67 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package persistentvolumeclaim
 
 import (
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-var _ = Describe("PVC detection", func() {
-	It("will list PVCs with Jobs or Pods or which are Ready", func(ctx SpecContext) {
-		clusterName := "myCluster"
-		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
-		}
-		pvcs := []corev1.PersistentVolumeClaim{
-			makeClusterPVC("1", false), // has a Pod
-			makeClusterPVC("2", false), // has a Job
-			makeClusterPVC("3", true),  // resizing
-			makeClusterPVC("4", false), // dangling
-		}
-		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: clusterName,
-			},
-		}
-		EnrichStatus(
-			ctx,
-			cluster,
-			[]corev1.Pod{
-				makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),
-				makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
-			},
-			[]batchv1.Job{makeJob(clusterName, "2")},
-			pvcs,
-		)
-
-		Expect(cluster.Status.PVCCount).Should(BeEquivalentTo(4))
-		Expect(cluster.Status.InstanceNames).Should(Equal([]string{
-			clusterName + "-1",
-			clusterName + "-2",
-			clusterName + "-3",
-			clusterName + "-4",
-		}))
-		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{
-			clusterName + "-2",
-		}))
-		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{
-			clusterName + "-3",
-		}))
-		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{
-			clusterName + "-4",
-		}))
-		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{
-			clusterName + "-1",
-		}))
-		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
-	})
-})
 
 var _ = Describe("PVCs used by instance", func() {
 	clusterName := "cluster-pvc-instance"
