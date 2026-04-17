@@ -61,6 +61,25 @@ func newTLSConfigFromSecret(
 	return NewTLSConfigFromCertPool(caCertPool), nil
 }
 
+// verifyCertificates it must be used with tls.Config in VerifyPeerCertificate and VerifyConnection
+// this is to have a consistent verification in both places, even if this is not a problem helps
+// to avoid introducing two different process in two important places.
+func verifyCertificates(certPool *x509.CertPool, certs []*x509.Certificate) error {
+	opts := x509.VerifyOptions{
+		Roots:         certPool,
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range certs[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := certs[0].Verify(opts)
+	if err != nil {
+		return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
+	}
+
+	return nil
+}
+
 // NewTLSConfigFromCertPool creates a tls.Config object from X509 cert pool
 // containing the expected server CA
 func NewTLSConfigFromCertPool(
@@ -85,20 +104,10 @@ func NewTLSConfigFromCertPool(
 				certs[i] = cert
 			}
 
-			opts := x509.VerifyOptions{
-				Roots:         certPool,
-				Intermediates: x509.NewCertPool(),
-			}
-
-			for _, cert := range certs[1:] {
-				opts.Intermediates.AddCert(cert)
-			}
-			_, err := certs[0].Verify(opts)
-			if err != nil {
-				return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
-			}
-
-			return nil
+			return verifyCertificates(certPool, certs)
+		},
+		VerifyConnection: func(conn tls.ConnectionState) error {
+			return verifyCertificates(certPool, conn.PeerCertificates)
 		},
 	}
 
