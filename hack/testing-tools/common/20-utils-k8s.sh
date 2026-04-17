@@ -193,13 +193,17 @@ function deploy_operator_from_manifest() {
     fi
 
     printf '%bDeploying operator from %s%b\n' "${bright}" "${operator}" "${reset}"
-    ${K8S_CLI} delete ns cnpg-system 2>/dev/null || true
+    if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
+        ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
+        ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
+    fi
     # --server-side avoids the last-applied-configuration annotation exceeding
     # the 262144 byte limit on large CRDs; --force-conflicts lets us adopt
     # existing field ownership when re-deploying or switching operator version.
     ${K8S_CLI} apply --server-side --force-conflicts -f "${manifest_file}"
+    ${K8S_CLI} -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=5m
 
-    printf '%bOperator deployment initiated.%b\n' "${bright}" "${reset}"
+    printf '%bOperator deployment complete.%b\n' "${bright}" "${reset}"
     print_operator_image
 }
 
