@@ -167,7 +167,7 @@ function deploy_operator_from_manifest() {
     if [[ "${operator}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
         local version="${operator#v}"
         mode="version"
-        manifest_url="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v${version}/releases/cnpg-${version}.yaml"
+        manifest_url="https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v${version}/cnpg-${version}.yaml"
     elif [[ "${operator}" =~ ^v?[0-9] ]]; then
         # Looks version-like but isn't valid semver -- refuse rather than silently
         # fall through to branch mode and produce a misleading "not found" error.
@@ -185,7 +185,8 @@ function deploy_operator_from_manifest() {
         exit 1
     fi
 
-    if ! curl --silent --fail -o /dev/null "${manifest_url}"; then
+    local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
+    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
         exit 1
@@ -196,7 +197,7 @@ function deploy_operator_from_manifest() {
     # --server-side avoids the last-applied-configuration annotation exceeding
     # the 262144 byte limit on large CRDs; --force-conflicts lets us adopt
     # existing field ownership when re-deploying or switching operator version.
-    ${K8S_CLI} apply --server-side --force-conflicts -f "${manifest_url}"
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${manifest_file}"
 
     printf '%bOperator deployment initiated.%b\n' "${bright}" "${reset}"
     print_operator_image
