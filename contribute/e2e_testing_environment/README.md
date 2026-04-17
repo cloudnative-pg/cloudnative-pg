@@ -59,7 +59,16 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 | -e    / --engine <CLUSTER_ENGINE>   | Use the specified Kubernetes engine (e.g., `-e k3d`). (Env: `CLUSTER_ENGINE`)                                   |
 | -k    / --k8s-version <K8S_VERSION> | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    / --nodes \<NODES>            | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
-| -o    / --operator \<OPERATOR> | Controls which version of the operator is deployed. Use `local` (default) to build from the local worktree, an exact version such as `1.28.1` to deploy that published release, or a branch name such as `main` or `release-1.28` to deploy the latest snapshot for that branch from the [`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts) repository. Only effective when using `make e2e-test-existing-cluster`; the `e2e-test-kind` and `e2e-test-k3d` targets are self-contained and always build the operator from the local worktree. (Env: `OPERATOR`) |
+| -o    / --operator \<OPERATOR> | Select the operator to deploy: `local` (default), a version, or a branch. See below. (Env: `OPERATOR`) |
+
+The `-o`/`--operator` flag accepts:
+
+- `local` (default): build and deploy from the local worktree.
+- A version such as `1.28.1`: deploy the matching published release.
+- A branch such as `main` or `release-1.28`: deploy the latest snapshot for
+  that branch from the
+  [`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+  repository.
 
 > **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
 > images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,

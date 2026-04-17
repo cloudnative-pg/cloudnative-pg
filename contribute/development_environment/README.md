@@ -206,7 +206,7 @@ Branch snapshots are pulled from the
 [`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
 repository.
 
-*Note:* For a list of options, run `./hack/setup-cluster.sh`.
+> **Note:** For a list of options, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go
 > binaries in your system. For this reason, from time to time, we recommend
