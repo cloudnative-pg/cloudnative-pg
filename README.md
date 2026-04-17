@@ -118,12 +118,14 @@ MariaDB cluster).
 
 ## Communications
 
-- [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
-- [Slack](https://cloud-native.slack.com/archives/C08MAUJ7NPM)
-  (join the [CNCF Slack Workspace](https://communityinviter.com/apps/cloud-native/cncf)).
-- [Twitter](https://twitter.com/CloudNativePg)
-- [Mastodon](https://mastodon.social/@CloudNativePG)
-- [Bluesky](https://bsky.app/profile/cloudnativepg.bsky.social)
+Please refer to the [Getting in touch](https://github.com/cloudnative-pg#getting-in-touch)
+section on the GitHub organization page.
+
+## Community Meetings
+
+Everyone is welcome, no invitation needed. For details, see the
+[Community Meetings](https://github.com/cloudnative-pg#cloudnativepg-community-meetings)
+section on the GitHub organization page.
 
 ## Resources
 
