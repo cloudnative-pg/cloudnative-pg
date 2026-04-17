@@ -23,7 +23,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -484,19 +486,19 @@ func getPprofServerAddress(enabled bool) string {
 }
 
 func getNamespacesToWatch(conf *configuration.Data) map[string]cache.Config {
-	if len(conf.WatchNamespace) == 0 {
+	watched := conf.WatchedNamespaces()
+	if len(watched) == 0 {
 		setupLog.Info("Listening for changes on all namespaces")
 		return nil
 	}
-	// ensure we always watch operator namespace
+	// ensure we always watch the operator namespace
 	namespaces := map[string]cache.Config{
 		conf.OperatorNamespace: {},
 	}
-
-	for _, namespace := range conf.WatchedNamespaces() {
+	for _, namespace := range watched {
 		namespaces[namespace] = cache.Config{}
 	}
 
-	setupLog.Info("Listening for changes", "watchNamespaces", conf.WatchedNamespaces())
+	setupLog.Info("Listening for changes", "watchNamespaces", slices.Sorted(maps.Keys(namespaces)))
 	return namespaces
 }

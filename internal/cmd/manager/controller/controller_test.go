@@ -96,4 +96,13 @@ var _ = Describe("getNamespacesToWatch", func() {
 		Expect(result).To(HaveKey("ns2"))
 		Expect(result).To(HaveKey("cnpg-system"))
 	})
+
+	It("should return nil when WatchNamespace contains only separators and whitespace", func() {
+		conf := &configuration.Data{
+			WatchNamespace:    ",, ,",
+			OperatorNamespace: "cnpg-system",
+		}
+		result := getNamespacesToWatch(conf)
+		Expect(result).To(BeNil())
+	})
 })
