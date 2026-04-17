@@ -23,7 +23,7 @@ IMAGE_NAME ?= ghcr.io/cloudnative-pg/cloudnative-pg-testing
 # Prevent e2e tests to proceed with empty tag which
 # will be considered as "latest".
 ifeq (,$(CONTROLLER_IMG))
-IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
+IMAGE_TAG ?= $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
 endif
@@ -191,7 +191,7 @@ docker-build: go-releaser ## Build the docker image.
 	  builder_name_option="--builder ${BUILDER_NAME}"; \
 	fi; \
 	DOCKER_BUILDKIT=1 buildVersion=${VERSION} revision=${COMMIT} \
-	  docker buildx bake $${builder_name_option} --set=*.platform="linux/${ARCH}" \
+	  docker buildx bake $(ADDITIONAL_BUILDER_OPTIONS) $${builder_name_option} --set=*.platform="linux/${ARCH}" \
 	  --set distroless.tags="$${CONTROLLER_IMG}" \
 	  --push distroless
 
