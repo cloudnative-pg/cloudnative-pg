@@ -323,7 +323,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -409,14 +409,14 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       -
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
+        uses: docker/bake-action@a66e1c87e2eca0503c343edf1d208c716d54b8a8 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -468,7 +468,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -502,7 +502,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         id: build-prime
         if: needs.evaluate_options.outputs.test_level == '4'
         with:
@@ -576,7 +576,7 @@ jobs:
           git commit -m "${COMMIT_MESSAGE}"
       -
         name: Push changes
-        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
+        uses: ad-m/github-push-action@4cc74773234f74829a8c21bc4d69dd4be9cfa599 # v1.1.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
@@ -707,14 +707,14 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -778,7 +778,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -804,7 +804,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kind-logs-${{ env.MATRIX }}
           path: kind-logs/
@@ -812,7 +812,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -823,7 +823,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -898,13 +898,13 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
       - ## In case hack/setup-cluster.sh needs to pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -967,7 +967,7 @@ jobs:
           fi
       - name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -988,14 +988,14 @@ jobs:
       - # Archive logs for failed test cases if there are any
         name: Archive K3D logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: k3d-logs-${{ env.MATRIX }}
           path: k3d-logs/
           retention-days: 7
       - name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1004,7 +1004,7 @@ jobs:
           if-no-files-found: ignore
       - name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1115,7 +1115,7 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -1140,7 +1140,7 @@ jobs:
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1282,7 +1282,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1307,7 +1307,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1317,7 +1317,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1465,14 +1465,14 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -1497,7 +1497,7 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1656,7 +1656,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -1681,7 +1681,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -1691,7 +1691,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -1853,14 +1853,14 @@ jobs:
           ref: ${{ env.GIT_REF }}
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -2004,7 +2004,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2029,7 +2029,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2039,7 +2039,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2183,7 +2183,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -2198,7 +2198,7 @@ jobs:
       -
         ## In case hack/setup-cluster.sh need pull operand image from registry
         name: Login into docker registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
@@ -2307,7 +2307,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
@@ -2332,7 +2332,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-failure-contexts-${{ env.MATRIX }}
           path: |
@@ -2342,7 +2342,7 @@ jobs:
       -
         name: Archive e2e logs
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cluster-logs-${{ env.MATRIX }}
           path: |
@@ -2422,7 +2422,7 @@ jobs:
 
       - name: If there is an overflow summary, archive it
         if: steps.generate-summary.outputs.Overflow
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
           path: ${{ steps.generate-summary.outputs.Overflow }}
