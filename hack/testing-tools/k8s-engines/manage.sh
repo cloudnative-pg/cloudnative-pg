@@ -41,8 +41,8 @@
 #
 # Usage:
 #   manage.sh <action>
-#   where <action> can be: create, load-from-sources, deploy-from-sources,
-#   deploy-from-manifest, load-helper-images, print-image, export-logs, teardown, pyroscope, env
+#   where <action> can be: create, load, deploy, load-helper-images,
+#   print-image, export-logs, teardown, pyroscope, env
 #
 # Environment Variables:
 #   CLUSTER_ENGINE - Determines the target vendor (default: 'kind')
@@ -75,7 +75,7 @@ source "${COMMON_DIR}/50-utils-images-load.sh"
 ACTION="${1:-}"
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|deploy-from-manifest|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
+    echo "Usage: $0 <create|load|deploy|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
     exit 1
 fi
 
