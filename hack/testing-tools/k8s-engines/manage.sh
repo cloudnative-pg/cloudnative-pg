@@ -82,6 +82,8 @@ fi
 # --- Action Aliases for Backward Compatibility ---
 case "$ACTION" in
     load)
+        # Published releases and branch snapshots already ship images on
+        # ghcr.io; only the 'local' path needs a local build + registry push.
         if [[ "${OPERATOR:-local}" != "local" ]]; then
             echo "Skipping image build: OPERATOR=${OPERATOR}"
             exit 0
