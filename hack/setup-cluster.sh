@@ -50,7 +50,7 @@ NODES=${NODES:-3}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-k <version>] [-n <nodes>] <command>
+Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -78,6 +78,15 @@ Options:
                           Used only during "create" command. Default: 3
                           Env: NODES
 
+    -o|--operator
+      <OPERATOR>          Controls which version of the operator is deployed.
+                          Use 'local' (default) to build and deploy from the
+                          local worktree, an exact version such as '1.28.1' to
+                          deploy that published release, or a branch name such
+                          as 'main' or 'release-1.28' to deploy the latest
+                          snapshot for that branch.
+                          Env: OPERATOR
+
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
 EOF
@@ -89,9 +98,9 @@ main() {
   # --- ARGUMENT PARSING ---
   # Parse command-line options (-k, -n, etc.) using getopt
   if ! getopt -T > /dev/null; then
-    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:o:r -l "engine:,k8s-version:,nodes:,operator:,registry" -- "$@") || usage
   else
-    parsed_opts=$(getopt e:k:n:r "$@") || usage
+    parsed_opts=$(getopt e:k:n:o:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
 
@@ -123,6 +132,11 @@ main() {
           echo >&2
           usage
         fi
+        ;;
+      -o | --operator)
+        shift
+        export OPERATOR="${1}"
+        shift
         ;;
       -r | --registry)
         shift
