@@ -91,13 +91,12 @@ function build_and_load_operator_image_from_sources() {
 }
 
 function deploy_operator_from_sources() {
-    echo -e "${bright}Deploying operator manifests from current worktree...${reset}"
+    printf '%bDeploying operator manifests from current worktree...%b\n' "${bright}" "${reset}"
 
-    # Attempt to delete the namespace first (ignore errors if it doesn't exist)
-    ${K8S_CLI} delete ns cnpg-system 2> /dev/null || true
+    reset_operator_namespace
 
     # Run the make target from the project root directory
     make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 
-    echo -e "${bright}Operator deployment initiated.${reset}"
+    wait_operator_ready
 }
