@@ -113,6 +113,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Check for Command
         id: command
@@ -156,6 +157,9 @@ jobs:
               "log_level"|"ll")
               LOG_LEVEL="${value}"
               ;;
+              "cnpg_deployment_method"|"deployment-method|"dm")
+              CNPG_DEPLOYMENT_METHOD="${value}"
+              ;;
               *)
               ;;
             esac
@@ -166,6 +170,7 @@ jobs:
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+          echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
