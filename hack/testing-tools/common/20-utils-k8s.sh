@@ -338,7 +338,7 @@ function deploy_operator_from_source() {
 
   if [[ "${cnpg_deployment_method}" != "helm" ]] && [[ "${cnpg_deployment_method}" != "manifest" ]]
   then
-    echo -e "${bright}Error: Deployment method not supported: ${CNPG_DEPLOYMENT_METHOD}${reset}" >&2
+    echo -e "${bright}Error: Deployment method not supported: ${cnpg_deployment_method}${reset}" >&2
     exit 1
   fi
 
