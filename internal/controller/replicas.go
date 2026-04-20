@@ -129,6 +129,22 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		if err != nil {
 			return "", err
 		}
+
+		// Mark the old primary as unhealthy immediately when failover starts,
+		// removing it from both the -rw and -ro services. This prevents replicas
+		// from reconnecting to it (primary_conninfo uses <cluster>-rw) and
+		// satisfying the synchronous replication quorum on a stale primary.
+		// Best-effort: the failover must proceed even if this fails. The
+		// retryable call in the reconcile loop's failover guard will correct
+		// the label on subsequent passes.
+		if err := r.markOldPrimaryAsUnhealthy(
+			ctx,
+			cluster.Status.CurrentPrimary,
+			resources.instances.Items,
+		); err != nil {
+			contextLogger.Error(err, "Failed to strip primary label from old primary, continuing with failover",
+				"oldPrimary", cluster.Status.CurrentPrimary)
+		}
 	}
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
@@ -167,6 +183,39 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Set the first pod in the sorted list as the new targetPrimary
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
+}
+
+// markOldPrimaryAsUnhealthy labels the old primary pod as unhealthy when failover
+// starts, removing it from both the -rw and -ro service selectors until
+// ReconcileMetadata restores the correct label after promotion completes.
+func (r *ClusterReconciler) markOldPrimaryAsUnhealthy(
+	ctx context.Context,
+	oldPrimaryName string,
+	instances []corev1.Pod,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	idx := slices.IndexFunc(instances, func(pod corev1.Pod) bool {
+		return pod.Name == oldPrimaryName
+	})
+	if idx == -1 {
+		contextLogger.Warning(
+			"Old primary pod not found in managed instances, skipping label demotion",
+			"oldPrimary", oldPrimaryName)
+		return nil
+	}
+
+	oldPrimary := &instances[idx]
+	if role, _ := utils.GetInstanceRole(oldPrimary.Labels); role == specs.ClusterRoleLabelUnhealthy {
+		return nil
+	}
+
+	contextLogger.Info(
+		"Setting primary label to unhealthy in the old primary during failover",
+		"pod", oldPrimary.Name)
+	origPod := oldPrimary.DeepCopy()
+	utils.SetInstanceRole(&oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
+	return r.Patch(ctx, oldPrimary, client.MergeFrom(origPod))
 }
 
 // isNodeUnschedulable checks whether a node is set to unschedulable
@@ -305,6 +354,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", err
 	}
 
+	// Unlike the non-replica path, we do not strip the old primary label here:
+	// a designated primary does not accept application writes via the -rw
+	// service, so the split-brain window #10403 guards against does not
+	// apply. The retryable call in the reconcile loop's failover guard still
+	// relabels the pod on its next pass.
 	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 

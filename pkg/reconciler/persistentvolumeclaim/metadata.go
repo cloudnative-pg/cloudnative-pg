@@ -82,6 +82,11 @@ func reconcileInstanceRoleLabel(
 		return nil
 	}
 	for _, instanceName := range cluster.Status.InstanceNames {
+		// PVCs inherit the role label from the instance name, independently of
+		// the pod's current label. The failover guard in the reconcile loop
+		// prevents this code from running while CurrentPrimary != TargetPrimary,
+		// so by the time we get here the old primary has already been demoted
+		// and "replica" is correct.
 		instanceRole := specs.ClusterRoleLabelReplica
 		if instanceName == cluster.Status.CurrentPrimary {
 			instanceRole = specs.ClusterRoleLabelPrimary
@@ -101,7 +106,7 @@ func reconcileInstanceRoleLabel(
 				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
-				utils.SetInstanceRole(pvc.ObjectMeta, instanceRole)
+				utils.SetInstanceRole(&pvc.ObjectMeta, instanceRole)
 			},
 		}
 
