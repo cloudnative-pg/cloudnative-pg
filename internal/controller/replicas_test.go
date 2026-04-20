@@ -176,7 +176,7 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", pods)
 		Expect(err).ToNot(HaveOccurred())
 
-		// Verify the old primary's label was changed to replica on the API server
+		// Verify the old primary's label was changed to unhealthy on the API server
 		var updated corev1.Pod
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&primary), &updated)).To(Succeed())
 		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))

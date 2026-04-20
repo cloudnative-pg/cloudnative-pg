@@ -370,12 +370,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		// Mark the old primary as unhealthy on every pass while failover is
 		// in progress. This retries each second until it succeeds,
 		// complementing the immediate best-effort attempt in replicas.go.
-		err := r.markOldPrimaryAsUnhealthy(ctx, cluster.Status.CurrentPrimary, resources.instances.Items)
-		if err != nil {
-			contextLogger.Error(
-				err,
-				"Failed to strip primary label from old primary",
-				"oldPrimary", cluster.Status.CurrentPrimary)
+		if err := r.markOldPrimaryAsUnhealthy(
+			ctx, cluster.Status.CurrentPrimary, resources.instances.Items,
+		); err != nil {
+			contextLogger.Warning(
+				"Failed to strip primary label from old primary, will retry",
+				"oldPrimary", cluster.Status.CurrentPrimary,
+				"error", err)
 		}
 
 		contextLogger.Info("There is a switchover or a failover "+
