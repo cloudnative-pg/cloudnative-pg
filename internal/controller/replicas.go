@@ -225,7 +225,7 @@ func (r *ClusterReconciler) markOldPrimaryAsUnhealthy(
 		"Setting primary label to unhealthy in the old primary during failover",
 		"pod", oldPrimary.Name)
 	origPod := oldPrimary.DeepCopy()
-	utils.SetInstanceRole(oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
+	utils.SetInstanceRole(&oldPrimary.ObjectMeta, specs.ClusterRoleLabelUnhealthy)
 	return r.Patch(ctx, oldPrimary, client.MergeFrom(origPod))
 }
 

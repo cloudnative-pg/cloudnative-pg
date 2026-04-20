@@ -152,7 +152,7 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 			},
 		}
 		if role != "" {
-			utils.SetInstanceRole(pod.ObjectMeta, role)
+			utils.SetInstanceRole(&pod.ObjectMeta, role)
 		}
 		return pod
 	}

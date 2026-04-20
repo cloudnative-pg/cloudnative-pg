@@ -106,7 +106,7 @@ func reconcileInstanceRoleLabel(
 				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
-				utils.SetInstanceRole(pvc.ObjectMeta, instanceRole)
+				utils.SetInstanceRole(&pvc.ObjectMeta, instanceRole)
 			},
 		}
 
