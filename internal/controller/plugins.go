@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,4 +88,43 @@ func setStatusPluginHook(
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// validateClusterCreate validates a cluster using the plugin client and sets status on failure
+func validateClusterCreate(
+	ctx context.Context,
+	cli client.Client,
+	pluginClient cnpgiClient.Client,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx).WithName("validate_cluster_create")
+
+	validationErrors, err := pluginClient.ValidateClusterCreate(ctx, cluster)
+	if err != nil {
+		if regErr := setClusterPhase(ctx, cli, cluster, apiv1.PhaseFailurePlugin, err.Error()); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
+		return err
+	}
+
+	if len(validationErrors) > 0 {
+		msg := fmt.Sprintf("cluster validation failed: %v", validationErrors)
+		if regErr := setClusterPhase(ctx, cli, cluster, apiv1.PhasePluginValidationFailed, msg); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", msg)
+		}
+		return errors.New(msg)
+	}
+	return nil
+}
+
+func setClusterPhase(ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	phase string,
+	reason string,
+) error {
+	origCluster := cluster.DeepCopy()
+	cluster.Status.Phase = phase
+	cluster.Status.PhaseReason = reason
+	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
