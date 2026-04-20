@@ -383,6 +383,11 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 		return "", err
 	}
 
+	// Unlike the non-replica path, we do not strip the old primary label here:
+	// a designated primary does not accept application writes via the -rw
+	// service, so the split-brain window #10403 guards against does not
+	// apply. The retryable call in the reconcile loop's failover guard still
+	// relabels the pod on its next pass.
 	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
