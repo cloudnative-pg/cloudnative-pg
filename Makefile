@@ -69,7 +69,7 @@ OPERATOR_SDK_VERSION ?= v1.42.2
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
 OPM_VERSION ?= v1.65.0
 # renovate: datasource=github-releases depName=helm/helm
-HELM_VERSION ?= v3.20.2
+HELM_VERSION ?= v4.1.4
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.17.1
 OPENSHIFT_VERSIONS ?= v4.16-v4.21
