@@ -23,6 +23,8 @@ import (
 	"context"
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
@@ -90,6 +92,12 @@ func (r *PoolerReconciler) updatePoolerStatus(
 
 	if resources.Deployment != nil {
 		updatedStatus.Instances = resources.Deployment.Status.Replicas
+	}
+
+	if service := resources.Service; service != nil && service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		updatedStatus.LoadBalancer = service.Status.LoadBalancer.DeepCopy()
+	} else {
+		updatedStatus.LoadBalancer = nil
 	}
 
 	// then update the status if anything changed
