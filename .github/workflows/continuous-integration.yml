@@ -207,6 +207,11 @@ jobs:
         uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
         with:
           go-version-file: go.mod
+          # Override the default value of "stable" for go-version-input.
+          # Without this, setup-go receives both go-version=stable and
+          # go-version-file=go.mod, and ignores the file.
+          # See https://github.com/golang/go/issues/70036
+          go-version-input: ""
           check-latest: true
 
   shellcheck:
