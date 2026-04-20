@@ -140,6 +140,14 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 		if err != nil {
 			return "", err
 		}
+
+		// Strip the primary label from the old primary pod immediately.
+		// This cuts it off from the -rw service, preventing replicas from
+		// reconnecting to it (primary_conninfo uses <cluster>-rw) and
+		// satisfying the synchronous replication quorum on a stale primary.
+		if err := r.demoteOldPrimaryLabel(ctx, cluster.Status.CurrentPrimary, resources); err != nil {
+			return "", err
+		}
 	}
 
 	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
@@ -178,6 +186,32 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 
 	// Set the first pod in the sorted list as the new targetPrimary
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
+}
+
+// demoteOldPrimaryLabel strips the primary label from the old primary pod,
+// cutting it off from the -rw service when failover starts.
+func (r *ClusterReconciler) demoteOldPrimaryLabel(
+	ctx context.Context,
+	oldPrimaryName string,
+	resources *managedResources,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for i := range resources.instances.Items {
+		pod := &resources.instances.Items[i]
+		if pod.Name != oldPrimaryName {
+			continue
+		}
+
+		contextLogger.Info("Stripping primary label from old primary during failover",
+			"pod", pod.Name)
+		origPod := pod.DeepCopy()
+		utils.SetInstanceRole(pod.ObjectMeta, specs.ClusterRoleLabelReplica)
+		return r.Patch(ctx, pod, client.MergeFrom(origPod))
+	}
+
+	contextLogger.Warning("Old primary pod not found in managed instances, skipping label demotion",
+		"oldPrimary", oldPrimaryName)
+	return nil
 }
 
 // isNodeUnschedulableOrBeingDrained checks if a node is currently being drained.

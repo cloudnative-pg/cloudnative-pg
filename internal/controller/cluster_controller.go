@@ -423,10 +423,26 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if primaryNames := instancesStatus.PrimaryNames(); len(primaryNames) > 1 {
 		contextLogger.Error(
 			errOldPrimaryDetected,
-			"An old primary pod has been detected. Awaiting its recognition of the new role",
+			"An old primary pod has been detected, reconciling metadata",
 			"primaryNames", primaryNames,
 		)
 		instancesStatus.LogStatus(ctx)
+
+		// Reconcile pod labels even during dual-primary detection, so the -rw
+		// service stops routing to the old primary. At this point CurrentPrimary
+		// is already correct (the CurrentPrimary != TargetPrimary guard earlier
+		// in this function ensures they are equal before we reach here), so
+		// updateRoleLabels will set the new primary's label to "primary" and
+		// the old one to "replica".
+		if err := instanceReconciler.ReconcileMetadata(
+			ctx,
+			r.Client,
+			cluster,
+			resources.instances.Items,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{
 			RequeueAfter: 5 * time.Second,
 		}, nil

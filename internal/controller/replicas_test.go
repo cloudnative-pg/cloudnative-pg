@@ -20,11 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -126,6 +130,99 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
+	})
+})
+
+var _ = Describe("demoteOldPrimaryLabel", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	makePod := func(name, namespace, role string) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels:    map[string]string{},
+			},
+		}
+		if role != "" {
+			utils.SetInstanceRole(pod.ObjectMeta, role)
+		}
+		return pod
+	}
+
+	It("strips the primary label from the old primary pod", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		primary := makePod("cluster-1", namespace, specs.ClusterRoleLabelPrimary)
+		replica1 := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
+		replica2 := makePod("cluster-3", namespace, specs.ClusterRoleLabelReplica)
+
+		for i, pod := range []corev1.Pod{primary, replica1, replica2} {
+			p := pod
+			Expect(env.client.Create(ctx, &p)).To(Succeed())
+			// refresh the local copy with server-assigned fields
+			if i == 0 {
+				primary = p
+			}
+		}
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{primary, replica1, replica2}},
+		}
+
+		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Verify the old primary's label was changed to replica on the API server
+		var updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&primary), &updated)).To(Succeed())
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+		//nolint:staticcheck
+		Expect(updated.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+
+		// Verify replica pods are unchanged
+		var replica1Updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&replica1), &replica1Updated)).To(Succeed())
+		Expect(replica1Updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+	})
+
+	It("does not error when the old primary is not in the pod list", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		replica := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
+		Expect(env.client.Create(ctx, &replica)).To(Succeed())
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{replica}},
+		}
+
+		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("is a no-op when the old primary already has the replica label", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		pod := makePod("cluster-1", namespace, specs.ClusterRoleLabelReplica)
+		Expect(env.client.Create(ctx, &pod)).To(Succeed())
+
+		resources := &managedResources{
+			instances: corev1.PodList{Items: []corev1.Pod{pod}},
+		}
+
+		err := env.clusterReconciler.demoteOldPrimaryLabel(ctx, "cluster-1", resources)
+		Expect(err).ToNot(HaveOccurred())
+
+		var updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&pod), &updated)).To(Succeed())
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 	})
 })
 
