@@ -213,7 +213,7 @@ case "$ACTION" in
         echo "NODES:                      ${NODES:-<not explicitly set>}"
         echo "ENABLE_APISERVER_AUDIT:     ${ENABLE_APISERVER_AUDIT:-false}"
         echo "ENABLE_FLUENTD:             ${ENABLE_FLUENTD:-false}"
-        echo "CNPG_DEPLOYMENT_METHOD"     ${CNPG_DEPLOYMENT_METHOD:-manifest}
+echo "CNPG_DEPLOYMENT_METHOD:  ${CNPG_DEPLOYMENT_METHOD:-manifest}"
         echo "OPERATOR:                   ${OPERATOR:-local}"
 
         # --- IMAGE & BUILD ARTIFACTS ---
