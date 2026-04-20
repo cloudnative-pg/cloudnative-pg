@@ -107,6 +107,10 @@ func NewTLSConfigFromCertPool(
 			return verifyCertificates(certPool, certs)
 		},
 		VerifyConnection: func(conn tls.ConnectionState) error {
+			if len(conn.PeerCertificates) == 0 {
+				return fmt.Errorf("no certificates provided")
+			}
+
 			return verifyCertificates(certPool, conn.PeerCertificates)
 		},
 	}
