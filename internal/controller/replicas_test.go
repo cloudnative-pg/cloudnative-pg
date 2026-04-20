@@ -21,10 +21,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -213,6 +216,33 @@ var _ = Describe("markOldPrimaryAsUnhealthy", func() {
 		var updated corev1.Pod
 		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&pod), &updated)).To(Succeed())
 		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
+	})
+
+	It("surfaces the Patch error so callers can apply their best-effort or retry strategy", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		primary := makePod("cluster-1", namespace, specs.ClusterRoleLabelPrimary)
+
+		failingClient := fake.NewClientBuilder().
+			WithScheme(env.scheme).
+			WithObjects(&primary).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(_ context.Context, _ client.WithWatch, obj client.Object,
+					_ client.Patch, _ ...client.PatchOption,
+				) error {
+					Expect(obj).To(BeAssignableToTypeOf(&corev1.Pod{}))
+					Expect(obj.GetName()).To(Equal("cluster-1"))
+					Expect(obj.GetNamespace()).To(Equal(namespace))
+					return fmt.Errorf("simulated API server error")
+				},
+			}).
+			Build()
+
+		r := &ClusterReconciler{Client: failingClient, Scheme: env.scheme}
+
+		err := r.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{primary})
+		Expect(err).To(MatchError(ContainSubstring("simulated API server error")))
 	})
 })
 
