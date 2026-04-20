@@ -428,15 +428,15 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 			cluster.Status.CurrentPrimary = currentPrimary
 			cluster.Status.TargetPrimary = targetPrimary
 
-			result := env.clusterReconciler.evaluatePodReadinessGuards(
+			result, err := env.clusterReconciler.evaluatePodReadinessGuards(
 				ctx, cluster, postgres.PostgresqlStatusList{Items: items},
 			)
+			Expect(err).NotTo(HaveOccurred())
 
 			if requeue {
-				Expect(result).NotTo(BeNil())
 				Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 			} else {
-				Expect(result).To(BeNil())
+				Expect(result.IsZero()).To(BeTrue())
 			}
 		},
 		Entry("happy path: primary Ready and reporting, no guard fires",
@@ -496,8 +496,8 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		cluster.Status.CurrentPrimary = primaryName
 		cluster.Status.TargetPrimary = primaryName
 
-		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
-		Expect(result).NotTo(BeNil())
+		result, err := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(err).NotTo(HaveOccurred())
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 	})
 })
