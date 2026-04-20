@@ -621,7 +621,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 			"instanceName", firstInstance.Pod.Name,
 			"hasHTTPStatus", hasHTTPStatus,
 			"isPodReady", isPodReady)
-		return &ctrl.Result{RequeueAfter: 1 * time.Second}
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -630,7 +630,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 		contextLogger.Info(
 			"Primary pod is ready but status endpoint is failing, requeueing",
 			"primaryPodName", cluster.Status.CurrentPrimary)
-		return &ctrl.Result{RequeueAfter: 1 * time.Second}
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}
 	}
 
 	return nil

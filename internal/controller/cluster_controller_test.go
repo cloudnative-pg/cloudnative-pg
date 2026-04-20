@@ -434,7 +434,7 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 			if requeue {
 				Expect(result).NotTo(BeNil())
-				Expect(result.RequeueAfter).To(Equal(1 * time.Second))
+				Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 			} else {
 				Expect(result).To(BeNil())
 			}
@@ -498,6 +498,6 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
 		Expect(result).NotTo(BeNil())
-		Expect(result.RequeueAfter).To(Equal(1 * time.Second))
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 	})
 })
