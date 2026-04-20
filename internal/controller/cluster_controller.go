@@ -571,28 +571,30 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 // evaluatePodReadinessGuards short-circuits the reconciliation loop with a
 // requeue when the readiness information reported by the instance managers is
-// not consistent with a promotion or failover being safe.
+// not consistent with a promotion or failover being safe. We can only promote
+// an instance that is Ready from the Kubernetes point of view, otherwise the
+// read-write service will not route traffic to it even if PostgreSQL is up
+// and running.
 //
-// We can only promote an instance that is Ready from the Kubernetes point of
-// view, otherwise the services will not route traffic to it even if PostgreSQL
-// is up and running. Two cases are covered:
+// Two branches are checked in order:
 //
-//   - The first element of the (post-sort) instance list is reporting a
-//     healthy /pg/status but the kubelet has not yet refreshed the readiness
-//     probe (typical after un-fencing an instance). Wait for the kubelet to
-//     catch up rather than electing a new primary that will immediately be
-//     unreachable.
+//   - Kubelet has not refreshed the readiness probe yet. The first element of
+//     the (post-sort) instance list is reporting a healthy /pg/status but the
+//     kubelet has not yet flipped the readiness probe to True (typical for a
+//     short window after un-fencing an instance). Waiting here prevents
+//     electing a primary that Kubernetes will refuse to route traffic to.
 //
-//   - The current primary is Ready from the kubelet's perspective, but the
-//     operator's call to /pg/status is failing. The sort in PostgresqlStatusList
-//     pushes the primary to the tail when its endpoint errors, so Items[0]
-//     becomes a healthy replica and the usual failover-election path would
-//     promote it. Since a successful /pg/status implies a passing readiness
-//     probe but not vice versa, a failing /pg/status on an otherwise Ready pod
-//     is a strong signal of a transient condition (e.g. a network hiccup
-//     between the operator and the pod) rather than a genuine PostgreSQL
-//     health problem. Requeue and wait for the next reconciliation rather than
-//     triggering a spurious failover.
+//   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
+//     /pg/status on an otherwise Ready pod usually indicates an
+//     operator-to-pod connectivity issue rather than a genuine PostgreSQL
+//     health problem. The operator trusts the kubelet's readiness probe as
+//     the source of truth and defers its own failover decision until
+//     Kubernetes agrees the primary is not Ready.
+//
+//     Without this branch the failover-election path would promote the
+//     healthiest replica: PostgresqlStatusList.Less pushes items with an
+//     Error to the tail, so the erroring primary ends up behind a healthy
+//     replica at Items[0] and gets supplanted on a mere network hiccup.
 //
 // Returns nil when the caller can proceed with the rest of the reconciliation.
 func (r *ClusterReconciler) evaluatePodReadinessGuards(

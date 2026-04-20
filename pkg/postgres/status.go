@@ -357,6 +357,9 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 // via the /pg/status endpoint. This indicates a likely transient failure
 // (e.g. a network hiccup between the operator and the pod) rather than a
 // genuine PostgreSQL health problem.
+//
+// "Not reporting" is the negation of IsPodReporting: the /pg/status call
+// against the pod returned an error.
 func (list PostgresqlStatusList) IsPodReadyAndNotReporting(podname string) bool {
 	for _, item := range list.Items {
 		if item.Pod.Name == podname {
