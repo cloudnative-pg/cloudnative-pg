@@ -20,11 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -366,4 +368,49 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
+})
+
+var _ = Describe("evaluatePodReadinessGuards", func() {
+	const (
+		primaryName = "cluster-1"
+		replicaName = "cluster-2"
+	)
+
+	var (
+		env     *testingEnvironment
+		cluster *apiv1.Cluster
+	)
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace := newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, namespace)
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+	})
+
+	It("requeues when the primary is Ready but /pg/status is failing", func(ctx SpecContext) {
+		// Mirror what the production sort does: an erroring instance is
+		// pushed below the healthy ones, so Items[0] is a healthy replica
+		// and the erroring primary is in the tail. Without the guard, the
+		// election logic would then pick the replica as the new primary.
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					IsPodReady: true,
+				},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+					IsPodReady: true,
+					Error:      fmt.Errorf("status endpoint failing"),
+				},
+			},
+		}
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RequeueAfter).To(Equal(1 * time.Second))
+	})
 })
