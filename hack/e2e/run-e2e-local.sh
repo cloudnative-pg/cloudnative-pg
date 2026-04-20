@@ -53,12 +53,12 @@ export TEST_CLOUD_VENDOR="${CLUSTER_ENGINE}"
 # shellcheck disable=SC2329
 cleanup() {
   if [ "${PRESERVE_CLUSTER}" = false ]; then
-    "${HACK_DIR}/setup-cluster.sh" -e "${CLUSTER_ENGINE}" destroy || true
+    "${HACK_DIR}/setup-cluster.sh" -e "${CLUSTER_ENGINE}" teardown || true
   else
     set +x
     echo "You've chosen to preserve the Kubernetes cluster."
     echo "You can delete it manually later running:"
-    echo "'${HACK_DIR}/setup-cluster.sh' -e ${CLUSTER_ENGINE} destroy"
+    echo "'${HACK_DIR}/setup-cluster.sh' -e ${CLUSTER_ENGINE} teardown"
   fi
 }
 

@@ -89,3 +89,14 @@ function build_and_load_operator_image_from_sources() {
 
   docker buildx rm "${builder_name}"
 }
+
+function deploy_operator_from_sources() {
+    printf '%bDeploying operator manifests from current worktree...%b\n' "${bright}" "${reset}"
+
+    reset_operator_namespace
+
+    # Run the make target from the project root directory
+    make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
+
+    wait_operator_ready
+}

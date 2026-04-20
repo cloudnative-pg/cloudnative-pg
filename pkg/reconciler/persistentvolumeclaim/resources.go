@@ -79,10 +79,6 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimResizing)
 }
 
-func isFileSystemResizePending(pvc corev1.PersistentVolumeClaim) bool {
-	return hasPVCCondition(pvc, corev1.PersistentVolumeClaimFileSystemResizePending)
-}
-
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
 func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
 	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
