@@ -61,9 +61,10 @@ func newTLSConfigFromSecret(
 	return NewTLSConfigFromCertPool(caCertPool), nil
 }
 
-// verifyCertificates it must be used with tls.Config in VerifyPeerCertificate and VerifyConnection
-// this is to have a consistent verification in both places, even if this is not a problem helps
-// to avoid introducing two different process in two important places.
+// verifyCertificates validates the peer certificate chain against the trusted CA pool.
+// It is called from VerifyConnection, which runs on every completed handshake —
+// including resumed sessions where no certificate exchange occurs but the original
+// peer certificates are still available in tls.ConnectionState.
 func verifyCertificates(certPool *x509.CertPool, certs []*x509.Certificate) error {
 	opts := x509.VerifyOptions{
 		Roots:         certPool,
@@ -89,23 +90,6 @@ func NewTLSConfigFromCertPool(
 		MinVersion:         tls.VersionTLS13,
 		RootCAs:            certPool,
 		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
-		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
-			if len(rawCerts) == 0 {
-				return fmt.Errorf("no raw certificates provided")
-			}
-
-			certs := make([]*x509.Certificate, len(rawCerts))
-			for i, rawCert := range rawCerts {
-				cert, err := x509.ParseCertificate(rawCert)
-				if err != nil {
-					return fmt.Errorf("failed to parse certificate: %v", err)
-				}
-				certs[i] = cert
-			}
-
-			return verifyCertificates(certPool, certs)
-		},
 		VerifyConnection: func(conn tls.ConnectionState) error {
 			if len(conn.PeerCertificates) == 0 {
 				return fmt.Errorf("no certificates provided")
