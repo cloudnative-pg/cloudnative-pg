@@ -81,8 +81,11 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 				},
 			},
 			ServerName: ptr.To(c.pooler.Name),
-			// InsecureSkipVerify needs to be set to match the ssl_mode=verify-ca
-			// used by postgres when connecting to the other instances.
+			// Prometheus scrapes pods by IP, so the cert's SANs will not
+			// generally match the scrape target. InsecureSkipVerify keeps the
+			// scrape working out of the box; the CA and ServerName above are
+			// retained so that users who supply a clientTLSSecret with matching
+			// SANs can patch this flag off and get strict verification.
 			InsecureSkipVerify: ptr.To(true),
 		}
 	}

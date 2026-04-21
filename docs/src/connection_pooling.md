@@ -670,8 +670,10 @@ spec:
 
 ### TLS for the Metrics Endpoint
 
-The pooler metrics endpoint can be secured with TLS by enabling
-`.spec.monitoring.tls.enabled` on the `Pooler` resource:
+Set `.spec.monitoring.tls.enabled: true` to serve the metrics endpoint over
+HTTPS. The metrics server presents `.spec.pgbouncer.clientTLSSecret` and
+reloads it on every TLS handshake, so certificate rotations are picked up
+without restarting the pod.
 
 ```yaml
 spec:
@@ -682,6 +684,10 @@ spec:
     tls:
       enabled: true
 ```
+
+The generated `PodMonitor` scrapes with `insecureSkipVerify=true` because
+Prometheus scrapes pods by IP and the certificate's SANs do not generally
+cover the pod IP.
 
 ### Deprecation of Automatic `PodMonitor` Creation
 
