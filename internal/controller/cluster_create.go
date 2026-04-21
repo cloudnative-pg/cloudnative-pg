@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
@@ -52,6 +53,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
+
+// maxInstanceSerial is the upper bound (exclusive) for instance serial numbers.
+// Serials are reused when instances are removed, so this is just a coherence cap
+// to guard against bugs — it should exceed any realistic cluster size.
+const maxInstanceSerial = 100
 
 // createPostgresClusterObjects ensures that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -1078,13 +1084,19 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 }
 
 // generateNodeSerial extracts the first free node serial in this pods
-func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int, error) {
-	cluster.Status.LatestGeneratedNode++
-	if err := r.Status().Update(ctx, cluster); err != nil {
-		return 0, err
+func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) (int, error) {
+	instanceNames := stringset.From(cluster.Status.InstanceNames)
+
+	for i := 1; i < maxInstanceSerial; i++ {
+		proposedInstanceName := fmt.Sprintf("%s-%v", cluster.Name, i)
+		if instanceNames.Has(proposedInstanceName) {
+			continue
+		}
+
+		return i, nil
 	}
 
-	return cluster.Status.LatestGeneratedNode, nil
+	return 0, fmt.Errorf("no free instance serial found below %d", maxInstanceSerial)
 }
 
 func (r *ClusterReconciler) createPrimaryInstance(
@@ -1093,7 +1105,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Status.LatestGeneratedNode != 0 {
+	if cluster.IsInitialized() {
 		// We are we creating a new blank primary when we had previously generated
 		// other nodes, and we don't have any PVC to reuse?
 		// This can happen when:
@@ -1108,8 +1120,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		// healing this cluster as we have nothing to do.
 		// For the second option we can just retry when the next
 		// reconciliation loop is started by the informers.
-		contextLogger.Info("refusing to create the primary instance while the latest generated serial is not zero",
-			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
+		contextLogger.Info("refusing to create the primary instance because the cluster already initialized")
 
 		if err := r.RegisterPhase(ctx, cluster,
 			apiv1.PhaseUnrecoverable,
@@ -1145,7 +1156,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// Generate a new node serial
-	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
+	nodeSerial, err := r.generateNodeSerial(cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
