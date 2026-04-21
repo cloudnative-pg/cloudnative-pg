@@ -34,14 +34,14 @@ var utilsLog = log.WithName("utils")
 //   - the kubelet on the pod's node, while the node is healthy: the transition
 //     from True to False happens within FailureThreshold consecutive probe
 //     periods of the underlying container becoming unhealthy (about 30s with
-//     CNPG defaults: PeriodSeconds=10, FailureThreshold=3).
+//     stock defaults: PeriodSeconds=10, FailureThreshold=3).
 //   - the node lifecycle controller when the node stops reporting to the API
 //     server; once the node transitions to `Unknown` (after
-//     `--node-monitor-grace-period`, 40s by default) the controller calls
-//     `MarkPodsNotReady`, which synchronously sets PodReady to False with
-//     reason `NodeNotReady` on every pod of that node. With stock defaults the
-//     operator observes the flip about 40 to 45 seconds after the node becomes
-//     unreachable.
+//     `--node-monitor-grace-period`, 40s by default on Kubernetes 1.29-1.31
+//     and 50s on 1.32+) the controller calls `MarkPodsNotReady`, which flips
+//     PodReady to False on every pod of that node. With stock defaults the
+//     operator observes the flip about 40 to 55 seconds after the node
+//     becomes unreachable.
 //
 // Note that `tolerationSeconds` on the `node.kubernetes.io/unreachable` taint
 // (300s by default) controls pod eviction, not this condition: PodReady has
