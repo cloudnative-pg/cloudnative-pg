@@ -222,13 +222,23 @@ func startReconciler(ctx context.Context, reconciler *controller.PgBouncerReconc
 }
 
 // boolFromEnv reads a boolean value from the given environment variable.
-// If the variable is set but cannot be parsed, it logs a warning and returns false.
+// Returns false when the variable is unset. Terminates the process with a
+// fatal error written to stderr when the variable is set to a value that
+// strconv.ParseBool cannot parse, to avoid silently ignoring an operator
+// misconfiguration. stderr is used directly because os.Exit skips deferred
+// log-sink flushes and a structured log entry could otherwise be buffered
+// and lost.
 func boolFromEnv(envVar string) bool {
 	str := os.Getenv(envVar)
+	if str == "" {
+		return false
+	}
 	val, err := strconv.ParseBool(str)
-	if err != nil && str != "" {
-		log.Warning("Invalid value for environment variable, defaulting to false",
-			"name", envVar, "value", str)
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"invalid boolean value %q for environment variable %s: %v\n",
+			str, envVar, err)
+		os.Exit(1)
 	}
 	return val
 }
