@@ -87,8 +87,16 @@ jobs:
             }
 
             if (existing.length === 0) {
-              const message =
-                `${marker}\nBuild Error! No linked issue found. Please reference one in the PR body using a keyword (Closes/Fixes/Resolves/Refs/See) followed by #<issue_id> or owner/repo#<issue_id>.`;
+              const message = [
+                marker,
+                '',
+                '> [!WARNING]',
+                '> **Linked issue missing.**',
+                '>',
+                '> Reference one in the PR body using a keyword (Closes / Fixes / Resolves / Refs / See) followed by `#<issue_id>` or `owner/repo#<issue_id>`.',
+                '>',
+                '> Alternatively, apply the `no-issue` label to skip this check.',
+              ].join('\n');
               await github.rest.issues.createComment({
                 issue_number: context.payload.pull_request.number,
                 owner: context.repo.owner,
