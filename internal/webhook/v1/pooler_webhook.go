@@ -240,7 +240,54 @@ func (v *PoolerCustomValidator) validateCluster(r *apiv1.Pooler) field.ErrorList
 func (v *PoolerCustomValidator) validate(r *apiv1.Pooler) (allErrs field.ErrorList) {
 	allErrs = append(allErrs, v.validatePgBouncer(r)...)
 	allErrs = append(allErrs, v.validateCluster(r)...)
+	allErrs = append(allErrs, v.validateMonitoring(r)...)
 	return allErrs
+}
+
+// validateMonitoring enforces that when the metrics endpoint is switched to
+// TLS *and* the operator is asked to generate the PodMonitor, the user has
+// supplied a clientTLSSecret whose certificate is appropriate for the pooler.
+//
+// Without a user-supplied clientTLSSecret the metrics server would fall back
+// to the cluster's server TLS certificate, whose SANs do not match the
+// pooler's DNS names. The generated PodMonitor would then ship with
+// insecureSkipVerify=true, silently relaxing verification despite the user's
+// explicit security opt-in. Reject that combination so the misalignment is
+// surfaced at admission time instead of going undetected.
+//
+// When enablePodMonitor is false (or omitted, its default), the operator does
+// not emit a PodMonitor at all — the user is wiring up their own scraper and
+// is responsible for the TLS expectations on that side. In that case
+// clientTLSSecret is not required; the rule therefore fires only on the one
+// configuration that would silently produce weak verification.
+func (v *PoolerCustomValidator) validateMonitoring(r *apiv1.Pooler) field.ErrorList {
+	if !r.IsMetricsTLSEnabled() {
+		return nil
+	}
+
+	// No operator-generated PodMonitor → no misleading operator-side TLS
+	// config to prevent. Let the user manage their own scrape config.
+	//nolint:staticcheck // EnablePodMonitor is a deprecated sub-field but still honoured during the deprecation window
+	if r.Spec.Monitoring == nil || !r.Spec.Monitoring.EnablePodMonitor {
+		return nil
+	}
+
+	if r.Spec.PgBouncer != nil &&
+		r.Spec.PgBouncer.ClientTLSSecret != nil &&
+		r.Spec.PgBouncer.ClientTLSSecret.Name != "" {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Required(
+			field.NewPath("spec", "pgbouncer", "clientTLSSecret"),
+			"clientTLSSecret is required when spec.monitoring.tls.enabled is true and "+
+				"the operator-generated PodMonitor is enabled. Without it the metrics endpoint "+
+				"would serve the cluster's server certificate, whose SANs do not match the "+
+				"pooler, and the generated PodMonitor would scrape with insecureSkipVerify=true. "+
+				"Supply a clientTLSSecret whose SANs cover the pooler's DNS names, or set "+
+				"spec.monitoring.enablePodMonitor=false and manage your own PodMonitor."),
+	}
 }
 
 // validatePgbouncerGenericParameters validates pgbouncer parameters
