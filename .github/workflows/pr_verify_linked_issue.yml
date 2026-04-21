@@ -22,8 +22,86 @@ jobs:
     runs-on: ubuntu-latest
     name: Ensure Pull Request has a linked issue.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-issue') }}
+    permissions:
+      issues: write
+      pull-requests: write
     steps:
       - name: Verify Linked Issue
-        uses: hattan/verify-linked-issue-action@2d8e2e47a462cc7b07ba5e6cab6f9d57bd36672e # v1.1.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const marker = '<!-- verify-linked-issue -->';
+            const body = context.payload.pull_request.body || '';
+            core.debug(`Checking PR body: "${body}"`);
+
+            // Match a GitHub-style issue reference preceded by a linking keyword
+            // at the start of a line, e.g. "Closes #123" or "Fixes owner/repo#45".
+            const keywords = 'close[sd]?|fix(?:es|ed)?|resolve[sd]?|refs?|refers?|see';
+            const name = '[\\w.-]+';
+            const pattern = [
+              '^\\s*',                           // start of line, optional indent
+              `(?:${keywords})\\b`,              // keyword (case-insensitive via flag)
+              '[:\\s]+',                         // colon and/or whitespace
+              `(?:(${name})\\/(${name}))?`,      // optional owner/repo prefix
+              '#(\\d+)',                         // issue number
+            ].join('');
+            const re = new RegExp(pattern, 'gim');
+            let linked = false;
+            for (const m of body.matchAll(re)) {
+              const owner = m[1] || context.repo.owner;
+              const repo = m[2] || context.repo.repo;
+              const issueNumber = parseInt(m[3], 10);
+              try {
+                await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                });
+                core.notice(`Success! Linked issue ${owner}/${repo}#${issueNumber} found in body.`);
+                linked = true;
+                break;
+              } catch {
+                core.debug(`${owner}/${repo}#${issueNumber} is not a valid issue.`);
+              }
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const existing = comments.filter(
+              (c) => c.user.login === 'github-actions[bot]' && c.body.includes(marker),
+            );
+
+            if (linked) {
+              for (const c of existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: c.id,
+                });
+              }
+              return;
+            }
+
+            if (existing.length === 0) {
+              const message = [
+                marker,
+                '',
+                '> [!WARNING]',
+                '> **Linked issue missing.**',
+                '>',
+                '> Reference one in the PR body using a keyword (Closes / Fixes / Resolves / Refs / See) followed by `#<issue_id>` or `owner/repo#<issue_id>`.',
+                '>',
+                '> Alternatively, apply the `no-issue` label to skip this check.',
+              ].join('\n');
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: message,
+              });
+            }
+            core.setFailed('No Linked Issue Found!');
