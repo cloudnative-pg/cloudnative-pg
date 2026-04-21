@@ -66,6 +66,24 @@ var _ = Describe("Pod conditions test suite", func() {
 			Expect(IsPodReady(pod)).To(BeFalse())
 		})
 
+		It("Returns false when ContainersReady is True but PodReady is False", func() {
+			pod := corev1.Pod{
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.ContainersReady,
+							Status: corev1.ConditionTrue,
+						},
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionFalse,
+						},
+					},
+				},
+			}
+			Expect(IsPodReady(pod)).To(BeFalse())
+		})
+
 		It("return 0 if the list of Pods is empty", func() {
 			var list []corev1.Pod
 			Expect(CountReadyPods(list)).To(Equal(0))
