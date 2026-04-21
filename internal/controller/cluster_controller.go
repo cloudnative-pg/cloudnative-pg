@@ -781,7 +781,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	runningJobs := resources.runningJobNames()
+	runningJobs := resources.runningJobNames(cluster)
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 

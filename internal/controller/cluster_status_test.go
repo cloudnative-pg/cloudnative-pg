@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -583,5 +585,88 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 
 			Expect(isTerminatedBecauseOfMissingWALArchivePlugin(pod)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("runningJobNames", func() {
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Status:     apiv1.ClusterStatus{LatestGeneratedNode: 1},
+	}
+	makeJob := func(name, instanceName string, serial int, succeeded int32) batchv1.Job {
+		labels := map[string]string{}
+		annotations := map[string]string{}
+		if instanceName != "" {
+			labels[utils.InstanceNameLabelName] = instanceName
+		}
+		if serial > 0 {
+			annotations[utils.ClusterSerialAnnotationName] = strconv.Itoa(serial)
+		}
+		return batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, Annotations: annotations},
+			Status:     batchv1.JobStatus{Succeeded: succeeded},
+		}
+	}
+	makePVC := func(name string) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+		}
+	}
+
+	It("counts a non-complete Job whose instance PVC exists", func() {
+		resources := &managedResources{
+			jobs: batchv1.JobList{Items: []batchv1.Job{
+				makeJob("cluster-1-initdb", "cluster-1", 1, 0),
+			}},
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{
+				makePVC("cluster-1"),
+			}},
+		}
+		Expect(resources.runningJobNames(cluster)).To(ConsistOf("cluster-1-initdb"))
+	})
+
+	It("skips a Job whose PVC is missing and whose serial is past LatestGeneratedNode", func() {
+		resources := &managedResources{
+			jobs: batchv1.JobList{Items: []batchv1.Job{
+				makeJob("cluster-2-join", "cluster-2", 2, 0),
+			}},
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{
+				makePVC("cluster-1"),
+			}},
+		}
+		Expect(resources.runningJobNames(cluster)).To(BeEmpty())
+	})
+
+	It("counts a Job whose PVC is missing from cache but covered by LatestGeneratedNode", func() {
+		// Stale PVC informer: the counter persisted past this serial, so the
+		// PVC is guaranteed to exist on the API server.
+		resources := &managedResources{
+			jobs: batchv1.JobList{Items: []batchv1.Job{
+				makeJob("cluster-1-initdb", "cluster-1", 1, 0),
+			}},
+			pvcs: corev1.PersistentVolumeClaimList{},
+		}
+		Expect(resources.runningJobNames(cluster)).To(ConsistOf("cluster-1-initdb"))
+	})
+
+	It("skips a Job that has completed", func() {
+		resources := &managedResources{
+			jobs: batchv1.JobList{Items: []batchv1.Job{
+				makeJob("cluster-1-initdb", "cluster-1", 1, 1),
+			}},
+			pvcs: corev1.PersistentVolumeClaimList{Items: []corev1.PersistentVolumeClaim{
+				makePVC("cluster-1"),
+			}},
+		}
+		Expect(resources.runningJobNames(cluster)).To(BeEmpty())
+	})
+
+	It("counts a Job without the instanceName label (defensive)", func() {
+		resources := &managedResources{
+			jobs: batchv1.JobList{Items: []batchv1.Job{
+				makeJob("unlabeled-job", "", 0, 0),
+			}},
+		}
+		Expect(resources.runningJobNames(cluster)).To(ConsistOf("unlabeled-job"))
 	})
 })
