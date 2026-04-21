@@ -26,7 +26,31 @@ import (
 
 var utilsLog = log.WithName("utils")
 
-// IsPodReady check if a Pod is ready or not
+// IsPodReady reports whether the Pod has its PodReady condition set to True.
+//
+// The PodReady condition is kept up-to-date by two independent control-plane
+// actors:
+//
+//   - the kubelet on the pod's node, while the node is healthy: the transition
+//     from True to False happens within FailureThreshold consecutive probe
+//     periods of the underlying container becoming unhealthy (about 30s with
+//     CNPG defaults: PeriodSeconds=10, FailureThreshold=3).
+//   - the node lifecycle controller when the node stops reporting to the API
+//     server; once the node transitions to `Unknown` (after
+//     `--node-monitor-grace-period`, 40s by default) the controller calls
+//     `MarkPodsNotReady`, which synchronously sets PodReady to False with
+//     reason `NodeNotReady` on every pod of that node. With stock defaults the
+//     operator observes the flip about 40 to 45 seconds after the node becomes
+//     unreachable.
+//
+// Note that `tolerationSeconds` on the `node.kubernetes.io/unreachable` taint
+// (300s by default) controls pod eviction, not this condition: PodReady has
+// already flipped to False well before eviction happens.
+//
+// This helper is the source of truth for "is this pod serviceable right now?"
+// across the operator: failover election, backup target selection,
+// failover-quorum reachability, offline volume-snapshot fencing, and
+// user-visible cluster health classification.
 func IsPodReady(pod corev1.Pod) bool {
 	for _, c := range pod.Status.Conditions {
 		if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
