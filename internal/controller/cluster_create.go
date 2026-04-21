@@ -1086,6 +1086,31 @@ func nextNodeSerial(cluster *apiv1.Cluster) int {
 	return cluster.Status.LatestGeneratedNode + 1
 }
 
+// ensureJobAdoptable verifies that an existing Job with the given name is
+// owned by this cluster and may be adopted by the reconciler. A NotFound
+// on the Get means the cache lags behind the AlreadyExists just reported
+// by Create: short-requeue rather than proceed with unverified adoption.
+func (r *ClusterReconciler) ensureJobAdoptable(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	jobName string,
+) (ctrl.Result, error) {
+	var existing batchv1.Job
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      jobName,
+	}, &existing); err != nil {
+		if apierrs.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot get existing job %q for adoption: %w", jobName, err)
+	}
+	if owner, ok := IsOwnedByCluster(&existing); !ok || owner != cluster.Name {
+		return ctrl.Result{}, fmt.Errorf("refusing to adopt job %q: not owned by cluster %q", jobName, cluster.Name)
+	}
+	return ctrl.Result{}, nil
+}
+
 // recordGeneratedNodeSerial persists cluster.Status.LatestGeneratedNode under
 // an optimistic-lock patch. No-op when already at or past nodeSerial, so safe
 // for retries that re-derive the same serial after adopting an existing Job.
@@ -1237,19 +1262,21 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err := r.Create(ctx, job); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			// A previous reconcile created the Job but did not run to
-			// completion. Adopt it so we can persist the counter bump for
-			// this serial.
-			contextLogger.Info("Job already exists, adopting it", "job", job.Name)
-		} else {
-			contextLogger.Error(err, "Unable to create job", "job", job)
-			return ctrl.Result{}, err
-		}
-	} else {
+	switch err := r.Create(ctx, job); {
+	case err == nil:
 		contextLogger.Info("Created new Job", "job", job.Name, "primary", true)
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", eventMessage)
+	case apierrs.IsAlreadyExists(err):
+		// A previous reconcile created the Job but did not run to
+		// completion. Adopt it so we can persist the counter bump for
+		// this serial.
+		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
+			return result, adoptErr
+		}
+		contextLogger.Info("Job already exists, adopting it", "job", job.Name)
+	default:
+		contextLogger.Error(err, "Unable to create job", "job", job)
+		return ctrl.Result{}, err
 	}
 
 	if err := r.recordGeneratedNodeSerial(ctx, cluster, nodeSerial); err != nil {
@@ -1332,18 +1359,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err := r.Create(ctx, job); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			// A previous reconcile created the Job but did not run to
-			// completion (e.g. a later status patch conflicted). Adopt it
-			// so we can finish creating the PVCs and persist the counter
-			// bump for this serial.
-			contextLogger.Info("Job already exists, adopting it", "job", job.Name)
-		} else {
-			contextLogger.Error(err, "Unable to create Job", "job", job)
-			return ctrl.Result{}, err
-		}
-	} else {
+	switch err := r.Create(ctx, job); {
+	case err == nil:
 		contextLogger.Info("Created new Job",
 			"job", job.Name,
 			"primary", false,
@@ -1352,6 +1369,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		)
 		r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
 			"Creating instance %v-%v", cluster.Name, nodeSerial)
+	case apierrs.IsAlreadyExists(err):
+		// A previous reconcile created the Job but did not run to
+		// completion (e.g. a later status patch conflicted). Adopt it
+		// so we can finish creating the PVCs and persist the counter
+		// bump for this serial.
+		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
+			return result, adoptErr
+		}
+		contextLogger.Info("Job already exists, adopting it", "job", job.Name)
+	default:
+		contextLogger.Error(err, "Unable to create Job", "job", job)
+		return ctrl.Result{}, err
 	}
 
 	if err := persistentvolumeclaim.CreateInstancePVCs(
