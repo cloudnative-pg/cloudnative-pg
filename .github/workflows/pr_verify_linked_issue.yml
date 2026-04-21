@@ -49,16 +49,6 @@ jobs:
               }
             }
 
-            const events = await github.paginate(github.rest.issues.listEvents, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-            });
-            if (events.some((e) => e.event === 'connected')) {
-              core.notice('Success! Connected issue found.');
-              return;
-            }
-
             const message =
               'Build Error! No Linked Issue found. Please link an issue or mention it in the body using #<issue_id>';
             await github.rest.issues.createComment({
