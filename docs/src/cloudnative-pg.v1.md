@@ -645,7 +645,7 @@ _Appears in:_
 | `podSelectorRefs` _[PodSelectorRefStatus](#podselectorrefstatus) array_ | PodSelectorRefs contains the resolved pod IPs for each named selector<br />defined in spec.podSelectorRefs. |  |  |  |
 | `timelineID` _integer_ | The timeline of the Postgres cluster |  |  |  |
 | `topology` _[Topology](#topology)_ | Instances topology. |  |  |  |
-| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing) |  |  |  |
+| `latestGeneratedNode` _integer_ | ID of the latest generated node (used to avoid node name clashing)<br />Deprecated: this field is not set anymore |  |  |  |
 | `currentPrimary` _string_ | Current primary instance |  |  |  |
 | `targetPrimary` _string_ | Target primary instance, this is different from the previous one<br />during a switchover or a failover |  |  |  |
 | `lastPromotionToken` _string_ | LastPromotionToken is the last verified promotion token that<br />was used to promote a replica cluster |  |  |  |

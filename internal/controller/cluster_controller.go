@@ -1085,7 +1085,7 @@ func (r *ClusterReconciler) reconcilePods(
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
 		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
+		newNodeSerial, err := r.generateNodeSerial(cluster)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 		}

@@ -879,6 +879,8 @@ type ClusterStatus struct {
 	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
+	//
+	// Deprecated: this field is not set anymore
 	// +optional
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
 
@@ -1104,6 +1106,8 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+	// ConditionInitialized is true when the cluster has been bootstrapped.
+	ConditionInitialized ClusterConditionType = "Initialized"
 )
 
 // ConditionStatus defines conditions of resources

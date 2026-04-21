@@ -46,7 +46,7 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	contextLogger := log.FromContext(ctx)
 
 	// No need to check this on a cluster which has been already deployed
-	if cluster.Status.LatestGeneratedNode != 0 {
+	if cluster.IsInitialized() {
 		return nil, nil
 	}
 
@@ -90,7 +90,7 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	}
 
 	contextLogger.Debug("proceeding to restore the cluster status")
-	if err := restoreClusterStatus(ctx, r.Client, cluster, highestSerial, primarySerial); err != nil {
+	if err := restoreClusterStatus(ctx, r.Client, cluster, primarySerial); err != nil {
 		return nil, err
 	}
 
@@ -208,11 +208,9 @@ func restoreClusterStatus(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	latestNodeSerial int,
 	targetPrimaryNodeSerial int,
 ) error {
 	clusterOrig := cluster.DeepCopy()
-	cluster.Status.LatestGeneratedNode = latestNodeSerial
 	cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }

@@ -218,7 +218,6 @@ var _ = Describe("Updating target primary", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.Instances = 2
-			cluster.Status.LatestGeneratedNode = 2
 			cluster.Status.ReadyInstances = 2
 		})
 
@@ -282,7 +281,6 @@ var _ = Describe("Updating target primary", func() {
 			namespace := newFakeNamespace(env.client)
 			cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 				cluster.Spec.Instances = 2
-				cluster.Status.LatestGeneratedNode = 2
 				cluster.Status.ReadyInstances = 1
 			})
 
