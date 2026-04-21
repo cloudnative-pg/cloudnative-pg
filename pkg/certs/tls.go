@@ -62,10 +62,10 @@ func newTLSConfigFromSecret(
 }
 
 // verifyCertificates validates the peer certificate chain against the trusted CA pool.
-// It is called from VerifyConnection, which runs on every completed handshake —
-// including resumed sessions where no certificate exchange occurs but the original
-// peer certificates are still available in tls.ConnectionState.
 func verifyCertificates(certPool *x509.CertPool, certs []*x509.Certificate) error {
+	if len(certs) == 0 {
+		return fmt.Errorf("no certificates provided")
+	}
 	opts := x509.VerifyOptions{
 		Roots:         certPool,
 		Intermediates: x509.NewCertPool(),
@@ -90,11 +90,10 @@ func NewTLSConfigFromCertPool(
 		MinVersion:         tls.VersionTLS13,
 		RootCAs:            certPool,
 		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
+		// VerifyConnection runs on every completed handshake, including resumed
+		// TLS 1.3 sessions where no certificate exchange occurs but the original
+		// peer certificates remain available in tls.ConnectionState.
 		VerifyConnection: func(conn tls.ConnectionState) error {
-			if len(conn.PeerCertificates) == 0 {
-				return fmt.Errorf("no certificates provided")
-			}
-
 			return verifyCertificates(certPool, conn.PeerCertificates)
 		},
 	}
