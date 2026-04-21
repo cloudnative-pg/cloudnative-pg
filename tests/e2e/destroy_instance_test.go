@@ -27,7 +27,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -45,28 +44,13 @@ var _ = Describe("Test destroy instance", func() {
 		}
 	})
 
-	countPVCForInstance := func(targetInstanceName, namespace string) int {
-		result := 0
-
-		pvcs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
-		Expect(err).ToNot(HaveOccurred(), "getting list of PVCs")
-
-		for i := range pvcs.Items {
-			instanceName := pvcs.Items[i].Labels[utils.InstanceNameLabelName]
-			if instanceName == targetInstanceName {
-				result++
-			}
-		}
-
-		return result
-	}
-
 	Describe("Unrecoverable instance annotation", func() {
 		const namespacePrefix = "destroy-instance"
 		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		const clusterName = "postgresql-storage-class"
 		var namespace string
 		var unrecoverableInstanceName string
+		var pgDataPVCUID string
 
 		It("should destroy instance successfully", func() {
 			// If we have specified secrets, we test that we're able to use them
@@ -87,6 +71,17 @@ var _ = Describe("Test destroy instance", func() {
 				Expect(podList.Items).Should(HaveLen(2))
 
 				unrecoverableInstanceName = podList.Items[0].Name
+
+				var pvc corev1.PersistentVolumeClaim
+				err = env.Client.Get(
+					env.Ctx,
+					types.NamespacedName{Namespace: namespace, Name: unrecoverableInstanceName},
+					&pvc)
+				Expect(err).ToNot(
+					HaveOccurred(),
+					"failed to get pvc")
+				pgDataPVCUID = string(pvc.UID)
+
 				var pod corev1.Pod
 				err = env.Client.Get(
 					env.Ctx,
@@ -102,20 +97,24 @@ var _ = Describe("Test destroy instance", func() {
 				originalPod := pod.DeepCopy()
 				pod.Annotations[utils.UnrecoverableInstanceAnnotationName] = "true"
 
-				Expect(countPVCForInstance(unrecoverableInstanceName, namespace)).To(
-					Equal(2),
-					"The number of PVCs is incorrect")
-
 				err = env.Client.Patch(env.Ctx, &pod, ctrlclient.MergeFrom(originalPod))
 				Expect(err).ToNot(
 					HaveOccurred(),
 					"failed to patch pod with unrecoverable instance annotation")
 			})
 
-			By("waiting for unrecoverable PVCs to be deleted", func() {
-				Eventually(func() int {
-					return countPVCForInstance(unrecoverableInstanceName, namespace)
-				}, 300).Should(Equal(0))
+			By("waiting for the PVC to be recreated", func() {
+				Eventually(func() string {
+					var pvc corev1.PersistentVolumeClaim
+					err := env.Client.Get(
+						env.Ctx,
+						types.NamespacedName{Namespace: namespace, Name: unrecoverableInstanceName},
+						&pvc)
+					Expect(err).ToNot(
+						HaveOccurred(),
+						"failed to get pvc")
+					return string(pvc.UID)
+				}, 300).Should(Not(Equal(pgDataPVCUID)))
 			})
 
 			By("waiting for the cluster to healthy again", func() {

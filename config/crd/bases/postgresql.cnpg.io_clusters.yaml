@@ -7071,8 +7071,10 @@ spec:
                   Deprecated: the field is not set for backup plugins.
                 type: object
               latestGeneratedNode:
-                description: ID of the latest generated node (used to avoid node name
-                  clashing)
+                description: |-
+                  ID of the latest generated node (used to avoid node name clashing)
+
+                  Deprecated: this field is not set anymore
                 type: integer
               managedRolesStatus:
                 description: ManagedRolesStatus reports the state of the managed roles
