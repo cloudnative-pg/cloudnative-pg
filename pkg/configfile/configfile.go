@@ -29,42 +29,26 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 )
 
+// postgresConfLiteralReplacer escapes every character the PostgreSQL config
+// file lexer (`guc-file.l`) interprets specially inside a single-quoted value.
+var postgresConfLiteralReplacer = strings.NewReplacer(
+	`\`, `\\`,
+	`'`, `''`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+	"\b", `\b`,
+	"\f", `\f`,
+)
+
 // EscapePostgresConfLiteral escapes an arbitrary string so it can be used as a
-// value in a PostgreSQL configuration file. The returned string is wrapped in
-// single quotes and any character that the PostgreSQL config file lexer would
-// interpret specially is escaped: backslash becomes `\\`, single quote becomes
-// `”`, and control characters (LF, CR, TAB, BS, FF) become their `\n`, `\r`,
-// `\t`, `\b`, `\f` two-character equivalents.
+// value in a PostgreSQL configuration file, wrapped in single quotes.
 //
-// pq.QuoteLiteral is unsuitable here because it emits ` E'...'` when the value
+// pq.QuoteLiteral is unsuitable here: it emits ` E'...'` when the value
 // contains a backslash, and the PostgreSQL config parser does not recognise
 // the `E'...'` syntax.
 func EscapePostgresConfLiteral(value string) string {
-	var b strings.Builder
-	b.Grow(len(value) + 2)
-	b.WriteByte('\'')
-	for i := 0; i < len(value); i++ {
-		switch value[i] {
-		case '\\':
-			b.WriteString(`\\`)
-		case '\'':
-			b.WriteString(`''`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		case '\b':
-			b.WriteString(`\b`)
-		case '\f':
-			b.WriteString(`\f`)
-		default:
-			b.WriteByte(value[i])
-		}
-	}
-	b.WriteByte('\'')
-	return b.String()
+	return "'" + postgresConfLiteralReplacer.Replace(value) + "'"
 }
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
