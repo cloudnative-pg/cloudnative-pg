@@ -627,7 +627,7 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary &&
 		instancesStatus.IsPodReadyAndNotReporting(cluster.Status.CurrentPrimary) {
-		contextLogger.Info(
+		contextLogger.Warning(
 			"Primary pod is ready but status endpoint is failing, requeueing",
 			"primaryPodName", cluster.Status.CurrentPrimary)
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}
