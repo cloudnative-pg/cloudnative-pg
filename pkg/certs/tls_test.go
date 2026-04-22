@@ -22,6 +22,7 @@ package certs
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -120,6 +121,14 @@ IRh7fVEH8WBfMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIwBdrw
 			Expect(tlsConfig.RootCAs).ToNot(BeNil())
 		})
 
+		It("should reject connections with no certificates", func(ctx context.Context) {
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			Expect(err).NotTo(HaveOccurred())
+			err = tlsConfig.VerifyConnection(tls.ConnectionState{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no certificates provided"))
+		})
+
 		It("should validate good certificates", func(ctx context.Context) {
 			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).NotTo(HaveOccurred())
@@ -191,7 +200,11 @@ rx8M7UTZeZJC1KjcnJuxJl7+6A8fjqHdZh/y/IFyiZNC9XRqouqWTT3JqI7BQAIw
 Zxj1fxVSmUy1TBXz6H0sUvtFh/Fgb6v4qUPdRE6xNJw3lbZUZxHr2xXk5Op/Cw6O
 -----END CERTIFICATE-----
 `))
-			err = tlsConfig.VerifyPeerCertificate([][]byte{serverBlock.Bytes}, nil)
+			cert, err := x509.ParseCertificate(serverBlock.Bytes)
+			Expect(err).NotTo(HaveOccurred())
+			err = tlsConfig.VerifyConnection(tls.ConnectionState{
+				PeerCertificates: []*x509.Certificate{cert},
+			})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
@@ -266,7 +279,11 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 6dk=
 -----END CERTIFICATE-----
 `))
-			err = tlsConfig.VerifyPeerCertificate([][]byte{badServerBlock.Bytes}, nil)
+			badCert, err := x509.ParseCertificate(badServerBlock.Bytes)
+			Expect(err).NotTo(HaveOccurred())
+			err = tlsConfig.VerifyConnection(tls.ConnectionState{
+				PeerCertificates: []*x509.Certificate{badCert},
+			})
 			var certError *tls.CertificateVerificationError
 			Expect(errors.As(err, &certError)).To(BeTrue())
 		})
