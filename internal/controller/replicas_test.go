@@ -50,7 +50,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -68,7 +68,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -86,7 +86,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -104,7 +104,32 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	// unreachable mimics a Pod whose node has stopped reporting to the API
+	// server: the node lifecycle controller flips PodReady to False, but the
+	// stale ContainersReady left by the kubelet remains True.
+	unreachable := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "unreachable",
+			Namespace: "default",
+			Annotations: map[string]string{
+				utils.ClusterSerialAnnotationName: "5",
+			},
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
 					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -132,6 +157,12 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		podList := []corev1.Pod{car2, foo, bar, car1}
 		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
+		Expect(resultName).To(Equal("car-2"))
+	})
+
+	It("skips a Pod whose node is unreachable even if it has the highest serial", func() {
+		podList := []corev1.Pod{car1, car2, unreachable}
+		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).To(Equal("car-2"))
 	})
 })
