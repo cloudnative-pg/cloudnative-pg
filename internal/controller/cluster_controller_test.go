@@ -20,11 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"fmt"
+	"sort"
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -366,4 +369,135 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
+})
+
+var _ = Describe("evaluatePodReadinessGuards", func() {
+	const (
+		primaryName    = "cluster-1"
+		replicaName    = "cluster-2"
+		newPrimaryName = "cluster-3"
+	)
+
+	var (
+		env     *testingEnvironment
+		cluster *apiv1.Cluster
+	)
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		namespace := newFakeNamespace(env.client)
+		cluster = newFakeCNPGCluster(env.client, namespace)
+	})
+
+	errStatusFailing := fmt.Errorf("status endpoint failing")
+
+	readyReportingReplica := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+		IsPodReady: true,
+	}
+	readyReportingPrimary := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+		IsPodReady: true,
+	}
+	readyErroringPrimary := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+		IsPodReady: true,
+		Error:      errStatusFailing,
+	}
+	unreadyErroringPrimary := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+		IsPodReady: false,
+		Error:      errStatusFailing,
+	}
+	readyErroringReplica := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+		IsPodReady: true,
+		Error:      errStatusFailing,
+	}
+	// kubeletStaleReporting is the "kubelet has not refreshed the probe yet"
+	// shape: instance manager reports success (Error==nil, so HasHTTPStatus
+	// returns true) but the pod is not yet Ready from the kubelet.
+	kubeletStaleReporting := postgres.PostgresqlStatus{
+		Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+		IsPodReady: false,
+	}
+
+	DescribeTable(
+		"guards behaviour",
+		func(ctx SpecContext, currentPrimary, targetPrimary string, items []postgres.PostgresqlStatus, requeue bool) {
+			cluster.Status.CurrentPrimary = currentPrimary
+			cluster.Status.TargetPrimary = targetPrimary
+
+			result := env.clusterReconciler.evaluatePodReadinessGuards(
+				ctx, cluster, postgres.PostgresqlStatusList{Items: items},
+			)
+
+			if requeue {
+				Expect(result).NotTo(BeNil())
+				Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+			} else {
+				Expect(result).To(BeNil())
+			}
+		},
+		Entry("happy path: primary Ready and reporting, no guard fires",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{readyReportingPrimary, readyReportingReplica}, false),
+		Entry("kubelet has not refreshed the readiness probe yet",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{kubeletStaleReporting, readyReportingReplica}, true),
+		Entry("transient /pg/status failure on Ready primary requeues",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, true),
+		Entry("guard is scoped to steady-state (CurrentPrimary == TargetPrimary)",
+			primaryName, newPrimaryName,
+			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, false),
+		Entry("bootstrap: no primary elected yet",
+			"", "",
+			[]postgres.PostgresqlStatus{}, false),
+		Entry("primary absent from status list (defensive)",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{readyReportingReplica}, false),
+		Entry("current primary set but target primary cleared: guard does not fire",
+			primaryName, "",
+			[]postgres.PostgresqlStatus{readyReportingPrimary, readyErroringReplica}, false),
+		Entry("erroring replica with reporting primary does not fire the guard",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{readyReportingPrimary, readyErroringReplica}, false),
+		Entry("primary unready and not reporting (genuine failover case)",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{readyReportingReplica, unreadyErroringPrimary}, false),
+		Entry("empty status list",
+			primaryName, primaryName,
+			[]postgres.PostgresqlStatus{}, false),
+	)
+
+	It("fires after the production sort pushes the erroring primary to the tail", func(ctx SpecContext) {
+		// Build the list in "primary first" order as the instance manager
+		// would populate it, then rely on PostgresqlStatusList.Less to push
+		// the erroring primary to the tail. This locks the guard's
+		// rationale against a regression in the sort.
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: primaryName}},
+					IsPodReady: true,
+					Error:      errStatusFailing,
+				},
+				{
+					Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: replicaName}},
+					IsPodReady: true,
+				},
+			},
+		}
+		sort.Sort(&statusList)
+		Expect(statusList.Items[0].Pod.Name).To(Equal(replicaName),
+			"sort must push the erroring primary to the tail")
+
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
+		Expect(result).NotTo(BeNil())
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+	})
 })
