@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -428,10 +429,9 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 			cluster.Status.CurrentPrimary = currentPrimary
 			cluster.Status.TargetPrimary = targetPrimary
 
-			result, err := env.clusterReconciler.evaluatePodReadinessGuards(
+			result := env.clusterReconciler.evaluatePodReadinessGuards(
 				ctx, cluster, postgres.PostgresqlStatusList{Items: items},
 			)
-			Expect(err).NotTo(HaveOccurred())
 
 			if requeue {
 				Expect(result.RequeueAfter).To(Equal(10 * time.Second))
@@ -496,8 +496,48 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		cluster.Status.CurrentPrimary = primaryName
 		cluster.Status.TargetPrimary = primaryName
 
-		result, err := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
-		Expect(err).NotTo(HaveOccurred())
+		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+	})
+
+	It("emits a Warning event when the primary is Ready but /pg/status is failing", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				readyReportingReplica, readyErroringPrimary,
+			}},
+		)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+
+		fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+		Expect(ok).To(BeTrue(), "test environment must wire a FakeRecorder")
+
+		var recorded string
+		Eventually(fakeRecorder.Events, "1s").Should(Receive(&recorded))
+		Expect(recorded).To(HavePrefix("Warning PrimaryStatusUnreachable"))
+		Expect(recorded).To(ContainSubstring(primaryName))
+		Expect(recorded).To(ContainSubstring("See operator logs"))
+	})
+
+	It("does not emit an event on the kubelet-stale branch", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				kubeletStaleReporting, readyReportingReplica,
+			}},
+		)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+
+		fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+		Expect(ok).To(BeTrue())
+
+		Consistently(fakeRecorder.Events, "100ms").ShouldNot(Receive(),
+			"kubelet-stale branch must stay event-less to avoid noise")
 	})
 })

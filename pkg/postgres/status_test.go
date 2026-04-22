@@ -262,20 +262,28 @@ var _ = Describe("IsPodReadyAndNotReporting", func() {
 		},
 	}
 
-	It("returns true when the pod is ready but the status endpoint is failing", func() {
-		Expect(podList.IsPodReadyAndNotReporting("primary")).To(BeTrue())
+	It("returns true and the underlying error when the pod is ready but the status endpoint is failing", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("primary")
+		Expect(ok).To(BeTrue())
+		Expect(err).To(MatchError(errStatusEndpointFailing))
 	})
 
-	It("returns false when the pod is ready and reporting", func() {
-		Expect(podList.IsPodReadyAndNotReporting("replica-reporting")).To(BeFalse())
+	It("returns false and a nil error when the pod is ready and reporting", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("replica-reporting")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("returns false when the pod is not ready and not reporting", func() {
-		Expect(podList.IsPodReadyAndNotReporting("replica-not-ready")).To(BeFalse())
+	It("returns false and a nil error when the pod is not ready and not reporting", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("replica-not-ready")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("returns false when the pod is not in the list", func() {
-		Expect(podList.IsPodReadyAndNotReporting("unknown")).To(BeFalse())
+	It("returns false and a nil error when the pod is not in the list", func() {
+		ok, err := podList.IsPodReadyAndNotReporting("unknown")
+		Expect(ok).To(BeFalse())
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
 
