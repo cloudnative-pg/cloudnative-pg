@@ -240,7 +240,7 @@ func isNodeUnschedulableOrBeingDrained(node *corev1.Node, drainTaints []string) 
 		}
 	}
 
-	return node.Spec.Unschedulable
+	return false
 }
 
 // isNodeUnschedulableOrBeingDrained checks whether a node is set to unschedulable
