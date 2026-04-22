@@ -249,6 +249,132 @@ var _ = Describe("Update configuration files", func() {
 	})
 })
 
+var _ = Describe("EscapePostgresConfLiteral", func() {
+	DescribeTable("produces a value that round-trips through the PostgreSQL config file parser",
+		func(input, expected string) {
+			Expect(EscapePostgresConfLiteral(input)).To(Equal(expected))
+		},
+		Entry("plain string", "hello", "'hello'"),
+		Entry("empty string", "", "''"),
+		Entry("single quote", "hello'world", "'hello''world'"),
+		Entry("backslash", `hello\world`, `'hello\\world'`),
+		Entry("backslash followed by n (two chars)", `a\nb`, `'a\\nb'`),
+		Entry("literal newline", "a\nb", `'a\nb'`),
+		Entry("literal carriage return", "a\rb", `'a\rb'`),
+		Entry("literal tab", "a\tb", `'a\tb'`),
+		Entry("literal backspace", "a\bb", `'a\bb'`),
+		Entry("literal form feed", "a\fb", `'a\fb'`),
+		Entry("backslash and quote together",
+			`a'\b`,
+			`'a''\\b'`),
+		Entry("everything at once",
+			"a'b\\c\nd\te",
+			`'a''b\\c\nd\te'`),
+	)
+
+	It("produces a quoted literal that PostgreSQL reverses back to the original", func() {
+		// The config file parser applies these rules inside single-quoted strings:
+		//   ''   -> '
+		//   \\   -> \
+		//   \n   -> newline
+		//   \r   -> CR
+		//   \t   -> tab
+		//   \b   -> backspace
+		//   \f   -> form feed
+		//   \X   -> X (backslash stripped for any other X)
+		reverse := func(quoted string) string {
+			// Expect surrounding single quotes
+			Expect(quoted[:1]).To(Equal("'"))
+			Expect(quoted[len(quoted)-1:]).To(Equal("'"))
+			inner := quoted[1 : len(quoted)-1]
+			var b []byte
+			for i := 0; i < len(inner); i++ {
+				switch inner[i] {
+				case '\'':
+					Expect(i+1 < len(inner)).To(BeTrue())
+					Expect(inner[i+1]).To(Equal(byte('\'')))
+					b = append(b, '\'')
+					i++
+				case '\\':
+					Expect(i+1 < len(inner)).To(BeTrue())
+					switch inner[i+1] {
+					case '\\':
+						b = append(b, '\\')
+					case 'n':
+						b = append(b, '\n')
+					case 'r':
+						b = append(b, '\r')
+					case 't':
+						b = append(b, '\t')
+					case 'b':
+						b = append(b, '\b')
+					case 'f':
+						b = append(b, '\f')
+					default:
+						b = append(b, inner[i+1])
+					}
+					i++
+				default:
+					b = append(b, inner[i])
+				}
+			}
+			return string(b)
+		}
+
+		cases := []string{
+			"hello",
+			"",
+			"hello'world",
+			`hello\world`,
+			`a\nb`,
+			"a\nb",
+			"a\rb",
+			"a\tb",
+			"a'b\\c\nd\te",
+			`multiple 'quotes' and \back\slashes`,
+		}
+		for _, value := range cases {
+			Expect(reverse(EscapePostgresConfLiteral(value))).To(Equal(value),
+				"round-trip failed for input %q", value)
+		}
+	})
+})
+
+var _ = Describe("UpdateConfigurationContents with special characters", func() {
+	It("escapes single quotes in values", func() {
+		updated, err := UpdateConfigurationContents(nil, map[string]string{
+			"recovery_target_name": "my'restore'point",
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updated).To(ConsistOf(
+			"recovery_target_name = 'my''restore''point'",
+		))
+	})
+
+	It("escapes backslashes without generating E-strings", func() {
+		// pq.QuoteLiteral generates `E'...'` when the input contains a backslash,
+		// which the postgresql.conf lexer does not understand. We must produce
+		// the plain single-quoted form with doubled backslashes.
+		updated, err := UpdateConfigurationContents(nil, map[string]string{
+			"archive_command": `test \ command`,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updated).To(ConsistOf(
+			`archive_command = 'test \\ command'`,
+		))
+	})
+
+	It("escapes literal newlines", func() {
+		updated, err := UpdateConfigurationContents(nil, map[string]string{
+			"recovery_target_name": "line1\nline2",
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updated).To(ConsistOf(
+			`recovery_target_name = 'line1\nline2'`,
+		))
+	})
+})
+
 var _ = Describe("Remove configuration files option", func() {
 	It("keeps the initial input if the option to be removed is not matched", func() {
 		initialContent := []string{

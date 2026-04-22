@@ -27,8 +27,45 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	"github.com/lib/pq"
 )
+
+// EscapePostgresConfLiteral escapes an arbitrary string so it can be used as a
+// value in a PostgreSQL configuration file. The returned string is wrapped in
+// single quotes and any character that the PostgreSQL config file lexer would
+// interpret specially is escaped: backslash becomes `\\`, single quote becomes
+// `”`, and control characters (LF, CR, TAB, BS, FF) become their `\n`, `\r`,
+// `\t`, `\b`, `\f` two-character equivalents.
+//
+// pq.QuoteLiteral is unsuitable here because it emits ` E'...'` when the value
+// contains a backslash, and the PostgreSQL config parser does not recognise
+// the `E'...'` syntax.
+func EscapePostgresConfLiteral(value string) string {
+	var b strings.Builder
+	b.Grow(len(value) + 2)
+	b.WriteByte('\'')
+	for i := 0; i < len(value); i++ {
+		switch value[i] {
+		case '\\':
+			b.WriteString(`\\`)
+		case '\'':
+			b.WriteString(`''`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		default:
+			b.WriteByte(value[i])
+		}
+	}
+	b.WriteByte('\'')
+	return b.String()
+}
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
 // If any managedOptions is passed, it will be removed unless present in the options map.
@@ -77,7 +114,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 			}
 
 			foundKeys.Put(key)
-			lines[index] = fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value))
+			lines[index] = fmt.Sprintf("%s = %s", key, EscapePostgresConfLiteral(value))
 			index++
 			continue
 		}
@@ -92,7 +129,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	for _, key := range keysList {
 		if !foundKeys.Has(key) {
 			value := options[key]
-			lines = append(lines, fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value)))
+			lines = append(lines, fmt.Sprintf("%s = %s", key, EscapePostgresConfLiteral(value)))
 		}
 	}
 

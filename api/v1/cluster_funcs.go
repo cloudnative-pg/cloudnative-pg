@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
@@ -1480,28 +1481,28 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 
 	if target.TargetTLI != "" {
 		result += fmt.Sprintf(
-			"recovery_target_timeline = '%v'\n",
-			target.TargetTLI)
+			"recovery_target_timeline = %s\n",
+			configfile.EscapePostgresConfLiteral(target.TargetTLI))
 	}
 	if target.TargetXID != "" {
 		result += fmt.Sprintf(
-			"recovery_target_xid = '%v'\n",
-			target.TargetXID)
+			"recovery_target_xid = %s\n",
+			configfile.EscapePostgresConfLiteral(target.TargetXID))
 	}
 	if target.TargetName != "" {
 		result += fmt.Sprintf(
-			"recovery_target_name = '%v'\n",
-			target.TargetName)
+			"recovery_target_name = %s\n",
+			configfile.EscapePostgresConfLiteral(target.TargetName))
 	}
 	if target.TargetLSN != "" {
 		result += fmt.Sprintf(
-			"recovery_target_lsn = '%v'\n",
-			target.TargetLSN)
+			"recovery_target_lsn = %s\n",
+			configfile.EscapePostgresConfLiteral(target.TargetLSN))
 	}
 	if target.TargetTime != "" {
 		result += fmt.Sprintf(
-			"recovery_target_time = '%v'\n",
-			pgTime.ConvertToPostgresFormat(target.TargetTime))
+			"recovery_target_time = %s\n",
+			configfile.EscapePostgresConfLiteral(pgTime.ConvertToPostgresFormat(target.TargetTime)))
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"

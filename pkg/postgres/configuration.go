@@ -35,6 +35,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 )
 
@@ -902,7 +903,7 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // escapePostgresConfValue escapes a value to make its representation
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
-	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+	return configfile.EscapePostgresConfLiteral(value)
 }
 
 // AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
