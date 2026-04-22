@@ -30,7 +30,7 @@ function wait_for() {
   local retries=$5
 
   ITER=0
-  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ $ITER -lt "$retries" ]; do
+  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ "$ITER" -lt "$retries" ]; do
     ITER=$((ITER + 1))
     echo "$name $type doesn't exist yet. Waiting $interval seconds ($ITER of $retries)."
     sleep "$interval"
@@ -50,12 +50,12 @@ function retry {
     local exit=$?
     local wait=$((2 ** count))
     count=$((count + 1))
-    if [ $count -lt "$retries" ]; then
+    if [ "$count" -lt "$retries" ]; then
       echo "Retry $count/$retries exited $exit, retrying in $wait seconds..." >&2
-      sleep $wait
+      sleep "$wait"
     else
       echo "Retry $count/$retries exited $exit, no more retries left." >&2
-      return $exit
+      return "$exit"
     fi
   done
   return 0
@@ -333,3 +333,12 @@ function deploy_fluentd() {
 }
 
 
+# deploy_operator_from_source: applies the pre-generated operator manifest.
+# Requires generate_operator_manifest (via setup-cluster.sh) to have been
+# called first.
+function deploy_operator_from_source() {
+    # shellcheck disable=SC2154
+    echo -e "${bright}Deploying CNPG operator from ${OPERATOR_MANIFEST_PATH}${reset}"
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${OPERATOR_MANIFEST_PATH}"
+    wait_operator_ready
+}

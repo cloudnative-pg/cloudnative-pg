@@ -48,6 +48,54 @@ source "${COMMON_DIR}/40-utils-registry.sh"
 
 NODES=${NODES:-3}
 
+# build_and_load_operator_image_from_sources: builds the operator image via
+# 'make docker-build' and pushes it to the local registry.
+function build_and_load_operator_image_from_sources() {
+  create_builder
+
+  # shellcheck disable=SC2154
+  echo -e "${bright}Building operator from current worktree${reset}"
+
+  CONTROLLER_IMG="$(print_image)"
+
+  # shellcheck disable=SC2154
+  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" insecure="true" \
+    ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
+
+  echo -e "${bright}Done building and pushing new operator image on local registry.${reset}"
+
+  if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+    echo -e "${bright}Building a 'prime' operator from current worktree${reset}"
+
+    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
+    CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
+    PRIME_VERSION="${CURRENT_VERSION}-prime"
+
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}" VERSION="${PRIME_VERSION}" insecure="true" \
+      ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
+
+    echo -e "${bright}Done building and pushing 'prime' operator image on local registry.${reset}"
+  fi
+
+  docker buildx rm "${builder_name}"
+}
+
+# generate_operator_manifest: renders the kustomize manifest for the locally
+# built operator image. Accepts an optional output path; defaults to
+# OPERATOR_MANIFEST_PATH.
+function generate_operator_manifest() {
+  local manifest_path="${1:-${OPERATOR_MANIFEST_PATH}}"
+  # shellcheck disable=SC2154
+  echo -e "${bright}Generating operator manifest at ${manifest_path}${reset}"
+  CONTROLLER_IMG="${CONTROLLER_IMG:-$(print_image)}" \
+      CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST:-}" \
+      POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+      PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
+      OPERATOR_MANIFEST_PATH="${manifest_path}" \
+      make -C "${ROOT_DIR}" generate-manifest
+  echo -e "${bright}Operator manifest generated.${reset}"
+}
+
 usage() {
   cat >&2 <<EOF
 Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] <command>
@@ -55,7 +103,8 @@ Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] <command>
 Commands:
     create                Create the test cluster and a local registry
     load                  Build and load the operator image in the local registry
-    deploy                Deploy the operator manifests in the cluster
+    generate-manifest     Generate the operator manifest from the local worktree
+    deploy                Generate the manifest (if OPERATOR=local) and deploy the operator
     load-helper-images    Load the catalog of helper images in the local registry
     print-image           Print the CONTROLLER_IMG name to be used inside the cluster
     export-logs           Export the logs from the cluster
@@ -175,7 +224,23 @@ main() {
 
     # Invoke the command through the dispatcher
     case "$command" in
-    create | load | load-helper-images | deploy | print-image | export-logs | teardown | pyroscope)
+    load)
+      if [[ "${OPERATOR}" != "local" ]]; then
+        echo "ERROR: 'load' requires OPERATOR=local, got OPERATOR=${OPERATOR}" >&2
+        exit 1
+      fi
+      build_and_load_operator_image_from_sources
+      ;;
+    generate-manifest)
+      generate_operator_manifest
+      ;;
+    deploy)
+      if [[ "${OPERATOR}" == "local" ]]; then
+        generate_operator_manifest
+      fi
+      "${CLUSTER_MGR_SCRIPT}" "${command}"
+      ;;
+    create | load-helper-images | print-image | export-logs | teardown | pyroscope)
       "${CLUSTER_MGR_SCRIPT}" "${command}"
       ;;
     *)
