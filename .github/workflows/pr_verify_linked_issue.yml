@@ -1,10 +1,15 @@
 # This workflow will inspect a pull request to ensure there is a linked issue or a
 # valid issue is mentioned in the body. If neither is present it fails the check and adds
 # a comment alerting users of this missing requirement.
+#
+# Uses pull_request_target so fork PRs get a write-scoped token for the
+# comment. Do NOT add actions/checkout or execute anything from the PR head
+# in this file: the safety of pull_request_target relies on the job reading
+# only PR metadata via the API.
 name: VerifyIssue
 
 on:
-  pull_request:
+  pull_request_target:
     branches-ignore:
       - 'renovate/**'
     types:
@@ -17,11 +22,14 @@ on:
 
 permissions: read-all
 
+concurrency:
+  group: verify-linked-issue-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   verify_linked_issue:
     runs-on: ubuntu-latest
     name: Ensure Pull Request has a linked issue.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-issue') }}
     permissions:
       issues: write
       pull-requests: write
@@ -32,6 +40,8 @@ jobs:
           script: |
             const marker = '<!-- verify-linked-issue -->';
             const body = context.payload.pull_request.body || '';
+            const hasNoIssueLabel = (context.payload.pull_request.labels || [])
+              .some((l) => l.name === 'no-issue');
             core.debug(`Checking PR body: "${body}"`);
 
             // Match a GitHub-style issue reference preceded by a linking keyword
@@ -47,7 +57,7 @@ jobs:
             ].join('');
             const re = new RegExp(pattern, 'gim');
             let linked = false;
-            for (const m of body.matchAll(re)) {
+            for (const m of hasNoIssueLabel ? [] : body.matchAll(re)) {
               const owner = m[1] || context.repo.owner;
               const repo = m[2] || context.repo.repo;
               const issueNumber = parseInt(m[3], 10);
@@ -65,23 +75,32 @@ jobs:
               }
             }
 
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const existing = comments.filter(
-              (c) => c.user.login === 'github-actions[bot]' && c.body.includes(marker),
-            );
+            let existing = [];
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                per_page: 100,
+              });
+              existing = comments.filter(
+                (c) => c.user.login === 'github-actions[bot]' && c.body.includes(marker),
+              );
+            } catch (err) {
+              core.warning(`Could not list PR comments: ${err.message}`);
+            }
 
-            if (linked) {
+            if (linked || hasNoIssueLabel) {
               for (const c of existing) {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: c.id,
-                });
+                try {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: c.id,
+                  });
+                } catch (err) {
+                  core.warning(`Could not delete stale comment ${c.id}: ${err.message}`);
+                }
               }
               return;
             }
@@ -97,11 +116,15 @@ jobs:
                 '>',
                 '> Alternatively, apply the `no-issue` label to skip this check.',
               ].join('\n');
-              await github.rest.issues.createComment({
-                issue_number: context.payload.pull_request.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: message,
-              });
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.payload.pull_request.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: message,
+                });
+              } catch (err) {
+                core.warning(`Could not post linked-issue warning comment: ${err.message}`);
+              }
             }
             core.setFailed('No Linked Issue Found!');
