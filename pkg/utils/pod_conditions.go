@@ -34,7 +34,8 @@ var utilsLog = log.WithName("utils")
 //   - the kubelet on the pod's node, while the node is healthy: the transition
 //     from True to False happens within FailureThreshold consecutive probe
 //     periods of the underlying container becoming unhealthy (about 30s with
-//     stock defaults: PeriodSeconds=10, FailureThreshold=3).
+//     stock defaults: PeriodSeconds=10, FailureThreshold=3, unless the user
+//     overrides them via `.spec.probes.readiness`).
 //   - the node lifecycle controller when the node stops reporting to the API
 //     server; once the node transitions to `Unknown` (after
 //     `--node-monitor-grace-period`, 40s by default on Kubernetes 1.29-1.31
