@@ -505,8 +505,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	if res, err := r.evaluatePodReadinessGuards(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
-		return res, err
+	if res := r.evaluatePodReadinessGuards(ctx, cluster, instancesStatus); !res.IsZero() {
+		return res, nil
 	}
 
 	// If the user has requested to hibernate the cluster, we do that before
@@ -589,7 +589,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     operator-to-pod connectivity issue rather than a genuine PostgreSQL
 //     health problem. The operator trusts the kubelet's readiness probe as
 //     the source of truth and defers its own failover decision until
-//     Kubernetes agrees the primary is not Ready.
+//     Kubernetes agrees the primary is not Ready. A PrimaryStatusUnreachable
+//     Warning event is emitted so the deferral is visible via
+//     `kubectl describe cluster` and the events API; the Kubernetes event
+//     recorder dedupes by reason + message, so a sustained outage rolls up
+//     into one logical event with a growing count.
 //
 //     Without this branch the failover-election path would promote the
 //     healthiest replica: PostgresqlStatusList.Less pushes items with an
@@ -602,9 +606,9 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
-) (ctrl.Result, error) {
+) ctrl.Result {
 	if instancesStatus.Len() == 0 {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}
 	}
 
 	contextLogger := log.FromContext(ctx)
@@ -622,28 +626,32 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 			"instanceName", firstInstance.Pod.Name,
 			"hasHTTPStatus", hasHTTPStatus,
 			"isPodReady", isPodReady)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 10 * time.Second}
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
-		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary &&
-		instancesStatus.IsPodReadyAndNotReporting(cluster.Status.CurrentPrimary) {
-		contextLogger.Warning(
-			"Primary pod is ready but status endpoint is failing, requeueing",
-			"instanceName", cluster.Status.CurrentPrimary)
-		if err := r.RegisterPhase(
-			ctx,
-			cluster,
-			apiv1.PhaseWaitingForPrimaryStatus,
-			"The primary pod is Ready but the operator cannot reach its /pg/status endpoint. "+
-				"Failover is deferred until Kubernetes marks the primary as not Ready.",
-		); err != nil {
-			return ctrl.Result{}, err
+		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary {
+		if unreachable, statusErr := instancesStatus.IsPodReadyAndNotReporting(
+			cluster.Status.CurrentPrimary,
+		); unreachable {
+			contextLogger.Warning(
+				"Primary pod is Ready but /pg/status is failing, deferring failover",
+				"instanceName", cluster.Status.CurrentPrimary,
+				"err", statusErr)
+			r.Recorder.Eventf(
+				cluster,
+				"Warning",
+				"PrimaryStatusUnreachable",
+				"Primary pod %s is Ready but the operator cannot reach its /pg/status endpoint; "+
+					"failover deferred until Kubernetes marks the primary as not Ready. "+
+					"See operator logs for the underlying error.",
+				cluster.Status.CurrentPrimary,
+			)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}
 		}
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(

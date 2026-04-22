@@ -356,18 +356,22 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 // marked as ready by the kubelet but is not successfully reporting its status
 // via the /pg/status endpoint. This indicates a likely transient failure
 // (e.g. a network hiccup between the operator and the pod) rather than a
-// genuine PostgreSQL health problem.
+// genuine PostgreSQL health problem. The second return value is the
+// underlying /pg/status error, meaningful only when the boolean is true.
 //
 // "Not reporting" is the negation of IsPodReporting: the /pg/status call
 // against the pod returned an error.
-func (list PostgresqlStatusList) IsPodReadyAndNotReporting(podname string) bool {
+func (list PostgresqlStatusList) IsPodReadyAndNotReporting(podname string) (bool, error) {
 	for _, item := range list.Items {
 		if item.Pod.Name == podname {
-			return item.IsPodReady && item.Error != nil
+			if item.IsPodReady && item.Error != nil {
+				return true, item.Error
+			}
+			return false, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // IsComplete checks the PostgreSQL status list for Pods which

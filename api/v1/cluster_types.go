@@ -700,12 +700,6 @@ const (
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
-	// PhaseWaitingForPrimaryStatus is set when the current primary pod is
-	// Ready from the kubelet's perspective but the operator is failing to
-	// collect its status via the /pg/status endpoint. Failover is deferred
-	// until Kubernetes marks the primary pod as not Ready.
-	PhaseWaitingForPrimaryStatus = "Waiting to re-establish contact with the primary instance"
-
 	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
 	PhaseOnlineUpgrading = "Online upgrade in progress"
 
