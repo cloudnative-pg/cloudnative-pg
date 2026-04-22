@@ -88,12 +88,14 @@ type PostgresqlStatus struct {
 	InstanceArch               string `json:"instanceArch"`
 	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
 
-	// This field represents the Kubelet point-of-view of the readiness
-	// status of this instance and may be slightly stale when the Kubelet has
-	// not still invoked the readiness probe.
+	// IsPodReady mirrors the Pod's PodReady condition, as set by the kubelet
+	// while the node is healthy and by the node lifecycle controller once the
+	// node stops reporting. It is a readiness signal driven by the readiness
+	// probe plus any readiness gates, so it may be briefly stale compared to
+	// the actual PostgreSQL state.
 	//
-	// If you want to check the latest detected status of PostgreSQL, you
-	// need to call HasHTTPStatus().
+	// For the latest PostgreSQL health as seen by the instance manager, use
+	// HasHTTPStatus() instead.
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
