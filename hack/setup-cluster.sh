@@ -81,17 +81,14 @@ function build_and_load_operator_image_from_sources() {
 }
 
 # generate_operator_manifest: renders the kustomize manifest for the locally
-# built operator image. Accepts an optional output path; defaults to
-# OPERATOR_MANIFEST_PATH.
+# built operator image, writing to OPERATOR_MANIFEST_PATH.
 function generate_operator_manifest() {
-  local manifest_path="${1:-${OPERATOR_MANIFEST_PATH}}"
   # shellcheck disable=SC2154
-  echo -e "${bright}Generating operator manifest at ${manifest_path}${reset}"
+  echo -e "${bright}Generating operator manifest at ${OPERATOR_MANIFEST_PATH}${reset}"
   CONTROLLER_IMG="${CONTROLLER_IMG:-$(print_image)}" \
       CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST:-}" \
       POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
       PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-      OPERATOR_MANIFEST_PATH="${manifest_path}" \
       make -C "${ROOT_DIR}" generate-manifest
   echo -e "${bright}Operator manifest generated.${reset}"
 }
