@@ -86,7 +86,6 @@ function generate_operator_manifest() {
   # shellcheck disable=SC2154
   echo -e "${bright}Generating operator manifest at ${OPERATOR_MANIFEST_PATH}${reset}"
   CONTROLLER_IMG="${CONTROLLER_IMG:-$(print_image)}" \
-      CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST:-}" \
       POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
       PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
       make -C "${ROOT_DIR}" generate-manifest
@@ -95,7 +94,7 @@ function generate_operator_manifest() {
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] <command>
+Usage: $0 [-e <engine>] [-k <version>] [-n <nodes>] [-o <operator>] [-d <method>] <command>
 
 Commands:
     create                Create the test cluster and a local registry
@@ -133,6 +132,14 @@ Options:
                           snapshot for that branch.
                           Env: OPERATOR
 
+    -d|--deployment-method
+      <METHOD>            Deployment method for the operator. Use 'manifest'
+                          (default) to deploy via a kustomize-generated
+                          manifest, or 'helm' to deploy via the official
+                          Helm chart. Only 'manifest' is supported when
+                          OPERATOR is not 'local'.
+                          Env: CNPG_DEPLOYMENT_METHOD
+
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
 EOF
@@ -144,9 +151,9 @@ main() {
   # --- ARGUMENT PARSING ---
   # Parse command-line options (-k, -n, etc.) using getopt
   if ! getopt -T > /dev/null; then
-    parsed_opts=$(getopt -o e:k:n:o:r -l "engine:,k8s-version:,nodes:,operator:,registry" -- "$@") || usage
+    parsed_opts=$(getopt -o e:k:n:o:d:r -l "engine:,k8s-version:,nodes:,operator:,deployment-method:,registry" -- "$@") || usage
   else
-    parsed_opts=$(getopt e:k:n:o:r "$@") || usage
+    parsed_opts=$(getopt e:k:n:o:d:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
 
@@ -183,6 +190,16 @@ main() {
         shift
         export OPERATOR="${1}"
         shift
+        ;;
+      -d | --deployment-method)
+        shift
+        export CNPG_DEPLOYMENT_METHOD="${1}"
+        shift
+        if [[ "${CNPG_DEPLOYMENT_METHOD}" != "manifest" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" != "helm" ]]; then
+          echo "ERROR: '${CNPG_DEPLOYMENT_METHOD}' is not a valid deployment method. Use 'manifest' or 'helm'." >&2
+          echo >&2
+          usage
+        fi
         ;;
       -r | --registry)
         shift
@@ -223,16 +240,16 @@ main() {
     case "$command" in
     load)
       if [[ "${OPERATOR}" != "local" ]]; then
-        echo "ERROR: 'load' requires OPERATOR=local, got OPERATOR=${OPERATOR}" >&2
-        exit 1
+        echo "Skipping image build: OPERATOR=${OPERATOR}"
+      else
+        build_and_load_operator_image_from_sources
       fi
-      build_and_load_operator_image_from_sources
       ;;
     generate-manifest)
       generate_operator_manifest
       ;;
     deploy)
-      if [[ "${OPERATOR}" == "local" ]]; then
+      if [[ "${OPERATOR}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" != "helm" ]]; then
         generate_operator_manifest
       fi
       "${CLUSTER_MGR_SCRIPT}" "${command}"
