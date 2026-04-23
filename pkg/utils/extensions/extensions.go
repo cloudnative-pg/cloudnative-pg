@@ -24,6 +24,10 @@ package extensions
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
+
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -168,6 +172,58 @@ func WithUpgradeTargetPrefix(exts []apiv1.ExtensionConfiguration) []apiv1.Extens
 		result[i].Name = postgres.UpgradeTargetExtensionPrefix + exts[i].Name
 	}
 	return result
+}
+
+// dedicatedEnvVars names env vars whose values come from dedicated extension
+// fields (LdLibraryPath, BinPath); custom Env entries targeting them are skipped.
+var dedicatedEnvVars = map[string]bool{
+	"PATH":            true,
+	"LD_LIBRARY_PATH": true,
+}
+
+// SetEnvVars applies custom Env entries from the given extensions into envMap,
+// expanding placeholders. Names reserved for operator use or covered by
+// dedicated fields are skipped, and overrides are logged as warnings.
+func SetEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
+	setBy := make(map[string]string)
+
+	for _, extension := range extensionList {
+		for _, envVar := range extension.Env {
+			if postgres.IsReservedEnvironmentVariable(envVar.Name) || dedicatedEnvVars[envVar.Name] {
+				log.Warning("Skipping reserved environment variable from extension",
+					"extension", extension.Name, "variable", envVar.Name)
+				continue
+			}
+
+			if unknown := postgres.FindUnknownPlaceholders(envVar.Value); len(unknown) > 0 {
+				log.Warning("Extension environment variable contains unknown placeholders",
+					"extension", extension.Name, "variable", envVar.Name, "unknownPlaceholders", unknown)
+			}
+
+			if prev, ok := setBy[envVar.Name]; ok {
+				log.Warning("Extension environment variable overrides value from a previous extension",
+					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
+			} else if _, exists := envMap[envVar.Name]; exists {
+				log.Warning("Extension environment variable overrides a cluster-level value",
+					"variable", envVar.Name, "extension", extension.Name)
+			}
+
+			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name)
+			setBy[envVar.Name] = extension.Name
+		}
+	}
+}
+
+// AppendPaths returns existing (a colon-separated list, possibly empty)
+// with extra appended. Returns existing unchanged when extra is empty.
+func AppendPaths(existing string, extra []string) string {
+	if len(extra) == 0 {
+		return existing
+	}
+	if existing == "" {
+		return strings.Join(extra, ":")
+	}
+	return existing + ":" + strings.Join(extra, ":")
 }
 
 // CollectBinPaths returns a list of paths which should be added to PATH
