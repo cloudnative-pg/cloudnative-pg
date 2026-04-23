@@ -300,7 +300,33 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	contextLogger.Info("Upgrade completed successfully")
 
+	reportUpdateExtensionsScript(ctx, ui.pgData)
+
 	return nil
+}
+
+// reportUpdateExtensionsScript surfaces pg_upgrade's update_extensions.sql
+// when present so the DBA knows to run it. PostgreSQL 19+ writes this script
+// when the target cluster has extensions whose default_version is newer than
+// what pg_upgrade installed; extension metadata in pg_catalog stays on the
+// old version until it is executed.
+func reportUpdateExtensionsScript(ctx context.Context, pgData string) {
+	contextLogger := log.FromContext(ctx)
+	scriptPath := path.Join(pgData, "update_extensions.sql")
+	exists, err := fileutils.FileExists(scriptPath)
+	if err != nil {
+		contextLogger.Error(err, "Could not check for update_extensions.sql",
+			"scriptPath", scriptPath)
+		return
+	}
+	if !exists {
+		return
+	}
+	contextLogger.Info(
+		"pg_upgrade emitted update_extensions.sql in PGDATA on the primary. "+
+			"Once the cluster is back online, review the script and apply extension updates as needed.",
+		"scriptPath", scriptPath,
+	)
 }
 
 func getControlData(binDir, pgData string) (map[string]string, error) {
