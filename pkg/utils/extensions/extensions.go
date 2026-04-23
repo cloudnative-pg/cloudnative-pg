@@ -158,6 +158,18 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string 
 	return result
 }
 
+// WithUpgradeTargetPrefix returns a deep copy of the extensions with each
+// Name prefixed, so target-version entries can coexist with source-version
+// ones in the major upgrade Job without volume/mount name collisions.
+func WithUpgradeTargetPrefix(exts []apiv1.ExtensionConfiguration) []apiv1.ExtensionConfiguration {
+	result := make([]apiv1.ExtensionConfiguration, len(exts))
+	for i := range exts {
+		result[i] = *exts[i].DeepCopy()
+		result[i].Name = postgres.UpgradeTargetExtensionPrefix + exts[i].Name
+	}
+	return result
+}
+
 // CollectBinPaths returns a list of paths which should be added to PATH
 // given a list of extensions.
 // NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or

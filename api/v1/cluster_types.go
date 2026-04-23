@@ -1040,6 +1040,12 @@ type ClusterStatus struct {
 	// +optional
 	PGDataImageInfo *ImageInfo `json:"pgDataImageInfo,omitempty"`
 
+	// TargetPGDataImageInfo contains the details of the target image for an
+	// in-progress major upgrade. It is set before the upgrade Job is created,
+	// and cleared on successful completion or when the upgrade is rolled back.
+	// +optional
+	TargetPGDataImageInfo *ImageInfo `json:"targetPgDataImageInfo,omitempty"`
+
 	// PluginStatus is the status of the loaded plugins
 	// +optional
 	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
