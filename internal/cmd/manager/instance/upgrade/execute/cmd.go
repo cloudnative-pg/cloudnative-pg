@@ -23,16 +23,19 @@ package execute
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	cnpgiPostgres "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/env"
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
@@ -577,9 +580,9 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 	return nil
 }
 
-// setupExtensionEnvironment extends LD_LIBRARY_PATH and PATH with the paths
-// needed by both source-version and target-version extensions, since
-// pg_upgrade runs both old and new PostgreSQL servers.
+// setupExtensionEnvironment extends LD_LIBRARY_PATH and PATH and applies each
+// extension's custom Env entries to the process environment, so pg_upgrade's
+// old and new PostgreSQL server children inherit the right paths and values.
 //
 // Sources: Status.PGDataImageInfo for the source set; Status.TargetPGDataImageInfo
 // for the target set (populated by the reconciler before Job creation).
@@ -593,36 +596,29 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 			"cannot set up extension environment: cluster status is missing TargetPGDataImageInfo")
 	}
 
-	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
-	renamedNewExtensions := extensions.WithUpgradeTargetPrefix(cluster.Status.TargetPGDataImageInfo.Extensions)
+	allExtensions := slices.Concat(
+		cluster.Status.PGDataImageInfo.Extensions,
+		extensions.WithUpgradeTargetPrefix(cluster.Status.TargetPGDataImageInfo.Extensions),
+	)
 
-	allExtensions := make([]apiv1.ExtensionConfiguration, 0, len(oldExtensions)+len(renamedNewExtensions))
-	allExtensions = append(allExtensions, oldExtensions...)
-	allExtensions = append(allExtensions, renamedNewExtensions...)
+	envMap, _ := envmap.Parse(os.Environ())
+	before := maps.Clone(envMap)
 
-	additionalLibraryPaths := extensions.CollectLibraryPaths(allExtensions)
-	if len(additionalLibraryPaths) > 0 {
-		currentPath := os.Getenv("LD_LIBRARY_PATH")
-		if currentPath != "" {
-			currentPath += ":"
+	if paths := extensions.CollectLibraryPaths(allExtensions); len(paths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
+	}
+	if paths := extensions.CollectBinPaths(allExtensions); len(paths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
+	}
+	extensions.SetEnvVars(allExtensions, envMap)
+
+	for name, value := range envMap {
+		if prev, ok := before[name]; ok && prev == value {
+			continue
 		}
-		currentPath += strings.Join(additionalLibraryPaths, ":")
-		if err := os.Setenv("LD_LIBRARY_PATH", currentPath); err != nil {
-			return fmt.Errorf("while setting LD_LIBRARY_PATH: %w", err)
+		if err := os.Setenv(name, value); err != nil {
+			return fmt.Errorf("while setting %s: %w", name, err)
 		}
 	}
-
-	additionalBinPaths := extensions.CollectBinPaths(allExtensions)
-	if len(additionalBinPaths) > 0 {
-		currentPath := os.Getenv("PATH")
-		if currentPath != "" {
-			currentPath += ":"
-		}
-		currentPath += strings.Join(additionalBinPaths, ":")
-		if err := os.Setenv("PATH", currentPath); err != nil {
-			return fmt.Errorf("while setting PATH: %w", err)
-		}
-	}
-
 	return nil
 }
