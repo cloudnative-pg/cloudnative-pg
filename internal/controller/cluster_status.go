@@ -246,6 +246,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
+	if cluster.IsReadOnlyServiceEnabled() && cluster.Spec.Instances > 1 {
+		cluster.Status.ReadOnlyService = cluster.GetServiceReadOnlyName()
+	}
 
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
