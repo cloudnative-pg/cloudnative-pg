@@ -25,9 +25,9 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 const jobMajorUpgrade = "major-upgrade"
@@ -54,24 +54,18 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 	return "", false
 }
 
-// createMajorUpgradeJobDefinition creates a job to upgrade the primary node to a new Postgres major version.
-// The extension parameter specifies the new-version extensions for the main container,
-// while the init container uses old extensions from PGDataImageInfo (it runs with the old image).
+// createMajorUpgradeJobDefinition creates the Job that runs pg_upgrade.
+// newExtensions is the target-major extension set; the source-major set
+// is taken from Status.PGDataImageInfo.
 func createMajorUpgradeJobDefinition(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	newExtensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
-	// Since we have to mount ImageVolumes for both new and old extensions, we
-	// rename the new extensions with a prefix to avoid conflicts. This keeps
-	// old extensions at their original mount paths, so the old PGDATA's
-	// configuration (dynamic_library_path, extension_control_path) works
-	// without modification.
-	renamedNewExtensions := make([]apiv1.ExtensionConfiguration, len(newExtensions))
-	for i := range newExtensions {
-		renamedNewExtensions[i] = *newExtensions[i].DeepCopy()
-		renamedNewExtensions[i].Name = postgres.UpgradeTargetExtensionPrefix + newExtensions[i].Name
-	}
+	// Prefix the new-version extensions (not the old ones) so the old PGDATA's
+	// dynamic_library_path and extension_control_path GUCs keep working
+	// unchanged while both sets are mounted.
+	renamedNewExtensions := extensions.WithUpgradeTargetPrefix(newExtensions)
 
 	var oldExtensions []apiv1.ExtensionConfiguration
 	if cluster.Status.PGDataImageInfo != nil {
