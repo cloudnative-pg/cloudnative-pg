@@ -41,6 +41,69 @@ A common scenario arises when using CloudNativePG in database-as-a-service
 cluster is required. In such cases, you can create your own service of type
 `LoadBalancer`, if available in your Kubernetes environment.
 
+## Cluster-Wide Service Template
+
+You can define a cluster-wide service template that is applied to all services
+created by the operator — both the default services (rw, ro, r) and any
+additional managed services. This is useful for configuring properties that
+should be consistent across all services, such as IPv6/dual-stack networking.
+
+The template is set via the
+[`managed.services.serviceTemplate` stanza](cloudnative-pg.v1.md#managedservices).
+Fields set in the cluster-wide template act as defaults: they are applied to
+every service unless the service's own template overrides them.
+
+For example, to configure all services for IPv6 single-stack:
+
+```yaml
+# <snip>
+managed:
+  services:
+    serviceTemplate:
+      spec:
+        ipFamilyPolicy: SingleStack
+        ipFamilies:
+          - IPv6
+```
+
+Or for dual-stack with both IPv4 and IPv6:
+
+```yaml
+# <snip>
+managed:
+  services:
+    serviceTemplate:
+      spec:
+        ipFamilyPolicy: RequireDualStack
+        ipFamilies:
+          - IPv4
+          - IPv6
+```
+
+When used together with additional managed services, the cluster-wide template
+serves as the base layer. Each additional service's own `serviceTemplate` is
+merged on top, allowing per-service overrides:
+
+```yaml
+# <snip>
+managed:
+  services:
+    serviceTemplate:
+      spec:
+        ipFamilyPolicy: RequireDualStack
+        ipFamilies:
+          - IPv4
+          - IPv6
+    additional:
+      - selectorType: rw
+        serviceTemplate:
+          metadata:
+            name: "mydb-lb"
+          spec:
+            type: LoadBalancer
+            # Inherits ipFamilyPolicy and ipFamilies from the cluster-wide template
+```
+
 ## Disabling Default Services
 
 You can disable any or all of the `ro` and `r` default services through the

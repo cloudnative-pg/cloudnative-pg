@@ -1491,6 +1491,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `disabledDefaultServices` _[ServiceSelectorType](#serviceselectortype) array_ | DisabledDefaultServices is a list of service types that are disabled by default.<br />Valid values are "r", and "ro", representing read, and read-only services. |  |  | Enum: [rw r ro] <br /> |
 | `additional` _[ManagedService](#managedservice) array_ | Additional is a list of additional managed services specified by the user. |  |  |  |
+| `serviceTemplate` _[ServiceTemplateSpec](#servicetemplatespec)_ | ServiceTemplate is a template applied to all services created by the<br />operator, both the default services (rw, ro, r, any) and additional<br />managed services. For additional services, their own service template<br />is merged on top of this base template. This allows cluster-wide<br />configuration of fields like ipFamilyPolicy and ipFamilies. |  |  |  |
 
 
 #### Metadata
@@ -2661,6 +2662,7 @@ a template for Service generation.
 _Appears in:_
 
 - [ManagedService](#managedservice)
+- [ManagedServices](#managedservices)
 - [PoolerSpec](#poolerspec)
 
 | Field | Description | Required | Default | Validation |
