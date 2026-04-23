@@ -51,7 +51,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
-	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -406,15 +405,15 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	tmpCluster := cluster.DeepCopy()
 	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
 
-	// Rename extensions to match the renamed mount paths used by the upgrade job.
-	// Target-version extensions are mounted with a prefix to avoid conflicts
-	// with source-version extensions that keep their original names.
-	if tmpCluster.Status.PGDataImageInfo != nil {
-		for i := range tmpCluster.Status.PGDataImageInfo.Extensions {
-			tmpCluster.Status.PGDataImageInfo.Extensions[i].Name = postgresConfig.UpgradeTargetExtensionPrefix +
-				tmpCluster.Status.PGDataImageInfo.Extensions[i].Name
-		}
+	// Use the target-version extensions so the new pgdata's
+	// extension_control_path and dynamic_library_path GUCs reflect the new
+	// image's layout. The prefix keeps names aligned with the Job's mount paths.
+	if tmpCluster.Status.PGDataImageInfo == nil || tmpCluster.Status.TargetPGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot prepare configuration files: cluster status is missing PGDataImageInfo or TargetPGDataImageInfo")
 	}
+	tmpCluster.Status.PGDataImageInfo.Extensions = extensions.WithUpgradeTargetPrefix(
+		tmpCluster.Status.TargetPGDataImageInfo.Extensions)
 
 	pgMajorVersion, err := postgresutils.GetMajorVersionFromPgData(destDir)
 	if err != nil {
@@ -578,25 +577,24 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 	return nil
 }
 
-// setupExtensionEnvironment merges extension library and binary paths into the
-// process environment (LD_LIBRARY_PATH and PATH). During a major upgrade, both
-// old and new (renamed) extension paths are needed because pg_upgrade starts
-// both old and new PostgreSQL servers.
+// setupExtensionEnvironment extends LD_LIBRARY_PATH and PATH with the paths
+// needed by both source-version and target-version extensions, since
+// pg_upgrade runs both old and new PostgreSQL servers.
+//
+// Sources: Status.PGDataImageInfo for the source set; Status.TargetPGDataImageInfo
+// for the target set (populated by the reconciler before Job creation).
 func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 	if cluster.Status.PGDataImageInfo == nil {
 		return nil
 	}
 
-	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
-
-	// Build the list of new (renamed) extensions. During the upgrade, new
-	// extension volumes are mounted with the UpgradeTargetExtensionPrefix
-	// to avoid conflicts with old extension volumes.
-	renamedNewExtensions := make([]apiv1.ExtensionConfiguration, len(oldExtensions))
-	for i, ext := range oldExtensions {
-		renamedNewExtensions[i] = ext
-		renamedNewExtensions[i].Name = postgresConfig.UpgradeTargetExtensionPrefix + ext.Name
+	if cluster.Status.TargetPGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing TargetPGDataImageInfo")
 	}
+
+	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+	renamedNewExtensions := extensions.WithUpgradeTargetPrefix(cluster.Status.TargetPGDataImageInfo.Extensions)
 
 	allExtensions := make([]apiv1.ExtensionConfiguration, 0, len(oldExtensions)+len(renamedNewExtensions))
 	allExtensions = append(allExtensions, oldExtensions...)

@@ -83,6 +83,16 @@ func Reconcile(
 		return nil, err
 	}
 	if cluster.Status.PGDataImageInfo == nil || requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
+		// If the user reverted the image spec after we persisted the target
+		// but before the upgrade Job was created, clear the stale target.
+		if cluster.Status.TargetPGDataImageInfo != nil {
+			if err := status.PatchWithOptimisticLock(
+				ctx, c, cluster,
+				status.SetTargetPGDataImageInfo(nil),
+			); err != nil {
+				return nil, err
+			}
+		}
 		return nil, nil
 	}
 
@@ -95,9 +105,41 @@ func Reconcile(
 	contextLogger.Info("Reconciling in-place major version upgrades",
 		"primaryNodeSerial", primaryNodeSerial, "requestedMajor", requestedMajor)
 
-	err = registerPhase(ctx, c, cluster, apiv1.PhaseMajorUpgrade,
-		fmt.Sprintf("Upgrading cluster to major version %v", requestedMajor))
+	// Resolve the target-major extensions upfront so we can fail before
+	// touching pods if the catalog is missing an entry, and so we can
+	// persist the resolved list atomically with the phase transition.
+	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
 	if err != nil {
+		contextLogger.Error(err, "Unable to resolve extensions for new major version",
+			"requestedMajor", requestedMajor)
+
+		if regErr := registerPhase(
+			ctx,
+			c,
+			cluster,
+			apiv1.PhaseImageCatalogError,
+			fmt.Sprintf("Cannot resolve extensions for major upgrade to version %d: %v", requestedMajor, err),
+		); regErr != nil {
+			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+		}
+
+		return nil, fmt.Errorf("cannot resolve extensions for major upgrade to version %d: %w",
+			requestedMajor, err)
+	}
+
+	if err := status.PatchWithOptimisticLock(
+		ctx,
+		c,
+		cluster,
+		status.SetPhase(apiv1.PhaseMajorUpgrade,
+			fmt.Sprintf("Upgrading cluster to major version %v", requestedMajor)),
+		status.SetClusterReadyCondition,
+		status.SetTargetPGDataImageInfo(&apiv1.ImageInfo{
+			Image:        cluster.Status.Image,
+			MajorVersion: requestedMajor,
+			Extensions:   extensions,
+		}),
+	); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +150,7 @@ func Reconcile(
 		return result, err
 	}
 
-	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial); err != nil {
+	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial, extensions); err != nil {
 		contextLogger.Error(err, "Unable to create major upgrade job")
 		return nil, err
 	} else if result != nil {
@@ -179,33 +221,9 @@ func createMajorUpgradeJob(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	primaryNodeSerial int,
+	extensions []apiv1.ExtensionConfiguration,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
-
-	requestedMajor, err := cluster.GetPostgresqlMajorVersion()
-	if err != nil {
-		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
-		return nil, err
-	}
-
-	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
-	if err != nil {
-		contextLogger.Error(err, "Unable to resolve extensions for new major version",
-			"requestedMajor", requestedMajor)
-
-		if regErr := registerPhase(
-			ctx,
-			c,
-			cluster,
-			apiv1.PhaseImageCatalogError,
-			fmt.Sprintf("Cannot resolve extensions for major upgrade to version %d: %v", requestedMajor, err),
-		); regErr != nil {
-			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
-		}
-
-		return nil, fmt.Errorf("cannot resolve extensions for major upgrade to version %d: %w",
-			requestedMajor, err)
-	}
 
 	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
 
@@ -313,6 +331,7 @@ func majorVersionUpgradeHandleCompletion(
 			MajorVersion: requestedMajor,
 			Extensions:   exts,
 		}),
+		status.SetTargetPGDataImageInfo(nil),
 		status.SetTimelineID(1),
 	); err != nil {
 		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
@@ -381,6 +400,7 @@ func handleRollbackIfNeeded(
 		c,
 		cluster,
 		status.SetImage(cluster.Status.PGDataImageInfo.Image),
+		status.SetTargetPGDataImageInfo(nil),
 	); err != nil {
 		contextLogger.Error(err, "Unable to reset status image after rollback")
 		return nil, err
