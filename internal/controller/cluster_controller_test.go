@@ -423,6 +423,11 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		IsPodReady: false,
 	}
 
+	// DescribeTable entries assert state (requeue vs. proceed) only. They also
+	// regression-lock event absence: none of these scenarios should emit an
+	// event. Event-emission assertions live in separate It blocks below — that
+	// is why the "transient /pg/status failure" case (which fires + emits)
+	// lives there rather than here.
 	DescribeTable(
 		"guards behaviour",
 		func(ctx SpecContext, currentPrimary, targetPrimary string, items []postgres.PostgresqlStatus, requeue bool) {
@@ -438,6 +443,11 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 			} else {
 				Expect(result.IsZero()).To(BeTrue())
 			}
+
+			fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+			Expect(ok).To(BeTrue())
+			Expect(fakeRecorder.Events).ShouldNot(Receive(),
+				"DescribeTable entries must not emit events; if a new branch needs one, add a dedicated It")
 		},
 		Entry("happy path: primary Ready and reporting, no guard fires",
 			primaryName, primaryName,
@@ -445,9 +455,6 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Entry("kubelet has not refreshed the readiness probe yet",
 			primaryName, primaryName,
 			[]postgres.PostgresqlStatus{kubeletStaleReporting, readyReportingReplica}, true),
-		Entry("transient /pg/status failure on Ready primary requeues",
-			primaryName, primaryName,
-			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, true),
 		Entry("guard is scoped to steady-state (CurrentPrimary == TargetPrimary)",
 			primaryName, newPrimaryName,
 			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, false),
@@ -517,7 +524,7 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 
 		var recorded string
 		Eventually(fakeRecorder.Events, "1s").Should(Receive(&recorded))
-		Expect(recorded).To(HavePrefix("Warning PrimaryStatusUnreachable"))
+		Expect(recorded).To(HavePrefix("Warning PrimaryStatusCheckFailed"))
 		Expect(recorded).To(ContainSubstring(primaryName))
 		Expect(recorded).To(ContainSubstring("See operator logs"))
 	})
@@ -537,7 +544,7 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
 		Expect(ok).To(BeTrue())
 
-		Consistently(fakeRecorder.Events, "100ms").ShouldNot(Receive(),
+		Expect(fakeRecorder.Events).ShouldNot(Receive(),
 			"kubelet-stale branch must stay event-less to avoid noise")
 	})
 })

@@ -589,7 +589,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     operator-to-pod connectivity issue rather than a genuine PostgreSQL
 //     health problem. The operator trusts the kubelet's readiness probe as
 //     the source of truth and defers its own failover decision until
-//     Kubernetes agrees the primary is not Ready. A PrimaryStatusUnreachable
+//     Kubernetes agrees the primary is not Ready. A PrimaryStatusCheckFailed
 //     Warning event is emitted so the deferral is visible via
 //     `kubectl describe cluster` and the events API; the Kubernetes event
 //     recorder dedupes by reason + message, so a sustained outage rolls up
@@ -635,14 +635,14 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 			cluster.Status.CurrentPrimary,
 		); unreachable {
 			contextLogger.Warning(
-				"Primary pod is Ready but /pg/status is failing, deferring failover",
+				"Primary pod is Ready but /pg/status is failing, short-circuiting reconcile",
 				"instanceName", cluster.Status.CurrentPrimary,
 				"err", statusErr)
 			r.Recorder.Eventf(
 				cluster,
 				"Warning",
-				"PrimaryStatusUnreachable",
-				"Primary pod %s is Ready but the operator cannot reach its /pg/status endpoint; "+
+				"PrimaryStatusCheckFailed",
+				"Primary pod %s is Ready but the operator's /pg/status check failed; "+
 					"failover deferred until Kubernetes marks the primary as not Ready. "+
 					"See operator logs for the underlying error.",
 				cluster.Status.CurrentPrimary,
