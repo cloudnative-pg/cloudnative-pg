@@ -38,8 +38,11 @@ var knownPlaceholders = map[string]bool{
 }
 
 // ExpandEnvPlaceholders expands supported placeholders in value for the given
-// extension and unescapes $$ pairs preceding braces.
-func ExpandEnvPlaceholders(value string, extensionName string) string {
+// extension and unescapes $$ pairs preceding braces. baseDir is the directory
+// under which the extension's ImageVolume is mounted (typically
+// ExtensionsBaseDirectory, or UpgradeTargetExtensionsBaseDirectory during a
+// major upgrade for target-version extensions).
+func ExpandEnvPlaceholders(value string, extensionName string, baseDir string) string {
 	return envPlaceholderRegexp.ReplaceAllStringFunc(value, func(match string) string {
 		dollars := 0
 		for dollars < len(match) && match[dollars] == '$' {
@@ -55,7 +58,7 @@ func ExpandEnvPlaceholders(value string, extensionName string) string {
 		name := match[dollars+1 : len(match)-1]
 		switch name {
 		case "image_root":
-			return prefix + filepath.Join(ExtensionsBaseDirectory, extensionName)
+			return prefix + filepath.Join(baseDir, extensionName)
 		default:
 			// Unknown placeholder: leave as-is (runtime warns separately).
 			return match

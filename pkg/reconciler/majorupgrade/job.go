@@ -27,7 +27,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 const jobMajorUpgrade = "major-upgrade"
@@ -62,11 +61,6 @@ func createMajorUpgradeJobDefinition(
 	nodeSerial int,
 	newExtensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
-	// Prefix the new-version extensions (not the old ones) so the old PGDATA's
-	// dynamic_library_path and extension_control_path GUCs keep working
-	// unchanged while both sets are mounted.
-	renamedNewExtensions := extensions.WithUpgradeTargetPrefix(newExtensions)
-
 	var oldExtensions []apiv1.ExtensionConfiguration
 	if cluster.Status.PGDataImageInfo != nil {
 		oldExtensions = cluster.Status.PGDataImageInfo.Extensions
@@ -96,16 +90,22 @@ func createMajorUpgradeJobDefinition(
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, renamedNewExtensions)
+	// Build the Job without any extension-managed volumes/mounts; both sets
+	// (source-version and target-version) are appended explicitly below so
+	// they can coexist under distinct mount trees.
+	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, nil)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))
 
-	// Mount old extension Volumes
 	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
 		specs.CreateExtensionVolumes(oldExtensions)...)
-	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
-		specs.CreateExtensionVolumeMounts(oldExtensions)...)
+	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+		specs.CreateUpgradeTargetExtensionVolumes(newExtensions)...)
+
+	mounts := &job.Spec.Template.Spec.Containers[0].VolumeMounts
+	*mounts = append(*mounts, specs.CreateExtensionVolumeMounts(oldExtensions)...)
+	*mounts = append(*mounts, specs.CreateUpgradeTargetExtensionVolumeMounts(newExtensions)...)
 
 	return job
 }

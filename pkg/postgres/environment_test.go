@@ -91,34 +91,34 @@ var _ = Describe("FindUnknownPlaceholders", func() {
 
 var _ = Describe("ExpandEnvPlaceholders", func() {
 	It("expands image_root to the extension mount path", func() {
-		Expect(ExpandEnvPlaceholders("${image_root}/lib", "my-ext")).To(Equal("/extensions/my-ext/lib"))
+		Expect(ExpandEnvPlaceholders("${image_root}/lib", "my-ext", ExtensionsBaseDirectory)).To(Equal("/extensions/my-ext/lib"))
 	})
 
 	It("unescapes $${...} to literal ${...}", func() {
-		Expect(ExpandEnvPlaceholders("$${not_expanded}", "my-ext")).To(Equal("${not_expanded}"))
+		Expect(ExpandEnvPlaceholders("$${not_expanded}", "my-ext", ExtensionsBaseDirectory)).To(Equal("${not_expanded}"))
 	})
 
 	It("handles mixed escaped and expanded placeholders", func() {
-		Expect(ExpandEnvPlaceholders("${image_root}/$${literal}", "my-ext")).To(Equal("/extensions/my-ext/${literal}"))
+		Expect(ExpandEnvPlaceholders("${image_root}/$${literal}", "my-ext", ExtensionsBaseDirectory)).To(Equal("/extensions/my-ext/${literal}"))
 	})
 
 	It("preserves $${image_root} as literal", func() {
-		Expect(ExpandEnvPlaceholders("$${image_root}", "my-ext")).To(Equal("${image_root}"))
+		Expect(ExpandEnvPlaceholders("$${image_root}", "my-ext", ExtensionsBaseDirectory)).To(Equal("${image_root}"))
 	})
 
 	It("expands $$${image_root} to literal $ plus expanded path", func() {
-		Expect(ExpandEnvPlaceholders("$$${image_root}", "my-ext")).To(Equal("$/extensions/my-ext"))
+		Expect(ExpandEnvPlaceholders("$$${image_root}", "my-ext", ExtensionsBaseDirectory)).To(Equal("$/extensions/my-ext"))
 	})
 
 	It("preserves $$$${image_root} as $${image_root}", func() {
-		Expect(ExpandEnvPlaceholders("$$$${image_root}", "my-ext")).To(Equal("$${image_root}"))
+		Expect(ExpandEnvPlaceholders("$$$${image_root}", "my-ext", ExtensionsBaseDirectory)).To(Equal("$${image_root}"))
 	})
 
 	It("does not alter bare $$ without braces", func() {
-		Expect(ExpandEnvPlaceholders("plain $$text", "my-ext")).To(Equal("plain $$text"))
+		Expect(ExpandEnvPlaceholders("plain $$text", "my-ext", ExtensionsBaseDirectory)).To(Equal("plain $$text"))
 	})
 
 	It("leaves unknown placeholders as-is", func() {
-		Expect(ExpandEnvPlaceholders("${unknown}", "my-ext")).To(Equal("${unknown}"))
+		Expect(ExpandEnvPlaceholders("${unknown}", "my-ext", ExtensionsBaseDirectory)).To(Equal("${unknown}"))
 	})
 })

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -374,7 +375,7 @@ var _ = Describe("SetEnvVars", func() {
 			},
 		}
 
-		SetEnvVars(extensionsConfig, envMap)
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
 		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
 		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
 		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "foo_value"))
@@ -396,7 +397,7 @@ var _ = Describe("SetEnvVars", func() {
 			},
 		}
 
-		SetEnvVars(extensionsConfig, envMap)
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
 		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
 		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
 		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
@@ -422,7 +423,7 @@ var _ = Describe("SetEnvVars", func() {
 			},
 		}
 
-		SetEnvVars(extensionsConfig, envMap)
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
 		Expect(envMap).To(HaveKeyWithValue("ESCAPED", "${not_expanded}"))
 		Expect(envMap).To(HaveKeyWithValue("MIXED", "/extensions/foo/${literal}"))
 	})
@@ -450,7 +451,7 @@ var _ = Describe("SetEnvVars", func() {
 			},
 		}
 
-		SetEnvVars(extensionsConfig, envMap)
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
 		Expect(envMap).To(HaveKeyWithValue("PATH", "/usr/bin"))
 		Expect(envMap).To(HaveKeyWithValue("LD_LIBRARY_PATH", "/usr/lib"))
 		Expect(envMap).NotTo(HaveKey("PGDATA"))
@@ -485,7 +486,7 @@ var _ = Describe("SetEnvVars", func() {
 			},
 		}
 
-		SetEnvVars(extensionsConfig, envMap)
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
 		Expect(envMap).To(HaveKeyWithValue("SHARED", "from_ext2"))
 		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT1", "ext1_value"))
 		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT2", "ext2_value"))

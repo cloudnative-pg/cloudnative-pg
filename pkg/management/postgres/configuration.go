@@ -344,13 +344,18 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
-	// Set additional extensions
+	// Set additional extensions. During a major upgrade, extensions are mounted
+	// under the upgrade-target directory to coexist with the source-version set.
 	if cluster.Status.PGDataImageInfo != nil {
+		baseDir := postgres.ExtensionsBaseDirectory
+		if operationType == postgresClient.OperationType_TYPE_UPGRADE {
+			baseDir = postgres.UpgradeTargetExtensionsBaseDirectory
+		}
 		for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
 			info.AdditionalExtensions = append(
 				info.AdditionalExtensions,
 				postgres.AdditionalExtensionConfiguration{
-					Name:                 extension.Name,
+					MountPath:            filepath.Join(baseDir, extension.Name),
 					ExtensionControlPath: extension.ExtensionControlPath,
 					DynamicLibraryPath:   extension.DynamicLibraryPath,
 				},
