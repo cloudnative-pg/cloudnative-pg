@@ -592,6 +592,7 @@ WALCapabilities
 WALs
 WalBackupConfiguration
 WalClassName
+WalRestoreRetryTimeout
 Wallner
 XXu
 YXBw
