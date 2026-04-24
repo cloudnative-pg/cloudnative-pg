@@ -116,6 +116,23 @@ transparently configures replicas to take advantage of `restore_command` when in
 continuous recovery. As a result, PostgreSQL can use the WAL archive as a
 fallback option whenever pulling WALs via streaming replication fails.
 
+A transient failure of that restore — for example a network blip or a flaky
+object store — is distinct from a missing WAL segment: the former is worth
+retrying, the latter is not. CloudNativePG inspects the exit code of
+`barman-cloud-wal-restore` (or the gRPC status returned by the configured
+CNPG-i plugin) on every attempt and retries transient failures within a
+bounded budget. Only when the budget is exhausted does `restore_command`
+exit with code `255`, which tells PostgreSQL to stop log-shipping
+replication rather than promote on a partial archive. This behavior is
+especially important during a replica promotion: without it, a brief
+network glitch while draining the archive could cause the new primary to
+skip transactions that were already archived.
+
+The budget defaults to 5 minutes per invocation and is configurable through
+`.spec.walRestoreRetryTimeout` on the `Cluster` resource. A missing WAL
+still returns immediately with exit code `1`, so PostgreSQL's normal
+log-shipping-to-streaming transition is unaffected.
+
 ## Synchronous Replication
 
 CloudNativePG supports both
