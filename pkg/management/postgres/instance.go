@@ -792,13 +792,13 @@ func (instance *Instance) buildPostgresEnv() []string {
 	// custom Env from extensions. Guard against empty paths to avoid creating
 	// an empty LD_LIBRARY_PATH (glibc treats that as "search cwd").
 	exts := cluster.Status.PGDataImageInfo.Extensions
-	if paths := extensions.CollectLibraryPaths(exts); len(paths) > 0 {
+	if paths := extensions.CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
 		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
 	}
-	if paths := extensions.CollectBinPaths(exts); len(paths) > 0 {
+	if paths := extensions.CollectBinPaths(exts, postgres.ExtensionsBaseDirectory); len(paths) > 0 {
 		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
 	}
-	extensions.SetEnvVars(exts, envMap)
+	extensions.SetEnvVars(exts, envMap, postgres.ExtensionsBaseDirectory)
 
 	return envMap.StringSlice()
 }

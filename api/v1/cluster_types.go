@@ -1542,6 +1542,7 @@ type PostgresConfiguration struct {
 type ExtensionConfiguration struct {
 	// The name of the extension, required
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=59
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 

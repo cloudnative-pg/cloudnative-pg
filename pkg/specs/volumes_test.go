@@ -663,4 +663,19 @@ var _ = Describe("ImageVolume Extensions", func() {
 			Expect(SanitizeExtensionNameForVolume("pg__stat")).To(Equal("ext-pg--stat"))
 		})
 	})
+
+	Context("SanitizeExtensionNameForUpgradeTargetVolume", func() {
+		It("prefixes with new- instead of ext- and sanitizes underscores", func() {
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("pg_ivm")).To(Equal("new-pg-ivm"))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("foo")).To(Equal("new-foo"))
+		})
+
+		It("cannot collide with a steady-state volume name", func() {
+			// No user-chosen extension name can produce a volume starting with
+			// "new-" through SanitizeExtensionNameForVolume (which always
+			// prepends "ext-"), so the two prefixes are disjoint by construction.
+			Expect(SanitizeExtensionNameForVolume("new-foo")).
+				NotTo(Equal(SanitizeExtensionNameForUpgradeTargetVolume("foo")))
+		})
+	})
 })

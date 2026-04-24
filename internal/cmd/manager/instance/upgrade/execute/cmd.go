@@ -54,6 +54,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -436,13 +437,14 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 
 	// Use the target-version extensions so the new pgdata's
 	// extension_control_path and dynamic_library_path GUCs reflect the new
-	// image's layout. The prefix keeps names aligned with the Job's mount paths.
+	// image's layout. RefreshConfigurationFilesFromCluster is invoked with
+	// OperationType_TYPE_UPGRADE, which makes the config generator resolve
+	// these mounts under UpgradeTargetExtensionsBaseDirectory.
 	if tmpCluster.Status.PGDataImageInfo == nil || tmpCluster.Status.TargetPGDataImageInfo == nil {
 		return fmt.Errorf(
 			"cannot prepare configuration files: cluster status is missing PGDataImageInfo or TargetPGDataImageInfo")
 	}
-	tmpCluster.Status.PGDataImageInfo.Extensions = extensions.WithUpgradeTargetPrefix(
-		tmpCluster.Status.TargetPGDataImageInfo.Extensions)
+	tmpCluster.Status.PGDataImageInfo.Extensions = tmpCluster.Status.TargetPGDataImageInfo.Extensions
 
 	pgMajorVersion, err := postgresutils.GetMajorVersionFromPgData(destDir)
 	if err != nil {
@@ -622,21 +624,30 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 			"cannot set up extension environment: cluster status is missing TargetPGDataImageInfo")
 	}
 
-	allExtensions := slices.Concat(
-		cluster.Status.PGDataImageInfo.Extensions,
-		extensions.WithUpgradeTargetPrefix(cluster.Status.TargetPGDataImageInfo.Extensions),
-	)
+	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+	newExtensions := cluster.Status.TargetPGDataImageInfo.Extensions
 
 	envMap, _ := envmap.Parse(os.Environ())
 	before := maps.Clone(envMap)
 
-	if paths := extensions.CollectLibraryPaths(allExtensions); len(paths) > 0 {
-		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], paths)
+	libPaths := slices.Concat(
+		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectLibraryPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(libPaths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], libPaths)
 	}
-	if paths := extensions.CollectBinPaths(allExtensions); len(paths) > 0 {
-		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], paths)
+
+	binPaths := slices.Concat(
+		extensions.CollectBinPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectBinPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(binPaths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], binPaths)
 	}
-	extensions.SetEnvVars(allExtensions, envMap)
+
+	extensions.SetEnvVars(oldExtensions, envMap, postgresConfig.ExtensionsBaseDirectory)
+	extensions.SetEnvVars(newExtensions, envMap, postgresConfig.UpgradeTargetExtensionsBaseDirectory)
 
 	for name, value := range envMap {
 		if prev, ok := before[name]; ok && prev == value {

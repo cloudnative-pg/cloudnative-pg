@@ -139,11 +139,11 @@ func ValidateWithoutCatalog(cluster *apiv1.Cluster) ([]apiv1.ExtensionConfigurat
 }
 
 // CollectLibraryPaths returns a list of paths which should be added to LD_LIBRARY_PATH
-// given a list of extensions.
+// given a list of extensions mounted under baseDir.
 // NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
 // trailing "/" are cleaned), so "/lib", "./lib", and "lib" all resolve to the
 // same directory under the extension mount point.
-func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
 	capacity := 0
 	for _, ext := range extensionList {
 		capacity += len(ext.LdLibraryPath)
@@ -154,23 +154,11 @@ func CollectLibraryPaths(extensionList []apiv1.ExtensionConfiguration) []string 
 		for _, libraryPath := range extension.LdLibraryPath {
 			result = append(
 				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, libraryPath),
+				filepath.Join(baseDir, extension.Name, libraryPath),
 			)
 		}
 	}
 
-	return result
-}
-
-// WithUpgradeTargetPrefix returns a deep copy of the extensions with each
-// Name prefixed, so target-version entries can coexist with source-version
-// ones in the major upgrade Job without volume/mount name collisions.
-func WithUpgradeTargetPrefix(exts []apiv1.ExtensionConfiguration) []apiv1.ExtensionConfiguration {
-	result := make([]apiv1.ExtensionConfiguration, len(exts))
-	for i := range exts {
-		result[i] = *exts[i].DeepCopy()
-		result[i].Name = postgres.UpgradeTargetExtensionPrefix + exts[i].Name
-	}
 	return result
 }
 
@@ -181,10 +169,11 @@ var dedicatedEnvVars = map[string]bool{
 	"LD_LIBRARY_PATH": true,
 }
 
-// SetEnvVars applies custom Env entries from the given extensions into envMap,
-// expanding placeholders. Names reserved for operator use or covered by
-// dedicated fields are skipped, and overrides are logged as warnings.
-func SetEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap) {
+// SetEnvVars applies custom Env entries from the given extensions (mounted
+// under baseDir) into envMap, expanding placeholders like ${image_root}
+// against baseDir. Names reserved for operator use or covered by dedicated
+// fields are skipped; overrides are logged as warnings.
+func SetEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.EnvironmentMap, baseDir string) {
 	setBy := make(map[string]string)
 
 	for _, extension := range extensionList {
@@ -204,11 +193,11 @@ func SetEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap envmap.Envi
 				log.Warning("Extension environment variable overrides value from a previous extension",
 					"variable", envVar.Name, "extension", extension.Name, "previousExtension", prev)
 			} else if _, exists := envMap[envVar.Name]; exists {
-				log.Warning("Extension environment variable overrides a cluster-level value",
+				log.Warning("Extension environment variable overrides an existing value",
 					"variable", envVar.Name, "extension", extension.Name)
 			}
 
-			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name)
+			envMap[envVar.Name] = postgres.ExpandEnvPlaceholders(envVar.Value, extension.Name, baseDir)
 			setBy[envVar.Name] = extension.Name
 		}
 	}
@@ -226,12 +215,12 @@ func AppendPaths(existing string, extra []string) string {
 	return existing + ":" + strings.Join(extra, ":")
 }
 
-// CollectBinPaths returns a list of paths which should be added to PATH
-// given a list of extensions.
+// CollectBinPaths returns a list of paths which should be added to PATH given
+// a list of extensions mounted under baseDir.
 // NOTE: filepath.Join normalizes user-supplied paths (e.g. leading "/", "./" or
 // trailing "/" are cleaned), so "/bin", "./bin", and "bin" all resolve to the
 // same directory under the extension mount point.
-func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
+func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration, baseDir string) []string {
 	capacity := 0
 	for _, ext := range extensionList {
 		capacity += len(ext.BinPath)
@@ -242,7 +231,7 @@ func CollectBinPaths(extensionList []apiv1.ExtensionConfiguration) []string {
 		for _, binPath := range extension.BinPath {
 			result = append(
 				result,
-				filepath.Join(postgres.ExtensionsBaseDirectory, extension.Name, binPath),
+				filepath.Join(baseDir, extension.Name, binPath),
 			)
 		}
 	}
