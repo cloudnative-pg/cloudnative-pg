@@ -46,7 +46,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
-OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+OPERATOR_MANIFEST_PATH ?= ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
