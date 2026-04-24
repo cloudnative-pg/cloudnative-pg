@@ -516,12 +516,8 @@ var _ = Describe("PostgreSQL Extensions", func() {
 				MajorVersion:       18,
 				IncludingMandatory: true,
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
-					{
-						Name: "postgis",
-					},
-					{
-						Name: "pgvector",
-					},
+					{MountPath: ExtensionsBaseDirectory + "/postgis"},
+					{MountPath: ExtensionsBaseDirectory + "/pgvector"},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
@@ -539,12 +535,8 @@ var _ = Describe("PostgreSQL Extensions", func() {
 					DynamicLibraryPath:   "/my/library/path",
 				},
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
-					{
-						Name: "postgis",
-					},
-					{
-						Name: "pgvector",
-					},
+					{MountPath: ExtensionsBaseDirectory + "/postgis"},
+					{MountPath: ExtensionsBaseDirectory + "/pgvector"},
 				},
 			}
 			config := CreatePostgresqlConfiguration(info)
@@ -572,12 +564,12 @@ var _ = Describe("PostgreSQL Extensions", func() {
 				IncludingMandatory: true,
 				AdditionalExtensions: []AdditionalExtensionConfiguration{
 					{
-						Name:                 "geo",
+						MountPath:            ExtensionsBaseDirectory + "/geo",
 						ExtensionControlPath: []string{"postgis/share", "./pgrouting/share"},
 						DynamicLibraryPath:   []string{"postgis/lib/", "/pgrouting/lib/"},
 					},
 					{
-						Name:                 "utility",
+						MountPath:            ExtensionsBaseDirectory + "/utility",
 						ExtensionControlPath: []string{"pgaudit/share", "./pg-failover-slots/share"},
 						DynamicLibraryPath:   []string{"pgaudit/lib/", "/pg-failover-slots/lib/"},
 					},

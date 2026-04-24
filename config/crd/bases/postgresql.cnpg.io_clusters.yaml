@@ -4536,6 +4536,7 @@ spec:
                           type: array
                         name:
                           description: The name of the extension, required
+                          maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
@@ -7223,6 +7224,7 @@ spec:
                           type: array
                         name:
                           description: The name of the extension, required
+                          maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
@@ -7550,6 +7552,7 @@ spec:
                           type: array
                         name:
                           description: The name of the extension, required
+                          maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                           type: string
