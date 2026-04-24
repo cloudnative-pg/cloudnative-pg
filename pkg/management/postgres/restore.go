@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"github.com/kballard/go-shellquote"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -639,23 +640,10 @@ func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, err
 
 	cmd = append(cmd, "%f", "%p")
 
-	quoted := make([]string, len(cmd))
-	for i, a := range cmd {
-		quoted[i] = shellQuote(a)
-	}
-
 	return configfile.RenderPostgresConfiguration(map[string]string{
 		"recovery_target_action": "promote",
-		"restore_command":        strings.Join(quoted, " "),
+		"restore_command":        shellquote.Join(cmd...),
 	}), nil
-}
-
-// shellQuote wraps s so a POSIX shell sees it as a single literal argument.
-// restore_command is executed via system(), which runs /bin/sh -c. Without
-// quoting, a value containing whitespace or other shell metacharacters would
-// be word-split before barman-cloud-wal-restore ever sees it.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {

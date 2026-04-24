@@ -220,13 +220,13 @@ var _ = Describe("getRestoreWalConfig", func() {
 			out, err := getRestoreWalConfig(ctx, backup)
 			Expect(err).ToNot(HaveOccurred())
 
-			// shellQuote wraps the value as 'has'\''quote' (close, escape, reopen).
+			// shellQuote wraps the value as has\'quote (escape).
 			// configfile.EscapePostgresConfLiteral then doubles every ' and \,
 			// yielding the exact form below at the config-file layer.
-			Expect(out).To(ContainSubstring(`''s3://bucket/has''\\''''quote''`))
-			// ServerName has no shell metachars — shellQuote wraps in single
-			// quotes; config layer doubles those quotes and the backslash.
-			Expect(out).To(ContainSubstring(`''server\\name''`))
+			Expect(out).To(ContainSubstring(`s3://bucket/has\\''quote`))
+			// shellQuote quotes `\` to `\\` — config layer doubles the
+			// backslash.
+			Expect(out).To(ContainSubstring(`server\\\\name`))
 
 			// Raw unescaped forms must not appear — either would let the user
 			// break out of the config-file string literal.
@@ -250,24 +250,9 @@ var _ = Describe("getRestoreWalConfig", func() {
 			// each of those single quotes, so the value appears as ''...'' in
 			// the config file.
 			Expect(out).To(ContainSubstring("''s3://my bucket/wal''"))
-			Expect(out).To(ContainSubstring("''server-a''"))
-			Expect(out).To(ContainSubstring("''%f''"))
-			Expect(out).To(ContainSubstring("''%p''"))
-		})
-})
 
-var _ = Describe("shellQuote", func() {
-	DescribeTable("produces a single POSIX-shell literal token",
-		func(in, want string) {
-			Expect(shellQuote(in)).To(Equal(want))
-		},
-		Entry("empty", "", `''`),
-		Entry("no metachars", "foo", `'foo'`),
-		Entry("space", "foo bar", `'foo bar'`),
-		Entry("embedded single quote", "foo'bar", `'foo'\''bar'`),
-		Entry("multiple single quotes", "a'b'c", `'a'\''b'\''c'`),
-		Entry("backslash", `foo\bar`, `'foo\bar'`),
-		Entry("newline", "foo\nbar", "'foo\nbar'"),
-		Entry("only a single quote", "'", `''\'''`),
-	)
+			// PostgreSQL will replace %f %p with proper quoting when needed.
+			Expect(out).To(ContainSubstring("%f"))
+			Expect(out).To(ContainSubstring("%p"))
+		})
 })
