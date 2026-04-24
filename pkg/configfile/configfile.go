@@ -120,6 +120,24 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	return lines, nil
 }
 
+// RenderPostgresConfiguration returns a PostgreSQL configuration fragment as
+// a single string: one `key = 'escaped value'\n` line per entry in options,
+// sorted by key. The returned string is safe to concatenate with other
+// fragments and to embed directly into a `postgresql.conf`-style file.
+//
+// This is the canonical way to produce a config fragment in-memory: callers
+// that build strings by hand can forget to escape values, while this funnels
+// every value through the same escaping that the on-disk parser uses.
+func RenderPostgresConfiguration(options map[string]string) string {
+	lines, _ := UpdateConfigurationContents(nil, options)
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString(l)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 // WritePostgresConfiguration replaces the content of a PostgreSQL configuration
 // file with the provided options
 func WritePostgresConfiguration(

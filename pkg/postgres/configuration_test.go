@@ -111,6 +111,31 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		))
 	})
 
+	It("produces a byte-exact, reproducible layout", func() {
+		// Lock the on-disk layout of postgresql.conf:
+		//   1. non-cnpg keys sorted alphabetically
+		//   2. cnpg.* keys (other than the sha256) sorted alphabetically
+		//   3. cnpg.config_sha256 ALWAYS last
+		// The sha256 hash is computed over (1) only. Any deviation from this
+		// layout changes every cluster's config-file bytes on upgrade and
+		// must be done deliberately.
+		settings := map[string]string{
+			"max_connections":    "100",
+			"shared_buffers":     "128MB",
+			"cnpg.some_internal": "value",
+		}
+		confFile, sum := CreatePostgresqlConfFile(&PgConfiguration{settings})
+
+		const expectedHash = "61d267eaf0cf58ed4279ce5fdd3866b1d9874ff4f63539f6933df62450933d8a"
+		expected := "max_connections = '100'\n" +
+			"shared_buffers = '128MB'\n" +
+			"cnpg.some_internal = 'value'\n" +
+			"cnpg.config_sha256 = '" + expectedHash + "'\n"
+
+		Expect(sum).To(Equal(expectedHash))
+		Expect(confFile).To(Equal(expected))
+	})
+
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{

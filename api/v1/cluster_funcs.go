@@ -1473,37 +1473,34 @@ func (cluster *Cluster) EnsureGVKIsPresent() {
 // should be added to the PostgreSQL configuration to
 // recover given a certain target
 func (target *RecoveryTarget) BuildPostgresOptions() string {
-	result := ""
-
 	if target == nil {
-		return result
+		return ""
 	}
 
+	// String-typed recovery targets go through the parser so that any
+	// user-supplied value is correctly escaped.
+	options := map[string]string{}
 	if target.TargetTLI != "" {
-		result += fmt.Sprintf(
-			"recovery_target_timeline = %s\n",
-			configfile.EscapePostgresConfLiteral(target.TargetTLI))
+		options["recovery_target_timeline"] = target.TargetTLI
 	}
 	if target.TargetXID != "" {
-		result += fmt.Sprintf(
-			"recovery_target_xid = %s\n",
-			configfile.EscapePostgresConfLiteral(target.TargetXID))
+		options["recovery_target_xid"] = target.TargetXID
 	}
 	if target.TargetName != "" {
-		result += fmt.Sprintf(
-			"recovery_target_name = %s\n",
-			configfile.EscapePostgresConfLiteral(target.TargetName))
+		options["recovery_target_name"] = target.TargetName
 	}
 	if target.TargetLSN != "" {
-		result += fmt.Sprintf(
-			"recovery_target_lsn = %s\n",
-			configfile.EscapePostgresConfLiteral(target.TargetLSN))
+		options["recovery_target_lsn"] = target.TargetLSN
 	}
 	if target.TargetTime != "" {
-		result += fmt.Sprintf(
-			"recovery_target_time = %s\n",
-			configfile.EscapePostgresConfLiteral(pgTime.ConvertToPostgresFormat(target.TargetTime)))
+		options["recovery_target_time"] = pgTime.ConvertToPostgresFormat(target.TargetTime)
 	}
+
+	result := configfile.RenderPostgresConfiguration(options)
+
+	// Enum-typed recovery targets are emitted as barewords to preserve the
+	// legacy on-disk format. Their values come from a fixed, non-user-
+	// controlled set (immediate / true / false), so escaping is unnecessary.
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
 	}

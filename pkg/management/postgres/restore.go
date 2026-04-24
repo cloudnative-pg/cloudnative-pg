@@ -148,10 +148,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	restoreCmd := fmt.Sprintf(
 		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 		postgresSpec.LogPath, postgresSpec.LogFileName)
-	config := fmt.Sprintf(
-		"recovery_target_action = promote\n"+
-			"restore_command = %s\n",
-		configfile.EscapePostgresConfLiteral(restoreCmd))
+	config := configfile.RenderPostgresConfiguration(map[string]string{
+		"recovery_target_action": "promote",
+		"restore_command":        restoreCmd,
+	})
 
 	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration == nil {
 		server, found := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
@@ -639,12 +639,10 @@ func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, err
 
 	cmd = append(cmd, "%f", "%p")
 
-	recoveryFileContents := fmt.Sprintf(
-		"recovery_target_action = promote\n"+
-			"restore_command = %s\n",
-		configfile.EscapePostgresConfLiteral(strings.Join(cmd, " ")))
-
-	return recoveryFileContents, nil
+	return configfile.RenderPostgresConfiguration(map[string]string{
+		"recovery_target_action": "promote",
+		"restore_command":        strings.Join(cmd, " "),
+	}), nil
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
