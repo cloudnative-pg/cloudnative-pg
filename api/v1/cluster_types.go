@@ -385,6 +385,25 @@ type ClusterSpec struct {
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
 
+	// WalRestoreRetryTimeout bounds how long a single invocation of
+	// `manager wal-restore` retries transient failures (network blips,
+	// flaky object stores, plugin glitches) before asking PostgreSQL to
+	// stop log-shipping replication with exit code 255. Without this
+	// bound, a transient failure during a replica promotion can cause the
+	// replica to promote on a partial archive, losing already-archived
+	// transactions.
+	//
+	// "WAL not found" outcomes are never retried: they flow straight back
+	// to PostgreSQL so log-shipping can hand off to streaming replication
+	// as usual. The budget only applies to errors that look recoverable
+	// (any barman-cloud exit code other than 0 or 1, or any gRPC status
+	// from a CNPG-i plugin other than `Ok` or `NotFound`).
+	//
+	// Must be positive. Defaults to 5 minutes when unset.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="duration(self) > duration('0s')",message="walRestoreRetryTimeout must be a positive duration"
+	WalRestoreRetryTimeout *metav1.Duration `json:"walRestoreRetryTimeout,omitempty"`
+
 	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
 	// to successfully respond to the liveness probe (default 30).
 	// The Liveness probe failure threshold is derived from this value using the formula:
