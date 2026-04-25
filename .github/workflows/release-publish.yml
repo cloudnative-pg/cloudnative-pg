@@ -97,7 +97,7 @@ jobs:
           --bundle "releases/cnpg-${VERSION}.sigstore.json" --yes
       -
         name: Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           body_path: release_notes.md
           draft: false
@@ -112,7 +112,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'cloudnative-pg' && 'ubuntu-latest-16-cores' || 'ubuntu-24.04' }}
     permissions:
       packages: write
       contents: write
@@ -136,7 +136,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -181,9 +181,12 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
           echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
+        name: Install Syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      -
         name: Run GoReleaser
         id: goreleaser
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@e24998b8b67b290c2fa8b7c14fcfa7de2c5c9b8c # v7
         with:
           distribution: goreleaser
           version: v2
@@ -230,14 +233,14 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       -
         name: Login to ghcr.io
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
+        uses: docker/bake-action@a66e1c87e2eca0503c343edf1d208c716d54b8a8 # v7
         id: bake-push
         env:
           BUILDX_METADATA_PROVENANCE: disabled
@@ -358,7 +361,7 @@ jobs:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
       - name: Install Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
           check-latest: true
@@ -367,7 +370,7 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login to ghcr.io
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -390,7 +393,7 @@ jobs:
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: bundle
           path: |
@@ -402,11 +405,14 @@ jobs:
     name: Create remote PR for OperatorHub
     runs-on: ubuntu-24.04
     needs:
+      - check-version
       - release-binaries
       - olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success'
+      needs.olm-bundle.result == 'success' &&
+      needs.check-version.outputs.is_latest == 'true' &&
+      needs.check-version.outputs.is_stable == 'true'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     steps:
@@ -418,7 +424,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
 
@@ -428,8 +434,14 @@ jobs:
           cp -R bundle/* "operators/cloudnative-pg/${VERSION}"
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
+      - name: Add replaces field to CSV
+        run: |
+          CSV_FILE="operators/cloudnative-pg/${VERSION}/manifests/cloudnative-pg.clusterserviceversion.yaml"
+          PREVIOUS_VERSION=$(ls -d operators/cloudnative-pg/[0-9]* | sort -V | tail -2 | head -1 | xargs basename)
+          sed -i "s/^  relatedImages:/  replaces: cloudnative-pg.v${PREVIOUS_VERSION}\n  relatedImages:/" "${CSV_FILE}"
+
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
@@ -504,7 +516,7 @@ jobs:
           git config user.name "${AUTHOR_NAME}"
       -
         name: Download the bundle
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bundle
       -
@@ -526,7 +538,7 @@ jobs:
           git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
-        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
+        uses: ad-m/github-push-action@4cc74773234f74829a8c21bc4d69dd4be9cfa599 # v1.1.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts

@@ -46,7 +46,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
-OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+OPERATOR_MANIFEST_PATH ?= ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
@@ -55,22 +55,22 @@ PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/ve
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize versioning=loose
 KUSTOMIZE_VERSION ?= v5.6.0
 # renovate: datasource=go depName=sigs.k8s.io/controller-tools
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+CONTROLLER_TOOLS_VERSION ?= v0.20.1
 # renovate: datasource=go depName=github.com/elastic/crd-ref-docs
 CRDREFDOCS_VERSION ?= v0.3.0
 # renovate: datasource=go depName=github.com/goreleaser/goreleaser
-GORELEASER_VERSION ?= v2.14.2
+GORELEASER_VERSION ?= v2.15.4
 # renovate: datasource=docker depName=jonasbn/github-action-spellcheck versioning=docker
-SPELLCHECK_VERSION ?= 0.58.0
+SPELLCHECK_VERSION ?= 0.60.0
 # renovate: datasource=docker depName=getwoke/woke versioning=docker
 WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
-OPERATOR_SDK_VERSION ?= v1.42.0
+OPERATOR_SDK_VERSION ?= v1.42.2
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.64.0
+OPM_VERSION ?= v1.65.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
-PREFLIGHT_VERSION ?= 1.16.0
-OPENSHIFT_VERSIONS ?= v4.14-v4.21
+PREFLIGHT_VERSION ?= 1.17.1
+OPENSHIFT_VERSIONS ?= v4.16-v4.21
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -219,15 +219,6 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
-install: manifests kustomize ## Install CRDs into a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
-
-uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
-	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
-
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\

@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -315,8 +316,8 @@ var _ = Describe("buildPostgresEnv", func() {
 
 	Context("Extensions enabled, LD_LIBRARY_PATH undefined", func() {
 		It("should be empty by default", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
 		})
 	})
 
@@ -339,14 +340,55 @@ var _ = Describe("buildPostgresEnv", func() {
 		})
 
 		It("should be defined", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(Equal(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=%s", finalPaths)))
 		})
 		It("should retain existing values", func() {
 			GinkgoT().Setenv("LD_LIBRARY_PATH", "/my/library/path")
 
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEquivalentTo(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("LD_LIBRARY_PATH=/my/library/path:%s", finalPaths)))
+		})
+	})
+
+	Context("Extensions enabled, no bin_path configured", func() {
+		It("should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
+		})
+	})
+
+	Context("Extensions enabled, PATH defined", func() {
+		const (
+			path1 = postgres.ExtensionsBaseDirectory + "/foo/bindir"
+			path2 = postgres.ExtensionsBaseDirectory + "/foo/sample"
+			path3 = postgres.ExtensionsBaseDirectory + "/bar/bindir"
+			path4 = postgres.ExtensionsBaseDirectory + "/bar/sample"
+		)
+		finalPaths := strings.Join([]string{path1, path2, path3, path4}, ":")
+
+		BeforeEach(func() {
+			// Update the spec
+			cluster.Spec.PostgresConfiguration.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Spec.PostgresConfiguration.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+			// Update the status
+			cluster.Status.PGDataImageInfo.Extensions[0].BinPath = []string{"/bindir", "sample/"}
+			cluster.Status.PGDataImageInfo.Extensions[1].BinPath = []string{"./bindir", "./sample/"}
+		})
+
+		It("should be defined", func() {
+			GinkgoT().Setenv("PATH", "")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=%s", finalPaths)))
+		})
+		It("should retain existing values", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement(fmt.Sprintf("PATH=/my/default/path:%s", finalPaths)))
 		})
 	})
 
@@ -356,24 +398,160 @@ var _ = Describe("buildPostgresEnv", func() {
 			cluster.Status.PGDataImageInfo.Extensions = []apiv1.ExtensionConfiguration{}
 		})
 		It("LD_LIBRARY_PATH should be empty", func() {
-			ldLibraryPath := getLibraryPathFromEnv(instance.buildPostgresEnv())
-			Expect(ldLibraryPath).To(BeEmpty())
+			env := instance.buildPostgresEnv()
+			Expect(env).ToNot(ContainElement(HavePrefix("LD_LIBRARY_PATH=")))
+		})
+		It("PATH should not be modified", func() {
+			GinkgoT().Setenv("PATH", "/my/default/path")
+
+			env := instance.buildPostgresEnv()
+			Expect(env).To(ContainElement("PATH=/my/default/path"))
 		})
 	})
 })
 
-func getLibraryPathFromEnv(envs []string) string {
-	var ldLibraryPath string
-
-	for i := len(envs) - 1; i >= 0; i-- {
-		if strings.HasPrefix(envs[i], "LD_LIBRARY_PATH=") {
-			ldLibraryPath = envs[i]
-			break
+var _ = Describe("setExtensionEnvVars", func() {
+	var envMap envmap.EnvironmentMap
+	BeforeEach(func() {
+		envMap = envmap.EnvironmentMap{
+			"BAR_ENV": "bar_value",
+			"BAZ_ENV": "baz_value",
 		}
-	}
+	})
 
-	return ldLibraryPath
-}
+	It("should add the extension's env variables", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "foo_value"))
+	})
+
+	It("should expand placeholders", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "${image_root}/foo_value",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
+	})
+
+	It("should unescape $${...} to literal ${...}", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "ESCAPED",
+						Value: "$${not_expanded}",
+					},
+					{
+						Name:  "MIXED",
+						Value: "${image_root}/$${literal}",
+					},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("ESCAPED", "${not_expanded}"))
+		Expect(envMap).To(HaveKeyWithValue("MIXED", "/extensions/foo/${literal}"))
+	})
+
+	It("should skip reserved environment variables", func() {
+		envMap["PATH"] = "/usr/bin"
+		envMap["LD_LIBRARY_PATH"] = "/usr/lib"
+
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PATH", Value: "/evil/path"},
+					{Name: "LD_LIBRARY_PATH", Value: "/evil/lib"},
+					{Name: "PGDATA", Value: "/evil/data"},
+					{Name: "CNPG_SECRET", Value: "stolen"},
+					{Name: "POD_NAME", Value: "fake"},
+					{Name: "NAMESPACE", Value: "fake"},
+					{Name: "CLUSTER_NAME", Value: "fake"},
+					{Name: "SAFE_VAR", Value: "allowed"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("PATH", "/usr/bin"))
+		Expect(envMap).To(HaveKeyWithValue("LD_LIBRARY_PATH", "/usr/lib"))
+		Expect(envMap).NotTo(HaveKey("PGDATA"))
+		Expect(envMap).NotTo(HaveKey("CNPG_SECRET"))
+		Expect(envMap).NotTo(HaveKey("POD_NAME"))
+		Expect(envMap).NotTo(HaveKey("NAMESPACE"))
+		Expect(envMap).NotTo(HaveKey("CLUSTER_NAME"))
+		Expect(envMap).To(HaveKeyWithValue("SAFE_VAR", "allowed"))
+	})
+
+	It("should let the last extension win when multiple define the same variable", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "ext1",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext1:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext1"},
+					{Name: "ONLY_EXT1", Value: "ext1_value"},
+				},
+			},
+			{
+				Name: "ext2",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext2:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext2"},
+					{Name: "ONLY_EXT2", Value: "ext2_value"},
+				},
+			},
+		}
+
+		setExtensionEnvVars(extensionsConfig, envMap)
+		Expect(envMap).To(HaveKeyWithValue("SHARED", "from_ext2"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT1", "ext1_value"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT2", "ext2_value"))
+	})
+})
 
 var _ = Describe("GetPrimaryConnInfo", func() {
 	var instance *Instance

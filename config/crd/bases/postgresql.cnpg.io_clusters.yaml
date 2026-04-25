@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: clusters.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -4338,6 +4338,82 @@ spec:
                         type: string
                     type: object
                 type: object
+              podSelectorRefs:
+                description: |-
+                  PodSelectorRefs defines named pod label selectors that can be referenced
+                  in pg_hba rules using the ${podselector:NAME} syntax in the address field.
+                  The operator resolves matching pod IPs and the instance manager expands
+                  pg_hba lines accordingly. Only pods in the Cluster's own namespace are considered.
+                items:
+                  description: |-
+                    PodSelectorRef defines a named pod label selector for use in pg_hba rules.
+                    Pods matching the selector in the Cluster's namespace will have their IPs
+                    resolved and made available for pg_hba address expansion via the
+                    `${podselector:NAME}` syntax.
+                  properties:
+                    name:
+                      description: |-
+                        Name is the identifier used to reference this selector in pg_hba rules
+                        via the ${podselector:NAME} syntax in the address field.
+                      minLength: 1
+                      pattern: ^[a-z]([a-z0-9_-]*[a-z0-9])?$
+                      type: string
+                    selector:
+                      description: |-
+                        Selector is a label selector that identifies the pods whose IPs
+                        should be resolved. Only pods in the Cluster's namespace are considered.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - name
+                  - selector
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               postgresGID:
                 default: 26
                 description: The GID of the `postgres` user inside the image, defaults
@@ -4367,6 +4443,13 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: |-
+                            A list of directories within the image to be appended to the
+                            PostgreSQL process's `PATH` environment variable.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.
@@ -4374,6 +4457,45 @@ spec:
                           items:
                             type: string
                           type: array
+                        env:
+                          description: |-
+                            Env is a list of custom environment variables to be set in the
+                            PostgreSQL process for this extension. It is the responsibility of the
+                            cluster administrator to ensure the variables are correct for the
+                            specific extension. Note that changes to these variables require
+                            a manual cluster restart to take effect.
+                          items:
+                            description: |-
+                              ExtensionEnvVar defines an environment variable for a specific extension
+                              image volume.
+                            properties:
+                              name:
+                                description: |-
+                                  Name of the environment variable to be injected into the
+                                  PostgreSQL process.
+                                minLength: 1
+                                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                type: string
+                              value:
+                                description: |-
+                                  Value of the environment variable. CloudNativePG performs a direct
+                                  replacement of this value, with support for placeholder expansion.
+                                  The ${`image_root`} placeholder resolves to the absolute mount path
+                                  of the extension's volume (e.g., `/extensions/my-extension`). This
+                                  is particularly useful for allowing applications or libraries to
+                                  locate specific directories within the mounted image.
+                                  Unrecognized placeholders are rejected. To include a literal ${...}
+                                  in the value, escape it as $${...}.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         extension_control_path:
                           description: |-
                             The list of directories inside the image which should be added to extension_control_path.
@@ -4501,7 +4623,9 @@ spec:
                   pg_hba:
                     description: |-
                       PostgreSQL Host Based Authentication rules (lines to be appended
-                      to the pg_hba.conf file)
+                      to the pg_hba.conf file).
+                      Use the ${podselector:NAME} syntax to reference a pod selector;
+                      the rule will be expanded for each Pod IP matching that selector.
                     items:
                       type: string
                     type: array
@@ -5708,6 +5832,20 @@ spec:
                         type: string
                     type: object
                 type: object
+              serviceAccountName:
+                description: |-
+                  Name of an existing ServiceAccount in the same namespace to use for the cluster.
+                  When specified, the operator will not create a new ServiceAccount
+                  but will use the provided one. This is useful for sharing a single
+                  ServiceAccount across multiple clusters (e.g., for cloud IAM configurations).
+                  If not specified, a ServiceAccount will be created with the cluster name.
+                  Mutually exclusive with ServiceAccountTemplate.
+                maxLength: 253
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
+                x-kubernetes-validations:
+                - message: serviceAccountName is immutable
+                  rule: self == oldSelf
               serviceAccountTemplate:
                 description: Configure the generation of the service account
                 properties:
@@ -6991,6 +7129,13 @@ spec:
                         ExtensionConfiguration is the configuration used to add
                         PostgreSQL extensions to the Cluster.
                       properties:
+                        bin_path:
+                          description: |-
+                            A list of directories within the image to be appended to the
+                            PostgreSQL process's `PATH` environment variable.
+                          items:
+                            type: string
+                          type: array
                         dynamic_library_path:
                           description: |-
                             The list of directories inside the image which should be added to dynamic_library_path.
@@ -6998,6 +7143,45 @@ spec:
                           items:
                             type: string
                           type: array
+                        env:
+                          description: |-
+                            Env is a list of custom environment variables to be set in the
+                            PostgreSQL process for this extension. It is the responsibility of the
+                            cluster administrator to ensure the variables are correct for the
+                            specific extension. Note that changes to these variables require
+                            a manual cluster restart to take effect.
+                          items:
+                            description: |-
+                              ExtensionEnvVar defines an environment variable for a specific extension
+                              image volume.
+                            properties:
+                              name:
+                                description: |-
+                                  Name of the environment variable to be injected into the
+                                  PostgreSQL process.
+                                minLength: 1
+                                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                type: string
+                              value:
+                                description: |-
+                                  Value of the environment variable. CloudNativePG performs a direct
+                                  replacement of this value, with support for placeholder expansion.
+                                  The ${`image_root`} placeholder resolves to the absolute mount path
+                                  of the extension's volume (e.g., `/extensions/my-extension`). This
+                                  is particularly useful for allowing applications or libraries to
+                                  locate specific directories within the mounted image.
+                                  Unrecognized placeholders are rejected. To include a literal ${...}
+                                  in the value, escape it as $${...}.
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         extension_control_path:
                           description: |-
                             The list of directories inside the image which should be added to extension_control_path.
@@ -7114,6 +7298,31 @@ spec:
                   - version
                   type: object
                 type: array
+              podSelectorRefs:
+                description: |-
+                  PodSelectorRefs contains the resolved pod IPs for each named selector
+                  defined in spec.podSelectorRefs.
+                items:
+                  description: PodSelectorRefStatus contains the resolved pod IPs
+                    for a named selector.
+                  properties:
+                    ips:
+                      description: |-
+                        IPs is the list of pod IPs matching the selector.
+                        Each IP is a single address (no CIDR notation).
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: Name corresponds to the name in the spec's PodSelectorRef.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               poolerIntegrations:
                 description: The integration needed by poolers referencing the cluster
                 properties:

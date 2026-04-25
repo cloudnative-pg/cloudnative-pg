@@ -70,6 +70,9 @@ const (
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
 
+	// ClusterRoleLabelUnhealthy is applied to the old primary when a failover starts.
+	ClusterRoleLabelUnhealthy = "unhealthy"
+
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
@@ -121,8 +124,8 @@ func (c EnvConfig) IsEnvEqual(container corev1.Container) bool {
 
 // CreatePodEnvConfig returns the hash of pod env configuration
 func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
-	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
-	// function in `cluster_webhook.go` too.
+	// When adding an environment variable here, remember to change the `IsReservedEnvironmentVariable`
+	// function in `pkg/postgres/environment.go` too.
 	config := EnvConfig{
 		EnvVars: []corev1.EnvVar{
 			{
@@ -196,7 +199,7 @@ func createClusterPodSpec(
 		SecurityContext:               GetPodSecurityContext(&cluster),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
-		ServiceAccountName:            cluster.Name,
+		ServiceAccountName:            cluster.GetServiceAccountName(),
 		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 		TerminationGracePeriodSeconds: &gracePeriod,
 		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,

@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -400,6 +401,7 @@ func (r *ClusterReconciler) serviceReconciler(
 			return nil
 		}
 		contextLogger.Info("creating service")
+		servicespec.SetLastApplied(&proposed.ObjectMeta, &proposed.Spec)
 		return r.Create(ctx, proposed)
 	}
 	if err != nil {
@@ -421,12 +423,6 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 	var shouldUpdate bool
 
-	// we ensure that the selector perfectly match
-	if !reflect.DeepEqual(proposed.Spec.Selector, livingService.Spec.Selector) {
-		livingService.Spec.Selector = proposed.Spec.Selector
-		shouldUpdate = true
-	}
-
 	// we ensure we've some space to store the labels and the annotations
 	if livingService.Labels == nil {
 		livingService.Labels = make(map[string]string)
@@ -446,13 +442,25 @@ func (r *ClusterReconciler) serviceReconciler(
 		shouldUpdate = true
 	}
 
+	// Three-way merge: start from living spec, overlay proposed changes,
+	// and use last-applied annotation to detect intentional field removals
+	patchedSpec := livingService.Spec.DeepCopy()
+	if err := servicespec.ApplyProposedChanges(patchedSpec, &proposed.Spec, livingService.Annotations); err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(*patchedSpec, livingService.Spec) {
+		livingService.Spec = *patchedSpec
+		shouldUpdate = true
+	}
+
 	if !shouldUpdate {
 		return nil
 	}
 
 	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		// Store the proposed spec for future three-way merges
+		servicespec.SetLastApplied(&livingService.ObjectMeta, &proposed.Spec)
 		contextLogger.Info("reconciling service")
-		// we update to ensure that we substitute the selectors
 		return r.Update(ctx, &livingService)
 	}
 
@@ -570,6 +578,10 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 // createOrPatchServiceAccount creates or synchronizes the ServiceAccount used by the
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Spec.ServiceAccountName != "" {
+		return r.validateExistingServiceAccount(ctx, cluster)
+	}
+
 	var sa corev1.ServiceAccount
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -601,6 +613,26 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
 	if err := r.Patch(ctx, &sa, client.MergeFrom(origSa)); err != nil {
 		return fmt.Errorf("while patching service account: %w", err)
+	}
+
+	return nil
+}
+
+// validateExistingServiceAccount checks if the specified ServiceAccount exists
+func (r *ClusterReconciler) validateExistingServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
+	var sa corev1.ServiceAccount
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      cluster.Spec.ServiceAccountName,
+		Namespace: cluster.Namespace,
+	}, &sa)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "ServiceAccountNotFound",
+				"Specified ServiceAccount %q not found in namespace %q",
+				cluster.Spec.ServiceAccountName, cluster.Namespace)
+			return fmt.Errorf("serviceAccount %q not found: %w", cluster.Spec.ServiceAccountName, err)
+		}
+		return fmt.Errorf("while validating existing service account: %w", err)
 	}
 
 	return nil
@@ -1033,7 +1065,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
-	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
+	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta, cluster.GetServiceAccountName())
 	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)
@@ -1253,7 +1285,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
 
 	// If we can bootstrap this replica from a pre-existing source, we do it
-	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
+	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, r.Client, cluster, backupList)
 	if storageSource != nil {
 		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
 	}

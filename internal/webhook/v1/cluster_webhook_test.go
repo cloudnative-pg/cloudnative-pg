@@ -3908,16 +3908,6 @@ var _ = Describe("Environment variables validation", func() {
 		v = &ClusterCustomValidator{}
 	})
 
-	When("an environment variable is given", func() {
-		It("detects if it is valid", func() {
-			Expect(isReservedEnvironmentVariable("PGDATA")).To(BeTrue())
-		})
-
-		It("detects if it is not valid", func() {
-			Expect(isReservedEnvironmentVariable("LC_ALL")).To(BeFalse())
-		})
-	})
-
 	When("a ClusterSpec is given", func() {
 		It("detects if the environment variable list is correct", func() {
 			cluster := &apiv1.Cluster{
@@ -5568,6 +5558,31 @@ var _ = Describe("validateExtensions", func() {
 		Expect(v.validateExtensions(cluster)).To(BeEmpty())
 	})
 
+	It("returns no error when LdLibraryPath and BinPath are valid", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/opt/custom/lib",
+							},
+							BinPath: []string{
+								"/opt/custom/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateExtensions(cluster)).To(BeEmpty())
+	})
+
 	It("returns errors for duplicate ExtensionControlPath entries", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -5677,6 +5692,129 @@ var _ = Describe("validateExtensions", func() {
 		Expect(err[0].Field).To(ContainSubstring("extensions[0].ld_library_path[1]"))
 	})
 
+	It("returns errors for duplicate BinPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							BinPath: []string{
+								"/usr/local/bin",
+								"/opt/custom/bin",
+								"/usr/local/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[2]"))
+		Expect(err[0].BadValue).To(Equal("/usr/local/bin"))
+	})
+
+	It("returns an error for empty BinPath entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							BinPath: []string{
+								"/valid/path",
+								"",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+		Expect(err[0].Field).To(ContainSubstring("extensions[0].bin_path[1]"))
+	})
+
+	It("returns an error for path traversal in path lists", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							ExtensionControlPath: []string{
+								"../../etc",
+							},
+							DynamicLibraryPath: []string{
+								"../escape",
+							},
+							LdLibraryPath: []string{
+								"lib/../../../secret",
+							},
+							BinPath: []string{
+								"../bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(4))
+		Expect(err[0].Field).To(ContainSubstring("extension_control_path[0]"))
+		Expect(err[1].Field).To(ContainSubstring("dynamic_library_path[0]"))
+		Expect(err[2].Field).To(ContainSubstring("ld_library_path[0]"))
+		Expect(err[3].Field).To(ContainSubstring("bin_path[0]"))
+	})
+
+	It("returns errors for duplicates in both LdLibraryPath and BinPath", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							LdLibraryPath: []string{
+								"/usr/lib/postgresql/lib",
+								"/usr/lib/postgresql/lib",
+							},
+							BinPath: []string{
+								"/usr/lib/postgresql/bin",
+								"/usr/lib/postgresql/bin",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/bin"))
+	})
+
 	It("returns errors for duplicates in both ExtensionControlPath and DynamicLibraryPath", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -5709,6 +5847,177 @@ var _ = Describe("validateExtensions", func() {
 
 		Expect(err[1].Type).To(Equal(field.ErrorTypeDuplicate))
 		Expect(err[1].BadValue).To(Equal("/usr/lib/postgresql/lib"))
+	})
+
+	It("returns an error for forbidden env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "PATH",
+									Value: "/my/binary/path",
+								},
+								{
+									Name:  "LD_LIBRARY_PATH",
+									Value: "/my/library/path",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[0].name"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(err[1].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
+	It("returns an error for reserved env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "PGDATA",
+									Value: "/some/path",
+								},
+								{
+									Name:  "CNPG_SECRET",
+									Value: "some_value",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(2))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[0].name"))
+		Expect(err[0].BadValue).To(Equal("PGDATA"))
+
+		Expect(err[1].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[1].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+		Expect(err[1].BadValue).To(Equal("CNPG_SECRET"))
+	})
+
+	It("returns an error for duplicate env entries", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "FOO",
+									Value: "foo",
+								},
+								{
+									Name:  "FOO",
+									Value: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeDuplicate))
+		Expect(err[0].BadValue).To(Equal("FOO"))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].name"))
+	})
+
+	It("returns an error for unknown placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "GOOD",
+									Value: "${image_root}/lib",
+								},
+								{
+									Name:  "BAD",
+									Value: "${image_rot}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(HaveLen(1))
+
+		Expect(err[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(err[0].Field).To(Equal("spec.postgresql.extensions[0].env[1].value"))
+	})
+
+	It("accepts escaped placeholders in env values", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Extensions: []apiv1.ExtensionConfiguration{
+						{
+							Name: "extOne",
+							ImageVolumeSource: corev1.ImageVolumeSource{
+								Reference: "extOne",
+							},
+							Env: []apiv1.ExtensionEnvVar{
+								{
+									Name:  "LITERAL",
+									Value: "$${not_a_placeholder}",
+								},
+								{
+									Name:  "MIXED",
+									Value: "$${escaped}/${image_root}/lib",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := v.validateExtensions(cluster)
+		Expect(err).To(BeEmpty())
 	})
 
 	It("returns an error when extension names collide after underscore sanitization", func() {
@@ -6190,5 +6499,201 @@ var _ = Describe("failoverQuorum validation", func() {
 
 		errList := v.validateFailoverQuorum(cluster)
 		Expect(errList).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("podSelectorRefs validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts a valid configuration", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:app-pods} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts an empty configuration", func() {
+		cluster := &apiv1.Cluster{}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects undefined pod selector in pg_hba", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"hostssl mydb myuser ${podselector:undefined-ref} scram-sha-256",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(result[0].Detail).To(ContainSubstring("undefined-ref"))
+	})
+
+	It("rejects duplicate podSelectorRefs names", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "other"},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeDuplicate))
+	})
+
+	It("rejects invalid label selector", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "bad-selector",
+						Selector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: "InvalidOperator",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("rejects multiple podselector references in a single pg_hba line", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app1",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "one"},
+						},
+					},
+					{
+						Name: "app2",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "two"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all ${podselector:app1} ${podselector:app2} md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeInvalid))
+	})
+
+	It("accepts defined but unreferenced selectors", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PodSelectorRefs: []apiv1.PodSelectorRef{
+					{
+						Name: "app-pods",
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "myapp"},
+						},
+					},
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					PgHBA: []string{
+						"host all all 10.0.0.0/8 md5",
+					},
+				},
+			},
+		}
+		result := v.validatePodSelectorRefs(cluster)
+		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("ServiceAccount configuration validation", func() {
+	var v *ClusterCustomValidator
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("accepts cluster without serviceAccountName or serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountName specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName: "shared-sa",
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts cluster with only serviceAccountTemplate specified", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects cluster with both serviceAccountName and serviceAccountTemplate", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ServiceAccountName:     "shared-sa",
+				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{},
+			},
+		}
+		result := v.validateServiceAccountConfig(cluster)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.serviceAccountName"))
+		Expect(result[0].Detail).To(ContainSubstring("mutually exclusive"))
 	})
 })

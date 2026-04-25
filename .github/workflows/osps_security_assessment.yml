@@ -5,6 +5,8 @@ on:
     - cron: "0 9 * * 1"  # Weekly on Mondays at 9 AM UTC
   workflow_dispatch:  # Allow manual triggering
 
+permissions: {}
+
 jobs:
   osps-assessment:
     runs-on: ubuntu-24.04
@@ -18,7 +20,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Open Source Project Security Baseline Scanner
-        uses: revanite-io/osps-baseline-action@99e372da63a5587fad5ef9a1a3c6e465f7e9fc03 # v1.3.1
+        uses: revanite-io/osps-baseline-action@3bf988fa8e4b59568dcfac138a1854df87c15aff # v1.3.2
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
@@ -28,7 +30,7 @@ jobs:
 
       - name: Upload Assessment Results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: osps-assessment-results-${{ github.run_number }}
           path: evaluation_results/

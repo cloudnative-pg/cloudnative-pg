@@ -353,6 +353,97 @@ PostgreSQL `Cluster` resource name.
     [recommended way to access the API server from within a Pod](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/).
 :::
 
+#### Using a shared ServiceAccount
+
+By default, CloudNativePG creates a dedicated `ServiceAccount` for each cluster,
+named after the cluster itself. However, in cloud environments using IAM roles
+(such as AWS IRSA, GCP Workload Identity, or Azure Workload Identity), each
+cluster creating its own `ServiceAccount` requires individual IAM configuration
+for every new cluster, making it difficult to scale when managing multiple
+clusters.
+
+CloudNativePG allows multiple clusters to share a single `ServiceAccount` by
+specifying the `serviceAccountName` field in the cluster specification. This
+enables one-time IAM configuration that works across all clusters using that
+`ServiceAccount`.
+
+:::important
+When using a shared `ServiceAccount`, you are responsible for creating and
+managing the `ServiceAccount` yourself. The operator will validate that the
+specified `ServiceAccount` exists but will not create or modify it.
+:::
+
+Here's an example of using a shared `ServiceAccount`:
+
+```yaml
+# Create the shared ServiceAccount once
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-cloud-sa
+  annotations:
+    # AWS IRSA annotation
+    eks.amazonaws.com/role-arn: arn:aws:iam:us-east-1:123456789012:role/PostgresRole
+---
+# Reference it from multiple clusters
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-prod
+spec:
+  serviceAccountName: postgres-cloud-sa
+  instances: 3
+  storage:
+    size: 100Gi
+```
+
+:::note
+The `serviceAccountName` field is mutually exclusive with
+`serviceAccountTemplate`. You can either let the operator manage the
+`ServiceAccount` (optionally customizing it with `serviceAccountTemplate`)
+or reference an existing one with `serviceAccountName`, but not both.
+:::
+
+:::warning
+The `serviceAccountName` field is immutable once set. If you need to change
+the `ServiceAccount`, you must recreate the cluster.
+:::
+
+:::note
+When multiple clusters share a `ServiceAccount`, the operator creates
+a separate `Role` and `RoleBinding` for each cluster. The shared
+`ServiceAccount` accumulates the Kubernetes RBAC permissions of all
+clusters using it. Each `Role` is narrowly scoped to the specific
+cluster's resources, so this does not constitute a privilege escalation.
+:::
+
+#### Using a shared ServiceAccount with Poolers
+
+The same shared `ServiceAccount` feature is available for `Pooler` resources.
+When deploying PgBouncer poolers in cloud environments with IAM integration,
+you can specify the `serviceAccountName` field in the Pooler spec to reference
+an existing `ServiceAccount` instead of having the operator create one per pooler.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-prod
+spec:
+  cluster:
+    name: cluster-prod
+  serviceAccountName: pgbouncer-cloud-sa
+  instances: 3
+  pgbouncer:
+    poolMode: session
+```
+
+:::warning
+As with clusters, the `serviceAccountName` field on poolers is immutable
+once set. If you need to change the `ServiceAccount`, you must recreate
+the pooler.
+:::
+
 For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
 file. For example, to retrieve the permissions of a generic `mypg` cluster in the
@@ -528,7 +619,7 @@ spec:
 #### Security Context Constraints
 
 When running in an environment that is utilizing
-[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
+[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html)
 the operator does not explicitly set the security context of the PostgreSQL
 cluster pods, but rather allows the pods to inherit the restricted Security
 Context Constraints that are already defined.

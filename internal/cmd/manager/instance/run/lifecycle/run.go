@@ -80,7 +80,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// If the system initialization failed, we return an error and let
 		// the instance manager quit.
 		if i.systemInitialization.Err() != nil {
-			return err
+			return i.systemInitialization.Err()
 		}
 
 		// The lifecycle loop will call us even when PostgreSQL is fenced.
@@ -88,6 +88,13 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		if i.instance.IsFenced() {
 			contextLogger.Info("Instance is fenced, won't start postgres right now")
 			return nil
+		}
+
+		if hasDiskSpace, err := i.instance.CheckHasDiskSpaceForWAL(postgresContext); err != nil {
+			contextLogger.Error(err, "Error checking WAL disk space, skipping")
+		} else if !hasDiskSpace {
+			contextLogger.Info("Not enough WAL disk space, avoid starting PostgreSQL")
+			return postgres.ErrNoFreeWALSpace
 		}
 
 		i.instance.LogPgControldata(postgresContext, "postmaster start up")

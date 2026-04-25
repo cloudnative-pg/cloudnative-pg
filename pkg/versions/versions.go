@@ -23,13 +23,13 @@ package versions
 
 const (
 	// Version is the version of the operator
-	Version = "1.28.1"
+	Version = "1.29.0"
 
 	// DefaultImageName is the default image used by the operator to create pods
 	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
-	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.28.1"
+	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.29.0"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
 	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.25.1"
@@ -42,7 +42,7 @@ type BuildInfo struct {
 
 var (
 	// buildVersion injected during the build
-	buildVersion = "1.28.1"
+	buildVersion = "1.29.0"
 
 	// buildCommit injected during the build
 	buildCommit = "none"

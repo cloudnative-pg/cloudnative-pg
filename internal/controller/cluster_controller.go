@@ -60,6 +60,7 @@ import (
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/podselector"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -321,6 +322,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
 	}
 
+	// Resolve podSelectorRefs to pod IPs and update cluster status
+	if err := podselector.Reconcile(ctx, r.Client, cluster); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
 		if errors.Is(err, ErrNextLoop) {
@@ -361,6 +367,18 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		// Mark the old primary as unhealthy on every pass while failover is
+		// in progress. This retries each second until it succeeds,
+		// complementing the immediate best-effort attempt in replicas.go.
+		if err := r.markOldPrimaryAsUnhealthy(
+			ctx, cluster.Status.CurrentPrimary, resources.instances.Items,
+		); err != nil {
+			contextLogger.Warning(
+				"Failed to strip primary label from old primary, will retry",
+				"oldPrimary", cluster.Status.CurrentPrimary,
+				"error", err)
+		}
+
 		contextLogger.Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
 			"currentPrimary", cluster.Status.CurrentPrimary,
@@ -487,37 +505,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	// The instance list is sorted and will present the primary as the first
-	// element, followed by the replicas, the most updated coming first.
-	// Pods that are not responding will be at the end of the list. We use
-	// the information reported by the instance manager to sort the
-	// instances. When we need to elect a new primary, we take the first item
-	// on this list.
-	//
-	// Here we check the readiness status of the first Pod as we can't
-	// promote an instance that is not ready from the Kubernetes
-	// point-of-view: the services will not forward traffic to it even if
-	// PostgreSQL is up and running.
-	//
-	// An instance can be up and running even if the readiness probe is
-	// negative: this is going to happen, i.e., when an instance is
-	// un-fenced, and the Kubelet still hasn't refreshed the status of the
-	// readiness probe.
-	if instancesStatus.Len() > 0 {
-		mostAdvancedInstance := instancesStatus.Items[0]
-		hasHTTPStatus := mostAdvancedInstance.HasHTTPStatus()
-		isPodReady := mostAdvancedInstance.IsPodReady
-
-		if hasHTTPStatus && !isPodReady {
-			// The readiness probe status from the Kubelet is not updated, so
-			// we need to wait for it to be refreshed
-			contextLogger.Info(
-				"Waiting for the Kubelet to refresh the readiness probe",
-				"mostAdvancedInstanceName", mostAdvancedInstance.Pod.Name,
-				"hasHTTPStatus", hasHTTPStatus,
-				"isPodReady", isPodReady)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-		}
+	if res := r.evaluatePodReadinessGuards(ctx, cluster, instancesStatus); res != nil {
+		return *res, nil
 	}
 
 	// If the user has requested to hibernate the cluster, we do that before
@@ -578,6 +567,73 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	return setStatusPluginHook(ctx, r.Client, cnpgiClient.GetPluginClientFromContext(ctx), cluster)
+}
+
+// evaluatePodReadinessGuards short-circuits the reconciliation loop with a
+// requeue when the readiness information reported by the instance managers is
+// not consistent with a promotion or failover being safe. We can only promote
+// an instance that is Ready from the Kubernetes point of view, otherwise the
+// read-write service will not route traffic to it even if PostgreSQL is up
+// and running.
+//
+// Two branches are checked in order:
+//
+//   - Kubelet has not refreshed the readiness probe yet. The first element of
+//     the (post-sort) instance list is reporting a healthy /pg/status but the
+//     kubelet has not yet flipped the readiness probe to True (typical for a
+//     short window after un-fencing an instance). Waiting here prevents
+//     electing a primary that Kubernetes will refuse to route traffic to.
+//
+//   - Primary pod is Ready but its /pg/status endpoint is failing. A failing
+//     /pg/status on an otherwise Ready pod usually indicates an
+//     operator-to-pod connectivity issue rather than a genuine PostgreSQL
+//     health problem. The operator trusts the kubelet's readiness probe as
+//     the source of truth and defers its own failover decision until
+//     Kubernetes agrees the primary is not Ready.
+//
+//     Without this branch the failover-election path would promote the
+//     healthiest replica: PostgresqlStatusList.Less pushes items with an
+//     Error to the tail, so the erroring primary ends up behind a healthy
+//     replica at Items[0] and gets supplanted on a mere network hiccup.
+//
+// Returns nil when the caller can proceed with the rest of the reconciliation.
+func (r *ClusterReconciler) evaluatePodReadinessGuards(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instancesStatus postgres.PostgresqlStatusList,
+) *ctrl.Result {
+	if instancesStatus.Len() == 0 {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+
+	firstInstance := instancesStatus.Items[0]
+	hasHTTPStatus := firstInstance.HasHTTPStatus()
+	isPodReady := firstInstance.IsPodReady
+
+	if hasHTTPStatus && !isPodReady {
+		// The readiness probe status from the kubelet has not been refreshed
+		// yet, so we wait rather than electing a primary that Kubernetes will
+		// refuse to route traffic to.
+		contextLogger.Info(
+			"Waiting for the Kubelet to refresh the readiness probe",
+			"instanceName", firstInstance.Pod.Name,
+			"hasHTTPStatus", hasHTTPStatus,
+			"isPodReady", isPodReady)
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}
+	}
+
+	if cluster.Status.CurrentPrimary != "" &&
+		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary &&
+		instancesStatus.IsPodReadyAndNotReporting(cluster.Status.CurrentPrimary) {
+		contextLogger.Warning(
+			"Primary pod is ready but status endpoint is failing, requeueing",
+			"primaryPodName", cluster.Status.CurrentPrimary)
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}
+	}
+
+	return nil
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
@@ -1082,12 +1138,20 @@ func (r *ClusterReconciler) reconcilePods(
 	// proceed with a rolling update to upgrade the instance manager
 	// to a version that reports the configuration status.
 	// If all pods report their configuration, wait until all instances
-	// report the same configuration.
+	// report the same configuration, unless the non-uniformity is caused
+	// by an operator upgrade that changed the hash algorithm. In that case
+	// configuration hashes will never converge on their own; proceeding
+	// to the rolling update (or in-place upgrade) is the only way forward.
 	if uniform := report.IsUniform(); uniform != nil && !*uniform {
-		contextLogger.Debug(
-			"Waiting for all Pods to have the same PostgreSQL configuration",
+		if !isConfigNonUniformityFromUpgrade(instancesStatus) {
+			contextLogger.Debug(
+				"Waiting for all Pods to have the same PostgreSQL configuration",
+				"configurationReport", report)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+		}
+		contextLogger.Info(
+			"Configuration non-uniformity caused by operator upgrade, proceeding with upgrade",
 			"configurationReport", report)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	return r.handleRollingUpdate(ctx, cluster, instancesStatus)
@@ -1194,6 +1258,13 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(r.nodesPredicate()),
+		).
+		// Watch external (non-owned) pods for podSelectorRefs IP resolution.
+		// Owned pods are already handled by Owns(&corev1.Pod{}) above.
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(podselector.MapExternalPodsToClusters(r.Client)),
+			builder.WithPredicates(podselector.ExternalPodsPredicate()),
 		).
 		Watches(
 			&apiv1.ImageCatalog{},
