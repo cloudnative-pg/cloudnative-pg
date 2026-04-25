@@ -5,13 +5,14 @@ title: Monitoring
 ---
 
 # Monitoring
+
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 :::info[Important]
-    Installing Prometheus and Grafana is beyond the scope of this project.
-    We assume they are correctly installed in your system. However, for
-    experimentation we provide instructions in
-    [Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
+Installing Prometheus and Grafana is beyond the scope of this project.
+We assume they are correctly installed in your system. However, for
+experimentation we provide instructions in
+[Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
 :::
 
 ## Monitoring Instances
@@ -24,14 +25,14 @@ more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 :::info[Important]
-    CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
-    in a `ConfigMap` named `cnpg-default-monitoring`.
+CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
+in a `ConfigMap` named `cnpg-default-monitoring`.
 :::
 
 :::info
-    You can inspect the exported metrics by following the instructions in
-    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
-    section below.
+You can inspect the exported metrics by following the instructions in
+the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
+section below.
 :::
 
 All monitoring queries that are performed on PostgreSQL are:
@@ -45,7 +46,7 @@ Please refer to the "Predefined Roles" section in PostgreSQL
 [documentation](https://www.postgresql.org/docs/current/predefined-roles.html)
 for details on the `pg_monitor` role.
 
-Queries, by default, are run against the *main database*, as defined by
+Queries, by default, are run against the _main database_, as defined by
 the specified `bootstrap` method of the `Cluster` resource, according
 to the following logic:
 
@@ -60,9 +61,9 @@ The default database can always be overridden for a given user-defined metric,
 by specifying a list of one or more databases in the `target_databases` option.
 
 :::note[Prometheus/Grafana]
-    If you are interested in evaluating the integration of CloudNativePG
-    with Prometheus and Grafana, you can find a quick setup guide
-    in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
+If you are interested in evaluating the integration of CloudNativePG
+with Prometheus and Grafana, you can find a quick setup guide
+in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
 :::
 
 ### Output caching
@@ -105,22 +106,19 @@ spec:
     matchLabels:
       cnpg.io/cluster: cluster-example
   podMetricsEndpoints:
-  - port: metrics
+    - port: metrics
 ```
 
-:::info[Important Configuration Details]
-    - `metadata.name`: Give your `PodMonitor` a unique name.
-    - `spec.namespaceSelector`: Use this to specify the namespace where
-      your PostgreSQL cluster is running.
-    - `spec.selector.matchLabels`: You must use the `cnpg.io/cluster: <cluster-name>`
-      label to correctly target the PostgreSQL instances.
+:::info[Important Configuration Details] - `metadata.name`: Give your `PodMonitor` a unique name. - `spec.namespaceSelector`: Use this to specify the namespace where
+your PostgreSQL cluster is running. - `spec.selector.matchLabels`: You must use the `cnpg.io/cluster: <cluster-name>`
+label to correctly target the PostgreSQL instances.
 :::
 
 #### Deprecation of Automatic `PodMonitor` Creation
 
 :::warning[Feature Deprecation Notice]
-    The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
-    now deprecated and will be removed in a future version of the operator.
+The `.spec.monitoring.enablePodMonitor` field in the `Cluster` resource is
+now deprecated and will be removed in a future version of the operator.
 :::
 
 If you are currently using this feature, we strongly recommend you either
@@ -136,7 +134,7 @@ setting to `true`. This setup ensures that the metrics exporter uses the same
 server certificate used by PostgreSQL to secure communication on port 5432.
 
 :::info[Important]
-    Changing the `.spec.monitoring.tls.enabled` setting will trigger a rolling restart of the Cluster.
+Changing the `.spec.monitoring.tls.enabled` setting will trigger a rolling restart of the Cluster.
 :::
 
 If the `PodMonitor` is managed by the operator (`.spec.monitoring.enablePodMonitor` set to `true`),
@@ -155,25 +153,25 @@ spec:
     matchLabels:
       "cnpg.io/cluster": cluster-example
   podMetricsEndpoints:
-  - port: metrics
-    scheme: https
-    tlsConfig:
-      ca:
-        secret:
-          name: cluster-example-ca
-          key: ca.crt
-      serverName: cluster-example-rw
+    - port: metrics
+      scheme: https
+      tlsConfig:
+        ca:
+          secret:
+            name: cluster-example-ca
+            key: ca.crt
+        serverName: cluster-example-rw
 ```
 
 :::info[Important]
-    Ensure you modify the example above with a unique name, as well as the
-    correct Cluster's namespace and labels (e.g., `cluster-example`).
+Ensure you modify the example above with a unique name, as well as the
+correct Cluster's namespace and labels (e.g., `cluster-example`).
 :::
 
 :::info[Important]
-    The `serverName` field in the metrics endpoint must match one of the names
-    defined in the server certificate. If the default certificate is in use,
-    the `serverName` value should be in the format `<cluster-name>-rw`.
+The `serverName` field in the metrics endpoint must match one of the names
+defined in the server certificate. If the default certificate is in use,
+the `serverName` value should be in the format `<cluster-name>-rw`.
 :::
 
 ### Predefined set of metrics
@@ -182,17 +180,16 @@ Every PostgreSQL instance exporter automatically exposes a set of predefined
 metrics, which can be classified in two major categories:
 
 - PostgreSQL related metrics, starting with `cnpg_collector_*`, including:
-
-    - number of WAL files and total size on disk
-    - number of `.ready` and `.done` files in the archive status folder
-    - requested minimum and maximum number of synchronous replicas, as well as
-      the expected and actually observed values
-    - number of distinct nodes accommodating the instances
-    - timestamps indicating last failed and last available backup, as well
-      as the first point of recoverability for the cluster
-    - flag indicating if replica cluster mode is enabled or disabled
-    - flag indicating if a manual switchover is required
-    - flag indicating if fencing is enabled or disabled
+  - number of WAL files and total size on disk
+  - number of `.ready` and `.done` files in the archive status folder
+  - requested minimum and maximum number of synchronous replicas, as well as
+    the expected and actually observed values
+  - number of distinct nodes accommodating the instances
+  - timestamps indicating last failed and last available backup, as well
+    as the first point of recoverability for the cluster
+  - flag indicating if replica cluster mode is enabled or disabled
+  - flag indicating if a manual switchover is required
+  - flag indicating if fencing is enabled or disabled
 
 - Go runtime related metrics, starting with `go_*`
 
@@ -433,27 +430,27 @@ go_threads 18
 ```
 
 :::note
-    `cnpg_collector_postgres_version` is a GaugeVec metric containing
-    the `Major.Minor` version of PostgreSQL. The full semantic version
-    `Major.Minor.Patch` can be found inside one of its label field
-    named `full`.
+`cnpg_collector_postgres_version` is a GaugeVec metric containing
+the `Major.Minor` version of PostgreSQL. The full semantic version
+`Major.Minor.Patch` can be found inside one of its label field
+named `full`.
 :::
 
 :::warning
-    The metrics `cnpg_collector_last_failed_backup_timestamp`,
-    `cnpg_collector_last_available_backup_timestamp`, and
-    `cnpg_collector_first_recoverability_point` have been deprecated starting
-    from version 1.26. These metrics will continue to function with native backup
-    solutions such as in-core Barman Cloud (deprecated) and volume snapshots. Note
-    that for these cases, `cnpg_collector_first_recoverability_point` and
-    `cnpg_collector_last_available_backup_timestamp` will remain zero until the
-    first backup is completed to the object store. This is separate from WAL
-    archiving.
+The metrics `cnpg_collector_last_failed_backup_timestamp`,
+`cnpg_collector_last_available_backup_timestamp`, and
+`cnpg_collector_first_recoverability_point` have been deprecated starting
+from version 1.26. These metrics will continue to function with native backup
+solutions such as in-core Barman Cloud (deprecated) and volume snapshots. Note
+that for these cases, `cnpg_collector_first_recoverability_point` and
+`cnpg_collector_last_available_backup_timestamp` will remain zero until the
+first backup is completed to the object store. This is separate from WAL
+archiving.
 :::
 
 ### User defined metrics
 
-This feature is currently in *beta* state and the format is inspired by the
+This feature is currently in _beta_ state and the format is inspired by the
 [queries.yaml file (release 0.12)](https://github.com/prometheus-community/postgres_exporter/blob/v0.12.1/queries.yaml)
 of the PostgreSQL Prometheus Exporter.
 
@@ -483,15 +480,15 @@ The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
 Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
 
 :::note
-    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
-    the instances using the `kubectl cnpg reload` subcommand.
+If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
+add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
+the instances using the `kubectl cnpg reload` subcommand.
 :::
 
 :::info[Important]
-    When a user defined metric overwrites an already existing metric the instance manager prints a json warning log,
-    containing the message:`Query with the same name already found. Overwriting the existing one.`
-    and a key `queryName` containing the overwritten query name.
+When a user defined metric overwrites an already existing metric the instance manager prints a json warning log,
+containing the message:`Query with the same name already found. Overwriting the existing one.`
+and a key `queryName` containing the overwritten query name.
 :::
 
 #### Example of a user defined metric
@@ -567,15 +564,15 @@ If the `target_databases` option lists more than one database
 the metric is collected from each of them.
 
 Database auto-discovery can be enabled for a specific query by specifying a
-*shell-like pattern* (i.e., containing `*`, `?` or `[]`) in the list of
+_shell-like pattern_ (i.e., containing `*`, `?` or `[]`) in the list of
 `target_databases`. If provided, the operator will expand the list of target
 databases by adding all the databases returned by the execution of `SELECT
 datname FROM pg_database WHERE datallowconn AND NOT datistemplate` and matching
 the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
 
 :::note
-    The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
-    so you need to quote (`"*"`) the `target_databases` value when it includes such a pattern.
+The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
+so you need to quote (`"*"`) the `target_databases` value when it includes such a pattern.
 :::
 
 It is recommended that you always include the name of the database
@@ -649,45 +646,45 @@ Every custom query has the following basic structure:
 
 ```yaml
 <MetricName>:
-      query: "<SQLQuery>"
-      metrics:
-        - <ColumnName>:
-            usage: "<MetricType>"
-            description: "<MetricDescription>"
+  query: "<SQLQuery>"
+  metrics:
+    - <ColumnName>:
+        usage: "<MetricType>"
+        description: "<MetricDescription>"
 ```
 
 Here is a short description of all the available fields:
 
 - `<MetricName>`: the name of the Prometheus metric
-    - `name`: override `<MetricName>`, if defined
-    - `query`: the SQL query to run on the target database to generate the metrics
-    - `primary`: whether to run the query only on the primary instance
-    - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
-    - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
-       (e.g. `">=11.0.0"` or `">=12.0.0 <=15.0.0"`)
-    - `target_databases`: a list of databases to run the `query` against,
-      or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
-      to enable auto discovery. Overwrites the default database if provided.
-    - `predicate_query`: a SQL query that returns at most one row and one `boolean` column to run on the target database.
-       The system evaluates the predicate and if `true` executes the `query`. 
-    - `metrics`: section containing a list of all exported columns, defined as follows:
-      - `<ColumnName>`: the name of the column returned by the query
-          - `name`: override the `ColumnName` of the column in the metric, if defined
-          - `usage`: one of the values described below
-          - `description`: the metric's description
-          - `metrics_mapping`: the optional column mapping when `usage` is set to `MAPPEDMETRIC`
+  - `name`: override `<MetricName>`, if defined
+  - `query`: the SQL query to run on the target database to generate the metrics
+  - `primary`: whether to run the query only on the primary instance
+  - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
+  - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
+    (e.g. `">=11.0.0"` or `">=12.0.0 <=15.0.0"`)
+  - `target_databases`: a list of databases to run the `query` against,
+    or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
+    to enable auto discovery. Overwrites the default database if provided.
+  - `predicate_query`: a SQL query that returns at most one row and one `boolean` column to run on the target database.
+    The system evaluates the predicate and if `true` executes the `query`.
+  - `metrics`: section containing a list of all exported columns, defined as follows:
+    - `<ColumnName>`: the name of the column returned by the query
+      - `name`: override the `ColumnName` of the column in the metric, if defined
+      - `usage`: one of the values described below
+      - `description`: the metric's description
+      - `metrics_mapping`: the optional column mapping when `usage` is set to `MAPPEDMETRIC`
 
 The possible values for `usage` are:
 
-| Column Usage Label  | Description                                              |
-|:--------------------|:---------------------------------------------------------|
-| `DISCARD`           | this column should be ignored                            |
-| `LABEL`             | use this column as a label                               |
-| `COUNTER`           | use this column as a counter                             |
-| `GAUGE`             | use this column as a gauge                               |
-| `MAPPEDMETRIC`      | use this column with the supplied mapping of text values |
-| `DURATION`          | use this column as a text duration (in milliseconds)     |
-| `HISTOGRAM`         | use this column as a histogram                          |
+| Column Usage Label | Description                                              |
+| :----------------- | :------------------------------------------------------- |
+| `DISCARD`          | this column should be ignored                            |
+| `LABEL`            | use this column as a label                               |
+| `COUNTER`          | use this column as a counter                             |
+| `GAUGE`            | use this column as a gauge                               |
+| `MAPPEDMETRIC`     | use this column with the supplied mapping of text values |
+| `DURATION`         | use this column as a text duration (in milliseconds)     |
+| `HISTOGRAM`        | use this column as a histogram                           |
 
 Please visit the ["Metric Types" page](https://prometheus.io/docs/concepts/metric_types/)
 from the Prometheus documentation for more information.
@@ -702,7 +699,7 @@ cnpg_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <Colum
 ```
 
 :::note
-    `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`
+`LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`
 :::
 
 Considering the `pg_replication` example above, the exporter's endpoint would
@@ -746,9 +743,9 @@ If you want to disable the default set of metrics, you can:
 - disable it for a specific Cluster: set `.spec.monitoring.disableDefaultQueries` to `true` in the Cluster.
 
 :::info[Important]
-    The ConfigMap or Secret specified via `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET`
-    will always be copied to the Cluster's namespace with a fixed name: `cnpg-default-monitoring`.
-    So that, if you intend to have default metrics, you should not create a ConfigMap with this name in the cluster's namespace.
+The ConfigMap or Secret specified via `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET`
+will always be copied to the Cluster's namespace with a fixed name: `cnpg-default-monitoring`.
+So that, if you intend to have default metrics, you should not create a ConfigMap with this name in the cluster's namespace.
 :::
 
 ### Differences with the Prometheus Postgres exporter
@@ -763,9 +760,9 @@ The operator internally exposes [Prometheus](https://prometheus.io/) metrics
 via HTTP on port 8080, named `metrics`.
 
 :::info
-    You can inspect the exported metrics by following the instructions in
-    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
-    section below.
+You can inspect the exported metrics by following the instructions in
+the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
+section below.
 :::
 
 Currently, the operator exposes default `kubebuilder` metrics. See
@@ -829,25 +826,25 @@ spec:
   template:
     spec:
       containers:
-      - name: manager
-        env:
-        - name: METRICS_CERT_DIR
-          value: /run/secrets/cnpg.io/metrics
-        volumeMounts:
-        - mountPath: /run/secrets/cnpg.io/metrics
-          name: metrics-certificates
-          readOnly: true
+        - name: manager
+          env:
+            - name: METRICS_CERT_DIR
+              value: /run/secrets/cnpg.io/metrics
+          volumeMounts:
+            - mountPath: /run/secrets/cnpg.io/metrics
+              name: metrics-certificates
+              readOnly: true
       volumes:
-      - name: metrics-certificates
-        secret:
-          secretName: cnpg-metrics-cert
-          defaultMode: 420
+        - name: metrics-certificates
+          secret:
+            secretName: cnpg-metrics-cert
+            defaultMode: 420
 ```
 
 :::note
-    When `METRICS_CERT_DIR` is set, the operator automatically enables TLS for
-    the metrics server. You must also update your PodMonitor configuration to
-    use the `https` scheme.
+When `METRICS_CERT_DIR` is set, the operator automatically enables TLS for
+the metrics server. You must also update your PodMonitor configuration to
+use the `https` scheme.
 :::
 
 Example `PodMonitor` configuration with TLS enabled:
@@ -866,7 +863,7 @@ spec:
     - port: metrics
       scheme: https
       tlsConfig:
-        insecureSkipVerify: true  # or configure proper CA validation
+        insecureSkipVerify: true # or configure proper CA validation
 ```
 
 ## How to inspect the exported metrics
@@ -876,9 +873,9 @@ the metrics exported by a specific PostgreSQL instance manager (primary
 or replica) or the operator.
 
 :::note
-    In the examples below we assume we are working in the default namespace, and
-    with the operator installed in the `cnpg-system` namespace.
-    Please adapt to your use case.
+In the examples below we assume we are working in the default namespace, and
+with the operator installed in the `cnpg-system` namespace.
+Please adapt to your use case.
 :::
 
 ### Using port forwarding
@@ -889,7 +886,7 @@ of the pods involved.
 For example, to inspect the metrics on the `-1` instance of `cluster-example`,
 we port-forward the 9187 port:
 
-``` sh
+```sh
 kubectl port-forward cluster-example-1 9187:9187
 ```
 
@@ -900,7 +897,7 @@ with address: `localhost:9187/metrics`.
 The operator pod also exports metrics, on port 8080. Similarly to instances, we
 port-forward the operator pod, which is located in the operator namespace:
 
-``` sh
+```sh
 kubectl -n cnpg-system port-forward pod/<CONTROLLER-MANAGER-POD> 8080:8080
 ```
 
@@ -968,8 +965,8 @@ kubectl delete -f curl.yaml
 ## Auxiliary resources
 
 :::info[Important]
-    These resources are provided for illustration and experimentation, and do
-    not represent any kind of recommendation for your production system
+These resources are provided for illustration and experimentation, and do
+not represent any kind of recommendation for your production system
 :::
 
 In the [`doc/src/samples/monitoring/`](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/docs/src/samples/monitoring)
@@ -999,3 +996,130 @@ you can execute `helm show values prometheus-community/kube-prometheus-stack`.
 Please refer to the
 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
 page for more detail.
+
+## Troubleshooting Prometheus Alerts
+
+### Understanding the ReplicaFailingReplication Alert
+
+The `ReplicaFailingReplication` alert is designed to detect instances that are in
+recovery mode but have no WAL receiver running. Under normal circumstances, a healthy
+replica should always be in recovery mode (`cnpg_pg_replication_in_recovery = 1`) with
+its WAL receiver active (`cnpg_pg_replication_is_wal_receiver_up = 1`). When the WAL
+receiver stops while the instance is still in recovery, it means the replica has lost
+its connection to the primary and can no longer receive or replay WAL data.
+
+However, the behavior of this alert differs significantly depending on your CNPG
+deployment architecture.
+
+#### Standard CNPG Clusters
+
+In a standard CNPG cluster, a replica's WAL receiver should be running at all times
+under normal operation. If `ReplicaFailingReplication` fires, it indicates a genuine
+problem that requires immediate investigation. Common causes include:
+
+- Network connectivity issues between the primary and replica pods
+- The replica pod crashing or restarting unexpectedly
+- The replication slot on the primary being removed or blocked
+- The primary failing to accept new replication connections
+
+**Troubleshooting steps:**
+
+1. Verify network connectivity between the primary and replica pods:
+   ```shell
+   kubectl get pods -o wide -n <namespace>
+   ```
+2. Check the replica logs for error messages:
+   ```shell
+   kubectl logs <replica-pod> -n <namespace> | grep -i "error\|fatal\|replication"
+   ```
+3. Check the primary logs for replication-related errors:
+   ```shell
+   kubectl logs <primary-pod> -n <namespace> | grep -i "replication\|wal"
+   ```
+4. Verify that the replication slot still exists on the primary:
+   ```shell
+   kubectl exec -ti <primary-pod> -n <namespace> -- psql -c "SELECT * FROM pg_replication_slots;"
+   ```
+
+#### Distributed CNPG with Barman Cloud
+
+In a [Distributed CNPG](https://cloudnative-pg.io/documentation/current/replica_cluster/)
+setup using Barman Cloud, the `ReplicaFailingReplication` alert can produce **false
+positives**. This is because the failover cluster's designated primary is itself a
+replica in recovery mode by design. During Barman Cloud backup or WAL archiving
+operations, the WAL receiver is temporarily paused as part of normal operation. This
+temporary pause produces the exact same raw metric values (`in_recovery=1`,
+`wal_receiver_up=0`) as a genuine replication failure, causing the alert to fire even
+when the system is healthy.
+
+**The key insight is that replication lag tells the real story:**
+
+| Scenario                 | WAL receiver   | Lag after 5 min    | What it means           |
+| ------------------------ | -------------- | ------------------ | ----------------------- |
+| Normal Barman pause      | Down (briefly) | Stays low (< 60s)  | Expected, not a failure |
+| Real replication failure | Down           | Grows continuously | Genuine problem         |
+
+During a normal Barman operation, the WAL receiver pause is brief. Replication resumes
+quickly and lag remains low. During a genuine replication failure, the replica can never
+catch up, so lag accumulates continuously over time.
+
+**Example timeline - normal Barman operation (not a failure):**
+
+```
+T+0m:  Barman backup starts, WAL receiver pauses → alert condition becomes true
+T+1m:  Alert fires (ReplicaFailingReplication), lag = 45s
+T+3m:  Barman operation completes, WAL receiver resumes
+T+5m:  Lag normalizes back to < 5s → alert resolves
+```
+
+**Example timeline - genuine replication failure:**
+
+```
+T+0m:  Replication connection drops → alert condition becomes true
+T+1m:  Alert fires (ReplicaFailingReplication), lag = 80s
+T+5m:  Lag = 380s and still growing
+T+10m: Lag = 680s and still growing → WAL receiver never recovered
+```
+
+**Recommended alert for Distributed CNPG setups:**
+
+For Distributed CNPG with Barman Cloud, use the `ReplicaFailingReplicationDistributed`
+alert provided in `prometheusrule.yaml` instead of `ReplicaFailingReplication`. This
+alert only fires when **all three** conditions are true simultaneously for 5 continuous
+minutes:
+
+1. The instance is in recovery with the WAL receiver down
+2. Replication lag exceeds 300 seconds (5 minutes)
+3. Replication lag is actively increasing (rate > 0 over the last 5 minutes)
+
+A brief Barman pause will not satisfy conditions 2 and 3 because the pause is too short
+to accumulate significant lag. Only a genuine replication failure will trigger all three
+conditions continuously.
+
+**Troubleshooting steps for Distributed CNPG:**
+
+1. Check whether a Barman operation is currently running:
+   ```shell
+   kubectl logs <failover-primary-pod> -n <namespace> | grep -i "barman\|backup\|archive"
+   ```
+2. If Barman is running, wait for it to complete and verify that lag normalizes:
+   ```shell
+   # Monitor lag in real time
+   kubectl exec -ti <failover-primary-pod> -n <namespace> -- \
+     psql -c "SELECT now() - pg_last_xact_replay_timestamp() AS replication_lag;"
+   ```
+3. If Barman is not running and lag is still high, follow the same troubleshooting
+   steps as for a standard CNPG cluster (network, logs, replication slots).
+4. If Barman completed but lag remains elevated, investigate whether the WAL receiver
+   successfully restarted:
+   ```shell
+   kubectl exec -ti <failover-primary-pod> -n <namespace> -- \
+     psql -c "SELECT * FROM pg_stat_wal_receiver;"
+   ```
+
+**Focus on lag as the primary health indicator:**
+
+In Distributed CNPG setups, `cnpg_pg_replication_lag` is the most reliable indicator
+of replication health. Low lag with a temporarily paused WAL receiver means normal
+Barman operation. High and continuously increasing lag, regardless of WAL receiver
+status, means a real problem that requires investigation.
