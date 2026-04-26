@@ -33,6 +33,9 @@ CONTROLLER_IMG_PRIME_DIGEST=${CONTROLLER_IMG_PRIME_DIGEST:-""}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+OPERATOR="${OPERATOR:-local}"
+CNPG_DEPLOYMENT_METHOD="${CNPG_DEPLOYMENT_METHOD:-manifest}"
+export OPERATOR_MANIFEST_PATH="${OPERATOR_MANIFEST_PATH:-${ROOT_DIR}/dist/operator-manifest.yaml}"
 
 # Override pgbouncer image repository if PGBOUNCER_IMG_REPOSITORY is set
 if [ -n "${PGBOUNCER_IMG_REPOSITORY:-}" ]; then
@@ -98,11 +101,12 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   # the image has been either:
   #   - built and pushed to nodes or the local registry (by setup-cluster.sh)
   #   - built by the `buildx` step in continuous delivery and pushed to the test registry
-  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-   PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-   CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST}" \
-   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
-   generate-manifest
+  CONTROLLER_IMG="${CONTROLLER_IMG}" \
+    CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST}" \
+    POSTGRES_IMG="${POSTGRES_IMG}" \
+    PGBOUNCER_IMG="${PGBOUNCER_IMG}" \
+    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
+    "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
   # In order to test the case of upgrading from the current operator
   # to a future one, we build and push an image with a different VERSION
   # to force a different hash for the manager binary.
@@ -114,11 +118,12 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   # Here we build a manifest for the new controller, with the `-prime` suffix
   # added to the tag by convention, which assumes the image is in place.
   # This manifest is used to upgrade into in the upgrade_test E2E.
-  make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-   PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-   CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_PRIME_DIGEST}" \
-   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
-   generate-manifest
+  CONTROLLER_IMG="${CONTROLLER_IMG}-prime" \
+    CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_PRIME_DIGEST}" \
+    POSTGRES_IMG="${POSTGRES_IMG}" \
+    PGBOUNCER_IMG="${PGBOUNCER_IMG}" \
+    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
+    "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
 
   # Run the upgrade tests
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
@@ -140,13 +145,14 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   kubectl create namespace cnpg-system
   ensure_image_pull_secret
 
-  CONTROLLER_IMG="${CONTROLLER_IMG}" \
-    POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-    PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
-    make -C "${ROOT_DIR}" deploy
-  kubectl wait --for=condition=Available --timeout=2m \
-    -n cnpg-system deployments \
-    cnpg-controller-manager
+  K8S_CLI=kubectl
+  bright=${bright:-}
+  reset=${reset:-}
+  source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
+  if [[ "${OPERATOR:-local}" == "local" ]]; then
+    "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
+  fi
+  deploy_operator_from_source
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

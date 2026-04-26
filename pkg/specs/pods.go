@@ -70,6 +70,9 @@ const (
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
 
+	// ClusterRoleLabelUnhealthy is applied to the old primary when a failover starts.
+	ClusterRoleLabelUnhealthy = "unhealthy"
+
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
