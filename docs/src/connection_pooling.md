@@ -227,8 +227,46 @@ The `Pooler` resource allows you to customize the underlying pods via the
 advanced configurations like scheduling constraints, custom security contexts,
 or resource overrides.
 
+
 For a complete list of supported fields, see the
 [`PoolerSpec`](cloudnative-pg.v1.md#poolerspec) API reference.
+
+### Example: Setting environment variables and projected volumes for PgBouncer (LDAPS/LDAP)
+
+To configure PgBouncer with custom environment variables (such as for LDAPS/LDAP), use the `template` field as shown below. The container name must be exactly `pgbouncer` for the operator to recognize it.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer-ldaps-pooler
+spec:
+  cluster:
+    name: my-cluster
+  instances: 3
+  type: rw
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          env:
+            - name: LDAPTLS_CACERT
+              value: /projected/root.crt
+          volumeMounts:
+            - name: ldap-ca
+              mountPath: /projected
+      volumes:
+        - name: ldap-ca
+          secret:
+            secretName: externalsecretldapCAsecret
+            items:
+              - key: token
+                path: root.crt
+  pgbouncer:
+    # ... your existing pgbouncer config
+```
+
+**Note:** The container name must be `pgbouncer` for the operator to manage it correctly. This approach allows you to inject secrets and environment variables required for LDAPS/LDAP or other advanced configurations.
 
 ### Key requirements
 
