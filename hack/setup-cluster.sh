@@ -240,10 +240,10 @@ main() {
     case "$command" in
     load)
       if [[ "${OPERATOR}" != "local" ]]; then
-        echo "Skipping image build: OPERATOR=${OPERATOR}"
-      else
-        build_and_load_operator_image_from_sources
+        echo "ERROR: 'load' requires OPERATOR=local, got OPERATOR=${OPERATOR}" >&2
+        exit 1
       fi
+      build_and_load_operator_image_from_sources
       ;;
     generate-manifest)
       generate_operator_manifest
