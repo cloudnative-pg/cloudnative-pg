@@ -1909,9 +1909,9 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor` |  | false |  |
-| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion. |  |  |  |
-| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping. |  |  |  |
+| `enablePodMonitor` _boolean_ | Enable or disable the `PodMonitor`<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  | false |  |
+| `podMonitorMetricRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `podMonitorRelabelings` _[RelabelConfig](https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig) array_ | The list of relabelings for the `PodMonitor`. Applied to samples before scraping.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
 | `tls` _[PoolerMonitoringTLSConfiguration](#poolermonitoringtlsconfiguration)_ | Configure TLS communication for the metrics endpoint.<br />Changing tls.enabled option will force a rollout of all instances. |  |  |  |
 
 
@@ -1974,7 +1974,7 @@ _Appears in:_
 | `template` _[PodTemplateSpec](#podtemplatespec)_ | The template of the Pod to be created |  |  |  |
 | `pgbouncer` _[PgBouncerSpec](#pgbouncerspec)_ | The PgBouncer configuration | True |  |  |
 | `deploymentStrategy` _[DeploymentStrategy](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#deploymentstrategy-v1-apps)_ | The deployment strategy to use for pgbouncer to replace existing pods with new ones |  |  |  |
-| `monitoring` _[PoolerMonitoringConfiguration](#poolermonitoringconfiguration)_ | The configuration of the monitoring infrastructure of this pooler.<br />Deprecated: This feature will be removed in an upcoming release. If<br />you need this functionality, you can create a PodMonitor manually. |  |  |  |
+| `monitoring` _[PoolerMonitoringConfiguration](#poolermonitoringconfiguration)_ | The configuration of the monitoring infrastructure of this pooler. |  |  |  |
 | `serviceTemplate` _[ServiceTemplateSpec](#servicetemplatespec)_ | Template for the Service to be created |  |  |  |
 | `serviceAccountName` _string_ | Name of an existing ServiceAccount in the same namespace to use for the pooler.<br />When specified, the operator will not create a new ServiceAccount<br />but will use the provided one. This is useful for sharing a single<br />ServiceAccount across multiple poolers (e.g., for cloud IAM configurations).<br />If not specified, a ServiceAccount will be created with the pooler name. |  |  | MaxLength: 253 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 
