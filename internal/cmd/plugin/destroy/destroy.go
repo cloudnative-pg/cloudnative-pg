@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -38,6 +39,25 @@ import (
 
 // Destroy implements destroy subcommand
 func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
+	//Validate cluster existence BEFORE doing anything destructive
+	var cluster apiv1.Cluster
+	err := plugin.Client.Get(ctx, client.ObjectKey{
+		Namespace: plugin.Namespace,
+		Name:      clusterName,
+	}, &cluster)
+
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return fmt.Errorf(
+				"cluster '%s' does not exist in namespace '%s'",
+				clusterName,
+				plugin.Namespace,
+			)
+		}
+		return fmt.Errorf("failed to retrieve cluster: %w", err)
+	}
+
+	// Existing logic continues below
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
 		return err
 	}
@@ -69,7 +89,6 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 	}
 
 	if keepPVC {
-		// we remove the ownership from the pvcs if present
 		for i := range pvcs {
 			if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
 				continue
@@ -97,10 +116,6 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		}
 
 		_, isOwned := controller.IsOwnedByCluster(&pvcs[i])
-		// if it is requested for deletion and it is owned by the cluster, we delete it. If it is not owned by the cluster
-		// but it does have the instance label and the detached annotation then we can still delete it
-		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
-		// the annotation or label
 		if isOwned ||
 			(pvcs[i].Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
 				pvcs[i].Labels[utils.InstanceNameLabelName] == instanceName) {
@@ -116,14 +131,12 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 }
 
 func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) error {
-	// Check if the Pod exist
 	var pod corev1.Pod
 	err := plugin.Client.Get(ctx, client.ObjectKey{
 		Namespace: plugin.Namespace,
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		// The Pod doesn't exist, so we already did our job
 		return nil
 	}
 	if err != nil {
@@ -137,7 +150,6 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 	return plugin.Client.Delete(ctx, &pod)
 }
 
-// removeOwnerReference removes the owner reference to the cluster
 func removeOwnerReference(references []metav1.OwnerReference, clusterName string) []metav1.OwnerReference {
 	for i := range references {
 		if references[i].Name == clusterName && references[i].Kind == "Cluster" {
