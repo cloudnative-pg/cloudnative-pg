@@ -20,7 +20,7 @@ following the next three steps:
 ## Installation
 
 Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems),
-[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
+[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](#microsoft-wsl2)
 (feel free to submit a PR for any improvement you might think of).
 
 Once you have followed the instructions for your system, run the following
