@@ -146,6 +146,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	var envs []string
+	// Operator-controlled command: LogPath and LogFileName are operator
+	// constants, so no shell-quoting layer is needed here. The config-file
+	// literal escaping is still applied for consistency with the WAL-restore
+	// path in getRestoreWalConfig.
 	restoreCmd := fmt.Sprintf(
 		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 		postgresSpec.LogPath, postgresSpec.LogFileName)
