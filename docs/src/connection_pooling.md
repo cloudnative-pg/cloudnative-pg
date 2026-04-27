@@ -671,9 +671,19 @@ spec:
 ### TLS for the Metrics Endpoint
 
 Set `.spec.monitoring.tls.enabled: true` to serve the metrics endpoint over
-HTTPS. The metrics server presents `.spec.pgbouncer.clientTLSSecret` and
-reloads it on every TLS handshake, so certificate rotations are picked up
-without restarting the pod.
+HTTPS. By default, the cluster's server certificate is being used.
+The certificate is reloaded on every TLS handshake, so rotations are
+picked up without restarting the pod.
+
+```yaml
+spec:
+  monitoring:
+    tls:
+      enabled: true
+```
+
+When `.spec.pgbouncer.clientTLSSecret` is set, the metrics server presents
+that certificate instead.
 
 ```yaml
 spec:
