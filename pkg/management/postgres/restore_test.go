@@ -255,4 +255,23 @@ var _ = Describe("getRestoreWalConfig", func() {
 			Expect(out).To(ContainSubstring("%f"))
 			Expect(out).To(ContainSubstring("%p"))
 		})
+
+	It("nests an obvious shell-injection payload inside both quoting layers",
+		func(ctx SpecContext) {
+			backup := &apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: `s3://bucket"; rm -rf /; "`,
+					ServerName:      "server-a",
+				},
+			}
+			out, err := getRestoreWalConfig(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
+
+			// shellquote.Join wraps the whole arg in single quotes (because
+			// of the embedded `;` and spaces); EscapePostgresConfLiteral
+			// then doubles each of those quotes. The payload must arrive at
+			// the shell as one argument, not as a `;`-separated command.
+			Expect(out).To(ContainSubstring(
+				`''s3://bucket"; rm -rf /; "''`))
+		})
 })
