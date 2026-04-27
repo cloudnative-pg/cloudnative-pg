@@ -118,11 +118,15 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		//   3. cnpg.config_sha256 ALWAYS last
 		// The sha256 hash is computed over (1) only. Any deviation from this
 		// layout changes every cluster's config-file bytes on upgrade and
-		// must be done deliberately.
+		// must be done deliberately. cnpg.synchronous_standby_names_metadata
+		// is included to anchor the sha256-last invariant: alphabetically it
+		// would sort after cnpg.config_sha256, and reordering would rewrite
+		// every sync-replication cluster's postgresql.conf on upgrade.
 		settings := map[string]string{
-			"max_connections":    "100",
-			"shared_buffers":     "128MB",
-			"cnpg.some_internal": "value",
+			"max_connections":                         "100",
+			"shared_buffers":                          "128MB",
+			"cnpg.some_internal":                      "value",
+			"cnpg.synchronous_standby_names_metadata": "ANY 1 (a, b)",
 		}
 		confFile, sum := CreatePostgresqlConfFile(&PgConfiguration{settings})
 
@@ -130,6 +134,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		expected := "max_connections = '100'\n" +
 			"shared_buffers = '128MB'\n" +
 			"cnpg.some_internal = 'value'\n" +
+			"cnpg.synchronous_standby_names_metadata = 'ANY 1 (a, b)'\n" +
 			"cnpg.config_sha256 = '" + expectedHash + "'\n"
 
 		Expect(sum).To(Equal(expectedHash))

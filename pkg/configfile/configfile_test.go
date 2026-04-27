@@ -207,7 +207,7 @@ var _ = Describe("Update configuration files", func() {
 			"recovery_target_timeline = 'latest'",
 		}
 
-		updatedContent, _ := UpdateConfigurationContents(initialContent, map[string]string{
+		updatedContent := UpdateConfigurationContents(initialContent, map[string]string{
 			"test.key": "test.value",
 		})
 
@@ -233,7 +233,7 @@ var _ = Describe("Update configuration files", func() {
 			"primary_conninfo = 'host=someHost2 user=someUser2 application_name=nodeName2'",
 		}
 
-		updatedContent, _ := UpdateConfigurationContents(initialContent, map[string]string{
+		updatedContent := UpdateConfigurationContents(initialContent, map[string]string{
 			"primary_conninfo": "host=someHost user=someUser application_name=nodeName",
 		})
 
@@ -249,10 +249,10 @@ var _ = Describe("Update configuration files", func() {
 	})
 })
 
-var _ = Describe("EscapePostgresConfLiteral", func() {
+var _ = Describe("escapePostgresConfLiteral", func() {
 	DescribeTable("produces a value that round-trips through the PostgreSQL config file parser",
 		func(input, expected string) {
-			Expect(EscapePostgresConfLiteral(input)).To(Equal(expected))
+			Expect(escapePostgresConfLiteral(input)).To(Equal(expected))
 		},
 		Entry("plain string", "hello", "'hello'"),
 		Entry("empty string", "", "''"),
@@ -334,7 +334,7 @@ var _ = Describe("EscapePostgresConfLiteral", func() {
 			`multiple 'quotes' and \back\slashes`,
 		}
 		for _, value := range cases {
-			Expect(reverse(EscapePostgresConfLiteral(value))).To(Equal(value),
+			Expect(reverse(escapePostgresConfLiteral(value))).To(Equal(value),
 				"round-trip failed for input %q", value)
 		}
 	})
@@ -342,10 +342,9 @@ var _ = Describe("EscapePostgresConfLiteral", func() {
 
 var _ = Describe("UpdateConfigurationContents with special characters", func() {
 	It("escapes single quotes in values", func() {
-		updated, err := UpdateConfigurationContents(nil, map[string]string{
+		updated := UpdateConfigurationContents(nil, map[string]string{
 			"recovery_target_name": "my'restore'point",
 		})
-		Expect(err).NotTo(HaveOccurred())
 		Expect(updated).To(ConsistOf(
 			"recovery_target_name = 'my''restore''point'",
 		))
@@ -355,20 +354,18 @@ var _ = Describe("UpdateConfigurationContents with special characters", func() {
 		// pq.QuoteLiteral generates `E'...'` when the input contains a backslash,
 		// which the postgresql.conf lexer does not understand. We must produce
 		// the plain single-quoted form with doubled backslashes.
-		updated, err := UpdateConfigurationContents(nil, map[string]string{
+		updated := UpdateConfigurationContents(nil, map[string]string{
 			"archive_command": `test \ command`,
 		})
-		Expect(err).NotTo(HaveOccurred())
 		Expect(updated).To(ConsistOf(
 			`archive_command = 'test \\ command'`,
 		))
 	})
 
 	It("escapes literal newlines", func() {
-		updated, err := UpdateConfigurationContents(nil, map[string]string{
+		updated := UpdateConfigurationContents(nil, map[string]string{
 			"recovery_target_name": "line1\nline2",
 		})
-		Expect(err).NotTo(HaveOccurred())
 		Expect(updated).To(ConsistOf(
 			`recovery_target_name = 'line1\nline2'`,
 		))

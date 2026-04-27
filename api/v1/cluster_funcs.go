@@ -1477,8 +1477,6 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 		return ""
 	}
 
-	// String-typed recovery targets go through the parser so that any
-	// user-supplied value is correctly escaped.
 	options := map[string]string{}
 	if target.TargetTLI != "" {
 		options["recovery_target_timeline"] = target.TargetTLI
@@ -1495,22 +1493,16 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetTime != "" {
 		options["recovery_target_time"] = pgTime.ConvertToPostgresFormat(target.TargetTime)
 	}
-
-	result := configfile.RenderPostgresConfiguration(options)
-
-	// Enum-typed recovery targets are emitted as barewords to preserve the
-	// legacy on-disk format. Their values come from a fixed, non-user-
-	// controlled set (immediate / true / false), so escaping is unnecessary.
 	if target.TargetImmediate != nil && *target.TargetImmediate {
-		result += "recovery_target = immediate\n"
+		options["recovery_target"] = "immediate"
 	}
 	if target.Exclusive != nil && *target.Exclusive {
-		result += "recovery_target_inclusive = false\n"
+		options["recovery_target_inclusive"] = "false"
 	} else {
-		result += "recovery_target_inclusive = true\n"
+		options["recovery_target_inclusive"] = "true"
 	}
 
-	return result
+	return configfile.RenderPostgresConfiguration(options)
 }
 
 // ApplyInto applies the content of the probe configuration in a Kubernetes
