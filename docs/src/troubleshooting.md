@@ -917,7 +917,7 @@ If you enable io_uring in your Cluster by setting the io_method parameter
       io_method: "io_uring"
 ```
 
-and afterwards the Pods are CrashLooping with this error
+and afterwards the Pods are `CrashLooping` with this error
 
 ```
 []FATAL:  could not setup io_uring queue: Operation not permitted","pipe":"stderr","logging_pod":"iouring-1"}
