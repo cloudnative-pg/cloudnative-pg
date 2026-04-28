@@ -925,7 +925,7 @@ and afterwards the Pods are `CrashLooping` with this error
 ```
 
 your `secCompProfile` does not allow the syscall's needed by `io_uring`.
-To fix this problem you have to create a new seccompProfile on your worker nodes and refere to it
+To fix this problem you have to create a new `secCompProfile` on your worker nodes and refer to it
 in the securityContext.
 
 ``` yaml
