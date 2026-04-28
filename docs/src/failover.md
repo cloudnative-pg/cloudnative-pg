@@ -77,6 +77,18 @@ and/or data being lost ([RPO](before_you_start.md#postgresql-terminology)):
     negatively affecting RTO.
 :::
 
+:::note
+    Before promoting, the new primary drains any outstanding WAL segments
+    from the archive through `restore_command`. A transient failure of that
+    restore (for example a network blip) is retried for up to
+    `.spec.walRestoreRetryTimeout` (default 5 minutes) to avoid promoting on
+    a partial archive and losing already-archived transactions. If the
+    budget is exhausted, `restore_command` exits with code `255` and
+    PostgreSQL stops log-shipping replication rather than promoting. See
+    ["Continuous backup integration"](replication.md#continuous-backup-integration)
+    for details.
+:::
+
 :::warning
     As already mentioned in the ["Instance Manager" section](instance_manager.md)
     when explaining the switchover process, the `.spec.switchoverDelay` option
