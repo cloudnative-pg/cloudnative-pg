@@ -367,6 +367,7 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -1248,6 +1249,7 @@ poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
 poolers
 poolersecrets
 poolerspec

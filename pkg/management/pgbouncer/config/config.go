@@ -42,11 +42,11 @@ const (
 
 	// ClientTLSCertPath is the path where the client TLS certificate
 	// is stored
-	clientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
+	ClientTLSCertPath = ConfigsDir + "/client-tls/tls.crt"
 
 	// ClientTLSKeyPath is the path where the client TLS private key
 	// is stored
-	clientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
+	ClientTLSKeyPath = ConfigsDir + "/client-tls/tls.key"
 
 	// ServerTLSCertPath is the path where the server TLS certificate
 	// is stored
@@ -136,8 +136,8 @@ var (
 		"admin_users":          PgBouncerAdminUser,
 		"auth_hba_file":        ConfigsDir + "/pg_hba.conf",
 		"server_tls_ca_file":   serverTLSCAPath,
-		"client_tls_cert_file": clientTLSCertPath,
-		"client_tls_key_file":  clientTLSKeyPath,
+		"client_tls_cert_file": ClientTLSCertPath,
+		"client_tls_key_file":  ClientTLSKeyPath,
 		"client_tls_ca_file":   clientTLSCAPath,
 	}
 )
@@ -252,8 +252,8 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	// The required crypto-material
 	files[serverTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
 	files[clientTLSCAPath] = secrets.ClientCA.Data[certs.CACertKey]
-	files[clientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
-	files[clientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
+	files[ClientTLSCertPath] = secrets.ClientTLS.Data[certs.TLSCertKey]
+	files[ClientTLSKeyPath] = secrets.ClientTLS.Data[certs.TLSPrivateKeyKey]
 
 	if secrets.ServerTLS != nil {
 		files[serverTLSCertPath] = secrets.ServerTLS.Data[certs.TLSCertKey]

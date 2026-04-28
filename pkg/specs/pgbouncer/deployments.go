@@ -23,6 +23,7 @@ package pgbouncer
 
 import (
 	"path"
+	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -119,6 +120,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:  "PSQL_HISTORY",
 			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
 		}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{
+			Name:  "METRICS_PORT_TLS",
+			Value: strconv.FormatBool(pooler.IsMetricsTLSEnabled()),
+		}, true).
 		WithContainerSecurityContext("pgbouncer", specs.GetSecurityContext(cluster), true).
 		WithServiceAccountName(pooler.GetServiceAccountName(), true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
