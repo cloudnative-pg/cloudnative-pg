@@ -699,6 +699,11 @@ The generated `PodMonitor` scrapes with `insecureSkipVerify=true` because
 Prometheus scrapes pods by IP and the certificate's SANs do not generally
 cover the pod IP.
 
+If you need strict verification, set `.spec.monitoring.enablePodMonitor: false`
+and manage the `PodMonitor` yourself: the operator-generated one is hardcoded
+to `insecureSkipVerify=true` and overwrites its spec on every reconcile, so a
+manual patch on the generated `PodMonitor` would not survive.
+
 ### Deprecation of Automatic `PodMonitor` Creation
 
 :::warning[Feature Deprecation Notice]

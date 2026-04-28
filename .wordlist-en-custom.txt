@@ -1245,7 +1245,6 @@ podtemplatespec
 podtopologylabels
 poolMode
 pooler
-pooler's
 poolerIntegrations
 poolerName
 poolerintegrations

@@ -142,7 +142,7 @@ type PoolerMonitoringConfiguration struct {
 }
 
 // PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
-// for the pooler's monitoring
+// for the pooler monitoring
 type PoolerMonitoringTLSConfiguration struct {
 	// Enable TLS for the monitoring endpoint.
 	// Changing this option will force a rollout of all instances.

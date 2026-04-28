@@ -244,22 +244,24 @@ func (v *PoolerCustomValidator) validate(r *apiv1.Pooler) (allErrs field.ErrorLi
 	return allErrs
 }
 
-// validateMonitoring enforces that when the metrics endpoint is switched to
-// TLS *and* the operator is asked to generate the PodMonitor, the user has
-// supplied a clientTLSSecret whose certificate is appropriate for the pooler.
+// validateMonitoring enforces a configuration hygiene rule: when the metrics
+// endpoint is switched to TLS *and* the operator is asked to generate the
+// PodMonitor, the user must supply a clientTLSSecret so the pooler presents
+// a certificate that semantically belongs to the pooler.
 //
-// Without a user-supplied clientTLSSecret the metrics server would fall back
-// to the cluster's server TLS certificate, whose SANs do not match the
-// pooler's DNS names. The generated PodMonitor would then ship with
-// insecureSkipVerify=true, silently relaxing verification despite the user's
-// explicit security opt-in. Reject that combination so the misalignment is
-// surfaced at admission time instead of going undetected.
+// Without a user-supplied clientTLSSecret the metrics server falls back to
+// the cluster's server TLS certificate, whose SANs cover the cluster's
+// services rather than the pooler. The operator-generated PodMonitor already
+// scrapes with insecureSkipVerify=true (Prometheus scrapes pods by IP), so
+// the scrape itself does not break, but serving a cluster-identity
+// certificate from a pooler endpoint is a configuration mistake the operator
+// should surface at admission time rather than ship silently when the user
+// has explicitly opted into TLS.
 //
 // When enablePodMonitor is false (or omitted, its default), the operator does
-// not emit a PodMonitor at all — the user is wiring up their own scraper and
-// is responsible for the TLS expectations on that side. In that case
-// clientTLSSecret is not required; the rule therefore fires only on the one
-// configuration that would silently produce weak verification.
+// not emit a PodMonitor at all: the user is wiring up their own scraper and
+// chooses the TLS expectations on that side. In that case clientTLSSecret is
+// not required and the rule does not fire.
 func (v *PoolerCustomValidator) validateMonitoring(r *apiv1.Pooler) field.ErrorList {
 	if !r.IsMetricsTLSEnabled() {
 		return nil
@@ -283,10 +285,10 @@ func (v *PoolerCustomValidator) validateMonitoring(r *apiv1.Pooler) field.ErrorL
 			field.NewPath("spec", "pgbouncer", "clientTLSSecret"),
 			"clientTLSSecret is required when spec.monitoring.tls.enabled is true and "+
 				"the operator-generated PodMonitor is enabled. Without it the metrics endpoint "+
-				"would serve the cluster's server certificate, whose SANs do not match the "+
-				"pooler, and the generated PodMonitor would scrape with insecureSkipVerify=true. "+
-				"Supply a clientTLSSecret whose SANs cover the pooler's DNS names, or set "+
-				"spec.monitoring.enablePodMonitor=false and manage your own PodMonitor."),
+				"serves the cluster's server certificate, whose SANs cover the cluster's "+
+				"services rather than the pooler. Supply a clientTLSSecret whose certificate "+
+				"represents the pooler, or set spec.monitoring.enablePodMonitor=false and "+
+				"manage your own PodMonitor."),
 	}
 }
 

@@ -1920,7 +1920,7 @@ _Appears in:_
 
 
 PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
-for the pooler's monitoring
+for the pooler monitoring
 
 
 

@@ -82,10 +82,14 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 			},
 			ServerName: ptr.To(c.pooler.Name),
 			// Prometheus scrapes pods by IP, so the cert's SANs will not
-			// generally match the scrape target. InsecureSkipVerify keeps the
-			// scrape working out of the box; the CA and ServerName above are
-			// retained so that users who supply a clientTLSSecret with matching
-			// SANs can patch this flag off and get strict verification.
+			// generally match the scrape target. The operator-generated
+			// PodMonitor is therefore hardcoded to InsecureSkipVerify=true.
+			// CA and ServerName are still set so the scrape config is
+			// internally coherent, but the value cannot be flipped off here:
+			// the operator overwrites Spec on every reconcile, so any manual
+			// patch on the generated PodMonitor would not survive. Users who
+			// need strict verification must set enablePodMonitor=false and
+			// manage their own PodMonitor.
 			InsecureSkipVerify: ptr.To(true),
 		}
 	}
