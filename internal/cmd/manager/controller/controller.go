@@ -60,12 +60,6 @@ const (
 	// is reachable
 	WebhookServiceName = "cnpg-webhook-service" // #nosec
 
-	// MutatingWebhookConfigurationName is the name of the mutating webhook configuration
-	MutatingWebhookConfigurationName = "cnpg-mutating-webhook-configuration"
-
-	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
-	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
-
 	// The name of the directory containing the TLS certificates for webhooks
 	defaultWebhookCertDir = "/run/secrets/cnpg.io/webhook"
 
@@ -404,8 +398,8 @@ func ensurePKI(
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
 		OperatorNamespace:                  conf.OperatorNamespace,
-		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
-		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
+		MutatingWebhookConfigurationName:   conf.GetMutatingWebhookConfigurationName(),
+		ValidatingWebhookConfigurationName: conf.GetValidatingWebhookConfigurationName(),
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
