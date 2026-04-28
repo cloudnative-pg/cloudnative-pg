@@ -21,14 +21,18 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/discovery"
@@ -38,6 +42,7 @@ import (
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -1538,5 +1543,325 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		Expect(rb.Subjects[0].Kind).To(Equal("ServiceAccount"))
 		Expect(rb.Subjects[0].Name).To(Equal("shared-sa"))
 		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
+	})
+})
+
+var _ = Describe("node serial allocation", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	Describe("nextNodeSerial", func() {
+		It("returns LatestGeneratedNode + 1 without mutating the cluster", func() {
+			cluster := &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{LatestGeneratedNode: 5},
+			}
+			Expect(nextNodeSerial(cluster)).To(Equal(6))
+			Expect(cluster.Status.LatestGeneratedNode).To(Equal(5))
+		})
+
+		It("returns 1 for a fresh cluster", func() {
+			Expect(nextNodeSerial(&apiv1.Cluster{})).To(Equal(1))
+		})
+	})
+
+	Describe("recordGeneratedNodeSerial", func() {
+		It("advances and persists the counter when below the target", func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+				c.Status.LatestGeneratedNode = 1
+			})
+
+			Expect(env.clusterReconciler.recordGeneratedNodeSerial(ctx, cluster, 2)).To(Succeed())
+			Expect(cluster.Status.LatestGeneratedNode).To(Equal(2))
+
+			var fetched apiv1.Cluster
+			Expect(env.client.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+			Expect(fetched.Status.LatestGeneratedNode).To(Equal(2))
+		})
+
+		It("is a no-op when the counter already matches the target", func(ctx SpecContext) {
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace, func(c *apiv1.Cluster) {
+				c.Status.LatestGeneratedNode = 3
+			})
+
+			Expect(env.clusterReconciler.recordGeneratedNodeSerial(ctx, cluster, 3)).To(Succeed())
+			Expect(cluster.Status.LatestGeneratedNode).To(Equal(3))
+		})
+	})
+
+	Describe("Job adoption safety", func() {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+
+		clusterOwnerRef := func(cluster *apiv1.Cluster) metav1.OwnerReference {
+			return metav1.OwnerReference{
+				APIVersion: apiv1.SchemeGroupVersion.String(),
+				Kind:       apiv1.ClusterKind,
+				Name:       cluster.Name,
+				UID:        cluster.UID,
+				Controller: ptr.To(true),
+			}
+		}
+
+		newReplicaCluster := func() *apiv1.Cluster {
+			cluster := &apiv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       apiv1.ClusterKind,
+					APIVersion: apiv1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "default",
+					UID:       "test-cluster-uid",
+				},
+				Spec: apiv1.ClusterSpec{
+					Instances:            2,
+					StorageConfiguration: apiv1.StorageConfiguration{Size: "1Gi"},
+				},
+				Status: apiv1.ClusterStatus{
+					LatestGeneratedNode: 1,
+					Instances:           1,
+				},
+			}
+			cluster.SetDefaults()
+			return cluster
+		}
+
+		newPrimaryCluster := func() *apiv1.Cluster {
+			cluster := newReplicaCluster()
+			cluster.Spec.Instances = 1
+			cluster.Status.LatestGeneratedNode = 0
+			cluster.Status.Instances = 0
+			return cluster
+		}
+
+		buildClient := func(cluster *apiv1.Cluster, extraObjs []k8client.Object,
+			fns interceptor.Funcs,
+		) k8client.WithWatch {
+			objs := append([]k8client.Object{cluster}, extraObjs...)
+			return fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithStatusSubresource(&apiv1.Cluster{}).
+				WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
+				WithIndex(&apiv1.Backup{}, ".spec.cluster.name", func(rawObj k8client.Object) []string {
+					return []string{rawObj.(*apiv1.Backup).Spec.Cluster.Name}
+				}).
+				WithObjects(objs...).
+				WithInterceptorFuncs(fns).
+				Build()
+		}
+
+		forceStatusConflict := interceptor.Funcs{
+			SubResourcePatch: func(
+				ctx context.Context,
+				cl k8client.Client,
+				subResourceName string,
+				obj k8client.Object,
+				patch k8client.Patch,
+				opts ...k8client.SubResourcePatchOption,
+			) error {
+				if _, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" {
+					return apierrs.NewConflict(
+						schema.GroupResource{
+							Group:    apiv1.SchemeGroupVersion.Group,
+							Resource: "clusters",
+						},
+						obj.GetName(),
+						fmt.Errorf("forced conflict"),
+					)
+				}
+				return cl.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+			},
+			SubResourceUpdate: func(
+				ctx context.Context,
+				cl k8client.Client,
+				subResourceName string,
+				obj k8client.Object,
+				opts ...k8client.SubResourceUpdateOption,
+			) error {
+				if _, isCluster := obj.(*apiv1.Cluster); isCluster && subResourceName == "status" {
+					return apierrs.NewConflict(
+						schema.GroupResource{
+							Group:    apiv1.SchemeGroupVersion.Group,
+							Resource: "clusters",
+						},
+						obj.GetName(),
+						fmt.Errorf("forced conflict"),
+					)
+				}
+				return cl.SubResource(subResourceName).Update(ctx, obj, opts...)
+			},
+		}
+
+		Context("joinReplicaInstance", func() {
+			It("does not advance LatestGeneratedNode when a status write fails", func(ctx SpecContext) {
+				cluster := newReplicaCluster()
+				cl := buildClient(cluster, nil, forceStatusConflict)
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				_, err := r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
+				Expect(err).To(HaveOccurred())
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(1))
+			})
+
+			It("adopts an owned existing Job and persists the serial bump", func(ctx SpecContext) {
+				cluster := newReplicaCluster()
+				existingJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            specs.GetInstanceName(cluster.Name, 2) + "-join",
+						Namespace:       cluster.Namespace,
+						OwnerReferences: []metav1.OwnerReference{clusterOwnerRef(cluster)},
+					},
+				}
+
+				cl := buildClient(cluster, []k8client.Object{existingJob}, interceptor.Funcs{})
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				_, err := r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
+				Expect(errors.Is(err, ErrNextLoop)).To(BeTrue(), "expected ErrNextLoop, got %v", err)
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(2))
+
+				var pvcs corev1.PersistentVolumeClaimList
+				Expect(cl.List(ctx, &pvcs, k8client.InNamespace(cluster.Namespace))).To(Succeed())
+				pvcNames := make([]string, 0, len(pvcs.Items))
+				for i := range pvcs.Items {
+					pvcNames = append(pvcNames, pvcs.Items[i].Name)
+				}
+				Expect(pvcNames).To(ContainElement(specs.GetInstanceName(cluster.Name, 2)))
+			})
+
+			It("refuses to adopt a Job not owned by the cluster", func(ctx SpecContext) {
+				cluster := newReplicaCluster()
+				existingJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      specs.GetInstanceName(cluster.Name, 2) + "-join",
+						Namespace: cluster.Namespace,
+					},
+				}
+
+				cl := buildClient(cluster, []k8client.Object{existingJob}, interceptor.Funcs{})
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				_, err := r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
+				Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(1))
+			})
+
+			It("requeues without error when the cache lags behind AlreadyExists", func(ctx SpecContext) {
+				cluster := newReplicaCluster()
+				jobName := specs.GetInstanceName(cluster.Name, 2) + "-join"
+				staleCache := interceptor.Funcs{
+					Create: func(
+						ctx context.Context,
+						_ k8client.WithWatch,
+						obj k8client.Object,
+						_ ...k8client.CreateOption,
+					) error {
+						if j, ok := obj.(*batchv1.Job); ok && j.Name == jobName {
+							return apierrs.NewAlreadyExists(
+								schema.GroupResource{Group: "batch", Resource: "jobs"},
+								j.Name,
+							)
+						}
+						return nil
+					},
+				}
+
+				cl := buildClient(cluster, nil, staleCache)
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				result, err := r.joinReplicaInstance(ctx, nextNodeSerial(cluster), cluster)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(1))
+			})
+		})
+
+		Context("createPrimaryInstance", func() {
+			It("adopts an owned existing Job and persists the serial bump", func(ctx SpecContext) {
+				cluster := newPrimaryCluster()
+				existingJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            specs.GetInstanceName(cluster.Name, 1) + "-initdb",
+						Namespace:       cluster.Namespace,
+						OwnerReferences: []metav1.OwnerReference{clusterOwnerRef(cluster)},
+					},
+				}
+
+				cl := buildClient(cluster, []k8client.Object{existingJob}, interceptor.Funcs{})
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				_, err := r.createPrimaryInstance(ctx, cluster)
+				Expect(errors.Is(err, ErrNextLoop)).To(BeTrue(), "expected ErrNextLoop, got %v", err)
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(1))
+			})
+
+			It("refuses to adopt a primary Job not owned by the cluster", func(ctx SpecContext) {
+				cluster := newPrimaryCluster()
+				existingJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      specs.GetInstanceName(cluster.Name, 1) + "-initdb",
+						Namespace: cluster.Namespace,
+					},
+				}
+
+				cl := buildClient(cluster, []k8client.Object{existingJob}, interceptor.Funcs{})
+
+				r := &ClusterReconciler{
+					Client:   cl,
+					Scheme:   scheme,
+					Recorder: record.NewFakeRecorder(10),
+				}
+
+				_, err := r.createPrimaryInstance(ctx, cluster)
+				Expect(err).To(MatchError(ContainSubstring("refusing to adopt job")))
+
+				var fetched apiv1.Cluster
+				Expect(cl.Get(ctx, k8client.ObjectKeyFromObject(cluster), &fetched)).To(Succeed())
+				Expect(fetched.Status.LatestGeneratedNode).To(Equal(0))
+			})
+		})
 	})
 })
