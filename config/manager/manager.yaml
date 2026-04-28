@@ -99,7 +99,8 @@ spec:
               - "ALL"
       volumes:
         - name: scratch-data
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 10Mi
         - name: webhook-certificates
           secret:
             optional: true
