@@ -924,7 +924,7 @@ and afterwards the Pods are `CrashLooping` with this error
 []HINT:  Check if io_uring is disabled via /proc/sys/kernel/io_uring_disabled.","pipe":"stderr","logging_pod":"iouring-1"}
 ```
 
-your seccompProfile does not allow the syscalls needed by io_uring.
+your `secCompProfile` does not allow the syscall's needed by `io_uring`.
 To fix this problem you have to create a new seccompProfile on your worker nodes and refere to it
 in the securityContext.
 
