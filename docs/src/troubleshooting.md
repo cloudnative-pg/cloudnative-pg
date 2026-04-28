@@ -933,3 +933,5 @@ in the `securityContext`.
       type: Localhost
       localhostProfile: profiles/postgres.json      
 ```
+
+Find the used `secCompProfile` in the  [here](./samples/io_uring-seccompprofile.json).
