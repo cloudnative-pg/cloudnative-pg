@@ -38,7 +38,7 @@ func ParseJSONLogs(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	namespace string, podName string,
-) ([]map[string]interface{}, error) {
+) ([]map[string]any, error) {
 	// Gather pod logs
 	podLogs, err := pods.Logs(ctx, kubeInterface, namespace, podName)
 	if err != nil {
@@ -47,12 +47,12 @@ func ParseJSONLogs(
 
 	// In pod logs, each row is stored as JSON object. Split the JSON objects into JSON array
 	logEntries := strings.Split(podLogs, "\n")
-	parsedLogEntries := make([]map[string]interface{}, len(logEntries))
+	parsedLogEntries := make([]map[string]any, len(logEntries))
 	for i, entry := range logEntries {
 		if entry == "" {
 			continue
 		}
-		parsedEntry := make(map[string]interface{})
+		parsedEntry := make(map[string]any)
 		err := json.Unmarshal([]byte(entry), &parsedEntry)
 		if err != nil {
 			return nil, err
@@ -63,7 +63,7 @@ func ParseJSONLogs(
 }
 
 // HasLogger verifies if a given value exists inside a list of JSON entries
-func HasLogger(logEntries []map[string]interface{}, logger string) bool {
+func HasLogger(logEntries []map[string]any, logger string) bool {
 	for _, logEntry := range logEntries {
 		if logEntry["logger"] == logger {
 			return true
@@ -74,7 +74,7 @@ func HasLogger(logEntries []map[string]interface{}, logger string) bool {
 
 // AssertQueryRecord verifies if any of the message record field of each JSON row
 // contains the expectedResult string, then applies the assertions related to the log format
-func AssertQueryRecord(logEntries []map[string]interface{}, errorTestQuery string, message string, logger string) bool {
+func AssertQueryRecord(logEntries []map[string]any, errorTestQuery string, message string, logger string) bool {
 	for _, logEntry := range logEntries {
 		if IsWellFormedLogForLogger(logEntry, logger) &&
 			CheckRecordForQuery(logEntry, errorTestQuery, "postgres", "app", message) {
@@ -87,7 +87,7 @@ func AssertQueryRecord(logEntries []map[string]interface{}, errorTestQuery strin
 // IsWellFormedLogForLogger verifies if the message record field of the given map
 // contains the expectedResult string. If the message field matches the expectedResult,
 // then the related record is returned. Otherwise return nil.
-func IsWellFormedLogForLogger(item map[string]interface{}, loggerField string) bool {
+func IsWellFormedLogForLogger(item map[string]any, loggerField string) bool {
 	if logger, ok := item["logger"]; !ok || logger != loggerField {
 		return false
 	}
@@ -95,7 +95,7 @@ func IsWellFormedLogForLogger(item map[string]interface{}, loggerField string) b
 		return false
 	}
 	if record, ok := item["record"]; ok && record != "" {
-		_, ok = record.(map[string]interface{})
+		_, ok = record.(map[string]any)
 		if !ok {
 			return false
 		}
@@ -105,12 +105,12 @@ func IsWellFormedLogForLogger(item map[string]interface{}, loggerField string) b
 }
 
 // CheckRecordForQuery applies some assertions related to the format of the JSON log fields keys and values
-func CheckRecordForQuery(entry map[string]interface{}, errorTestQuery, user, database, message string) bool {
+func CheckRecordForQuery(entry map[string]any, errorTestQuery, user, database, message string) bool {
 	record, ok := entry["record"]
 	if !ok || record == nil {
 		return false
 	}
-	recordMap, isMap := record.(map[string]interface{})
+	recordMap, isMap := record.(map[string]any)
 	// JSON entry assertions
 	if !isMap || recordMap["user_name"] != user ||
 		recordMap["database_name"] != database ||
@@ -127,11 +127,11 @@ func CheckRecordForQuery(entry map[string]interface{}, errorTestQuery, user, dat
 
 // CheckOptionsForBarmanCommand checks if the expected options are used from the barman command execution log
 func CheckOptionsForBarmanCommand(
-	logEntries []map[string]interface{},
+	logEntries []map[string]any,
 	message, backupName, podName string,
 	optionsExpected []string,
 ) (bool, error) {
-	var optionsInLog interface{}
+	var optionsInLog any
 	for _, logEntry := range logEntries {
 		if logEntry["msg"] == message &&
 			logEntry["backupName"] == backupName &&
@@ -148,13 +148,13 @@ func CheckOptionsForBarmanCommand(
 		)
 	}
 
-	optionsSlice, isSlice := optionsInLog.([]interface{})
+	optionsSlice, isSlice := optionsInLog.([]any)
 	if !isSlice {
 		return false, fmt.Errorf("optionsInLog is not a slice %v", optionsInLog)
 	}
 
 	for _, option := range optionsExpected {
-		if !slices.ContainsFunc(optionsSlice, func(opt interface{}) bool { return opt == option }) {
+		if !slices.ContainsFunc(optionsSlice, func(opt any) bool { return opt == option }) {
 			return false, fmt.Errorf("option %v is not found in logEntry %v",
 				option,
 				optionsInLog,
