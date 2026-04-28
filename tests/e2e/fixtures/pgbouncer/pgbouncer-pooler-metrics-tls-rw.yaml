@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-metrics-tls-rw
+spec:
+  cluster:
+    name: cluster-pgbouncer
+
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    authQuerySecret:
+      name: cluster-pgbouncer-app
+    authQuery: SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1
+  monitoring:
+    tls:
+      enabled: true

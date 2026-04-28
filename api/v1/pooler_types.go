@@ -88,9 +88,6 @@ type PoolerSpec struct {
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this pooler.
-	//
-	// Deprecated: This feature will be removed in an upcoming release. If
-	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
 
@@ -117,17 +114,41 @@ type PoolerSpec struct {
 // part for now.
 type PoolerMonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +kubebuilder:default:=false
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	//
+	// Deprecated: This feature will be removed in an upcoming release. If
+	// you need this functionality, you can create a PodMonitor manually.
 	// +optional
 	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+
+	// Configure TLS communication for the metrics endpoint.
+	// Changing tls.enabled option will force a rollout of all instances.
+	// +optional
+	TLSConfig *PoolerMonitoringTLSConfiguration `json:"tls,omitempty"`
+}
+
+// PoolerMonitoringTLSConfiguration is the type containing the TLS configuration
+// for the pooler monitoring
+type PoolerMonitoringTLSConfiguration struct {
+	// Enable TLS for the monitoring endpoint.
+	// Changing this option will force a rollout of all instances.
+	// +kubebuilder:default:=false
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set

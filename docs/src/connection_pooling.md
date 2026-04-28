@@ -668,6 +668,42 @@ spec:
   - port: metrics
 ```
 
+### TLS for the Metrics Endpoint
+
+Set `.spec.monitoring.tls.enabled: true` to serve the metrics endpoint over
+HTTPS. By default, the cluster's server certificate is being used.
+The certificate is reloaded on every TLS handshake, so rotations are
+picked up without restarting the pod.
+
+```yaml
+spec:
+  monitoring:
+    tls:
+      enabled: true
+```
+
+When `.spec.pgbouncer.clientTLSSecret` is set, the metrics server presents
+that certificate instead.
+
+```yaml
+spec:
+  pgbouncer:
+    clientTLSSecret:
+      name: <CLIENT_TLS_SECRET>
+  monitoring:
+    tls:
+      enabled: true
+```
+
+The generated `PodMonitor` scrapes with `insecureSkipVerify=true` because
+Prometheus scrapes pods by IP and the certificate's SANs do not generally
+cover the pod IP.
+
+If you need strict verification, set `.spec.monitoring.enablePodMonitor: false`
+and manage the `PodMonitor` yourself: the operator-generated one is hardcoded
+to `insecureSkipVerify=true` and overwrites its spec on every reconcile, so a
+manual patch on the generated `PodMonitor` would not survive.
+
 ### Deprecation of Automatic `PodMonitor` Creation
 
 :::warning[Feature Deprecation Notice]
