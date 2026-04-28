@@ -88,3 +88,48 @@ func setStatusPluginHook(
 	}
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
+
+// finalizeReconciliation runs the post-reconcile plugin hooks, syncs the
+// per-plugin statuses, and registers PhaseHealthy as the very last status
+// mutation of the reconciliation loop.
+//
+// PhaseHealthy MUST be the final status update of a successful loop. Any
+// later phase patch (e.g. an error path that registers PhaseFailurePlugin)
+// would race with the next reconciliation and oscillate Phase between
+// Healthy and the error phase. See #8582.
+//
+// The result is propagated from the underlying plugin operations so any
+// requeue they request (notably the 5s polling from setStatusPluginHook
+// after a successful status patch) is honored alongside the Healthy
+// registration.
+func (r *ClusterReconciler) finalizeReconciliation(
+	ctx context.Context,
+	pluginClient cnpgiClient.Client,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	hookResult := pluginClient.PostReconcile(ctx, cluster, cluster)
+	if hookResult.Err != nil || !hookResult.Result.IsZero() {
+		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
+			"hookResult", hookResult)
+		if hookResult.Err != nil {
+			return hookResult.Result, hookResult.Err
+		}
+	}
+
+	res := hookResult.Result
+	if res.IsZero() {
+		var err error
+		res, err = setStatusPluginHook(ctx, r.Client, pluginClient, cluster)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return res, nil
+}
