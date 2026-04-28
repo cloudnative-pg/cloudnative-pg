@@ -30,7 +30,7 @@ function wait_for() {
   local retries=$5
 
   ITER=0
-  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ $ITER -lt "$retries" ]; do
+  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ "$ITER" -lt "$retries" ]; do
     ITER=$((ITER + 1))
     echo "$name $type doesn't exist yet. Waiting $interval seconds ($ITER of $retries)."
     sleep "$interval"
@@ -50,12 +50,12 @@ function retry {
     local exit=$?
     local wait=$((2 ** count))
     count=$((count + 1))
-    if [ $count -lt "$retries" ]; then
+    if [ "$count" -lt "$retries" ]; then
       echo "Retry $count/$retries exited $exit, retrying in $wait seconds..." >&2
-      sleep $wait
+      sleep "$wait"
     else
       echo "Retry $count/$retries exited $exit, no more retries left." >&2
-      return $exit
+      return "$exit"
     fi
   done
   return 0
@@ -138,6 +138,84 @@ EOF
   "${K8S_CLI}" -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 
   echo -e "${bright}Pyroscope deployment successful and operator patched to expose profiling data.${reset}"
+}
+
+# print_operator_image: prints the operator image reference (as set on the
+# controller-manager Deployment's first container) when the deployment exists.
+function print_operator_image() {
+    local image
+    image=$(${K8S_CLI} get deployment cnpg-controller-manager -n cnpg-system \
+        --ignore-not-found \
+        -o jsonpath='{.spec.template.spec.containers[0].image}')
+    if [[ -n "${image}" ]]; then
+        printf '%bOperator image: %s%b\n' "${bright}" "${image}" "${reset}"
+    fi
+}
+
+# reset_operator_namespace: deletes the cnpg-system namespace if present and
+# waits for finalization, so the next apply doesn't race a terminating namespace.
+function reset_operator_namespace() {
+    if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
+        ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
+        ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
+    fi
+}
+
+# wait_operator_ready: waits for the controller-manager rollout to finish and
+# prints a completion banner plus the deployed image reference.
+function wait_operator_ready() {
+    ${K8S_CLI} -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=5m
+    printf '%bOperator deployment complete.%b\n' "${bright}" "${reset}"
+    print_operator_image
+}
+
+# deploy_operator_from_manifest <operator>
+# Deploys the operator by applying its manifest. The <operator> argument is
+# interpreted either as a semver version (e.g. 1.28.1 or v1.28.1, with optional
+# prerelease suffix), in which case the published release manifest from the main
+# repository is used, or as a branch name (e.g. main, release-1.28), in which
+# case the snapshot manifest from the cloudnative-pg/artifacts repository is
+# used.
+function deploy_operator_from_manifest() {
+    local operator="${1:?operator is required}"
+    local mode
+    local manifest_url
+
+    if [[ "${operator}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+        local version="${operator#v}"
+        mode="version"
+        manifest_url="https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v${version}/cnpg-${version}.yaml"
+    elif [[ "${operator}" =~ ^v?[0-9] ]]; then
+        # Looks version-like but isn't valid semver -- refuse rather than silently
+        # fall through to branch mode and produce a misleading "not found" error.
+        printf '%bError: %s is not a valid operator version (expected e.g. 1.28.1 or v1.28.1)%b\n' \
+            "${bright}" "${operator}" "${reset}" >&2
+        exit 1
+    elif [[ "${operator}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] && [[ "${operator}" != *..* ]]; then
+        mode="branch"
+        manifest_url="https://raw.githubusercontent.com/cloudnative-pg/artifacts/${operator}/manifests/operator-manifest.yaml"
+    else
+        printf '%bError: %s is not a valid operator value%b\n' \
+            "${bright}" "${operator}" "${reset}" >&2
+        printf '%bExpected a semver (e.g. 1.28.1) or a branch name (e.g. main, release-1.28).%b\n' \
+            "${bright}" "${reset}" >&2
+        exit 1
+    fi
+
+    local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
+    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+        printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
+        printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
+        exit 1
+    fi
+
+    printf '%bDeploying operator from %s%b\n' "${bright}" "${operator}" "${reset}"
+    reset_operator_namespace
+    # --server-side avoids the last-applied-configuration annotation exceeding
+    # the 262144 byte limit on large CRDs; --force-conflicts lets us adopt
+    # existing field ownership when re-deploying or switching operator version.
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${manifest_file}"
+    wait_operator_ready
 }
 
 # deploy_csi_host_path: Deploys the host path CSI driver and snapshotter components.
@@ -255,3 +333,12 @@ function deploy_fluentd() {
 }
 
 
+# deploy_operator_from_source: applies the pre-generated operator manifest.
+# Requires generate_operator_manifest (via setup-cluster.sh) to have been
+# called first.
+function deploy_operator_from_source() {
+    # shellcheck disable=SC2154
+    echo -e "${bright}Deploying CNPG operator from ${OPERATOR_MANIFEST_PATH}${reset}"
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${OPERATOR_MANIFEST_PATH}"
+    wait_operator_ready
+}

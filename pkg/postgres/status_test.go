@@ -239,6 +239,46 @@ var _ = Describe("PostgreSQL status real", func() {
 	})
 })
 
+var _ = Describe("IsPodReadyAndNotReporting", func() {
+	errStatusEndpointFailing := fmt.Errorf("status endpoint failing")
+
+	podList := PostgresqlStatusList{
+		Items: []PostgresqlStatus{
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "primary"}},
+				IsPodReady: true,
+				Error:      errStatusEndpointFailing,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-reporting"}},
+				IsPodReady: true,
+				Error:      nil,
+			},
+			{
+				Pod:        &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "replica-not-ready"}},
+				IsPodReady: false,
+				Error:      errStatusEndpointFailing,
+			},
+		},
+	}
+
+	It("returns true when the pod is ready but the status endpoint is failing", func() {
+		Expect(podList.IsPodReadyAndNotReporting("primary")).To(BeTrue())
+	})
+
+	It("returns false when the pod is ready and reporting", func() {
+		Expect(podList.IsPodReadyAndNotReporting("replica-reporting")).To(BeFalse())
+	})
+
+	It("returns false when the pod is not ready and not reporting", func() {
+		Expect(podList.IsPodReadyAndNotReporting("replica-not-ready")).To(BeFalse())
+	})
+
+	It("returns false when the pod is not in the list", func() {
+		Expect(podList.IsPodReadyAndNotReporting("unknown")).To(BeFalse())
+	})
+})
+
 var _ = Describe("Configuration report", func() {
 	DescribeTable(
 		"Configuration report",

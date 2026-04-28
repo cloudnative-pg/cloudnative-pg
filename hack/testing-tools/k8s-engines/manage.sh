@@ -36,13 +36,12 @@
 #       * teardown.sh - Destroy the cluster and cleanup resources
 #       * export-logs.sh - Export cluster logs for debugging
 #   - Optional vendor scripts (with fallback to common implementations):
-#       * load.sh - Vendor-specific image loading (falls back to registry push)
 #       * load-helper-images.sh - Load helper images for testing
 #
 # Usage:
 #   manage.sh <action>
-#   where <action> can be: create, load-from-sources, deploy-from-sources,
-#   load-helper-images, print-image, export-logs, teardown, pyroscope, env
+#   where <action> can be: create, deploy, load-helper-images,
+#   print-image, export-logs, teardown, pyroscope, env
 #
 # Environment Variables:
 #   CLUSTER_ENGINE - Determines the target vendor (default: 'kind')
@@ -75,19 +74,24 @@ source "${COMMON_DIR}/50-utils-images-load.sh"
 ACTION="${1:-}"
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 <create|load-from-sources|deploy-from-sources|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
+    echo "Usage: $0 <create|deploy|load-helper-images|print-image|export-logs|teardown|pyroscope|env>"
     exit 1
 fi
 
 # --- Action Aliases for Backward Compatibility ---
 case "$ACTION" in
-    load) ACTION="load-from-sources" ;;
-    deploy) ACTION="deploy-from-sources" ;;
+    deploy)
+        if [[ "${OPERATOR}" != "local" ]]; then
+            ACTION="deploy-from-manifest"
+        else
+            ACTION="deploy-from-sources"
+        fi
+        ;;
 esac
 
 # Ensure registry exists for actions that need it
 case "$ACTION" in
-    create|load-from-sources|deploy-from-sources|load-helper-images|pyroscope)
+    create|deploy-from-sources|load-helper-images|pyroscope)
         ensure_registry
         ;;
 esac
@@ -117,27 +121,15 @@ case "$ACTION" in
         fi
         ;;
 
-    load-from-sources)
-        LOAD_VENDOR_SCRIPT="${VENDOR_DIR}/load.sh"
-
-        if [ -f "${LOAD_VENDOR_SCRIPT}" ]; then
-            source "${LOAD_VENDOR_SCRIPT}"
-            load_operator_image_vendor_specific
-        else
-            build_and_load_operator_image_from_sources
-        fi
+    deploy-from-sources)
+        source "${COMMON_DIR}/20-utils-k8s.sh"
+        reset_operator_namespace
+        deploy_operator_from_source
         ;;
 
-    deploy-from-sources)
-        # Ensure CONTROLLER_IMG is defined
-        CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
-        if [ -z "$CONTROLLER_IMG" ]; then
-            echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
-            exit 1
-        fi
-
+    deploy-from-manifest)
         source "${COMMON_DIR}/20-utils-k8s.sh"
-        deploy_operator_from_sources
+        deploy_operator_from_manifest "${OPERATOR}"
         ;;
 
     load-helper-images)
@@ -195,6 +187,8 @@ case "$ACTION" in
         echo "NODES:                      ${NODES:-<not explicitly set>}"
         echo "ENABLE_APISERVER_AUDIT:     ${ENABLE_APISERVER_AUDIT:-false}"
         echo "ENABLE_FLUENTD:             ${ENABLE_FLUENTD:-false}"
+        echo "CNPG_DEPLOYMENT_METHOD:     ${CNPG_DEPLOYMENT_METHOD}"
+        echo "OPERATOR:                   ${OPERATOR}"
 
         # --- IMAGE & BUILD ARTIFACTS ---
         echo ""
