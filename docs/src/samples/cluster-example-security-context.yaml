@@ -44,7 +44,7 @@ spec:
     runAsNonRoot: true
   # Custom SeccompProfile
   # In order to use io_uring, you have to create a new SeccompProfile on your worker nodes that includes
-  # the syscalls needed (io_uring_enter, io_uring_register, io_uring_setup) and refere to it.
+  # the syscall's needed (io_uring_enter, io_uring_register, io_uring_setup) and refere to it.
     seccompProfile:
       type: Localhost
       localhostProfile: profiles/postgres.json       
