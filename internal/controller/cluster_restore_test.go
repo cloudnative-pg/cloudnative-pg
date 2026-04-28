@@ -132,17 +132,15 @@ var _ = Describe("restoreClusterStatus", func() {
 
 	Context("when restoring cluster status", func() {
 		It("should patch the cluster with the updated status", func(ctx SpecContext) {
-			latestNodeSerial := 10
 			targetPrimaryNodeSerial := 3
 
-			err := restoreClusterStatus(ctx, mockCli, cluster, latestNodeSerial, targetPrimaryNodeSerial)
+			err := restoreClusterStatus(ctx, mockCli, cluster, targetPrimaryNodeSerial)
 			Expect(err).ToNot(HaveOccurred())
 
 			modifiedCluster := &apiv1.Cluster{}
 			err = mockCli.Get(ctx, k8client.ObjectKeyFromObject(cluster), modifiedCluster)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(modifiedCluster.Status.LatestGeneratedNode).To(Equal(latestNodeSerial))
 			Expect(modifiedCluster.Status.TargetPrimary).To(
 				Equal(specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)))
 		})
