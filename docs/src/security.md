@@ -578,7 +578,7 @@ spec:
 
 :::note
     The containerd RuntimeDefault seccompProfile removed the io_uring syscalls [PR](https://github.com/containerd/containerd/pull/9320).
-    If you want to use io_uring, you have to create a custom seccompProfile with io_uring_enter, io_uring_register and io_uring_setup capabilities.
+    If you want to use io_uring, you have to create a custom `secCompProfile` with `io_uring_enter`, `io_uring_register` and `io_uring_setup` capabilities.
 :::
 
 **Container Security Context** (`spec.securityContext`):
