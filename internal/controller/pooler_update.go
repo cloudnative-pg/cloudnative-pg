@@ -60,7 +60,12 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	return createOrPatchPodMonitor(
+		ctx,
+		r.Client,
+		r.DiscoveryClient,
+		pgbouncer.NewPoolerPodMonitorManager(pooler, resources.Cluster),
+	)
 }
 
 // updateDeployment update the deployment or create it when needed
