@@ -28,7 +28,6 @@ import (
 	"math"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -692,18 +691,6 @@ func (p *PgConfiguration) AddSharedPreloadLibrary(newLibrary string) {
 // GetConfig retrieves a configuration from the map of configurations, given the key
 func (p *PgConfiguration) GetConfig(key string) string {
 	return p.configs[key]
-}
-
-// GetSortedList returns a sorted list of configurations
-func (p *PgConfiguration) GetSortedList() []string {
-	parameters := make([]string, len(p.configs))
-	i := 0
-	for key := range p.configs {
-		parameters[i] = key
-		i++
-	}
-	sort.Strings(parameters)
-	return parameters
 }
 
 // CreatePostgresqlConfiguration creates the configuration from the settings
