@@ -44,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -74,6 +75,13 @@ const (
 	pqPingReject     = 1 // server is alive but rejecting connections
 	pqPingNoResponse = 2 // could not establish connection
 	pgPingNoAttempt  = 3 // connection not attempted (bad params)
+
+	// pgUndefinedObjectSQLState is the SQLSTATE code PostgreSQL returns when
+	// a referenced object does not exist. We use it to detect SHOW on a
+	// custom placeholder GUC that is not currently defined in the
+	// PostgreSQL configuration.
+	// See: https://www.postgresql.org/docs/current/errcodes-appendix.html
+	pgUndefinedObjectSQLState = "42704"
 )
 
 // GetPostgresExecutableName returns the name of the PostgreSQL executable
@@ -1143,6 +1151,16 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 // GetSynchronousReplicationMetadata reads the current PostgreSQL configuration
 // and extracts the parameters that were used to compute the synchronous_standby_names
 // GUC.
+//
+// Returns (nil, nil) when synchronous replication is not currently configured,
+// either because the custom GUC is empty or because it has never been set.
+// The latter happens on the "preferred" data-durability path when no healthy
+// replicas are available: the operator renders a configuration without
+// synchronous_standby_names and, consequently, without the companion
+// cnpg.synchronous_standby_names_metadata placeholder GUC. PostgreSQL then
+// reports SHOW on that parameter as "unrecognized configuration parameter"
+// (SQLSTATE 42704), which we treat as equivalent to "no sync metadata in
+// effect".
 func (instance *Instance) GetSynchronousReplicationMetadata(
 	ctx context.Context,
 ) (*postgres.SynchronousStandbyNamesConfig, error) {
@@ -1155,8 +1173,11 @@ func (instance *Instance) GetSynchronousReplicationMetadata(
 	row := db.QueryRowContext(
 		ctx, fmt.Sprintf("SHOW %s", postgres.CNPGSynchronousStandbyNamesMetadata))
 	err = row.Scan(&metadata)
-	if err != nil {
-		return nil, err
+	if err := row.Scan(&metadata); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUndefinedObjectSQLState {
+			return nil, nil
+		}
 	}
 
 	if len(metadata) == 0 {
