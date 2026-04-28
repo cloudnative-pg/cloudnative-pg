@@ -268,6 +268,26 @@ func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *corev1.Se
 	}
 }
 
+// GenerateWebhookCertificateSecret creates a k8s webhook secret from a key pair including the CA
+// This method is specifically for webhook certificates that need the CA bundle for validation
+func (pair KeyPair) GenerateWebhookCertificateSecret(namespace, name string, caCertificate []byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
+		},
+		Data: map[string][]byte{
+			TLSPrivateKeyKey: pair.Private,
+			TLSCertKey:       pair.Certificate,
+			CACertKey:        caCertificate,
+		},
+		Type: corev1.SecretTypeTLS,
+	}
+}
+
 // RenewCertificate create a new certificate for the embedded private
 // key, replacing the existing one. The certificate will be signed
 // with the passed private key and will have as parent the specified
