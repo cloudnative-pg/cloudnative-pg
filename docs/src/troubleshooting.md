@@ -909,7 +909,7 @@ connection more quickly.
 
 ### Enabling io_uring causes the cluster to CrashLoopBackOff
 
-If you enable io_uring in your Cluster by setting the io_method parameter
+If you enable io_uring in your Cluster by setting the [io_method](https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-IO-METHOD) parameter
 
 ``` yaml
   postgresql:
