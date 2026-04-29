@@ -27,8 +27,29 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	"github.com/lib/pq"
 )
+
+// postgresConfLiteralReplacer escapes every character the PostgreSQL config
+// file lexer (`guc-file.l`) interprets specially inside a single-quoted value.
+var postgresConfLiteralReplacer = strings.NewReplacer(
+	`\`, `\\`,
+	`'`, `''`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+	"\b", `\b`,
+	"\f", `\f`,
+)
+
+// escapePostgresConfLiteral escapes an arbitrary string so it can be used as a
+// value in a PostgreSQL configuration file, wrapped in single quotes.
+//
+// pq.QuoteLiteral is unsuitable here: it emits ` E'...'` when the value
+// contains a backslash, and the PostgreSQL config parser does not recognise
+// the `E'...'` syntax.
+func escapePostgresConfLiteral(value string) string {
+	return "'" + postgresConfLiteralReplacer.Replace(value) + "'"
+}
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
 // If any managedOptions is passed, it will be removed unless present in the options map.
@@ -50,17 +71,13 @@ func UpdatePostgresConfigurationFile(
 		}
 	}
 	lines = RemoveOptionsFromConfigurationContents(lines, optionsToRemove...)
-
-	lines, err = UpdateConfigurationContents(lines, options)
-	if err != nil {
-		return false, fmt.Errorf("error while updating configuration from %v: %w", fileName, err)
-	}
+	lines = UpdateConfigurationContents(lines, options)
 	return fileutils.WriteLinesToFile(fileName, lines)
 }
 
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
-func UpdateConfigurationContents(lines []string, options map[string]string) ([]string, error) {
+func UpdateConfigurationContents(lines []string, options map[string]string) []string {
 	foundKeys := stringset.New()
 	index := 0
 	for _, line := range lines {
@@ -77,7 +94,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 			}
 
 			foundKeys.Put(key)
-			lines[index] = fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value))
+			lines[index] = fmt.Sprintf("%s = %s", key, escapePostgresConfLiteral(value))
 			index++
 			continue
 		}
@@ -92,11 +109,28 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	for _, key := range keysList {
 		if !foundKeys.Has(key) {
 			value := options[key]
-			lines = append(lines, fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value)))
+			lines = append(lines, fmt.Sprintf("%s = %s", key, escapePostgresConfLiteral(value)))
 		}
 	}
 
-	return lines, nil
+	return lines
+}
+
+// RenderPostgresConfiguration returns a PostgreSQL configuration fragment as
+// a single string: one `key = 'escaped value'\n` line per entry in options,
+// sorted by key. The returned string is safe to concatenate with other
+// fragments and to embed directly into a `postgresql.conf`-style file.
+//
+// This is the canonical way to produce a config fragment in-memory: callers
+// that build strings by hand can forget to escape values, while this funnels
+// every value through the same escaping that the on-disk parser uses.
+func RenderPostgresConfiguration(options map[string]string) string {
+	var b strings.Builder
+	for _, l := range UpdateConfigurationContents(nil, options) {
+		b.WriteString(l)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 // WritePostgresConfiguration replaces the content of a PostgreSQL configuration
@@ -105,11 +139,7 @@ func WritePostgresConfiguration(
 	fileName string,
 	options map[string]string,
 ) (changed bool, err error) {
-	lines, err := UpdateConfigurationContents(nil, options)
-	if err != nil {
-		return false, fmt.Errorf("error while writing configuration to %v: %w", fileName, err)
-	}
-	return fileutils.WriteLinesToFile(fileName, lines)
+	return fileutils.WriteLinesToFile(fileName, UpdateConfigurationContents(nil, options))
 }
 
 // RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
