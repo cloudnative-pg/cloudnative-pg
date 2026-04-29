@@ -77,7 +77,9 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			WithStatusSubresource(cluster).
 			Build()
 
-		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, pvcs)
+		result, err := majorVersionUpgradeHandleCompletion(
+			ctx, fakeClient, record.NewFakeRecorder(10), cluster, job, pvcs,
+		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).ToNot(BeNil())
 		Expect(*result).To(Equal(ctrl.Result{Requeue: true}))
@@ -103,6 +105,77 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
 		Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
 	})
+
+	It("emits an Event when the upgrade pod recorded ExtensionUpdatesPending",
+		func(ctx SpecContext) {
+			job := buildCompletedUpgradeJob()
+			// Simulate the upgrade pod having patched the condition before the
+			// reconciler runs the completion handler.
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-example",
+				},
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:16",
+				},
+				Status: apiv1.ClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+							Status:  metav1.ConditionTrue,
+							Reason:  string(apiv1.ConditionReasonExtensionUpdatesPending),
+							Message: "pg_upgrade emitted /var/lib/postgresql/data/pgdata/update_extensions.sql in pod \"primary-1\"",
+						},
+					},
+				},
+			}
+			pvcs := []corev1.PersistentVolumeClaim{buildPrimaryPVC(1)}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithRuntimeObjects(job, cluster, &pvcs[0]).
+				WithStatusSubresource(cluster).
+				Build()
+
+			recorder := record.NewFakeRecorder(10)
+			_, err := majorVersionUpgradeHandleCompletion(
+				ctx, fakeClient, recorder, cluster, job, pvcs,
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(recorder.Events).Should(Receive(SatisfyAll(
+				ContainSubstring("Warning"),
+				ContainSubstring(string(apiv1.ConditionReasonExtensionUpdatesPending)),
+				ContainSubstring("update_extensions.sql"),
+				ContainSubstring("primary-1"),
+			)))
+		},
+	)
+
+	It("does not emit an Event when the condition is absent",
+		func(ctx SpecContext) {
+			job := buildCompletedUpgradeJob()
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-example"},
+				Spec:       apiv1.ClusterSpec{ImageName: "postgres:16"},
+			}
+			pvcs := []corev1.PersistentVolumeClaim{buildPrimaryPVC(1)}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithRuntimeObjects(job, cluster, &pvcs[0]).
+				WithStatusSubresource(cluster).
+				Build()
+
+			recorder := record.NewFakeRecorder(10)
+			_, err := majorVersionUpgradeHandleCompletion(
+				ctx, fakeClient, recorder, cluster, job, pvcs,
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			Consistently(recorder.Events).ShouldNot(Receive())
+		},
+	)
 })
 
 var _ = Describe("Major upgrade rollback handling", func() {
