@@ -461,7 +461,7 @@ data:
     pg_extensions:
       query: |
         SELECT
-         current_database() as datname,
+         pg_catalog.current_database() as datname,
          name as extname,
          default_version,
          installed_version,

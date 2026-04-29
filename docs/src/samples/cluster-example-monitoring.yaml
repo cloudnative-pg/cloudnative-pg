@@ -40,7 +40,7 @@ data:
       - "*"
       query: |
        SELECT
-         current_database() datname,
+         pg_catalog.current_database() datname,
          schemaname,
          relname,
          seq_scan,
@@ -63,7 +63,7 @@ data:
          analyze_count,
          autoanalyze_count
        FROM
-         pg_stat_user_tables
+         pg_catalog.pg_stat_user_tables
       metrics:
         - datname:
             usage: "LABEL"
@@ -133,7 +133,7 @@ data:
             description: "Number of times this table has been analyzed by the autovacuum daemon"
 
     pg_statio_user_tables:
-      query: "SELECT current_database() datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_statio_user_tables"
+      query: "SELECT pg_catalog.current_database() datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_catalog.pg_statio_user_tables"
       metrics:
         - datname:
             usage: "LABEL"
@@ -177,7 +177,7 @@ data:
               application_name,
               SUM(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - state_change))::bigint)::float AS process_idle_seconds_sum,
               COUNT(*) AS process_idle_seconds_count
-            FROM pg_stat_activity
+            FROM pg_catalog.pg_stat_activity
             WHERE state = 'idle'
             GROUP BY application_name
           ),
@@ -222,7 +222,7 @@ metadata:
 stringData:
   pg-database: |
     pg_database:
-      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size_bytes FROM pg_database"
+      query: "SELECT pg_database.datname, pg_catalog.pg_database_size(pg_database.datname) as size_bytes FROM pg_catalog.pg_database"
       primary: true
       cache_seconds: 30
       metrics:
