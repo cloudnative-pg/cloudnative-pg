@@ -24,6 +24,9 @@ spec:
     - jsonPath: .spec.type
       name: Type
       type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -369,6 +372,46 @@ spec:
                     required:
                     - name
                     type: object
+                  image:
+                    description: |-
+                      Image is the pgbouncer container image to use. When set, it takes
+                      precedence over ImageCatalogRef and the operator default, but is
+                      overridden by an explicit image set in the pod template.
+                    type: string
+                  imageCatalogRef:
+                    description: |-
+                      ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.
+                      Mutually exclusive with Image.
+                    properties:
+                      apiGroup:
+                        description: |-
+                          APIGroup is the group for the resource being referenced.
+                          If APIGroup is not specified, the specified Kind must be in the core API group.
+                          For any other third-party types, APIGroup is required.
+                        type: string
+                      key:
+                        description: Key identifies the entry within the catalog's
+                          extraImages list.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      kind:
+                        description: Kind is the type of resource being referenced
+                        type: string
+                      name:
+                        description: Name is the name of resource being referenced
+                        type: string
+                    required:
+                    - key
+                    - kind
+                    - name
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    x-kubernetes-validations:
+                    - message: Only ImageCatalog and ClusterImageCatalog are supported
+                      rule: self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'
+                    - message: apiGroup must be postgresql.cnpg.io
+                      rule: self.apiGroup == 'postgresql.cnpg.io'
                   parameters:
                     additionalProperties:
                       type: string
@@ -422,6 +465,9 @@ spec:
                     - name
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: image and imageCatalogRef are mutually exclusive
+                  rule: '!(has(self.image) && has(self.imageCatalogRef))'
               serviceAccountName:
                 description: |-
                   Name of an existing ServiceAccount in the same namespace to use for the pooler.
@@ -9324,10 +9370,26 @@ spec:
               date. Populated by the system. Read-only.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
+              image:
+                description: |-
+                  Image is the fully-resolved pgbouncer container image that the operator is
+                  using for this Pooler. Populated on every reconciliation.
+                type: string
               instances:
                 description: The number of pods trying to be scheduled
                 format: int32
                 type: integer
+              phase:
+                description: Phase summarises the overall lifecycle state of the Pooler.
+                enum:
+                - active
+                - inactive
+                - failed
+                type: string
+              phaseReason:
+                description: PhaseReason is a human-readable explanation of the current
+                  Phase.
+                type: string
               secrets:
                 description: The resource version of the config object
                 properties:

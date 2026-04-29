@@ -259,7 +259,7 @@ func RunController(
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
-	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}

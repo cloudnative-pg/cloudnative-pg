@@ -26,6 +26,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// PoolerPhase represents the lifecycle phase of a Pooler.
+// +kubebuilder:validation:Enum=active;inactive;failed
+type PoolerPhase string
+
+const (
+	// PoolerPhaseActive means the pooler is running normally.
+	PoolerPhaseActive PoolerPhase = "active"
+
+	// PoolerPhaseInactive means the pooler is paused or waiting for prerequisites.
+	PoolerPhaseInactive PoolerPhase = "inactive"
+
+	// PoolerPhaseFailed means the pooler cannot be reconciled due to a
+	// configuration error. Check status.phaseReason for details.
+	PoolerPhaseFailed PoolerPhase = "failed"
+)
+
 // PoolerType is the type of the connection pool, meaning the service
 // we are targeting. Allowed values are `rw` and `ro`.
 // +kubebuilder:validation:Enum=rw;ro;r
@@ -188,6 +204,21 @@ type ServiceTemplateSpec struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 }
 
+// ImageCatalogExtraRef identifies a named image within the extraImages list of an
+// ImageCatalog or ClusterImageCatalog.
+type ImageCatalogExtraRef struct {
+	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only ImageCatalog and ClusterImageCatalog are supported"
+	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="apiGroup must be postgresql.cnpg.io"
+	corev1.TypedLocalObjectReference `json:",inline"`
+
+	// Key identifies the entry within the catalog's extraImages list.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	Key string `json:"key"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.image) && has(self.imageCatalogRef))",message="image and imageCatalogRef are mutually exclusive"
+
 // PgBouncerSpec defines how to configure PgBouncer
 type PgBouncerSpec struct {
 	// The pool mode. Default: `session`.
@@ -250,6 +281,17 @@ type PgBouncerSpec struct {
 	// +kubebuilder:default:=false
 	// +optional
 	Paused *bool `json:"paused,omitempty"`
+
+	// Image is the pgbouncer container image to use. When set, it takes
+	// precedence over ImageCatalogRef and the operator default, but is
+	// overridden by an explicit image set in the pod template.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.
+	// Mutually exclusive with Image.
+	// +optional
+	ImageCatalogRef *ImageCatalogExtraRef `json:"imageCatalogRef,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler
@@ -257,9 +299,23 @@ type PoolerStatus struct {
 	// The resource version of the config object
 	// +optional
 	Secrets *PoolerSecrets `json:"secrets,omitempty"`
+
 	// The number of pods trying to be scheduled
 	// +optional
 	Instances int32 `json:"instances,omitempty"`
+
+	// Phase summarises the overall lifecycle state of the Pooler.
+	// +optional
+	Phase PoolerPhase `json:"phase,omitempty"`
+
+	// PhaseReason is a human-readable explanation of the current Phase.
+	// +optional
+	PhaseReason string `json:"phaseReason,omitempty"`
+
+	// Image is the fully-resolved pgbouncer container image that the operator is
+	// using for this Pooler. Populated on every reconciliation.
+	// +optional
+	Image string `json:"image,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used
@@ -310,6 +366,7 @@ type SecretVersion struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
 
 // Pooler is the Schema for the poolers API
