@@ -435,17 +435,6 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	tmpCluster := cluster.DeepCopy()
 	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
 
-	// Use the target-version extensions so the new pgdata's
-	// extension_control_path and dynamic_library_path GUCs reflect the new
-	// image's layout. RefreshConfigurationFilesFromCluster is invoked with
-	// OperationType_TYPE_UPGRADE, which makes the config generator resolve
-	// these mounts under UpgradeTargetExtensionsBaseDirectory.
-	if tmpCluster.Status.PGDataImageInfo == nil || tmpCluster.Status.TargetPGDataImageInfo == nil {
-		return fmt.Errorf(
-			"cannot prepare configuration files: cluster status is missing PGDataImageInfo or TargetPGDataImageInfo")
-	}
-	tmpCluster.Status.PGDataImageInfo.Extensions = tmpCluster.Status.TargetPGDataImageInfo.Extensions
-
 	pgMajorVersion, err := postgresutils.GetMajorVersionFromPgData(destDir)
 	if err != nil {
 		return fmt.Errorf("error while reading the new data directory version: %w", err)
@@ -465,6 +454,13 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	ctx = cluster.SetInContext(ctx)
 
 	newInstance := postgres.Instance{PgData: destDir}
+	// OperationType_TYPE_UPGRADE switches the configuration generator to the
+	// target-version extension layout: it reads the extension list from
+	// Status.TargetPGDataImageInfo and resolves mounts under
+	// UpgradeTargetExtensionsBaseDirectory, so the new pgdata's
+	// extension_control_path / dynamic_library_path GUCs reflect the new image.
+	// See pkg/management/postgres.selectAdditionalExtensions for the actual
+	// branch.
 	if _, err := newInstance.RefreshConfigurationFilesFromCluster(
 		ctx,
 		tmpCluster,

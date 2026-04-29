@@ -98,7 +98,7 @@ func Reconcile(
 	// Resolve the target-major extensions upfront so we can fail before
 	// touching pods if the catalog is missing an entry, and so we can
 	// persist the resolved list atomically with the phase transition.
-	extensions, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+	targetExts, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
 	if err != nil {
 		contextLogger.Error(err, "Unable to resolve extensions for new major version",
 			"requestedMajor", requestedMajor)
@@ -127,7 +127,7 @@ func Reconcile(
 		status.SetTargetPGDataImageInfo(&apiv1.ImageInfo{
 			Image:        cluster.Status.Image,
 			MajorVersion: requestedMajor,
-			Extensions:   extensions,
+			Extensions:   targetExts,
 		}),
 	); err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func Reconcile(
 		return result, err
 	}
 
-	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial, extensions); err != nil {
+	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial, targetExts); err != nil {
 		contextLogger.Error(err, "Unable to create major upgrade job")
 		return nil, err
 	} else if result != nil {
@@ -235,11 +235,11 @@ func createMajorUpgradeJob(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	primaryNodeSerial int,
-	extensions []apiv1.ExtensionConfiguration,
+	targetExts []apiv1.ExtensionConfiguration,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, targetExts)
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
