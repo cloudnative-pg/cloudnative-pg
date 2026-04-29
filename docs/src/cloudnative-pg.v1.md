@@ -991,7 +991,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | The name of the extension, required | True |  | MaxLength: 59 <br />MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
+| `name` _string_ | The name of the extension, required.<br />MaxLength is 59 because the name is embedded into Kubernetes Volume<br />names whose total length is bounded by RFC 1123 at 63 characters; the<br />operator prepends a 4-character prefix ("ext-" for steady state and<br />"new-" for the upgrade-target copy, see<br />`pkg/specs.SanitizeExtensionNameForVolume` and<br />`SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59<br />characters for the user-supplied name. Adjusting either prefix<br />requires updating this bound to keep them disjoint. | True |  | MaxLength: 59 <br />MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
 | `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension. |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |

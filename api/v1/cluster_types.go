@@ -1552,7 +1552,16 @@ type PostgresConfiguration struct {
 // ExtensionConfiguration is the configuration used to add
 // PostgreSQL extensions to the Cluster.
 type ExtensionConfiguration struct {
-	// The name of the extension, required
+	// The name of the extension, required.
+	//
+	// MaxLength is 59 because the name is embedded into Kubernetes Volume
+	// names whose total length is bounded by RFC 1123 at 63 characters; the
+	// operator prepends a 4-character prefix ("ext-" for steady state and
+	// "new-" for the upgrade-target copy, see
+	// `pkg/specs.SanitizeExtensionNameForVolume` and
+	// `SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59
+	// characters for the user-supplied name. Adjusting either prefix
+	// requires updating this bound to keep them disjoint.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=59
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`

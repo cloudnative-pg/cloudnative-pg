@@ -4531,7 +4531,17 @@ spec:
                             type: string
                           type: array
                         name:
-                          description: The name of the extension, required
+                          description: |-
+                            The name of the extension, required.
+
+                            MaxLength is 59 because the name is embedded into Kubernetes Volume
+                            names whose total length is bounded by RFC 1123 at 63 characters; the
+                            operator prepends a 4-character prefix ("ext-" for steady state and
+                            "new-" for the upgrade-target copy, see
+                            `pkg/specs.SanitizeExtensionNameForVolume` and
+                            `SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59
+                            characters for the user-supplied name. Adjusting either prefix
+                            requires updating this bound to keep them disjoint.
                           maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
@@ -7218,7 +7228,17 @@ spec:
                             type: string
                           type: array
                         name:
-                          description: The name of the extension, required
+                          description: |-
+                            The name of the extension, required.
+
+                            MaxLength is 59 because the name is embedded into Kubernetes Volume
+                            names whose total length is bounded by RFC 1123 at 63 characters; the
+                            operator prepends a 4-character prefix ("ext-" for steady state and
+                            "new-" for the upgrade-target copy, see
+                            `pkg/specs.SanitizeExtensionNameForVolume` and
+                            `SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59
+                            characters for the user-supplied name. Adjusting either prefix
+                            requires updating this bound to keep them disjoint.
                           maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
@@ -7546,7 +7566,17 @@ spec:
                             type: string
                           type: array
                         name:
-                          description: The name of the extension, required
+                          description: |-
+                            The name of the extension, required.
+
+                            MaxLength is 59 because the name is embedded into Kubernetes Volume
+                            names whose total length is bounded by RFC 1123 at 63 characters; the
+                            operator prepends a 4-character prefix ("ext-" for steady state and
+                            "new-" for the upgrade-target copy, see
+                            `pkg/specs.SanitizeExtensionNameForVolume` and
+                            `SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59
+                            characters for the user-supplied name. Adjusting either prefix
+                            requires updating this bound to keep them disjoint.
                           maxLength: 59
                           minLength: 1
                           pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$

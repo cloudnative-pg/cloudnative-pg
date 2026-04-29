@@ -327,6 +327,11 @@ func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 
 // SanitizeExtensionNameForVolume returns a prefixed, RFC 1123 compliant
 // volume name for an extension.
+//
+// The 4-character "ext-" prefix is what bounds ExtensionConfiguration.Name
+// to MaxLength=59 (RFC 1123 label limit of 63, minus the prefix). The
+// upgrade-target counterpart uses an equally-sized "new-" prefix on purpose,
+// so adjusting either one requires updating the API's MaxLength too.
 func SanitizeExtensionNameForVolume(extensionName string) string {
 	return "ext-" + strings.ReplaceAll(extensionName, "_", "-")
 }
@@ -334,7 +339,8 @@ func SanitizeExtensionNameForVolume(extensionName string) string {
 // SanitizeExtensionNameForUpgradeTargetVolume returns the RFC 1123 compliant
 // volume name for a target-version extension during a major upgrade. The
 // distinct prefix guarantees no collision with steady-state volumes (which
-// start with "ext-") regardless of the extension name.
+// start with "ext-") regardless of the extension name. See
+// SanitizeExtensionNameForVolume for the prefix-vs-MaxLength accounting.
 func SanitizeExtensionNameForUpgradeTargetVolume(extensionName string) string {
 	return "new-" + strings.ReplaceAll(extensionName, "_", "-")
 }
