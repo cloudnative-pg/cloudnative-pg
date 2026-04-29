@@ -421,17 +421,24 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 // ready instances are unreachable from the operator via HTTP request.
 func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 	hasActiveAndReady := false
-	for _, item := range list.Items {
-		podIsActiveAndReady := utils.IsPodActive(*item.Pod) && utils.IsPodReady(*item.Pod)
 
-		if !podIsActiveAndReady {
+	for _, item := range list.Items {
+		// Only consider pods that kubelet says are ready
+		if !utils.IsPodActive(*item.Pod) || !item.IsPodReady {
 			continue
 		}
 
 		hasActiveAndReady = true
-		if item.Error == nil {
-			return false
+
+		// ✅ NEW FIX:
+		// If pod is Ready but HTTP failed → WAIT (do NOT failover)
+		if item.Error != nil {
+			// Instead of treating as unreachable, skip it
+			continue
 		}
+
+		// If any Ready pod is reachable → cluster is fine
+		return false
 	}
 
 	return hasActiveAndReady
