@@ -1513,6 +1513,7 @@ synchronousreplicaconfigurationmethod
 syncreplicaelectionconstraints
 sys
 syscall's
+syscalls
 syslog
 systemID
 systemd
