@@ -283,7 +283,7 @@ go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
 	$(GOVULNCHECK) ./...
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
+checks: go-mod-check generate manifests apidoc generate-release-table fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
 
 ##@ Documentation
 
@@ -294,6 +294,9 @@ licenses: go-licenses ## Generate the licenses folder.
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
+
+generate-release-table: ## Regenerate the supported releases tables from docs/releases.json.
+	python3 hack/generate-supported-releases.py
 
 apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 	$(CRDREFDOCS) --source-path api/v1 \

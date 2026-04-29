@@ -86,12 +86,13 @@ Git tags for versions are prefixed with `v`.
 
 ## Support status of CloudNativePG releases
 
-<!-- TODO: Complete dates and versions below -->
-| Version         | Currently supported  | Release date | End of life     | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
-|-----------------|----------------------|--------------|-----------------|-------------------------------|---------------------------|-----------------------------|
-| 1.29.x          | Yes                  | 31 Mar 2026  | ~  Sep 2026     | 1.33, 1.34, 1.35              | 1.32, 1.31, 1.30, 1.29    | 14 - 18                     |
-| 1.28.x          | Yes                  |  9 Dec 2025  | 30 Jun 2026     | 1.32, 1.33, 1.34              | 1.35, 1.31, 1.30, 1.29    | 14 - 18                     |
-| main            | No, development only |              |                 |                               |                           | 13 - 18                     |
+<!-- BEGIN ACTIVE_RELEASES_TABLE -->
+| Version | Currently supported | Release date | End of life | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
+|---------|---------------------|--------------|-------------|-------------------------------|---------------------------|-----------------------------|
+| 1.29.x | Yes | Mar 31, 2026 | ~ Sep 2026 | 1.33, 1.34, 1.35 | 1.29, 1.30, 1.31, 1.32 | 14 - 18 |
+| 1.28.x | Yes | Dec 9, 2025 | Jun 30, 2026 | 1.32, 1.33, 1.34 | 1.29, 1.30, 1.31, 1.35 | 14 - 18 |
+| main | No, development only |  |  |  |  | 14 - 18 |
+<!-- END ACTIVE_RELEASES_TABLE -->
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -125,11 +126,13 @@ version of PostgreSQL, we might not be able to help you.
 
 ## Upcoming releases
 
+<!-- BEGIN UPCOMING_RELEASES_TABLE -->
 | Version | Release date | End of life |
 |---------|--------------|-------------|
-| 1.30.0  | ~ Jun, 2026  | ~ Dec, 2026 |
-| 1.31.0  | ~ Sep, 2026  | ~ Mar, 2027 |
-| 1.32.0  | ~ Dec, 2026  | ~ Jun, 2027 |
+| 1.30.0 | ~ Jun 2026 | ~ Dec 2026 |
+| 1.31.0 | ~ Sep 2026 | ~ Mar 2027 |
+| 1.32.0 | ~ Dec 2026 | ~ Jun 2027 |
+<!-- END UPCOMING_RELEASES_TABLE -->
 
 :::note
     Feature freeze occurs 1-2 weeks before the release, at which point a
@@ -146,21 +149,23 @@ version of PostgreSQL, we might not be able to help you.
 
 ## Old releases
 
-| Version         | Release date      | End of life         | Supported Kubernetes versions  |
-|-----------------|-------------------|---------------------|--------------------------------|
-| 1.27.x          | August, 12 2025   | March 9, 2026       | 1.31, 1.32, 1.33               |
-| 1.26.x          | May 23, 2025      | November 12, 2025   | 1.30, 1.31, 1.32, 1.33         |
-| 1.25.x          | Dec 23, 2024      | August 22, 2025     | 1.29, 1.30, 1.31, 1.32         |
-| 1.24.x          | Aug 22, 2024      | May 23, 2025        | 1.28, 1.29, 1.30, 1.31         |
-| 1.23.x          | April 24, 2024    | November 24, 2024   | 1.27, 1.28, 1.29               |
-| 1.22.x          | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28               |
-| 1.21.x          | October 12, 2023  | Jun 12, 2024        | 1.25, 1.26, 1.27, 1.28         |
-| 1.20.x          | April 27, 2023    | January 21, 2024    | 1.24, 1.25, 1.26, 1.27         |
-| 1.19.x          | February 14, 2023 | November 3, 2023    | 1.23, 1.24, 1.25, 1.26         |
-| 1.18.x          | Nov 10, 2022      | June 12, 2023       | 1.23, 1.24, 1.25, 1.26, 1.27   |
-| 1.17.x          | September 6, 2022 | March 20, 2023      | 1.22, 1.23, 1.24               |
-| 1.16.x          | July 7, 2022      | December 21, 2022   | 1.22, 1.23, 1.24               |
-| 1.15.x          | April 21, 2022    | October 6, 2022     | 1.21, 1.22, 1.23               |
+<!-- BEGIN OLD_RELEASES_TABLE -->
+| Version | Release date | End of life | Supported Kubernetes versions |
+|---------|--------------|-------------|-------------------------------|
+| 1.27.x | Aug 12, 2025 | Mar 9, 2026 | 1.31, 1.32, 1.33 |
+| 1.26.x | May 23, 2025 | Nov 12, 2025 | 1.30, 1.31, 1.32, 1.33 |
+| 1.25.x | Dec 23, 2024 | Aug 22, 2025 | 1.29, 1.30, 1.31, 1.32 |
+| 1.24.x | Aug 22, 2024 | May 23, 2025 | 1.28, 1.29, 1.30, 1.31 |
+| 1.23.x | Apr 24, 2024 | Nov 24, 2024 | 1.27, 1.28, 1.29 |
+| 1.22.x | Dec 21, 2023 | Jul 24, 2024 | 1.26, 1.27, 1.28 |
+| 1.21.x | Oct 12, 2023 | Jun 12, 2024 | 1.25, 1.26, 1.27, 1.28 |
+| 1.20.x | Apr 27, 2023 | Jan 21, 2024 | 1.24, 1.25, 1.26, 1.27 |
+| 1.19.x | Feb 14, 2023 | Nov 3, 2023 | 1.23, 1.24, 1.25, 1.26 |
+| 1.18.x | Nov 10, 2022 | Jun 12, 2023 | 1.23, 1.24, 1.25, 1.26, 1.27 |
+| 1.17.x | Sep 6, 2022 | Mar 20, 2023 | 1.22, 1.23, 1.24 |
+| 1.16.x | Jul 7, 2022 | Dec 21, 2022 | 1.22, 1.23, 1.24 |
+| 1.15.x | Apr 21, 2022 | Oct 6, 2022 | 1.21, 1.22, 1.23 |
+<!-- END OLD_RELEASES_TABLE -->
 
 ## What we mean by support
 

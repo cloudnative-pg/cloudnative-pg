@@ -30,17 +30,17 @@ on the release branch in GitHub.
 
 **Release date:** Mon DD, 20YY
 
-### Important changes:
+### Important changes
 
 - OPTIONAL
 - OPTIONAL
 
-### Features:
+### Features
 
 - **MAIN FEATURE #1**: short description
 - **MAIN FEATURE #2**: short description
 
-### Enhancements:
+### Enhancements
 
 - Added ...
 - Introduced ...
@@ -50,12 +50,12 @@ on the release branch in GitHub.
     - Enhanced ...
     - Added ...
 
-### Security:
+### Security
 
 - Added ...
 - Improved ...
 
-### Fixes:
+### Fixes
 
 - Enhanced ...
 - Disabled ...

@@ -46,9 +46,19 @@ activities:
   put the focus on finishing those in time. No new features should land in the
   last few days without previous validation from the team.
 
-- **Supported releases:** Make sure that you update the supported releases page
-  in [`docs/src/supported_releases.md`](../docs/src/supported_releases.md),
-  and that the maintainers approve the changes.
+- **Supported releases:** Make sure that you update
+  [`docs/releases.json`](../docs/releases.json), which is the single source of
+  truth for release metadata (dates, EOL, Kubernetes and PostgreSQL version
+  support). After editing it, regenerate the tables with:
+
+  ```bash
+  make generate-release-table
+  ```
+
+  Commit both `docs/releases.json` and the updated
+  [`docs/src/supported_releases.md`](../docs/src/supported_releases.md),
+  and make sure the maintainers approve the changes. Do **not** edit the
+  Markdown tables in `supported_releases.md` by hand — they are generated.
 
 - **Check on backporting:** Make sure to cherry-pick any code that requires
   backporting to the various release branches ahead of time. Doing that will
