@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -58,6 +59,7 @@ import (
 	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -355,14 +357,22 @@ func recordPendingExtensionUpdates(
 		"primaryPodName", primaryPodName,
 	)
 
-	return status.PatchConditionsWithOptimisticLock(ctx, c, cluster, metav1.Condition{
-		Type:   string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
-		Status: metav1.ConditionTrue,
-		Reason: string(apiv1.ConditionReasonExtensionUpdatesPending),
-		Message: fmt.Sprintf(
-			"pg_upgrade emitted %s in pod %q (in-pod path; access via kubectl exec). "+
-				"Apply it in every database that uses the affected extensions.",
-			scriptPath, primaryPodName),
+	// PatchConditionsWithOptimisticLock retries on conflict but bubbles up
+	// other transient errors (network blips, throttling, 5xx). The upgrade
+	// Job pod is deleted seconds after this returns, taking pod logs with
+	// it; if the patch fails the durable signal is gone for good. Retry on
+	// the broader transient set to make the patch reliable enough that the
+	// caller does not need a fallback.
+	return retry.OnError(retry.DefaultBackoff, resources.IsTransientAPIError, func() error {
+		return status.PatchConditionsWithOptimisticLock(ctx, c, cluster, metav1.Condition{
+			Type:   string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+			Status: metav1.ConditionTrue,
+			Reason: string(apiv1.ConditionReasonExtensionUpdatesPending),
+			Message: fmt.Sprintf(
+				"pg_upgrade emitted %s in pod %q (in-pod path; access via kubectl exec). "+
+					"Apply it in every database that uses the affected extensions.",
+				scriptPath, primaryPodName),
+		})
 	})
 }
 
