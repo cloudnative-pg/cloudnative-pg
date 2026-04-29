@@ -683,7 +683,6 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 			"proceeding with the entries that did parse",
 			"error", err.Error())
 	}
-	before := maps.Clone(envMap)
 
 	libPaths := slices.Concat(
 		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
@@ -706,13 +705,8 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 
 	// Iterate in a stable order so log output and partial-failure recovery are
 	// reproducible across runs; Go map iteration is otherwise randomized.
-	names := slices.Sorted(maps.Keys(envMap))
-	for _, name := range names {
-		value := envMap[name]
-		if prev, ok := before[name]; ok && prev == value {
-			continue
-		}
-		if err := os.Setenv(name, value); err != nil {
+	for _, name := range slices.Sorted(maps.Keys(envMap)) {
+		if err := os.Setenv(name, envMap[name]); err != nil {
 			return fmt.Errorf("while setting %s: %w", name, err)
 		}
 	}
