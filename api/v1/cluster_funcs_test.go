@@ -1725,3 +1725,45 @@ var _ = Describe("Probes configuration", func() {
 			"configured probe should not be modified with zero values")
 	})
 })
+
+var _ = Describe("RecoveryTarget.BuildPostgresOptions", func() {
+	It("returns an empty string for a nil receiver", func() {
+		var target *RecoveryTarget
+		Expect(target.BuildPostgresOptions()).To(Equal(""))
+	})
+
+	It("escapes single quotes in the target name", func() {
+		target := &RecoveryTarget{TargetName: "my'restore'point"}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			"recovery_target_name = 'my''restore''point'\n",
+		))
+	})
+
+	It("escapes backslashes in the target name", func() {
+		target := &RecoveryTarget{TargetName: `path\to\restore`}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			`recovery_target_name = 'path\\to\\restore'` + "\n",
+		))
+	})
+
+	It("escapes literal newlines in the target name", func() {
+		// pg_create_restore_point accepts any string, including one with a
+		// literal newline. The config file must stay line-oriented.
+		target := &RecoveryTarget{TargetName: "line1\nline2"}
+		Expect(target.BuildPostgresOptions()).To(ContainSubstring(
+			`recovery_target_name = 'line1\nline2'` + "\n",
+		))
+	})
+
+	It("escapes every other target field", func() {
+		target := &RecoveryTarget{
+			TargetTLI: `l\a'test`,
+			TargetXID: "1'2",
+			TargetLSN: `0/1\6`,
+		}
+		out := target.BuildPostgresOptions()
+		Expect(out).To(ContainSubstring(`recovery_target_timeline = 'l\\a''test'` + "\n"))
+		Expect(out).To(ContainSubstring(`recovery_target_xid = '1''2'` + "\n"))
+		Expect(out).To(ContainSubstring(`recovery_target_lsn = '0/1\\6'` + "\n"))
+	})
+})

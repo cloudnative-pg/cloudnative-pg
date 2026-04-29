@@ -207,3 +207,24 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
 	})
 })
+
+var _ = Describe("getRestoreWalConfig", func() {
+	It("escapes quotes and backslashes so user-controlled backup fields cannot corrupt custom.conf",
+		func(ctx SpecContext) {
+			backup := &apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://bucket/has'quote",
+					ServerName:      `server\name`,
+				},
+			}
+			out, err := getRestoreWalConfig(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
+			// Embedded single quote must be doubled; backslash must be doubled.
+			Expect(out).To(ContainSubstring("s3://bucket/has''quote"))
+			Expect(out).To(ContainSubstring(`server\\name`))
+			// And the raw unescaped form must NOT appear anywhere in the output.
+			Expect(out).NotTo(ContainSubstring("has'quote"))
+			Expect(out).NotTo(MatchRegexp(`server\\[^\\]name`),
+				"backslash in server name must be doubled")
+		})
+})

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
@@ -1428,47 +1429,36 @@ func (cluster *Cluster) EnsureGVKIsPresent() {
 // should be added to the PostgreSQL configuration to
 // recover given a certain target
 func (target *RecoveryTarget) BuildPostgresOptions() string {
-	result := ""
-
 	if target == nil {
-		return result
+		return ""
 	}
 
+	options := map[string]string{}
 	if target.TargetTLI != "" {
-		result += fmt.Sprintf(
-			"recovery_target_timeline = '%v'\n",
-			target.TargetTLI)
+		options["recovery_target_timeline"] = target.TargetTLI
 	}
 	if target.TargetXID != "" {
-		result += fmt.Sprintf(
-			"recovery_target_xid = '%v'\n",
-			target.TargetXID)
+		options["recovery_target_xid"] = target.TargetXID
 	}
 	if target.TargetName != "" {
-		result += fmt.Sprintf(
-			"recovery_target_name = '%v'\n",
-			target.TargetName)
+		options["recovery_target_name"] = target.TargetName
 	}
 	if target.TargetLSN != "" {
-		result += fmt.Sprintf(
-			"recovery_target_lsn = '%v'\n",
-			target.TargetLSN)
+		options["recovery_target_lsn"] = target.TargetLSN
 	}
 	if target.TargetTime != "" {
-		result += fmt.Sprintf(
-			"recovery_target_time = '%v'\n",
-			pgTime.ConvertToPostgresFormat(target.TargetTime))
+		options["recovery_target_time"] = pgTime.ConvertToPostgresFormat(target.TargetTime)
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
-		result += "recovery_target = immediate\n"
+		options["recovery_target"] = "immediate"
 	}
 	if target.Exclusive != nil && *target.Exclusive {
-		result += "recovery_target_inclusive = false\n"
+		options["recovery_target_inclusive"] = "false"
 	} else {
-		result += "recovery_target_inclusive = true\n"
+		options["recovery_target_inclusive"] = "true"
 	}
 
-	return result
+	return configfile.RenderPostgresConfiguration(options)
 }
 
 // ApplyInto applies the content of the probe configuration in a Kubernetes
