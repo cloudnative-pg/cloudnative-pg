@@ -83,17 +83,7 @@ func Reconcile(
 		return nil, err
 	}
 	if cluster.Status.PGDataImageInfo == nil || requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
-		// If the user reverted the image spec after we persisted the target
-		// but before the upgrade Job was created, clear the stale target.
-		if cluster.Status.TargetPGDataImageInfo != nil {
-			if err := status.PatchWithOptimisticLock(
-				ctx, c, cluster,
-				status.SetTargetPGDataImageInfo(nil),
-			); err != nil {
-				return nil, err
-			}
-		}
-		return nil, nil
+		return nil, clearStaleUpgradeTarget(ctx, c, cluster)
 	}
 
 	primaryNodeSerial, err := getPrimarySerial(pvcs)
@@ -158,6 +148,30 @@ func Reconcile(
 	}
 
 	return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+// clearStaleUpgradeTarget reverts any artifacts left from a major-upgrade
+// attempt that the user has rolled back before the upgrade Job was created.
+// reconcileImage Case 3 sets Status.Image to the upgrade target without
+// touching PGDataImageInfo; on revert reconcileImage compares the spec
+// against PGDataImageInfo (now matching) and short-circuits at Case 2,
+// leaving Status.Image stale. This mirrors the reset that
+// handleRollbackIfNeeded performs once the Job exists.
+//
+// The function issues no API call when there is nothing to clear.
+func clearStaleUpgradeTarget(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	var transactions []status.Transaction
+	if cluster.Status.TargetPGDataImageInfo != nil {
+		transactions = append(transactions, status.SetTargetPGDataImageInfo(nil))
+	}
+	if cluster.Status.PGDataImageInfo != nil &&
+		cluster.Status.Image != cluster.Status.PGDataImageInfo.Image {
+		transactions = append(transactions, status.SetImage(cluster.Status.PGDataImageInfo.Image))
+	}
+	if len(transactions) == 0 {
+		return nil
+	}
+	return status.PatchWithOptimisticLock(ctx, c, cluster, transactions...)
 }
 
 func getMajorUpdateJob(items []batchv1.Job) *batchv1.Job {
