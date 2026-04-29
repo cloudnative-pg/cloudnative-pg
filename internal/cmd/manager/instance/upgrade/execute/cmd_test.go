@@ -20,13 +20,17 @@ SPDX-License-Identifier: Apache-2.0
 package execute
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -138,5 +142,75 @@ var _ = Describe("recordPendingExtensionUpdates", func() {
 		err := recordPendingExtensionUpdates(ctx, fakeC, cluster, podName, "/dev/null/\x00invalid")
 		Expect(err).To(HaveOccurred())
 		Expect(getCondition(ctx)).To(BeNil())
+	})
+
+	It("retries the patch through transient API errors before succeeding", func(ctx SpecContext) {
+		scriptPath := filepath.Join(pgDataDir, "update_extensions.sql")
+		Expect(os.WriteFile(scriptPath, []byte("ALTER EXTENSION x UPDATE;"), 0o600)).
+			To(Succeed())
+
+		var patchAttempts atomic.Int32
+		flakyClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithStatusSubresource(cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					ctx context.Context,
+					cli client.Client,
+					_ string,
+					obj client.Object,
+					patch client.Patch,
+					opts ...client.SubResourcePatchOption,
+				) error {
+					if patchAttempts.Add(1) <= 2 {
+						return apierrors.NewServiceUnavailable("simulated transient error")
+					}
+					return cli.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}).
+			Build()
+
+		Expect(recordPendingExtensionUpdates(ctx, flakyClient, cluster, podName, pgDataDir)).
+			To(Succeed())
+		Expect(patchAttempts.Load()).To(BeNumerically(">=", 3))
+
+		var updated apiv1.Cluster
+		Expect(flakyClient.Get(ctx, client.ObjectKeyFromObject(cluster), &updated)).To(Succeed())
+		Expect(meta.FindStatusCondition(
+			updated.Status.Conditions,
+			string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+		)).ToNot(BeNil())
+	})
+
+	It("does not retry on a permanent API error and returns it to the caller", func(ctx SpecContext) {
+		scriptPath := filepath.Join(pgDataDir, "update_extensions.sql")
+		Expect(os.WriteFile(scriptPath, []byte("ALTER EXTENSION x UPDATE;"), 0o600)).
+			To(Succeed())
+
+		var patchAttempts atomic.Int32
+		failingClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithStatusSubresource(cluster).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					_ context.Context,
+					_ client.Client,
+					_ string,
+					_ client.Object,
+					_ client.Patch,
+					_ ...client.SubResourcePatchOption,
+				) error {
+					patchAttempts.Add(1)
+					return apierrors.NewBadRequest("simulated permanent error")
+				},
+			}).
+			Build()
+
+		err := recordPendingExtensionUpdates(ctx, failingClient, cluster, podName, pgDataDir)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsBadRequest(err)).To(BeTrue())
+		Expect(patchAttempts.Load()).To(Equal(int32(1)))
 	})
 })

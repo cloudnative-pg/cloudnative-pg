@@ -22,12 +22,27 @@ package resources
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RetryAlways is a function that always returns true on any error encountered
 func RetryAlways(_ error) bool { return true }
+
+// IsTransientAPIError reports whether err is a Kubernetes API error worth
+// retrying with backoff. Permanent errors (forbidden, unauthorized, validation,
+// not-found) return false so callers fail fast instead of burning the backoff
+// budget. Use with retry.OnError when you want resilience to network blips,
+// throttling, and 5xx responses but not to genuine misconfiguration.
+func IsTransientAPIError(err error) bool {
+	return apierrors.IsConflict(err) ||
+		apierrors.IsServerTimeout(err) ||
+		apierrors.IsTimeout(err) ||
+		apierrors.IsTooManyRequests(err) ||
+		apierrors.IsServiceUnavailable(err) ||
+		apierrors.IsInternalError(err)
+}
 
 // RetryWithRefreshedResource updates the resource before invoking the cb
 func RetryWithRefreshedResource(
