@@ -42,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -57,6 +58,7 @@ import (
 	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
@@ -301,33 +303,67 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	contextLogger.Info("Upgrade completed successfully")
 
-	reportUpdateExtensionsScript(ctx, ui.pgData)
+	if err := recordPendingExtensionUpdates(
+		ctx, client, &cluster, instance.GetPodName(), ui.pgData,
+	); err != nil {
+		// Don't fail the upgrade just because we couldn't surface the
+		// pending-updates signal: the upgrade itself succeeded and the script
+		// is still on disk. The error is logged so it remains visible while
+		// the upgrade pod is still running.
+		contextLogger.Error(err, "Could not record pending extension updates condition",
+			"pgData", ui.pgData)
+	}
 
 	return nil
 }
 
-// reportUpdateExtensionsScript surfaces pg_upgrade's update_extensions.sql
-// when present so the DBA knows to run it. PostgreSQL 19+ writes this script
-// when the target cluster has extensions whose default_version is newer than
-// what pg_upgrade installed; extension metadata in pg_catalog stays on the
-// old version until it is executed.
-func reportUpdateExtensionsScript(ctx context.Context, pgData string) {
+// recordPendingExtensionUpdates checks for pg_upgrade's update_extensions.sql
+// and, if present, persists a cluster status condition pointing the DBA at it.
+// PostgreSQL 19+ writes this script when the target cluster has extensions
+// whose default_version is newer than what pg_upgrade installed; extension
+// metadata in pg_catalog stays on the old version until it is executed.
+//
+// We set ConditionMajorUpgradeExtensionUpdatesPending so the signal survives
+// Job pod deletion: the upgrade Job is torn down within seconds of completion,
+// taking pod logs with it, but the condition stays on the Cluster object until
+// the DBA addresses it (the operator clears it at the start of the next major
+// upgrade).
+//
+// primaryPodName names the pod where the script lives, since the path is
+// in-pod and only reachable via `kubectl exec`.
+func recordPendingExtensionUpdates(
+	ctx context.Context,
+	c ctrl.Client,
+	cluster *apiv1.Cluster,
+	primaryPodName string,
+	pgData string,
+) error {
 	contextLogger := log.FromContext(ctx)
 	scriptPath := path.Join(pgData, "update_extensions.sql")
 	exists, err := fileutils.FileExists(scriptPath)
 	if err != nil {
-		contextLogger.Error(err, "Could not check for update_extensions.sql",
-			"scriptPath", scriptPath)
-		return
+		return fmt.Errorf("checking for update_extensions.sql at %q: %w", scriptPath, err)
 	}
 	if !exists {
-		return
+		return nil
 	}
+
 	contextLogger.Info(
 		"pg_upgrade emitted update_extensions.sql in PGDATA on the primary. "+
 			"Once the cluster is back online, review the script and apply extension updates as needed.",
 		"scriptPath", scriptPath,
+		"primaryPodName", primaryPodName,
 	)
+
+	return status.PatchConditionsWithOptimisticLock(ctx, c, cluster, metav1.Condition{
+		Type:   string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+		Status: metav1.ConditionTrue,
+		Reason: string(apiv1.ConditionReasonExtensionUpdatesPending),
+		Message: fmt.Sprintf(
+			"pg_upgrade emitted %s in pod %q (in-pod path; access via kubectl exec). "+
+				"Apply it in every database that uses the affected extensions.",
+			scriptPath, primaryPodName),
+	})
 }
 
 func getControlData(binDir, pgData string) (map[string]string, error) {
