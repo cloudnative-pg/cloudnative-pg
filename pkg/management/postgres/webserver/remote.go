@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -59,6 +60,43 @@ func IsRetryableError(err *Error) bool {
 		return false
 	}
 	return err.Code == errCodeAnotherRequestInProgress
+}
+
+// withOperatorAuth wraps a handler to enforce mTLS fingerprint authentication.
+// It reads the expected fingerprint from the instance's cached cluster (updated by
+// the reconciliation loop) and compares it against the SHA-256 public key fingerprint
+// of the peer certificate presented by the caller.
+func (ws *remoteWebserverEndpoints) withOperatorAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		contextLogger := log.FromContext(r.Context())
+
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			contextLogger.Debug("Rejecting unauthenticated request to protected endpoint",
+				"path", r.URL.Path)
+			http.Error(w, "client certificate required", http.StatusUnauthorized)
+			return
+		}
+
+		expectedFingerprint := ws.instance.GetClusterOrDefault().Status.OperatorCertificateFingerprint
+		if expectedFingerprint == "" {
+			contextLogger.Debug("No operator certificate fingerprint in cluster status; rejecting request",
+				"path", r.URL.Path)
+			http.Error(w, "operator certificate not registered", http.StatusServiceUnavailable)
+			return
+		}
+
+		peerCert := r.TLS.PeerCertificates[0]
+		actualFingerprint := certs.PublicKeyFingerprint(peerCert)
+		if actualFingerprint != expectedFingerprint {
+			contextLogger.Debug("Rejecting request with unknown operator certificate",
+				"path", r.URL.Path,
+				"fingerprint", actualFingerprint)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next(w, r)
+	}
 }
 
 type remoteWebserverEndpoints struct {
@@ -115,15 +153,29 @@ func NewRemoteWebServer(
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc(url.PathFailSafe, endpoints.failSafe)
-	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
-	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
-	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
-	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
+
+	// Unauthenticated: used by the Kubernetes API server ProxyGet (kubectl cnpg status).
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
-	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
-	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
-	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	// Unauthenticated: kubelet liveness probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
+	// Unauthenticated: kubelet readiness probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
+	// Unauthenticated: kubelet startup probe; must be reachable without client cert.
+	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
+	// Unauthenticated: failsafe is a lightweight no-op called only by the operator.
+	// It does not perform any sensitive operation and needs no authentication.
+	serveMux.HandleFunc(url.PathFailSafe, endpoints.failSafe)
+
+	// Authenticated: backup drives a PostgreSQL pg_start/stop_backup session.
+	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.withOperatorAuth(endpoints.backup))
+	// Authenticated: spawns a pg_controldata process per call; only the operator should invoke it.
+	serveMux.HandleFunc(url.PathPGControlData, endpoints.withOperatorAuth(endpoints.pgControlData))
+	// Authenticated: pgarchivepartial triggers WAL archival and must not be callable by arbitrary clients.
+	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.withOperatorAuth(endpoints.pgArchivePartial))
+	// Authenticated: update replaces the running instance manager binary.
+	serveMux.HandleFunc(
+		url.PathUpdate,
+		endpoints.withOperatorAuth(endpoints.updateInstanceManager(cancelFunc, exitedConditions)))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -138,6 +190,9 @@ func NewRemoteWebServer(
 			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				return instance.GetServerCertificate(), nil
 			},
+			// RequestClientCert asks the client to send a certificate but does not require it.
+			// Authentication is enforced per-endpoint by withOperatorAuth.
+			ClientAuth: tls.RequestClientCert,
 		}
 	}
 

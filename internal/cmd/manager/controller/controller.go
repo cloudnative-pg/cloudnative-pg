@@ -22,8 +22,10 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -75,6 +77,9 @@ const (
 	// CaSecretName is the name of the secret which is hosting the Operator CA
 	CaSecretName = "cnpg-ca-secret" // #nosec
 
+	// operatorClientCertCommonName is the fallback CN for the operator's in-memory
+	// client certificate when the Pod hostname cannot be determined.
+	operatorClientCertCommonName = "cloudnative-pg-operator"
 )
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
@@ -212,6 +217,12 @@ func RunController(
 		return err
 	}
 
+	operatorClientCert, err := generateOperatorClientCertificate()
+	if err != nil {
+		setupLog.Error(err, "unable to generate operator client certificate")
+		return err
+	}
+
 	pluginRepository := repository.New()
 	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		conf.PluginSocketDir,
@@ -225,6 +236,7 @@ func RunController(
 		discoveryClient,
 		pluginRepository,
 		conf.DrainTaints,
+		operatorClientCert,
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
@@ -234,6 +246,7 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
+		operatorClientCert,
 	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
@@ -480,6 +493,22 @@ func readSecret(
 	}
 
 	return data, nil
+}
+
+func generateOperatorClientCertificate() (*tls.Certificate, error) {
+	commonName, err := os.Hostname()
+	if err != nil {
+		commonName = operatorClientCertCommonName
+	}
+	pair, err := certs.GenerateSelfSignedClientCertificate(commonName)
+	if err != nil {
+		return nil, err
+	}
+	cert, err := pair.TLSCertificate()
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
 }
 
 func getPprofServerAddress(enabled bool) string {
