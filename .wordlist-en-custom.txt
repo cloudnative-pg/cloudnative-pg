@@ -525,6 +525,7 @@ TLS
 TLSv
 TOC
 TODO
+TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
@@ -1280,6 +1281,7 @@ preferredDuringSchedulingIgnoredDuringExecution
 prefetched
 preload
 prepended
+prepends
 primaryUpdateMethod
 primaryUpdateStrategy
 primaryupdatemethod
