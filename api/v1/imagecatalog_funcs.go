@@ -60,3 +60,14 @@ func (spec *ImageCatalogSpec) FindExtensionsForMajor(major int) ([]ExtensionConf
 
 	return nil, false
 }
+
+// FindExtraImageForKey finds the image string for a given extra-image key.
+func (spec *ImageCatalogSpec) FindExtraImageForKey(key string) (string, bool) {
+	for _, entry := range spec.ExtraImages {
+		if entry.Key == key {
+			return entry.Image, true
+		}
+	}
+
+	return "", false
+}

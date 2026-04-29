@@ -88,3 +88,42 @@ var _ = Describe("image catalog", func() {
 		Expect(extensions).To(BeNil())
 	})
 })
+
+var _ = Describe("image catalog extra images", func() {
+	catalogSpec := ImageCatalogSpec{
+		Images: []CatalogImage{
+			{Image: "test:16", Major: 16},
+		},
+		ExtraImages: []CatalogExtraImage{
+			{Key: "pgbouncer", Image: "pgbouncer:1.24.0"},
+			{Key: "other-tool", Image: "other-tool:1.0.0"},
+		},
+	}
+
+	It("looks up an extra image by key", func() {
+		image, ok := catalogSpec.FindExtraImageForKey("pgbouncer")
+		Expect(ok).To(BeTrue())
+		Expect(image).To(Equal("pgbouncer:1.24.0"))
+	})
+
+	It("looks up a second extra image by key", func() {
+		image, ok := catalogSpec.FindExtraImageForKey("other-tool")
+		Expect(ok).To(BeTrue())
+		Expect(image).To(Equal("other-tool:1.0.0"))
+	})
+
+	It("returns false when the key is not present", func() {
+		image, ok := catalogSpec.FindExtraImageForKey("nonexistent")
+		Expect(ok).To(BeFalse())
+		Expect(image).To(BeEmpty())
+	})
+
+	It("returns false when extraImages is empty", func() {
+		emptySpec := ImageCatalogSpec{
+			Images: []CatalogImage{{Image: "test:16", Major: 16}},
+		}
+		image, ok := emptySpec.FindExtraImageForKey("pgbouncer")
+		Expect(ok).To(BeFalse())
+		Expect(image).To(BeEmpty())
+	})
+})

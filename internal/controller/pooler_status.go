@@ -21,7 +21,8 @@ package controller
 
 import (
 	"context"
-	"reflect"
+
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -92,8 +93,20 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		updatedStatus.Instances = resources.Deployment.Status.Replicas
 	}
 
+	image, err := r.resolvePoolerImage(ctx, pooler)
+	if err != nil {
+		r.Recorder.Eventf(pooler, "Warning", "ImageCatalogError", err.Error())
+		updatedStatus.Phase = apiv1.PoolerPhaseFailed
+		updatedStatus.PhaseReason = err.Error()
+		updatedStatus.Image = ""
+	} else {
+		updatedStatus.Phase = apiv1.PoolerPhaseActive
+		updatedStatus.PhaseReason = ""
+		updatedStatus.Image = image
+	}
+
 	// then update the status if anything changed
-	if !reflect.DeepEqual(pooler.Status, updatedStatus) {
+	if !equality.Semantic.DeepEqual(pooler.Status, *updatedStatus) {
 		pooler.Status = *updatedStatus
 		return r.Status().Update(ctx, pooler)
 	}

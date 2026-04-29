@@ -45,6 +45,35 @@ spec:
               Specification of the desired behavior of the ImageCatalog.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
+              extraImages:
+                description: |-
+                  ExtraImages is a list of named images for components other than PostgreSQL
+                  (e.g. pgbouncer). Keys must be unique within a catalog.
+                items:
+                  description: CatalogExtraImage is a named image entry for a non-PostgreSQL
+                    component.
+                  properties:
+                    image:
+                      description: Image is the container image reference.
+                      type: string
+                    key:
+                      description: Key is the unique identifier for this image within
+                        the catalog.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - image
+                  - key
+                  type: object
+                maxItems: 32
+                type: array
+                x-kubernetes-list-map-keys:
+                - key
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: Extra image keys must be unique
+                  rule: self.all(e, self.filter(f, f.key==e.key).size() == 1)
               images:
                 description: List of CatalogImages available in the catalog
                 items:

@@ -76,7 +76,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			},
 		}).
 		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
-		WithContainerImage("pgbouncer", config.Current.PgbouncerImageName, false).
+		WithContainerImage("pgbouncer", pooler.Status.Image, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
 			"pgbouncer",
@@ -176,12 +176,14 @@ func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string
 	type deploymentHash struct {
 		poolerSpec                      apiv1.PoolerSpec
 		operatorImageName               string
+		pgbouncerImage                  string
 		isPodSpecReconciliationDisabled bool
 	}
 
 	return hash.ComputeHash(deploymentHash{
 		poolerSpec:                      pooler.Spec,
 		operatorImageName:               operatorImageName,
+		pgbouncerImage:                  pooler.Status.Image,
 		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
 	})
 }
