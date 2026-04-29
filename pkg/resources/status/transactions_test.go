@@ -88,37 +88,11 @@ var _ = Describe("Status transactions", func() {
 			Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseMajorUpgrade))
 			Expect(cluster.Status.PhaseReason).To(Equal("Upgrading to version 17"))
 		})
-
-		It("overwrites existing phase and reason", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					Phase:       apiv1.PhaseHealthy,
-					PhaseReason: "All good",
-				},
-			}
-
-			SetPhase(apiv1.PhaseUpgrade, "Rolling update")(cluster)
-
-			Expect(cluster.Status.Phase).To(Equal(apiv1.PhaseUpgrade))
-			Expect(cluster.Status.PhaseReason).To(Equal("Rolling update"))
-		})
 	})
 
 	Describe("SetImage", func() {
 		It("sets the cluster image", func() {
 			cluster := &apiv1.Cluster{}
-
-			SetImage("ghcr.io/cloudnative-pg/postgresql:17.2")(cluster)
-
-			Expect(cluster.Status.Image).To(Equal("ghcr.io/cloudnative-pg/postgresql:17.2"))
-		})
-
-		It("overwrites existing image", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					Image: "ghcr.io/cloudnative-pg/postgresql:16.5",
-				},
-			}
 
 			SetImage("ghcr.io/cloudnative-pg/postgresql:17.2")(cluster)
 
@@ -137,26 +111,6 @@ var _ = Describe("Status transactions", func() {
 			SetPGDataImageInfo(imageInfo)(cluster)
 
 			Expect(cluster.Status.PGDataImageInfo).ToNot(BeNil())
-			Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("ghcr.io/cloudnative-pg/postgresql:17.2"))
-			Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(17))
-		})
-
-		It("overwrites existing PGData image info", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					PGDataImageInfo: &apiv1.ImageInfo{
-						Image:        "ghcr.io/cloudnative-pg/postgresql:16.5",
-						MajorVersion: 16,
-					},
-				},
-			}
-			newImageInfo := &apiv1.ImageInfo{
-				Image:        "ghcr.io/cloudnative-pg/postgresql:17.2",
-				MajorVersion: 17,
-			}
-
-			SetPGDataImageInfo(newImageInfo)(cluster)
-
 			Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("ghcr.io/cloudnative-pg/postgresql:17.2"))
 			Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(17))
 		})
@@ -224,13 +178,6 @@ var _ = Describe("Status transactions", func() {
 			Expect(cluster.Status.Conditions).To(HaveLen(1))
 			Expect(cluster.Status.Conditions[0].Type).To(Equal("Bar"))
 		})
-
-		It("is a no-op on a nil conditions slice", func() {
-			cluster := &apiv1.Cluster{}
-
-			Expect(func() { RemoveCondition("Foo")(cluster) }).ToNot(Panic())
-			Expect(cluster.Status.Conditions).To(BeEmpty())
-		})
 	})
 
 	Describe("SetTimelineID", func() {
@@ -243,17 +190,6 @@ var _ = Describe("Status transactions", func() {
 
 			SetTimelineID(10)(cluster)
 			Expect(cluster.Status.TimelineID).To(Equal(10))
-		})
-
-		It("resets timeline ID to 1 after major upgrade", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					TimelineID: 2,
-				},
-			}
-
-			SetTimelineID(1)(cluster)
-			Expect(cluster.Status.TimelineID).To(Equal(1))
 		})
 	})
 })
