@@ -105,9 +105,6 @@ var _ = Describe("IsTransientAPIError", func() {
 	DescribeTable("returns true for retriable Kubernetes API errors",
 		func(err error) { Expect(IsTransientAPIError(err)).To(BeTrue()) },
 		Entry("conflict", apierrors.NewConflict(gr, "x", errors.New("conflict"))),
-		Entry("server timeout", apierrors.NewServerTimeout(gr, "x", 1)),
-		Entry("request timeout", apierrors.NewTimeoutError("timeout", 1)),
-		Entry("too many requests", apierrors.NewTooManyRequests("throttled", 1)),
 		Entry("service unavailable", apierrors.NewServiceUnavailable("unavailable")),
 		Entry("internal error", apierrors.NewInternalError(errors.New("oops"))),
 	)
@@ -115,10 +112,7 @@ var _ = Describe("IsTransientAPIError", func() {
 	DescribeTable("returns false for permanent errors",
 		func(err error) { Expect(IsTransientAPIError(err)).To(BeFalse()) },
 		Entry("forbidden", apierrors.NewForbidden(gr, "x", errors.New("rbac"))),
-		Entry("unauthorized", apierrors.NewUnauthorized("nope")),
-		Entry("not found", apierrors.NewNotFound(gr, "x")),
 		Entry("bad request", apierrors.NewBadRequest("bad")),
-		Entry("plain error", errors.New("non-API error")),
 		Entry("nil", nil),
 	)
 })

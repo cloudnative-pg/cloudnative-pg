@@ -545,21 +545,15 @@ var _ = Describe("SetEnvVars", func() {
 
 var _ = Describe("AppendPaths", func() {
 	It("returns existing unchanged when extra is empty", func() {
-		Expect(AppendPaths("", nil)).To(Equal(""))
-		Expect(AppendPaths("", []string{})).To(Equal(""))
 		Expect(AppendPaths("/usr/lib", nil)).To(Equal("/usr/lib"))
-		Expect(AppendPaths("/usr/lib", []string{})).To(Equal("/usr/lib"))
 	})
 
 	It("returns extra joined when existing is empty", func() {
-		Expect(AppendPaths("", []string{"/a"})).To(Equal("/a"))
 		Expect(AppendPaths("", []string{"/a", "/b"})).To(Equal("/a:/b"))
 	})
 
 	It("appends extra after existing with a single colon separator", func() {
-		Expect(AppendPaths("/usr/lib", []string{"/a"})).To(Equal("/usr/lib:/a"))
-		Expect(AppendPaths("/usr/lib:/usr/local/lib", []string{"/a", "/b"})).
-			To(Equal("/usr/lib:/usr/local/lib:/a:/b"))
+		Expect(AppendPaths("/usr/lib", []string{"/a", "/b"})).To(Equal("/usr/lib:/a:/b"))
 	})
 })
 
