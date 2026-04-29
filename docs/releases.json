@@ -1,0 +1,184 @@
+{
+  "releases": [
+    {
+      "minor": "1.29",
+      "release_date": "2026-03-31",
+      "release_date_approximate": false,
+      "end_of_life": "2026-09-30",
+      "end_of_life_approximate": true,
+      "kubernetes": {
+        "supported": ["1.33", "1.34", "1.35"],
+        "tested": ["1.29", "1.30", "1.31", "1.32"]
+      },
+      "postgres": { "min": 14, "max": 18 }
+    },
+    {
+      "minor": "1.28",
+      "release_date": "2025-12-09",
+      "release_date_approximate": false,
+      "end_of_life": "2026-06-30",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.32", "1.33", "1.34"],
+        "tested": ["1.29", "1.30", "1.31", "1.35"]
+      },
+      "postgres": { "min": 14, "max": 18 }
+    },
+    {
+      "minor": "1.30",
+      "release_date": "2026-06-01",
+      "release_date_approximate": true,
+      "end_of_life": "2026-12-01",
+      "end_of_life_approximate": true
+    },
+    {
+      "minor": "1.31",
+      "release_date": "2026-09-01",
+      "release_date_approximate": true,
+      "end_of_life": "2027-03-01",
+      "end_of_life_approximate": true
+    },
+    {
+      "minor": "1.32",
+      "release_date": "2026-12-01",
+      "release_date_approximate": true,
+      "end_of_life": "2027-06-01",
+      "end_of_life_approximate": true
+    },
+    {
+      "minor": "1.27",
+      "release_date": "2025-08-12",
+      "release_date_approximate": false,
+      "end_of_life": "2026-03-09",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.31", "1.32", "1.33"]
+      }
+    },
+    {
+      "minor": "1.26",
+      "release_date": "2025-05-23",
+      "release_date_approximate": false,
+      "end_of_life": "2025-11-12",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.30", "1.31", "1.32", "1.33"]
+      }
+    },
+    {
+      "minor": "1.25",
+      "release_date": "2024-12-23",
+      "release_date_approximate": false,
+      "end_of_life": "2025-08-22",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.29", "1.30", "1.31", "1.32"]
+      }
+    },
+    {
+      "minor": "1.24",
+      "release_date": "2024-08-22",
+      "release_date_approximate": false,
+      "end_of_life": "2025-05-23",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.28", "1.29", "1.30", "1.31"]
+      }
+    },
+    {
+      "minor": "1.23",
+      "release_date": "2024-04-24",
+      "release_date_approximate": false,
+      "end_of_life": "2024-11-24",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.27", "1.28", "1.29"]
+      }
+    },
+    {
+      "minor": "1.22",
+      "release_date": "2023-12-21",
+      "release_date_approximate": false,
+      "end_of_life": "2024-07-24",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.26", "1.27", "1.28"]
+      }
+    },
+    {
+      "minor": "1.21",
+      "release_date": "2023-10-12",
+      "release_date_approximate": false,
+      "end_of_life": "2024-06-12",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.25", "1.26", "1.27", "1.28"]
+      }
+    },
+    {
+      "minor": "1.20",
+      "release_date": "2023-04-27",
+      "release_date_approximate": false,
+      "end_of_life": "2024-01-21",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.24", "1.25", "1.26", "1.27"]
+      }
+    },
+    {
+      "minor": "1.19",
+      "release_date": "2023-02-14",
+      "release_date_approximate": false,
+      "end_of_life": "2023-11-03",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.23", "1.24", "1.25", "1.26"]
+      }
+    },
+    {
+      "minor": "1.18",
+      "release_date": "2022-11-10",
+      "release_date_approximate": false,
+      "end_of_life": "2023-06-12",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.23", "1.24", "1.25", "1.26", "1.27"]
+      }
+    },
+    {
+      "minor": "1.17",
+      "release_date": "2022-09-06",
+      "release_date_approximate": false,
+      "end_of_life": "2023-03-20",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.22", "1.23", "1.24"]
+      }
+    },
+    {
+      "minor": "1.16",
+      "release_date": "2022-07-07",
+      "release_date_approximate": false,
+      "end_of_life": "2022-12-21",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.22", "1.23", "1.24"]
+      }
+    },
+    {
+      "minor": "1.15",
+      "release_date": "2022-04-21",
+      "release_date_approximate": false,
+      "end_of_life": "2022-10-06",
+      "end_of_life_approximate": false,
+      "kubernetes": {
+        "supported": ["1.21", "1.22", "1.23"]
+      }
+    },
+    {
+      "minor": "main",
+      "development": true,
+      "postgres": { "min": 14, "max": 18 }
+    }
+  ]
+}
