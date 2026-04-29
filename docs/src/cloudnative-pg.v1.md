@@ -680,6 +680,7 @@ _Appears in:_
 | `onlineUpdateEnabled` _boolean_ | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster |  |  |  |
 | `image` _string_ | Image contains the image name used by the pods |  |  |  |
 | `pgDataImageInfo` _[ImageInfo](#imageinfo)_ | PGDataImageInfo contains the details of the latest image that has run on the current data directory. |  |  |  |
+| `targetPgDataImageInfo` _[ImageInfo](#imageinfo)_ | TargetPGDataImageInfo contains the details of the target image for an<br />in-progress major upgrade. It is set before the upgrade Job is created,<br />and cleared on successful completion or when the upgrade is rolled back. |  |  |  |
 | `pluginStatus` _[PluginStatus](#pluginstatus) array_ | PluginStatus is the status of the loaded plugins |  |  |  |
 | `switchReplicaClusterStatus` _[SwitchReplicaClusterStatus](#switchreplicaclusterstatus)_ | SwitchReplicaClusterStatus is the status of the switch to replica cluster |  |  |  |
 | `demotionToken` _string_ | DemotionToken is a JSON token containing the information<br />from pg_controldata such as Database system identifier, Latest checkpoint's<br />TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO<br />WAL file, and Time of latest checkpoint |  |  |  |
@@ -990,7 +991,7 @@ _Appears in:_
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
-| `name` _string_ | The name of the extension, required | True |  | MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
+| `name` _string_ | The name of the extension, required.<br />MaxLength is 59 because the name is embedded into Kubernetes Volume<br />names whose total length is bounded by RFC 1123 at 63 characters; the<br />operator prepends a 4-character prefix ("ext-" for steady state and<br />"new-" for the upgrade-target copy, see<br />`pkg/specs.SanitizeExtensionNameForVolume` and<br />`SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59<br />characters for the user-supplied name. Adjusting either prefix<br />requires updating this bound to keep them disjoint. | True |  | MaxLength: 59 <br />MinLength: 1 <br />Pattern: `^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$` <br /> |
 | `image` _[ImageVolumeSource](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#imagevolumesource-v1-core)_ | The image containing the extension. |  |  |  |
 | `extension_control_path` _string array_ | The list of directories inside the image which should be added to extension_control_path.<br />If not defined, defaults to "/share". |  |  |  |
 | `dynamic_library_path` _string array_ | The list of directories inside the image which should be added to dynamic_library_path.<br />If not defined, defaults to "/lib". |  |  |  |

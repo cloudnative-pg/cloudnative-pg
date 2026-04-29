@@ -77,9 +77,25 @@ func SetPGDataImageInfo(imageInfo *apiv1.ImageInfo) Transaction {
 	}
 }
 
+// SetTargetPGDataImageInfo is a transaction that sets the TargetPGDataImageInfo,
+// representing the target image for an in-progress major upgrade.
+func SetTargetPGDataImageInfo(imageInfo *apiv1.ImageInfo) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.TargetPGDataImageInfo = imageInfo
+	}
+}
+
 // SetTimelineID is a transaction that sets the cluster timeline ID
 func SetTimelineID(timelineID int) Transaction {
 	return func(cluster *apiv1.Cluster) {
 		cluster.Status.TimelineID = timelineID
+	}
+}
+
+// RemoveCondition is a transaction that removes a status condition by type if
+// it is present, leaving the conditions slice unchanged otherwise.
+func RemoveCondition(conditionType string) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionType)
 	}
 }

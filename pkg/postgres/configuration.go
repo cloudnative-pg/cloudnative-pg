@@ -274,6 +274,11 @@ cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
 
 	// ExtensionsBaseDirectory is the base directory to store ImageVolume Extensions
 	ExtensionsBaseDirectory = "/extensions"
+
+	// UpgradeTargetExtensionsBaseDirectory is where target-version ImageVolume
+	// extensions are mounted during a major upgrade so they can coexist with the
+	// source-version ones at their original location.
+	UpgradeTargetExtensionsBaseDirectory = "/new-extensions"
 )
 
 // hbaTemplate is the template used to create the HBA configuration.
@@ -907,8 +912,9 @@ func escapePostgresConfValue(value string) string {
 
 // AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume
 type AdditionalExtensionConfiguration struct {
-	// The name of the Extension
-	Name string
+	// MountPath is the directory where the extension's ImageVolume is mounted
+	// (e.g. /extensions/postgis or /new-extensions/postgis during a major upgrade).
+	MountPath string
 
 	// The list of directories that should be added to ExtensionControlPath.
 	ExtensionControlPath []string
@@ -917,12 +923,11 @@ type AdditionalExtensionConfiguration struct {
 	DynamicLibraryPath []string
 }
 
-// absolutizePaths returns an iterator over the passed paths, absolutized
-// using the name of the extension
+// absolutizePaths returns an iterator over paths joined to the extension's MountPath.
 func (ext *AdditionalExtensionConfiguration) absolutizePaths(paths []string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for _, path := range paths {
-			if !yield(filepath.Join(ExtensionsBaseDirectory, ext.Name, path)) {
+			if !yield(filepath.Join(ext.MountPath, path)) {
 				break
 			}
 		}

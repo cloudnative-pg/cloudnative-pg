@@ -1040,6 +1040,12 @@ type ClusterStatus struct {
 	// +optional
 	PGDataImageInfo *ImageInfo `json:"pgDataImageInfo,omitempty"`
 
+	// TargetPGDataImageInfo contains the details of the target image for an
+	// in-progress major upgrade. It is set before the upgrade Job is created,
+	// and cleared on successful completion or when the upgrade is rolled back.
+	// +optional
+	TargetPGDataImageInfo *ImageInfo `json:"targetPgDataImageInfo,omitempty"`
+
 	// PluginStatus is the status of the loaded plugins
 	// +optional
 	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
@@ -1104,6 +1110,13 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+
+	// ConditionMajorUpgradeExtensionUpdatesPending signals that pg_upgrade
+	// emitted an update_extensions.sql script in PGDATA on the primary, and
+	// the DBA must apply it to bring SQL-level extension metadata in line with
+	// the loaded shared libraries. The condition Message contains the absolute
+	// script path on the primary pod.
+	ConditionMajorUpgradeExtensionUpdatesPending ClusterConditionType = "MajorUpgradeExtensionUpdatesPending"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1152,6 +1165,11 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// ConditionReasonExtensionUpdatesPending is set on
+	// ConditionMajorUpgradeExtensionUpdatesPending when pg_upgrade has written
+	// an update_extensions.sql script that the DBA still needs to apply.
+	ConditionReasonExtensionUpdatesPending ConditionReason = "ExtensionUpdatesPending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1534,8 +1552,18 @@ type PostgresConfiguration struct {
 // ExtensionConfiguration is the configuration used to add
 // PostgreSQL extensions to the Cluster.
 type ExtensionConfiguration struct {
-	// The name of the extension, required
+	// The name of the extension, required.
+	//
+	// MaxLength is 59 because the name is embedded into Kubernetes Volume
+	// names whose total length is bounded by RFC 1123 at 63 characters; the
+	// operator prepends a 4-character prefix ("ext-" for steady state and
+	// "new-" for the upgrade-target copy, see
+	// `pkg/specs.SanitizeExtensionNameForVolume` and
+	// `SanitizeExtensionNameForUpgradeTargetVolume`), leaving 63 - 4 = 59
+	// characters for the user-supplied name. Adjusting either prefix
+	// requires updating this bound to keep them disjoint.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=59
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 

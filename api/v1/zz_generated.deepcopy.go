@@ -1002,6 +1002,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = new(ImageInfo)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TargetPGDataImageInfo != nil {
+		in, out := &in.TargetPGDataImageInfo, &out.TargetPGDataImageInfo
+		*out = new(ImageInfo)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.PluginStatus != nil {
 		in, out := &in.PluginStatus, &out.PluginStatus
 		*out = make([]PluginStatus, len(*in))

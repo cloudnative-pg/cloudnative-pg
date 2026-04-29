@@ -20,9 +20,13 @@ SPDX-License-Identifier: Apache-2.0
 package resources
 
 import (
+	"errors"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -93,4 +97,22 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 			Expect(*testResource.Spec.Replicas).To(Equal(int32(10)))
 		})
 	})
+})
+
+var _ = Describe("IsTransientAPIError", func() {
+	gr := schema.GroupResource{Group: "", Resource: "clusters"}
+
+	DescribeTable("returns true for retriable Kubernetes API errors",
+		func(err error) { Expect(IsTransientAPIError(err)).To(BeTrue()) },
+		Entry("conflict", apierrors.NewConflict(gr, "x", errors.New("conflict"))),
+		Entry("service unavailable", apierrors.NewServiceUnavailable("unavailable")),
+		Entry("internal error", apierrors.NewInternalError(errors.New("oops"))),
+	)
+
+	DescribeTable("returns false for permanent errors",
+		func(err error) { Expect(IsTransientAPIError(err)).To(BeFalse()) },
+		Entry("forbidden", apierrors.NewForbidden(gr, "x", errors.New("rbac"))),
+		Entry("bad request", apierrors.NewBadRequest("bad")),
+		Entry("nil", nil),
+	)
 })

@@ -23,22 +23,27 @@ package execute
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	cnpgiPostgres "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/env"
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -51,10 +56,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	instancestorage "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/extensions"
 )
 
 // NewCmd creates the cobra command
@@ -161,6 +170,10 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 		return err
 	}
 	instance.SetCluster(&cluster)
+
+	if err := setupExtensionEnvironment(&cluster); err != nil {
+		return fmt.Errorf("error while setting up extension environment: %w", err)
+	}
 
 	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
@@ -292,7 +305,75 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	contextLogger.Info("Upgrade completed successfully")
 
+	if err := recordPendingExtensionUpdates(
+		ctx, client, &cluster, instance.GetPodName(), ui.pgData,
+	); err != nil {
+		// Don't fail the upgrade just because we couldn't surface the
+		// pending-updates signal: the upgrade itself succeeded and the script
+		// is still on disk. The error is logged so it remains visible while
+		// the upgrade pod is still running.
+		contextLogger.Error(err, "Could not record pending extension updates condition",
+			"pgData", ui.pgData)
+	}
+
 	return nil
+}
+
+// recordPendingExtensionUpdates checks for pg_upgrade's update_extensions.sql
+// and, if present, persists a cluster status condition pointing the DBA at it.
+// PostgreSQL 19+ writes this script when the target cluster has extensions
+// whose default_version is newer than what pg_upgrade installed; extension
+// metadata in pg_catalog stays on the old version until it is executed.
+//
+// We set ConditionMajorUpgradeExtensionUpdatesPending so the signal survives
+// Job pod deletion: the upgrade Job is torn down within seconds of completion,
+// taking pod logs with it, but the condition stays on the Cluster object until
+// the DBA addresses it (the operator clears it at the start of the next major
+// upgrade).
+//
+// primaryPodName names the pod where the script lives, since the path is
+// in-pod and only reachable via `kubectl exec`.
+func recordPendingExtensionUpdates(
+	ctx context.Context,
+	c ctrl.Client,
+	cluster *apiv1.Cluster,
+	primaryPodName string,
+	pgData string,
+) error {
+	contextLogger := log.FromContext(ctx)
+	scriptPath := path.Join(pgData, "update_extensions.sql")
+	exists, err := fileutils.FileExists(scriptPath)
+	if err != nil {
+		return fmt.Errorf("checking for update_extensions.sql at %q: %w", scriptPath, err)
+	}
+	if !exists {
+		return nil
+	}
+
+	contextLogger.Info(
+		"pg_upgrade emitted update_extensions.sql in PGDATA on the primary. "+
+			"Once the cluster is back online, review the script and apply extension updates as needed.",
+		"scriptPath", scriptPath,
+		"primaryPodName", primaryPodName,
+	)
+
+	// PatchConditionsWithOptimisticLock retries on conflict but bubbles up
+	// other transient errors (network blips, throttling, 5xx). The upgrade
+	// Job pod is deleted seconds after this returns, taking pod logs with
+	// it; if the patch fails the durable signal is gone for good. Retry on
+	// the broader transient set to make the patch reliable enough that the
+	// caller does not need a fallback.
+	return retry.OnError(retry.DefaultBackoff, resources.IsTransientAPIError, func() error {
+		return status.PatchConditionsWithOptimisticLock(ctx, c, cluster, metav1.Condition{
+			Type:   string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+			Status: metav1.ConditionTrue,
+			Reason: string(apiv1.ConditionReasonExtensionUpdatesPending),
+			Message: fmt.Sprintf(
+				"pg_upgrade emitted %s in pod %q (in-pod path; access via kubectl exec). "+
+					"Apply it in every database that uses the affected extensions.",
+				scriptPath, primaryPodName),
+		})
+	})
 }
 
 func getControlData(binDir, pgData string) (map[string]string, error) {
@@ -419,6 +500,13 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 	ctx = cluster.SetInContext(ctx)
 
 	newInstance := postgres.Instance{PgData: destDir}
+	// OperationType_TYPE_UPGRADE switches the configuration generator to the
+	// target-version extension layout: it reads the extension list from
+	// Status.TargetPGDataImageInfo and resolves mounts under
+	// UpgradeTargetExtensionsBaseDirectory, so the new pgdata's
+	// extension_control_path / dynamic_library_path GUCs reflect the new image.
+	// See pkg/management/postgres.selectAdditionalExtensions for the actual
+	// branch.
 	if _, err := newInstance.RefreshConfigurationFilesFromCluster(
 		ctx,
 		tmpCluster,
@@ -559,5 +647,68 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 		}
 	}
 
+	return nil
+}
+
+// setupExtensionEnvironment extends LD_LIBRARY_PATH and PATH and applies each
+// extension's custom Env entries to the process environment, so pg_upgrade's
+// old and new PostgreSQL server children inherit the right paths and values.
+//
+// Sources: Status.PGDataImageInfo for the source set; Status.TargetPGDataImageInfo
+// for the target set (populated by the reconciler before Job creation).
+//
+// Both fields are reconciler invariants for an in-progress major upgrade; either
+// one being nil means the operator violated its contract, so we surface that as
+// an error rather than silently skipping environment setup.
+func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
+	if cluster.Status.PGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing PGDataImageInfo")
+	}
+
+	if cluster.Status.TargetPGDataImageInfo == nil {
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing TargetPGDataImageInfo")
+	}
+
+	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
+	newExtensions := cluster.Status.TargetPGDataImageInfo.Extensions
+
+	envMap, err := envmap.Parse(os.Environ())
+	if err != nil {
+		// envmap.Parse returns a partial map alongside the error; we keep going
+		// so legitimate entries still get propagated, but we surface the
+		// failure so a malformed env doesn't disappear silently.
+		log.Warning("Could not fully parse process environment; "+
+			"proceeding with the entries that did parse",
+			"error", err.Error())
+	}
+
+	libPaths := slices.Concat(
+		extensions.CollectLibraryPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectLibraryPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(libPaths) > 0 {
+		envMap["LD_LIBRARY_PATH"] = extensions.AppendPaths(envMap["LD_LIBRARY_PATH"], libPaths)
+	}
+
+	binPaths := slices.Concat(
+		extensions.CollectBinPaths(oldExtensions, postgresConfig.ExtensionsBaseDirectory),
+		extensions.CollectBinPaths(newExtensions, postgresConfig.UpgradeTargetExtensionsBaseDirectory),
+	)
+	if len(binPaths) > 0 {
+		envMap["PATH"] = extensions.AppendPaths(envMap["PATH"], binPaths)
+	}
+
+	extensions.SetEnvVars(oldExtensions, envMap, postgresConfig.ExtensionsBaseDirectory)
+	extensions.SetEnvVars(newExtensions, envMap, postgresConfig.UpgradeTargetExtensionsBaseDirectory)
+
+	// Iterate in a stable order so log output and partial-failure recovery are
+	// reproducible across runs; Go map iteration is otherwise randomized.
+	for _, name := range slices.Sorted(maps.Keys(envMap)) {
+		if err := os.Setenv(name, envMap[name]); err != nil {
+			return fmt.Errorf("while setting %s: %w", name, err)
+		}
+	}
 	return nil
 }
