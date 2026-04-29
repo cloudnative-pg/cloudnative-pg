@@ -344,23 +344,23 @@ func createPostgresqlConfiguration(
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
-	// Set additional extensions. During a major upgrade, extensions are mounted
-	// under the upgrade-target directory to coexist with the source-version set.
-	if cluster.Status.PGDataImageInfo != nil {
-		baseDir := postgres.ExtensionsBaseDirectory
-		if operationType == postgresClient.OperationType_TYPE_UPGRADE {
-			baseDir = postgres.UpgradeTargetExtensionsBaseDirectory
-		}
-		for _, extension := range cluster.Status.PGDataImageInfo.Extensions {
-			info.AdditionalExtensions = append(
-				info.AdditionalExtensions,
-				postgres.AdditionalExtensionConfiguration{
-					MountPath:            filepath.Join(baseDir, extension.Name),
-					ExtensionControlPath: extension.ExtensionControlPath,
-					DynamicLibraryPath:   extension.DynamicLibraryPath,
-				},
-			)
-		}
+	// Set additional extensions. During a major upgrade we configure the
+	// target-version cluster, so we read from TargetPGDataImageInfo and resolve
+	// mounts under UpgradeTargetExtensionsBaseDirectory; otherwise we read from
+	// PGDataImageInfo at the steady-state mount path.
+	exts, baseDir, err := selectAdditionalExtensions(cluster, operationType)
+	if err != nil {
+		return "", "", err
+	}
+	for _, extension := range exts {
+		info.AdditionalExtensions = append(
+			info.AdditionalExtensions,
+			postgres.AdditionalExtensionConfiguration{
+				MountPath:            filepath.Join(baseDir, extension.Name),
+				ExtensionControlPath: extension.ExtensionControlPath,
+				DynamicLibraryPath:   extension.DynamicLibraryPath,
+			},
+		)
 	}
 
 	// Setup minimum replay delay if we're on a replica cluster
@@ -393,6 +393,47 @@ func isSynchronizeLogicalDecodingEnabled(cluster *apiv1.Cluster) bool {
 		cluster.Spec.ReplicationSlots.HighAvailability != nil &&
 		cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() &&
 		cluster.Spec.ReplicationSlots.HighAvailability.SynchronizeLogicalDecoding
+}
+
+// selectAdditionalExtensions returns the extension list and mount base
+// directory the configuration generator should use, picking between the
+// source-version (steady-state) and target-version (major upgrade) layouts
+// according to operationType.
+//
+// Caller invariant for OperationType_TYPE_UPGRADE: cluster.Status.TargetPGDataImageInfo
+// MUST be populated. The configuration being written in upgrade mode belongs
+// to the new pgdata, so the target set is authoritative; falling back to the
+// source set on a missing target would silently produce a config pointing at
+// the wrong mount tree. Today only the major-upgrade reconciler -> upgrade-Job
+// path passes TYPE_UPGRADE, and it always patches TargetPGDataImageInfo
+// atomically with the phase transition before scheduling the Job. New callers
+// adding TYPE_UPGRADE paths (e.g. plugin hooks, restoration jobs) must
+// preserve this invariant.
+//
+// In all other operation types the source set is read from
+// cluster.Status.PGDataImageInfo; a nil there returns an empty list (no
+// error), since a freshly-bootstrapped cluster legitimately has no extensions
+// yet.
+func selectAdditionalExtensions(
+	cluster *apiv1.Cluster,
+	operationType postgresClient.OperationType_Type,
+) ([]apiv1.ExtensionConfiguration, string, error) {
+	if operationType == postgresClient.OperationType_TYPE_UPGRADE {
+		if cluster.Status.TargetPGDataImageInfo == nil {
+			return nil, "", fmt.Errorf(
+				"cannot configure target-version extensions: cluster status is missing TargetPGDataImageInfo")
+		}
+		return cluster.Status.TargetPGDataImageInfo.Extensions,
+			postgres.UpgradeTargetExtensionsBaseDirectory,
+			nil
+	}
+
+	if cluster.Status.PGDataImageInfo == nil {
+		return nil, postgres.ExtensionsBaseDirectory, nil
+	}
+	return cluster.Status.PGDataImageInfo.Extensions,
+		postgres.ExtensionsBaseDirectory,
+		nil
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import
