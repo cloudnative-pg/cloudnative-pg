@@ -114,7 +114,7 @@ IRh7fVEH8WBfMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIwBdrw
 		})
 
 		It("should return a valid tls.Config", func(ctx context.Context) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(tlsConfig).NotTo(BeNil())
 			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
@@ -122,7 +122,7 @@ IRh7fVEH8WBfMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIwBdrw
 		})
 
 		It("should reject connections with no certificates", func(ctx context.Context) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).NotTo(HaveOccurred())
 			err = tlsConfig.VerifyConnection(tls.ConnectionState{})
 			Expect(err).To(HaveOccurred())
@@ -130,7 +130,7 @@ IRh7fVEH8WBfMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIwBdrw
 		})
 
 		It("should validate good certificates", func(ctx context.Context) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).NotTo(HaveOccurred())
 			serverBlock, _ := pem.Decode([]byte(`
 Certificate:
@@ -209,7 +209,7 @@ Zxj1fxVSmUy1TBXz6H0sUvtFh/Fgb6v4qUPdRE6xNJw3lbZUZxHr2xXk5Op/Cw6O
 		})
 
 		It("should reject bad certificates", func(ctx context.Context) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).NotTo(HaveOccurred())
 			badServerBlock, _ := pem.Decode([]byte(`Certificate:
     Data:
@@ -295,7 +295,7 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 		})
 
 		It("should return an error", func(ctx SpecContext) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting caSecret %s", caSecret.Name)))
@@ -314,7 +314,7 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 		})
 
 		It("should return an error", func(ctx SpecContext) {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, TLSConfigOptions{Client: c, CASecret: caSecret})
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("missing %s entry in secret %s", CACertKey, caSecret.Name)))

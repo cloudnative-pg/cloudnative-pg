@@ -35,21 +35,31 @@ type contextKey string
 // contextKeyTLSConfig is the context key holding the TLS configuration
 const contextKeyTLSConfig contextKey = "tlsConfig"
 
+// TLSConfigOptions holds the parameters required to build a TLS client configuration.
+type TLSConfigOptions struct {
+	// Client is the Kubernetes client used to fetch the CA secret.
+	Client client.Client
+
+	// CASecret is the namespaced name of the secret containing the server CA certificate.
+	CASecret types.NamespacedName
+
+	// ClientCert is the certificate presented to the server during the TLS handshake.
+	// Pass nil when the caller does not need to authenticate itself (e.g. isolation
+	// probes, diagnostic commands).
+	ClientCert *tls.Certificate
+}
+
 // newTLSConfigFromSecret creates a tls.Config from the given CA secret.
-func newTLSConfigFromSecret(
-	ctx context.Context,
-	cli client.Client,
-	caSecret types.NamespacedName,
-) (*tls.Config, error) {
+func newTLSConfigFromSecret(ctx context.Context, opts TLSConfigOptions) (*tls.Config, error) {
 	secret := &corev1.Secret{}
-	err := cli.Get(ctx, caSecret, secret)
+	err := opts.Client.Get(ctx, opts.CASecret, secret)
 	if err != nil {
-		return nil, fmt.Errorf("while getting caSecret %s: %w", caSecret.Name, err)
+		return nil, fmt.Errorf("while getting caSecret %s: %w", opts.CASecret.Name, err)
 	}
 
 	caCertificate, ok := secret.Data[CACertKey]
 	if !ok {
-		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, caSecret.Name)
+		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, opts.CASecret.Name)
 	}
 
 	// The operator will verify the certificates only against the CA, ignoring the DNS name.
@@ -101,16 +111,16 @@ func NewTLSConfigFromCertPool(
 	return &tlsConfig
 }
 
-// NewTLSConfigForContext creates a tls.config with the provided data and returns an expanded context that contains
-// the *tls.Config
-func NewTLSConfigForContext(
-	ctx context.Context,
-	cli client.Client,
-	caSecret types.NamespacedName,
-) (context.Context, error) {
-	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret)
+// NewTLSConfigForContext creates a tls.Config from the given options and stores it
+// in the returned context.
+func NewTLSConfigForContext(ctx context.Context, opts TLSConfigOptions) (context.Context, error) {
+	conf, err := newTLSConfigFromSecret(ctx, opts)
 	if err != nil {
 		return ctx, err
+	}
+
+	if opts.ClientCert != nil {
+		conf.Certificates = []tls.Certificate{*opts.ClientCert}
 	}
 
 	return context.WithValue(ctx, contextKeyTLSConfig, conf), nil

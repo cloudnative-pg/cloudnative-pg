@@ -320,6 +320,7 @@ OpenSSL
 OpenShift
 Openshift
 OperatorCapabilities
+OperatorCertificateFingerprint
 OperatorHub
 OptionSpec
 OwnNamespace
