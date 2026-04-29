@@ -429,6 +429,24 @@ _Appears in:_
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
+#### CatalogExtraImage
+
+
+
+CatalogExtraImage is a named image entry for a non-PostgreSQL component.
+
+
+
+_Appears in:_
+
+- [ImageCatalogSpec](#imagecatalogspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `key` _string_ | Key is the unique identifier for this image within the catalog. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+| `image` _string_ | Image is the container image reference. | True |  |  |
+
+
 #### CatalogImage
 
 
@@ -1150,6 +1168,27 @@ ImageCatalog is the Schema for the imagecatalogs API
 | `spec` _[ImageCatalogSpec](#imagecatalogspec)_ | Specification of the desired behavior of the ImageCatalog.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
 
 
+#### ImageCatalogExtraRef
+
+
+
+ImageCatalogExtraRef identifies a named image within the extraImages list of an
+ImageCatalog or ClusterImageCatalog.
+
+
+
+_Appears in:_
+
+- [PgBouncerSpec](#pgbouncerspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `apiGroup` _string_ | APIGroup is the group for the resource being referenced.<br />If APIGroup is not specified, the specified Kind must be in the core API group.<br />For any other third-party types, APIGroup is required. |  |  |  |
+| `kind` _string_ | Kind is the type of resource being referenced | True |  |  |
+| `name` _string_ | Name is the name of resource being referenced | True |  |  |
+| `key` _string_ | Key identifies the entry within the catalog's extraImages list. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+
+
 #### ImageCatalogRef
 
 
@@ -1186,6 +1225,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `images` _[CatalogImage](#catalogimage) array_ | List of CatalogImages available in the catalog | True |  | MaxItems: 8 <br />MinItems: 1 <br /> |
+| `extraImages` _[CatalogExtraImage](#catalogextraimage) array_ | ExtraImages is a list of named images for components other than PostgreSQL<br />(e.g. pgbouncer). Keys must be unique within a catalog. |  |  | MaxItems: 32 <br /> |
 
 
 #### ImageInfo
@@ -1697,6 +1737,8 @@ _Appears in:_
 | `parameters` _object (keys:string, values:string)_ | Additional parameters to be passed to PgBouncer - please check<br />the CNPG documentation for a list of options you can configure |  |  |  |
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
 | `paused` _boolean_ | When set to `true`, PgBouncer will disconnect from the PostgreSQL<br />server, first waiting for all queries to complete, and pause all new<br />client connections until this value is set to `false` (default). Internally,<br />the operator calls PgBouncer's `PAUSE` and `RESUME` commands. |  | false |  |
+| `image` _string_ | Image is the pgbouncer container image to use. When set, it takes<br />precedence over ImageCatalogRef and the operator default, but is<br />overridden by an explicit image set in the pod template. |  |  |  |
+| `imageCatalogRef` _[ImageCatalogExtraRef](#imagecatalogextraref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
 
 
 #### PluginConfiguration
@@ -1933,6 +1975,27 @@ _Appears in:_
 | `enabled` _boolean_ | Enable TLS for the monitoring endpoint.<br />Changing this option will force a rollout of all instances. |  | false |  |
 
 
+#### PoolerPhase
+
+_Underlying type:_ _string_
+
+PoolerPhase represents the lifecycle phase of a Pooler.
+
+_Validation:_
+
+- Enum: [active inactive failed]
+
+_Appears in:_
+
+- [PoolerStatus](#poolerstatus)
+
+| Field | Description |
+| --- | --- |
+| `active` | PoolerPhaseActive means the pooler is running normally.<br /> |
+| `inactive` | PoolerPhaseInactive means the pooler is paused or waiting for prerequisites.<br /> |
+| `failed` | PoolerPhaseFailed means the pooler cannot be reconciled due to a<br />configuration error. Check status.phaseReason for details.<br /> |
+
+
 #### PoolerSecrets
 
 
@@ -1995,6 +2058,9 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `secrets` _[PoolerSecrets](#poolersecrets)_ | The resource version of the config object |  |  |  |
 | `instances` _integer_ | The number of pods trying to be scheduled |  |  |  |
+| `phase` _[PoolerPhase](#poolerphase)_ | Phase summarises the overall lifecycle state of the Pooler. |  |  | Enum: [active inactive failed] <br /> |
+| `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
+| `image` _string_ | Image is the fully-resolved pgbouncer container image that the operator is<br />using for this Pooler. Populated on every reconciliation. |  |  |  |
 
 
 #### PoolerType
