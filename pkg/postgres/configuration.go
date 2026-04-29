@@ -28,13 +28,13 @@ import (
 	"math"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/hba"
 )
 
@@ -693,18 +693,6 @@ func (p *PgConfiguration) GetConfig(key string) string {
 	return p.configs[key]
 }
 
-// GetSortedList returns a sorted list of configurations
-func (p *PgConfiguration) GetSortedList() []string {
-	parameters := make([]string, len(p.configs))
-	i := 0
-	for key := range p.configs {
-		parameters[i] = key
-		i++
-	}
-	sort.Strings(parameters)
-	return parameters
-}
-
 // CreatePostgresqlConfiguration creates the configuration from the settings
 // and the default values
 func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
@@ -872,37 +860,33 @@ func (p *PgConfiguration) setUserSharedPreloadLibraries(info ConfigurationInfo) 
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
-	// We need to be able to compare two configurations generated
-	// by operator to know if they are different or not. To do
-	// that we sort the configuration by parameter name as order
-	// is really irrelevant for our purposes
-	parameters := configuration.GetSortedList()
-	var postgresConf strings.Builder
-	var cnpgConf strings.Builder
-	for _, parameter := range parameters {
-		line := fmt.Sprintf(
-			"%v = %v\n",
-			parameter,
-			escapePostgresConfValue(configuration.configs[parameter]))
-		if strings.HasPrefix(parameter, "cnpg.") {
-			cnpgConf.WriteString(line)
+	// Split the parameters into the regular PostgreSQL section (whose hash
+	// defines the identity of the configuration) and the cnpg.* section (which
+	// carries operator-internal state and must not contribute to the hash).
+	pgOptions := map[string]string{}
+	cnpgOptions := map[string]string{}
+	for name, value := range configuration.configs {
+		if strings.HasPrefix(name, "cnpg.") {
+			cnpgOptions[name] = value
 		} else {
-			postgresConf.WriteString(line)
+			pgOptions[name] = value
 		}
 	}
 
-	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf.String())))
-	postgresConf.WriteString(cnpgConf.String())
-	fmt.Fprintf(&postgresConf, "%v = %v\n", CNPGConfigSha256,
-		escapePostgresConfValue(sha256sum))
+	pgPart := configfile.RenderPostgresConfiguration(pgOptions)
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(pgPart)))
 
-	return postgresConf.String(), sha256sum
-}
+	// Emit the cnpg.* keys (sorted), then always emit the sha256 line LAST.
+	// The sha256-last layout is legacy behaviour; preserving it prevents a
+	// byte-level diff in postgresql.conf (and an avoidable pg_reload_conf())
+	// on operator upgrade for clusters that already have other cnpg.* keys
+	// such as cnpg.synchronous_standby_names_metadata.
+	cnpgPart := configfile.RenderPostgresConfiguration(cnpgOptions)
+	sha256Line := configfile.RenderPostgresConfiguration(map[string]string{
+		CNPGConfigSha256: sha256sum,
+	})
 
-// escapePostgresConfValue escapes a value to make its representation
-// directly embeddable in the PostgreSQL configuration file
-func escapePostgresConfValue(value string) string {
-	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+	return pgPart + cnpgPart + sha256Line, sha256sum
 }
 
 // AdditionalExtensionConfiguration is the configuration for an Extension added via ImageVolume

@@ -101,6 +101,46 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		Expect(confFile).To(ContainSubstring("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
 	})
 
+	It("escapes backslashes, quotes and control characters in parameter values", func() {
+		settings := map[string]string{
+			"log_line_prefix": `%m [%p] \'%u\'` + "\n",
+		}
+		confFile, _ := CreatePostgresqlConfFile(&PgConfiguration{settings})
+		Expect(confFile).To(ContainSubstring(
+			`log_line_prefix = '%m [%p] \\''%u\\''\n'` + "\n",
+		))
+	})
+
+	It("produces a byte-exact, reproducible layout", func() {
+		// Lock the on-disk layout of postgresql.conf:
+		//   1. non-cnpg keys sorted alphabetically
+		//   2. cnpg.* keys (other than the sha256) sorted alphabetically
+		//   3. cnpg.config_sha256 ALWAYS last
+		// The sha256 hash is computed over (1) only. Any deviation from this
+		// layout changes every cluster's config-file bytes on upgrade and
+		// must be done deliberately. cnpg.synchronous_standby_names_metadata
+		// is included to anchor the sha256-last invariant: alphabetically it
+		// would sort after cnpg.config_sha256, and reordering would rewrite
+		// every sync-replication cluster's postgresql.conf on upgrade.
+		settings := map[string]string{
+			"max_connections":                         "100",
+			"shared_buffers":                          "128MB",
+			"cnpg.some_internal":                      "value",
+			"cnpg.synchronous_standby_names_metadata": "ANY 1 (a, b)",
+		}
+		confFile, sum := CreatePostgresqlConfFile(&PgConfiguration{settings})
+
+		const expectedHash = "61d267eaf0cf58ed4279ce5fdd3866b1d9874ff4f63539f6933df62450933d8a"
+		expected := "max_connections = '100'\n" +
+			"shared_buffers = '128MB'\n" +
+			"cnpg.some_internal = 'value'\n" +
+			"cnpg.synchronous_standby_names_metadata = 'ANY 1 (a, b)'\n" +
+			"cnpg.config_sha256 = '" + expectedHash + "'\n"
+
+		Expect(sum).To(Equal(expectedHash))
+		Expect(confFile).To(Equal(expected))
+	})
+
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{
