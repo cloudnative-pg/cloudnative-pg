@@ -30,8 +30,25 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// RoleOptions are the information needed to create the Role object
+// with the permissions used by the CNPG instance manager
+type RoleOptions struct {
+	// Cluster is the cluster that should be used to generate
+	// the permissions
+	Cluster *apiv1.Cluster
+
+	// BackupOrigin is the backup object that is being used to restore
+	// this cluster, if any.
+	BackupOrigin *apiv1.Backup
+
+	// Roles is the list of PostgreSQL roles. It is used to grant
+	// the instance manager permissions to read the secrets that
+	// contain the roles' password.
+	Roles []apiv1.DatabaseRole
+}
+
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
+func CreateRole(opts RoleOptions) rbacv1.Role {
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -44,7 +61,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: getInvolvedConfigMapNames(cluster),
+			ResourceNames: getInvolvedConfigMapNames(opts.Cluster),
 		},
 		{
 			APIGroups: []string{
@@ -57,7 +74,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: getInvolvedSecretNames(cluster, backupOrigin),
+			ResourceNames: getInvolvedSecretNames(opts),
 		},
 		{
 			APIGroups: []string{
@@ -72,7 +89,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"watch",
 			},
 			ResourceNames: []string{
-				cluster.Name,
+				opts.Cluster.Name,
 			},
 		},
 		{
@@ -89,7 +106,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"watch",
 			},
 			ResourceNames: []string{
-				cluster.Name,
+				opts.Cluster.Name,
 			},
 		},
 		{
@@ -227,7 +244,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"watch",
 			},
 			ResourceNames: []string{
-				cluster.Name,
+				opts.Cluster.Name,
 			},
 		},
 		{
@@ -244,15 +261,44 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"watch",
 			},
 			ResourceNames: []string{
-				cluster.Name,
+				opts.Cluster.Name,
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"databaseroles",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"databaseroles/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+				"watch",
 			},
 		},
 	}
 
 	return rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
+			Namespace: opts.Cluster.Namespace,
+			Name:      opts.Cluster.Name,
 			Labels: map[string]string{
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
 			},
@@ -261,31 +307,32 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	}
 }
 
-func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
+func getInvolvedSecretNames(opts RoleOptions) []string {
 	involvedSecretNames := []string{
-		cluster.GetReplicationSecretName(),
-		cluster.GetClientCASecretName(),
-		cluster.GetServerCASecretName(),
-		cluster.GetServerTLSSecretName(),
-		cluster.GetApplicationSecretName(),
-		cluster.GetSuperuserSecretName(),
-		cluster.GetLDAPSecretName(),
+		opts.Cluster.GetReplicationSecretName(),
+		opts.Cluster.GetClientCASecretName(),
+		opts.Cluster.GetServerCASecretName(),
+		opts.Cluster.GetServerTLSSecretName(),
+		opts.Cluster.GetApplicationSecretName(),
+		opts.Cluster.GetSuperuserSecretName(),
+		opts.Cluster.GetLDAPSecretName(),
 	}
 
-	if cluster.Spec.Monitoring != nil {
-		for _, secretName := range cluster.Spec.Monitoring.CustomQueriesSecret {
+	if opts.Cluster.Spec.Monitoring != nil {
+		for _, secretName := range opts.Cluster.Spec.Monitoring.CustomQueriesSecret {
 			involvedSecretNames = append(involvedSecretNames, secretName.Name)
 		}
 	}
 
-	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
-	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
-	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
+	involvedSecretNames = append(involvedSecretNames, backupSecrets(opts.Cluster, opts.BackupOrigin)...)
+	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(opts.Cluster)...)
+	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(opts.Cluster)...)
+	involvedSecretNames = append(involvedSecretNames, customResourceRolesSecrets(opts.Roles)...)
 
 	return cleanupResourceList(involvedSecretNames)
 }
 
-func getInvolvedConfigMapNames(cluster apiv1.Cluster) []string {
+func getInvolvedConfigMapNames(cluster *apiv1.Cluster) []string {
 	involvedConfigMapNames := []string{
 		cluster.Name,
 	}
@@ -310,7 +357,7 @@ func cleanupResourceList(resourceList []string) []string {
 	})
 }
 
-func externalClusterSecrets(cluster apiv1.Cluster) []string {
+func externalClusterSecrets(cluster *apiv1.Cluster) []string {
 	var result []string
 
 	for _, server := range cluster.Spec.ExternalClusters {
@@ -349,7 +396,7 @@ func externalClusterSecrets(cluster apiv1.Cluster) []string {
 	return result
 }
 
-func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
+func backupSecrets(cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	var result []string
 
 	// Secrets needed to access S3 and Azure
@@ -453,7 +500,7 @@ func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []stri
 	return secrets
 }
 
-func managedRolesSecrets(cluster apiv1.Cluster) []string {
+func managedRolesSecrets(cluster *apiv1.Cluster) []string {
 	if cluster.Spec.Managed == nil {
 		return nil
 	}
@@ -473,4 +520,23 @@ func managedRolesSecrets(cluster apiv1.Cluster) []string {
 	}
 
 	return secretNames
+}
+
+func customResourceRolesSecrets(roles []apiv1.DatabaseRole) []string {
+	result := make([]string, 0, len(roles))
+
+	for _, r := range roles {
+		if secretName := crdRoleSecretName(r); secretName != "" {
+			result = append(result, secretName)
+		}
+	}
+
+	return result
+}
+
+func crdRoleSecretName(role apiv1.DatabaseRole) string {
+	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
+		return ""
+	}
+	return role.Spec.GetRoleSecretName()
 }

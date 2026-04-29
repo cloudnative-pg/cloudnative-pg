@@ -73,12 +73,27 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		return err
 	}
 
-	return notifyOwnedResourceDeletion(
+	if err := notifyOwnedResourceDeletion(
 		ctx,
 		r.Client,
 		namespacedName,
 		toSliceWithPointers(sbList.Items),
 		utils.SubscriptionFinalizerName,
+	); err != nil {
+		return err
+	}
+
+	var roleList apiv1.DatabaseRoleList
+	if err := r.List(ctx, &roleList, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	return notifyOwnedResourceDeletion(
+		ctx,
+		r.Client,
+		namespacedName,
+		toSliceWithPointers(roleList.Items),
+		utils.RoleFinalizerName,
 	)
 }
 

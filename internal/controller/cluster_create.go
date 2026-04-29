@@ -756,7 +756,31 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		return r.createRole(ctx, cluster, originBackup)
 	}
 
-	generatedRole := specs.CreateRole(*cluster, originBackup)
+	// List all the PG roles that will be reconciled by the primary
+	// instance of the cluster. CreateRole will create a corev1.Role
+	// resource allowing access to all the secrets that are referred
+	// by them.
+	var roleList apiv1.DatabaseRoleList
+
+	if err := r.List(
+		ctx,
+		&roleList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{
+			roleKey: cluster.Name,
+		},
+	); err != nil {
+		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
+		return r.createRole(ctx, cluster, originBackup)
+	}
+
+	generatedRole := specs.CreateRole(
+		specs.RoleOptions{
+			Cluster:      cluster,
+			BackupOrigin: originBackup,
+			Roles:        roleList.Items,
+		},
+	)
 	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
 		// Everything fine, the two rules have the same content
 		return nil
@@ -1051,7 +1075,13 @@ func createOrPatchPodMonitor(
 
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
-	role := specs.CreateRole(*cluster, backupOrigin)
+	role := specs.CreateRole(
+		specs.RoleOptions{
+			Cluster:      cluster,
+			BackupOrigin: backupOrigin,
+			Roles:        nil,
+		},
+	)
 	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
 
 	err := r.Create(ctx, &role)

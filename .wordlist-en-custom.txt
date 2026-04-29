@@ -1,3 +1,4 @@
+
 AES
 API's
 APIGroup
@@ -127,7 +128,16 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
+DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleState
+DatabaseRoleStatus
+DatabaseRoles
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -433,6 +443,8 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
+RoleReclaimDelete
+RoleReclaimRetain
 RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
@@ -802,7 +814,13 @@ databaseReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaseroles
+databaserolespec
+databaserolestate
 databasespec
 databasestatus
 datacenter
@@ -1173,6 +1191,7 @@ paru
 passfile
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
@@ -1363,8 +1382,13 @@ retryable
 reusePVC
 ro
 robfig
+roleReclaimPolicy
 roleRef
 roleconfiguration
+rolelist
+rolereclaimpolicy
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
