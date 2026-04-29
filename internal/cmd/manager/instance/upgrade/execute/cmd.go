@@ -614,9 +614,14 @@ func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error 
 //
 // Sources: Status.PGDataImageInfo for the source set; Status.TargetPGDataImageInfo
 // for the target set (populated by the reconciler before Job creation).
+//
+// Both fields are reconciler invariants for an in-progress major upgrade; either
+// one being nil means the operator violated its contract, so we surface that as
+// an error rather than silently skipping environment setup.
 func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 	if cluster.Status.PGDataImageInfo == nil {
-		return nil
+		return fmt.Errorf(
+			"cannot set up extension environment: cluster status is missing PGDataImageInfo")
 	}
 
 	if cluster.Status.TargetPGDataImageInfo == nil {
@@ -627,7 +632,15 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 	oldExtensions := cluster.Status.PGDataImageInfo.Extensions
 	newExtensions := cluster.Status.TargetPGDataImageInfo.Extensions
 
-	envMap, _ := envmap.Parse(os.Environ())
+	envMap, err := envmap.Parse(os.Environ())
+	if err != nil {
+		// envmap.Parse returns a partial map alongside the error; we keep going
+		// so legitimate entries still get propagated, but we surface the
+		// failure so a malformed env doesn't disappear silently.
+		log.Warning("Could not fully parse process environment; "+
+			"proceeding with the entries that did parse",
+			"error", err.Error())
+	}
 	before := maps.Clone(envMap)
 
 	libPaths := slices.Concat(
@@ -649,7 +662,11 @@ func setupExtensionEnvironment(cluster *apiv1.Cluster) error {
 	extensions.SetEnvVars(oldExtensions, envMap, postgresConfig.ExtensionsBaseDirectory)
 	extensions.SetEnvVars(newExtensions, envMap, postgresConfig.UpgradeTargetExtensionsBaseDirectory)
 
-	for name, value := range envMap {
+	// Iterate in a stable order so log output and partial-failure recovery are
+	// reproducible across runs; Go map iteration is otherwise randomized.
+	names := slices.Sorted(maps.Keys(envMap))
+	for _, name := range names {
+		value := envMap[name]
 		if prev, ok := before[name]; ok && prev == value {
 			continue
 		}
