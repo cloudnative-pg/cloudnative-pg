@@ -317,6 +317,84 @@ spec:
               memory: 500Mi
 ```
 
+## Pooler image catalog reference
+
+The `Pooler` resource supports managing the pgbouncer container image
+centrally via an `ImageCatalog` or `ClusterImageCatalog`, following the same
+pattern as `Cluster` resources (see [Image Catalog](image_catalog.md)).
+
+The operator resolves the image to use for each pooler according to the
+following priority (highest wins):
+
+1. An explicit image set on the `pgbouncer` container inside
+   `spec.template.spec.containers` (see [Pod templates](#pod-templates)).
+2. `spec.pgbouncer.image` — a direct image reference on the pooler spec.
+3. `spec.pgbouncer.imageCatalogRef` — a reference to an entry in an
+   `ImageCatalog` or `ClusterImageCatalog`.
+4. The operator's built-in default pgbouncer image (lowest priority).
+
+### Referencing a namespaced ImageCatalog
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    imageCatalogRef:
+      apiGroup: postgresql.cnpg.io
+      kind: ImageCatalog
+      name: my-catalog
+      key: pgbouncer
+```
+
+### Referencing a cluster-wide ClusterImageCatalog
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    imageCatalogRef:
+      apiGroup: postgresql.cnpg.io
+      kind: ClusterImageCatalog
+      name: my-global-catalog
+      key: pgbouncer
+```
+
+When a catalog entry is updated, the operator automatically reconciles all
+poolers referencing it and rolls out the new image without any change to the
+`Pooler` spec.
+
+### Monitoring the resolved image
+
+The operator stores the resolved image in `status.image` and reflects the
+outcome in `status.phase` (`active` on success, `failed` if resolution
+fails — for example, if the catalog or key does not exist). You can inspect
+the current state with:
+
+```shell
+kubectl get pooler pooler-example-rw -o jsonpath='{.status.image}'
+```
+
+:::note[API reference]
+    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#pgbouncerspec)
+    in the API reference.
+:::
+
 ## Service Template
 
 Sometimes, your pooler will require some different labels, annotations, or even change

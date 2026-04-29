@@ -30,6 +30,26 @@ type ImageCatalogSpec struct {
 	// +kubebuilder:validation:MaxItems=8
 	// +kubebuilder:validation:XValidation:rule="self.all(e, self.filter(f, f.major==e.major).size() == 1)",message=Images must have unique major versions
 	Images []CatalogImage `json:"images"`
+
+	// ExtraImages is a list of named images for components other than PostgreSQL
+	// (e.g. pgbouncer). Keys must be unique within a catalog.
+	// +optional
+	// +listType=map
+	// +listMapKey=key
+	// +kubebuilder:validation:MaxItems=32
+	// +kubebuilder:validation:XValidation:rule="self.all(e, self.filter(f, f.key==e.key).size() == 1)",message="Extra image keys must be unique"
+	ExtraImages []CatalogExtraImage `json:"extraImages,omitempty"`
+}
+
+// CatalogExtraImage is a named image entry for a non-PostgreSQL component.
+type CatalogExtraImage struct {
+	// Key is the unique identifier for this image within the catalog.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	Key string `json:"key"`
+
+	// Image is the container image reference.
+	Image string `json:"image"`
 }
 
 // CatalogImage defines the image and major version

@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -120,12 +121,20 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	if pooler.Status.Phase == apiv1.PoolerPhaseFailed {
+		return ctrl.Result{}, nil
+	}
+
 	// Take the required actions to align the spec with the collected status
 	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
 
 // SetupWithManager setup this controller inside the controller manager
-func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
+	if err := r.createFieldIndexes(ctx, mgr); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.Pooler{}).
@@ -140,7 +149,38 @@ func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentRecon
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPooler()),
 			builder.WithPredicates(secretsPoolerPredicate),
 		).
+		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogToPoolers()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&apiv1.ClusterImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogToPoolers()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+// poolerImageCatalogKey is the field index key for Poolers referencing an image catalog.
+const poolerImageCatalogKey = ".spec.pgbouncer.imageCatalogRef.name"
+
+// createFieldIndexes creates the field indexes needed by the Pooler controller.
+func (r *PoolerReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
+	return mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Pooler{},
+		poolerImageCatalogKey,
+		func(rawObj client.Object) []string {
+			pooler := rawObj.(*apiv1.Pooler)
+			if pooler.Spec.PgBouncer == nil ||
+				pooler.Spec.PgBouncer.ImageCatalogRef == nil ||
+				pooler.Spec.PgBouncer.ImageCatalogRef.Name == "" {
+				return nil
+			}
+			return []string{pooler.Spec.PgBouncer.ImageCatalogRef.Name}
+		},
+	)
 }
 
 // isOwnedByPoolerKind checks that an object is owned by a pooler and returns
