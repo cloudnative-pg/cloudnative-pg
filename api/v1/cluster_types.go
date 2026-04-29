@@ -1110,6 +1110,13 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+
+	// ConditionMajorUpgradeExtensionUpdatesPending signals that pg_upgrade
+	// emitted an update_extensions.sql script in PGDATA on the primary, and
+	// the DBA must apply it to bring SQL-level extension metadata in line with
+	// the loaded shared libraries. The condition Message contains the absolute
+	// script path on the primary pod.
+	ConditionMajorUpgradeExtensionUpdatesPending ClusterConditionType = "MajorUpgradeExtensionUpdatesPending"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1158,6 +1165,11 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// ConditionReasonExtensionUpdatesPending is set on
+	// ConditionMajorUpgradeExtensionUpdatesPending when pg_upgrade has written
+	// an update_extensions.sql script that the DBA still needs to apply.
+	ConditionReasonExtensionUpdatesPending ConditionReason = "ExtensionUpdatesPending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

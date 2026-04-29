@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -66,7 +67,7 @@ func Reconcile(
 
 	if majorUpgradeJob := getMajorUpdateJob(jobs); majorUpgradeJob != nil {
 		if utils.JobHasOneCompletion(*majorUpgradeJob) {
-			return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
+			return majorVersionUpgradeHandleCompletion(ctx, c, recorder, cluster, majorUpgradeJob, pvcs)
 		}
 
 		if result, err := handleRollbackIfNeeded(ctx, c, recorder, cluster, majorUpgradeJob); result != nil || err != nil {
@@ -129,6 +130,11 @@ func Reconcile(
 			MajorVersion: requestedMajor,
 			Extensions:   targetExts,
 		}),
+		// Drop any stale "extension updates pending" condition left over from a
+		// previous major upgrade. The upgrade pod re-sets it at the end of this
+		// run if pg_upgrade emits update_extensions.sql; if it does not, we
+		// must not carry the previous upgrade's message forward.
+		status.RemoveCondition(string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending)),
 	); err != nil {
 		return nil, err
 	}
@@ -275,6 +281,7 @@ func createMajorUpgradeJob(
 func majorVersionUpgradeHandleCompletion(
 	ctx context.Context,
 	c client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	job *batchv1.Job,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -350,6 +357,22 @@ func majorVersionUpgradeHandleCompletion(
 	); err != nil {
 		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
 		return nil, err
+	}
+
+	// If the upgrade pod recorded MajorUpgradeExtensionUpdatesPending, also
+	// emit a Kubernetes Event. The condition itself is the durable signal
+	// (visible via `kubectl describe cluster`); the Event is the ephemeral
+	// counterpart that monitoring/alerting pipelines watching `kubectl get
+	// events` will pick up. PatchWithOptimisticLock above syncs server-side
+	// status (including conditions written by the upgrade pod) back into
+	// `cluster`, so it is safe to read here.
+	if pending := meta.FindStatusCondition(
+		cluster.Status.Conditions,
+		string(apiv1.ConditionMajorUpgradeExtensionUpdatesPending),
+	); pending != nil && pending.Status == metav1.ConditionTrue {
+		recorder.Eventf(cluster, "Warning",
+			string(apiv1.ConditionReasonExtensionUpdatesPending),
+			"%s", pending.Message)
 	}
 
 	if err := c.Delete(ctx, job, &client.DeleteOptions{
