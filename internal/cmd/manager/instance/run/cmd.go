@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
@@ -43,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -175,7 +177,15 @@ func runSubCommand( //nolint: gocyclo,gocognit
 		"build", versions.Info,
 		"skipNameValidation", skipNameValidation)
 
-	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
+	restConfig := config.GetConfigOrDie()
+
+	kubeClientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		contextLogger.Error(err, "unable to create kubernetes clientset")
+		return err
+	}
+
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
@@ -247,8 +257,11 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	}
 	defer pluginRepository.Close()
 
+	leaseRunnable := lease.New(kubeClientset, instance)
+
 	metricsExporter := metricserver.NewExporter(instance, metrics.NewPluginCollector(pluginRepository))
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter, pluginRepository)
+	reconciler := controller.NewInstanceReconciler(
+		instance, mgr.GetClient(), metricsExporter, pluginRepository, leaseRunnable)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Named("instance-cluster").
@@ -344,6 +357,20 @@ func runSubCommand( //nolint: gocyclo,gocognit
 	// which will imply the deletion of the child onlineUpgradeCtx too, again, terminating all the Runnables.
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
+
+	if err = mgr.Add(leaseRunnable); err != nil {
+		contextLogger.Error(err, "unable to add primary lease runnable")
+		return err
+	}
+	defer func() {
+		// The run context is already cancelled when this defer fires, so we use
+		// context.Background(). We deliberately avoid a timeout: abandoning the
+		// release would force replicas to wait out the full lease TTL before promoting.
+		if releaseErr := leaseRunnable.Release(context.Background()); releaseErr != nil {
+			contextLogger.Error(releaseErr, "failed to release primary lease")
+		}
+	}()
+
 	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
 		contextLogger.Error(err, "unable to create remote webserver runnable")

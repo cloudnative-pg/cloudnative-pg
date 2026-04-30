@@ -68,6 +68,10 @@ const (
 	userSearchFunctionSchema = "public"
 	userSearchFunctionName   = "user_search"
 	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
+
+	// primaryLeaseAcquireTimeout is how long reconcilePrimary waits to acquire
+	// the primary lease before giving up and requeueing.
+	primaryLeaseAcquireTimeout = 10 * time.Second
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -221,7 +225,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore, it should not be counted as "a restart".
-	if err := r.reconcilePrimary(ctx, cluster); err != nil {
+	if result, err := r.reconcilePrimary(ctx, cluster); err != nil {
 		var tokenError *promotiontoken.TokenVerificationError
 		if errors.As(err, &tokenError) {
 			contextLogger.Warning(
@@ -232,6 +236,9 @@ func (r *InstanceReconciler) Reconcile(
 			// We should be waiting for WAL recovery to reach the LSN in the token
 			return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 		}
+		return reconcile.Result{}, err
+	} else if !result.IsZero() {
+		return result, nil
 	}
 
 	restarted, err := r.reconcileOldPrimary(ctx, cluster)
@@ -1111,17 +1118,27 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
-		return nil
+		return reconcile.Result{}, nil
+	}
+
+	acquireCtx, acquireCancel := context.WithTimeout(ctx, primaryLeaseAcquireTimeout)
+	defer acquireCancel()
+	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			contextLogger.Warning("Primary lease not yet acquired, retrying")
+			return reconcile.Result{RequeueAfter: primaryLeaseAcquireTimeout}, nil
+		}
+		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
 	}
 
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return err
+		return reconcile.Result{}, err
 	}
 
 	// If I'm not the primary, let's promote myself
@@ -1131,14 +1148,14 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			// Report that a promotion is still ongoing on the cluster
 			cluster.Status.Phase = apiv1.PhaseReplicaClusterPromotion
 			if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-				return err
+				return reconcile.Result{}, err
 			}
-			return err
+			return reconcile.Result{}, err
 		}
 
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 	}
 
@@ -1148,11 +1165,11 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 
 		if err := r.instance.DropConnections(); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 	}
@@ -1161,7 +1178,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
 		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.PromotionToken
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return err
+			return reconcile.Result{}, err
 		}
 
 		contextLogger.Info("Updated last promotion token", "lastPromotionToken",
@@ -1169,12 +1186,13 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	}
 
 	// If it is already the current primary, everything is ok
-	return nil
+	return reconcile.Result{}, nil
 }
 
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
+
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
