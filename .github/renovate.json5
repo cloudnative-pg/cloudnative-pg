@@ -211,10 +211,11 @@
       matchUpdateTypes: [
         'digest',
         'pinDigest',
+        'major',
         'minor',
         'patch',
       ],
-      groupName: 'all non-major github action',
+      groupName: 'all github action',
       pinDigests: true,
     },
     {
