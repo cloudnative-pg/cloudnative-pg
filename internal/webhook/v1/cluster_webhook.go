@@ -2473,10 +2473,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 
 // validateManagedExtensions validate the managed extensions parameters set by the user
 func (v *ClusterCustomValidator) validateManagedExtensions(r *apiv1.Cluster) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	allErrors = append(allErrors, v.validatePgFailoverSlots(r)...)
-	return allErrors
+	return v.validatePgFailoverSlots(r)
 }
 
 func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field.ErrorList {

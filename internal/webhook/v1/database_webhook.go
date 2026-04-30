@@ -220,7 +220,7 @@ func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) fiel
 	}
 
 	nameSet := stringset.New()
-	var allErrs field.ErrorList
+	allErrs := make(field.ErrorList, 0, len(d.Spec.Servers))
 	for i, server := range d.Spec.Servers {
 		itemPath := basePath.Index(i)
 
