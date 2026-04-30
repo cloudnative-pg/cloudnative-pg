@@ -209,7 +209,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 })
 
 var _ = Describe("getRestoreWalConfig", func() {
-	It("escapes quotes and backslashes so user-controlled backup fields cannot corrupt custom.conf",
+	It("escapes quotes and backslashes across both shell and config layers",
 		func(ctx SpecContext) {
 			backup := &apiv1.Backup{
 				Status: apiv1.BackupStatus{
@@ -219,12 +219,59 @@ var _ = Describe("getRestoreWalConfig", func() {
 			}
 			out, err := getRestoreWalConfig(ctx, backup)
 			Expect(err).ToNot(HaveOccurred())
-			// Embedded single quote must be doubled; backslash must be doubled.
-			Expect(out).To(ContainSubstring("s3://bucket/has''quote"))
-			Expect(out).To(ContainSubstring(`server\\name`))
-			// And the raw unescaped form must NOT appear anywhere in the output.
+
+			// shellQuote wraps the value as has\'quote (escape).
+			// configfile.EscapePostgresConfLiteral then doubles every ' and \,
+			// yielding the exact form below at the config-file layer.
+			Expect(out).To(ContainSubstring(`s3://bucket/has\\''quote`))
+			// shellQuote quotes `\` to `\\` — config layer doubles the
+			// backslash.
+			Expect(out).To(ContainSubstring(`server\\\\name`))
+
+			// Raw unescaped forms must not appear — either would let the user
+			// break out of the config-file string literal.
 			Expect(out).NotTo(ContainSubstring("has'quote"))
 			Expect(out).NotTo(MatchRegexp(`server\\[^\\]name`),
 				"backslash in server name must be doubled")
+		})
+
+	It("shell-quotes cmd args so whitespace in user-controlled fields does not word-split",
+		func(ctx SpecContext) {
+			backup := &apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: "s3://my bucket/wal",
+					ServerName:      "server-a",
+				},
+			}
+			out, err := getRestoreWalConfig(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
+			// After shell-quoting, the DestinationPath is wrapped in single quotes.
+			// The outer configfile.EscapePostgresConfLiteral layer then doubles
+			// each of those single quotes, so the value appears as ''...'' in
+			// the config file.
+			Expect(out).To(ContainSubstring("''s3://my bucket/wal''"))
+
+			// PostgreSQL will replace %f %p with proper quoting when needed.
+			Expect(out).To(ContainSubstring("%f"))
+			Expect(out).To(ContainSubstring("%p"))
+		})
+
+	It("nests an obvious shell-injection payload inside both quoting layers",
+		func(ctx SpecContext) {
+			backup := &apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					DestinationPath: `s3://bucket"; rm -rf /; "`,
+					ServerName:      "server-a",
+				},
+			}
+			out, err := getRestoreWalConfig(ctx, backup)
+			Expect(err).ToNot(HaveOccurred())
+
+			// shellquote.Join wraps the whole arg in single quotes (because
+			// of the embedded `;` and spaces); EscapePostgresConfLiteral
+			// then doubles each of those quotes. The payload must arrive at
+			// the shell as one argument, not as a `;`-separated command.
+			Expect(out).To(ContainSubstring(
+				`''s3://bucket"; rm -rf /; "''`))
 		})
 })
