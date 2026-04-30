@@ -27,8 +27,8 @@ data:
                    , state
                    , usename
                    , COALESCE(application_name, '') AS application_name
-                   , COUNT(*)
-                   , COALESCE(EXTRACT (EPOCH FROM (max(now() - xact_start))), 0) AS max_tx_secs
+                   , pg_catalog.count(*)
+                   , COALESCE(EXTRACT (EPOCH FROM (pg_catalog.max(pg_catalog.now() - xact_start))), 0) AS max_tx_secs
                FROM pg_catalog.pg_stat_activity
                GROUP BY datname, state, usename, application_name
            ) sa ON states.state = sa.state
@@ -55,7 +55,7 @@ data:
 
     backends_waiting:
       query: |
-       SELECT count(*) AS total
+       SELECT pg_catalog.count(*) AS total
        FROM pg_catalog.pg_locks blocked_locks
        JOIN pg_catalog.pg_locks blocking_locks
          ON blocking_locks.locktype = blocked_locks.locktype
@@ -113,11 +113,11 @@ data:
                 OR pg_catalog.pg_last_wal_receive_lsn() = pg_catalog.pg_last_wal_replay_lsn())
               THEN 0
               ELSE GREATEST (0,
-                EXTRACT(EPOCH FROM (now() - pg_catalog.pg_last_xact_replay_timestamp())))
+                EXTRACT(EPOCH FROM (pg_catalog.now() - pg_catalog.pg_last_xact_replay_timestamp())))
               END AS lag,
               pg_catalog.pg_is_in_recovery() AS in_recovery,
               EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
-              (SELECT count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas"
+              (SELECT pg_catalog.count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -165,8 +165,8 @@ data:
       query: |
         SELECT archived_count
           , failed_count
-          , COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time)), -1) AS seconds_since_last_archival
-          , COALESCE(EXTRACT(EPOCH FROM (now() - last_failed_time)), -1) AS seconds_since_last_failure
+          , COALESCE(EXTRACT(EPOCH FROM (pg_catalog.now() - last_archived_time)), -1) AS seconds_since_last_archival
+          , COALESCE(EXTRACT(EPOCH FROM (pg_catalog.now() - last_failed_time)), -1) AS seconds_since_last_failure
           , COALESCE(EXTRACT(EPOCH FROM last_archived_time), -1) AS last_archived_time
           , COALESCE(EXTRACT(EPOCH FROM last_failed_time), -1) AS last_failed_time
           , COALESCE(CAST(CAST('x'||pg_catalog.right(pg_catalog.split_part(last_archived_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_archived_wal_start_lsn
