@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"github.com/kballard/go-shellquote"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -145,6 +146,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	}
 
 	var envs []string
+	// Operator-controlled command: LogPath and LogFileName are operator
+	// constants, so no shell-quoting layer is needed here. The config-file
+	// literal escaping is still applied for consistency with the WAL-restore
+	// path in getRestoreWalConfig.
 	restoreCmd := fmt.Sprintf(
 		"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 		postgresSpec.LogPath, postgresSpec.LogFileName)
@@ -648,7 +653,7 @@ func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, err
 
 	return configfile.RenderPostgresConfiguration(map[string]string{
 		"recovery_target_action": "promote",
-		"restore_command":        strings.Join(cmd, " "),
+		"restore_command":        shellquote.Join(cmd...),
 	}), nil
 }
 
