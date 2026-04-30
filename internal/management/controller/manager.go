@@ -39,9 +39,14 @@ import (
 	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 )
 
+// PrimaryLeaseAcquirer is the interface the primary lease runnable exposes to the reconciler.
+type PrimaryLeaseAcquirer interface {
+	Acquire(ctx context.Context) error
+}
+
 // InstanceReconciler reconciles the status of the Cluster resource with
 // the one of this PostgreSQL instance. Also, the configuration in the
-// ConfigMap is applied when needed
+// ConfigMap is applied when needed.
 type InstanceReconciler struct {
 	client        ctrl.Client
 	instance      *postgres.Instance
@@ -56,6 +61,7 @@ type InstanceReconciler struct {
 
 	certificateReconciler *instancecertificate.Reconciler
 	pluginRepository      repository.Interface
+	primaryLeaseAcquirer  PrimaryLeaseAcquirer
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -64,6 +70,7 @@ func NewInstanceReconciler(
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
 	pluginRepository repository.Interface,
+	primaryLeaseAcquirer PrimaryLeaseAcquirer,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -74,6 +81,7 @@ func NewInstanceReconciler(
 		metricsServerExporter: metricsExporter,
 		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 		pluginRepository:      pluginRepository,
+		primaryLeaseAcquirer:  primaryLeaseAcquirer,
 	}
 }
 
