@@ -31,6 +31,25 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("regexPGWalFileName", func() {
+	DescribeTable("matches only valid WAL segment filenames",
+		func(filename string, shouldMatch bool) {
+			Expect(regexPGWalFileName.MatchString(filename)).To(Equal(shouldMatch))
+		},
+		Entry("valid WAL segment", "000000010000000000000001", true),
+		Entry("valid WAL segment (all zeros)", "000000000000000000000000", true),
+		Entry("valid WAL segment (all Fs)", "FFFFFFFFFFFFFFFFFFFFFFFF", true),
+		Entry("partial WAL file", "000000010000000000000001.partial", false),
+		Entry("backup label file", "000000010000000000000001.00000028.backup", false),
+		Entry("timeline history file", "00000002.history", false),
+		Entry("archive_status directory", "archive_status", false),
+		Entry("lowercase hex (invalid)", "00000001000000000000000a", false),
+		Entry("too short", "0000000100000000000000", false),
+		Entry("too long (25 hex chars)", "0000000100000000000000011", false),
+		Entry("empty string", "", false),
+	)
+})
+
 var _ = Describe("ensures walSettings works correctly", func() {
 	const (
 		sha256                     = "random-sha"
