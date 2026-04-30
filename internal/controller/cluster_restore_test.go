@@ -164,7 +164,7 @@ var _ = Describe("getOrphanPVCs", func() {
 			},
 		}
 
-		goodPvcs = []corev1.PersistentVolumeClaim{
+		goodPvcs = []corev1.PersistentVolumeClaim{ //nolint:prealloc
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-1",

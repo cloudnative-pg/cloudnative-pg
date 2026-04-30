@@ -393,6 +393,9 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
+
+		// The backup start request continues when the request already terminated.
+		//nolint:gosec
 		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingBackupRequest)
 
 		res := Response[BackupResultData]{
@@ -452,6 +455,8 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 
 		ws.currentBackup.data.Phase = Closing
 
+		// The backup stop request continues when the request already terminated.
+		//nolint:gosec
 		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingBackupRequest)
 		sendJSONResponseWithData(w, 200, res)
 		return
