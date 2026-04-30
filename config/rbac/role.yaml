@@ -110,6 +110,7 @@ rules:
   verbs:
   - create
   - get
+  - patch
   - update
 - apiGroups:
   - monitoring.coreos.com
