@@ -82,7 +82,7 @@ if notinpath "${go_bin}"; then
 fi
 
 # renovate: datasource=github-releases depName=onsi/ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
+(cd "${ROOT_DIR}/tests" && go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1)
 
 # Build kubectl-cnpg and export its path
 make build-plugin
@@ -130,10 +130,11 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
   unset TEST_SKIP_UPGRADE
+  cd "${ROOT_DIR}/tests"
   ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
    --github-output --force-newlines \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
-   --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
+   --json-report  "upgrade_report.json" -v ./e2e/... || RC_GINKGO1=$?
 
   # Report if there are any tests that failed
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?

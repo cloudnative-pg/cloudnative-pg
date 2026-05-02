@@ -123,7 +123,11 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils/...
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/...
+
+test-e2e:
+	cd tests/ ;\
+	go test -coverpkg=./... -coverprofile=cover.out ./utils/...
 
 test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
@@ -308,7 +312,7 @@ apidoc: crd-ref-docs ## Update the API Reference section of the documentation.
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out tests/cover.out
 
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
