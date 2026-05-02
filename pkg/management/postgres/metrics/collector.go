@@ -575,6 +575,14 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 
 	// Set the pg_monitor role
 	_, err = tx.Exec("SET ROLE TO pg_monitor")
+	if err != nil {
+		return nil, err
+	}
+
+	// Operator-defined queries may reference unqualified objects in public.
+	// SET LOCAL is bounded by this transaction's end, so the pinned
+	// connection-level default is restored when the metrics tx commits.
+	_, err = tx.Exec("SET LOCAL search_path = pg_catalog, public")
 
 	return tx, err
 }

@@ -814,10 +814,15 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 		return err
 	}
 	if !existsFunction {
+		// SECURITY DEFINER functions run as the function owner (the cluster
+		// superuser here). Pin search_path to pg_catalog, pg_temp on the
+		// function itself so that operators inside the body cannot be
+		// resolved through the caller's search_path (CWE-426 hardening).
 		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
 			"as '%s' "+
-			"LANGUAGE sql SECURITY DEFINER",
+			"LANGUAGE sql SECURITY DEFINER "+
+			"SET search_path = pg_catalog, pg_temp",
 			userSearchFunctionSchema,
 			userSearchFunctionName,
 			userSearchFunction))
