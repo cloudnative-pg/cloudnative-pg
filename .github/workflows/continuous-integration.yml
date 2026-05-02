@@ -181,6 +181,12 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
+      - name: Run golangci-lint (tests module)
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: tests
+
       - name: Check go mod tidy has no pending changes
         run: |
           make go-mod-check
@@ -224,6 +230,14 @@ jobs:
           # See https://github.com/golang/go/issues/70036
           go-version-input: ""
           check-latest: true
+
+      - name: Run govulncheck (tests module)
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        with:
+          go-version-file: tests/go.mod
+          go-version-input: ""
+          check-latest: true
+          work-dir: tests
 
   shellcheck:
     name: Run shellcheck linter
