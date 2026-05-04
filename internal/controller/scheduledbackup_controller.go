@@ -270,17 +270,20 @@ func createBackup(
 
 	contextLogger.Info("Creating backup", "backupName", backup.Name)
 	if err := cli.Create(ctx, backup); err != nil {
-		if apierrs.IsConflict(err) {
-			// Retry later, the cache is stale
-			contextLogger.Debug("Conflict while creating backup", "error", err)
-			return ctrl.Result{}, nil
+		if apierrs.IsAlreadyExists(err) {
+			// A Backup with this deterministic name already exists. This can happen
+			// when a previous reconcile persisted the Backup but the subsequent
+			// status patch did not land (lost response or transient error), so
+			// LastCheckTime never advanced. Treat as a no-op success and proceed
+			// to update the status; the next reconcile will compute a new schedule.
+			contextLogger.Debug("Backup already exists, treating as no-op", "error", err)
+		} else {
+			contextLogger.Error(
+				err, "Error while creating backup object",
+				"backupName", backup.GetName())
+			event.Event(scheduledBackup, "Warning", "BackupCreation", "Error while creating backup object")
+			return ctrl.Result{}, err
 		}
-
-		contextLogger.Error(
-			err, "Error while creating backup object",
-			"backupName", backup.GetName())
-		event.Event(scheduledBackup, "Warning", "BackupCreation", "Error while creating backup object")
-		return ctrl.Result{}, err
 	}
 
 	// Ok, now update the latest check to now
