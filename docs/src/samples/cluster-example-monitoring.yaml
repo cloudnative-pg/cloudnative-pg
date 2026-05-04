@@ -192,7 +192,7 @@ data:
                 END
               )::bigint AS bucket
             FROM
-              pg_stat_activity,
+              pg_catalog.pg_stat_activity,
               UNNEST(ARRAY[1, 2, 5, 15, 30, 60, 90, 120, 300]) AS le
             GROUP BY application_name, le
             ORDER BY application_name, le

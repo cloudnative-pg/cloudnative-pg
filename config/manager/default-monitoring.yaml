@@ -116,7 +116,7 @@ data:
                 EXTRACT(EPOCH FROM (pg_catalog.now() OPERATOR(pg_catalog.-) pg_catalog.pg_last_xact_replay_timestamp())))
               END AS lag,
               pg_catalog.pg_is_in_recovery() AS in_recovery,
-              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
+              EXISTS (TABLE pg_catalog.pg_stat_wal_receiver) AS is_wal_receiver_up,
               (SELECT pg_catalog.count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas"
       metrics:
         - lag:
