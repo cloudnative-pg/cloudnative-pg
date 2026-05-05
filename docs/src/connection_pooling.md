@@ -379,6 +379,15 @@ When a catalog entry is updated, the operator automatically reconciles all
 poolers referencing it and rolls out the new image without any change to the
 `Pooler` spec.
 
+:::warning[Policy gating]
+    If you enforce admission policies that restrict which pgbouncer images
+    may run, those policies **must gate both** `spec.pgbouncer.image` **and**
+    `spec.pgbouncer.imageCatalogRef`: either field can determine the
+    container image, so a policy that covers only one is incomplete. The
+    same consideration applies to `Cluster.spec.imageName` and
+    `Cluster.spec.imageCatalogRef`.
+:::
+
 ### Monitoring the resolved image
 
 The operator stores the resolved image in `status.image` and reflects the
