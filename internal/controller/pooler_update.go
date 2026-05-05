@@ -76,6 +76,18 @@ func (r *PoolerReconciler) updateDeployment(
 ) error {
 	contextLog := log.FromContext(ctx)
 
+	// When the pgbouncer image cannot be resolved (e.g. an imageCatalogRef points
+	// to a missing key) we leave the existing deployment untouched: the running
+	// pgbouncer keeps serving traffic with whatever image it had, and a new
+	// deployment is not created from an empty image reference. Recovery is
+	// automatic once the catalog is fixed and Phase moves back to Active.
+	if pooler.Status.Image == "" {
+		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
+			"phase", pooler.Status.Phase,
+			"reason", pooler.Status.PhaseReason)
+		return nil
+	}
+
 	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
 		return err

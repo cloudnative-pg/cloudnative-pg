@@ -121,11 +121,11 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	if pooler.Status.Phase == apiv1.PoolerPhaseFailed {
-		return ctrl.Result{}, nil
-	}
-
-	// Take the required actions to align the spec with the collected status
+	// Take the required actions to align the spec with the collected status.
+	// When the pgbouncer image cannot be resolved (Phase=Failed) updateDeployment
+	// is a no-op, but service accounts, RBAC, services and PodMonitor are still
+	// reconciled so drift in those resources is corrected even when the catalog
+	// reference is misconfigured.
 	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
 
