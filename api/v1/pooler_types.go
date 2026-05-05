@@ -27,17 +27,22 @@ import (
 )
 
 // PoolerPhase represents the lifecycle phase of a Pooler.
-// +kubebuilder:validation:Enum=active;inactive;failed
+// +kubebuilder:validation:Enum=active;paused;inactive;failed
 type PoolerPhase string
 
 const (
 	// PoolerPhaseActive means the pooler is running normally and serving traffic.
 	PoolerPhaseActive PoolerPhase = "active"
 
-	// PoolerPhaseInactive means the pooler is not currently serving traffic. This
-	// covers two cases: a prerequisite resource is missing (cluster, secret,
-	// certificate) so reconciliation is on hold, or PgBouncer has been paused
-	// via spec.pgbouncer.paused. Check status.phaseReason for the specific cause.
+	// PoolerPhasePaused means PgBouncer is up and running but holding new client
+	// connections in queue because spec.pgbouncer.paused is true. The Deployment
+	// keeps reconciling; lifting the pause transitions back to Active.
+	PoolerPhasePaused PoolerPhase = "paused"
+
+	// PoolerPhaseInactive means the pooler cannot make progress because a
+	// prerequisite resource is missing (cluster, secret, certificate). The
+	// controller retries periodically until the prerequisite shows up. Check
+	// status.phaseReason for the specific cause.
 	PoolerPhaseInactive PoolerPhase = "inactive"
 
 	// PoolerPhaseFailed means the pooler cannot be reconciled due to a

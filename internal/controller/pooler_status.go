@@ -102,9 +102,10 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		updatedStatus.Image = ""
 	case isPgBouncerPaused(pooler):
 		// The deployment still runs while paused; the manager calls PgBouncer's
-		// PAUSE command to stop accepting new client connections. Inactive
-		// reflects that state without disturbing reconciliation.
-		updatedStatus.Phase = apiv1.PoolerPhaseInactive
+		// PAUSE command so existing connections are kept open and new clients
+		// are queued. Paused is a deliberate operational state, distinct from
+		// Inactive (which means a prerequisite is missing).
+		updatedStatus.Phase = apiv1.PoolerPhasePaused
 		updatedStatus.PhaseReason = "pgbouncer is paused"
 		updatedStatus.Image = image
 	default:
