@@ -82,7 +82,7 @@ fi
 case "$ACTION" in
     deploy)
         if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
-            if [[ "${OPERATOR:-local}" != "local" ]]; then
+            if [[ "${OPERATOR}" != "local" ]]; then
                 echo "ERROR: Helm deployment is only supported with OPERATOR=local" >&2
                 exit 1
             fi
