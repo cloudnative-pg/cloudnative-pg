@@ -510,14 +510,14 @@ metadata:
 data:
   custom-queries: |
     pg_replication:
-      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
+      query: "SELECT CASE WHEN NOT pg_catalog.pg_is_in_recovery()
               THEN 0
               ELSE GREATEST (0,
-                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
+                EXTRACT(EPOCH FROM (pg_catalog.now() OPERATOR(pg_catalog.-) pg_catalog.pg_last_xact_replay_timestamp())))
               END AS lag,
-              pg_is_in_recovery() AS in_recovery,
-              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
-              (SELECT count(*) FROM pg_stat_replication) AS streaming_replicas"
+              pg_catalog.pg_is_in_recovery() AS in_recovery,
+              EXISTS (TABLE pg_catalog.pg_stat_wal_receiver) AS is_wal_receiver_up,
+              (SELECT pg_catalog.count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas"
 
       metrics:
         - lag:
@@ -553,7 +553,7 @@ some_query: |
     FROM some_table
   query: |
     SELECT
-     count(*) as rows
+     pg_catalog.count(*) as rows
     FROM some_table
   metrics:
     - rows:
@@ -586,8 +586,8 @@ as in the following example:
 some_query: |
   query: |
     SELECT
-     current_database() as datname,
-     count(*) as rows
+     pg_catalog.current_database() as datname,
+     pg_catalog.count(*) as rows
     FROM some_table
   metrics:
     - datname:
@@ -618,8 +618,8 @@ aforementioned query):
 some_query: |
   query: |
     SELECT
-     current_database() as datname,
-     count(*) as rows
+     pg_catalog.current_database() as datname,
+     pg_catalog.count(*) as rows
     FROM some_table
   metrics:
     - datname:
