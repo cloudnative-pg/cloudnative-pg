@@ -297,6 +297,42 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 					g.Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseFailed))
 				}, 60).Should(Succeed())
 			})
+
+			By("verifying the deployment was not created while the catalog key was missing", func() {
+				deployment := &appsv1.Deployment{}
+				err := env.Client.Get(env.Ctx,
+					client.ObjectKey{Namespace: namespace, Name: poolerName},
+					deployment)
+				Expect(err).To(HaveOccurred())
+			})
+
+			By("adding the missing key to the catalog", func() {
+				var catalog apiv1.ImageCatalog
+				Expect(env.Client.Get(env.Ctx,
+					client.ObjectKey{Namespace: namespace, Name: catalogName},
+					&catalog)).To(Succeed())
+				catalog.Spec.ExtraImages = []apiv1.CatalogExtraImage{
+					{Key: "nonexistent-key", Image: pgbouncerImage},
+				}
+				Expect(env.Client.Update(env.Ctx, &catalog)).To(Succeed())
+			})
+
+			By("verifying the pooler recovers to active and the deployment is created", func() {
+				Eventually(func(g Gomega) {
+					var pooler apiv1.Pooler
+					g.Expect(env.Client.Get(env.Ctx,
+						client.ObjectKey{Namespace: namespace, Name: poolerName},
+						&pooler)).To(Succeed())
+					g.Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseActive))
+					g.Expect(pooler.Status.Image).To(Equal(pgbouncerImage))
+
+					var deployment appsv1.Deployment
+					g.Expect(env.Client.Get(env.Ctx,
+						client.ObjectKey{Namespace: namespace, Name: poolerName},
+						&deployment)).To(Succeed())
+					g.Expect(pgbouncerContainerImage(deployment)).To(Equal(pgbouncerImage))
+				}, 90).Should(Succeed())
+			})
 		})
 	})
 })
