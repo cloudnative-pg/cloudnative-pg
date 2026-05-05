@@ -72,6 +72,7 @@ OPM_VERSION ?= v1.67.0
 PREFLIGHT_VERSION ?= 1.17.2
 OPENSHIFT_VERSIONS ?= v4.16-v4.21
 ARCH ?= amd64
+FUZZ_TIME ?= 30s
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -130,6 +131,10 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
+
+fuzz: ## Run native fuzzing targets.
+	go test -run=^$$ ./pkg/postgres -fuzz=FuzzCreatePostgresqlConfigurationSanitization -fuzztime=$(FUZZ_TIME)
+	go test -run=^$$ ./internal/configuration/... -fuzz=FuzzConfigurationParsing -fuzztime=$(FUZZ_TIME)
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh
