@@ -96,7 +96,7 @@ func (r *PoolerReconciler) updatePoolerStatus(
 	image, err := r.resolvePoolerImage(ctx, pooler)
 	switch {
 	case err != nil:
-		r.Recorder.Eventf(pooler, "Warning", "ImageCatalogError", err.Error())
+		r.Recorder.Event(pooler, "Warning", "ImageCatalogError", err.Error())
 		updatedStatus.Phase = apiv1.PoolerPhaseFailed
 		updatedStatus.PhaseReason = err.Error()
 		updatedStatus.Image = ""
