@@ -116,3 +116,71 @@ var _ = Describe("resolvePoolerImage", func() {
 		Expect(image).To(Equal("explicit:9"))
 	})
 })
+
+var _ = Describe("poolerImageCatalogIndexer", func() {
+	newPooler := func() *apiv1.Pooler {
+		return &apiv1.Pooler{
+			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"},
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{},
+			},
+		}
+	}
+
+	It("returns nil when no imageCatalogRef is set", func() {
+		Expect(poolerImageCatalogIndexer(newPooler())).To(BeNil())
+	})
+
+	It("returns nil when PgBouncer is nil", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer = nil
+		Expect(poolerImageCatalogIndexer(pooler)).To(BeNil())
+	})
+
+	It("returns Kind/Name for namespaced catalog references", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ImageCatalogKind,
+				Name: "foo",
+			},
+			Key: "pgbouncer",
+		}
+		Expect(poolerImageCatalogIndexer(pooler)).To(ConsistOf("ImageCatalog/foo"))
+	})
+
+	It("returns Kind/Name for cluster-scoped catalog references", func() {
+		pooler := newPooler()
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ClusterImageCatalogKind,
+				Name: "foo",
+			},
+			Key: "pgbouncer",
+		}
+		Expect(poolerImageCatalogIndexer(pooler)).To(ConsistOf("ClusterImageCatalog/foo"))
+	})
+
+	It("uses different index values for same-named catalogs of different kinds", func() {
+		namespaced := newPooler()
+		namespaced.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ImageCatalogKind,
+				Name: "shared-name",
+			},
+			Key: "pgbouncer",
+		}
+
+		clusterScoped := newPooler()
+		clusterScoped.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ClusterImageCatalogKind,
+				Name: "shared-name",
+			},
+			Key: "pgbouncer",
+		}
+
+		Expect(poolerImageCatalogIndexer(namespaced)).
+			ToNot(Equal(poolerImageCatalogIndexer(clusterScoped)))
+	})
+})
