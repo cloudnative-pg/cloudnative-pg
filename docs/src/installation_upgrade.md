@@ -400,3 +400,35 @@ To inspect the SLSA Provenance (Build details):
 docker buildx imagetools inspect ghcr.io/cloudnative-pg/postgresql:{tag} \
   --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
 ```
+
+## Troubleshooting
+
+### Troubleshooting CrashLoopBackOff
+
+During installation, you might see the `cnpg-controller-manager` pod stuck in a `CrashLoopBackOff` state. This indicates that the operator pod is starting but failing and restarting continuously.
+
+To identify the root cause, you can follow these steps:
+
+1. **Inspect the pods** to see their current state:
+
+   ```shell
+   kubectl get pods -n cnpg-system
+   ```
+
+2. **Check the logs** for the failing pod to identify any error messages:
+
+   ```shell
+   kubectl logs -n cnpg-system deployment/cnpg-controller-manager
+   ```
+
+3. **Debug the pod** by describing it to see Kubernetes events related to the pod's startup sequence (replace `<pod-name>` with the name of the failing pod):
+
+   ```shell
+   kubectl describe pod -n cnpg-system <pod-name>
+   ```
+
+**Common Causes:**
+
+- **Missing Custom Resource Definitions (CRDs):** The operator relies on specific CRDs. If they are missing or failed to install correctly, the operator will crash.
+- **Cluster Issues:** Underlying issues with the Kubernetes control plane or network configurations.
+- **Resource Limits:** The pod might be running out of memory (OOMKilled) or CPU resources, causing it to be terminated. Check the `describe` output for `OOMKilled` reasons.
