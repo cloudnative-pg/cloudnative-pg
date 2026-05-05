@@ -20,6 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package v1
 
 import (
+	"fmt"
+	"time"
+
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -62,6 +66,14 @@ func (scheduledBackup *ScheduledBackup) GetSchedule() string {
 // GetStatus gets the status that the caller may update
 func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 	return &scheduledBackup.Status
+}
+
+// BackupName returns the deterministic name of the Backup that this
+// ScheduledBackup creates for an iteration scheduled at the given time.
+// The name is unique per (ScheduledBackup, scheduledTime) pair, which is
+// what makes the controller idempotent against retries.
+func (scheduledBackup *ScheduledBackup) BackupName(scheduledTime time.Time) string {
+	return fmt.Sprintf("%s-%s", scheduledBackup.Name, pgTime.ToCompactISO8601(scheduledTime))
 }
 
 // CreateBackup creates a backup from this scheduled backup

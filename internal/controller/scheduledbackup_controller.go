@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/robfig/cron"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,6 +185,26 @@ func ReconcileScheduledBackup(
 	}
 
 	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
+		// Operator-restart guard: if a previous reconcile already created the
+		// immediate Backup but did not land the status patch, time.Now() on
+		// retry differs from the first attempt, so a name-based check would
+		// miss the orphan. List by parent + immediate label to catch any
+		// existing immediate Backup regardless of its scheduled-time suffix.
+		var existingImmediate apiv1.BackupList
+		if err := cli.List(ctx, &existingImmediate,
+			client.InNamespace(scheduledBackup.Namespace),
+			client.MatchingLabels{
+				utils.ParentScheduledBackupLabelName: scheduledBackup.GetName(),
+				utils.ImmediateBackupLabelName:       "true",
+			},
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		if len(existingImmediate.Items) > 0 {
+			adopted := existingImmediate.Items[0].CreationTimestamp.Time
+			return advanceScheduledBackupStatus(ctx, event, cli, scheduledBackup, adopted, now, schedule)
+		}
+
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
 		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
 		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
@@ -224,10 +243,9 @@ func ReconcileScheduledBackup(
 	// look it up directly. If it already exists, a previous reconcile created
 	// it but did not land the status patch — adopt that observation and advance
 	// the status. Otherwise, create the Backup.
-	expectedName := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), pgTime.ToCompactISO8601(nextTime))
 	var existing apiv1.Backup
 	switch err := cli.Get(ctx, types.NamespacedName{
-		Name:      expectedName,
+		Name:      scheduledBackup.BackupName(nextTime),
 		Namespace: scheduledBackup.Namespace,
 	}, &existing); {
 	case apierrs.IsNotFound(err):
@@ -253,8 +271,7 @@ func createBackup(
 	contextLogger := log.FromContext(ctx)
 
 	// Deterministic name so retries do not produce duplicates.
-	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), pgTime.ToCompactISO8601(backupTime))
-	backup := scheduledBackup.CreateBackup(name)
+	backup := scheduledBackup.CreateBackup(scheduledBackup.BackupName(backupTime))
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {
 		metadata.Labels = make(map[string]string)
