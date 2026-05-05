@@ -136,8 +136,8 @@ Options:
       <METHOD>            Deployment method for the operator. Use 'manifest'
                           (default) to deploy via a kustomize-generated
                           manifest, or 'helm' to deploy via the official
-                          Helm chart. Only 'manifest' is supported when
-                          OPERATOR is not 'local'.
+                          Helm chart (from https://cloudnative-pg.github.io/charts).
+                          Only 'manifest' is supported when OPERATOR is not 'local'.
                           Env: CNPG_DEPLOYMENT_METHOD
 
 To use long options you need to have GNU enhanced getopt available, otherwise

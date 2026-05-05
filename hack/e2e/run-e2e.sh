@@ -149,7 +149,7 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   bright=${bright:-}
   reset=${reset:-}
   source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
-  if [[ "${OPERATOR:-local}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
+  if [[ "${OPERATOR}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
     "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
   fi
   if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
