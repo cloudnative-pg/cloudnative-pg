@@ -316,7 +316,11 @@ type PoolerStatus struct {
 	PhaseReason string `json:"phaseReason,omitempty"`
 
 	// Image is the fully-resolved pgbouncer container image that the operator is
-	// using for this Pooler. Populated on every reconciliation.
+	// using for this Pooler, including any override coming from spec.template.
+	// While Phase is Active or Paused this field reflects what the Deployment
+	// actually runs; while Phase is Inactive or Failed it may carry the last
+	// successfully resolved value (or be empty if the Pooler has never reconciled
+	// successfully).
 	// +optional
 	Image string `json:"image,omitempty"`
 }

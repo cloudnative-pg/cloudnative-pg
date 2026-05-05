@@ -2060,7 +2060,7 @@ _Appears in:_
 | `instances` _integer_ | The number of pods trying to be scheduled |  |  |  |
 | `phase` _[PoolerPhase](#poolerphase)_ | Phase summarises the overall lifecycle state of the Pooler. |  |  | Enum: [active inactive failed] <br /> |
 | `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
-| `image` _string_ | Image is the fully-resolved pgbouncer container image that the operator is<br />using for this Pooler. Populated on every reconciliation. |  |  |  |
+| `image` _string_ | Image is the fully-resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
 
 
 #### PoolerType
