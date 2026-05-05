@@ -82,6 +82,14 @@ func podTemplatePgbouncerImage(pooler *apiv1.Pooler) string {
 	return ""
 }
 
+// isPgBouncerPaused reports whether the user has requested PgBouncer to pause
+// new client connections via spec.pgbouncer.paused.
+func isPgBouncerPaused(pooler *apiv1.Pooler) bool {
+	return pooler.Spec.PgBouncer != nil &&
+		pooler.Spec.PgBouncer.Paused != nil &&
+		*pooler.Spec.PgBouncer.Paused
+}
+
 func (r *PoolerReconciler) resolveImageFromCatalog(ctx context.Context, pooler *apiv1.Pooler) (string, error) {
 	ref := pooler.Spec.PgBouncer.ImageCatalogRef
 

@@ -31,10 +31,13 @@ import (
 type PoolerPhase string
 
 const (
-	// PoolerPhaseActive means the pooler is running normally.
+	// PoolerPhaseActive means the pooler is running normally and serving traffic.
 	PoolerPhaseActive PoolerPhase = "active"
 
-	// PoolerPhaseInactive means the pooler is paused or waiting for prerequisites.
+	// PoolerPhaseInactive means the pooler is not currently serving traffic. This
+	// covers two cases: a prerequisite resource is missing (cluster, secret,
+	// certificate) so reconciliation is on hold, or PgBouncer has been paused
+	// via spec.pgbouncer.paused. Check status.phaseReason for the specific cause.
 	PoolerPhaseInactive PoolerPhase = "inactive"
 
 	// PoolerPhaseFailed means the pooler cannot be reconciled due to a

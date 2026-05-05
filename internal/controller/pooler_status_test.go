@@ -187,6 +187,43 @@ var _ = Describe("pooler_status unit tests", func() {
 		})
 	})
 
+	It("marks the pooler Inactive while pgbouncer is paused", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		paused := true
+		pooler.Spec.PgBouncer.Paused = &paused
+
+		res := &poolerManagedResources{Cluster: cluster}
+
+		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+		Expect(pooler.Status.PhaseReason).To(Equal("pgbouncer is paused"))
+		Expect(pooler.Status.Image).ToNot(BeEmpty())
+	})
+
+	It("transitions back to Active after the pause is lifted", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		paused := true
+		pooler.Spec.PgBouncer.Paused = &paused
+
+		res := &poolerManagedResources{Cluster: cluster}
+
+		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+
+		paused = false
+		pooler.Spec.PgBouncer.Paused = &paused
+
+		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseActive))
+		Expect(pooler.Status.PhaseReason).To(BeEmpty())
+	})
+
 	It("should clear ServerTLS status when not using manual TLS authentication (migration to v1.28)", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)

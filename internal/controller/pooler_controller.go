@@ -249,60 +249,84 @@ func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
 }
 
 // waitForPrerequisites centralizes the early-return checks for missing dependent resources
-// to keep Reconcile lean. It logs a concise message and instructs the controller to
-// requeue after a short delay when something is missing.
+// to keep Reconcile lean. It logs a concise message, marks the Pooler as Inactive with a
+// human-readable reason, and instructs the controller to requeue after a short delay when
+// something is missing.
 // Returns a non-nil *ctrl.Result when it requested a requeue; otherwise nil.
 func (r *PoolerReconciler) waitForPrerequisites(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) *ctrl.Result {
-	contextLogger := log.FromContext(ctx)
-	waitResult := &ctrl.Result{RequeueAfter: 30 * time.Second}
-
 	if resources.Cluster == nil {
-		contextLogger.Info("Cluster not found, will retry in 30 seconds",
-			"cluster", pooler.Spec.Cluster.Name)
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("Cluster %q not found", pooler.Spec.Cluster.Name))
 	}
 
 	// For automated integration, we need AuthUserSecret
 	if pooler.IsAutomatedIntegration() && resources.AuthUserSecret == nil {
-		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds",
-			"secret", pooler.GetAuthQuerySecretName())
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("AuthUserSecret %q not found", pooler.GetAuthQuerySecretName()))
 	}
 
 	// For manual TLS authentication to PostgreSQL, we need ServerTLSSecret
 	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
-		contextLogger.Info("ServerTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerTLSSecretName())
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ServerTLSSecret %q not found", pooler.GetServerTLSSecretName()))
 	}
 
 	// Always required: TLS certificates for accepting client connections
 	if resources.ClientTLSSecret == nil {
-		contextLogger.Info(
-			"ClientTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientTLSSecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ClientTLSSecret %q not found",
+				pooler.GetClientTLSSecretNameOrDefault(resources.Cluster)))
 	}
 
 	if resources.ClientCASecret == nil {
-		contextLogger.Info(
-			"ClientCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ClientCASecret %q not found",
+				pooler.GetClientCASecretNameOrDefault(resources.Cluster)))
 	}
 
 	if resources.ServerCASecret == nil {
-		contextLogger.Info(
-			"ServerCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerCASecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ServerCASecret %q not found",
+				pooler.GetServerCASecretNameOrDefault(resources.Cluster)))
 	}
 
 	return nil
+}
+
+// markInactiveAndWait records that the Pooler cannot progress until a missing
+// prerequisite becomes available and returns the standard 30s requeue.
+func (r *PoolerReconciler) markInactiveAndWait(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	reason string,
+) *ctrl.Result {
+	log.FromContext(ctx).Info(reason)
+	if err := r.setPoolerPhase(ctx, pooler, apiv1.PoolerPhaseInactive, reason); err != nil {
+		log.FromContext(ctx).Error(err, "while marking pooler as Inactive", "reason", reason)
+	}
+	return &ctrl.Result{RequeueAfter: 30 * time.Second}
+}
+
+// setPoolerPhase patches status.phase and status.phaseReason in place, skipping
+// the API call when the values already match. It is intended for early-return
+// paths where the full updatePoolerStatus pipeline cannot run (e.g. while
+// prerequisites are missing).
+func (r *PoolerReconciler) setPoolerPhase(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	phase apiv1.PoolerPhase,
+	reason string,
+) error {
+	if pooler.Status.Phase == phase && pooler.Status.PhaseReason == reason {
+		return nil
+	}
+	pooler.Status.Phase = phase
+	pooler.Status.PhaseReason = reason
+	return r.Status().Update(ctx, pooler)
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them
