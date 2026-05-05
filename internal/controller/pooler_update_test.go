@@ -111,6 +111,42 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 				ToNot(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
 			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
 		})
+
+		By("leaving the existing deployment untouched when the image becomes unresolved", func() {
+			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
+
+			brokenPooler := pooler.DeepCopy()
+			brokenPooler.Status.Image = ""
+			brokenPooler.Spec.Instances = ptr.To(int32(7))
+
+			err := env.poolerReconciler.updateDeployment(ctx, brokenPooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			afterDep := getPoolerDeployment(ctx, env.client, pooler)
+			Expect(afterDep.ResourceVersion).To(Equal(beforeDep.ResourceVersion))
+			Expect(*afterDep.Spec.Replicas).To(Equal(*beforeDep.Spec.Replicas))
+		})
+	})
+
+	It("does not create a deployment when the image cannot be resolved", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		pooler.Status.Image = ""
+		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
+
+		err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Deployment).To(BeNil())
+
+		deployment := &appsv1.Deployment{}
+		getErr := env.client.Get(
+			ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			deployment,
+		)
+		Expect(apierrors.IsNotFound(getErr)).To(BeTrue())
 	})
 
 	It("should test the ServiceAccount and RBAC update logic", func() {
