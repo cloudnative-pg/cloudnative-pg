@@ -1983,7 +1983,7 @@ PoolerPhase represents the lifecycle phase of a Pooler.
 
 _Validation:_
 
-- Enum: [active inactive failed]
+- Enum: [active paused inactive failed]
 
 _Appears in:_
 
@@ -1992,7 +1992,8 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `active` | PoolerPhaseActive means the pooler is running normally and serving traffic.<br /> |
-| `inactive` | PoolerPhaseInactive means the pooler is not currently serving traffic. This<br />covers two cases: a prerequisite resource is missing (cluster, secret,<br />certificate) so reconciliation is on hold, or PgBouncer has been paused<br />via spec.pgbouncer.paused. Check status.phaseReason for the specific cause.<br /> |
+| `paused` | PoolerPhasePaused means PgBouncer is up and running but holding new client<br />connections in queue because spec.pgbouncer.paused is true. The Deployment<br />keeps reconciling; lifting the pause transitions back to Active.<br /> |
+| `inactive` | PoolerPhaseInactive means the pooler cannot make progress because a<br />prerequisite resource is missing (cluster, secret, certificate). The<br />controller retries periodically until the prerequisite shows up. Check<br />status.phaseReason for the specific cause.<br /> |
 | `failed` | PoolerPhaseFailed means the pooler cannot be reconciled due to a<br />configuration error. Check status.phaseReason for details.<br /> |
 
 
@@ -2058,7 +2059,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `secrets` _[PoolerSecrets](#poolersecrets)_ | The resource version of the config object |  |  |  |
 | `instances` _integer_ | The number of pods trying to be scheduled |  |  |  |
-| `phase` _[PoolerPhase](#poolerphase)_ | Phase summarises the overall lifecycle state of the Pooler. |  |  | Enum: [active inactive failed] <br /> |
+| `phase` _[PoolerPhase](#poolerphase)_ | Phase summarises the overall lifecycle state of the Pooler. |  |  | Enum: [active paused inactive failed] <br /> |
 | `phaseReason` _string_ | PhaseReason is a human-readable explanation of the current Phase. |  |  |  |
 | `image` _string_ | Image is the fully-resolved pgbouncer container image that the operator is<br />using for this Pooler, including any override coming from spec.template.<br />While Phase is Active or Paused this field reflects what the Deployment<br />actually runs; while Phase is Inactive or Failed it may carry the last<br />successfully resolved value (or be empty if the Pooler has never reconciled<br />successfully). |  |  |  |
 

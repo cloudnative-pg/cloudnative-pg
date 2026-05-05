@@ -375,6 +375,7 @@ PoolerPhase
 PoolerPhaseActive
 PoolerPhaseFailed
 PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus

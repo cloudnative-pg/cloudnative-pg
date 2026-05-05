@@ -9387,6 +9387,7 @@ spec:
                 description: Phase summarises the overall lifecycle state of the Pooler.
                 enum:
                 - active
+                - paused
                 - inactive
                 - failed
                 type: string

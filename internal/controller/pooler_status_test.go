@@ -187,7 +187,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		})
 	})
 
-	It("marks the pooler Inactive while pgbouncer is paused", func() {
+	It("marks the pooler Paused while pgbouncer is paused", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
@@ -198,7 +198,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		res := &poolerManagedResources{Cluster: cluster}
 
 		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
-		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhasePaused))
 		Expect(pooler.Status.PhaseReason).To(Equal("pgbouncer is paused"))
 		Expect(pooler.Status.Image).ToNot(BeEmpty())
 	})
@@ -214,7 +214,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		res := &poolerManagedResources{Cluster: cluster}
 
 		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
-		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhasePaused))
 
 		paused = false
 		pooler.Spec.PgBouncer.Paused = &paused
