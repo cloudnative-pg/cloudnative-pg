@@ -21,19 +21,22 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/robfig/cron"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -88,7 +91,7 @@ var _ = Describe("scheduledbackup createBackup", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
-		backupName := fmt.Sprintf("%s-%s", sb.Name, pgTime.ToCompactISO8601(backupTime))
+		backupName := sb.BackupName(backupTime)
 		var backup apiv1.Backup
 		Expect(cli.Get(ctx, types.NamespacedName{Name: backupName, Namespace: ns}, &backup)).To(Succeed())
 
@@ -107,7 +110,7 @@ var _ = Describe("scheduledbackup createBackup", func() {
 		// only when the cache was stale at Get time but the Backup is already
 		// in the apiserver — a transient race. We requeue so the next reconcile
 		// observes the existing Backup and advances the status from there.
-		backupName := fmt.Sprintf("%s-%s", sb.Name, pgTime.ToCompactISO8601(backupTime))
+		backupName := sb.BackupName(backupTime)
 		existing := &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      backupName,
@@ -190,7 +193,7 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup", func() {
 			schedule, err := cron.Parse(sb.Spec.Schedule)
 			Expect(err).ToNot(HaveOccurred())
 			expectedBackupTime := schedule.Next(originalLastCheck)
-			expectedName := fmt.Sprintf("%s-%s", sb.Name, pgTime.ToCompactISO8601(expectedBackupTime))
+			expectedName := sb.BackupName(expectedBackupTime)
 
 			existing := &apiv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
@@ -224,4 +227,112 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup", func() {
 			Expect(stored.Status.LastScheduleTime).ToNot(BeNil())
 			Expect(stored.Status.LastScheduleTime.Time).To(BeTemporally("==", expectedBackupTime))
 		})
+})
+
+var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
+	It("adopts an existing immediate Backup instead of creating a duplicate", func(ctx context.Context) {
+		// Operator-restart corner case: a previous reconcile created the
+		// immediate Backup but did not land the status patch, so
+		// LastCheckTime is still nil. On retry, time.Now() differs from the
+		// previous attempt, so the deterministic name is different. Without
+		// observing what's already there, the controller would create a
+		// second immediate Backup. This test pins that the existing
+		// immediate Backup is adopted instead.
+		cli := newScheduledBackupTestClient()
+		ns := newFakeNamespace(cli)
+
+		sb := &apiv1.ScheduledBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "sb-test", Namespace: ns},
+			Spec: apiv1.ScheduledBackupSpec{
+				Schedule:  "0 0 0 * * *",
+				Cluster:   apiv1.LocalObjectReference{Name: "cluster-x"},
+				Immediate: ptr.To(true),
+			},
+		}
+		Expect(cli.Create(ctx, sb)).To(Succeed())
+
+		// Pre-create an immediate Backup as if a previous reconcile had
+		// created it. The compactISO8601 time intentionally differs from
+		// what time.Now() would produce now, to mimic the restart-after-Create
+		// scenario.
+		existing := &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      sb.BackupName(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)),
+				Namespace: ns,
+				Labels: map[string]string{
+					ParentScheduledBackupLabelName: sb.Name,
+					utils.ImmediateBackupLabelName: "true",
+					utils.ClusterLabelName:         sb.Spec.Cluster.Name,
+				},
+			},
+			Spec: apiv1.BackupSpec{Cluster: sb.Spec.Cluster},
+		}
+		Expect(cli.Create(ctx, existing)).To(Succeed())
+
+		recorder := record.NewFakeRecorder(10)
+		result, err := ReconcileScheduledBackup(ctx, recorder, cli, sb)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
+
+		// Only the pre-existing Backup remains; the controller did not create a duplicate.
+		var backups apiv1.BackupList
+		Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
+		Expect(backups.Items).To(HaveLen(1))
+		Expect(backups.Items[0].Name).To(Equal(existing.Name))
+
+		var stored apiv1.ScheduledBackup
+		Expect(cli.Get(ctx, types.NamespacedName{Name: sb.Name, Namespace: ns}, &stored)).To(Succeed())
+		Expect(stored.Status.LastCheckTime).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("scheduledbackup advanceScheduledBackupStatus", func() {
+	It("requeues without error when the status patch hits a Conflict", func(ctx context.Context) {
+		scheme := schemeBuilder.BuildWithAllKnownScheme()
+		cli := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(&apiv1.ScheduledBackup{}, &apiv1.Backup{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(
+					_ context.Context,
+					_ client.Client,
+					subResourceName string,
+					obj client.Object,
+					_ client.Patch,
+					_ ...client.SubResourcePatchOption,
+				) error {
+					if subResourceName == "status" {
+						if _, ok := obj.(*apiv1.ScheduledBackup); ok {
+							return apierrs.NewConflict(
+								schema.GroupResource{Group: apiv1.SchemeGroupVersion.Group, Resource: "scheduledbackups"},
+								obj.GetName(),
+								nil,
+							)
+						}
+					}
+					return nil
+				},
+			}).
+			Build()
+		ns := newFakeNamespace(cli)
+
+		sb := &apiv1.ScheduledBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "sb-test", Namespace: ns},
+			Spec: apiv1.ScheduledBackupSpec{
+				Schedule: "0 0 0 * * *",
+				Cluster:  apiv1.LocalObjectReference{Name: "cluster-x"},
+			},
+		}
+		Expect(cli.Create(ctx, sb)).To(Succeed())
+
+		schedule, err := cron.Parse(sb.Spec.Schedule)
+		Expect(err).ToNot(HaveOccurred())
+		recorder := record.NewFakeRecorder(10)
+		now := time.Now()
+		backupTime := schedule.Next(now)
+
+		result, err := advanceScheduledBackupStatus(ctx, recorder, cli, sb, backupTime, now, schedule)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(time.Second))
+	})
 })
