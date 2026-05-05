@@ -1991,8 +1991,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `active` | PoolerPhaseActive means the pooler is running normally.<br /> |
-| `inactive` | PoolerPhaseInactive means the pooler is paused or waiting for prerequisites.<br /> |
+| `active` | PoolerPhaseActive means the pooler is running normally and serving traffic.<br /> |
+| `inactive` | PoolerPhaseInactive means the pooler is not currently serving traffic. This<br />covers two cases: a prerequisite resource is missing (cluster, secret,<br />certificate) so reconciliation is on hold, or PgBouncer has been paused<br />via spec.pgbouncer.paused. Check status.phaseReason for the specific cause.<br /> |
 | `failed` | PoolerPhaseFailed means the pooler cannot be reconciled due to a<br />configuration error. Check status.phaseReason for details.<br /> |
 
 
