@@ -153,8 +153,11 @@ func (r *PoolerReconciler) getPoolersForImageCatalog(
 ) (apiv1.PoolerList, error) {
 	var poolers apiv1.PoolerList
 	err := r.List(ctx, &poolers, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(poolerImageCatalogKey, catalog.GetName()),
-		Namespace:     catalog.GetNamespace(),
+		FieldSelector: fields.OneTermEqualSelector(
+			poolerImageCatalogKey,
+			imageCatalogIndexValue(apiv1.ImageCatalogKind, catalog.GetName()),
+		),
+		Namespace: catalog.GetNamespace(),
 	})
 	return poolers, err
 }
@@ -191,7 +194,10 @@ func (r *PoolerReconciler) getPoolersForClusterImageCatalog(
 ) (apiv1.PoolerList, error) {
 	var poolers apiv1.PoolerList
 	err := r.List(ctx, &poolers, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(poolerImageCatalogKey, catalog.GetName()),
+		FieldSelector: fields.OneTermEqualSelector(
+			poolerImageCatalogKey,
+			imageCatalogIndexValue(apiv1.ClusterImageCatalogKind, catalog.GetName()),
+		),
 	})
 	return poolers, err
 }

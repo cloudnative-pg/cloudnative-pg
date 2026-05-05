@@ -163,7 +163,16 @@ func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 }
 
 // poolerImageCatalogKey is the field index key for Poolers referencing an image catalog.
-const poolerImageCatalogKey = ".spec.pgbouncer.imageCatalogRef.name"
+// Index values combine Kind and Name (see imageCatalogIndexValue) so a watch event on a
+// catalog only enqueues Poolers that reference both the matching kind and name; without
+// the Kind component, an event on ClusterImageCatalog/foo would over-reconcile any
+// Pooler referencing ImageCatalog/foo (and vice versa).
+const poolerImageCatalogKey = ".spec.pgbouncer.imageCatalogRef"
+
+// imageCatalogIndexValue builds the index value used by poolerImageCatalogKey.
+func imageCatalogIndexValue(kind, name string) string {
+	return kind + "/" + name
+}
 
 // createFieldIndexes creates the field indexes needed by the Pooler controller.
 func (r *PoolerReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
@@ -171,16 +180,25 @@ func (r *PoolerReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Mana
 		ctx,
 		&apiv1.Pooler{},
 		poolerImageCatalogKey,
-		func(rawObj client.Object) []string {
-			pooler := rawObj.(*apiv1.Pooler)
-			if pooler.Spec.PgBouncer == nil ||
-				pooler.Spec.PgBouncer.ImageCatalogRef == nil ||
-				pooler.Spec.PgBouncer.ImageCatalogRef.Name == "" {
-				return nil
-			}
-			return []string{pooler.Spec.PgBouncer.ImageCatalogRef.Name}
-		},
+		poolerImageCatalogIndexer,
 	)
+}
+
+// poolerImageCatalogIndexer extracts the index value(s) used by poolerImageCatalogKey
+// for a given Pooler. It returns nil for poolers that do not reference an image
+// catalog so they are not enqueued by catalog watches.
+func poolerImageCatalogIndexer(rawObj client.Object) []string {
+	pooler := rawObj.(*apiv1.Pooler)
+	if pooler.Spec.PgBouncer == nil ||
+		pooler.Spec.PgBouncer.ImageCatalogRef == nil ||
+		pooler.Spec.PgBouncer.ImageCatalogRef.Name == "" ||
+		pooler.Spec.PgBouncer.ImageCatalogRef.Kind == "" {
+		return nil
+	}
+	return []string{imageCatalogIndexValue(
+		pooler.Spec.PgBouncer.ImageCatalogRef.Kind,
+		pooler.Spec.PgBouncer.ImageCatalogRef.Name,
+	)}
 }
 
 // isOwnedByPoolerKind checks that an object is owned by a pooler and returns
