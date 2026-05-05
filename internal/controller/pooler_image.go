@@ -35,15 +35,23 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
-// resolvePoolerImage determines the pgbouncer image to use for a Pooler, applying
-// the following priority (lowest to highest):
-//  1. operator default (config.Current.PgbouncerImageName)
-//  2. spec.pgbouncer.imageCatalogRef
-//  3. spec.pgbouncer.image
+// resolvePoolerImage determines the pgbouncer image that the resulting
+// Deployment will run, applying the following priority (highest wins):
 //
-// Priority 4 (an explicit image in spec.template) is handled transparently by the
-// deployment builder, which only fills the container image when not already set.
+//  1. an explicit image set on the pgbouncer container in spec.template
+//  2. spec.pgbouncer.image
+//  3. spec.pgbouncer.imageCatalogRef
+//  4. operator default (config.Current.PgbouncerImageName)
+//
+// The pod-template override is honoured here so that status.image always
+// matches what is actually written into the Deployment by the builder
+// (which keeps any image already set on the pgbouncer container in
+// spec.template).
 func (r *PoolerReconciler) resolvePoolerImage(ctx context.Context, pooler *apiv1.Pooler) (string, error) {
+	if image := podTemplatePgbouncerImage(pooler); image != "" {
+		return image, nil
+	}
+
 	if pooler.Spec.PgBouncer == nil {
 		return configuration.Current.PgbouncerImageName, nil
 	}
@@ -57,6 +65,21 @@ func (r *PoolerReconciler) resolvePoolerImage(ctx context.Context, pooler *apiv1
 	}
 
 	return configuration.Current.PgbouncerImageName, nil
+}
+
+// podTemplatePgbouncerImage returns a non-empty image when the user has pinned
+// the pgbouncer container image in spec.template; the deployment builder
+// preserves that value, so it must win over every other resolution source.
+func podTemplatePgbouncerImage(pooler *apiv1.Pooler) string {
+	if pooler.Spec.Template == nil {
+		return ""
+	}
+	for _, c := range pooler.Spec.Template.Spec.Containers {
+		if c.Name == "pgbouncer" {
+			return c.Image
+		}
+	}
+	return ""
 }
 
 func (r *PoolerReconciler) resolveImageFromCatalog(ctx context.Context, pooler *apiv1.Pooler) (string, error) {
