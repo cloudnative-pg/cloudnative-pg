@@ -454,6 +454,14 @@ func (e *Exporter) updateInstanceMetrics() {
 		e.collectFromPrimaryLastAvailableBackupTimestamp()
 
 		e.collectFromPrimaryLastFailedBackupTimestamp()
+
+		if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+			if err := collectPGStatWAL(e); err != nil {
+				log.Error(err, "while collecting pg_stat_wal")
+				e.Metrics.Error.Set(1)
+				e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWALStat").Inc()
+			}
+		}
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
@@ -475,14 +483,6 @@ func (e *Exporter) updateInstanceMetrics() {
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGVersion").Inc()
 		e.Metrics.PgVersion.Reset()
-	}
-
-	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
-		if err := collectPGStatWAL(e); err != nil {
-			log.Error(err, "while collecting pg_stat_wal")
-			e.Metrics.Error.Set(1)
-			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWALStat").Inc()
-		}
 	}
 }
 
