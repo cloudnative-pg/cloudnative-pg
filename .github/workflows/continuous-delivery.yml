@@ -31,7 +31,7 @@ on:
         required: false
         default: 'debug'
       cnpg_deployment_method:
-        description: 'Deployment method for CNPG operator (manifest, helm) use helm only on Kind and K3D clusters'
+        description: 'Deployment method for CNPG operator: manifest(default), helm. Only relevant for Kind and K3D engines.'
         required: false
         default: 'manifest'
   schedule:
@@ -207,6 +207,7 @@ jobs:
           INPUT_TEST_LEVEL: ${{ github.event.inputs.test_level }}
           INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
           INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
+          INPUT_CNPG_DEPLOYMENT_METHOD: ${{ github.event.inputs.cnpg_deployment_method }}
         run: |
           # Set the defaults for workflow dispatch
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
@@ -215,7 +216,7 @@ jobs:
             TEST_LEVEL="${INPUT_TEST_LEVEL}"
             FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
             LOG_LEVEL="${INPUT_LOG_LEVEL}"
-            CNPG_DEPLOYMENT_METHOD="${{ github.event.inputs.cnpg_deployment_method }}"
+            CNPG_DEPLOYMENT_METHOD="${INPUT_CNPG_DEPLOYMENT_METHOD}"
           fi
           # Set the defaults for schedule dispatch
           if [[ "${EVENT_NAME}" == 'schedule' ]]; then
