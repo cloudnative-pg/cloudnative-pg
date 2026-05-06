@@ -128,6 +128,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return err
 	}
 
+	// Validate WAL segment timeline to prevent replicas from downloading
+	// old-timeline WAL segments from the archive after switchover/failover
+	if err := validateWALSegmentTimeline(ctx, walName, cluster, podName); err != nil {
+		return err
+	}
+
 	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, pgData, destinationPath)
 	if err != nil {
 		// With the current implementation, this happens when both of the following conditions are met:
@@ -479,6 +485,53 @@ func validateTimelineHistoryFile(ctx context.Context, walName string, cluster *a
 		"walName", walName,
 		"fileTimeline", fileTimeline,
 		"clusterTimeline", clusterTimeline)
+
+	return nil
+}
+
+// validateWALSegmentTimeline prevents replicas from downloading old-timeline
+// WAL segments from the archive after a switchover or failover.
+// Skipped during bootstrap/recovery (CurrentPrimary not yet set) to allow PITR.
+func validateWALSegmentTimeline(ctx context.Context, walName string, cluster *apiv1.Cluster, podName string) error {
+	contextLog := log.FromContext(ctx)
+
+	if !postgres.IsWALFile(walName) {
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimary == "" {
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimary == podName || cluster.Status.TargetPrimary == podName {
+		return nil
+	}
+
+	segment, err := postgres.SegmentFromName(walName)
+	if err != nil {
+		contextLog.Warning("Could not parse WAL segment name",
+			"walName", walName,
+			"error", err)
+		return nil
+	}
+
+	walTimeline := int(segment.Tli)
+	clusterTimeline := cluster.Status.TimelineID
+
+	if clusterTimeline == 0 {
+		return nil
+	}
+
+	if walTimeline < clusterTimeline {
+		contextLog.Warning("Refusing to restore old-timeline WAL segment for replica",
+			"walName", walName,
+			"walTimeline", walTimeline,
+			"clusterTimeline", clusterTimeline,
+			"podName", podName,
+			"currentPrimary", cluster.Status.CurrentPrimary)
+
+		return barmanRestorer.ErrWALNotFound
+	}
 
 	return nil
 }
