@@ -216,6 +216,49 @@ var _ = Describe("pooler_controller unit tests", func() {
 			Expect(name).To(Equal(""))
 		})
 	})
+
+	It("waitForPrerequisites marks the pooler Inactive when the cluster is missing", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		res := &poolerManagedResources{Cluster: nil}
+
+		ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
+		Expect(ctrlRes).ToNot(BeNil())
+
+		var fetched apiv1.Pooler
+		Expect(env.client.Get(ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			&fetched)).To(Succeed())
+		Expect(fetched.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+		Expect(fetched.Status.PhaseReason).To(ContainSubstring("Cluster"))
+		Expect(fetched.Status.PhaseReason).To(ContainSubstring("not found"))
+	})
+
+	It("setPoolerPhase skips the API update when phase and reason already match", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		pooler.Status.Phase = apiv1.PoolerPhaseInactive
+		pooler.Status.PhaseReason = "stable reason"
+		Expect(env.client.Status().Update(ctx, pooler)).To(Succeed())
+
+		var before apiv1.Pooler
+		Expect(env.client.Get(ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			&before)).To(Succeed())
+
+		Expect(env.poolerReconciler.setPoolerPhase(ctx, pooler,
+			apiv1.PoolerPhaseInactive, "stable reason")).To(Succeed())
+
+		var after apiv1.Pooler
+		Expect(env.client.Get(ctx,
+			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+			&after)).To(Succeed())
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+	})
 })
 
 var _ = Describe("isOwnedByPooler function tests", func() {

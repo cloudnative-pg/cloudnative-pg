@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -120,12 +121,20 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// Take the required actions to align the spec with the collected status
+	// Take the required actions to align the spec with the collected status.
+	// When the pgbouncer image cannot be resolved (Phase=Failed) updateDeployment
+	// is a no-op, but service accounts, RBAC, services and PodMonitor are still
+	// reconciled so drift in those resources is corrected even when the catalog
+	// reference is misconfigured.
 	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
 
 // SetupWithManager setup this controller inside the controller manager
-func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
+	if err := r.createFieldIndexes(ctx, mgr); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.Pooler{}).
@@ -140,7 +149,56 @@ func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentRecon
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPooler()),
 			builder.WithPredicates(secretsPoolerPredicate),
 		).
+		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogToPoolers()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&apiv1.ClusterImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogToPoolers()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+// poolerImageCatalogKey is the field index key for Poolers referencing an image catalog.
+// Index values combine Kind and Name (see imageCatalogIndexValue) so a watch event on a
+// catalog only enqueues Poolers that reference both the matching kind and name; without
+// the Kind component, an event on ClusterImageCatalog/foo would over-reconcile any
+// Pooler referencing ImageCatalog/foo (and vice versa).
+const poolerImageCatalogKey = ".spec.pgbouncer.imageCatalogRef"
+
+// imageCatalogIndexValue builds the index value used by poolerImageCatalogKey.
+func imageCatalogIndexValue(kind, name string) string {
+	return kind + "/" + name
+}
+
+// createFieldIndexes creates the field indexes needed by the Pooler controller.
+func (r *PoolerReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
+	return mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Pooler{},
+		poolerImageCatalogKey,
+		poolerImageCatalogIndexer,
+	)
+}
+
+// poolerImageCatalogIndexer extracts the index value(s) used by poolerImageCatalogKey
+// for a given Pooler. It returns nil for poolers that do not reference an image
+// catalog so they are not enqueued by catalog watches.
+func poolerImageCatalogIndexer(rawObj client.Object) []string {
+	pooler := rawObj.(*apiv1.Pooler)
+	if pooler.Spec.PgBouncer == nil ||
+		pooler.Spec.PgBouncer.ImageCatalogRef == nil ||
+		pooler.Spec.PgBouncer.ImageCatalogRef.Name == "" ||
+		pooler.Spec.PgBouncer.ImageCatalogRef.Kind == "" {
+		return nil
+	}
+	return []string{imageCatalogIndexValue(
+		pooler.Spec.PgBouncer.ImageCatalogRef.Kind,
+		pooler.Spec.PgBouncer.ImageCatalogRef.Name,
+	)}
 }
 
 // isOwnedByPoolerKind checks that an object is owned by a pooler and returns
@@ -209,60 +267,84 @@ func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
 }
 
 // waitForPrerequisites centralizes the early-return checks for missing dependent resources
-// to keep Reconcile lean. It logs a concise message and instructs the controller to
-// requeue after a short delay when something is missing.
+// to keep Reconcile lean. It logs a concise message, marks the Pooler as Inactive with a
+// human-readable reason, and instructs the controller to requeue after a short delay when
+// something is missing.
 // Returns a non-nil *ctrl.Result when it requested a requeue; otherwise nil.
 func (r *PoolerReconciler) waitForPrerequisites(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) *ctrl.Result {
-	contextLogger := log.FromContext(ctx)
-	waitResult := &ctrl.Result{RequeueAfter: 30 * time.Second}
-
 	if resources.Cluster == nil {
-		contextLogger.Info("Cluster not found, will retry in 30 seconds",
-			"cluster", pooler.Spec.Cluster.Name)
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("Cluster %q not found", pooler.Spec.Cluster.Name))
 	}
 
 	// For automated integration, we need AuthUserSecret
 	if pooler.IsAutomatedIntegration() && resources.AuthUserSecret == nil {
-		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds",
-			"secret", pooler.GetAuthQuerySecretName())
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("AuthUserSecret %q not found", pooler.GetAuthQuerySecretName()))
 	}
 
 	// For manual TLS authentication to PostgreSQL, we need ServerTLSSecret
 	if pooler.GetServerTLSSecretName() != "" && resources.ServerTLSSecret == nil {
-		contextLogger.Info("ServerTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerTLSSecretName())
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ServerTLSSecret %q not found", pooler.GetServerTLSSecretName()))
 	}
 
 	// Always required: TLS certificates for accepting client connections
 	if resources.ClientTLSSecret == nil {
-		contextLogger.Info(
-			"ClientTLSSecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientTLSSecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ClientTLSSecret %q not found",
+				pooler.GetClientTLSSecretNameOrDefault(resources.Cluster)))
 	}
 
 	if resources.ClientCASecret == nil {
-		contextLogger.Info(
-			"ClientCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetClientCASecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ClientCASecret %q not found",
+				pooler.GetClientCASecretNameOrDefault(resources.Cluster)))
 	}
 
 	if resources.ServerCASecret == nil {
-		contextLogger.Info(
-			"ServerCASecret not found, waiting 30 seconds",
-			"secret", pooler.GetServerCASecretNameOrDefault(resources.Cluster))
-		return waitResult
+		return r.markInactiveAndWait(ctx, pooler,
+			fmt.Sprintf("ServerCASecret %q not found",
+				pooler.GetServerCASecretNameOrDefault(resources.Cluster)))
 	}
 
 	return nil
+}
+
+// markInactiveAndWait records that the Pooler cannot progress until a missing
+// prerequisite becomes available and returns the standard 30s requeue.
+func (r *PoolerReconciler) markInactiveAndWait(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	reason string,
+) *ctrl.Result {
+	log.FromContext(ctx).Info(reason)
+	if err := r.setPoolerPhase(ctx, pooler, apiv1.PoolerPhaseInactive, reason); err != nil {
+		log.FromContext(ctx).Error(err, "while marking pooler as Inactive", "reason", reason)
+	}
+	return &ctrl.Result{RequeueAfter: 30 * time.Second}
+}
+
+// setPoolerPhase patches status.phase and status.phaseReason in place, skipping
+// the API call when the values already match. It is intended for early-return
+// paths where the full updatePoolerStatus pipeline cannot run (e.g. while
+// prerequisites are missing).
+func (r *PoolerReconciler) setPoolerPhase(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	phase apiv1.PoolerPhase,
+	reason string,
+) error {
+	if pooler.Status.Phase == phase && pooler.Status.PhaseReason == reason {
+		return nil
+	}
+	pooler.Status.Phase = phase
+	pooler.Status.PhaseReason = reason
+	return r.Status().Update(ctx, pooler)
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them

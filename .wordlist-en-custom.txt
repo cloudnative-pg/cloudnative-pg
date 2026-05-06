@@ -71,6 +71,7 @@ CVE
 CVEs
 CannotReconcile
 Canovai
+CatalogExtraImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -166,6 +167,7 @@ ExtensionEnvVar
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
+ExtraImages
 FDW
 FDWSpec
 FDWs
@@ -214,6 +216,7 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogExtraRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
@@ -368,6 +371,11 @@ PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
 PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -697,6 +705,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogextraimage
 catalogimage
 cb
 cd
@@ -882,6 +891,7 @@ externalClusterSecretVersion
 externalClusters
 externalcluster
 externalclusters
+extraImages
 facto
 failover
 failoverDelay
@@ -962,6 +972,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogextraref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -1250,6 +1261,7 @@ poolerName
 poolerintegrations
 poolermonitoringconfiguration
 poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
@@ -1492,6 +1504,7 @@ substatement
 successThreshold
 successfullyExtracted
 sudo
+summarises
 superuserSecret
 superuserSecretVersion
 sv

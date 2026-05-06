@@ -21,7 +21,8 @@ package controller
 
 import (
 	"context"
-	"reflect"
+
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -92,8 +93,29 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		updatedStatus.Instances = resources.Deployment.Status.Replicas
 	}
 
+	image, err := r.resolvePoolerImage(ctx, pooler)
+	switch {
+	case err != nil:
+		r.Recorder.Event(pooler, "Warning", "ImageCatalogError", err.Error())
+		updatedStatus.Phase = apiv1.PoolerPhaseFailed
+		updatedStatus.PhaseReason = err.Error()
+		updatedStatus.Image = ""
+	case isPgBouncerPaused(pooler):
+		// The deployment still runs while paused; the manager calls PgBouncer's
+		// PAUSE command so existing connections are kept open and new clients
+		// are queued. Paused is a deliberate operational state, distinct from
+		// Inactive (which means a prerequisite is missing).
+		updatedStatus.Phase = apiv1.PoolerPhasePaused
+		updatedStatus.PhaseReason = "pgbouncer is paused"
+		updatedStatus.Image = image
+	default:
+		updatedStatus.Phase = apiv1.PoolerPhaseActive
+		updatedStatus.PhaseReason = ""
+		updatedStatus.Image = image
+	}
+
 	// then update the status if anything changed
-	if !reflect.DeepEqual(pooler.Status, updatedStatus) {
+	if !equality.Semantic.DeepEqual(pooler.Status, *updatedStatus) {
 		pooler.Status = *updatedStatus
 		return r.Status().Update(ctx, pooler)
 	}
