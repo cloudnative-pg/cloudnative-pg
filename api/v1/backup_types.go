@@ -356,7 +356,3 @@ type BackupList struct {
 	// List of backups
 	Items []Backup `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Backup{}, &BackupList{})
-}
