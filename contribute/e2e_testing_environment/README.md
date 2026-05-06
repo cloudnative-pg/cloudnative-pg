@@ -60,7 +60,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 | -k    / --k8s-version <K8S_VERSION> | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    / --nodes \<NODES>            | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 | -o    / --operator \<OPERATOR>      | Select the operator to deploy: `local` (default), a version, or a branch. See below. (Env: `OPERATOR`) |
-| -d    / --deployment-method \<METHOD> | How to deploy the operator when building from the local worktree (`-o local`): `manifest` (default) or `helm`. (Env: `CNPG_DEPLOYMENT_METHOD`) |
+| -d    / --deployment-method \<METHOD> | How to deploy the operator: `manifest` (default) or `helm`. (Env: `CNPG_DEPLOYMENT_METHOD`) |
 
 The `-o`/`--operator` flag accepts:
 
@@ -73,11 +73,13 @@ The `-o`/`--operator` flag accepts:
 
 The `-d`/`--deployment-method` flag accepts:
 
-- `manifest` (default): deploy the locally-built operator using a
-  kustomize-generated manifest.
-- `helm`: deploy the locally-built operator using the official Helm chart
-  from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts)
-  repository. Only supported with `-o local` on kind and k3d clusters.
+- `manifest` (default): deploy using a kustomize-generated manifest.
+- `helm`: deploy using the official Helm chart from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts) repository.
+
+> **NOTE:** the `helm` deployment method currently only supports `-o local` deploys.
+> When deploying via helm with `-o local`, CRDs are always applied from the local
+> source tree (config/helm) so they always match the locally built operator binary.
+> The chart's built-in CRD management is disabled via `--set crds.create=false`.
 
 > **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
 > images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,
@@ -150,7 +152,7 @@ See [operator config](../../docs/src/operator_conf.md#profiling-tools)
 and [instance-pprof](../../docs/src/troubleshooting.md#visualizing-and-analyzing-profiling-data)
 for details.
 
-If issues arise, verify that teh Pyroscope annotations are on the pods
+If issues arise, verify that the Pyroscope annotations are on the pods
 and the `--pprof-server` flag is present in the pod command arguments.
 
 ## E2E tests suite
@@ -412,8 +414,7 @@ Options supported are:
   - debug (default)
   - trace
 
-- cnpg_deployment_method (`deployment-method` or `dm`
-  for short)
+- cnpg_deployment_method (`deployment-method` or `dm` for short)
   Deployment method for the CNPG operator. Default
   value is `manifest`. Available values are:
   - manifest: deploy using kustomize manifests
