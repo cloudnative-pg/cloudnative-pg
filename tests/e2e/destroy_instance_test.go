@@ -45,28 +45,27 @@ var _ = Describe("Test destroy instance", func() {
 		}
 	})
 
-	countPVCForInstance := func(targetInstanceName, namespace string) int {
-		result := 0
-
-		pvcs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
-		Expect(err).ToNot(HaveOccurred(), "getting list of PVCs")
-
-		for i := range pvcs.Items {
-			instanceName := pvcs.Items[i].Labels[utils.InstanceNameLabelName]
-			if instanceName == targetInstanceName {
-				result++
-			}
-		}
-
-		return result
-	}
-
 	Describe("Unrecoverable instance annotation", func() {
 		const namespacePrefix = "destroy-instance"
 		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		const clusterName = "postgresql-storage-class"
 		var namespace string
 		var unrecoverableInstanceName string
+		var originalPVCUIDs map[string]string
+
+		collectPVCUIDsForInstance := func(instanceName string) map[string]string {
+			GinkgoHelper()
+			pvcs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+			Expect(err).ToNot(HaveOccurred(), "failed to list PVCs")
+
+			result := map[string]string{}
+			for i := range pvcs.Items {
+				if pvcs.Items[i].Labels[utils.InstanceNameLabelName] == instanceName {
+					result[pvcs.Items[i].Name] = string(pvcs.Items[i].UID)
+				}
+			}
+			return result
+		}
 
 		It("should destroy instance successfully", func() {
 			// If we have specified secrets, we test that we're able to use them
@@ -87,6 +86,10 @@ var _ = Describe("Test destroy instance", func() {
 				Expect(podList.Items).Should(HaveLen(2))
 
 				unrecoverableInstanceName = podList.Items[0].Name
+
+				originalPVCUIDs = collectPVCUIDsForInstance(unrecoverableInstanceName)
+				Expect(originalPVCUIDs).ToNot(BeEmpty(), "expected at least one PVC for the instance")
+
 				var pod corev1.Pod
 				err = env.Client.Get(
 					env.Ctx,
@@ -102,20 +105,28 @@ var _ = Describe("Test destroy instance", func() {
 				originalPod := pod.DeepCopy()
 				pod.Annotations[utils.UnrecoverableInstanceAnnotationName] = "true"
 
-				Expect(countPVCForInstance(unrecoverableInstanceName, namespace)).To(
-					Equal(2),
-					"The number of PVCs is incorrect")
-
 				err = env.Client.Patch(env.Ctx, &pod, ctrlclient.MergeFrom(originalPod))
 				Expect(err).ToNot(
 					HaveOccurred(),
 					"failed to patch pod with unrecoverable instance annotation")
 			})
 
-			By("waiting for unrecoverable PVCs to be deleted", func() {
-				Eventually(func() int {
-					return countPVCForInstance(unrecoverableInstanceName, namespace)
-				}, 300).Should(Equal(0))
+			By("waiting for every PVC of the instance to be recreated", func() {
+				// The unrecoverable instance keeps its name (serials are reused),
+				// so each PVC must come back under the same name with a fresh UID.
+				// Checking the full set guards against leaks of secondary PVCs
+				// (wal, tablespaces) that share only the instance label.
+				Eventually(func(g Gomega) {
+					currentUIDs := collectPVCUIDsForInstance(unrecoverableInstanceName)
+					g.Expect(currentUIDs).To(HaveLen(len(originalPVCUIDs)))
+					for name, originalUID := range originalPVCUIDs {
+						currentUID, ok := currentUIDs[name]
+						g.Expect(ok).To(BeTrue(),
+							"expected PVC %q to exist after recreation", name)
+						g.Expect(currentUID).ToNot(Equal(originalUID),
+							"PVC %q kept its original UID instead of being recreated", name)
+					}
+				}, 300).Should(Succeed())
 			})
 
 			By("waiting for the cluster to healthy again", func() {

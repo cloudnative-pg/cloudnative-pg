@@ -1540,3 +1540,59 @@ var _ = Describe("ServiceAccount with custom name", func() {
 		Expect(rb.Subjects[0].Namespace).To(Equal(namespace))
 	})
 })
+
+var _ = Describe("generateNodeSerial", func() {
+	const clusterName = "cluster-example"
+
+	newCluster := func(instanceNames ...string) *apiv1.Cluster {
+		return &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName},
+			Status:     apiv1.ClusterStatus{InstanceNames: instanceNames},
+		}
+	}
+
+	r := &ClusterReconciler{}
+
+	It("returns 1 when there are no instances", func() {
+		serial, err := r.generateNodeSerial(newCluster())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(1))
+	})
+
+	It("returns the next serial when names are sequential", func() {
+		serial, err := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 2),
+		))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(3))
+	})
+
+	It("fills the lowest gap left by a removed instance", func() {
+		serial, err := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 1),
+			specs.GetInstanceName(clusterName, 3),
+		))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(2))
+	})
+
+	It("ignores names that don't follow the cluster prefix", func() {
+		serial, err := r.generateNodeSerial(newCluster(
+			specs.GetInstanceName(clusterName, 2),
+			"unrelated-pod",
+		))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(serial).To(Equal(1))
+	})
+
+	It("returns an error when every serial up to the cap is taken", func() {
+		taken := make([]string, 0, maxInstanceSerial-1)
+		for i := 1; i < maxInstanceSerial; i++ {
+			taken = append(taken, specs.GetInstanceName(clusterName, i))
+		}
+		serial, err := r.generateNodeSerial(newCluster(taken...))
+		Expect(err).To(HaveOccurred())
+		Expect(serial).To(Equal(0))
+	})
+})
