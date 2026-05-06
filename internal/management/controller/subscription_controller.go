@@ -200,6 +200,7 @@ func NewSubscriptionReconciler(
 		mgr.GetClient(),
 		utils.SubscriptionFinalizerName,
 		sr.evaluateDropSubscription,
+		func(sub *apiv1.Subscription) bool { return sub.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete },
 	)
 
 	return sr

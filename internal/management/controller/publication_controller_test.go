@@ -116,6 +116,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			fakeClient,
 			utils.PublicationFinalizerName,
 			r.evaluateDropPublication,
+			func(pub *apiv1.Publication) bool { return pub.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete },
 		)
 	})
 
@@ -207,7 +208,7 @@ var _ = Describe("Managed publication controller tests", func() {
 	})
 
 	When("reclaim policy is retain", func() {
-		It("on deletion it removes finalizers and does NOT drop the Publication", func(ctx SpecContext) {
+		It("on deletion it does NOT add a finalizer and does NOT drop the Publication", func(ctx SpecContext) {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
 			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
@@ -227,19 +228,12 @@ var _ = Describe("Managed publication controller tests", func() {
 			err := reconcilePublication(ctx, fakeClient, r, publication)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Plain successful reconciliation, finalizers have been created
-			Expect(publication.GetFinalizers()).NotTo(BeEmpty())
+			// No finalizer added — retain policy means the publication is not owned by the operator lifecycle
+			Expect(publication.GetFinalizers()).To(BeEmpty())
 			Expect(publication.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(publication.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			publication.SetGeneration(publication.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Deleting the k8s object succeeds immediately with no finalizer blocking it
 			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
 
 			err = reconcilePublication(ctx, fakeClient, r, publication)
