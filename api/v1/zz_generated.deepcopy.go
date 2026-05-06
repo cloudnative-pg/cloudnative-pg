@@ -777,6 +777,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.WalRestoreRetryTimeout != nil {
+		in, out := &in.WalRestoreRetryTimeout, &out.WalRestoreRetryTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.LivenessProbeTimeout != nil {
 		in, out := &in.LivenessProbeTimeout, &out.LivenessProbeTimeout
 		*out = new(int32)
