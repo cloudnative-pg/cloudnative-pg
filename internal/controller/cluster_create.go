@@ -1083,13 +1083,14 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 	return nil
 }
 
-// generateNodeSerial extracts the first free node serial in this pods
+// generateNodeSerial returns the first free node serial number for this cluster.
+// A serial is considered free when no instance currently listed in
+// cluster.Status.InstanceNames is using it.
 func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) (int, error) {
 	instanceNames := stringset.From(cluster.Status.InstanceNames)
 
 	for i := 1; i < maxInstanceSerial; i++ {
-		proposedInstanceName := fmt.Sprintf("%s-%v", cluster.Name, i)
-		if instanceNames.Has(proposedInstanceName) {
+		if instanceNames.Has(specs.GetInstanceName(cluster.Name, i)) {
 			continue
 		}
 
