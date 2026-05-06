@@ -1591,7 +1591,7 @@ func (cluster *Cluster) GetServiceAccountName() string {
 
 // IsInitialized is true when the cluster has been running once.
 func (cluster *Cluster) IsInitialized() bool {
-	c := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionBackup))
+	c := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionInitialized))
 	if c == nil {
 		return false
 	}

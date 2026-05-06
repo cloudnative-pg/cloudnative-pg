@@ -338,7 +338,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:   string(apiv1.ConditionInitialized),
 			Status: metav1.ConditionTrue,
-			Reason: "ClusterInitialized",
+			Reason: string(apiv1.ClusterInitialized),
 		})
 	}
 
