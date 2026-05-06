@@ -20,11 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -48,6 +51,12 @@ type DatabaseRole struct {
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
 	transactionID   int64            `json:"-"`
+}
+
+// MarkPasswordAsIgnored marks the password as to be ignored.
+// When this happens, no password will be set in the database.
+func (d *DatabaseRole) MarkPasswordAsIgnored() {
+	d.ignorePassword = true
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -122,4 +131,36 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+}
+
+// ApplyPassword updates a database role with the password located in the Secret,
+// and it returns the resource version of the Secret
+func (d *DatabaseRole) ApplyPassword(
+	ctx context.Context,
+	cl client.Client,
+	rolePassword passwordManager,
+	namespace string,
+) (string, error) {
+	switch {
+	case rolePassword.GetRoleSecretName() == "" && !rolePassword.ShouldDisablePassword():
+		d.ignorePassword = true
+		return "", nil
+	case rolePassword.GetRoleSecretName() == "" && rolePassword.ShouldDisablePassword():
+		d.password = sql.NullString{}
+		return "", nil
+	case rolePassword.GetRoleSecretName() != "" && rolePassword.ShouldDisablePassword():
+		// For DatabaseRole CRDs this is prevented by CEL validation.
+		// For inline managed roles this is a runtime error.
+		return "",
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				rolePassword.GetRoleSecretName())
+	default:
+		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		return passwordSecret.version, nil
+	}
 }

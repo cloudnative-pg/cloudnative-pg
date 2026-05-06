@@ -3305,7 +3305,7 @@ spec:
                           default: true
                           description: |-
                             Whether a role "inherits" the privileges of roles it is a member of.
-                            Defaults is `true`.
+                            Default is `true`.
                           type: boolean
                         login:
                           description: |-

@@ -1,0 +1,21 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-with-roles
+spec:
+  instances: 1 # this feature only requires a primary
+  imageName: "${POSTGRES_IMG}"
+  bootstrap:
+    initdb:
+      postInitApplicationSQL:
+      - ALTER ROLE app VALID UNTIL 'infinity'
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  managed:
+    roles:
+    - name: petrarca
+      ensure: present
+      comment: Francesco Petrarca

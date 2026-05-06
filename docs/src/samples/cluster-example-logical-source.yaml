@@ -1,4 +1,15 @@
 apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: cluster-example-app
+spec:
+  cluster:
+    name: cluster-example
+  name: app
+  login: true
+  replication: true
+---
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -28,12 +39,6 @@ spec:
   replicationSlots:
     highAvailability:
       synchronizeLogicalDecoding: true
-
-  managed:
-    roles:
-      - name: app
-        login: true
-        replication: true
 
   postgresql:
     parameters:
