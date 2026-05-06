@@ -289,3 +289,51 @@ var _ = Describe("recovery_min_apply_delay", func() {
 		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 })
+
+var _ = Describe("selectAdditionalExtensions", func() {
+	steadyStateCluster := func() *apiv1.Cluster {
+		return &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				PGDataImageInfo: &apiv1.ImageInfo{
+					Extensions: []apiv1.ExtensionConfiguration{{Name: "old-ext"}},
+				},
+			},
+		}
+	}
+	upgradingCluster := func() *apiv1.Cluster {
+		c := steadyStateCluster()
+		c.Status.TargetPGDataImageInfo = &apiv1.ImageInfo{
+			Extensions: []apiv1.ExtensionConfiguration{{Name: "new-ext"}},
+		}
+		return c
+	}
+
+	It("returns the source-version extensions and steady-state baseDir for non-upgrade ops", func() {
+		exts, baseDir, err := selectAdditionalExtensions(steadyStateCluster(), postgres.OperationType_TYPE_UNSPECIFIED)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exts).To(HaveLen(1))
+		Expect(exts[0].Name).To(Equal("old-ext"))
+		Expect(baseDir).To(Equal("/extensions"))
+	})
+
+	It("returns the target-version extensions and upgrade baseDir for TYPE_UPGRADE", func() {
+		exts, baseDir, err := selectAdditionalExtensions(upgradingCluster(), postgres.OperationType_TYPE_UPGRADE)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exts).To(HaveLen(1))
+		Expect(exts[0].Name).To(Equal("new-ext"))
+		Expect(baseDir).To(Equal("/new-extensions"))
+	})
+
+	It("errors when TargetPGDataImageInfo is missing during a TYPE_UPGRADE", func() {
+		_, _, err := selectAdditionalExtensions(steadyStateCluster(), postgres.OperationType_TYPE_UPGRADE)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("TargetPGDataImageInfo"))
+	})
+
+	It("returns nil and steady-state baseDir when PGDataImageInfo is missing", func() {
+		exts, baseDir, err := selectAdditionalExtensions(&apiv1.Cluster{}, postgres.OperationType_TYPE_UNSPECIFIED)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exts).To(BeNil())
+		Expect(baseDir).To(Equal("/extensions"))
+	})
+})

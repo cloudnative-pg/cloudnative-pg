@@ -146,6 +146,96 @@ If the upgrade is successful, CloudNativePG:
     may want to run `ANALYZE` on your databases to update them.
 :::
 
+#### Extensions during a major upgrade
+
+When a cluster declares image-volume extensions, the upgrade Job mounts both
+the source-version and the target-version extension images side by side so
+`pg_upgrade` can dump from the old server and restore into the new one without
+either set's libraries going missing:
+
+- Source-version extensions are mounted at `/extensions/<name>` (the
+  steady-state path) so the `dynamic_library_path` and
+  `extension_control_path` GUCs in the old PGDATA continue to resolve while
+  the old server runs.
+- Target-version extensions are mounted at `/new-extensions/<name>` so the
+  new server picks them up under the GUCs of the new pgdata once initialized.
+
+`LD_LIBRARY_PATH` and `PATH` are extended with both sets, so binaries and
+shared objects from either version are reachable. Custom environment
+variables declared via `extensions[].env` follow the same precedence rule
+as steady-state extensions: when multiple entries set the same variable
+name (including the same name appearing in both the source-version and
+target-version copies of an extension), **the last writer wins** and the
+earlier value is overridden. The target-version copy is applied after the
+source-version copy, so during a major upgrade the target's value is what
+the running pg_upgrade process sees.
+
+If the source-version semantic of a variable must survive the upgrade
+window (for example, `pg_upgrade` invokes a tool that depends on the old
+extension's `PYTHONPATH`), the recommended pattern is to use distinct
+variable names per major version - e.g. declare `PYTHONPATH_PG15` on the
+source-version `ExtensionConfiguration` and `PYTHONPATH_PG16` on the
+target-version one - rather than letting both copies set the same name
+and rely on ordering. Tools that read the standard names (`PYTHONPATH`,
+`PERL5LIB`) will see the target value during pg_upgrade; declare those
+only on the version whose value should actually be in effect at upgrade
+time.
+
+#### When pg_upgrade emits `update_extensions.sql`
+
+PostgreSQL 19 and later emit an `update_extensions.sql` script in PGDATA
+when the target cluster contains extensions whose `default_version` is
+newer than the version `pg_upgrade` left installed. Until that script is
+applied, the SQL-level extension metadata in `pg_catalog` lags the
+shared libraries actually loaded by the running server.
+
+When CloudNativePG detects this script after a successful upgrade it sets
+the cluster condition `MajorUpgradeExtensionUpdatesPending=True`, with
+the in-pod path of the script and the primary pod name in the
+condition's `Message` field. The condition stays on the Cluster object
+until the DBA addresses it, so it survives the upgrade Job's pod being
+garbage-collected. Inspect it with:
+
+```sh
+kubectl get cluster <name> -o jsonpath='{.status.conditions[?(@.type=="MajorUpgradeExtensionUpdatesPending")]}'
+```
+
+The script lives **inside the primary pod** (CloudNativePG mounts PGDATA
+on the pod, not on the host); access it via `kubectl exec`. Inspect it
+before running: `update_extensions.sql` typically contains
+`ALTER EXTENSION ... UPDATE` statements and may include `\connect`
+directives covering every database that hosts an affected extension. If
+the script is self-contained (PostgreSQL emits `\connect` directives),
+running it once is enough; otherwise apply it explicitly to each
+relevant database.
+
+A self-contained run looks like this (omit `-t` so the pod's stdout is
+not wrapped in a TTY):
+
+```sh
+PRIMARY=$(kubectl get cluster <name> -o jsonpath='{.status.currentPrimary}')
+SCRIPT=/var/lib/postgresql/data/pgdata/update_extensions.sql
+
+kubectl exec -i "$PRIMARY" -- psql -f "$SCRIPT"
+```
+
+If the script does **not** use `\connect`, iterate over the user
+databases yourself:
+
+```sh
+for db in $(kubectl exec -i "$PRIMARY" -- \
+  psql -tAc "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate"); do
+  kubectl exec -i "$PRIMARY" -- psql -d "$db" -f "$SCRIPT"
+done
+```
+
+Once the script has been applied where needed, you can delete the
+condition manually with `kubectl edit cluster <name>` (remove the entry
+under `.status.conditions`). The operator also clears
+`MajorUpgradeExtensionUpdatesPending` automatically at the start of the
+next major upgrade, so a stale message from a prior upgrade will not
+carry over.
+
 If the upgrade fails, revert the image in the cluster's configuration to the
 previous major version. The operator detects the rollback and automatically
 deletes the failed upgrade job, allowing the cluster to restart on the original
