@@ -1,0 +1,52 @@
+# Cluster used by the search_path operator hijack regression test (CWE-426).
+#
+# bootstrap.initdb.postInitApplicationSQL plants attacker-controlled `>` and `=`
+# operators in the application database's `public` schema and flips the
+# database-level search_path so that those operators are resolved before the
+# pg_catalog ones. After bootstrap completes, the e2e test triggers a
+# reconcile that runs reconcileExtensions; the patched operator must NOT
+# execute the planted operator bodies, so the application user must remain a
+# regular (non-superuser) role.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: p-search-path-hijack
+spec:
+  instances: 1
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      postInitApplicationSQL:
+        # Plant a function that, if it ever runs, would try to elevate the
+        # application user to SUPERUSER. The function is intentionally a
+        # PL/pgSQL function bound to a custom `>` operator; the patched
+        # operator's probes pin search_path to pg_catalog at startup, so
+        # this body must never execute on a CNPG-issued connection.
+        - |
+          CREATE OR REPLACE FUNCTION public.shadow_gt(a bigint, b integer) RETURNS boolean
+            LANGUAGE plpgsql AS $$
+            BEGIN
+              EXECUTE 'ALTER ROLE ' || quote_ident(current_user) || ' SUPERUSER';
+              RETURN a > b;
+            END;
+            $$;
+        - CREATE OPERATOR public.> (LEFTARG=bigint, RIGHTARG=integer, FUNCTION=public.shadow_gt);
+        - |
+          CREATE OR REPLACE FUNCTION public.shadow_eq(a name, b name) RETURNS boolean
+            LANGUAGE plpgsql AS $$ BEGIN RETURN a::text = b::text; END; $$;
+        - CREATE OPERATOR public.= (LEFTARG=name, RIGHTARG=name, FUNCTION=public.shadow_eq);
+        # Flip the database-level search_path so that, on connections where
+        # the operator does NOT pin search_path, the planted operators take
+        # precedence over pg_catalog.
+        - ALTER DATABASE app SET search_path = public, pg_catalog;
+
+  postgresql:
+    parameters:
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

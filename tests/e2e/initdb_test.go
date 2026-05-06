@@ -148,6 +148,77 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		})
 	})
 
+	// Regression test for CWE-426 search_path operator hijack
+	// (CNPG-PROBE-SEARCH-PATH-OPERATOR-HIJACK). A database-owner who plants
+	// shadow `>` and `=` operators in `public` and flips the database
+	// search_path must NOT be able to elevate to PostgreSQL superuser via
+	// the operator's introspection probes.
+	Context("search_path operator hijack negative", func() {
+		const (
+			clusterName    = "p-search-path-hijack"
+			clusterFixture = fixturesInitdbDir + "/cluster-postinit-search-path-hijack.yaml.template"
+		)
+
+		var namespace string
+
+		It("does not elevate the application role to superuser through probe queries", func() {
+			const namespacePrefix = "initdb-search-path-hijack"
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertCreateCluster(namespace, clusterName, clusterFixture, env)
+
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("verifying the application role is not a superuser after bootstrap", func() {
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"SELECT rolsuper FROM pg_catalog.pg_roles WHERE rolname = 'app'")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(strings.TrimSpace(stdout)).To(Equal("f"))
+			})
+
+			By("verifying the application role is still not a superuser after reconcile cycles", func() {
+				// The instance manager reconciles managed extensions on a
+				// schedule. Wait long enough for at least one reconcile to
+				// run after bootstrap, then re-check that the planted
+				// operators were not invoked.
+				Eventually(func() (string, error) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: namespace,
+							PodName:   primary.Name,
+						}, "app",
+						"SELECT current_setting('is_superuser')")
+					return strings.TrimSpace(stdout), err
+				}, "60s", "5s").Should(Equal("off"))
+			})
+
+			By("verifying the planted shadow_gt function was never invoked", func() {
+				// shadow_gt's body issues `ALTER ROLE ... SUPERUSER` on
+				// invocation. If it ever fired, the role would now be
+				// superuser. We already asserted it is not, but this is the
+				// belt-and-braces check that the body itself never executed.
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"SELECT pg_catalog.count(*)::text FROM pg_catalog.pg_roles WHERE rolname = 'app' AND rolsuper")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(strings.TrimSpace(stdout)).To(Equal("0"))
+			})
+		})
+	})
+
 	Context("custom default locale", func() {
 		const (
 			clusterName        = "p-locale"
