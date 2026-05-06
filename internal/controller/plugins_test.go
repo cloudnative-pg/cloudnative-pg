@@ -22,8 +22,10 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -86,5 +88,77 @@ var _ = Describe("setStatusPluginHook", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(BeNil())
 		Expect(cluster.Status.PluginStatus[0].Status).To(BeEquivalentTo(string(content)))
+	})
+})
+
+type fakeValidatingPluginClient struct {
+	pluginClient.Client
+	validationErrors field.ErrorList
+	pluginErr        error
+}
+
+func (f *fakeValidatingPluginClient) ValidateClusterCreate(
+	_ context.Context,
+	_ k8client.Object,
+) (field.ErrorList, error) {
+	return f.validationErrors, f.pluginErr
+}
+
+var _ = Describe("validateClusterCreate", func() {
+	var (
+		cluster   *apiv1.Cluster
+		cli       k8client.Client
+		pluginCli *fakeValidatingPluginClient
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "test-suite",
+			},
+		}
+		cli = fake.NewClientBuilder().
+			WithObjects(cluster).
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithStatusSubresource(&apiv1.Cluster{}).
+			Build()
+		pluginCli = &fakeValidatingPluginClient{}
+	})
+
+	It("should return nil when validation succeeds", func(ctx SpecContext) {
+		pluginCli.validationErrors = nil
+		pluginCli.pluginErr = nil
+		err := validateClusterCreate(ctx, cli, pluginCli, cluster)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return error and set phase when validation fails", func(ctx SpecContext) {
+		pluginCli.validationErrors = field.ErrorList{
+			field.Invalid(field.NewPath("spec"), "value", "test error"),
+		}
+		pluginCli.pluginErr = nil
+		err := validateClusterCreate(ctx, cli, pluginCli, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cluster validation failed"))
+
+		updatedCluster := &apiv1.Cluster{}
+		err = cli.Get(ctx, k8client.ObjectKeyFromObject(cluster), updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhasePluginValidationFailed))
+		Expect(updatedCluster.Status.PhaseReason).To(ContainSubstring("cluster validation failed"))
+	})
+
+	It("should return error and set phase when plugin client returns error", func(ctx SpecContext) {
+		pluginCli.pluginErr = fmt.Errorf("plugin error")
+		err := validateClusterCreate(ctx, cli, pluginCli, cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("plugin error"))
+
+		updatedCluster := &apiv1.Cluster{}
+		err = cli.Get(ctx, k8client.ObjectKeyFromObject(cluster), updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.Phase).To(Equal(apiv1.PhaseFailurePlugin))
+		Expect(updatedCluster.Status.PhaseReason).To(Equal("plugin error"))
 	})
 })
