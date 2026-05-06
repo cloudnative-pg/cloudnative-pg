@@ -86,6 +86,7 @@ function generate_operator_manifest() {
   # shellcheck disable=SC2154
   echo -e "${bright}Generating operator manifest at ${OPERATOR_MANIFEST_PATH}${reset}"
   CONTROLLER_IMG="${CONTROLLER_IMG:-$(print_image)}" \
+      CONTROLLER_IMG_DIGEST="${CONTROLLER_IMG_DIGEST:-}" \
       POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
       PGBOUNCER_IMAGE_NAME="${PGBOUNCER_IMG}" \
       make -C "${ROOT_DIR}" generate-manifest
