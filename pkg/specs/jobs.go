@@ -21,6 +21,7 @@ package specs
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
@@ -351,6 +352,9 @@ func CreatePrimaryJob(
 				utils.KubernetesAppVersionLabelName:   fmt.Sprint(version),
 				utils.KubernetesAppComponentLabelName: utils.DatabaseComponentName,
 				utils.KubernetesAppManagedByLabelName: utils.ManagerName,
+			},
+			Annotations: map[string]string{
+				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 			},
 		},
 		Spec: batchv1.JobSpec{
