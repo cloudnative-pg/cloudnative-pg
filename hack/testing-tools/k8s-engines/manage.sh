@@ -87,10 +87,14 @@ case "$ACTION" in
                 exit 1
             fi
             ACTION="deploy-from-helm"
-        elif [[ "${OPERATOR}" != "local" ]]; then
-            ACTION="deploy-from-manifest"
-        else
-            ACTION="deploy-from-sources"
+        fi
+
+        if [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
+            if [[ "${OPERATOR}" != "local" ]]; then
+                ACTION="deploy-from-manifest"
+            else
+                ACTION="deploy-from-sources"
+            fi
         fi
         ;;
 esac
