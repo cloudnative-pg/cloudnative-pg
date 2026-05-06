@@ -1562,7 +1562,7 @@ var _ = Describe("recovery target", func() {
 						RecoveryTarget: &apiv1.RecoveryTarget{
 							BackupID:        "",
 							TargetTLI:       "",
-							TargetXID:       "1/1",
+							TargetXID:       "1234",
 							TargetName:      "",
 							TargetLSN:       "",
 							TargetTime:      "",
@@ -1777,6 +1777,88 @@ var _ = Describe("recovery target", func() {
 				},
 			}
 			Expect(v.validateRecoveryTarget(cluster)).To(HaveLen(1))
+		})
+	})
+
+	When("TargetXID is specified", func() {
+		recoveryTargetWith := func(xid string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:  "backup-id",
+								TargetXID: xid,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts a non-negative integer", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1234"))).To(BeEmpty())
+		})
+
+		It("rejects a non-numeric value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("not-a-number"))).To(HaveLen(1))
+		})
+
+		It("rejects an LSN-shaped value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("1/1"))).To(HaveLen(1))
+		})
+
+		It("rejects a negative value", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("-1"))).To(HaveLen(1))
+		})
+
+		It("accepts the largest 32-bit XID", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967295"))).To(BeEmpty())
+		})
+
+		It("rejects a value above 2^32-1 to avoid silent epoch truncation", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("4294967296"))).To(HaveLen(1))
+		})
+	})
+
+	When("TargetName is specified", func() {
+		recoveryTargetWith := func(name string) *apiv1.Cluster {
+			return &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							RecoveryTarget: &apiv1.RecoveryTarget{
+								BackupID:   "backup-id",
+								TargetName: name,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("accepts an arbitrary printable string", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("my'restore point"))).To(BeEmpty())
+		})
+
+		It("rejects an embedded newline", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("line1\nline2"))).To(HaveLen(1))
+		})
+
+		It("rejects an embedded NUL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x00b"))).To(HaveLen(1))
+		})
+
+		It("rejects a DEL byte", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith("a\x7fb"))).To(HaveLen(1))
+		})
+
+		It("accepts a 63-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 63)))).To(BeEmpty())
+		})
+
+		It("rejects a 64-byte name", func() {
+			Expect(v.validateRecoveryTarget(recoveryTargetWith(strings.Repeat("a", 64)))).To(HaveLen(1))
 		})
 	})
 })
