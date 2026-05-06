@@ -22,6 +22,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"reflect"
@@ -86,11 +87,12 @@ var errOldPrimaryDetected = errors.New("old primary detected")
 type ClusterReconciler struct {
 	client.Client
 
-	DiscoveryClient discovery.DiscoveryInterface
-	Scheme          *runtime.Scheme
-	Recorder        record.EventRecorder
-	InstanceClient  remote.InstanceClient
-	Plugins         repository.Interface
+	DiscoveryClient    discovery.DiscoveryInterface
+	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
+	InstanceClient     remote.InstanceClient
+	Plugins            repository.Interface
+	OperatorClientCert *tls.Certificate
 
 	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
@@ -102,14 +104,16 @@ func NewClusterReconciler(
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
 	drainTaints []string,
+	operatorClientCert *tls.Certificate,
 ) *ClusterReconciler {
 	return &ClusterReconciler{
-		InstanceClient:  remote.NewClient().Instance(),
-		DiscoveryClient: discoveryClient,
-		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"), //nolint:staticcheck
-		Plugins:         plugins,
+		InstanceClient:     remote.NewClient().Instance(),
+		DiscoveryClient:    discoveryClient,
+		Client:             operatorclient.NewExtendedClient(mgr.GetClient()),
+		Scheme:             mgr.GetScheme(),
+		Recorder:           mgr.GetEventRecorderFor("cloudnative-pg"), //nolint:staticcheck
+		Plugins:            plugins,
+		OperatorClientCert: operatorClientCert,
 		rolloutManager: rolloutManager.New(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
@@ -300,6 +304,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
+	// Ensure the operator's client certificate fingerprint is up to date in the
+	// cluster status before making any authenticated call to the instance manager.
+	if result, err := r.reconcileOperatorCertificateFingerprint(ctx, cluster); err != nil || result.RequeueAfter > 0 {
+		return result, err
+	}
+
 	// Discover the image to be used and set it into the status
 	if result, err := r.reconcileImage(ctx, cluster); result != nil || err != nil {
 		if result != nil {
@@ -400,12 +410,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err = certs.NewTLSConfigForContext(
-		ctx,
-		r.Client,
-		cluster.GetServerCASecretObjectKey(),
-	)
+	// Store in the context the TLS configuration required communicating with the Pods.
+	// The operator client certificate is presented to authenticate with the instance manager.
+	ctx, err = certs.NewTLSConfigForContext(ctx, certs.TLSConfigOptions{
+		Client:     r.Client,
+		CASecret:   cluster.GetServerCASecretObjectKey(),
+		ClientCert: r.OperatorClientCert,
+	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}

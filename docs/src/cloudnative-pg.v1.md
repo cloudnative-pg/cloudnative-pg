@@ -674,6 +674,7 @@ _Appears in:_
 | `targetPrimaryTimestamp` _string_ | The timestamp when the last request for a new primary has occurred |  |  |  |
 | `poolerIntegrations` _[PoolerIntegrations](#poolerintegrations)_ | The integration needed by poolers referencing the cluster |  |  |  |
 | `cloudNativePGOperatorHash` _string_ | The hash of the binary of the operator |  |  |  |
+| `operatorCertificateFingerprint` _string_ | OperatorCertificateFingerprint is the SHA256 fingerprint of the operator's<br />in-memory client certificate public key. The instance manager uses this to<br />authenticate requests from the operator via mTLS. |  |  |  |
 | `availableArchitectures` _[AvailableArchitecture](#availablearchitecture) array_ | AvailableArchitectures reports the available architectures of a cluster |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for cluster object |  |  |  |
 | `instanceNames` _string array_ | List of instance names in the cluster |  |  |  |
