@@ -108,9 +108,7 @@ main() {
   if [ "${ENABLE_FLUENTD}" = "true" ]; then
     deploy_fluentd
   fi
-  if [ "${ENABLE_CSI_DRIVER:-true}" = "true" ]; then
-    deploy_csi_host_path
-  fi
+  deploy_csi_host_path
   deploy_prometheus_crds
 
   echo -e "${bright}K3D cluster ${CLUSTER_NAME} setup complete.${reset}"
