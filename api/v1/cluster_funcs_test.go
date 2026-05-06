@@ -1891,3 +1891,75 @@ var _ = Describe("GetExternalClustersEnabledPluginNames", func() {
 		Expect(GetExternalClustersEnabledPluginNames(clusters)).To(BeEmpty())
 	})
 })
+
+var _ = Describe("IsInitialized", func() {
+	It("returns false when the cluster has no conditions", func() {
+		cluster := &Cluster{}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns false when the Initialized condition is missing", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("returns true when the Initialized condition is True", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionTrue,
+						Reason: string(ClusterInitialized),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns false when the Initialized condition is False", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(ClusterInitialized),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+
+	It("ignores the LastBackupSucceeded condition (regression guard)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionBackup),
+						Status: metav1.ConditionTrue,
+						Reason: string(ConditionReasonLastBackupSucceeded),
+					},
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(ClusterInitialized),
+					},
+				},
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeFalse())
+	})
+})
