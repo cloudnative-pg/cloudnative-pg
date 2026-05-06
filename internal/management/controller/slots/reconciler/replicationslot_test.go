@@ -210,3 +210,207 @@ var _ = Describe("dropReplicationSlots", func() {
 		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
 	})
 })
+
+var _ = Describe("ReconcileReplicationSlots logical slot cleanup integration", func() {
+	const selectLogicalSlots = "SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'"
+
+	var (
+		db   *sql.DB
+		mock sqlmock.Sqlmock
+	)
+
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	//nolint:unparam // primary is parameterized for clarity and future test cases
+	makeClusterWithLogicalDecoding := func(
+		instanceNames []string, primary, imageName string, syncEnabled bool,
+	) apiv1.Cluster {
+		return apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: imageName,
+				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+						Enabled:                    ptr.To(true),
+						SlotPrefix:                 slotPrefix,
+						SynchronizeLogicalDecoding: syncEnabled,
+					},
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				InstanceNames:  instanceNames,
+				CurrentPrimary: primary,
+				TargetPrimary:  primary,
+			},
+		}
+	}
+
+	It("cleans up orphaned failover logical slots on replica with PG17+",
+		func(ctx SpecContext) {
+			cluster := makeClusterWithLogicalDecoding(
+				[]string{"instance1", "instance2"},
+				"instance1",
+				"ghcr.io/cloudnative-pg/postgresql:17.0",
+				true,
+			)
+
+			// Expect logical slot cleanup query
+			// Only the orphan_slot (synced=false, failover=true) should be dropped
+			// external_sub_slot (synced=false, failover=false) should NOT be dropped
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+				AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true).       // orphaned failover slot - DROP
+				AddRow("external_sub_slot", "pgoutput", false, "0/9ABC", false, false) // external subscription - KEEP
+
+			mock.ExpectQuery(selectLogicalSlots).WillReturnRows(rows)
+
+			// Expect slot deletion - only orphan_slot should be dropped
+			mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
+				WithArgs("orphan_slot").
+				WillReturnResult(sqlmock.NewResult(1, 1))
+
+			// This is a replica (instance2 is not the primary)
+			_, err := ReconcileReplicationSlots(ctx, "instance2", db, &cluster)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+	It("does NOT cleanup logical slots on primary", func(ctx SpecContext) {
+		cluster := makeClusterWithLogicalDecoding(
+			[]string{"instance1", "instance2"},
+			"instance1",
+			"ghcr.io/cloudnative-pg/postgresql:17.0",
+			true,
+		)
+
+		// Expect HA slot reconciliation query (primary behavior)
+		rows := sqlmock.NewRows(repSlotColumns)
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").WillReturnRows(rows)
+
+		// Expect slot creation for replica
+		mock.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
+			WithArgs(slotPrefix+"instance2", false).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		// This is the primary - no logical slot cleanup should occur
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("does NOT cleanup logical slots when synchronizeLogicalDecoding is disabled", func(ctx SpecContext) {
+		cluster := makeClusterWithLogicalDecoding(
+			[]string{"instance1", "instance2"},
+			"instance1",
+			"ghcr.io/cloudnative-pg/postgresql:17.0",
+			false, // disabled
+		)
+
+		// No logical slot cleanup query should be executed
+		// This is a replica but syncLogicalDecoding is disabled
+		_, err := ReconcileReplicationSlots(ctx, "instance2", db, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("does NOT cleanup logical slots on PG16 (synced column doesn't exist)", func(ctx SpecContext) {
+		cluster := makeClusterWithLogicalDecoding(
+			[]string{"instance1", "instance2"},
+			"instance1",
+			"ghcr.io/cloudnative-pg/postgresql:16.0",
+			true,
+		)
+
+		// No logical slot cleanup query should be executed for PG16
+		_, err := ReconcileReplicationSlots(ctx, "instance2", db, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
+var _ = Describe("cleanupOrphanedLogicalSlots", func() {
+	var (
+		mock sqlmock.Sqlmock
+		db   *sql.DB
+	)
+
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("should drop only orphaned failover slots (synced=false, failover=true, active=false)",
+		func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+				AddRow("synced_slot", "pgoutput", false, "0/1234", true, true).   // synced=true, skip
+				AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true).  // orphaned failover slot, DROP
+				AddRow("active_orphan", "pgoutput", true, "0/9ABC", false, true). // active, skip
+				AddRow("external_sub", "pgoutput", false, "0/DEF0", false, false) // failover=false (external subscription), skip
+
+			mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+				WillReturnRows(rows)
+
+			// Only orphan_slot should be dropped (synced=false, failover=true, active=false)
+			mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
+				WithArgs("orphan_slot").
+				WillReturnResult(sqlmock.NewResult(1, 1))
+
+			err := cleanupOrphanedLogicalSlots(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+	It("should NOT drop external subscription slots (failover=false)", func(ctx SpecContext) {
+		// This test ensures we don't accidentally break external logical replication
+		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+			AddRow("test_sub", "pgoutput", false, "0/5678", false, false) // external subscription slot
+
+		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+			WillReturnRows(rows)
+
+		// No deletion should occur - test_sub has failover=false
+		err := cleanupOrphanedLogicalSlots(ctx, db)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should do nothing when no orphaned failover slots exist", func(ctx SpecContext) {
+		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+			AddRow("synced_slot", "pgoutput", false, "0/1234", true, true)
+
+		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+			WillReturnRows(rows)
+
+		err := cleanupOrphanedLogicalSlots(ctx, db)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should return error when listing slots fails", func(ctx SpecContext) {
+		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+			WillReturnError(errors.New("mock error"))
+
+		err := cleanupOrphanedLogicalSlots(ctx, db)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should return error when deleting a slot fails", func(ctx SpecContext) {
+		rows := sqlmock.NewRows([]string{"slot_name", "plugin", "active", "restart_lsn", "synced", "failover"}).
+			AddRow("orphan_slot", "pgoutput", false, "0/5678", false, true)
+
+		mock.ExpectQuery("SELECT .+ FROM pg_catalog.pg_replication_slots WHERE slot_type = 'logical'").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").
+			WithArgs("orphan_slot").
+			WillReturnError(errors.New("delete error"))
+
+		err := cleanupOrphanedLogicalSlots(ctx, db)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("delete error"))
+	})
+})

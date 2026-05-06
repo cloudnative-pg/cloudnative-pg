@@ -1013,6 +1013,45 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 })
 
+var _ = Describe("GetSynchronizeLogicalDecoding", func() {
+	It("returns false when configuration is nil", func() {
+		var config *ReplicationSlotsHAConfiguration
+		Expect(config.GetSynchronizeLogicalDecoding()).To(BeFalse())
+	})
+
+	It("returns false when HA slots are disabled", func() {
+		config := &ReplicationSlotsHAConfiguration{
+			Enabled:                    ptr.To(false),
+			SynchronizeLogicalDecoding: true,
+		}
+		Expect(config.GetSynchronizeLogicalDecoding()).To(BeFalse())
+	})
+
+	It("returns false when SynchronizeLogicalDecoding is false", func() {
+		config := &ReplicationSlotsHAConfiguration{
+			Enabled:                    ptr.To(true),
+			SynchronizeLogicalDecoding: false,
+		}
+		Expect(config.GetSynchronizeLogicalDecoding()).To(BeFalse())
+	})
+
+	It("returns true when HA enabled and SynchronizeLogicalDecoding is true", func() {
+		config := &ReplicationSlotsHAConfiguration{
+			Enabled:                    ptr.To(true),
+			SynchronizeLogicalDecoding: true,
+		}
+		Expect(config.GetSynchronizeLogicalDecoding()).To(BeTrue())
+	})
+
+	It("returns true when Enabled is nil (defaults to true) and SynchronizeLogicalDecoding is true", func() {
+		config := &ReplicationSlotsHAConfiguration{
+			Enabled:                    nil,
+			SynchronizeLogicalDecoding: true,
+		}
+		Expect(config.GetSynchronizeLogicalDecoding()).To(BeTrue())
+	})
+})
+
 var _ = Describe("Managed Roles", func() {
 	It("Verify default values", func() {
 		cluster := Cluster{
