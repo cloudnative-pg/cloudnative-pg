@@ -2733,7 +2733,3 @@ type ConfigMapResourceVersion struct {
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
-}

@@ -48,7 +48,3 @@ type ClusterImageCatalogList struct {
 	// List of ClusterImageCatalogs
 	Items []ClusterImageCatalog `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ClusterImageCatalog{}, &ClusterImageCatalogList{})
-}
