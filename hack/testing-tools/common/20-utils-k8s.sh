@@ -152,13 +152,27 @@ function print_operator_image() {
     fi
 }
 
-# reset_operator_namespace: deletes the cnpg-system namespace if present and
-# waits for finalization, so the next apply doesn't race a terminating namespace.
+# reset_operator_namespace: deletes the cnpg-system namespace and any
+# cluster-scoped resources left by a previous operator installation, then waits
+# for finalization so the next apply doesn't race a terminating namespace.
+# Cluster-scoped resources (webhooks, ClusterRoles, ClusterRoleBindings) must be
+# removed explicitly because they survive namespace deletion and would block Helm
+# from adopting them (missing ownership labels).
 function reset_operator_namespace() {
+    if command -v helm &>/dev/null && helm status cnpg -n cnpg-system &>/dev/null; then
+        helm uninstall cnpg -n cnpg-system --wait
+    fi
+
     if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
         ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
         ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
     fi
+
+    # Clean up cluster-scoped resources that survive namespace deletion.
+    ${K8S_CLI} get mutatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
+    ${K8S_CLI} get validatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
+    ${K8S_CLI} get clusterroles -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
+    ${K8S_CLI} get clusterrolebindings -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
 }
 
 # wait_operator_ready: waits for the operator deployment rollout to finish and
