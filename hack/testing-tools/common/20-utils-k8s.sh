@@ -169,10 +169,10 @@ function reset_operator_namespace() {
     fi
 
     # Clean up cluster-scoped resources that survive namespace deletion.
-    ${K8S_CLI} get mutatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
-    ${K8S_CLI} get validatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
-    ${K8S_CLI} get clusterroles -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
-    ${K8S_CLI} get clusterrolebindings -o name | { grep '/cnpg-' || true; } | xargs -r ${K8S_CLI} delete
+    ${K8S_CLI} get mutatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get validatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterroles -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterrolebindings -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
 }
 
 # wait_operator_ready: waits for the operator deployment rollout to finish and
