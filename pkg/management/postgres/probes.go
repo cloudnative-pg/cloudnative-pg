@@ -594,7 +594,7 @@ type PgStatWal struct {
 	WalSync        int64
 	WalWriteTime   float64
 	WalSyncTime    float64
-	StatsReset     string
+	StatsReset     sql.NullString
 }
 
 // TryGetPgStatWAL retrieves pg_stat_wal on pg version 14 and further
