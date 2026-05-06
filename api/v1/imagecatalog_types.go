@@ -66,7 +66,3 @@ type ImageCatalogList struct {
 	// List of ImageCatalogs
 	Items []ImageCatalog `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ImageCatalog{}, &ImageCatalogList{})
-}

@@ -273,7 +273,3 @@ type PoolerList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Pooler `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Pooler{}, &PoolerList{})
-}

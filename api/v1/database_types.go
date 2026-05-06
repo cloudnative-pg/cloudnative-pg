@@ -216,7 +216,3 @@ type DatabaseList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Database `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Database{}, &DatabaseList{})
-}
