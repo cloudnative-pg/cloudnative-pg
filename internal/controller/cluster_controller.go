@@ -505,8 +505,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	if res := r.evaluatePodReadinessGuards(ctx, cluster, instancesStatus); res != nil {
-		return *res, nil
+	if res := r.evaluatePodReadinessGuards(ctx, cluster, instancesStatus); !res.IsZero() {
+		return res, nil
 	}
 
 	// If the user has requested to hibernate the cluster, we do that before
@@ -589,21 +589,26 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 //     operator-to-pod connectivity issue rather than a genuine PostgreSQL
 //     health problem. The operator trusts the kubelet's readiness probe as
 //     the source of truth and defers its own failover decision until
-//     Kubernetes agrees the primary is not Ready.
+//     Kubernetes agrees the primary is not Ready. A PrimaryStatusCheckFailed
+//     Warning event is emitted so the deferral is visible via
+//     `kubectl describe cluster` and the events API; the Kubernetes event
+//     recorder dedupes by reason + message, so a sustained outage rolls up
+//     into one logical event with a growing count.
 //
 //     Without this branch the failover-election path would promote the
 //     healthiest replica: PostgresqlStatusList.Less pushes items with an
 //     Error to the tail, so the erroring primary ends up behind a healthy
 //     replica at Items[0] and gets supplanted on a mere network hiccup.
 //
-// Returns nil when the caller can proceed with the rest of the reconciliation.
+// Returns a zero Result when the caller can proceed with the rest of the
+// reconciliation.
 func (r *ClusterReconciler) evaluatePodReadinessGuards(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
-) *ctrl.Result {
+) ctrl.Result {
 	if instancesStatus.Len() == 0 {
-		return nil
+		return ctrl.Result{}
 	}
 
 	contextLogger := log.FromContext(ctx)
@@ -621,19 +626,32 @@ func (r *ClusterReconciler) evaluatePodReadinessGuards(
 			"instanceName", firstInstance.Pod.Name,
 			"hasHTTPStatus", hasHTTPStatus,
 			"isPodReady", isPodReady)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
-		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary &&
-		instancesStatus.IsPodReadyAndNotReporting(cluster.Status.CurrentPrimary) {
-		contextLogger.Warning(
-			"Primary pod is ready but status endpoint is failing, requeueing",
-			"primaryPodName", cluster.Status.CurrentPrimary)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}
+		cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary {
+		if unreachable, statusErr := instancesStatus.IsPodReadyAndNotReporting(
+			cluster.Status.CurrentPrimary,
+		); unreachable {
+			contextLogger.Warning(
+				"Primary pod is Ready but /pg/status is failing, short-circuiting reconcile",
+				"instanceName", cluster.Status.CurrentPrimary,
+				"err", statusErr)
+			r.Recorder.Eventf(
+				cluster,
+				"Warning",
+				"PrimaryStatusCheckFailed",
+				"Primary pod %s is Ready but the operator's /pg/status check failed; "+
+					"failover deferred until Kubernetes marks the primary as not Ready. "+
+					"See operator logs for the underlying error.",
+				cluster.Status.CurrentPrimary,
+			)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}
+		}
 	}
 
-	return nil
+	return ctrl.Result{}
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
