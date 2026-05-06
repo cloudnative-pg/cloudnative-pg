@@ -459,8 +459,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(BeEquivalentTo(3))
 			})
 
-			// Retrieve the names of the current pods. All of them should
-			// not exist anymore after the drain
+			// Retrieve the names of the current pods. After the drain
+			// they must come back with the exact same names: instance
+			// serials are reused, so pod identity (name) is stable.
 			var podsBeforeDrain []string
 			By("retrieving the current pods' names", func() {
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -495,6 +496,19 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Expect pods to be recreated and to be ready
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
+			By("verifying cluster pods kept their names", func() {
+				timeout := 600
+				Eventually(func(g Gomega) {
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+					currentNames := make([]string, 0, len(podList.Items))
+					for _, pod := range podList.Items {
+						currentNames = append(currentNames, pod.GetName())
+					}
+					g.Expect(currentNames).To(ConsistOf(podsBeforeDrain))
+				}, timeout).Should(Succeed())
+			})
 
 			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)

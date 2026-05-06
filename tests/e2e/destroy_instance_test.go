@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,7 +51,21 @@ var _ = Describe("Test destroy instance", func() {
 		const clusterName = "postgresql-storage-class"
 		var namespace string
 		var unrecoverableInstanceName string
-		var pgDataPVCUID string
+		var originalPVCUIDs map[string]string
+
+		collectPVCUIDsForInstance := func(instanceName string) map[string]string {
+			GinkgoHelper()
+			pvcs, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+			Expect(err).ToNot(HaveOccurred(), "failed to list PVCs")
+
+			result := map[string]string{}
+			for i := range pvcs.Items {
+				if pvcs.Items[i].Labels[utils.InstanceNameLabelName] == instanceName {
+					result[pvcs.Items[i].Name] = string(pvcs.Items[i].UID)
+				}
+			}
+			return result
+		}
 
 		It("should destroy instance successfully", func() {
 			// If we have specified secrets, we test that we're able to use them
@@ -72,15 +87,8 @@ var _ = Describe("Test destroy instance", func() {
 
 				unrecoverableInstanceName = podList.Items[0].Name
 
-				var pvc corev1.PersistentVolumeClaim
-				err = env.Client.Get(
-					env.Ctx,
-					types.NamespacedName{Namespace: namespace, Name: unrecoverableInstanceName},
-					&pvc)
-				Expect(err).ToNot(
-					HaveOccurred(),
-					"failed to get pvc")
-				pgDataPVCUID = string(pvc.UID)
+				originalPVCUIDs = collectPVCUIDsForInstance(unrecoverableInstanceName)
+				Expect(originalPVCUIDs).ToNot(BeEmpty(), "expected at least one PVC for the instance")
 
 				var pod corev1.Pod
 				err = env.Client.Get(
@@ -103,18 +111,22 @@ var _ = Describe("Test destroy instance", func() {
 					"failed to patch pod with unrecoverable instance annotation")
 			})
 
-			By("waiting for the PVC to be recreated", func() {
-				Eventually(func() string {
-					var pvc corev1.PersistentVolumeClaim
-					err := env.Client.Get(
-						env.Ctx,
-						types.NamespacedName{Namespace: namespace, Name: unrecoverableInstanceName},
-						&pvc)
-					Expect(err).ToNot(
-						HaveOccurred(),
-						"failed to get pvc")
-					return string(pvc.UID)
-				}, 300).Should(Not(Equal(pgDataPVCUID)))
+			By("waiting for every PVC of the instance to be recreated", func() {
+				// The unrecoverable instance keeps its name (serials are reused),
+				// so each PVC must come back under the same name with a fresh UID.
+				// Checking the full set guards against leaks of secondary PVCs
+				// (wal, tablespaces) that share only the instance label.
+				Eventually(func(g Gomega) {
+					currentUIDs := collectPVCUIDsForInstance(unrecoverableInstanceName)
+					g.Expect(currentUIDs).To(HaveLen(len(originalPVCUIDs)))
+					for name, originalUID := range originalPVCUIDs {
+						currentUID, ok := currentUIDs[name]
+						g.Expect(ok).To(BeTrue(),
+							"expected PVC %q to exist after recreation", name)
+						g.Expect(currentUID).ToNot(Equal(originalUID),
+							"PVC %q kept its original UID instead of being recreated", name)
+					}
+				}, 300).Should(Succeed())
 			})
 
 			By("waiting for the cluster to healthy again", func() {
