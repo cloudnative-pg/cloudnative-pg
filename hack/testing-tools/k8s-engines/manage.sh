@@ -81,17 +81,27 @@ fi
 # --- Action Aliases for Backward Compatibility ---
 case "$ACTION" in
     deploy)
-        if [[ "${OPERATOR}" != "local" ]]; then
-            ACTION="deploy-from-manifest"
-        else
-            ACTION="deploy-from-sources"
+        if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
+            if [[ "${OPERATOR}" != "local" ]]; then
+                echo "ERROR: Helm deployment is only supported with OPERATOR=local" >&2
+                exit 1
+            fi
+            ACTION="deploy-from-helm"
+        fi
+
+        if [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
+            if [[ "${OPERATOR}" != "local" ]]; then
+                ACTION="deploy-from-manifest"
+            else
+                ACTION="deploy-from-sources"
+            fi
         fi
         ;;
 esac
 
 # Ensure registry exists for actions that need it
 case "$ACTION" in
-    create|deploy-from-sources|load-helper-images|pyroscope)
+    create|deploy-from-sources|deploy-from-helm|load-helper-images|pyroscope)
         ensure_registry
         ;;
 esac
@@ -125,6 +135,17 @@ case "$ACTION" in
         source "${COMMON_DIR}/20-utils-k8s.sh"
         reset_operator_namespace
         deploy_operator_from_source
+        ;;
+
+    deploy-from-helm)
+        source "${COMMON_DIR}/20-utils-k8s.sh"
+        CONTROLLER_IMG=${CONTROLLER_IMG:-$(print_image)}
+        if [ -z "$CONTROLLER_IMG" ]; then
+            echo "ERROR: Failed to determine CONTROLLER_IMG" >&2
+            exit 1
+        fi
+        reset_operator_namespace
+        deploy_operator_with_helm
         ;;
 
     deploy-from-manifest)

@@ -30,6 +30,10 @@ on:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'
         required: false
         default: 'debug'
+      cnpg_deployment_method:
+        description: 'Deployment method for CNPG operator: manifest(default), helm. Only relevant for Kind and K3D engines.'
+        required: false
+        default: 'manifest'
   schedule:
     - cron:  '0 1 * * *'
 
@@ -109,6 +113,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Check for Command
         id: command
@@ -132,6 +137,7 @@ jobs:
           TEST_LEVEL="4"
           FEATURE_TYPE=""
           LOG_LEVEL="debug"
+          CNPG_DEPLOYMENT_METHOD="manifest"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -151,6 +157,9 @@ jobs:
               "log_level"|"ll")
               LOG_LEVEL="${value}"
               ;;
+              "cnpg_deployment_method"|"deployment-method"|"dm")
+              CNPG_DEPLOYMENT_METHOD="${value}"
+              ;;
               *)
               ;;
             esac
@@ -161,6 +170,7 @@ jobs:
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+          echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
@@ -187,6 +197,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
     steps:
       - name: Parse input to env
         env:
@@ -196,6 +207,7 @@ jobs:
           INPUT_TEST_LEVEL: ${{ github.event.inputs.test_level }}
           INPUT_FEATURE_TYPE: ${{ github.event.inputs.feature_type }}
           INPUT_LOG_LEVEL: ${{ github.event.inputs.log_level }}
+          INPUT_CNPG_DEPLOYMENT_METHOD: ${{ github.event.inputs.cnpg_deployment_method }}
         run: |
           # Set the defaults for workflow dispatch
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]]; then
@@ -204,6 +216,7 @@ jobs:
             TEST_LEVEL="${INPUT_TEST_LEVEL}"
             FEATURE_TYPE="${INPUT_FEATURE_TYPE}"
             LOG_LEVEL="${INPUT_LOG_LEVEL}"
+            CNPG_DEPLOYMENT_METHOD="${INPUT_CNPG_DEPLOYMENT_METHOD}"
           fi
           # Set the defaults for schedule dispatch
           if [[ "${EVENT_NAME}" == 'schedule' ]]; then
@@ -212,12 +225,14 @@ jobs:
             TEST_LEVEL="4"
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
+            CNPG_DEPLOYMENT_METHOD="manifest"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "LIMIT=${LIMIT}" >> $GITHUB_ENV
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+          echo "CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
@@ -238,6 +253,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       log_level: ${{ env.LOG_LEVEL }}
+      cnpg_deployment_method: ${{ env.CNPG_DEPLOYMENT_METHOD }}
       runs_on: ${{ steps.set-runner.outputs.runs_on }}
     steps:
       - name: From command
@@ -249,12 +265,14 @@ jobs:
           WD_TEST_LEVEL: ${{ needs.test_arguments.outputs.test_level }}
           WD_FEATURE_TYPE: ${{ needs.test_arguments.outputs.feature_type }}
           WD_LOG_LEVEL: ${{ needs.test_arguments.outputs.log_level }}
+          WD_CNPG_DEPLOYMENT_METHOD: ${{ needs.test_arguments.outputs.cnpg_deployment_method }}
           IC_GITHUB_REF: ${{ needs.check_commenter.outputs.github_ref }}
           IC_DEPTH: ${{ needs.check_commenter.outputs.depth }}
           IC_LIMIT: ${{ needs.check_commenter.outputs.limit }}
           IC_TEST_LEVEL: ${{ needs.check_commenter.outputs.test_level }}
           IC_FEATURE_TYPE: ${{ needs.check_commenter.outputs.feature_type }}
           IC_LOG_LEVEL: ${{ needs.check_commenter.outputs.log_level }}
+          IC_CNPG_DEPLOYMENT_METHOD: ${{ needs.check_commenter.outputs.cnpg_deployment_method }}
         run: |
           if [[ "${EVENT_NAME}" == 'workflow_dispatch' ]] || [[ "${EVENT_NAME}" == 'schedule' ]]; then
             echo "GITHUB_REF=${WD_GITHUB_REF}" >> $GITHUB_ENV
@@ -263,6 +281,7 @@ jobs:
             echo "TEST_LEVEL=${WD_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${WD_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${WD_LOG_LEVEL}" >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${WD_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
           fi
           if [[ "${EVENT_NAME}" == 'issue_comment' ]]; then
             echo "GITHUB_REF=${IC_GITHUB_REF}" >> $GITHUB_ENV
@@ -271,6 +290,7 @@ jobs:
             echo "TEST_LEVEL=${IC_TEST_LEVEL}" >> $GITHUB_ENV
             echo "FEATURE_TYPE=${IC_FEATURE_TYPE}" >> $GITHUB_ENV
             echo "LOG_LEVEL=${IC_LOG_LEVEL}" >> $GITHUB_ENV
+            echo "CNPG_DEPLOYMENT_METHOD=${IC_CNPG_DEPLOYMENT_METHOD}" >> $GITHUB_ENV
           fi
 
       - name: Set runner based on organization
@@ -680,6 +700,7 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "kind"
+      CNPG_DEPLOYMENT_METHOD: ${{ needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       -
         name: Cleanup Disk
@@ -875,6 +896,7 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/k3d-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "k3d"
+      CNPG_DEPLOYMENT_METHOD: ${{ needs.evaluate_options.outputs.cnpg_deployment_method }}
     steps:
       - name: Cleanup Disk
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1

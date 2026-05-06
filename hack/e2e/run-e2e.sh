@@ -95,7 +95,7 @@ fi
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
-if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
+if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" != "helm" ]]; then
   # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
   # This manifest uses the default image and tag for the current operator build, and assumes
   # the image has been either:
@@ -149,10 +149,14 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   bright=${bright:-}
   reset=${reset:-}
   source "${ROOT_DIR}/hack/testing-tools/common/20-utils-k8s.sh"
-  if [[ "${OPERATOR:-local}" == "local" ]]; then
+  if [[ "${OPERATOR}" == "local" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
     "${ROOT_DIR}/hack/setup-cluster.sh" generate-manifest
   fi
-  deploy_operator_from_source
+  if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
+    deploy_operator_with_helm
+  else
+    deploy_operator_from_source
+  fi
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

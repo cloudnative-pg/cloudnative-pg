@@ -152,19 +152,38 @@ function print_operator_image() {
     fi
 }
 
-# reset_operator_namespace: deletes the cnpg-system namespace if present and
-# waits for finalization, so the next apply doesn't race a terminating namespace.
+# reset_operator_namespace: deletes the cnpg-system namespace and any
+# cluster-scoped resources left by a previous operator installation, then waits
+# for finalization so the next apply doesn't race a terminating namespace.
+# Cluster-scoped resources (webhooks, ClusterRoles, ClusterRoleBindings) must be
+# removed explicitly because they survive namespace deletion and would block Helm
+# from adopting them (missing ownership labels).
 function reset_operator_namespace() {
+    if command -v helm &>/dev/null && helm status cnpg -n cnpg-system &>/dev/null; then
+        helm uninstall cnpg -n cnpg-system --wait
+    fi
+
     if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
         ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
         ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
     fi
+
+    # Clean up cluster-scoped resources that survive namespace deletion.
+    ${K8S_CLI} get mutatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get validatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterroles -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterrolebindings -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
 }
 
-# wait_operator_ready: waits for the controller-manager rollout to finish and
-# prints a completion banner plus the deployed image reference.
+# wait_operator_ready: waits for the operator deployment rollout to finish and
+# prints a completion banner. Accepts an optional deployment name.
+# When installed via manifest or the cnpg plugin the deployment is called
+# cnpg-controller-manager; when installed via Helm it is called
+# cnpg-cloudnative-pg. See:
+# https://cloudnative-pg.io/docs/1.29/installation_upgrade#using-the-helm-chart
 function wait_operator_ready() {
-    ${K8S_CLI} -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=5m
+    local deploy_name="${1:-cnpg-controller-manager}"
+    ${K8S_CLI} -n cnpg-system rollout status deploy/"${deploy_name}" --timeout=5m
     printf '%bOperator deployment complete.%b\n' "${bright}" "${reset}"
     print_operator_image
 }
@@ -332,7 +351,6 @@ function deploy_fluentd() {
   done
 }
 
-
 # deploy_operator_from_source: applies the pre-generated operator manifest.
 # Requires generate_operator_manifest (via setup-cluster.sh) to have been
 # called first.
@@ -341,4 +359,55 @@ function deploy_operator_from_source() {
     echo -e "${bright}Deploying CNPG operator from ${OPERATOR_MANIFEST_PATH}${reset}"
     ${K8S_CLI} apply --server-side --force-conflicts -f "${OPERATOR_MANIFEST_PATH}"
     wait_operator_ready
+}
+
+# deploy_operator_with_helm: installs the operator from the published CNPG Helm
+# chart, overriding the chart's default image with the locally-built one so the
+# same binary under test is used. Only supported with OPERATOR=local.
+#
+# CRDs are applied from the local source tree (config/helm) so they always
+# match the locally-built operator binary under test. The chart's built-in CRD
+# management is disabled via --set crds.create=false.
+function deploy_operator_with_helm() {
+    if ! command -v helm &>/dev/null; then
+        echo "ERROR: 'helm' not found in PATH. Install Helm before running with CNPG_DEPLOYMENT_METHOD=helm." >&2
+        exit 1
+    fi
+
+    echo -e "${bright}Deploying CNPG operator via Helm chart...${reset}"
+
+    # Apply CRDs from the local source tree to ensure they match the operator binary under test.
+    ${K8S_CLI} apply --server-side -k "${ROOT_DIR}/config/helm"
+
+    helm repo add cnpg https://cloudnative-pg.github.io/charts
+    helm repo update cnpg
+
+    local -a helm_args=(
+        --namespace cnpg-system
+        --create-namespace
+        --set crds.create=false
+        --set config.create=false
+        --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config"
+    )
+
+    # Override the chart's default image with the locally-built one.
+    # Currently OPERATOR=local is the only supported value for Helm deployments,
+    # but this guard is kept explicit to ease future extension.
+    # shellcheck disable=SC2153
+    if [[ "${OPERATOR}" == "local" ]]; then
+        helm_args+=(
+            --set "image.repository=${CONTROLLER_IMG%:*}"
+            --set "image.tag=${CONTROLLER_IMG##*:}"
+            --set "additionalEnv[0].name=POSTGRES_IMAGE_NAME"
+            --set "additionalEnv[0].value=${POSTGRES_IMG}"
+            --set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME"
+            --set "additionalEnv[1].value=${PGBOUNCER_IMG}"
+        )
+    fi
+
+    helm upgrade --install cnpg cnpg/cloudnative-pg "${helm_args[@]}"
+    # When installed via Helm the deployment is called cnpg-cloudnative-pg, not
+    # cnpg-controller-manager. See:
+    # https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
+    wait_operator_ready "cnpg-cloudnative-pg"
 }
