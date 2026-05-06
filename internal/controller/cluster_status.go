@@ -336,9 +336,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	if cluster.Status.Instances > 0 {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:   string(apiv1.ConditionInitialized),
-			Status: metav1.ConditionTrue,
-			Reason: string(apiv1.ClusterInitialized),
+			Type:    string(apiv1.ConditionInitialized),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ClusterInitialized),
+			Message: "Cluster has been bootstrapped",
 		})
 	}
 
