@@ -1406,6 +1406,39 @@ func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.
 		}
 	}
 
+	// PostgreSQL casts recovery_target_xid to TransactionId (uint32); a value
+	// above 2^32-1 would be silently truncated. Use bitSize 32 so we reject
+	// rather than admit a different XID than the user wrote.
+	if recoveryTarget.TargetXID != "" {
+		if _, err := strconv.ParseUint(recoveryTarget.TargetXID, 10, 32); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetXID"),
+				recoveryTarget.TargetXID,
+				"recovery target xid must be a non-negative 32-bit integer"))
+		}
+	}
+
+	// PostgreSQL enforces MAXFNAMELEN (64) on recovery_target_name and on
+	// pg_create_restore_point; mirror it at admission for a better error.
+	if len(recoveryTarget.TargetName) >= 64 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must be shorter than 64 bytes"))
+	}
+
+	// pg_create_restore_point accepts arbitrary text, but a name with
+	// newlines or NUL is never legitimate and is a strong signal of a
+	// malformed or hostile spec.
+	if strings.ContainsFunc(recoveryTarget.TargetName, func(r rune) bool {
+		return r < 0x20 || r == 0x7F
+	}) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must not contain ASCII control characters"))
+	}
+
 	// When using a backup catalog, we can identify the backup to be restored
 	// only if the PITR is time-based. If the PITR is not time-based, the user
 	// need to specify a backup ID.
