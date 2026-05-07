@@ -121,7 +121,3 @@ type DatabaseRoleList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []DatabaseRole `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&DatabaseRole{}, &DatabaseRoleList{})
-}
