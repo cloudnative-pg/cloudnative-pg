@@ -136,6 +136,13 @@ spec:
                   Whether a role "inherits" the privileges of roles it is a member of.
                   Default is `true`.
                 type: boolean
+              issueClientCertificate:
+                description: |-
+                  IssueClientCertificate enables the operator to generate and renew a TLS client
+                  certificate for this role, signed by the cluster's client CA. The certificate
+                  is stored in a Secret named `<databaserole-name>-client-cert`.
+                  Requires login to be true.
+                type: boolean
               login:
                 description: |-
                   Whether the role is allowed to log in. A role having the `login`
@@ -204,6 +211,9 @@ spec:
               rule: self.name.size() != 0
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
+            - message: issueClientCertificate requires the role to have login enabled
+              rule: '!has(self.issueClientCertificate) || !self.issueClientCertificate
+                || self.login'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -213,6 +223,21 @@ spec:
               applied:
                 description: Applied is true if the role was reconciled correctly
                 type: boolean
+              clientCertificate:
+                description: |-
+                  ClientCertificate holds the observed state of the generated TLS client
+                  certificate, when issueClientCertificate is true.
+                properties:
+                  expiration:
+                    description: Expiration is the expiration time of the generated
+                      client certificate, in RFC3339 format.
+                    type: string
+                  message:
+                    description: |-
+                      Message contains a human-readable explanation of the current certificate status,
+                      such as why issuance was skipped.
+                    type: string
+                type: object
               conditions:
                 description: Conditions for the DatabaseRole object
                 items:

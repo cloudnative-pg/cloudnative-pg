@@ -47,6 +47,12 @@ const (
 	ConditionPasswordSecretChange DatabaseRoleConditionType = "PasswordSecretChange"
 )
 
+const (
+	// clientCertSecretSuffix is the suffix appended to a DatabaseRole name to form
+	// the name of the Secret holding its generated TLS client certificate.
+	clientCertSecretSuffix = "-client-cert"
+)
+
 // DatabaseRoleSpec represents a role in Postgres
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="name is immutable"
 // +kubebuilder:validation:XValidation:rule="!has(self.ensure) || self.ensure != 'absent'",message="ensure: absent is not supported for DatabaseRole; delete the resource with databaseRoleReclaimPolicy: delete instead"
@@ -56,6 +62,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
 // +kubebuilder:validation:XValidation:rule="self.name.size() != 0",message="role name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.issueClientCertificate) || !self.issueClientCertificate || self.login",message="issueClientCertificate requires the role to have login enabled"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.
@@ -70,6 +77,25 @@ type DatabaseRoleSpec struct {
 	// +kubebuilder:default:=retain
 	// +optional
 	ReclaimPolicy DatabaseRoleReclaimPolicy `json:"databaseRoleReclaimPolicy,omitempty"`
+
+	// IssueClientCertificate enables the operator to generate and renew a TLS client
+	// certificate for this role, signed by the cluster's client CA. The certificate
+	// is stored in a Secret named `<databaserole-name>-client-cert`.
+	// Requires login to be true.
+	// +optional
+	IssueClientCertificate bool `json:"issueClientCertificate,omitempty"`
+}
+
+// ClientCertificateState holds the observed state of the generated TLS client certificate.
+type ClientCertificateState struct {
+	// Expiration is the expiration time of the generated client certificate, in RFC3339 format.
+	// +optional
+	Expiration string `json:"expiration,omitempty"`
+
+	// Message contains a human-readable explanation of the current certificate status,
+	// such as why issuance was skipped.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // DatabaseRoleStatus defines the observed state of a DatabaseRole
@@ -91,6 +117,11 @@ type DatabaseRoleStatus struct {
 	// last applied to the role; a change to it triggers reconciliation.
 	// +optional
 	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
+
+	// ClientCertificate holds the observed state of the generated TLS client
+	// certificate, when issueClientCertificate is true.
+	// +optional
+	ClientCertificate *ClientCertificateState `json:"clientCertificate,omitempty"`
 
 	// Conditions for the DatabaseRole object
 	// +optional

@@ -73,3 +73,9 @@ func (r *DatabaseRole) GetStatusMessage() string {
 func (r *DatabaseRole) SetStatusObservedGeneration(obsGeneration int64) {
 	r.Status.ObservedGeneration = obsGeneration
 }
+
+// GetClientCertSecretName returns the name of the Secret that holds the
+// generated TLS client certificate for this role.
+func (r *DatabaseRole) GetClientCertSecretName() string {
+	return r.Name + clientCertSecretSuffix
+}

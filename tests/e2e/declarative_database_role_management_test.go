@@ -31,6 +31,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -38,11 +39,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -657,6 +660,173 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 		})
+	})
+
+	Context("with issueClientCertificate enabled", Ordered, func() {
+		const (
+			certClusterManifest = fixturesDir + "/declarative_roles/cluster-with-cert-auth.yaml.template"
+			namespacePrefix     = "declarative-roles-cert"
+		)
+		var (
+			clusterName, namespace string
+			err                    error
+		)
+
+		BeforeAll(func() {
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, certClusterManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("setting up cluster with cert auth HBA", func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, certClusterManifest)
+			})
+		})
+
+		It("issues a cert Secret, allows connection, cleans up on opt-out and deletion",
+			Label(tests.LabelDeclarativeDatabaseRoles), func() {
+				const roleCRName = "role-app"
+
+				var role *apiv1.DatabaseRole
+				By("creating a DatabaseRole for the 'app' user with issueClientCertificate: true", func() {
+					role = &apiv1.DatabaseRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      roleCRName,
+							Namespace: namespace,
+						},
+						Spec: apiv1.DatabaseRoleSpec{
+							RoleConfiguration: apiv1.RoleConfiguration{
+								Name:  "app",
+								Login: true,
+							},
+							ClusterRef:             corev1.LocalObjectReference{Name: clusterName},
+							ReclaimPolicy:          apiv1.DatabaseRoleReclaimRetain,
+							IssueClientCertificate: true,
+						},
+					}
+					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
+				})
+
+				certSecretName := role.GetClientCertSecretName()
+
+				By("waiting for the cert Secret and status.clientCertificate.expiration to be set", func() {
+					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
+					Eventually(func(g Gomega) {
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.ClientCertificate).NotTo(BeNil())
+						g.Expect(role.Status.ClientCertificate.Expiration).NotTo(BeEmpty())
+						g.Expect(role.Status.ClientCertificate.Message).To(BeEmpty())
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+
+					var certSecret corev1.Secret
+					Expect(env.Client.Get(env.Ctx, types.NamespacedName{
+						Namespace: namespace, Name: certSecretName,
+					}, &certSecret)).To(Succeed())
+					Expect(certSecret.Data).To(HaveKey("tls.crt"))
+					Expect(certSecret.Data).To(HaveKey("tls.key"))
+				})
+
+				By("connecting to PostgreSQL using the generated client certificate", func() {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					var secretMode int32 = 0o600
+					seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+					pod := corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "cert-verify-app",
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "secret-volume-root-ca",
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  cluster.GetClientCASecretName(),
+											DefaultMode: &secretMode,
+										},
+									},
+								},
+								{
+									Name: "secret-volume-tls",
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  certSecretName,
+											DefaultMode: &secretMode,
+										},
+									},
+								},
+							},
+							Containers: []corev1.Container{
+								{
+									Name:  "cert-verify-app",
+									Image: "ghcr.io/cloudnative-pg/webtest:1.7.0",
+									VolumeMounts: []corev1.VolumeMount{
+										{Name: "secret-volume-root-ca", MountPath: "/etc/secrets/ca"},
+										{Name: "secret-volume-tls", MountPath: "/etc/secrets/tls"},
+									},
+									SecurityContext: &corev1.SecurityContext{
+										AllowPrivilegeEscalation: ptr.To(false),
+										SeccompProfile:           seccompProfile,
+									},
+								},
+							},
+							SecurityContext: &corev1.PodSecurityContext{
+								SeccompProfile: seccompProfile,
+							},
+						},
+					}
+					Expect(podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)).To(Succeed())
+					secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
+				})
+
+				By("deleting the cert Secret when issueClientCertificate is set to false", func() {
+					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.IssueClientCertificate = false
+					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						var secret corev1.Secret
+						err := env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace, Name: certSecretName,
+						}, &secret)
+						g.Expect(err).To(MatchError(ContainSubstring("not found")))
+
+						g.Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+						g.Expect(role.Status.ClientCertificate).To(BeNil())
+					}, 60).WithPolling(5 * time.Second).Should(Succeed())
+				})
+
+				By("garbage-collecting the cert Secret when the DatabaseRole is deleted", func() {
+					// Re-enable cert issuance so a secret exists before deletion.
+					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
+					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
+					oldRole := role.DeepCopy()
+					role.Spec.IssueClientCertificate = true
+					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						var secret corev1.Secret
+						g.Expect(env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace, Name: certSecretName,
+						}, &secret)).To(Succeed())
+					}, 60).WithPolling(5 * time.Second).Should(Succeed())
+
+					Expect(objects.Delete(env.Ctx, env.Client, role)).To(Succeed())
+
+					Eventually(func(g Gomega) {
+						var secret corev1.Secret
+						err := env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace, Name: certSecretName,
+						}, &secret)
+						g.Expect(err).To(MatchError(ContainSubstring("not found")))
+					}, 60).WithPolling(5 * time.Second).Should(Succeed())
+				})
+			})
 	})
 
 	Context("in a Namespace to be deleted manually", func() {

@@ -64,6 +64,7 @@ CONTAINERNAME
 CR's
 CRD
 CRDs
+CRLs
 CSI
 CSV
 CSVs
@@ -83,6 +84,8 @@ Certmanager
 CiliumNetworkPolicy
 ClassName
 ClientCASecret
+ClientCertificate
+ClientCertificateState
 ClientTLSSecret
 CloudNativePG
 CloudNativePG's
@@ -239,6 +242,7 @@ InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
 Isovalent
+IssueClientCertificate
 Istio
 Istio's
 JSON
@@ -333,6 +337,7 @@ OptionSpec
 OwnNamespace
 PDB
 PDBs
+PEM
 PGAudit
 PGDATA
 PGDG
@@ -748,6 +753,7 @@ clientCASecret
 clientCaSecretVersion
 clientTLS
 clientTLSSecret
+clientcertificatestate
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
 cloudnative
@@ -1044,6 +1050,7 @@ isWALArchiver
 isolationCheck
 isolationcheckconfiguration
 isready
+issueClientCertificate
 issuecomment
 italy
 jdbc

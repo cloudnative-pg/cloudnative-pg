@@ -22,6 +22,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
 // DatabaseRoleReconciler reconciles a DatabaseRole object
@@ -50,6 +53,8 @@ type DatabaseRoleReconciler struct {
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile implements the main reconciliation loop for Role objects
 func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -57,41 +62,80 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	var role apiv1.DatabaseRole
 	if err := r.Get(ctx, req.NamespacedName, &role); err != nil {
-		// Resource has been deleted, nothing to reconcile.
 		if apierrs.IsNotFound(err) {
 			contextLogger.Info("Resource has been deleted")
 			return ctrl.Result{}, nil
 		}
-
-		// This is a real error, maybe the RBAC configuration is wrong?
 		return ctrl.Result{}, fmt.Errorf("cannot get the role resource: %w", err)
 	}
 
+	if err := r.reconcilePasswordCondition(ctx, &role); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	var cluster apiv1.Cluster
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      role.Spec.ClusterRef.Name,
+	}, &cluster); apierrs.IsNotFound(err) {
+		contextLogger.Info("cluster not found, will retry when it appears",
+			"cluster", role.Spec.ClusterRef.Name)
+		return ctrl.Result{}, nil
+	} else if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
+	}
+
+	origRole := role.DeepCopy()
+
+	if err := r.reconcileClientCertificate(ctx, &role, &cluster); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !reflect.DeepEqual(origRole.Status, role.Status) {
+		if err := r.Status().Update(ctx, &role); err != nil {
+			return ctrl.Result{}, fmt.Errorf("while updating role status: %w", err)
+		}
+	}
+
+	if role.Spec.IssueClientCertificate {
+		return ctrl.Result{RequeueAfter: time.Hour}, nil
+	}
+	return ctrl.Result{}, nil
+}
+
+// reconcilePasswordCondition manages the ConditionPasswordSecretChange status condition.
+// If the role has no password secret, the condition is removed. If the secret is found,
+// the condition is set with the secret's ResourceVersion so downstream reconcilers can
+// detect changes.
+func (r *DatabaseRoleReconciler) reconcilePasswordCondition(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+) error {
 	if role.Spec.PasswordSecret == nil {
 		// If passwordSecret was removed, clear any stale PasswordSecretChange
 		// condition left over from a previously configured secret.
 		if meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange)) != nil {
 			oldRole := role.DeepCopy()
 			meta.RemoveStatusCondition(&role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
-			if err := r.Status().Patch(ctx, &role, client.MergeFrom(oldRole)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("while clearing stale password condition: %w", err)
+			if err := r.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
+				return fmt.Errorf("while clearing stale password condition: %w", err)
 			}
 		}
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	var secret corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{
-		Namespace: req.Namespace,
+		Namespace: role.Namespace,
 		Name:      role.Spec.PasswordSecret.Name,
 	}, &secret); err != nil {
 		// There's no need to fill the operator log with errors
 		// if the secret still doesn't exist.
 		if apierrs.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return nil
 		}
 
-		return ctrl.Result{}, fmt.Errorf(
+		return fmt.Errorf(
 			"while getting secret %q referred by role %q: %w",
 			role.Spec.PasswordSecret.Name,
 			role.Name,
@@ -119,12 +163,12 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Message: secret.ResourceVersion,
 	})
 	if changed {
-		if err := r.Status().Patch(ctx, &role, client.MergeFrom(oldRole)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("while setting role status: %w", err)
+		if err := r.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
+			return fmt.Errorf("while setting role status: %w", err)
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager setup this controller inside the controller manager
@@ -144,6 +188,17 @@ func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		},
 	}
 
+	// Only consider secrets that carry a CA certificate, to avoid triggering
+	// a full role list on every unrelated secret change.
+	caSecretPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return false
+		}
+		_, hasCA := secret.Data[certs.CACertKey]
+		return hasCA
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.DatabaseRole{}).
@@ -153,10 +208,27 @@ func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToRole()),
 			builder.WithPredicates(rolesSecretsPredicate),
 		).
+		// Cert secrets owned by a DatabaseRole: re-enqueue the owner on any change
+		// so that an externally deleted or modified cert is promptly regenerated.
+		Owns(&corev1.Secret{}).
+		// CA secrets: when the cluster's client CA rotates, re-issue certs for all
+		// DatabaseRoles that reference that cluster.
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClientCASecretToRoles()),
+			builder.WithPredicates(caSecretPredicate),
+		).
+		// Cluster: when a cluster becomes available, unblock roles that were waiting
+		// for it to appear.
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterToRoles()),
+		).
 		Complete(r)
 }
 
-// mapSecretToRole returns a function mapping secrets events to the roles using them
+// mapSecretToRole returns a function mapping secret events to the roles using them
+// as password secrets.
 func (r *DatabaseRoleReconciler) mapSecretToRole() handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) (result []reconcile.Request) {
 		secret, ok := obj.(*corev1.Secret)
@@ -164,29 +236,88 @@ func (r *DatabaseRoleReconciler) mapSecretToRole() handler.MapFunc {
 			return nil
 		}
 
-		// get all the roles in the secret namespace
 		var roles apiv1.DatabaseRoleList
-		if err := r.List(ctx, &roles,
-			client.InNamespace(secret.Namespace),
-		); err != nil {
-			log.FromContext(ctx).Error(err, "while getting roles list for secret",
+		if err := r.List(ctx, &roles, client.InNamespace(secret.Namespace)); err != nil {
+			log.FromContext(ctx).Error(err, "while listing roles for secret",
 				"namespace", secret.Namespace, "secret", secret.Name)
 			return nil
 		}
 
-		// filter the cluster list preserving only the ones which are using
-		// the passed secret
-		filteredRolesList := getRolesUsingSecret(roles, secret)
-		result = make([]reconcile.Request, len(filteredRolesList))
-		for idx, value := range filteredRolesList {
+		filteredRoles := getRolesUsingSecret(roles, secret)
+		result = make([]reconcile.Request, len(filteredRoles))
+		for idx, value := range filteredRoles {
 			result[idx] = reconcile.Request{NamespacedName: value}
 		}
-
 		return result
 	}
 }
 
-// getRolesUsingSecret get a list of roles which are using the passed secret
+// mapClientCASecretToRoles returns a function that enqueues all DatabaseRoles
+// whose cluster uses the changed Secret as its client CA.
+func (r *DatabaseRoleReconciler) mapClientCASecretToRoles() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var clusters apiv1.ClusterList
+		if err := r.List(ctx, &clusters, client.InNamespace(secret.Namespace)); err != nil {
+			log.FromContext(ctx).Error(err, "while listing clusters for CA secret",
+				"secret", secret.Name)
+			return nil
+		}
+
+		var result []reconcile.Request
+		for i := range clusters.Items {
+			if clusters.Items[i].GetClientCASecretName() != secret.Name {
+				continue
+			}
+			var roles apiv1.DatabaseRoleList
+			if err := r.List(ctx, &roles, client.InNamespace(secret.Namespace)); err != nil {
+				continue
+			}
+			for _, role := range roles.Items {
+				if role.Spec.ClusterRef.Name == clusters.Items[i].Name && role.Spec.IssueClientCertificate {
+					result = append(result, reconcile.Request{
+						NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
+					})
+				}
+			}
+		}
+		return result
+	}
+}
+
+// mapClusterToRoles returns a function that enqueues all DatabaseRoles
+// referencing the changed Cluster.
+func (r *DatabaseRoleReconciler) mapClusterToRoles() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		cluster, ok := obj.(*apiv1.Cluster)
+		if !ok {
+			return nil
+		}
+
+		var roles apiv1.DatabaseRoleList
+		if err := r.List(ctx, &roles, client.InNamespace(cluster.Namespace)); err != nil {
+			log.FromContext(ctx).Error(err, "while listing roles for cluster", "cluster", cluster.Name)
+			return nil
+		}
+
+		var result []reconcile.Request
+		for _, role := range roles.Items {
+			if role.Spec.ClusterRef.Name == cluster.Name {
+				result = append(result, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
+				})
+			}
+		}
+		return result
+	}
+}
+
+// getRolesUsingSecret returns the namespaced names of roles that reference the
+// given secret as their password secret.
 func getRolesUsingSecret(roles apiv1.DatabaseRoleList, secret *corev1.Secret) (requests []types.NamespacedName) {
 	for i := range roles.Items {
 		role := &roles.Items[i]

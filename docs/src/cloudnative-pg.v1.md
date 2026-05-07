@@ -512,6 +512,24 @@ _Appears in:_
 | `expirations` _object (keys:string, values:string)_ | Expiration dates for all certificates. |  |  |  |
 
 
+#### ClientCertificateState
+
+
+
+ClientCertificateState holds the observed state of the generated TLS client certificate.
+
+
+
+_Appears in:_
+
+- [DatabaseRoleStatus](#databaserolestatus)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `expiration` _string_ | Expiration is the expiration time of the generated client certificate, in RFC3339 format. |  |  |  |
+| `message` _string_ | Message contains a human-readable explanation of the current certificate status,<br />such as why issuance was skipped. |  |  |  |
+
+
 #### Cluster
 
 
@@ -959,6 +977,7 @@ _Appears in:_
 | `bypassrls` _boolean_ | Whether a role bypasses every row-level security (RLS) policy.<br />Default is `false`. |  |  |  |
 | `cluster` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#localobjectreference-v1-core)_ | The corresponding cluster | True |  |  |
 | `databaseRoleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
+| `issueClientCertificate` _boolean_ | IssueClientCertificate enables the operator to generate and renew a TLS client<br />certificate for this role, signed by the cluster's client CA. The certificate<br />is stored in a Secret named `<databaserole-name>-client-cert`.<br />Requires login to be true. |  |  |  |
 
 
 #### DatabaseRoleStatus
@@ -979,6 +998,7 @@ _Appears in:_
 | `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
 | `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
+| `clientCertificate` _[ClientCertificateState](#clientcertificatestate)_ | ClientCertificate holds the observed state of the generated TLS client<br />certificate, when issueClientCertificate is true. |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
