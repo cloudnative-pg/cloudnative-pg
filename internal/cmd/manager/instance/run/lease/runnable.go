@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -115,9 +114,13 @@ func (r *Runnable) Acquire(ctx context.Context) error {
 // holder (including if the lease does not exist yet).
 // Callers must pass a fresh (non-cancelled) context; the previous run context
 // is already cancelled by the time this is called.
-// By the time this is called from the defer in cmd.go, the controller-runtime
-// manager has already waited for all runnables — including PostgresLifecycle —
-// to finish, so PostgreSQL is guaranteed to be down before the lease is released.
+// When invoked from the defer in cmd.go, controller-runtime has already waited
+// for all runnables — including PostgresLifecycle — to finish. PostgreSQL is
+// normally down by then. The exception is a failed in-place instance-manager
+// online upgrade: PostgresLifecycle skips the shutdown when
+// InstanceManagerIsUpgrading is set, so PostgreSQL may still be running when
+// this defer fires. The operator's onlineUpgradeFailOverDelay (30s) covers
+// the pod-restart window in that case so no other pod can promote.
 func (r *Runnable) Release(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Releasing primary lease")
@@ -180,12 +183,6 @@ func (r *Runnable) Start(ctx context.Context) error {
 func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
-	// becameLeader is set to true the moment we first acquire the lease.
-	// It is stored from the OnStartedLeading goroutine and read after le.Run
-	// returns — well after the first renewal cycle — so the write always
-	// happens before the read.
-	var becameLeader atomic.Bool
-
 	for {
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            r.lock,
@@ -197,11 +194,13 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(context.Context) {
 					contextLogger.Info("Acquired primary lease")
-					becameLeader.Store(true)
 					r.heldOnce.Do(func() { close(r.heldCh) })
 				},
 				OnStoppedLeading: func() {
-					contextLogger.Warning("Primary lease lost")
+					// leaderelection invokes this on every Run exit, including
+					// clean ctx cancellation. The meaningful "we lost the lease"
+					// signal is the fatal error returned from runLeaderElection.
+					contextLogger.Debug("leaderelection.Run exited")
 				},
 				OnNewLeader: func(string) {},
 			},
