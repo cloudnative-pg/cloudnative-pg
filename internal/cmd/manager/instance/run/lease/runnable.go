@@ -223,6 +223,13 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		record, _, checkErr := r.lock.Get(checkCtx)
 		checkCancel()
 
+		if errors.IsNotFound(checkErr) {
+			// The lease object is gone (e.g. someone deleted it). The cluster
+			// controller will recreate it on its next reconcile; loop and let
+			// le.Run re-acquire it once it reappears.
+			contextLogger.Warning("Primary lease object missing, waiting for it to be recreated")
+			continue
+		}
 		if checkErr != nil {
 			// Cannot reach the API server to verify the holder. We have no evidence
 			// of preemption, so loop back and let le.Run retry. If we are genuinely
