@@ -241,7 +241,6 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 			Verbs: []string{
 				"get",
 				"update",
-				"patch",
 			},
 			ResourceNames: []string{
 				cluster.Name,
