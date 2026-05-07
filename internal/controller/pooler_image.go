@@ -56,12 +56,12 @@ func (r *PoolerReconciler) resolvePoolerImage(ctx context.Context, pooler *apiv1
 		return configuration.Current.PgbouncerImageName, nil
 	}
 
-	if pooler.Spec.PgBouncer.ImageCatalogRef != nil {
-		return r.resolveImageFromCatalog(ctx, pooler)
-	}
-
 	if pooler.Spec.PgBouncer.Image != "" {
 		return pooler.Spec.PgBouncer.Image, nil
+	}
+
+	if pooler.Spec.PgBouncer.ImageCatalogRef != nil {
+		return r.resolveImageFromCatalog(ctx, pooler)
 	}
 
 	return configuration.Current.PgbouncerImageName, nil
