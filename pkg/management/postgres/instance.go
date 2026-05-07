@@ -1040,7 +1040,7 @@ func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
-	db, err := sql.Open("pgx", primaryConnInfo)
+	db, err := pool.NewDBConnection(primaryConnInfo, pool.ConnectionProfilePostgresql)
 	if err != nil {
 		return err
 	}

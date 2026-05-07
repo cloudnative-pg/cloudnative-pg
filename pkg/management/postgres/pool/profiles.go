@@ -84,4 +84,9 @@ func fillDefaultParameters(config *pgx.ConnConfig) {
 	// a standard date format for the operator to manage the dates
 	// when it's needed
 	config.RuntimeParams["datestyle"] = "ISO"
+
+	// Pin search_path so a tenant ALTER DATABASE / ALTER ROLE setting cannot
+	// influence operator-issued queries (CWE-426). User-SQL paths (initdb
+	// post-init scripts, custom monitoring queries) reset this explicitly.
+	config.RuntimeParams["search_path"] = "pg_catalog"
 }
