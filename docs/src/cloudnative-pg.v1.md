@@ -1992,7 +1992,7 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `active` | PoolerPhaseActive means the pooler is running normally and serving traffic.<br /> |
-| `paused` | PoolerPhasePaused means PgBouncer is up and running but holding new client<br />connections in queue because spec.pgbouncer.paused is true. The Deployment<br />keeps reconciling; lifting the pause transitions back to Active.<br /> |
+| `paused` | PoolerPhasePaused means PgBouncer is up and running but holding new client<br />connections in the queue because spec.pgbouncer.paused is true. The Deployment<br />keeps reconciling; lifting the pause transitions back to Active.<br /> |
 | `inactive` | PoolerPhaseInactive means the pooler cannot make progress because a<br />prerequisite resource is missing (cluster, secret, certificate). The<br />controller retries periodically until the prerequisite shows up. Check<br />status.phaseReason for the specific cause.<br /> |
 | `failed` | PoolerPhaseFailed means the pooler cannot be reconciled due to a<br />configuration error. Check status.phaseReason for details.<br /> |
 

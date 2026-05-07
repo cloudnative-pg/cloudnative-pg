@@ -77,7 +77,7 @@ func (r *PoolerReconciler) updateDeployment(
 	contextLog := log.FromContext(ctx)
 
 	// When the pgbouncer image cannot be resolved (e.g. an imageCatalogRef points
-	// to a missing key) we leave the existing deployment untouched: the running
+	// to a missing key), we leave the existing deployment untouched: the running
 	// pgbouncer keeps serving traffic with whatever image it had, and a new
 	// deployment is not created from an empty image reference. Recovery is
 	// automatic once the catalog is fixed and Phase moves back to Active.

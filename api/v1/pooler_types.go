@@ -35,7 +35,7 @@ const (
 	PoolerPhaseActive PoolerPhase = "active"
 
 	// PoolerPhasePaused means PgBouncer is up and running but holding new client
-	// connections in queue because spec.pgbouncer.paused is true. The Deployment
+	// connections in the queue because spec.pgbouncer.paused is true. The Deployment
 	// keeps reconciling; lifting the pause transitions back to Active.
 	PoolerPhasePaused PoolerPhase = "paused"
 

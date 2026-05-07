@@ -137,7 +137,7 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Take the required actions to align the spec with the collected status.
 	// When the pgbouncer image cannot be resolved (Phase=Failed) updateDeployment
 	// is a no-op, but service accounts, RBAC, services and PodMonitor are still
-	// reconciled so drift in those resources is corrected even when the catalog
+	// reconciled, so drift in those resources is corrected even when the catalog
 	// reference is misconfigured.
 	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
@@ -199,7 +199,7 @@ func (r *PoolerReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Mana
 
 // poolerImageCatalogIndexer extracts the index value(s) used by poolerImageCatalogKey
 // for a given Pooler. It returns nil for poolers that do not reference an image
-// catalog so they are not enqueued by catalog watches.
+// catalog, so they are not enqueued by catalog watches.
 func poolerImageCatalogIndexer(rawObj client.Object) []string {
 	pooler := rawObj.(*apiv1.Pooler)
 	if pooler.Spec.PgBouncer == nil ||

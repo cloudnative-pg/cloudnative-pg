@@ -43,7 +43,7 @@ import (
 //  3. spec.pgbouncer.imageCatalogRef
 //  4. operator default (config.Current.PgbouncerImageName)
 //
-// The pod-template override is honoured here so that status.image always
+// The pod-template override is honored here so that status.image always
 // matches what is actually written into the Deployment by the builder
 // (which keeps any image already set on the pgbouncer container in
 // spec.template).
