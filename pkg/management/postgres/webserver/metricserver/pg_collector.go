@@ -415,7 +415,7 @@ func (e *Exporter) updateInstanceMetrics() {
 		return
 	}
 
-	db, err := e.instance.GetSuperUserDB()
+	db, err := e.instance.GetMetricsDB("postgres")
 	if err != nil {
 		log.Error(err, "Error opening connection to PostgreSQL")
 		e.Metrics.Error.Set(1)
@@ -424,7 +424,7 @@ func (e *Exporter) updateInstanceMetrics() {
 
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
-		log.Warning("Unable to collect metrics", "error", err)
+		log.Warning("Unable to collect metrics", "error", postgres.EnrichMetricsConnError(err))
 		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())

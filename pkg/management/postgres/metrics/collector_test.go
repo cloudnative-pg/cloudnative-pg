@@ -220,9 +220,10 @@ var _ = Describe("QueryRunner tests", func() {
 			}
 			_ = metricMap
 			dbMock.ExpectBegin()
-			dbMock.ExpectExec("SET application_name TO cnpg_metrics_exporter").WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.ExpectExec(
+				"SELECT pg_catalog.set_config('search_path', 'pg_catalog, ' OPERATOR(pg_catalog.||)" +
+					" pg_catalog.current_setting('search_path'), true)").WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectExec("SET standard_conforming_strings TO on").WillReturnResult(sqlmock.NewResult(0, 1))
-			dbMock.ExpectExec("SET ROLE TO pg_monitor").WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectQuery(loPagesQuery).WillReturnRows(sqlmock.NewRows(
 				[]string{"datname", "lo_pages"}).
 				AddRow(`app`, 3))

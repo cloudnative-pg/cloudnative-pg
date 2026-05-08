@@ -21,12 +21,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/jackc/pgx/v5/pgconn"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -414,5 +416,52 @@ var _ = Describe("GetPrimaryConnInfo", func() {
 		Expect(err).ToNot(HaveOccurred())
 		connInfo := instance.GetPrimaryConnInfo()
 		Expect(connInfo).To(ContainSubstring("tcp_user_timeout='5000\\\\test'"))
+	})
+})
+
+var _ = Describe("EnrichMetricsConnError", func() {
+	const recoveryHint = "see the troubleshooting documentation for recovery steps"
+
+	It("returns nil unchanged", func() {
+		Expect(EnrichMetricsConnError(nil)).To(Succeed())
+	})
+
+	It("wraps a 28000 error that names the metrics exporter role", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `role "cnpg_metrics_exporter" does not exist`,
+		}
+		err := EnrichMetricsConnError(original)
+		Expect(err).To(MatchError(ContainSubstring(recoveryHint)))
+		Expect(errors.Is(err, original)).To(BeTrue())
+	})
+
+	It("leaves a 28000 error that does not name the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `peer authentication failed for user "someone_else"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves a 28000 ident-misconfig error that names the role unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28000",
+			Message: `no pg_ident.conf entry for host "...", user "cnpg_metrics_exporter", database "postgres"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves errors with a different SQLSTATE unchanged", func() {
+		original := &pgconn.PgError{
+			Code:    "28P01",
+			Message: `password authentication failed for user "cnpg_metrics_exporter"`,
+		}
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
+	})
+
+	It("leaves non-pgconn errors unchanged", func() {
+		original := errors.New("plain network error")
+		Expect(EnrichMetricsConnError(original)).To(Equal(original))
 	})
 })
