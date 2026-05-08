@@ -194,6 +194,11 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return err
 	}
 
+	if err = postgres.SetupMetricsExporterRole(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
 	return tx.Commit()
 }
 

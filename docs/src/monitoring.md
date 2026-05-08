@@ -36,10 +36,17 @@ more `ConfigMap` or `Secret` resources (see the
 
 All monitoring queries that are performed on PostgreSQL are:
 
-- atomic (one transaction per query)
-- executed with the `pg_monitor` role
+- atomic (one read-only transaction per query)
+- executed as the `cnpg_metrics_exporter` role (a member of `pg_monitor`)
 - executed with `application_name` set to `cnpg_metrics_exporter`
-- executed as user `postgres`
+
+The connection uses peer authentication on the pod-local Unix socket;
+because `session_user` is never a superuser, the monitoring session
+cannot escalate via `RESET ROLE` or `RESET SESSION AUTHORIZATION`. Do
+not grant additional privileges or role memberships to
+`cnpg_metrics_exporter` beyond `pg_monitor` and the table-level grants
+required by your custom queries: any extra membership flows into the
+scrape session via inheritance and weakens this property.
 
 Please refer to the "Predefined Roles" section in PostgreSQL
 [documentation](https://www.postgresql.org/docs/current/predefined-roles.html)
@@ -494,6 +501,42 @@ Take care that the referred resources have to be created **in the same namespace
     and a key `queryName` containing the overwritten query name.
 :::
 
+#### Custom query privileges and safety
+
+:::warning
+    Custom queries run as the `cnpg_metrics_exporter` role, which inherits
+    `pg_monitor`. Queries within `pg_monitor`'s scope (catalog reads,
+    `pg_stat_*` views, configuration parameters) work without modification.
+    Queries that read user-owned tables or superuser-only catalogs (e.g.
+    `pg_authid`, `pg_subscription`) need explicit grants. Reading a table
+    also requires USAGE on its schema:
+
+    ```sql
+    GRANT USAGE ON SCHEMA myschema TO cnpg_metrics_exporter;
+    GRANT SELECT ON TABLE myschema.mytable TO cnpg_metrics_exporter;
+    ```
+
+    Every database in `target_databases` must allow
+    `cnpg_metrics_exporter` to `CONNECT`. On clusters that have
+    revoked `CONNECT` from `PUBLIC` for a database, grant it
+    explicitly to that role:
+
+    ```sql
+    GRANT CONNECT ON DATABASE domainapp TO cnpg_metrics_exporter;
+    ```
+
+    Prefer an explicit list of trusted databases (e.g.
+    `target_databases: ["domainapp"]`) over the `"*"` wildcard. The
+    wildcard scrapes every database the role can connect to and
+    silently skips the rest, so an explicit list makes a missing grant
+    easier to notice. Use `"*"` only when the query is meant to
+    collect per-database metrics across the whole cluster.
+
+    Schema-qualify catalog references (`pg_catalog.now()`,
+    `pg_catalog.current_database()`) to prevent `search_path` shadowing
+    by user-owned objects.
+:::
+
 #### Example of a user defined metric
 
 Here you can see an example of a `ConfigMap` containing a single custom query,
@@ -570,8 +613,13 @@ Database auto-discovery can be enabled for a specific query by specifying a
 *shell-like pattern* (i.e., containing `*`, `?` or `[]`) in the list of
 `target_databases`. If provided, the operator will expand the list of target
 databases by adding all the databases returned by the execution of `SELECT
-datname FROM pg_database WHERE datallowconn AND NOT datistemplate` and matching
-the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
+datname FROM pg_catalog.pg_database WHERE datallowconn AND NOT datistemplate
+AND pg_catalog.has_database_privilege(datname, 'CONNECT')` and matching the
+pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
+Databases on which `cnpg_metrics_exporter` lacks the `CONNECT` privilege are
+silently skipped; if you want a database with revoked `PUBLIC` access to be
+scraped, grant `CONNECT` explicitly (see "Custom query privileges and safety"
+above).
 
 :::note
     The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
@@ -579,8 +627,8 @@ the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
 :::
 
 It is recommended that you always include the name of the database
-in the returned labels, for example using the `current_database()` function
-as in the following example:
+in the returned labels, for example using the `pg_catalog.current_database()`
+function as in the following example:
 
 ```yaml
 some_query: |
@@ -756,6 +804,33 @@ If you want to disable the default set of metrics, you can:
 CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
 presents some differences. In particular, the `cache_seconds` field is not implemented
 in CloudNativePG's exporter.
+
+### Manually creating the metrics exporter role
+
+The operator creates the `cnpg_metrics_exporter` PostgreSQL role on the
+primary during reconciliation; it then propagates to standbys and
+replica clusters via streaming replication.
+
+If the role is missing (replica cluster upgraded before its primary,
+restore from a backup that predates the role, accidental removal),
+recreate it as a superuser on the writable primary of the replication
+chain (the source primary, not a designated primary of a replica
+cluster):
+
+```sql
+CREATE ROLE cnpg_metrics_exporter WITH LOGIN NOSUPERUSER NOCREATEDB
+    NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+GRANT pg_monitor TO cnpg_metrics_exporter;
+```
+
+If your custom monitoring queries need access to objects outside
+`pg_monitor`'s scope, grant the necessary privileges explicitly. SELECT
+on a table also requires USAGE on its schema:
+
+```sql
+GRANT USAGE ON SCHEMA myschema TO cnpg_metrics_exporter;
+GRANT SELECT ON TABLE myschema.mytable TO cnpg_metrics_exporter;
+```
 
 ## Monitoring the CloudNativePG operator
 

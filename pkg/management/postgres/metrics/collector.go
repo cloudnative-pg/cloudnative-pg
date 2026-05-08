@@ -180,7 +180,7 @@ func (q *QueriesCollector) createMetricsFromUserQueries(isPrimary bool) {
 
 		allTargetDatabases := q.expandTargetDatabases(targetDatabases, allAccessibleDatabasesCache)
 		for targetDatabase := range allTargetDatabases {
-			db, err := q.instance.ConnectionPool().Connection(targetDatabase)
+			db, err := q.instance.GetMetricsDB(targetDatabase)
 			if err != nil {
 				q.reportUserQueryErrorMetric(name + ": " + err.Error())
 				continue
@@ -268,7 +268,7 @@ func (q *QueriesCollector) expandTargetDatabases(
 }
 
 func (q *QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
-	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
+	conn, err := q.instance.GetMetricsDB(q.defaultDBName)
 	if err != nil {
 		return nil, fmt.Errorf("while connecting to expand target_database *: %w", err)
 	}
@@ -281,9 +281,35 @@ func (q *QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 			log.Error(err, "Error while committing monitoring tx to retrieve accessible databases list")
 		}
 	}()
-	databases, errors := postgresutils.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
-	if errors != nil {
-		return nil, fmt.Errorf("while discovering databases for metrics: %v", errors)
+
+	rows, err := tx.Query(
+		`SELECT datname, pg_catalog.has_database_privilege(datname, 'CONNECT')
+		 FROM pg_catalog.pg_database
+		 WHERE datallowconn AND NOT datistemplate`)
+	if err != nil {
+		return nil, fmt.Errorf("while discovering databases for metrics: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Error(err, "while closing pg_database rows")
+		}
+	}()
+
+	var databases []string
+	for rows.Next() {
+		var datname string
+		var canConnect bool
+		if err := rows.Scan(&datname, &canConnect); err != nil {
+			return nil, fmt.Errorf("while parsing pg_database row: %w", err)
+		}
+		if !canConnect {
+			log.Debug("Skipping database: metrics exporter lacks CONNECT", "targetDatabase", datname)
+			continue
+		}
+		databases = append(databases, datname)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("while iterating pg_database rows: %w", err)
 	}
 	return databases, nil
 }
@@ -545,14 +571,15 @@ func (c QueryRunner) createMetricsFromColumns(
 	return computedMetrics
 }
 
-// createMonitoringTx create a monitoring transaction with read-only access
-// and role set to `pg_monitor`
+// createMonitoringTx creates a read-only monitoring transaction. The connection
+// is already established as cnpg_metrics_exporter (which inherits pg_monitor),
+// so no role switching is required.
 func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, postgres.EnrichMetricsConnError(err)
 	}
 
 	defer func() {
@@ -561,20 +588,18 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 		}
 	}()
 
-	// Set the application name
-	_, err = tx.Exec("SET application_name TO cnpg_metrics_exporter")
+	// Prepend pg_catalog to the connection's search_path so unqualified
+	// catalog references (e.g. current_database()) cannot be shadowed by
+	// objects planted in user-owned schemas.
+	_, err = tx.Exec(
+		"SELECT pg_catalog.set_config('search_path', " +
+			"'pg_catalog, ' OPERATOR(pg_catalog.||) pg_catalog.current_setting('search_path'), true)")
 	if err != nil {
 		return nil, err
 	}
 
 	// Ensure standard_conforming_strings is enforced
 	_, err = tx.Exec("SET standard_conforming_strings TO on")
-	if err != nil {
-		return nil, err
-	}
-
-	// Set the pg_monitor role
-	_, err = tx.Exec("SET ROLE TO pg_monitor")
 
 	return tx, err
 }

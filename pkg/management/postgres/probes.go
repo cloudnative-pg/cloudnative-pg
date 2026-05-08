@@ -604,7 +604,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 		return nil, err
 	}
 
-	superUserDB, err := instance.GetSuperUserDB()
+	db, err := instance.GetMetricsDB("postgres")
 	if err != nil {
 		return nil, err
 	}
@@ -614,7 +614,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	// See https://github.com/postgres/postgres/commit/2421e9a51d20bb83154e54a16ce628f9249fa907
 	var pgWalStat PgStatWal
 	if version.Major < 18 {
-		row := superUserDB.QueryRow(
+		row := db.QueryRow(
 			`SELECT
 			wal_records,
 			wal_fpi,
@@ -637,12 +637,12 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 			&pgWalStat.WalSyncTime,
 			&pgWalStat.StatsReset,
 		); err != nil {
-			return nil, err
+			return nil, EnrichMetricsConnError(err)
 		}
 	}
 
 	if version.Major >= 18 {
-		row := superUserDB.QueryRow(
+		row := db.QueryRow(
 			`SELECT
         	wal_records,
 		wal_fpi,
@@ -657,7 +657,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 			&pgWalStat.WALBuffersFull,
 			&pgWalStat.StatsReset,
 		); err != nil {
-			return nil, err
+			return nil, EnrichMetricsConnError(err)
 		}
 	}
 
