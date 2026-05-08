@@ -1,6 +1,6 @@
 module github.com/cloudnative-pg/cloudnative-pg
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
