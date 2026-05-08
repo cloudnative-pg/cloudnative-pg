@@ -507,11 +507,20 @@ func validateWALSegmentTimeline(ctx context.Context, walName string, cluster *ap
 		return nil
 	}
 
+	// During an active failover TimelineID still reports the old timeline,
+	// so the comparison below is unsafe; refuse outright.
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+		contextLog.Info("Refusing to restore WAL segment during pending failover",
+			"walName", walName,
+			"podName", podName,
+			"currentPrimary", cluster.Status.CurrentPrimary)
+		return barmanRestorer.ErrWALNotFound
+	}
+
 	segment, err := postgres.SegmentFromName(walName)
 	if err != nil {
-		contextLog.Warning("Could not parse WAL segment name",
-			"walName", walName,
-			"error", err)
+		contextLog.Error(err, "Could not parse WAL segment name despite passing IsWALFile",
+			"walName", walName)
 		return nil
 	}
 

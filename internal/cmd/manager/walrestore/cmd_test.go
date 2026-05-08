@@ -323,4 +323,17 @@ var _ = Describe("validateWALSegmentTimeline", func() {
 		err := validateWALSegmentTimeline(ctx, "000000010000000000000048", cluster, "replica-pod")
 		Expect(err).ToNot(HaveOccurred())
 	})
+
+	It("should reject WAL when failover is pending (TargetPrimary is the marker)", func(ctx SpecContext) {
+		cluster := &apiv1.Cluster{
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "old-primary",
+				TargetPrimary:  apiv1.PendingFailoverMarker,
+				TimelineID:     3,
+			},
+		}
+
+		err := validateWALSegmentTimeline(ctx, "000000030000000000000048", cluster, "replica-pod")
+		Expect(err).To(Equal(barmanRestorer.ErrWALNotFound))
+	})
 })
