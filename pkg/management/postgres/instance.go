@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -146,8 +148,13 @@ type Instance struct {
 	// Pool of DB connections pointing to every used database
 	pool *pool.ConnectionPool
 
+	// Pool of DB connections for the metrics exporter (connects as cnpg_metrics_exporter)
+	initializeMetricsPool sync.Once
+	metricsPool           *pool.ConnectionPool
+
 	// Pool of DB connections pointing to primary instance
-	primaryPool *pool.ConnectionPool
+	initializePrimaryPool sync.Once
+	primaryPool           *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
 	namespace string
@@ -495,6 +502,9 @@ func (instance *Instance) ShutdownConnections() {
 	if instance.pool != nil {
 		instance.pool.ShutdownConnections()
 	}
+	if instance.metricsPool != nil {
+		instance.metricsPool.ShutdownConnections()
+	}
 	if instance.primaryPool != nil {
 		instance.primaryPool.ShutdownConnections()
 	}
@@ -767,6 +777,39 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("postgres")
 }
 
+// GetMetricsDB gets a connection to the named database authenticated as cnpg_metrics_exporter.
+func (instance *Instance) GetMetricsDB(dbname string) (*sql.DB, error) {
+	return instance.metricsConnectionPool().Connection(dbname)
+}
+
+// PostgreSQL SQLSTATE for "invalid authorization specification" (Class 28).
+// See https://www.postgresql.org/docs/current/errcodes-appendix.html
+const sqlstateInvalidAuth = "28000"
+
+// EnrichMetricsConnError wraps a database error with a recovery hint when
+// it indicates the cnpg_metrics_exporter role is missing. It deliberately
+// matches the role-not-found case only (SQLSTATE 28000 with the canonical
+// "role <name> does not exist" message) to avoid misleading users when
+// SQLSTATE 28000 surfaces from other auth-time failures (peer ident
+// misconfiguration, password mismatch, etc.).
+func EnrichMetricsConnError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) &&
+		pgErr.Code == sqlstateInvalidAuth &&
+		strings.Contains(pgErr.Message, apiv1.MetricsExporterUserName) &&
+		strings.Contains(pgErr.Message, "does not exist") {
+		return fmt.Errorf(
+			"metrics exporter cannot connect: PostgreSQL role %q not found in the database; "+
+				"see the troubleshooting documentation for recovery steps: %w",
+			apiv1.MetricsExporterUserName, err,
+		)
+	}
+	return err
+}
+
 // GetTemplateDB gets a connection to the "template1" database on this instance
 func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("template1")
@@ -811,11 +854,27 @@ func (instance *Instance) ConnectionPool() pool.Pooler {
 	return instance.pool
 }
 
+// metricsConnectionPool gets or initializes the connection pool used by the metrics exporter.
+func (instance *Instance) metricsConnectionPool() pool.Pooler {
+	instance.initializeMetricsPool.Do(func() {
+		socketDir := GetSocketDir()
+		dsn := fmt.Sprintf(
+			"host=%s port=%v user=%v sslmode=disable application_name=%v",
+			socketDir,
+			GetServerPort(),
+			apiv1.MetricsExporterUserName,
+			apiv1.MetricsExporterUserName,
+		)
+		instance.metricsPool = pool.NewPostgresqlConnectionPool(dsn)
+	})
+	return instance.metricsPool
+}
+
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
 func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
-	if instance.primaryPool == nil {
+	instance.initializePrimaryPool.Do(func() {
 		instance.primaryPool = pool.NewPostgresqlConnectionPool(instance.GetPrimaryConnInfo())
-	}
+	})
 
 	return instance.primaryPool
 }

@@ -432,25 +432,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			Expect(err).ToNot(HaveOccurred())
 			query := "select count(1) from pg_catalog.pg_ident_file_mappings;"
 
-			By("check that there is only one entry in pg_ident_file_mappings", func() {
-				Eventually(func() (string, error) {
-					stdout, _, err := exec.QueryInInstancePod(
-						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
-							Namespace: primaryPod.Namespace,
-							PodName:   primaryPod.Name,
-						},
-						postgres.PostgresDBName,
-						query)
-					return strings.Trim(stdout, "\n"), err
-				}, timeout).Should(BeEquivalentTo("1"))
-			})
-
-			By("apply configuration update", func() {
-				updateClusterPostgresPgIdent(namespace)
-			})
-
-			By("verify that there are now two entries in pg_ident_file_mappings", func() {
+			By("check that there are two entries in pg_ident_file_mappings", func() {
 				Eventually(func() (string, error) {
 					stdout, _, err := exec.QueryInInstancePod(
 						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -462,6 +444,24 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 						query)
 					return strings.Trim(stdout, "\n"), err
 				}, timeout).Should(BeEquivalentTo("2"))
+			})
+
+			By("apply configuration update", func() {
+				updateClusterPostgresPgIdent(namespace)
+			})
+
+			By("verify that there are now three entries in pg_ident_file_mappings", func() {
+				Eventually(func() (string, error) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: primaryPod.Namespace,
+							PodName:   primaryPod.Name,
+						},
+						postgres.PostgresDBName,
+						query)
+					return strings.Trim(stdout, "\n"), err
+				}, timeout).Should(BeEquivalentTo("3"))
 			})
 		}
 	})
