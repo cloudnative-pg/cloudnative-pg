@@ -101,6 +101,7 @@ const (
 #
 
 # Grant local access ('local' user map)
+local all cnpg_metrics_exporter peer map=cnpg_metrics_exporter
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -144,6 +145,9 @@ cnpg_streaming_replica streaming_replica streaming_replica
 
 # Grant cnpg_pooler_pgbouncer access ('cnpg_pooler_pgbouncer' user map)
 cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer cnpg_pooler_pgbouncer
+
+# Grant cnpg_metrics_exporter access via peer authentication on the Unix socket
+cnpg_metrics_exporter {{.Username}} cnpg_metrics_exporter
 
 #
 # USER-DEFINED RULES

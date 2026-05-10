@@ -320,6 +320,10 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile pgbouncer integration: %w", err)
 	}
 
+	if err := r.reconcileMetricsExporterAuthUser(ctx, postgresDB); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile metrics exporter integration: %w", err)
+	}
+
 	// Reconcile postgresql.auto.conf file permissions (< PG 17)
 	// IMPORTANT: this needs a database connection to determine
 	// the PostgreSQL major version
@@ -836,6 +840,43 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 		if err != nil {
 			return err
 		}
+	}
+
+	return tx.Commit()
+}
+
+// reconcileMetricsExporterAuthUser ensures the dedicated cnpg_metrics_exporter
+// PostgreSQL role exists and has pg_monitor granted. This role is used by the
+// metrics exporter instead of the postgres superuser so that session_user is
+// never a superuser and RESET ROLE has no escalation effect.
+func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
+	ctx context.Context,
+	db *sql.DB,
+) error {
+	ok, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("unable to check if instance is primary: %w", err)
+	}
+	if !ok {
+		return nil
+	}
+	return setupMetricsExporterRole(ctx, db)
+}
+
+// setupMetricsExporterRole opens a transaction and delegates to the shared
+// helper that creates or repairs the cnpg_metrics_exporter role.
+func setupMetricsExporterRole(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := postgresManagement.SetupMetricsExporterRole(ctx, tx); err != nil {
+		return err
 	}
 
 	return tx.Commit()

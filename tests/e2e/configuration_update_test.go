@@ -440,7 +440,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 				By("check that there is the expected number of entry in pg_ident_file_mappings", func() {
 					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "3"), RetryTimeout).Should(Succeed())
+						query, "4"), RetryTimeout).Should(Succeed())
 				})
 
 				By("apply configuration update", func() {
@@ -449,7 +449,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 				By("verify that there is one more entry in pg_ident_file_mappings", func() {
 					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "4"), RetryTimeout).Should(Succeed())
+						query, "5"), RetryTimeout).Should(Succeed())
 				})
 			}
 		})
