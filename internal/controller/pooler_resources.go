@@ -82,6 +82,9 @@ func (r *PoolerReconciler) getManagedResources(
 	if err != nil {
 		return nil, err
 	}
+	if result.Cluster == nil {
+		return result, nil
+	}
 
 	// Get the auth query secret if any
 	result.AuthUserSecret, err = getSecretOrNil(
