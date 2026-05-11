@@ -119,14 +119,12 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, &scheduledBackup)
+	return r.reconcileScheduledBackup(ctx, &scheduledBackup)
 }
 
-// ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
-func ReconcileScheduledBackup(
+// reconcileScheduledBackup is the main reconciliation logic for a scheduled backup
+func (r *ScheduledBackupReconciler) reconcileScheduledBackup(
 	ctx context.Context,
-	event record.EventRecorder,
-	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -145,11 +143,11 @@ func ReconcileScheduledBackup(
 	isVolumeSnapshot := scheduledBackup.Spec.Method == apiv1.BackupMethodVolumeSnapshot
 	if isVolumeSnapshot && scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
 		var cluster apiv1.Cluster
-		if err := cli.Get(ctx, client.ObjectKey{
+		if err := r.Get(ctx, client.ObjectKey{
 			Namespace: scheduledBackup.Namespace,
 			Name:      scheduledBackup.Spec.Cluster.Name,
 		}, &cluster); err != nil {
-			event.Eventf(
+			r.Recorder.Eventf(
 				scheduledBackup,
 				"Normal",
 				"InvalidCluster",
@@ -161,7 +159,7 @@ func ReconcileScheduledBackup(
 		}
 
 		if cluster.Status.Phase != apiv1.PhaseHealthy {
-			event.Eventf(
+			r.Recorder.Eventf(
 				scheduledBackup,
 				"Warning",
 				"ClusterNotHealthy",
@@ -176,7 +174,7 @@ func ReconcileScheduledBackup(
 	if schedule.Next(now).IsZero() {
 		// No time satisfying the schedule have been found.
 		// We cannot proceed reconciling it.
-		event.Eventf(
+		r.Recorder.Eventf(
 			scheduledBackup,
 			"Warning",
 			"NoSchedule",
@@ -191,7 +189,7 @@ func ReconcileScheduledBackup(
 		// miss the orphan. List by parent + immediate label to catch any
 		// existing immediate Backup regardless of its scheduled-time suffix.
 		var existingImmediate apiv1.BackupList
-		if err := cli.List(ctx, &existingImmediate,
+		if err := r.List(ctx, &existingImmediate,
 			client.InNamespace(scheduledBackup.Namespace),
 			client.MatchingLabels{
 				utils.ParentScheduledBackupLabelName: scheduledBackup.GetName(),
@@ -202,12 +200,12 @@ func ReconcileScheduledBackup(
 		}
 		if len(existingImmediate.Items) > 0 {
 			adopted := existingImmediate.Items[0].CreationTimestamp.Time
-			return advanceScheduledBackupStatus(ctx, event, cli, scheduledBackup, adopted, now, schedule)
+			return r.advanceScheduledBackupStatus(ctx, scheduledBackup, adopted, now, schedule)
 		}
 
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
-		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
-		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
+		r.Recorder.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
+		return r.createBackup(ctx, scheduledBackup, now, now, schedule, true)
 	}
 
 	if scheduledBackup.Status.LastCheckTime == nil {
@@ -218,14 +216,14 @@ func ReconcileScheduledBackup(
 		scheduledBackup.Status.LastCheckTime = &metav1.Time{
 			Time: now,
 		}
-		err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
+		err := r.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		nextTime := schedule.Next(now)
 		contextLogger.Info("Next backup schedule", "next", nextTime)
-		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled first backup by %v", nextTime)
+		r.Recorder.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
@@ -244,24 +242,22 @@ func ReconcileScheduledBackup(
 	// it but did not land the status patch — adopt that observation and advance
 	// the status. Otherwise, create the Backup.
 	var existing apiv1.Backup
-	switch err := cli.Get(ctx, types.NamespacedName{
+	switch err := r.Get(ctx, types.NamespacedName{
 		Name:      scheduledBackup.BackupName(nextTime),
 		Namespace: scheduledBackup.Namespace,
 	}, &existing); {
 	case apierrs.IsNotFound(err):
-		return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false)
+		return r.createBackup(ctx, scheduledBackup, nextTime, now, schedule, false)
 	case err != nil:
 		return ctrl.Result{}, err
 	default:
-		return advanceScheduledBackupStatus(ctx, event, cli, scheduledBackup, nextTime, now, schedule)
+		return r.advanceScheduledBackupStatus(ctx, scheduledBackup, nextTime, now, schedule)
 	}
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
-func createBackup(
+func (r *ScheduledBackupReconciler) createBackup(
 	ctx context.Context,
-	event record.EventRecorder,
-	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
 	backupTime time.Time,
 	now time.Time,
@@ -283,7 +279,7 @@ func createBackup(
 	switch scheduledBackup.Spec.BackupOwnerReference {
 	case "cluster":
 		var cluster apiv1.Cluster
-		if err := cli.Get(
+		if err := r.Get(
 			ctx,
 			types.NamespacedName{Name: scheduledBackup.Spec.Cluster.Name, Namespace: scheduledBackup.Namespace},
 			&cluster,
@@ -299,9 +295,9 @@ func createBackup(
 	}
 
 	contextLogger.Info("Creating backup", "backupName", backup.Name)
-	if err := cli.Create(ctx, backup); err != nil {
+	if err := r.Create(ctx, backup); err != nil {
 		if apierrs.IsAlreadyExists(err) {
-			// Cache was stale at the Get-first observation in ReconcileScheduledBackup
+			// Cache was stale at the Get-first observation in reconcileScheduledBackup
 			// (or another reconcile won the race). Requeue so the next pass observes
 			// the existing Backup and advances the status from there.
 			contextLogger.Debug("Backup already exists, requeuing for re-observation", "error", err)
@@ -310,21 +306,19 @@ func createBackup(
 		contextLogger.Error(
 			err, "Error while creating backup object",
 			"backupName", backup.GetName())
-		event.Event(scheduledBackup, "Warning", "BackupCreation", "Error while creating backup object")
+		r.Recorder.Event(scheduledBackup, "Warning", "BackupCreation", "Error while creating backup object")
 		return ctrl.Result{}, err
 	}
 
-	return advanceScheduledBackupStatus(ctx, event, cli, scheduledBackup, backupTime, now, schedule)
+	return r.advanceScheduledBackupStatus(ctx, scheduledBackup, backupTime, now, schedule)
 }
 
 // advanceScheduledBackupStatus records that a Backup for backupTime exists in
 // the apiserver and schedules the next iteration. It is the single point that
 // patches the ScheduledBackup status; both the Get-first observation path and
 // the createBackup path funnel through here so the invariants stay aligned.
-func advanceScheduledBackupStatus(
+func (r *ScheduledBackupReconciler) advanceScheduledBackupStatus(
 	ctx context.Context,
-	event record.EventRecorder,
-	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
 	backupTime time.Time,
 	now time.Time,
@@ -338,7 +332,7 @@ func advanceScheduledBackupStatus(
 	nextBackupTime := schedule.Next(now)
 	scheduledBackup.Status.NextScheduleTime = &metav1.Time{Time: nextBackupTime}
 
-	if err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {
+	if err := r.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {
 		if apierrs.IsConflict(err) {
 			// Stale view of the resource; let the next reconcile re-read and retry.
 			contextLogger.Debug("Conflict while updating scheduled backup status", "error", err)
@@ -348,7 +342,7 @@ func advanceScheduledBackupStatus(
 	}
 
 	contextLogger.Info("Next backup schedule", "next", nextBackupTime)
-	event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
+	r.Recorder.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
 	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 

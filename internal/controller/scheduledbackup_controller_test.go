@@ -53,6 +53,7 @@ func newScheduledBackupTestClient() client.Client {
 var _ = Describe("scheduledbackup createBackup", func() {
 	var (
 		cli        client.Client
+		r          *ScheduledBackupReconciler
 		ns         string
 		sb         *apiv1.ScheduledBackup
 		sched      cron.Schedule
@@ -82,12 +83,13 @@ var _ = Describe("scheduledbackup createBackup", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		recorder = record.NewFakeRecorder(10)
+		r = &ScheduledBackupReconciler{Client: cli, Recorder: recorder}
 		backupTime = time.Date(2026, 4, 17, 22, 35, 42, 0, time.UTC)
 		now = time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
 	})
 
 	It("creates a backup and advances status", func(ctx context.Context) {
-		result, err := createBackup(ctx, recorder, cli, sb, backupTime, now, sched, false)
+		result, err := r.createBackup(ctx, sb, backupTime, now, sched, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
@@ -105,7 +107,7 @@ var _ = Describe("scheduledbackup createBackup", func() {
 	})
 
 	It("requeues without advancing status when Create races with an existing backup", func(ctx context.Context) {
-		// In production, the up-front Get in ReconcileScheduledBackup catches a
+		// In production, the up-front Get in reconcileScheduledBackup catches a
 		// pre-existing Backup before reaching createBackup. This branch fires
 		// only when the cache was stale at Get time but the Backup is already
 		// in the apiserver — a transient race. We requeue so the next reconcile
@@ -120,7 +122,7 @@ var _ = Describe("scheduledbackup createBackup", func() {
 		}
 		Expect(cli.Create(ctx, existing)).To(Succeed())
 
-		result, err := createBackup(ctx, recorder, cli, sb, backupTime, now, sched, false)
+		result, err := r.createBackup(ctx, sb, backupTime, now, sched, false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(Equal(time.Second))
 
@@ -131,9 +133,10 @@ var _ = Describe("scheduledbackup createBackup", func() {
 	})
 })
 
-var _ = Describe("scheduledbackup ReconcileScheduledBackup", func() {
+var _ = Describe("scheduledbackup reconcileScheduledBackup", func() {
 	var (
 		cli      client.Client
+		r        *ScheduledBackupReconciler
 		ns       string
 		sb       *apiv1.ScheduledBackup
 		recorder *record.FakeRecorder
@@ -164,12 +167,13 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup", func() {
 		Expect(cli.Status().Update(ctx, sb)).To(Succeed())
 
 		recorder = record.NewFakeRecorder(10)
+		r = &ScheduledBackupReconciler{Client: cli, Recorder: recorder}
 	})
 
 	It("creates a Backup and advances status when none exists for the iteration", func(ctx context.Context) {
 		originalLastCheck := sb.Status.LastCheckTime.Time
 
-		result, err := ReconcileScheduledBackup(ctx, recorder, cli, sb)
+		result, err := r.reconcileScheduledBackup(ctx, sb)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
@@ -207,7 +211,7 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup", func() {
 			}
 			Expect(cli.Create(ctx, existing)).To(Succeed())
 
-			result, err := ReconcileScheduledBackup(ctx, recorder, cli, sb)
+			result, err := r.reconcileScheduledBackup(ctx, sb)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
@@ -269,8 +273,8 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
 		}
 		Expect(cli.Create(ctx, existing)).To(Succeed())
 
-		recorder := record.NewFakeRecorder(10)
-		result, err := ReconcileScheduledBackup(ctx, recorder, cli, sb)
+		r := &ScheduledBackupReconciler{Client: cli, Recorder: record.NewFakeRecorder(10)}
+		result, err := r.reconcileScheduledBackup(ctx, sb)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
@@ -327,11 +331,11 @@ var _ = Describe("scheduledbackup advanceScheduledBackupStatus", func() {
 
 		schedule, err := cron.Parse(sb.Spec.Schedule)
 		Expect(err).ToNot(HaveOccurred())
-		recorder := record.NewFakeRecorder(10)
+		r := &ScheduledBackupReconciler{Client: cli, Recorder: record.NewFakeRecorder(10)}
 		now := time.Now()
 		backupTime := schedule.Next(now)
 
-		result, err := advanceScheduledBackupStatus(ctx, recorder, cli, sb, backupTime, now, schedule)
+		result, err := r.advanceScheduledBackupStatus(ctx, sb, backupTime, now, schedule)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(Equal(time.Second))
 	})
