@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -422,6 +423,11 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		IsPodReady: false,
 	}
 
+	// DescribeTable entries assert state (requeue vs. proceed) only. They also
+	// regression-lock event absence: none of these scenarios should emit an
+	// event. Event-emission assertions live in separate It blocks below — that
+	// is why the "transient /pg/status failure" case (which fires + emits)
+	// lives there rather than here.
 	DescribeTable(
 		"guards behaviour",
 		func(ctx SpecContext, currentPrimary, targetPrimary string, items []postgres.PostgresqlStatus, requeue bool) {
@@ -433,11 +439,15 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 			)
 
 			if requeue {
-				Expect(result).NotTo(BeNil())
 				Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 			} else {
-				Expect(result).To(BeNil())
+				Expect(result.IsZero()).To(BeTrue())
 			}
+
+			fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+			Expect(ok).To(BeTrue())
+			Expect(fakeRecorder.Events).ShouldNot(Receive(),
+				"DescribeTable entries must not emit events; if a new branch needs one, add a dedicated It")
 		},
 		Entry("happy path: primary Ready and reporting, no guard fires",
 			primaryName, primaryName,
@@ -445,9 +455,6 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		Entry("kubelet has not refreshed the readiness probe yet",
 			primaryName, primaryName,
 			[]postgres.PostgresqlStatus{kubeletStaleReporting, readyReportingReplica}, true),
-		Entry("transient /pg/status failure on Ready primary requeues",
-			primaryName, primaryName,
-			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, true),
 		Entry("guard is scoped to steady-state (CurrentPrimary == TargetPrimary)",
 			primaryName, newPrimaryName,
 			[]postgres.PostgresqlStatus{readyReportingReplica, readyErroringPrimary}, false),
@@ -497,7 +504,47 @@ var _ = Describe("evaluatePodReadinessGuards", func() {
 		cluster.Status.TargetPrimary = primaryName
 
 		result := env.clusterReconciler.evaluatePodReadinessGuards(ctx, cluster, statusList)
-		Expect(result).NotTo(BeNil())
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+	})
+
+	It("emits a Warning event when the primary is Ready but /pg/status is failing", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				readyReportingReplica, readyErroringPrimary,
+			}},
+		)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+
+		fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+		Expect(ok).To(BeTrue(), "test environment must wire a FakeRecorder")
+
+		var recorded string
+		Eventually(fakeRecorder.Events, "1s").Should(Receive(&recorded))
+		Expect(recorded).To(HavePrefix("Warning PrimaryStatusCheckFailed"))
+		Expect(recorded).To(ContainSubstring(primaryName))
+		Expect(recorded).To(ContainSubstring("See operator logs"))
+	})
+
+	It("does not emit an event on the kubelet-stale branch", func(ctx SpecContext) {
+		cluster.Status.CurrentPrimary = primaryName
+		cluster.Status.TargetPrimary = primaryName
+
+		result := env.clusterReconciler.evaluatePodReadinessGuards(
+			ctx, cluster,
+			postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{
+				kubeletStaleReporting, readyReportingReplica,
+			}},
+		)
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+
+		fakeRecorder, ok := env.clusterReconciler.Recorder.(*record.FakeRecorder)
+		Expect(ok).To(BeTrue())
+
+		Expect(fakeRecorder.Events).ShouldNot(Receive(),
+			"kubelet-stale branch must stay event-less to avoid noise")
 	})
 })
