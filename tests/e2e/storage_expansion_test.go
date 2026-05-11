@@ -23,7 +23,13 @@ import (
 	"fmt"
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 
@@ -114,3 +120,174 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		})
 	})
 })
+
+// OnlineResizePVC is for verifying if storage can be automatically expanded, or not
+func OnlineResizePVC(namespace, clusterName string) {
+	walStorageEnabled, err := storage.IsWalStorageEnabled(
+		env.Ctx, env.Client,
+		namespace, clusterName,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	pvc := &corev1.PersistentVolumeClaimList{}
+	By("verify PVC before expansion", func() {
+		// Verifying the first stage of deployment to compare it further with expanded value
+		err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+		Expect(err).ToNot(HaveOccurred())
+		// Iterating through PVC list to assure its default size
+		for _, pvClaim := range pvc.Items {
+			Expect(pvClaim.Status.Capacity.Storage().String()).To(BeEquivalentTo("1Gi"))
+		}
+	})
+	By("expanding Cluster storage", func() {
+		// Patching cluster to expand storage size from 1Gi to 2Gi
+		storageType := []string{"storage"}
+		if walStorageEnabled {
+			storageType = append(storageType, "walStorage")
+		}
+		for _, s := range storageType {
+			cmd := fmt.Sprintf(
+				"kubectl patch cluster %v -n %v -p '{\"spec\":{\"%v\":{\"size\":\"2Gi\"}}}' --type=merge",
+				clusterName,
+				namespace,
+				s)
+			Eventually(func() error {
+				_, _, err := run.Unchecked(cmd)
+				return err
+			}, 60, 5).Should(Succeed())
+		}
+	})
+	By("verifying Cluster storage is expanded", func() {
+		// Gathering and verifying the new size of PVC after update on cluster
+		expectedCount := 3
+		if walStorageEnabled {
+			expectedCount = 6
+		}
+		Eventually(func(g Gomega) {
+			// Variable counter to store the updated total of expanded PVCs. It should be equal to three
+			updateCount := 0
+			// Gathering PVC list
+			err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+			g.Expect(err).ToNot(HaveOccurred())
+			// Iterating through PVC list to compare with expanded size
+			for _, pvClaim := range pvc.Items {
+				// Size comparison
+				if pvClaim.Status.Capacity.Storage().String() == "2Gi" {
+					updateCount++
+				}
+			}
+			g.Expect(updateCount).To(BeEquivalentTo(expectedCount))
+		}, 300).Should(Succeed())
+	})
+}
+
+func OfflineResizePVC(namespace, clusterName string, timeout int) {
+	walStorageEnabled, err := storage.IsWalStorageEnabled(
+		env.Ctx, env.Client,
+		namespace, clusterName,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("verify PVC size before expansion", func() {
+		// Gathering PVC list for future use of comparison and deletion after storage expansion
+		pvc := &corev1.PersistentVolumeClaimList{}
+		err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+		Expect(err).ToNot(HaveOccurred())
+		// Iterating through PVC list to verify the default size for future comparison
+		for _, pvClaim := range pvc.Items {
+			Expect(pvClaim.Status.Capacity.Storage().String()).To(BeEquivalentTo("1Gi"))
+		}
+	})
+	By("expanding Cluster storage", func() {
+		// Expanding cluster storage
+		storageType := []string{"storage"}
+		if walStorageEnabled {
+			storageType = append(storageType, "walStorage")
+		}
+		for _, s := range storageType {
+			cmd := fmt.Sprintf(
+				"kubectl patch cluster %v -n %v -p '{\"spec\":{\"%v\":{\"size\":\"2Gi\"}}}' --type=merge",
+				clusterName,
+				namespace,
+				s)
+			Eventually(func() error {
+				_, _, err := run.Unchecked(cmd)
+				return err
+			}, 60, 5).Should(Succeed())
+		}
+	})
+	By("deleting Pod and PVCs, first replicas then the primary", func() {
+		// Gathering cluster primary
+		currentPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		currentPrimaryWalStorageName := currentPrimary.Name + "-wal"
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
+		}
+
+		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
+
+		// Iterating through PVC list for deleting pod and PVC for storage expansion
+		for _, p := range podList.Items {
+			// Comparing cluster pods to not be primary to ensure cluster is healthy.
+			// Primary will be eventually deleted
+			if !specs.IsPodPrimary(p) {
+				// Deleting PVC
+				_, _, err = run.Run(
+					"kubectl delete pvc " + p.Name + " -n " + namespace + " --wait=false")
+				Expect(err).ToNot(HaveOccurred())
+				// Deleting WalStorage PVC if needed
+				if walStorageEnabled {
+					_, _, err = run.Run(
+						"kubectl delete pvc " + p.Name + "-wal" + " -n " + namespace + " --wait=false")
+					Expect(err).ToNot(HaveOccurred())
+				}
+				// Deleting standby and replica pods
+				err = podutils.Delete(env.Ctx, env.Client, namespace, p.Name, quickDelete)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		}
+		AssertClusterIsReady(namespace, clusterName, timeout, env)
+
+		// Deleting primary pvc
+		_, _, err = run.Run(
+			"kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false")
+		Expect(err).ToNot(HaveOccurred())
+		// Deleting Primary WalStorage PVC if needed
+		if walStorageEnabled {
+			_, _, err = run.Run(
+				"kubectl delete pvc " + currentPrimaryWalStorageName + " -n " + namespace + " --wait=false")
+			Expect(err).ToNot(HaveOccurred())
+		}
+		// Deleting primary pod
+		err = podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary.Name, quickDelete)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AssertClusterIsReady(namespace, clusterName, timeout, env)
+	By("verifying Cluster storage is expanded", func() {
+		// Gathering PVC list for comparison
+		pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
+		Expect(err).ToNot(HaveOccurred())
+		// Gathering PVC size and comparing with expanded value
+		expectedCount := 3
+		if walStorageEnabled {
+			expectedCount = 6
+		}
+		Eventually(func() int {
+			// Bool value to ensure every pod in cluster expanded, will be eventually compared as true
+			count := 0
+			// Iterating through PVC list for comparison
+			for _, pvClaim := range pvcList.Items {
+				// Comparing to expanded value.
+				// Once all pods will be expanded, count will be equal to three
+				if pvClaim.Status.Capacity.Storage().String() == "2Gi" {
+					count++
+				}
+			}
+			return count
+		}, 30).Should(BeEquivalentTo(expectedCount))
+	})
+}

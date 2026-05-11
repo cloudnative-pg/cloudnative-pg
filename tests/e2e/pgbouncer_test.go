@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,12 +32,15 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -349,4 +353,29 @@ func createAppClientCertificates(namespace, commonName, sourceCASecretName strin
 	Expect(err).ToNot(HaveOccurred())
 
 	return caCert, clientCert, clientKey
+}
+
+func DeleteTableUsingPgBouncerService(
+	namespace,
+	clusterName,
+	poolerYamlFilePath string,
+	env *environment.TestingEnvironment,
+	pod *corev1.Pod,
+) {
+	poolerService, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
+	Expect(err).ToNot(HaveOccurred())
+
+	appUser, generatedAppUserPassword, err := secrets.GetCredentials(
+		env.Ctx, env.Client,
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+	)
+	Expect(err).ToNot(HaveOccurred())
+	AssertConnection(namespace, poolerService, testsUtils.AppDBName, appUser, generatedAppUserPassword, env)
+
+	connectionTimeout := time.Second * 10
+	dsn := services.CreateDSN(poolerService, appUser, testsUtils.AppDBName, generatedAppUserPassword,
+		services.Require, 5432)
+	_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &connectionTimeout,
+		"psql", dsn, "-tAc", "DROP TABLE table1")
+	Expect(err).ToNot(HaveOccurred())
 }

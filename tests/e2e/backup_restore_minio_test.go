@@ -961,3 +961,91 @@ func prepareClusterForPITROnMinio(
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 }
+
+func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {
+	By("Async Replication into external cluster", func() {
+		restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		// Add additional data to the source cluster
+		sourceClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sourceClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		CreateResourceFromFile(namespace, restoreClusterFile)
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+
+		// Test data should be present on restored primary
+		restoredPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// We need the credentials from the source cluster because the replica cluster
+		// doesn't create the credentials on its own namespace
+		appUser, appUserPass, err := secrets.GetCredentials(
+			env.Ctx,
+			env.Client,
+			sourceClusterName,
+			namespace,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		forwardRestored, connRestored, err := postgres.ForwardPSQLConnectionWithCreds(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			restoredClusterName,
+			postgres.AppDBName,
+			appUser,
+			appUserPass,
+		)
+		defer func() {
+			_ = connRestored.Close()
+			forwardRestored.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+
+		row := connRestored.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s", tableName))
+		var countString string
+		err = row.Scan(&countString)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(countString).To(BeEquivalentTo("2"))
+
+		forwardSource, connSource, err := postgres.ForwardPSQLConnection(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			sourceClusterName,
+			postgres.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		defer func() {
+			_ = connSource.Close()
+			forwardSource.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+
+		// Insert new data in the source cluster
+		insertRecordIntoTable(tableName, 3, connSource)
+		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
+		tableLocator := TableLocator{
+			Namespace:    namespace,
+			ClusterName:  sourceClusterName,
+			DatabaseName: postgres.AppDBName,
+			TableName:    tableName,
+		}
+		AssertDataExpectedCount(env, tableLocator, 3)
+
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		expectedReplicas := cluster.Spec.Instances - 1
+		// Cascading replicas should be attached to primary replica
+		connectedReplicas, err := postgres.CountReplicas(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			restoredPrimary, RetryTimeout,
+		)
+		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
+	})
+}

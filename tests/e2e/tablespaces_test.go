@@ -33,6 +33,7 @@ import (
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -1338,4 +1339,24 @@ func hibernateOff(
 	default:
 		return fmt.Errorf("unknown method: %v", method)
 	}
+}
+
+func AssertBackupConditionTimestampChangedInClusterStatus(
+	namespace,
+	clusterName string,
+	clusterConditionType apiv1.ClusterConditionType,
+	lastTransactionTimeStamp *metav1.Time,
+) {
+	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (bool, error) {
+			getBackupCondition, err := backups.GetConditionsInClusterStatus(
+				env.Ctx, env.Client,
+				namespace, clusterName, clusterConditionType,
+			)
+			if err != nil {
+				return false, err
+			}
+			return getBackupCondition.LastTransitionTime.After(lastTransactionTimeStamp.Time), nil
+		}, 300, 5).Should(BeTrue())
+	})
 }

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -135,3 +136,21 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 	})
 })
+
+func AssertWebhookEnabled(env *environment.TestingEnvironment, mutating, validating string) {
+	By("re-setting namespace selector for all admission controllers", func() {
+		// Setting the namespace selector in MutatingWebhook and ValidatingWebhook
+		// to nil will go back to the default behaviour
+		mWhc, position, err := operator.GetMutatingWebhookByName(env.Ctx, env.Client, mutating)
+		Expect(err).ToNot(HaveOccurred())
+		mWhc.Webhooks[position].NamespaceSelector = nil
+		err = operator.UpdateMutatingWebhookConf(env.Ctx, env.Interface, mWhc)
+		Expect(err).ToNot(HaveOccurred())
+
+		vWhc, position, err := operator.GetValidatingWebhookByName(env.Ctx, env.Client, validating)
+		Expect(err).ToNot(HaveOccurred())
+		vWhc.Webhooks[position].NamespaceSelector = nil
+		err = operator.UpdateValidatingWebhookConf(env.Ctx, env.Interface, vWhc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
