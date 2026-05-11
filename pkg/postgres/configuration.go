@@ -729,16 +729,15 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		}
 	}
 
-	// Apply the correct archive_mode
-	switch {
-	case info.IsWalArchivingDisabled:
+	// Apply the correct archive_mode.
+	// We always use "always" so that standbys also run the archive_command;
+	// the archiver itself decides whether to actually ship WAL based on the
+	// instance role, avoiding a PostgreSQL restart when a replica cluster is
+	// promoted to a primary cluster.
+	if info.IsWalArchivingDisabled {
 		configuration.OverwriteConfig("archive_mode", "off")
-
-	case info.IsReplicaCluster:
+	} else {
 		configuration.OverwriteConfig("archive_mode", "always")
-
-	default:
-		configuration.OverwriteConfig("archive_mode", "on")
 	}
 
 	// Apply the synchronous replication settings
