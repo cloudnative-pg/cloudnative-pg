@@ -25,6 +25,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
@@ -55,7 +56,7 @@ var _ = Describe("Shared ServiceAccount", Label(tests.LabelBasic), func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating a shared ServiceAccount with operator pull secrets", func() {
-			CreateResourceFromFile(namespace, sharedSAFile)
+			resources.CreateResourceFromFile(env, namespace, sharedSAFile)
 			operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(secrets.CopyOperatorPullSecretToServiceAccount(

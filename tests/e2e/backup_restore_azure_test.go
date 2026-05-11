@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -126,7 +127,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the restored cluster", func() {
-				err := DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				err := resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})

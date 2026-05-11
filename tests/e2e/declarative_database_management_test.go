@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
@@ -104,7 +105,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				databaseObjectName string
 			)
 			By("applying Database CRD manifest", func() {
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -228,7 +229,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 					"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
 				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 			})
 			By("ensuring the database is reconciled successfully", func() {
 				// get database object

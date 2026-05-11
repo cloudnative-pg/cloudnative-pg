@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -174,7 +175,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		})
 
 		By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-			CreateResourceFromFile(namespace, sampleFile)
+			resources.CreateResourceFromFile(env, namespace, sampleFile)
 		})
 
 		By("verifying cluster reaches ready condition", func() {

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
@@ -96,12 +97,12 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			CreateResourceFromFile(namespace, postInitSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
-			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitApplicationSQLConfigMapRef)
-			CreateResourceFromFile(namespace, postInitTemplateSQLSecretRef)
-			CreateResourceFromFile(namespace, postInitTemplateSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitApplicationSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitApplicationSQLConfigMapRef)
+			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLSecretRef)
+			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLConfigMapRef)
 
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 

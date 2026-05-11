@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -348,7 +349,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the cluster to be restored through snapshot", func() {
-				CreateResourceFromFile(namespace, clusterRestoreFromBarmanManifest)
+				resources.CreateResourceFromFile(env, namespace, clusterRestoreFromBarmanManifest)
 				// A delay of 5 min when restoring with tablespaces is normal, let's give extra time
 				AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
 					env)
@@ -547,7 +548,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot", func() {
-					CreateResourceFromFile(namespace, clusterVolumesnapshoRestoreManifest)
+					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)
 					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
 						env)
 				})
@@ -647,7 +648,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot", func() {
-					CreateResourceFromFile(namespace, clusterVolumesnapshoPITRManifest)
+					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoPITRManifest)
 					AssertClusterIsReady(namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow],
 						env)
 				})

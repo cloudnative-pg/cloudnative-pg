@@ -31,6 +31,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
@@ -107,7 +108,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		}, timeout).Should(BeEquivalentTo(namespace))
 	})
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-		CreateResourceFromFile(namespace, sampleFile)
+		resources.CreateResourceFromFile(env, namespace, sampleFile)
 	})
 	By("having a Cluster with three instances ready", func() {
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)

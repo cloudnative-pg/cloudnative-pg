@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -70,7 +71,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			})
 
 			By(fmt.Sprintf("creating a cluster in the %v namespace", namespace), func() {
-				CreateResourceFromFile(namespace, sampleFile)
+				resources.CreateResourceFromFile(env, namespace, sampleFile)
 			})
 
 			// The cluster should be created but the pods shouldn't be scheduled

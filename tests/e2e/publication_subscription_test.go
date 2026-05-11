@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -132,8 +133,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
-			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
+			Expect(resources.DeleteResourcesFromFile(env, namespace, destinationDatabaseManifest)).To(Succeed())
+			Expect(resources.DeleteResourcesFromFile(env, namespace, sourceDatabaseManifest)).To(Succeed())
 			Eventually(QueryMatchExpectationPredicate(sourcePrimaryPod, postgres.PostgresDBName,
 				databaseExistsQuery(dbname), "f"), 30).Should(Succeed())
 			Eventually(QueryMatchExpectationPredicate(destPrimaryPod, postgres.PostgresDBName,
@@ -146,7 +147,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("applying the %s Database CRD manifest", databaseObjectName), func() {
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 			})
 
 			By(fmt.Sprintf("ensuring the %s Database CRD succeeded reconciliation", databaseObjectName), func() {
@@ -177,7 +178,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).NotTo(HaveOccurred())
 
 			By("applying Publication CRD manifest", func() {
-				CreateResourceFromFile(namespace, publicationManifest)
+				resources.CreateResourceFromFile(env, namespace, publicationManifest)
 			})
 
 			By("ensuring the Publication CRD succeeded reconciliation", func() {
@@ -210,7 +211,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).NotTo(HaveOccurred())
 
 			By("applying Subscription CRD manifest", func() {
-				CreateResourceFromFile(namespace, subscriptionManifest)
+				resources.CreateResourceFromFile(env, namespace, subscriptionManifest)
 			})
 
 			By("ensuring the Subscription CRD succeeded reconciliation", func() {

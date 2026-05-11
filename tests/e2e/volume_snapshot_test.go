@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -458,7 +459,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the backup", func() {
-					err := CreateResourcesFromFileWithError(namespace, backupFileFilePath)
+					err := resources.CreateResourcesFromFileWithError(env, namespace, backupFileFilePath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -503,7 +504,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the restore", func() {
-					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreFilePath)
 					AssertClusterIsReady(namespace,
 						clusterToRestoreName,
 						testTimeouts[timeouts.ClusterIsReady],
@@ -526,7 +527,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the backup", func() {
-					err := CreateResourcesFromFileWithError(namespace, backupPrimaryFilePath)
+					err := resources.CreateResourcesFromFileWithError(env, namespace, backupPrimaryFilePath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 

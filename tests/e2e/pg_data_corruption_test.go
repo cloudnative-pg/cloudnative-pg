@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -220,7 +221,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})
@@ -230,7 +231,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-no-slots.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})
@@ -240,7 +241,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-roles.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})

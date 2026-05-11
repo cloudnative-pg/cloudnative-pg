@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -222,7 +223,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			databaseName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 			Expect(err).NotTo(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
-			CreateResourceFromFile(namespace, databaseManifest)
+			resources.CreateResourceFromFile(env, namespace, databaseManifest)
 		})
 
 		By("checking volumes and volumeMounts", func() {
@@ -351,7 +352,7 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-			CreateResourceFromFile(namespace, databaseManifest)
+			resources.CreateResourceFromFile(env, namespace, databaseManifest)
 		})
 
 		By("checking volumes and volumeMounts", func() {

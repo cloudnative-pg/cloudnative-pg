@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
@@ -116,7 +117,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		AfterAll(func() {
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
 			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
-			err := DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -273,7 +274,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the restored cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -332,7 +333,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the standby cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioStandbySampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioStandbySampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -391,7 +392,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -458,12 +459,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the primary cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioCustomSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioCustomSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("deleting the restored cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -656,12 +657,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the first cluster", func() {
-				err = DeleteResourcesFromFile(namespace, firstClusterFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, firstClusterFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("deleting the second cluster", func() {
-				err = DeleteResourcesFromFile(namespace, secondClusterFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, secondClusterFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -789,7 +790,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				AssertDataExpectedCount(env, tableLocator, 2)
 
 				By("deleting the restored cluster", func() {
-					err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
+					err = resources.DeleteResourcesFromFile(env, namespace, externalClusterFileMinio)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -969,7 +970,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		// Add additional data to the source cluster
 		sourceClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sourceClusterFile)
 		Expect(err).ToNot(HaveOccurred())
-		CreateResourceFromFile(namespace, restoreClusterFile)
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
 

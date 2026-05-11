@@ -25,7 +25,8 @@ SPDX-License-Identifier: Apache-2.0
 // required timeouts map explicitly rather than reach for package-level state.
 //
 // Layering rules:
-//   - tests/utils/<x>/   primitives over k8s / postgres state
-//   - tests/internal/asserts/<x>/ composed assertions, may depend on tests/utils
-//   - tests/e2e/         specs only, depend on both
+//   - tests/utils/<x>/            primitives over k8s / postgres state, no ginkgo
+//   - tests/internal/resources/   ginkgo-coupled helpers that materialise YAML; not assertions
+//   - tests/internal/asserts/<x>/ composed assertions, may depend on tests/utils and resources
+//   - tests/e2e/                  specs only, depend on the above
 package asserts

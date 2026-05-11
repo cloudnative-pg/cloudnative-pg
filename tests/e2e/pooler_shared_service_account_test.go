@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -63,7 +64,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		})
 
 		By("creating a shared ServiceAccount with operator pull secrets", func() {
-			CreateResourceFromFile(namespace, sharedSAFile)
+			resources.CreateResourceFromFile(env, namespace, sharedSAFile)
 			operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(secrets.CopyOperatorPullSecretToServiceAccount(
@@ -72,7 +73,7 @@ var _ = Describe("Pooler Shared ServiceAccount", Label(tests.LabelBasic), func()
 		})
 
 		By("creating pooler using shared ServiceAccount", func() {
-			CreateResourceFromFile(namespace, pooler1File)
+			resources.CreateResourceFromFile(env, namespace, pooler1File)
 		})
 
 		By("waiting for pooler deployment to be ready", func() {

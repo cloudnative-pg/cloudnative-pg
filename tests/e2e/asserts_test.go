@@ -23,8 +23,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -47,17 +45,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/envsubst"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
-	objectsutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
@@ -238,7 +235,7 @@ func AssertCreateCluster(
 	})
 
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-		CreateResourceFromFile(namespace, sampleFile)
+		resources.CreateResourceFromFile(env, namespace, sampleFile)
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
@@ -894,7 +891,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 }
 
 func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
-	CreateResourceFromFile(namespace, backupYAMLPath)
+	resources.CreateResourceFromFile(env, namespace, backupYAMLPath)
 	scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupYAMLPath)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1301,7 +1298,7 @@ func AssertFastFailOver(
 	})
 
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-		CreateResourceFromFile(namespace, sampleFile)
+		resources.CreateResourceFromFile(env, namespace, sampleFile)
 	})
 
 	By("having a Cluster with three instances ready", func() {
@@ -1615,7 +1612,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Restoring a backup in a new cluster", func() {
-		CreateResourceFromFile(namespace, restoreClusterFile)
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
@@ -1692,7 +1689,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Restoring a backup in a new cluster", func() {
-		CreateResourceFromFile(namespace, restoreClusterFile)
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
@@ -1745,7 +1742,7 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 	By("scheduling immediate backups", func() {
 		var err error
 		// Create the ScheduledBackup
-		CreateResourceFromFile(namespace, backupYAMLPath)
+		resources.CreateResourceFromFile(env, namespace, backupYAMLPath)
 
 		// We expect the scheduled backup to be scheduled after creation
 		scheduledBackupNamespacedName := types.NamespacedName{
@@ -2018,7 +2015,7 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
-	CreateResourceFromFile(namespace, poolerYamlFilePath)
+	resources.CreateResourceFromFile(env, namespace, poolerYamlFilePath)
 	Eventually(func(g Gomega) {
 		poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
 		g.Expect(err).ToNot(HaveOccurred())
@@ -2370,115 +2367,6 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 
 // CreateResourcesFromFileWithError creates the Kubernetes objects defined in the
 // YAML sample file and returns any errors
-func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
-	wrapErr := func(err error) error { return fmt.Errorf("on CreateResourcesFromFileWithError: %w", err) }
-	yamlContent, err := GetYAMLContent(sampleFilePath)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	objects, err := yaml.ParseObjectsFromYAML(yamlContent, namespace)
-	if err != nil {
-		return wrapErr(err)
-	}
-	for _, obj := range objects {
-		if cluster, ok := obj.(*apiv1.Cluster); ok {
-			clusterutils.AddTopologySpreadConstraint(cluster)
-		}
-		_, err := objectsutils.Create(env.Ctx, env.Client, obj)
-		if err != nil {
-			return wrapErr(err)
-		}
-	}
-	return nil
-}
-
-// CreateResourceFromFile creates the Kubernetes objects defined in a YAML sample file
-func CreateResourceFromFile(namespace, sampleFilePath string) {
-	Eventually(func() error {
-		return CreateResourcesFromFileWithError(namespace, sampleFilePath)
-	}, RetryTimeout, PollingTime).Should(Succeed())
-}
-
-// GetYAMLContent opens a .yaml of .template file and returns its content
-//
-// In the case of a .template file, it performs the substitution of the embedded
-// SHELL-FORMAT variables
-func GetYAMLContent(sampleFilePath string) ([]byte, error) {
-	wrapErr := func(err error) error { return fmt.Errorf("in GetYAMLContent: %w", err) }
-	cleanPath := filepath.Clean(sampleFilePath)
-	data, err := os.ReadFile(cleanPath)
-	if err != nil {
-		return nil, wrapErr(err)
-	}
-	yamlContent := data
-
-	if filepath.Ext(cleanPath) == ".template" {
-		preRollingUpdateImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-		if preRollingUpdateImg == "" {
-			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
-		}
-		csiStorageClass := os.Getenv("E2E_CSI_STORAGE_CLASS")
-		if csiStorageClass == "" {
-			csiStorageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-		}
-		envVars := buildTemplateEnvs(map[string]string{
-			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
-			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
-			"PG_MAJOR":                   strconv.FormatUint(env.PostgresVersion, 10),
-		})
-
-		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {
-			envVars["SERVER_NAME"] = serverName
-		}
-
-		yamlContent, err = envsubst.Envsubst(envVars, data)
-		if err != nil {
-			return nil, wrapErr(err)
-		}
-	}
-	return yamlContent, nil
-}
-
-func buildTemplateEnvs(additionalEnvs map[string]string) map[string]string {
-	envs := make(map[string]string)
-	rawEnvs := os.Environ()
-	for _, s := range rawEnvs {
-		keyValue := strings.Split(s, "=")
-		if len(keyValue) < 2 {
-			continue
-		}
-		envs[keyValue[0]] = keyValue[1]
-	}
-
-	for key, value := range additionalEnvs {
-		envs[key] = value
-	}
-
-	return envs
-}
-
-// DeleteResourcesFromFile deletes the Kubernetes objects described in the file
-func DeleteResourcesFromFile(namespace, sampleFilePath string) error {
-	wrapErr := func(err error) error { return fmt.Errorf("in DeleteResourcesFromFile: %w", err) }
-	yamlContent, err := GetYAMLContent(sampleFilePath)
-	if err != nil {
-		return wrapErr(err)
-	}
-
-	objects, err := yaml.ParseObjectsFromYAML(yamlContent, namespace)
-	if err != nil {
-		return wrapErr(err)
-	}
-	for _, obj := range objects {
-		err := objectsutils.Delete(env.Ctx, env.Client, obj)
-		if err != nil {
-			return wrapErr(err)
-		}
-	}
-	return nil
-}
-
 func AssertClusterReadinessStatusIsReached(
 	namespace,
 	clusterName string,

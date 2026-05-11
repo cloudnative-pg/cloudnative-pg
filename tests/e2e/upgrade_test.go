@@ -39,6 +39,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
@@ -492,7 +493,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
-			CreateResourceFromFile(upgradeNamespace, pgSecrets)
+			resources.CreateResourceFromFile(env, upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
 			_, err := secrets.CreateObjectStorageSecret(
@@ -516,7 +517,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
-			CreateResourceFromFile(upgradeNamespace, sampleFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile)
 
 			if online {
 				// Upgrading to the new release will trigger a
@@ -544,7 +545,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 
 		By("creating a Pooler with two instances", func() {
-			CreateResourceFromFile(upgradeNamespace, pgBouncerSampleFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, pgBouncerSampleFile)
 		})
 
 		// Now that everything is in place, we add a bit of data we'll use to
@@ -571,7 +572,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("uploading a backup on minio", func() {
 			// We create a Backup
-			CreateResourceFromFile(upgradeNamespace, backupFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, backupFile)
 		})
 
 		By("verifying that a backup has actually completed", func() {
@@ -596,7 +597,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("creating a ScheduledBackup", func() {
 			// We create a ScheduledBackup
-			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, scheduledBackupFile)
 		})
 		AssertScheduledBackupsAreScheduled(serverName1)
 
@@ -670,7 +671,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// set the serverName to a random name
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
-			CreateResourceFromFile(upgradeNamespace, sampleFile2)
+			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady], env)
 		})
 
@@ -680,7 +681,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// create a v1 cluster
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
-			CreateResourceFromFile(upgradeNamespace, restoreFile)
+			resources.CreateResourceFromFile(env, upgradeNamespace, restoreFile)
 			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
 				env)
 

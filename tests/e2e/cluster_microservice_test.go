@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
@@ -145,7 +146,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		importedClusterName = "cluster-pgdump-error"
 		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
-		CreateResourceFromFile(namespace, importClusterNonexistentDB)
+		resources.CreateResourceFromFile(env, namespace, importClusterNonexistentDB)
 		By("having a imported Cluster in failed state", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
@@ -334,7 +335,7 @@ func assertImportRenamesSelectedDatabase(
 	})
 
 	By("cleaning up the clusters", func() {
-		err = DeleteResourcesFromFile(namespace, sampleFile)
+		err = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(objects.Delete(env.Ctx, env.Client, importedCluster)).To(Succeed())
