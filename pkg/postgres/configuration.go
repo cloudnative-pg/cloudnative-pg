@@ -392,6 +392,32 @@ type ConfigurationInfo struct {
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
 
+	// Recovery target (post-bootstrap) — populated from
+	// cluster.Spec.RecoveryTarget. When any of these are set,
+	// the corresponding recovery_target_* GUCs are written into the
+	// generated PostgreSQL configuration. PostgreSQL requires these
+	// parameters to be set at server start, so the operator triggers
+	// a controlled rolling restart when they change.
+	//
+	// Exactly one of RecoveryTargetTime / RecoveryTargetLSN /
+	// RecoveryTargetXID / RecoveryTargetName / RecoveryTargetImmediate
+	// should be set; this is enforced at the cluster spec level.
+	RecoveryTargetTime      string
+	RecoveryTargetLSN       string
+	RecoveryTargetXID       string
+	RecoveryTargetName      string
+	RecoveryTargetImmediate bool
+	// RecoveryTargetTLI sets recovery_target_timeline (e.g. "latest" or
+	// a numeric timeline ID).
+	RecoveryTargetTLI string
+	// RecoveryTargetExclusive, when true, sets
+	// recovery_target_inclusive = false. Default is inclusive (true).
+	RecoveryTargetExclusive bool
+	// RecoveryTargetAction sets recovery_target_action: pause | promote |
+	// shutdown. When empty and any other RecoveryTarget* is set, defaults
+	// to "pause" so DR automation can verify state before promoting.
+	RecoveryTargetAction string
+
 	// The list of additional extensions to be loaded into the PostgreSQL configuration
 	AdditionalExtensions []AdditionalExtensionConfiguration
 }
@@ -403,6 +429,19 @@ func (c ConfigurationInfo) getAlterSystemEnabledValue() string {
 	}
 
 	return "off"
+}
+
+// anyRecoveryTargetSet returns true when any of the runtime recovery target
+// fields on ConfigurationInfo is set. Used to gate the rendering of the
+// recovery_target_* GUCs in the generated PostgreSQL configuration.
+func anyRecoveryTargetSet(info ConfigurationInfo) bool {
+	return info.RecoveryTargetTime != "" ||
+		info.RecoveryTargetLSN != "" ||
+		info.RecoveryTargetXID != "" ||
+		info.RecoveryTargetName != "" ||
+		info.RecoveryTargetImmediate ||
+		info.RecoveryTargetTLI != "" ||
+		info.RecoveryTargetAction != ""
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -786,6 +825,48 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig(
 			ParameterRecoveryMinApplyDelay,
 			fmt.Sprintf("%vs", math.Floor(info.RecoveryMinApplyDelay.Seconds())))
+	}
+
+	// Apply the runtime recovery target (post-bootstrap), if any.
+	//
+	// PostgreSQL requires recovery_target_* parameters to be set at server
+	// start (PGC_POSTMASTER), so any change here will be reflected in the
+	// next cnpg.config_sha256 and trigger pg_settings.pending_restart, which
+	// the operator's existing rollout machinery picks up to perform a
+	// controlled restart of the instance(s).
+	//
+	// Only meaningful for clusters in recovery (replica clusters); ignored
+	// otherwise by PostgreSQL itself.
+	if anyRecoveryTargetSet(info) {
+		if info.RecoveryTargetTime != "" {
+			configuration.OverwriteConfig("recovery_target_time", info.RecoveryTargetTime)
+		}
+		if info.RecoveryTargetLSN != "" {
+			configuration.OverwriteConfig("recovery_target_lsn", info.RecoveryTargetLSN)
+		}
+		if info.RecoveryTargetXID != "" {
+			configuration.OverwriteConfig("recovery_target_xid", info.RecoveryTargetXID)
+		}
+		if info.RecoveryTargetName != "" {
+			configuration.OverwriteConfig("recovery_target_name", info.RecoveryTargetName)
+		}
+		if info.RecoveryTargetImmediate {
+			configuration.OverwriteConfig("recovery_target", "immediate")
+		}
+		if info.RecoveryTargetTLI != "" {
+			configuration.OverwriteConfig("recovery_target_timeline", info.RecoveryTargetTLI)
+		}
+		if info.RecoveryTargetExclusive {
+			configuration.OverwriteConfig("recovery_target_inclusive", "false")
+		} else {
+			configuration.OverwriteConfig("recovery_target_inclusive", "true")
+		}
+		action := info.RecoveryTargetAction
+		if action == "" {
+			// Default to pause so DR automation can verify before promoting.
+			action = "pause"
+		}
+		configuration.OverwriteConfig("recovery_target_action", action)
 	}
 
 	if info.IncludingSharedPreloadLibraries {

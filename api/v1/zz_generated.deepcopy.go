@@ -736,6 +736,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(ReplicaClusterConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RecoveryTarget != nil {
+		in, out := &in.RecoveryTarget, &out.RecoveryTarget
+		*out = new(RecoveryTarget)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SuperuserSecret != nil {
 		in, out := &in.SuperuserSecret, &out.SuperuserSecret
 		*out = new(LocalObjectReference)

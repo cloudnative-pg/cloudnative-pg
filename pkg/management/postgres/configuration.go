@@ -31,6 +31,7 @@ import (
 	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -361,6 +362,26 @@ func createPostgresqlConfiguration(
 	// Setup minimum replay delay if we're on a replica cluster
 	if cluster.IsReplica() && cluster.Spec.ReplicaCluster.MinApplyDelay != nil {
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
+	}
+
+	// Apply runtime recovery target (post-bootstrap) only on replica
+	// clusters, where it's meaningful. PostgreSQL silently ignores
+	// recovery_target_* on a primary not in recovery, but populating the
+	// config there would still trigger needless restarts; gate on IsReplica.
+	if cluster.IsReplica() && cluster.Spec.RecoveryTarget != nil {
+		rt := cluster.Spec.RecoveryTarget
+		info.RecoveryTargetTime = pgTime.ConvertToPostgresFormat(rt.TargetTime)
+		info.RecoveryTargetLSN = rt.TargetLSN
+		info.RecoveryTargetXID = rt.TargetXID
+		info.RecoveryTargetName = rt.TargetName
+		if rt.TargetImmediate != nil && *rt.TargetImmediate {
+			info.RecoveryTargetImmediate = true
+		}
+		info.RecoveryTargetTLI = rt.TargetTLI
+		if rt.Exclusive != nil && *rt.Exclusive {
+			info.RecoveryTargetExclusive = true
+		}
+		info.RecoveryTargetAction = cluster.Spec.RecoveryTargetAction
 	}
 
 	if isSynchronizeLogicalDecodingEnabled(cluster) {

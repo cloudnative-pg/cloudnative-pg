@@ -5438,6 +5438,67 @@ spec:
                     type: array
                     x-kubernetes-list-type: atomic
                 type: object
+              recoveryTarget:
+                description: |-
+                  RecoveryTarget specifies a runtime PostgreSQL recovery target
+                  (`recovery_target_time`, `recovery_target_lsn`, `recovery_target_xid`,
+                  `recovery_target_name`) for an already-bootstrapped standby cluster.
+                  When set, the operator renders the corresponding `recovery_target_*`
+                  GUCs into the generated PostgreSQL configuration and triggers a
+                  rolling restart of the instance(s) so the GUCs take effect at server
+                  start (PostgreSQL requires `recovery_target_*` to be set at start).
+                  On reaching the target, replay pauses (default `targetAction = pause`),
+                  allowing operators to verify state before promoting via
+                  `replica.enabled = false` or by setting `targetAction = promote`.
+                  This field is meaningful only while the cluster is in recovery
+                  (i.e. `replica.enabled = true`); it is ignored for primaries.
+                properties:
+                  backupID:
+                    description: |-
+                      The ID of the backup from which to start the recovery process.
+                      If empty (default) the operator will automatically detect the backup
+                      based on targetTime or targetLSN if specified. Otherwise use the
+                      latest available backup in chronological order.
+                    type: string
+                  exclusive:
+                    description: |-
+                      Set the target to be exclusive. If omitted, defaults to false, so that
+                      in Postgres, `recovery_target_inclusive` will be true
+                    type: boolean
+                  targetImmediate:
+                    description: End recovery as soon as a consistent state is reached
+                    type: boolean
+                  targetLSN:
+                    description: The target LSN (Log Sequence Number)
+                    type: string
+                  targetName:
+                    description: |-
+                      The target name (to be previously created
+                      with `pg_create_restore_point`)
+                    type: string
+                  targetTLI:
+                    description: The target timeline ("latest" or a positive integer)
+                    type: string
+                  targetTime:
+                    description: |-
+                      The target time as a timestamp in RFC3339 format or PostgreSQL timestamp format.
+                      Timestamps without an explicit timezone are interpreted as UTC.
+                    type: string
+                  targetXID:
+                    description: The target transaction ID
+                    type: string
+                type: object
+              recoveryTargetAction:
+                description: |-
+                  RecoveryTargetAction specifies what action the server should take
+                  once the recovery target is reached. One of `pause`, `promote`,
+                  `shutdown`. Defaults to `pause` when `RecoveryTarget` is set.
+                  Maps to PostgreSQL `recovery_target_action`.
+                enum:
+                - pause
+                - promote
+                - shutdown
+                type: string
               replica:
                 description: Replica cluster configuration
                 properties:
