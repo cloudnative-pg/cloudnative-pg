@@ -94,8 +94,21 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Resolve the referenced Cluster up front: it gates the rest of the
+	// reconciliation and is required by getManagedResources.
+	cluster, err := getClusterOrNil(
+		ctx, r.Client, client.ObjectKey{Name: pooler.Spec.Cluster.Name, Namespace: pooler.Namespace})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while getting referenced cluster: %w", err)
+	}
+	if cluster == nil {
+		contextLogger.Info("Cluster not found, will retry in 30 seconds",
+			"cluster", pooler.Spec.Cluster.Name)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	// Get the set of resources we directly manage and their status
-	resources, err := r.getManagedResources(ctx, &pooler)
+	resources, err := r.getManagedResources(ctx, &pooler, cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("while getting managed resources: %w", err)
 	}
@@ -219,12 +232,6 @@ func (r *PoolerReconciler) waitForPrerequisites(
 ) *ctrl.Result {
 	contextLogger := log.FromContext(ctx)
 	waitResult := &ctrl.Result{RequeueAfter: 30 * time.Second}
-
-	if resources.Cluster == nil {
-		contextLogger.Info("Cluster not found, will retry in 30 seconds",
-			"cluster", pooler.Spec.Cluster.Name)
-		return waitResult
-	}
 
 	// For automated integration, we need AuthUserSecret
 	if pooler.IsAutomatedIntegration() && resources.AuthUserSecret == nil {

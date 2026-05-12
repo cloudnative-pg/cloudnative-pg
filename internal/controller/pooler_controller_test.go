@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -191,6 +192,31 @@ var _ = Describe("pooler_controller unit tests", func() {
 				Expect(reReqs).ToNot(ContainElement(nonExpectedRequest))
 			}
 		})
+	})
+
+	It("should requeue without panicking when the referenced cluster is missing", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		// cluster is intentionally not persisted: the Pooler references
+		// a Cluster that does not exist (e.g., it has been deleted while
+		// the Pooler still existed).
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "missing-cluster",
+				Namespace: namespace,
+			},
+		}
+		pooler := newFakePooler(env.client, cluster)
+
+		result, err := env.poolerReconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      pooler.Name,
+				Namespace: pooler.Namespace,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(30 * time.Second))
 	})
 
 	It("should make sure that isOwnedByPoolerKind works correctly", func() {
