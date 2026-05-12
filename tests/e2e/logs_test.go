@@ -32,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	logsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -107,7 +108,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 
 					// Gather the record containing the wrong query result
-					return logs.AssertQueryRecord(
+					return logsasserts.AssertQueryRecord(
 						logEntries,
 						errorTestQuery,
 						queryError.Error(),
@@ -145,8 +146,9 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				}
 
 				// Gather the record containing the wrong query result
-				return logs.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
-					logpipe.LoggingCollectorRecordName), nil
+				return logsasserts.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
+						logpipe.LoggingCollectorRecordName),
+					nil
 			}, timeout).Should(BeTrue())
 
 			// Retrieve cluster replicas
@@ -169,7 +171,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				Expect(logEntries).ToNot(BeEmpty())
 
 				// No record should be returned in this case
-				isQueryRecordContained := logs.AssertQueryRecord(
+				isQueryRecordContained := logsasserts.AssertQueryRecord(
 					logEntries,
 					queryError.Error(),
 					errorTestQuery,
