@@ -240,6 +240,57 @@ and the Kubernetes ones are aligned with the supported release page.
 
 Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
 
+## Release artifacts
+
+This section summarises the artifacts produced by a full execution of the
+release procedure, so maintainers can confirm at a glance that nothing has
+been missed.
+
+### Per released version
+
+The following artifacts are produced for **each** supported version that gets
+released:
+
+- A [GitHub release](https://github.com/cloudnative-pg/cloudnative-pg/releases)
+  on the `cloudnative-pg/cloudnative-pg` repository, with the version's
+  release notes attached.
+- The container images on the registry, published as
+  `ghcr.io/cloudnative-pg/cloudnative-pg:X.Y.Z`.
+- The OLM bundle and catalog images (suffixed `-bundle` and `-catalog` on
+  the registry), together with a pull request opened against
+  [`k8s-operatorhub/community-operators`](https://github.com/k8s-operatorhub/community-operators)
+  so the new version becomes available through
+  [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
+- Supply-chain attestations attached to the GitHub release:
+  [cosign](https://docs.sigstore.dev/cosign/) signatures (`.sig`) and
+  [Sigstore](https://www.sigstore.dev/) bundles (`.sigstore.json`) covering
+  the release artifacts and the container images, SBOMs (`.sbom.json`)
+  for the released binaries, and SLSA provenance
+  (`multiple.intoto.jsonl`).
+- The updated documentation on the
+  [CloudNativePG website](https://cloudnative-pg.io/docs/),
+  containing the release notes for that version (see
+  [Documentation on the website](#documentation-on-the-website)).
+
+### Produced once per release cycle
+
+The following artifacts are produced **once** per release cycle, regardless of
+how many supported versions are released together:
+
+- The release announcement (blog post) on the
+  [CloudNativePG website](https://cloudnative-pg.io/blog/).
+- The Helm chart for the newest released version — only one chart is
+  published per release cycle, even when multiple versions are released —
+  from the [`cloudnative-pg/charts`](https://github.com/cloudnative-pg/charts)
+  repository (see [Helm chart release](#helm-chart-release)).
+- The [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml)
+  file updated so that the listed CloudNativePG (and Kubernetes) versions
+  stay consistent with the supported releases (see
+  [Versions in the bug issue template](#versions-in-the-bug-issue-template)).
+- The Git tag on the
+  [`cloudnative-pg/api`](https://github.com/cloudnative-pg/api) repository
+  matching the newest released version.
+
 ## Release candidate
 
 It's possible to create a release candidate (RC) for a new upcoming
