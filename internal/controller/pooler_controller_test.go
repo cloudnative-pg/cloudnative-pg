@@ -243,25 +243,6 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 	})
 
-	It("waitForPrerequisites marks the pooler Inactive when the cluster is missing", func() {
-		ctx := context.Background()
-		namespace := newFakeNamespace(env.client)
-		cluster := newFakeCNPGCluster(env.client, namespace)
-		pooler := newFakePooler(env.client, cluster)
-		res := &poolerManagedResources{Cluster: nil}
-
-		ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
-		Expect(ctrlRes).ToNot(BeNil())
-
-		var fetched apiv1.Pooler
-		Expect(env.client.Get(ctx,
-			types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
-			&fetched)).To(Succeed())
-		Expect(fetched.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
-		Expect(fetched.Status.PhaseReason).To(ContainSubstring("Cluster"))
-		Expect(fetched.Status.PhaseReason).To(ContainSubstring("not found"))
-	})
-
 	It("setPoolerPhase skips the API update when phase and reason already match", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
@@ -285,6 +266,108 @@ var _ = Describe("pooler_controller unit tests", func() {
 			&after)).To(Succeed())
 		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
 	})
+})
+
+var _ = Describe("waitForPrerequisites function tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("waitForPrerequisites returns nil when all prerequisites are present", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+
+		res := &poolerManagedResources{
+			AuthUserSecret:  &corev1.Secret{},
+			ClientTLSSecret: &corev1.Secret{},
+			ClientCASecret:  &corev1.Secret{},
+			ServerCASecret:  &corev1.Secret{},
+			Cluster:         cluster,
+		}
+		ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
+		Expect(ctrlRes).To(BeNil())
+	})
+
+	DescribeTable("waitForPrerequisites marks the pooler Inactive when a resource is missing",
+		func(
+			setupPooler func(*apiv1.Pooler),
+			buildResources func(*apiv1.Cluster) *poolerManagedResources,
+			expectedSubstring string,
+		) {
+			ctx := context.Background()
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pooler := newFakePooler(env.client, cluster)
+			if setupPooler != nil {
+				setupPooler(pooler)
+				Expect(env.client.Update(ctx, pooler)).To(Succeed())
+			}
+
+			res := buildResources(cluster)
+			ctrlRes := env.poolerReconciler.waitForPrerequisites(ctx, pooler, res)
+			Expect(ctrlRes).ToNot(BeNil())
+
+			var fetched apiv1.Pooler
+			Expect(env.client.Get(ctx,
+				types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
+				&fetched)).To(Succeed())
+			Expect(fetched.Status.Phase).To(Equal(apiv1.PoolerPhaseInactive))
+			Expect(fetched.Status.PhaseReason).To(ContainSubstring(expectedSubstring))
+			Expect(fetched.Status.PhaseReason).To(ContainSubstring("not found"))
+		},
+		Entry("AuthUserSecret missing (automated integration)",
+			nil,
+			func(_ *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{}
+			},
+			"AuthUserSecret",
+		),
+		Entry("ServerTLSSecret missing (manual TLS)",
+			func(p *apiv1.Pooler) {
+				p.Spec.PgBouncer.ServerTLSSecret = &apiv1.LocalObjectReference{Name: "custom-server-tls"}
+			},
+			func(_ *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{}
+			},
+			"ServerTLSSecret",
+		),
+		Entry("ClientTLSSecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret: &corev1.Secret{},
+					Cluster:        cluster,
+				}
+			},
+			"ClientTLSSecret",
+		),
+		Entry("ClientCASecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret:  &corev1.Secret{},
+					ClientTLSSecret: &corev1.Secret{},
+					Cluster:         cluster,
+				}
+			},
+			"ClientCASecret",
+		),
+		Entry("ServerCASecret missing",
+			nil,
+			func(cluster *apiv1.Cluster) *poolerManagedResources {
+				return &poolerManagedResources{
+					AuthUserSecret:  &corev1.Secret{},
+					ClientTLSSecret: &corev1.Secret{},
+					ClientCASecret:  &corev1.Secret{},
+					Cluster:         cluster,
+				}
+			},
+			"ServerCASecret",
+		),
+	)
 })
 
 var _ = Describe("isOwnedByPooler function tests", func() {
