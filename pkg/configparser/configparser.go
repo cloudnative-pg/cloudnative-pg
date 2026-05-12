@@ -155,7 +155,7 @@ func ensurePointerToStruct(name string, data interface{}) {
 		name,
 		reflect.TypeOf(data).String())
 
-	if reflect.TypeOf(data).Kind() != reflect.Ptr {
+	if reflect.TypeOf(data).Kind() != reflect.Pointer {
 		panic(errMsg)
 	}
 

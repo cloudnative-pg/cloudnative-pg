@@ -16,7 +16,7 @@ linters:
     - gocyclo
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -43,6 +43,18 @@ linters:
     - wastedassign
     - whitespace
   settings:
+    goconst:
+      min-occurrences: 10
+      # RBAC verb strings are stable Kubernetes API values not defined as constants
+      # in k8s.io/api/rbac/v1 — extracting them adds noise without reducing risk.
+      ignore-string-values:
+        - "^get$"
+        - "^list$"
+        - "^watch$"
+        - "^create$"
+        - "^patch$"
+        - "^update$"
+        - "^delete$"
     gosec:
       excludes:
         - G101
@@ -101,7 +113,7 @@ linters:
         source: ginkgo|gomega
       - linters:
           - goconst
-        path: _test\.go
+        path: (_test\.go|^tests/)
       - linters:
           - lll
         source: //\s*\+

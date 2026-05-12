@@ -40,6 +40,9 @@ const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 // PgTablespaceVolumePath is the base path used by tablespace when present
 const PgTablespaceVolumePath = "/var/lib/postgresql/tablespaces"
 
+// pgdataVolumeName is the name of the PGDATA volume
+const pgdataVolumeName = "pgdata"
+
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func MountForTablespace(tablespaceName string) string {
@@ -94,7 +97,7 @@ func SnapshotBackupNameForTablespace(backupName, tablespaceName string) string {
 func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
-			Name: "pgdata",
+			Name: pgdataVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: podName,
@@ -225,7 +228,7 @@ func createVolumesAndVolumeMountsForSQLRefs(
 func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      "pgdata",
+			Name:      pgdataVolumeName,
 			MountPath: "/var/lib/postgresql/data",
 		},
 		{

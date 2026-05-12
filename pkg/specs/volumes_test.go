@@ -312,7 +312,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "pgdata",
+				Name:             pgdataVolumeName,
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/data",
 				SubPath:          "",
@@ -331,7 +331,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		},
 		[]corev1.VolumeMount{
 			{
-				Name:             "pgdata",
+				Name:             pgdataVolumeName,
 				ReadOnly:         false,
 				MountPath:        "/var/lib/postgresql/data",
 				SubPath:          "",
@@ -403,7 +403,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "pgdata",
+				Name: pgdataVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1",
@@ -422,7 +422,7 @@ var _ = DescribeTable("test creation of volumes",
 		},
 		[]corev1.Volume{
 			{
-				Name: "pgdata",
+				Name: pgdataVolumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: "pod-1",

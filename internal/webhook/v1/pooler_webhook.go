@@ -135,7 +135,7 @@ func (v *PoolerCustomValidator) ValidateCreate(_ context.Context, pooler *apiv1.
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
@@ -162,7 +162,7 @@ func (v *PoolerCustomValidator) ValidateUpdate(
 	}
 
 	return warns, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Pooler"},
 		pooler.Name, allErrs)
 }
 
