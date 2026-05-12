@@ -81,21 +81,26 @@ fi
 # --- Action Aliases for Backward Compatibility ---
 case "$ACTION" in
     deploy)
-        if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
-            if [[ "${OPERATOR}" != "local" ]]; then
-                echo "ERROR: Helm deployment is only supported with OPERATOR=local" >&2
+        case "${CNPG_DEPLOYMENT_METHOD}" in
+            helm)
+                if [[ "${OPERATOR}" != "local" ]]; then
+                    echo "ERROR: Helm deployment is only supported with OPERATOR=local" >&2
+                    exit 1
+                fi
+                ACTION="deploy-from-helm"
+                ;;
+            manifest)
+                if [[ "${OPERATOR}" != "local" ]]; then
+                    ACTION="deploy-from-manifest"
+                else
+                    ACTION="deploy-from-sources"
+                fi
+                ;;
+            *)
+                echo "ERROR: unknown CNPG_DEPLOYMENT_METHOD='${CNPG_DEPLOYMENT_METHOD}'. Expected 'manifest' or 'helm'." >&2
                 exit 1
-            fi
-            ACTION="deploy-from-helm"
-        fi
-
-        if [[ "${CNPG_DEPLOYMENT_METHOD}" == "manifest" ]]; then
-            if [[ "${OPERATOR}" != "local" ]]; then
-                ACTION="deploy-from-manifest"
-            else
-                ACTION="deploy-from-sources"
-            fi
-        fi
+                ;;
+        esac
         ;;
 esac
 
