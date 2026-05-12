@@ -19,12 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 
 // Package backup provides Ginkgo/Gomega assertions around backup/restore
 // flows: BackupCondition checks, ScheduledBackup scheduling/suspension,
-// continuous archiving, and PITR restoration verification.
-//
-// Restore variants that depend on streaming-replication checks or
-// application-database password rotation live in
-// tests/internal/asserts/replication and tests/internal/asserts/secrets respectively, and
-// are added in a later refactor step.
+// continuous archiving, restoration (with/without application DB), and
+// PITR verification.
 package backup
 
 import (
@@ -38,12 +34,17 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -330,4 +331,227 @@ func getScheduledBackupCompleteBackupsCount(
 		}
 	}
 	return completed, nil
+}
+
+// AssertClusterRestore restores a cluster from restoreClusterFile, waits
+// for it to be ready, checks that the test data table is there, the
+// timeline is 2, and the standbys stream from the new primary.
+func AssertClusterRestore(
+	env *environment.TestingEnvironment,
+	testTimeouts map[timeouts.Timeout]int,
+	namespace, restoreClusterFile, tableName string,
+) {
+	GinkgoHelper()
+	restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreClusterFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("Restoring a backup in a new cluster", func() {
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
+
+		clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+
+		primary := restoredClusterName + "-1"
+		tableLocator := pgasserts.TableLocator{
+			Namespace:    namespace,
+			ClusterName:  restoredClusterName,
+			DatabaseName: pgutils.AppDBName,
+			TableName:    tableName,
+		}
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+
+		// Restored primary should be on timeline 2
+		out, _, err := exec.QueryInInstancePod(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			exec.PodLocator{
+				Namespace: namespace,
+				PodName:   primary,
+			},
+			pgutils.AppDBName,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+
+		replication.AssertClusterStandbysAreStreaming(env, namespace, restoredClusterName, 140)
+	})
+}
+
+// AssertClusterRestoreWithApplicationDB asserts the full
+// AssertClusterRestore flow and additionally rotates the application
+// user password and verifies the cluster remains reachable.
+func AssertClusterRestoreWithApplicationDB(
+	env *environment.TestingEnvironment,
+	testTimeouts map[timeouts.Timeout]int,
+	namespace, restoreClusterFile, tableName string,
+) {
+	GinkgoHelper()
+	restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreClusterFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("Restoring a backup in a new cluster", func() {
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
+
+		clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+
+		tableLocator := pgasserts.TableLocator{
+			Namespace:    namespace,
+			ClusterName:  restoredClusterName,
+			DatabaseName: pgutils.AppDBName,
+			TableName:    tableName,
+		}
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+	})
+
+	By("Ensuring the restored cluster is on timeline 2", func() {
+		row, err := pgutils.RunQueryRowOverForward(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			restoredClusterName,
+			pgutils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+			"SELECT substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		var timeline string
+		err = row.Scan(&timeline)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(timeline).To(BeEquivalentTo("00000002"))
+	})
+
+	replication.AssertClusterStandbysAreStreaming(env, namespace, restoredClusterName, 140)
+
+	appUser, appUserPass, err := secrets.GetCredentials(
+		env.Ctx, env.Client,
+		restoredClusterName, namespace,
+		apiv1.ApplicationUserSecretSuffix,
+	)
+	Expect(err).ToNot(HaveOccurred())
+	secretName := restoredClusterName + apiv1.ApplicationUserSecretSuffix
+
+	By("checking the restored cluster with pre-defined app password connectable", func() {
+		pgasserts.AssertApplicationDatabaseConnection(env,
+			namespace,
+			restoredClusterName,
+			appUser,
+			pgutils.AppDBName,
+			appUserPass,
+			secretName)
+	})
+
+	By("update user application password for restored cluster and verify connectivity", func() {
+		const newPassword = "eeh2Zahohx"
+		secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName, namespace, restoredClusterName, 30)
+
+		pgasserts.AssertApplicationDatabaseConnection(env,
+			namespace,
+			restoredClusterName,
+			appUser,
+			pgutils.AppDBName,
+			newPassword,
+			secretName)
+	})
+}
+
+// AssertClusterWasRestoredWithPITRAndApplicationDB is the PITR variant of
+// AssertClusterRestoreWithApplicationDB: verifies timeline 3, table
+// contents, and that the application database password can be rotated.
+func AssertClusterWasRestoredWithPITRAndApplicationDB(
+	env *environment.TestingEnvironment,
+	testTimeouts map[timeouts.Timeout]int,
+	namespace, clusterName, tableName, lsn string,
+) {
+	GinkgoHelper()
+	clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+
+	primaryInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	secretName := clusterName + apiv1.ApplicationUserSecretSuffix
+
+	By("Ensuring the restored cluster is on timeline 3", func() {
+		row, err := pgutils.RunQueryRowOverForward(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			clusterName,
+			pgutils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		var currentWalLsn string
+		err = row.Scan(&currentWalLsn)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(currentWalLsn).To(Equal(lsn))
+
+		Expect(pgutils.CountReplicas(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			primaryInfo, environment.RetryTimeout,
+		)).To(BeEquivalentTo(2))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		tableLocator := pgasserts.TableLocator{
+			Namespace:    namespace,
+			ClusterName:  clusterName,
+			DatabaseName: pgutils.AppDBName,
+			TableName:    tableName,
+		}
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+	})
+
+	appUser, appUserPass, err := secrets.GetCredentials(
+		env.Ctx, env.Client,
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("checking the restored cluster with auto generated app password connectable", func() {
+		pgasserts.AssertApplicationDatabaseConnection(env,
+			namespace,
+			clusterName,
+			appUser,
+			pgutils.AppDBName,
+			appUserPass,
+			secretName)
+	})
+
+	By("update user application password for restored cluster and verify connectivity", func() {
+		const newPassword = "eeh2Zahohx"
+		secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName, namespace, clusterName, 30)
+		pgasserts.AssertApplicationDatabaseConnection(env,
+			namespace,
+			clusterName,
+			appUser,
+			pgutils.AppDBName,
+			newPassword,
+			secretName)
+	})
+}
+
+// AssertClusterImport imports a database into a new cluster, waits for
+// it to be ready, and verifies the standbys are streaming.
+func AssertClusterImport(
+	env *environment.TestingEnvironment,
+	testTimeouts map[timeouts.Timeout]int,
+	namespace, clusterWithExternalClusterName, clusterName, databaseName string,
+) *apiv1.Cluster {
+	GinkgoHelper()
+	var cluster *apiv1.Cluster
+	By("Importing Database in a new cluster", func() {
+		var err error
+		cluster, err = importdb.ImportDatabaseMicroservice(env.Ctx, env.Client, namespace, clusterName,
+			clusterWithExternalClusterName, "", databaseName)
+		Expect(err).ToNot(HaveOccurred())
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterWithExternalClusterName,
+			testTimeouts[timeouts.ClusterIsReadySlow])
+
+		replication.AssertClusterStandbysAreStreaming(env, namespace, clusterWithExternalClusterName, 140)
+	})
+	return cluster
 }

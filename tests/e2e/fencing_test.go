@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
@@ -171,7 +172,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Expect(beforeFencingPodName).Should(BeEquivalentTo(currentPrimaryPodInfo.GetName()))
 			})
 			By("all followers should be streaming again from the primary instance", func() {
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 			checkFencingAnnotationSet(fencingMethod, nil)
 		})

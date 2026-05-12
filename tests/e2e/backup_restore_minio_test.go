@@ -30,8 +30,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	metricsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/metrics"
 	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -101,7 +103,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
-			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
+			metricsasserts.AssertCustomMetricsResourcesExist(env, namespace, customQueriesSampleFile, 1, 1)
 
 			// Create the cluster
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
@@ -255,11 +257,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
+			metricsasserts.AssertMetricsData(env, testTimeouts, namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
@@ -466,7 +468,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Restore backup in a new cluster
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the primary cluster", func() {
 				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioCustomSampleFile)
@@ -667,7 +669,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				// "requested timeline 2 is not a child of this server's history" and enter
 				// a crash-loop, causing this assertion to timeout. The validation logic must
 				// reject the future timeline file to allow the replica to join successfully.
-				AssertClusterStandbysAreStreaming(namespace, firstClusterName, int32(testTimeouts[timeouts.ClusterIsReadyQuick]))
+				replicationasserts.AssertClusterStandbysAreStreaming(
+					env,
+					namespace,
+					firstClusterName,
+					int32(testTimeouts[timeouts.ClusterIsReadyQuick]),
+				)
 			})
 
 			By("deleting the first cluster", func() {
@@ -792,7 +799,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestore(namespace, externalClusterFileMinio, tableName)
+				backupasserts.AssertClusterRestore(env, testTimeouts, namespace, externalClusterFileMinio, tableName)
 
 				// verify test data on restored external cluster
 				tableLocator = pgasserts.TableLocator{
@@ -863,12 +870,12 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 					namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			AssertClusterWasRestoredWithPITRAndApplicationDB(
+			backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 				namespace,
 				externalClusterRestoreName,
 				tableName,
-				"00000002",
-			)
+				"00000002")
+
 			By("delete restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 			})

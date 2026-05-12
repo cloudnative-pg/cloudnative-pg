@@ -24,6 +24,8 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -55,7 +57,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithReplicationSlots)
 
-			AssertClusterHAReplicationSlots(clusterName, namespace)
+			replicationasserts.AssertClusterHAReplicationSlots(env, clusterName, namespace)
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
@@ -64,8 +66,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				timeout := 300
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
-			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterHAReplicationSlots(clusterName, namespace)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
+			replicationasserts.AssertClusterHAReplicationSlots(env, clusterName, namespace)
 
 			// Remove a node from the cluster and verify the cluster has one
 			// element less
@@ -75,7 +77,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				timeout := 60
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
-			AssertClusterHAReplicationSlots(clusterName, namespace)
+			replicationasserts.AssertClusterHAReplicationSlots(env, clusterName, namespace)
 
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
 				clusterasserts.AssertPVCCount(env, namespace, clusterName, expectedPvcCount, 60)
@@ -100,7 +102,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				timeout := 300
 				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 
 			// Remove a node from the cluster and verify the cluster has one
 			// element less

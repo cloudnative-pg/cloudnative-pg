@@ -32,6 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -86,7 +87,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
-			AssertClusterHAReplicationSlots(namespace, clusterName)
+			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
 		})
 	})
 })
@@ -200,7 +201,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
 
-	AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
+	replicationasserts.AssertStandbysFollowPromotion(env, testTimeouts, namespace, clusterName, maxReattachTime)
 
-	AssertWritesResumedBeforeTimeout(namespace, clusterName, maxSwitchoverTime)
+	replicationasserts.AssertWritesResumedBeforeTimeout(env, namespace, clusterName, maxSwitchoverTime)
 }

@@ -29,8 +29,10 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -87,7 +89,9 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		pgasserts.AssertCreateTestDataLargeObject(env, namespace, sourceClusterName, oid, data)
 
 		importedClusterName = "cluster-pgdump-large-object"
-		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
+		cluster := backupasserts.AssertClusterImport(
+			env, testTimeouts, namespace, importedClusterName, sourceClusterName, "app",
+		)
 		tableLocator = pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
@@ -113,7 +117,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
 		importedClusterName = "cluster-pgdump"
-		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
+		backupasserts.AssertClusterImport(env, testTimeouts, namespace, importedClusterName, sourceClusterName, "app")
 		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
@@ -316,7 +320,7 @@ func assertImportRenamesSelectedDatabase(
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
 		clusterasserts.AssertClusterIsReady(env, namespace, importedClusterName, 1000)
-		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 140)
+		replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, importedClusterName, 140)
 	})
 
 	tableLocator := pgasserts.TableLocator{

@@ -95,7 +95,13 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 
 		It("restores a backed up cluster", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestoreWithApplicationDB(
+				env,
+				testTimeouts,
+				namespace,
+				clusterRestoreSampleFile,
+				tableName,
+			)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled.
@@ -224,7 +230,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestoreWithApplicationDB(namespace, externalClusterFileAzurite, tableName)
+			backupasserts.AssertClusterRestoreWithApplicationDB(
+				env,
+				testTimeouts,
+				namespace,
+				externalClusterFileAzurite,
+				tableName,
+			)
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -242,12 +254,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
 			Expect(err).NotTo(HaveOccurred())
 
-			AssertClusterWasRestoredWithPITRAndApplicationDB(
+			backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 				namespace,
 				externalClusterRestoreName,
 				tableName,
-				"00000002",
-			)
+				"00000002")
 
 			By("delete restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())

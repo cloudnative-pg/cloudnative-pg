@@ -22,6 +22,8 @@ package e2e
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -53,8 +55,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithReplicationSlots)
 			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
-			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterHAReplicationSlots(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
+			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
 		})
 	})
 	Context("without HA Replication slots", func() {
@@ -69,7 +71,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithoutReplicationSlots)
 			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 	})
 })

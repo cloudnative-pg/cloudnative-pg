@@ -128,7 +128,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Restore backup in a new cluster
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the restored cluster", func() {
 				err := resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
@@ -306,7 +306,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 					// Restoring cluster using a recovery barman object store, which is defined
 					// in the externalClusters section
-					AssertClusterRestore(namespace, externalClusterFileAzure, tableName)
+					backupasserts.AssertClusterRestore(env, testTimeouts, namespace, externalClusterFileAzure, tableName)
 				})
 
 			It("restores a cluster with 'PITR' from barman object using "+
@@ -337,12 +337,11 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterWasRestoredWithPITRAndApplicationDB(
+				backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 					namespace,
 					externalClusterName,
 					tableName,
-					"00000002",
-				)
+					"00000002")
 
 				By("delete restored cluster", func() {
 					Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
@@ -413,7 +412,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 					})
 
 					// Restore backup in a new cluster
-					AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreFileAzureSAS, tableName)
+					backupasserts.AssertClusterRestoreWithApplicationDB(
+						env,
+						testTimeouts,
+						namespace,
+						clusterRestoreFileAzureSAS,
+						tableName,
+					)
 				})
 
 			It("restores a cluster with 'PITR' from barman object using "+
@@ -444,12 +449,11 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterWasRestoredWithPITRAndApplicationDB(
+				backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 					namespace,
 					externalClusterName,
 					tableName,
-					"00000002",
-				)
+					"00000002")
 
 				By("delete restored cluster", func() {
 					Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())

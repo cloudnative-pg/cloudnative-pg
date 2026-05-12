@@ -32,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -155,7 +156,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			By("data is present and standbys are streaming", func() {
 				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 		})
 	})
@@ -278,7 +279,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 		})
 
 		// Scenario: all the pods of a cluster are on a single node and another schedulable node exists.
@@ -408,7 +409,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+				replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			})
 		})
 	})
@@ -519,7 +520,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 			err = nodes.UncordonAll(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 		})

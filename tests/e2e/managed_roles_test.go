@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -527,8 +528,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			Expect(err).ToNot(HaveOccurred())
 
 			By("update password from secrets", func() {
-				AssertUpdateSecret("password", newPassword, secretName,
-					namespace, clusterName, 30, env)
+				secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName,
+					namespace, clusterName, 30)
 			})
 
 			By("Verify connectivity using changed password in secret", func() {

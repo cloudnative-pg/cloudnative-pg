@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -191,6 +192,6 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 		})
 
 		// Check the labels of each PVC
-		AssertPvcHasLabels(namespace, clusterName)
+		storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 	})
 })

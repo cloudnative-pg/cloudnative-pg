@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -181,10 +182,15 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create client certificate secrets for PostgreSQL
-			CreateAndAssertServerCertificatesSecrets(namespace, clusterName, postgresServerCA, postgresServerTLS, true)
+			secretsasserts.CreateAndAssertServerCertificatesSecrets(
+				env, namespace, clusterName, postgresServerCA, postgresServerTLS, true,
+			)
 			// Create server certificate secrets for PostgreSQL
-			CreateAndAssertClientCertificatesSecrets(namespace, clusterName, postgresClientCA, postgresReplicationTLS,
-				"app-user-cert", true)
+			secretsasserts.CreateAndAssertClientCertificatesSecrets(
+				env, namespace, clusterName,
+				postgresClientCA, postgresReplicationTLS, "app-user-cert",
+				true,
+			)
 
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleCluster)
 		})

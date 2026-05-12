@@ -36,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -267,7 +268,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
@@ -424,7 +425,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.

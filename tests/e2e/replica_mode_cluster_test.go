@@ -42,6 +42,8 @@ import (
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -93,13 +95,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertCreateCluster(env, testTimeouts, replicaNamespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleTLS,
-				testTableName,
-			)
+				testTableName)
 
 			replicaName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
@@ -201,15 +202,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
-				testTableName,
-			)
+				testTableName)
 
-			AssertDetachReplicaModeCluster(
+			replicationasserts.AssertDetachReplicaModeCluster(
+				env, testTimeouts,
 				namespace,
 				srcClusterName,
 				sourceDBName,
@@ -244,13 +245,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterOneName, clusterOneFile)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				namespace,
 				clusterOneName,
 				sourceDBName,
 				clusterTwoFile,
-				testTableName,
-			)
+				testTableName)
 
 			// turn the src cluster into a replica
 			By("setting replica mode on the src cluster", func() {
@@ -331,8 +331,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					clusterTwoName, namespace,
 					apiv1.ApplicationUserSecretSuffix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertUpdateSecret("password", appSecretPassword, clusterOneName+apiv1.ApplicationUserSecretSuffix,
-					namespace, clusterOneName, 30, env)
+				secretsasserts.AssertUpdateSecret(
+					env, "password", appSecretPassword,
+					clusterOneName+apiv1.ApplicationUserSecretSuffix,
+					namespace, clusterOneName, 30,
+				)
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
@@ -379,13 +382,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			clusterasserts.AssertCreateCluster(env, testTimeouts, replicaNamespace, srcClusterName, srcClusterSample)
 
-			AssertReplicaModeCluster(
+			replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSample,
-				testTableName,
-			)
+				testTableName)
 
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := clusterutils.GetPrimary(
@@ -490,13 +492,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the backup", func() {
-				AssertReplicaModeCluster(
+				replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					testTableName,
-				)
+					testTableName)
 			})
 		})
 
@@ -569,13 +570,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the snapshot", func() {
-				AssertReplicaModeCluster(
+				replicationasserts.AssertReplicaModeCluster(env, testTimeouts,
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					testTableName,
-				)
+					testTableName)
 			})
 		})
 	})

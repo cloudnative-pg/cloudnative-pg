@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -66,8 +67,11 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
-				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts, quickDeletionPeriod,
+				namespace, sampleFileWithoutReplicationSlots, clusterName,
+				webTestFile, webTestJob, maxReattachTime, maxFailoverTime,
+			)
 		})
 	})
 
@@ -84,9 +88,13 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
-				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
-			AssertClusterHAReplicationSlots(namespace, clusterName)
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts, quickDeletionPeriod,
+				namespace, sampleFileWithReplicationSlots, clusterName,
+				webTestFile, webTestJob, maxReattachTime, maxFailoverTime,
+			)
+
+			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
 		})
 	})
 
@@ -98,8 +106,10 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(
-				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime,
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts, quickDeletionPeriod,
+				namespace, sampleFileSyncReplicas, clusterName,
+				webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime,
 			)
 		})
 	})

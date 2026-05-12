@@ -30,6 +30,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	metricsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -223,6 +224,13 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, cluster.IsMetricsTLSEnabled(), false)
+		metricsasserts.CollectAndAssertDefaultMetricsPresentOnEachPod(
+			env,
+			testTimeouts,
+			namespace,
+			clusterName,
+			cluster.IsMetricsTLSEnabled(),
+			false,
+		)
 	})
 })

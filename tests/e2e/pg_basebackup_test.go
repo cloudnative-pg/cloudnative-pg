@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -85,7 +86,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 
 			By("update user application password for dst cluster and verify connectivity", func() {
 				const newPassword = "eeh2Zahohx"
-				AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
+				secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName, namespace, dstClusterName, 30)
 				pgasserts.AssertApplicationDatabaseConnection(env,
 					namespace,
 					dstClusterName,
