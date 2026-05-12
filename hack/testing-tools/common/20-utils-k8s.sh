@@ -390,14 +390,15 @@ function deploy_operator_with_helm() {
         --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config"
     )
 
-    # Override the chart's default image with the locally-built one.
-    # Currently OPERATOR=local is the only supported value for Helm deployments,
-    # but this guard is kept explicit to ease future extension.
     # shellcheck disable=SC2153
     if [[ "${OPERATOR}" == "local" ]]; then
+        local helm_image_tag="${CONTROLLER_IMG##*:}"
+        if [[ -n "${CONTROLLER_IMG_DIGEST:-}" ]]; then
+            helm_image_tag="${helm_image_tag}@${CONTROLLER_IMG_DIGEST}"
+        fi
         helm_args+=(
             --set "image.repository=${CONTROLLER_IMG%:*}"
-            --set "image.tag=${CONTROLLER_IMG##*:}"
+            --set "image.tag=${helm_image_tag}"
             --set "additionalEnv[0].name=POSTGRES_IMAGE_NAME"
             --set "additionalEnv[0].value=${POSTGRES_IMG}"
             --set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME"
