@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -606,7 +607,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 		AssertScheduledBackupsAreScheduled(serverName1)
 
-		assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
+		pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 2)
 
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, upgradeNamespace, clusterName1)
 		Expect(err).ToNot(HaveOccurred())
@@ -669,7 +670,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
 		By("verifying connection through pooler after upgrade", func() {
-			assertReadWriteConnectionUsingPgBouncerService(upgradeNamespace, clusterName1, pgBouncerSampleFile, true)
+			pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(
+				env,
+				upgradeNamespace,
+				clusterName1,
+				pgBouncerSampleFile,
+				true,
+			)
 		})
 
 		By("installing a second Cluster on the upgraded operator", func() {
@@ -739,8 +746,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertScheduledBackupsAreScheduled(serverName1)
 
 		By("scaling down the pooler to 0", func() {
-			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
-			assertPGBouncerEndpointsContainsPodsIP(upgradeNamespace, pgBouncerSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 2)
+			pgbouncerasserts.AssertPgBouncerEndpointsContainsPodsIP(env, upgradeNamespace, pgBouncerSampleFile, 2)
 
 			Eventually(func(g Gomega) {
 				pooler := apiv1.Pooler{}
@@ -754,7 +761,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				g.Expect(err).ToNot(HaveOccurred())
 			}).Should(Succeed())
 
-			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 0)
+			pgbouncerasserts.AssertPgBouncerPodsAreReady(env, upgradeNamespace, pgBouncerSampleFile, 0)
 		})
 
 		if testOnlineUpgrade {
