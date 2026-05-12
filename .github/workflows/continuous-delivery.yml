@@ -31,9 +31,13 @@ on:
         required: false
         default: 'debug'
       cnpg_deployment_method:
-        description: 'Deployment method for CNPG operator: manifest(default), helm. Only relevant for Kind and K3D engines.'
+        description: 'Deployment method for CNPG operator. Only relevant for Kind and K3D engines.'
         required: false
         default: 'manifest'
+        type: choice
+        options:
+          - manifest
+          - helm
   schedule:
     - cron:  '0 1 * * *'
 
