@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -57,7 +58,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, namespaceErr = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		By("verifying the presence of possible logger values", func() {
 			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
@@ -202,7 +203,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 			// Here we need to verify the number of the ready pods as well as wait for
 			// the cluster status to be PhaseHealthy, using the AssertClusterIsReady.
-			AssertClusterIsReady(namespace, clusterName, timeout, env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 
 			Eventually(func() (bool, error) {
 				// Gather pod logs in the form of a JSON slice

@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -69,7 +70,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			// Create the cluster namespace
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
@@ -126,7 +127,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			})
 
 			// Expect a new primary to be elected and promoted
-			AssertNewPrimary(namespace, clusterName, currentPrimary)
+			clusterasserts.AssertNewPrimary(env, namespace, clusterName, currentPrimary)
 
 			By("expect a standby with the same name of the old primary to be created", func() {
 				namespacedName := types.NamespacedName{
@@ -153,7 +154,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			// Create the cluster namespace
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
@@ -216,7 +217,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			})
 
 			// Expect a new primary to be elected and promoted
-			AssertNewPrimary(namespace, clusterName, currentPrimary)
+			clusterasserts.AssertNewPrimary(env, namespace, clusterName, currentPrimary)
 
 			By("expect a standby with the same name of the old primary to be created", func() {
 				namespacedName := types.NamespacedName{

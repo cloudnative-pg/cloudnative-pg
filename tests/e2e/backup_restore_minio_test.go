@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -101,7 +102,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
 			// Create the cluster
-			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
 
 			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -266,7 +267,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertSwitchover(namespace, clusterName, env)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
@@ -296,7 +297,13 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbySampleFile, env)
+			clusterasserts.AssertCreateCluster(
+				env,
+				testTimeouts,
+				namespace,
+				targetClusterName,
+				clusterWithMinioStandbySampleFile,
+			)
 
 			// Create required test data
 			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
@@ -355,7 +362,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, targetClusterName, clusterWithMinioSampleFile)
 
 			// Create required test data
 			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
@@ -418,7 +425,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, customClusterName, clusterWithMinioCustomSampleFile)
 
 			// Create required test data
 			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
@@ -511,7 +518,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				*currentTimestamp,
 			)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000003")
@@ -559,7 +566,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			err = pods.Delete(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertNewPrimary(namespace, clusterName, oldPrimary)
+			clusterasserts.AssertNewPrimary(env, namespace, clusterName, oldPrimary)
 
 			tags, err = minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
@@ -609,7 +616,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating first cluster with 1 instance", func() {
-				AssertCreateCluster(namespace, firstClusterName, firstClusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, firstClusterName, firstClusterFile)
 			})
 
 			By("creating backup", func() {
@@ -618,7 +625,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("creating second cluster from backup", func() {
-				AssertCreateCluster(namespace, secondClusterName, secondClusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, secondClusterName, secondClusterFile)
 			})
 
 			By("verifying second cluster is on timeline 2", func() {
@@ -722,7 +729,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			})
 
 			// Create the cluster
-			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileMinio)
 
 			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -973,7 +980,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 
 		// Test data should be present on restored primary
 		restoredPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, restoredClusterName)

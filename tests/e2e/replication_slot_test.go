@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -55,7 +56,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		By("enabling replication slot on cluster", func() {
 			err := replicationslot.ToggleHAReplicationSlots(

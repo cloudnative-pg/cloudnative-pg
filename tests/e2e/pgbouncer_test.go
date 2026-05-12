@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
@@ -72,7 +73,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Expect(err).ToNot(HaveOccurred())
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		})
 		JustAfterEach(func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -187,7 +188,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			CreateAndAssertClientCertificatesSecrets(namespace, clusterName, postgresClientCA, postgresReplicationTLS,
 				"app-user-cert", true)
 
-			AssertCreateCluster(namespace, clusterName, sampleCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleCluster)
 		})
 
 		It("using automatic TLS configuration", func() {

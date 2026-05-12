@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -77,7 +78,7 @@ var _ = Describe("Operator High Availability", Serial,
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create Cluster
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("verifying current leader", func() {
 				// Check for the current Operator Pod leader from ConfigMap
@@ -153,7 +154,7 @@ var _ = Describe("Operator High Availability", Serial,
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect a new primary to be elected and promoted
-				AssertNewPrimary(namespace, clusterName, oldPrimary)
+				clusterasserts.AssertNewPrimary(env, namespace, clusterName, oldPrimary)
 			})
 
 			By("scale down operator replicas to 1", func() {

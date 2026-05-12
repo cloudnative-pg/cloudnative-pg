@@ -31,6 +31,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -211,7 +212,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("leaving a full disk pod fenced", func() {
 				diskSpaceDetectionTest(namespace, clusterName)

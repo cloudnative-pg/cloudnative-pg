@@ -25,6 +25,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -94,7 +95,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		})
 
 		// Create the cluster and assert it be ready
-		AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
 
 		// Get the primary
 		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)

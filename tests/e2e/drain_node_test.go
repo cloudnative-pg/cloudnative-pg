@@ -30,6 +30,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
@@ -98,7 +99,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				var err error
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			})
 
 			By("waiting for the jobs to be removed", func() {
@@ -188,7 +189,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("waiting for the jobs to be removed", func() {
 				// Wait for jobs to be removed
@@ -312,7 +313,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// Create a cluster in a namespace we'll delete after the test
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				By("waiting for the jobs to be removed", func() {
 					// Wait for jobs to be removed
@@ -445,7 +446,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Avoid pod from init jobs interfering with the tests
 			By("waiting for the jobs to be removed", func() {
@@ -495,7 +496,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			)
 
 			// Expect pods to be recreated and to be ready
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady])
 
 			// Expect pods to be running on the uncordoned node and to have new names
 			By("verifying cluster pods changed names", func() {
@@ -539,7 +540,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 		When("the PDB is disabled", func() {
 			It("can drain the primary node and recover the cluster when uncordoned", func() {
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				var drainedNodeName string
 				By("waiting for the jobs to be removed", func() {
@@ -589,7 +590,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady])
 				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})

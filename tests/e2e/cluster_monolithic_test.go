@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -78,7 +79,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceClusterFile)
 		})
 
 		By("creating several roles, one of them a superuser and source databases", func() {
@@ -155,7 +156,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				sourceRoles,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, targetClusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, targetClusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("connect to the imported cluster", func() {

@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -129,7 +130,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 				*currentTimestamp,
 			)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
@@ -261,7 +262,7 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	})
 
 	// Creating cluster
-	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSampleFile)
 
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 }

@@ -22,6 +22,7 @@ package e2e
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -57,7 +58,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the source Cluster
 			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, srcCluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcCluster)
 			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  srcClusterName,
@@ -71,9 +72,9 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the destination Cluster
 			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterBasic)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, dstClusterName, dstClusterBasic, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterBasic)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
@@ -138,9 +139,9 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			// Create the destination Cluster
 			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterTLS)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, dstClusterName, dstClusterTLS, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, dstClusterName, dstClusterTLS)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 
 			By("checking data have been copied correctly", func() {
 				tableLocator := pgasserts.TableLocator{

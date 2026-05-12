@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -60,7 +61,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating a new cluster", func() {
-			AssertCreateCluster(namespace, clusterName, sampleFileCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileCluster)
 			// Write a table and some data on the "app" database
 			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,

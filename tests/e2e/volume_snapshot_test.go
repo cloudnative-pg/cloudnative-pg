@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -110,7 +111,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				// Creating a cluster with three nodes
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			})
 
 			It("can create a Volume Snapshot", func() {
@@ -226,7 +227,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("creating the cluster to snapshot", func() {
-					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
 				By("verify connectivity of barman to minio", func() {
@@ -344,9 +345,13 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 
 					By("creating the cluster to be restored through snapshot and PITR", func() {
-						AssertCreateCluster(namespace, clusterToRestoreName, restoreFile, env)
-						AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-							env)
+						clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreFile)
+						clusterasserts.AssertClusterIsReady(
+							env,
+							namespace,
+							clusterToRestoreName,
+							testTimeouts[timeouts.ClusterIsReadySlow],
+						)
 					})
 
 					By("verifying the correct data exists in the restored cluster", func() {
@@ -440,8 +445,8 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster on which to execute the backup", func() {
-					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackupFilePath, env)
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToBackupName, clusterToBackupFilePath)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadySlow])
 				})
 			})
 
@@ -506,19 +511,16 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("executing the restore", func() {
 					resources.CreateResourceFromFile(env, namespace, clusterToRestoreFilePath)
-					AssertClusterIsReady(namespace,
+					clusterasserts.AssertClusterIsReady(env, namespace,
 						clusterToRestoreName,
-						testTimeouts[timeouts.ClusterIsReady],
-						env,
-					)
+						testTimeouts[timeouts.ClusterIsReady])
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
 					tableLocator := pgasserts.TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreName,
+						TableName:   tableName,
 					}
 					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
@@ -565,8 +567,9 @@ var _ = Describe("Verify Volume Snapshot",
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
-						env)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+					)
 				})
 			})
 
@@ -642,8 +645,9 @@ var _ = Describe("Verify Volume Snapshot",
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
-						env)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+					)
 				})
 			})
 		})
@@ -696,7 +700,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("creating the cluster to snapshot", func() {
-					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
 				By("verify connectivity of barman to minio", func() {
@@ -803,9 +807,10 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-						env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, clusterSnapshotRestoreFile)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+					)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
@@ -867,7 +872,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("checking the cluster is working", func() {
 					// Setting up a cluster with three pods is slow, usually 200-600s
-					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady], env)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady])
 				})
 
 				By("checking the new replicas have been created using the snapshot", func() {

@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,7 +53,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithReplicationSlots)
 
 			AssertClusterHAReplicationSlots(clusterName, namespace)
 			// Add a node to the cluster and verify the cluster has one more
@@ -61,7 +62,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
 			AssertPvcHasLabels(namespace, clusterName)
 			AssertClusterHAReplicationSlots(clusterName, namespace)
@@ -72,12 +73,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 60
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
 			AssertClusterHAReplicationSlots(clusterName, namespace)
 
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
-				AssertPVCCount(namespace, clusterName, expectedPvcCount, 60)
+				clusterasserts.AssertPVCCount(env, namespace, clusterName, expectedPvcCount, 60)
 			})
 		})
 	})
@@ -89,7 +90,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithoutReplicationSlots)
 
 			// Add a node to the cluster and verify the cluster has one more
 			// element
@@ -97,7 +98,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
 			AssertPvcHasLabels(namespace, clusterName)
 
@@ -107,10 +108,10 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 60
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 			})
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
-				AssertPVCCount(namespace, clusterName, expectedPvcCount, 60)
+				clusterasserts.AssertPVCCount(env, namespace, clusterName, expectedPvcCount, 60)
 			})
 		})
 	})

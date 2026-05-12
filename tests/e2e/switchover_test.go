@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,8 +51,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
-			AssertSwitchover(namespace, clusterName, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithReplicationSlots)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
 			AssertPvcHasLabels(namespace, clusterName)
 			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
@@ -66,8 +67,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithoutReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
-			AssertSwitchover(namespace, clusterName, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithoutReplicationSlots)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
 			AssertPvcHasLabels(namespace, clusterName)
 		})
 	})

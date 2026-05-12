@@ -27,6 +27,7 @@ import (
 
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -61,7 +62,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	})
 
 	It("should have proper service ip and host details for ro and rw with default installation", func() {

@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -87,7 +88,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating a cluster for the pooler", func() {
-				AssertCreateCluster(namespace, clusterName, clusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFile)
 			})
 
 			pgbouncerImage := versions.DefaultPgbouncerImage
@@ -186,7 +187,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating a cluster for the pooler", func() {
-				AssertCreateCluster(namespace, clusterName, clusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFile)
 			})
 
 			pgbouncerImage := versions.DefaultPgbouncerImage
@@ -256,7 +257,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating a cluster for the pooler", func() {
-				AssertCreateCluster(namespace, clusterName, clusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFile)
 			})
 
 			pgbouncerImage := versions.DefaultPgbouncerImage

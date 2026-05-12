@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -79,7 +80,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			// Creating a cluster with three nodes
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			OnlineResizePVC(namespace, clusterName)
 		})
 	})
@@ -103,7 +104,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			// Creating namespace
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			By("update cluster for resizeInUseVolumes as false", func() {
 				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.
 				// Check if operator does not return error
@@ -249,7 +250,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
-		AssertClusterIsReady(namespace, clusterName, timeout, env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 
 		// Deleting primary pvc
 		_, _, err = run.Run(
@@ -266,7 +267,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	AssertClusterIsReady(namespace, clusterName, timeout, env)
+	clusterasserts.AssertClusterIsReady(env, namespace, clusterName, timeout)
 	By("verifying Cluster storage is expanded", func() {
 		// Gathering PVC list for comparison
 		pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)

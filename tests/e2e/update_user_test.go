@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -63,7 +64,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		rwService := services.GetReadWriteServiceName(clusterName)
 
@@ -147,7 +148,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		rwService := services.GetReadWriteServiceName(clusterName)
 

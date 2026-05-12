@@ -29,6 +29,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -165,7 +166,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithInheritedLabelsFile)
 	})
 
 	It("verify label's and annotation's inheritance when global config-map changed", func() {

@@ -33,6 +33,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -94,7 +95,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster with managed roles", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 		})
 

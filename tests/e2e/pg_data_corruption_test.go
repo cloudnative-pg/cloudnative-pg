@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -68,7 +69,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		tableName := "test_pg_data_corruption"
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  clusterName,
@@ -213,7 +214,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				}, 300).Should(BeTrue())
 			})
 		})
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick])
 		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 	}

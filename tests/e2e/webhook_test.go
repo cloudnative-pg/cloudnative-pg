@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -80,9 +81,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		// Create a basic PG cluster
 		webhookNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, webhookNamespace, clusterName, sampleFile)
 		// Check if cluster is ready and the default values are populated
-		AssertClusterDefault(webhookNamespace, clusterName, env)
+		clusterasserts.AssertClusterDefault(env, webhookNamespace, clusterName)
 	})
 
 	It("Does not crash the operator when disabled", func() {
@@ -119,9 +120,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		// Create a basic PG cluster
 		webhookNamespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, webhookNamespace, clusterName, sampleFile)
 		// Check if cluster is ready and has no default value in the object
-		AssertClusterDefault(webhookNamespace, clusterName, env)
+		clusterasserts.AssertClusterDefault(env, webhookNamespace, clusterName)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {

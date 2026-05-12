@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -89,7 +90,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating a cluster and having it be ready", func() {
-			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 		})
 		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -269,7 +270,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("waiting for the cluster to be ready", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("verifying expected number of PVCs for tablespaces", func() {
@@ -352,8 +353,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			By("creating the cluster to be restored through snapshot", func() {
 				resources.CreateResourceFromFile(env, namespace, clusterRestoreFromBarmanManifest)
 				// A delay of 5 min when restoring with tablespaces is normal, let's give extra time
-				AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
-					env)
+				clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
 			})
 
 			By("verifying that tablespaces and PVC were created", func() {
@@ -550,8 +550,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				By("creating the cluster to be restored through snapshot", func() {
 					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoRestoreManifest)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-						env)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+					)
 				})
 
 				By("verifying that tablespaces and PVC were created", func() {
@@ -650,8 +651,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				By("creating the cluster to be restored through snapshot", func() {
 					resources.CreateResourceFromFile(env, namespace, clusterVolumesnapshoPITRManifest)
-					AssertClusterIsReady(namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow],
-						env)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToPITRName, testTimeouts[timeouts.ClusterIsReadySlow])
 				})
 
 				By("can verify tablespaces and PVC were created", func() {
@@ -733,11 +733,13 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
 			})
 			By("waiting for the cluster to be ready again", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("checking the primary didn't switch", func() {
-				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart)
+				clusterasserts.AssertPrimaryUpdateMethod(
+					env, namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodRestart,
+				)
 			})
 		})
 
@@ -808,7 +810,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[timeouts.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[timeouts.PodRollout])
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("verifying all PVCs for tablespaces are recreated", func() {
@@ -845,7 +847,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("waiting for the cluster to be ready", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 			By("adding tablespaces to the spec and patching", func() {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -885,11 +887,17 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[timeouts.PodRollout])
 			})
 			By("waiting for the cluster to be ready again", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+				clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 			})
 
 			By("checking the primary did switch", func() {
-				AssertPrimaryUpdateMethod(namespace, clusterName, initialPrimary, apiv1.PrimaryUpdateMethodSwitchover)
+				clusterasserts.AssertPrimaryUpdateMethod(
+					env,
+					namespace,
+					clusterName,
+					initialPrimary,
+					apiv1.PrimaryUpdateMethodSwitchover,
+				)
 			})
 		})
 	})
@@ -1189,7 +1197,7 @@ func assertCanHibernateClusterWithTablespaces(
 	})
 
 	By("waiting for the cluster to be ready", func() {
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 	})
 
 	By("verify tablespaces and PVC are there", func() {

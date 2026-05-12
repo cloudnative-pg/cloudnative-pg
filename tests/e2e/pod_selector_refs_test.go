@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -97,7 +98,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			}
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("resolves pod IPs in cluster status and expands pg_hba rules", func() {

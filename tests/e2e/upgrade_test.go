@@ -39,6 +39,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -541,7 +542,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Cluster ready happens after minio is ready
 		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		By("creating a Pooler with two instances", func() {
@@ -649,7 +650,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				GinkgoWriter.Printf("online manager rollout not done. Didn't find the expected Events\n")
 			}
 		}
-		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
+		clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName1, 300)
 
 		// the instance pods should not restart
 		By("verifying that the instance pods are not restarted", func() {
@@ -672,7 +673,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
 			resources.CreateResourceFromFile(env, upgradeNamespace, sampleFile2)
-			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		AssertConfUpgrade(clusterName2, upgradeNamespace)
@@ -682,8 +683,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
 			resources.CreateResourceFromFile(env, upgradeNamespace, restoreFile)
-			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
-				env)
+			clusterasserts.AssertClusterIsReady(
+				env,
+				upgradeNamespace,
+				restoredClusterName,
+				testTimeouts[timeouts.ClusterIsReadySlow],
+			)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"

@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -84,11 +85,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up source cluster", func() {
-				AssertCreateCluster(namespace, sourceClusterName, sourceClusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceClusterManifest)
 			})
 
 			By("setting up destination cluster", func() {
-				AssertCreateCluster(namespace, destinationClusterName, destinationClusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, destinationClusterName, destinationClusterManifest)
 			})
 		})
 

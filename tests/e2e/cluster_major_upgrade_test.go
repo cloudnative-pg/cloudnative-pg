@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -529,8 +530,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		clusterutils.AddTopologySpreadConstraint(cluster)
 		err := env.Client.Create(env.Ctx, cluster)
 		Expect(err).NotTo(HaveOccurred())
-		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady],
-			env)
+		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 		if cluster.Spec.Backup != nil {
 			By("verifying connectivity of barman to minio", func() {
@@ -546,7 +546,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		}
 
 		By("Performing switchover to move to timeline 2")
-		AssertSwitchover(cluster.Namespace, cluster.Name, env)
+		clusterasserts.AssertSwitchover(env, testTimeouts, cluster.Namespace, cluster.Name)
 
 		By("Verifying cluster is on timeline 2 before upgrade")
 		Eventually(func(g Gomega) {
@@ -611,7 +611,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			By("Rolling back the cluster to the initial major version")
 			applyRollback(env.Ctx, env.Client, cluster, startingImage)
 
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 			By("Verifying the cluster was rolled back to the starting version")
 			verifyPostgresVersion(env, primary, oldStdOut, scenario.startingMajor, false)
@@ -624,7 +624,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 			return
 		}
 
-		AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 
 		// The upgrade destroys all the original pods and creates new ones. We want to make sure that we have
 		// the same amount of pods as before, but with different UUIDs.

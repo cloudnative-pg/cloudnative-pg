@@ -31,6 +31,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -187,7 +188,7 @@ var _ = Describe("Certificates", func() {
 			Expect(err).ToNot(HaveOccurred())
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Create the client certificate
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -356,7 +357,7 @@ var _ = Describe("Certificates", func() {
 				serverCertSecretName,
 				false,
 			)
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			err = createClientCertificatesViaKubectlPluginFunc(
@@ -405,7 +406,7 @@ var _ = Describe("Certificates", func() {
 					clientCertSecretName,
 					false,
 				)
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 				pod := defaultPodFunc(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
 				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
@@ -446,7 +447,7 @@ var _ = Describe("Certificates", func() {
 					clientCertSecretName,
 					false,
 				)
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 				pod := defaultPodFunc(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
 				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())

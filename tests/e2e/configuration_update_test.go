@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -239,9 +240,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		if primaryUpdateMethod == apiv1.PrimaryUpdateMethodRestart {
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that pgaudit is enabled", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -280,7 +282,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			clusterutils.AddTopologySpreadConstraint(cluster)
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("1. reloading PG when a GUC requiring reload is modified", func() {
@@ -327,9 +329,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that shared_buffers setting changed", func() {
 				// Check that the new parameter has been modified in every pod
@@ -354,9 +357,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that both parameters have been modified in each pod", func() {
 				// Check that both parameters have been modified in each pod
@@ -397,9 +401,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that max_connections has been decreased in every pod", func() {
 				// Check that the new GUC has been modified in every pod
@@ -423,9 +428,10 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				updateClusterPostgresParams(postgresParams, namespace)
 			})
 
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseApplyingConfiguration, apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			By("verify that the max_connections has been set to default in every pod", func() {
 				// Check that the new parameter has been modified in every pod
@@ -484,7 +490,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			clusterutils.AddTopologySpreadConstraint(cluster)
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, cluster.Namespace, cluster.Name, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("1. reloading PG when a GUC requiring reload is modified", func() {
@@ -493,7 +499,7 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		It("2. restarting (in place) the primary after increasing max_connection", func() {
 			// Ensure cluster is fully ready after previous test configuration change
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 			var oldPrimaryPodName string
 			var newMaxConnectionsValue int

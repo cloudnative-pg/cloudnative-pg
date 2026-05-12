@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -90,7 +91,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Create the cluster
-			AssertCreateCluster(namespace, clusterName, azureBlobSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, azureBlobSampleFile)
 		})
 
 		// We back up and restore a cluster, and verify some expected data to
@@ -172,7 +173,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 				*currentTimestamp,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
@@ -265,7 +266,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				})
 
 				// Create the cluster
-				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzure, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileAzure)
 			})
 
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
@@ -370,7 +371,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				})
 
 				// Create the Cluster
-				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzureSAS, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileAzureSAS)
 			})
 
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",

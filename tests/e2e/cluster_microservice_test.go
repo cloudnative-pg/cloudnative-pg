@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -75,7 +76,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
 		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,
@@ -108,7 +109,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
 		importedClusterName = "cluster-pgdump"
@@ -143,7 +144,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		Expect(err).ToNot(HaveOccurred())
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
 
 		importedClusterName = "cluster-pgdump-error"
 		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
@@ -278,7 +279,7 @@ func assertImportRenamesSelectedDatabase(
 	clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 	Expect(err).ToNot(HaveOccurred())
 
-	AssertCreateCluster(namespace, clusterName, sampleFile, env)
+	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -314,7 +315,7 @@ func assertImportRenamesSelectedDatabase(
 			importedClusterName, imageName, dbToImport)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, importedClusterName, 1000, env)
+		clusterasserts.AssertClusterIsReady(env, namespace, importedClusterName, 1000)
 		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 140)
 	})
 

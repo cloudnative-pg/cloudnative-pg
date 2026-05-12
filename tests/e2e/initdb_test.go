@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -104,7 +105,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLSecretRef)
 			resources.CreateResourceFromFile(env, namespace, postInitTemplateSQLConfigMapRef)
 
-			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
 
 			// Data defined by postInitSQL, postInitApplicationSQL and postInitTemplateSQL
 			assertPostInitData(namespace, clusterName, "sql",
@@ -163,7 +164,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, postInitSQLCluster)
 
 			By("checking inside the database", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
