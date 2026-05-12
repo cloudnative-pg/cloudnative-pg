@@ -202,7 +202,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		}
 	})
 
-	DescribeTable("WAL volume space unavailable",
+	DescribeTable(
+		"WAL volume space unavailable",
 		func(sampleFile string) {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test

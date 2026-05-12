@@ -69,7 +69,8 @@ var _ = Describe("Certificates", func() {
 			certName,
 			cluster.Name,
 			userName,
-			cluster.Namespace))
+			cluster.Namespace,
+		))
 		if err != nil {
 			return err
 		}
@@ -234,7 +235,8 @@ var _ = Describe("Certificates", func() {
 						"kubectl patch cluster %v -n %v -p "+
 							"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
 							"\"serverTLSSecret\":\"%v\"}}}'"+
-							" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
+							" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName,
+					))
 					if err != nil {
 						return err
 					}
@@ -277,7 +279,8 @@ var _ = Describe("Certificates", func() {
 						"kubectl patch cluster %v -n %v -p "+
 							"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
 							"\"replicationTLSSecret\":\"%v\"}}}'"+
-							" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
+							" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName,
+					))
 					if err != nil {
 						return err
 					}

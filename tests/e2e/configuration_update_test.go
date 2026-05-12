@@ -297,7 +297,8 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			// Connection should fail now because we are not supplying a password
 			By("verify that connections with an empty password fail by default", func() {
 				commandTimeout := time.Second * 10
-				_, _, err := exec.Command(env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
+				_, _, err := exec.Command(
+					env.Ctx, env.Interface, env.RestClientConfig, podList.Items[0],
 					specs.PostgresContainerName, &commandTimeout,
 					"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1",
 				)

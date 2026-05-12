@@ -84,7 +84,8 @@ var _ = Describe("Operator High Availability", Serial,
 				// Check for the current Operator Pod leader from ConfigMap
 				Expect(operator.GetLeaderInfoFromLease(
 					env.Ctx, env.Interface,
-					operatorNamespace)).To(HavePrefix(operatorPodName.GetName()))
+					operatorNamespace,
+				)).To(HavePrefix(operatorPodName.GetName()))
 			})
 
 			By("scale up operator replicas to 3", func() {

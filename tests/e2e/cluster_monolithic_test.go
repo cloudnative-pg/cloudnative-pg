@@ -204,7 +204,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			databaseSuperUser), func() {
 			row := connTarget.QueryRow(fmt.Sprintf(
 				"SELECT usesuper FROM pg_catalog.pg_user WHERE usename='%s'",
-				databaseSuperUser))
+				databaseSuperUser,
+			))
 			var superUser bool
 			err := row.Scan(&superUser)
 			Expect(err).ToNot(HaveOccurred())

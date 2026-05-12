@@ -24,7 +24,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -102,7 +104,12 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupImmediateSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertScheduledBackupsImmediate(namespace, scheduledBackupImmediateSampleFile, scheduledBackupName)
+			backupasserts.AssertScheduledBackupsImmediate(
+				env,
+				namespace,
+				scheduledBackupImmediateSampleFile,
+				scheduledBackupName,
+			)
 
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
@@ -133,7 +140,14 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
+			backupasserts.AssertClusterWasRestoredWithPITR(
+				env,
+				testTimeouts,
+				namespace,
+				restoredClusterName,
+				tableName,
+				"00000002",
+			)
 
 			By("deleting the restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
@@ -149,13 +163,13 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
-				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
 					return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 3))
 			})
 
-			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+			backupasserts.AssertSuspendScheduleBackups(env, namespace, scheduledBackupName)
 		})
 	})
 })
@@ -264,7 +278,7 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	// Creating cluster
 	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSampleFile)
 
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
 }
 
 func prepareClusterBackupOnAzurite(
@@ -303,7 +317,7 @@ func prepareClusterBackupOnAzurite(
 			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
-	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzurite(
@@ -372,7 +386,7 @@ func assertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
+		latestWAL := minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
 		// verifying on blob storage using az
 		// Define what file we are looking for in Azurite.
 		// Escapes are required since az expects forward slashes to be escaped

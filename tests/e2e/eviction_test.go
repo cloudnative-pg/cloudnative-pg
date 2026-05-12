@@ -89,7 +89,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		// Checking the Pod is actually evicted and resource version changed
 		err = retry.New(
 			retry.Delay(2*time.Second),
-			retry.Attempts(timeoutSeconds)).
+			retry.Attempts(timeoutSeconds),
+		).
 			Do(
 				func() error {
 					err = env.Client.Get(env.Ctx,

@@ -191,7 +191,8 @@ func assertSwitchoverWithHistory(
 						exec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod,
-						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
+						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history",
+					)
 					if err != nil {
 						return err
 					}
@@ -287,7 +288,8 @@ func AssertClusterIsReady(
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
+		}, timeout, 2).Should(
+			BeEquivalentTo(apiv1.PhaseHealthy),
 			func() string {
 				clusterDump := testsutils.PrintClusterResources(env.Ctx, env.Client, namespace, clusterName)
 				kubeNodes, _ := nodes.DescribeKubernetesNodes(env.Ctx, env.Client)
@@ -384,7 +386,8 @@ func assertClusterHasSequentialPods(
 			"Pod serial numbers are non-sequential on a freshly created cluster.\n"+
 				"Expected: %v\n"+
 				"Actual:   %v\n",
-			expectedSerials, podSerials)
+			expectedSerials, podSerials,
+		)
 
 		if len(skippedSerials) > 0 {
 			errorMsg += fmt.Sprintf("Skipped serial number(s): %v\n", skippedSerials)
@@ -484,7 +487,8 @@ func AssertClusterReadinessStatusIsReached(
 		Eventually(func() (string, error) {
 			clusterCondition, err := backups.GetConditionsInClusterStatus(
 				env.Ctx, env.Client,
-				namespace, clusterName, apiv1.ConditionClusterReady)
+				namespace, clusterName, apiv1.ConditionClusterReady,
+			)
 			if err != nil {
 				return "", err
 			}

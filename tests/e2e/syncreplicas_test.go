@@ -98,7 +98,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	assertProbeRespectsReplicaLag := func(namespace, replicaName, probeType string) {
 		By(fmt.Sprintf(
 			"checking that %s probe of replica %s is waiting for lag to decrease before marking the pod ready",
-			probeType, replicaName), func() {
+			probeType, replicaName,
+		), func() {
 			timeout := 2 * time.Minute
 
 			// This "Eventually" block is needed because we may grab only a portion

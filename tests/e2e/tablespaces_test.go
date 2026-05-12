@@ -41,7 +41,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -215,7 +217,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					namespace, clusterBackupManifest, false,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("verifying the number of tars in minio", func() {
@@ -301,9 +303,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 				// This should be better handled inside Execute
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("verifying the number of tars in the latest base backup", func() {
@@ -440,7 +442,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					false,
 					testTimeouts[timeouts.VolumeSnapshotIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("checking that volumeSnapshots are properly labeled", func() {
@@ -507,7 +509,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 				// This should probably be moved elsewhere
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 				Eventually(func(g Gomega) {
 					backupList, err := backups.List(env.Ctx, env.Client, namespace)
@@ -630,7 +632,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					pgasserts.InsertRecordIntoTable(table2, 6, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 				})
 				By("fetching the volume snapshots", func() {
 					snapshotList, err := getSnapshots(backupName, clusterName, namespace)

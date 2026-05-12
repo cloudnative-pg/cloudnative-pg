@@ -151,7 +151,8 @@ func OnlineResizePVC(namespace, clusterName string) {
 				"kubectl patch cluster %v -n %v -p '{\"spec\":{\"%v\":{\"size\":\"2Gi\"}}}' --type=merge",
 				clusterName,
 				namespace,
-				s)
+				s,
+			)
 			Eventually(func() error {
 				_, _, err := run.Unchecked(cmd)
 				return err
@@ -210,7 +211,8 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				"kubectl patch cluster %v -n %v -p '{\"spec\":{\"%v\":{\"size\":\"2Gi\"}}}' --type=merge",
 				clusterName,
 				namespace,
-				s)
+				s,
+			)
 			Eventually(func() error {
 				_, _, err := run.Unchecked(cmd)
 				return err
@@ -237,12 +239,14 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			if !specs.IsPodPrimary(p) {
 				// Deleting PVC
 				_, _, err = run.Run(
-					"kubectl delete pvc " + p.Name + " -n " + namespace + " --wait=false")
+					"kubectl delete pvc " + p.Name + " -n " + namespace + " --wait=false",
+				)
 				Expect(err).ToNot(HaveOccurred())
 				// Deleting WalStorage PVC if needed
 				if walStorageEnabled {
 					_, _, err = run.Run(
-						"kubectl delete pvc " + p.Name + "-wal" + " -n " + namespace + " --wait=false")
+						"kubectl delete pvc " + p.Name + "-wal" + " -n " + namespace + " --wait=false",
+					)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// Deleting standby and replica pods
@@ -254,12 +258,14 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 
 		// Deleting primary pvc
 		_, _, err = run.Run(
-			"kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false")
+			"kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false",
+		)
 		Expect(err).ToNot(HaveOccurred())
 		// Deleting Primary WalStorage PVC if needed
 		if walStorageEnabled {
 			_, _, err = run.Run(
-				"kubectl delete pvc " + currentPrimaryWalStorageName + " -n " + namespace + " --wait=false")
+				"kubectl delete pvc " + currentPrimaryWalStorageName + " -n " + namespace + " --wait=false",
+			)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		// Deleting primary pod

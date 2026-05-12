@@ -140,7 +140,8 @@ func AssertCreateTestDataLargeObject(
 		_, err := pgutils.RunExecOverForward(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 			namespace, clusterName, pgutils.AppDBName,
-			apiv1.ApplicationUserSecretSuffix, query)
+			apiv1.ApplicationUserSecretSuffix, query,
+		)
 		Expect(err).ToNot(HaveOccurred())
 	})
 }
@@ -266,7 +267,8 @@ func AssertLargeObjectValue(
 					PodName:   primaryPod.Name,
 				},
 				pgutils.AppDBName,
-				query)
+				query,
+			)
 			if err != nil {
 				return "", err
 			}
@@ -287,7 +289,8 @@ func AssertPgRecoveryMode(env *environment.TestingEnvironment, pod *corev1.Pod, 
 					PodName:   pod.Name,
 				},
 				pgutils.PostgresDBName,
-				"select pg_catalog.pg_is_in_recovery()")
+				"select pg_catalog.pg_is_in_recovery()",
+			)
 			if err != nil {
 				GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", stdOut, stdErr)
 			}
@@ -336,7 +339,8 @@ func AssertCreationOfTestDataForTargetDB(
 				PodName:   currentPrimary.Name,
 			},
 			pgutils.PostgresDBName,
-			createDBQuery)
+			createDBQuery,
+		)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Open a connection to the newly created database

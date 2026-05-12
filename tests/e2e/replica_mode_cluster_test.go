@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -306,7 +307,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					TableName:    "new_test_table",
 				}
 				Eventually(func() error {
-					_, err := postgres.RunExecOverForward(ctx,
+					_, err := postgres.RunExecOverForward(
+						ctx,
 						env.Client,
 						env.Interface,
 						env.RestClientConfig,
@@ -411,7 +413,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("verify the WALs are archived from the designated primary", func() {
 				// only replica cluster has backup configure to minio,
 				// need the server name  be replica cluster name here
-				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName, replicaClusterName)
+				minioasserts.AssertArchiveWalOnMinio(
+					env, testTimeouts, minioEnv, replicaNamespace, srcClusterName, replicaClusterName,
+				)
 			})
 		})
 	})
@@ -613,7 +617,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+		_ = minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 
 		Eventually(func(g Gomega) {
 			podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
@@ -658,7 +662,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 		}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
 	}
 
-	DescribeTable("should demote and promote the clusters correctly",
+	DescribeTable(
+		"should demote and promote the clusters correctly",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
@@ -753,7 +758,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				// Speed up backup finalization
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
-				_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+				_ = minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(
@@ -917,7 +922,8 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 			for _, standby := range standbys {
 				streamingInstances, err := getStreamingInfo(standby)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(streamingInstances).To(BeEmpty(),
+				g.Expect(streamingInstances).To(
+					BeEmpty(),
 					fmt.Sprintf("the standby %s should not stream to any other instance", standby),
 				)
 			}

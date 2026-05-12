@@ -37,7 +37,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -128,7 +130,7 @@ var _ = Describe("Verify Volume Snapshot",
 					}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 					// trigger a checkpoint as the backup may run on standby
-					CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
+					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterName)
 					Eventually(func(g Gomega) {
 						backupList, err := backups.List(env.Ctx, env.Client, namespace)
 						g.Expect(err).ToNot(HaveOccurred())
@@ -262,7 +264,7 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 					// trigger a checkpoint
-					CheckPointAndSwitchWalOnPrimary(namespace, clusterToSnapshotName)
+					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToSnapshotName)
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -337,7 +339,14 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				assertRecoveryIsAtExpectedPointInTime := func(restoreFile string) {
@@ -479,7 +488,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -545,7 +554,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -612,7 +621,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				CheckPointAndSwitchWalOnPrimary(namespace, clusterToBackupName)
+				minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToBackupName)
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
@@ -623,7 +632,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -754,7 +763,14 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				By("creating a snapshot and waiting until it's completed", func() {
@@ -848,7 +864,14 @@ var _ = Describe("Verify Volume Snapshot",
 					pgasserts.InsertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				// reuse the snapshot taken from the clusterToSnapshot cluster

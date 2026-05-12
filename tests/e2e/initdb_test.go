@@ -63,7 +63,8 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		By(fmt.Sprintf(
 			"querying the %s table in the %s database defined by postInit SQL",
-			tableName, dbName), func() {
+			tableName, dbName,
+		), func() {
 			stdout, _, err := exec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{

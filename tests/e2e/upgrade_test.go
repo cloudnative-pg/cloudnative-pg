@@ -40,6 +40,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -140,7 +141,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		dockerUsername := os.Getenv("DOCKER_USERNAME")
 		dockerPassword := os.Getenv("DOCKER_PASSWORD")
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
-			_, _, err := run.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
+			_, _, err := run.Run(fmt.Sprintf(
+				`kubectl -n %v create secret docker-registry
 			cnpg-pull-secret
 			--docker-server="%v"
 			--docker-username="%v"
@@ -330,7 +332,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		err := retry.OnError(backoffCheckingEvents, shouldRetry, func() error {
 			eventList := corev1.EventList{}
-			err := env.Client.List(env.Ctx,
+			err := env.Client.List(
+				env.Ctx,
 				&eventList,
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
@@ -432,7 +435,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		var namespace string
 		By(fmt.Sprintf(
 			"having a '%s' upgradeNamespace",
-			namespacePrefix), func() {
+			namespacePrefix,
+		), func() {
 			var err error
 			// Create a upgradeNamespace for all the resources
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
@@ -569,7 +573,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, upgradeNamespace, clusterName1, serverName1)
 
 		By("uploading a backup on minio", func() {
 			// We create a Backup
@@ -731,7 +735,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, upgradeNamespace, clusterName1, serverName1)
 		AssertScheduledBackupsAreScheduled(serverName1)
 
 		By("scaling down the pooler to 0", func() {

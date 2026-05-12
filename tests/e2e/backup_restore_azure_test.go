@@ -24,7 +24,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -113,7 +115,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupFile, false,
 					testTimeouts[testUtils.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 
 				// Verifying file called data.tar should be available on Azure blob storage
 				Eventually(func() (int, error) {
@@ -139,7 +141,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+			backupasserts.AssertScheduledBackupsImmediate(env, namespace, scheduledBackupSampleFile, scheduledBackupName)
 
 			// Only one data.tar files should be present
 			Eventually(func() (int, error) {
@@ -176,7 +178,14 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
+			backupasserts.AssertClusterWasRestoredWithPITR(
+				env,
+				testTimeouts,
+				namespace,
+				restoredClusterName,
+				tableName,
+				"00000002",
+			)
 			By("deleting the restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 			})
@@ -193,7 +202,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
-				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 480)
+				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 480)
 
 				// AssertScheduledBackupsImmediate creates at least two backups, we should find
 				// their base backups
@@ -202,7 +211,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 						clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
-			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+			backupasserts.AssertSuspendScheduleBackups(env, namespace, scheduledBackupName)
 		})
 	})
 })
@@ -288,7 +297,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 							namespace, sourceBackupFileAzure, false,
 							testTimeouts[testUtils.BackupIsReady],
 						)
-						backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+						backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 						// Verifying file called data.tar should be available on Azure blob storage
 						Eventually(func() (int, error) {
 							return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
@@ -396,7 +405,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 							namespace, sourceBackupFileAzureSAS, false,
 							testTimeouts[testUtils.BackupIsReady],
 						)
-						backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+						backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 						// Verifying file called data.tar should be available on Azure blob storage
 						Eventually(func() (int, error) {
 							return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
@@ -455,7 +464,7 @@ func assertArchiveWalOnAzureBlob(namespace, clusterName string, configuration ba
 	By("archiving WALs and verifying they exist", func() {
 		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
+		latestWAL := minioasserts.SwitchWalAndGetLatestArchive(env, primary.Namespace, primary.Name)
 		// Define what file we are looking for in Azure.
 		// Escapes are required since az expects forward slashes to be escaped
 		path := fmt.Sprintf("wals\\/0000000100000000\\/%v.gz", latestWAL)
@@ -529,6 +538,6 @@ func prepareClusterForPITROnAzureBlob(
 		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
 	assertArchiveWalOnAzureBlob(namespace, clusterName, azureConfig)
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }

@@ -28,7 +28,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -152,7 +154,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 			latestTar := minio.GetFilePath(clusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -160,7 +162,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				func() {
 					backup = backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
 						testTimeouts[timeouts.BackupIsReady])
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 					Eventually(func() (int, error) {
 						return minio.CountFiles(minioEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(1))
@@ -319,7 +321,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -330,7 +332,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupStandbyFile, true,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
@@ -378,7 +380,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -389,7 +391,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupWithTargetFile, true,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
@@ -441,7 +443,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, customClusterName, clusterServerName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, customClusterName, clusterServerName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -450,7 +452,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupFileCustom, false,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, customClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, customClusterName)
 				latestBaseTar := minio.GetFilePath(clusterServerName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestBaseTar)
@@ -484,7 +486,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+			backupasserts.AssertScheduledBackupsImmediate(env, namespace, scheduledBackupSampleFile, scheduledBackupName)
 			latestBaseTar := minio.GetFilePath(clusterName, "data.tar")
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
@@ -521,7 +523,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000003")
+			backupasserts.AssertClusterWasRestoredWithPITR(
+				env, testTimeouts, namespace, restoredClusterName, tableName, "00000003",
+			)
 
 			By("deleting the restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
@@ -539,7 +543,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
-				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 300)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -547,11 +551,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					fmt.Sprintf("verify the number of backup %v is great than 2", latestTar))
 			})
 
-			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+			backupasserts.AssertSuspendScheduleBackups(env, namespace, scheduledBackupName)
 		})
 
 		It("verify tags in backed files", func() {
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 			tags, err := minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*1.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
@@ -636,7 +640,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("verifying timeline 2 history file is archived", func() {
-				AssertArchiveWalOnMinio(namespace, secondClusterName, "shared-timeline-test")
+				minioasserts.AssertArchiveWalOnMinio(
+					env, testTimeouts, minioEnv, namespace, secondClusterName, "shared-timeline-test",
+				)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, minio.GetFilePath("shared-timeline-test", "00000002.history*"))
 				}, 60).Should(BeNumerically(">", 0))
@@ -757,18 +763,18 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				}
 				pgasserts.AssertCreateTestData(env, tableLocator)
 
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 				// There should be a backup resource and
 				By("backing up a cluster and verifying it exists on minio", func() {
 					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileMinio,
 						false,
 						testTimeouts[timeouts.BackupIsReady])
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 
 					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 					// This should be better handled inside Execute
-					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 					latestTar := minio.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
@@ -842,7 +848,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio,
 					false,
 					testTimeouts[timeouts.BackupIsReady])
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -878,12 +884,12 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 			By("backing up a cluster and verifying it exists on minio", func() {
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
 					testTimeouts[timeouts.BackupIsReady])
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -966,9 +972,9 @@ func prepareClusterForPITROnMinio(
 
 		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
-	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+	minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 
 func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {
@@ -1038,7 +1044,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 
 		// Insert new data in the source cluster
 		pgasserts.InsertRecordIntoTable(tableName, 3, connSource)
-		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
+		minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, sourceClusterName, sourceClusterName)
 		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,

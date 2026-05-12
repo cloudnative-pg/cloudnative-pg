@@ -44,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -651,7 +652,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		// Verify WAL archiving continues to work after the major upgrade
 		if cluster.Spec.Backup != nil {
 			By("Verifying WAL archiving works after the major upgrade")
-			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, cluster.Namespace, cluster.Name, cluster.Name)
 		}
 	},
 		Entry("PostGIS", postgisEntry),

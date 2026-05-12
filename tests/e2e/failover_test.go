@@ -129,7 +129,8 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(postgres.CountReplicas(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					primaryPod, RetryTimeout)).To(BeEquivalentTo(1))
+					primaryPod, RetryTimeout,
+				)).To(BeEquivalentTo(1))
 			}, RetryTimeout).Should(Succeed())
 		})
 

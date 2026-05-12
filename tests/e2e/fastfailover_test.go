@@ -99,7 +99,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertFastFailOver(
-				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)
+				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime,
+			)
 		})
 	})
 })
