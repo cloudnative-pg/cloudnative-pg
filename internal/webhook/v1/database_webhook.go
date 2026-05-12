@@ -83,7 +83,7 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Database "},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Database "},
 		database.Name, allErrs)
 }
 

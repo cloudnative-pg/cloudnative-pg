@@ -561,7 +561,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -592,7 +592,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					},
 				},
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -612,7 +612,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -625,7 +625,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		reorderedPodSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-foo",
@@ -667,7 +667,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					},
 				},
 				{
-					Name: "pgdata",
+					Name: pgdataVolumeName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "test-1",
@@ -691,7 +691,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
@@ -725,7 +725,7 @@ var _ = Describe("PodSpec drift detection", func() {
 							SubPathExpr:      "",
 						},
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
@@ -795,7 +795,7 @@ var _ = Describe("PodSpec drift detection", func() {
 					Image: "postgres:13.11",
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:             "pgdata",
+							Name:             pgdataVolumeName,
 							ReadOnly:         false,
 							MountPath:        "/var/lib/postgresql/data",
 							SubPath:          "",
