@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 
@@ -63,7 +64,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		roService := fmt.Sprintf("%v-ro", clusterName)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(namespace, service, appDBName, postgres.PostgresDBName, superuserPassword, env)
+			pgasserts.AssertConnection(env, namespace, service, appDBName, postgres.PostgresDBName, superuserPassword)
 		}
 
 		AssertWritesToReplicaFails(namespace, roService, appDBName, appDBUser, appPassword)

@@ -22,6 +22,7 @@ package e2e
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -57,13 +58,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, srcCluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  srcClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 		})
 
 		It("using basic authentication", func() {
@@ -77,14 +78,14 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
 			By("checking the dst cluster with auto generated app password connectable", func() {
-				AssertApplicationDatabaseConnection(namespace, dstClusterName,
+				pgasserts.AssertApplicationDatabaseConnection(env, namespace, dstClusterName,
 					appUser, postgres.AppDBName, "", secretName)
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
 				const newPassword = "eeh2Zahohx"
 				AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
-				AssertApplicationDatabaseConnection(
+				pgasserts.AssertApplicationDatabaseConnection(env,
 					namespace,
 					dstClusterName,
 					appUser,
@@ -94,13 +95,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("checking data have been copied correctly", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -119,17 +120,17 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
-				insertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 
@@ -142,13 +143,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
 
 			By("checking data have been copied correctly", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -167,17 +168,17 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
-				insertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})

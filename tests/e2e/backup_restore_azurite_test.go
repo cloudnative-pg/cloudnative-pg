@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -275,13 +276,13 @@ func prepareClusterBackupOnAzurite(
 	// Setting up Azurite and az cli along with Postgresql cluster
 	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
 	// Write a table and some data on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableName,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 	assertArchiveWalOnAzurite(namespace, clusterName)
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
@@ -329,13 +330,13 @@ func prepareClusterForPITROnAzurite(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    "for_restore",
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := postgres.GetCurrentTimestamp(
@@ -361,7 +362,7 @@ func prepareClusterForPITROnAzurite(
 			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable("for_restore", 3, conn)
+		pgasserts.InsertRecordIntoTable("for_restore", 3, conn)
 	})
 	assertArchiveWalOnAzurite(namespace, clusterName)
 }

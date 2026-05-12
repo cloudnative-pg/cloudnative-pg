@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -125,8 +126,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 
 		// Expect other config parameters applied together with a blockedParameter to not have changed
 		for _, pod := range podList.Items {
-			Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-				"SHOW autovacuum_max_workers", "4"), RetryTimeout).ShouldNot(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+				"SHOW autovacuum_max_workers", "4"),
+				RetryTimeout).ShouldNot(Succeed())
 		}
 	}
 
@@ -200,8 +202,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 		By("verify that work_mem result as expected", func() {
 			// Check that GUCs has been modified in every pod
 			for _, pod := range podList.Items {
-				Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-					"SHOW work_mem", "8MB"), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+					"SHOW work_mem", "8MB"),
+					RetryTimeout).Should(Succeed())
 			}
 		})
 	}
@@ -243,12 +246,13 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 			By("verify that pgaudit is enabled", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName,
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName,
 					"SELECT extname FROM pg_extension WHERE extname = 'pgaudit'", "pgaudit")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
-				QueryMatchExpectationPredicate(primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
+
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log", "all, -misc")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_catalog", "off")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_parameter", "on")
+				pgasserts.QueryMatchExpectationPredicate(env, primary, postgres.PostgresDBName, "SHOW pgaudit.log_relation", "on")
 			})
 		}
 	}
@@ -306,11 +310,12 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				// The new pg_hba rule should be present in every pod
 				query := "select count(*) from pg_catalog.pg_hba_file_rules where type = 'host' and auth_method = 'trust'"
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						query, "1"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						query, "1"),
+						RetryTimeout).Should(Succeed())
 				}
 				// The connection should now work
-				AssertConnection(namespace, endpointName, postgres.PostgresDBName, postgres.PostgresDBName, "", env)
+				pgasserts.AssertConnection(env, namespace, endpointName, postgres.PostgresDBName, postgres.PostgresDBName, "")
 			})
 		})
 
@@ -331,8 +336,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW shared_buffers", "256MB"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW shared_buffers", "256MB"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -357,10 +363,12 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_replication_slots", "16"), RetryTimeout).Should(Succeed())
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW maintenance_work_mem", "128MB"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_replication_slots", "16"),
+						RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW maintenance_work_mem", "128MB"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -398,8 +406,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", "105"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", "105"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -423,8 +432,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", "100"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", "100"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -439,8 +449,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				query := "select count(1) from pg_catalog.pg_ident_file_mappings;"
 
 				By("check that there is the expected number of entry in pg_ident_file_mappings", func() {
-					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "4"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
+						query, "4"),
+						RetryTimeout).Should(Succeed())
 				})
 
 				By("apply configuration update", func() {
@@ -448,8 +459,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				})
 
 				By("verify that there is one more entry in pg_ident_file_mappings", func() {
-					Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
-						query, "5"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPod, postgres.PostgresDBName,
+						query, "5"),
+						RetryTimeout).Should(Succeed())
 				})
 			}
 		})
@@ -541,8 +553,9 @@ var _ = Describe("Configuration update", Label(tests.LabelClusterMetadata), func
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					Eventually(QueryMatchExpectationPredicate(&pod, postgres.PostgresDBName,
-						"SHOW max_connections", strconv.Itoa(newMaxConnectionsValue)), 180).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &pod, postgres.PostgresDBName,
+						"SHOW max_connections", strconv.Itoa(newMaxConnectionsValue)),
+						180).Should(Succeed())
 				}
 			})
 

@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -256,8 +257,17 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
+			pgasserts.QueryMatchExpectationPredicate(
+				env, primary, postgresutils.PostgresDBName,
+				"SHOW hnsw.iterative_scan", "on",
+			)
+			pgasserts.QueryMatchExpectationPredicate(
+				env,
+				primary,
+				postgresutils.PostgresDBName,
+				"SHOW ivfflat.iterative_scan",
+				"on",
+			)
 		})
 
 		By("verifying the extension's usage ", func() {
@@ -397,8 +407,17 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
+			pgasserts.QueryMatchExpectationPredicate(
+				env, primary, postgresutils.PostgresDBName,
+				"SHOW hnsw.iterative_scan", "on",
+			)
+			pgasserts.QueryMatchExpectationPredicate(
+				env,
+				primary,
+				postgresutils.PostgresDBName,
+				"SHOW ivfflat.iterative_scan",
+				"on",
+			)
 		})
 
 		By("verifying the extension's usage ", func() {

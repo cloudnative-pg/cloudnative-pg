@@ -32,6 +32,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -162,9 +163,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
-		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBOne, testTableName)
-		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
-		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
+		pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBOne, testTableName)
+		pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
+		pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
 
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())

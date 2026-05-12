@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -76,7 +77,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			const newPassword = "eeh2Zahohx"
 
 			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertConnection(namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword, env)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword)
 		})
 
 		By("fail updating user application password with wrong user in secret", func() {
@@ -120,7 +121,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 
 			const newPassword = "fi6uCae7"
 			AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
-			AssertConnection(namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword, env)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword)
 		})
 	})
 })
@@ -205,7 +206,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 				clusterName, namespace, apiv1.SuperUserSecretSuffix,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			AssertConnection(namespace, rwService, postgres.PostgresDBName, superUser, superUserPass, env)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, superUser, superUserPass)
 		})
 
 		By("disable superuser access", func() {

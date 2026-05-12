@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -96,13 +97,13 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 		// be there
 		It("backs up and restore a cluster", func() {
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 			assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
 			By("uploading a backup", func() {
 				// We create a backup
@@ -270,13 +271,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
 				func() {
 					// Write a table and some data on the "app" database
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 					assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
 
 					By("backing up a cluster and verifying it exists on azure blob storage", func() {
@@ -375,13 +376,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
 				func() {
 					// Write a table and some data on the "app" database
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 
 					// Create a WAL on the primary and check if it arrives in the
 					// Azure Blob Storage within a short time
@@ -491,13 +492,13 @@ func prepareClusterForPITROnAzureBlob(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableNamePitr,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := postgres.GetCurrentTimestamp(
@@ -524,7 +525,7 @@ func prepareClusterForPITROnAzureBlob(
 			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable(tableNamePitr, 3, conn)
+		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
 	assertArchiveWalOnAzureBlob(namespace, clusterName, azureConfig)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")

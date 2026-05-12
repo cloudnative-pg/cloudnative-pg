@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -137,18 +138,18 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 			latestTar := minio.GetFilePath(clusterName, "data.tar")
@@ -298,18 +299,18 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbySampleFile, env)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  targetClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
@@ -357,18 +358,18 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioSampleFile, env)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  targetClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
@@ -420,18 +421,18 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  customClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, customClusterName, clusterServerName)
 
@@ -741,13 +742,13 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				Expect(err).ToNot(HaveOccurred())
 
 				// Write a table and some data on the "app" database
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
@@ -781,13 +782,13 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				AssertClusterRestore(namespace, externalClusterFileMinio, tableName)
 
 				// verify test data on restored external cluster
-				tableLocator = TableLocator{
+				tableLocator = pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  externalClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 				By("deleting the restored cluster", func() {
 					err = resources.DeleteResourcesFromFile(env, namespace, externalClusterFileMinio)
@@ -827,8 +828,8 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				}()
 				Expect(err).ToNot(HaveOccurred())
 				// insert 2 more rows entries 3,4 on the "app" database
-				insertRecordIntoTable(tableName, 3, conn)
-				insertRecordIntoTable(tableName, 4, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 			})
 			By("creating second backup and verifying it exists on minio", func() {
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio,
@@ -862,13 +863,13 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 		It("restore cluster from barman object using replica option in spec", func() {
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "for_restore_repl",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
@@ -923,13 +924,13 @@ func prepareClusterForPITROnMinio(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableNamePitr,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := postgres.GetCurrentTimestamp(
@@ -956,7 +957,7 @@ func prepareClusterForPITROnMinio(
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
-		insertRecordIntoTable(tableNamePitr, 3, conn)
+		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
 	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
@@ -1029,15 +1030,15 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 
 		// Insert new data in the source cluster
-		insertRecordIntoTable(tableName, 3, connSource)
+		pgasserts.InsertRecordIntoTable(tableName, 3, connSource)
 		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 3)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 3)
 
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
 		Expect(err).ToNot(HaveOccurred())

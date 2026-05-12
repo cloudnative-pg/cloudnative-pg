@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -290,13 +291,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Create a "test" table with values 1,2
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
@@ -331,8 +332,8 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 3, conn)
-					insertRecordIntoTable(tableName, 4, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -349,13 +350,13 @@ var _ = Describe("Verify Volume Snapshot",
 					})
 
 					By("verifying the correct data exists in the restored cluster", func() {
-						tableLocator := TableLocator{
+						tableLocator := pgasserts.TableLocator{
 							Namespace:    namespace,
 							ClusterName:  clusterToRestoreName,
 							DatabaseName: postgres.AppDBName,
 							TableName:    tableName,
 						}
-						AssertDataExpectedCount(env, tableLocator, 2)
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 					})
 				}
 
@@ -446,13 +447,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 			It("can create a declarative cold backup and restoring using it", func() {
 				By("inserting test data", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToBackupName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 				})
 
 				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFileFilePath)
@@ -513,13 +514,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToRestoreName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 2)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 			It("can take a snapshot targeting the primary", func() {
@@ -736,17 +737,17 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Create a "test" table with values 1,2
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 3, conn)
-					insertRecordIntoTable(tableName, 4, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -808,13 +809,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToRestoreName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 4)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
 				})
 			})
 
@@ -838,8 +839,8 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 5, conn)
-					insertRecordIntoTable(tableName, 6, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 5, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -887,13 +888,13 @@ var _ = Describe("Verify Volume Snapshot",
 						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 6)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 6)
 				})
 			})
 

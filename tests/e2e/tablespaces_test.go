@@ -41,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
@@ -459,22 +460,22 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 				// Create a table and insert data 1,2 in each tablespace
-				tl1 := TableLocator{
+				tl1 := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    table1,
 					Tablespace:   tablespace1,
 				}
-				AssertCreateTestData(env, tl1)
-				tl2 := TableLocator{
+				pgasserts.AssertCreateTestData(env, tl1)
+				tl2 := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    table2,
 					Tablespace:   tablespace2,
 				}
-				AssertCreateTestData(env, tl2)
+				pgasserts.AssertCreateTestData(env, tl2)
 
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -564,20 +565,20 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToRestoreName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    table1,
 					}
-					AssertDataExpectedCount(env, tableLocator, 2)
-					tableLocator = TableLocator{
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+					tableLocator = pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToRestoreName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    table2,
 					}
-					AssertDataExpectedCount(env, tableLocator, 2)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 
@@ -601,11 +602,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					Expect(err).ToNot(HaveOccurred())
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(table1, 3, conn)
-					insertRecordIntoTable(table1, 4, conn)
+					pgasserts.InsertRecordIntoTable(table1, 3, conn)
+					pgasserts.InsertRecordIntoTable(table1, 4, conn)
 
-					insertRecordIntoTable(table2, 3, conn)
-					insertRecordIntoTable(table2, 4, conn)
+					pgasserts.InsertRecordIntoTable(table2, 3, conn)
+					pgasserts.InsertRecordIntoTable(table2, 4, conn)
 
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
@@ -621,11 +622,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					Expect(err).ToNot(HaveOccurred())
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(table1, 5, conn)
-					insertRecordIntoTable(table1, 6, conn)
+					pgasserts.InsertRecordIntoTable(table1, 5, conn)
+					pgasserts.InsertRecordIntoTable(table1, 6, conn)
 
-					insertRecordIntoTable(table2, 5, conn)
-					insertRecordIntoTable(table2, 6, conn)
+					pgasserts.InsertRecordIntoTable(table2, 5, conn)
+					pgasserts.InsertRecordIntoTable(table2, 6, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
@@ -663,20 +664,20 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToPITRName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    table1,
 					}
-					AssertDataExpectedCount(env, tableLocator, 4)
-					tableLocator = TableLocator{
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
+					tableLocator = pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToPITRName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    table2,
 					}
-					AssertDataExpectedCount(env, tableLocator, 4)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
 				})
 			})
 	})

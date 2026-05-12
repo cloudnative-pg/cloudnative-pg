@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -61,13 +62,13 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		By("creating a new cluster", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFileCluster, env)
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: testsUtils.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 		})
 
 		By("hibernating the new cluster", func() {
@@ -127,13 +128,13 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("verifying the data has been preserved", func() {
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: testsUtils.AppDBName,
 				TableName:    tableName,
 			}
-			AssertDataExpectedCount(env, tableLocator, 2)
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })

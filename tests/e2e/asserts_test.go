@@ -20,7 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -45,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
@@ -61,7 +61,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/replicationslot"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -190,7 +189,8 @@ func AssertSwitchoverWithHistory(
 						exec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod,
-						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
+						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history",
+					)
 					if err != nil {
 						return err
 					}
@@ -281,7 +281,8 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
+		}, timeout, 2).Should(
+			BeEquivalentTo(apiv1.PhaseHealthy),
 			func() string {
 				cluster := testsUtils.PrintClusterResources(env.Ctx, env.Client, namespace, clusterName)
 				kubeNodes, _ := nodes.DescribeKubernetesNodes(env.Ctx, env.Client)
@@ -378,7 +379,8 @@ func AssertClusterHasSequentialPods(
 			"Pod serial numbers are non-sequential on a freshly created cluster.\n"+
 				"Expected: %v\n"+
 				"Actual:   %v\n",
-			expectedSerials, podSerials)
+			expectedSerials, podSerials,
+		)
 
 		if len(skippedSerials) > 0 {
 			errorMsg += fmt.Sprintf("Skipped serial number(s): %v\n", skippedSerials)
@@ -474,199 +476,6 @@ func AssertUpdateSecret(
 }
 
 // AssertConnection is used if a connection from a pod to a postgresql database works
-func AssertConnection(
-	namespace string,
-	service string,
-	dbname string,
-	user string,
-	password string,
-	env *environment.TestingEnvironment,
-) {
-	By(fmt.Sprintf("connecting to the %v service as %v", service, user), func() {
-		Eventually(func(g Gomega) {
-			forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
-				env.Ctx, env.Interface, env.RestClientConfig,
-				namespace, service, dbname, user, password,
-			)
-			defer func() {
-				_ = conn.Close()
-				forwardConn.Close()
-			}()
-			g.Expect(err).ToNot(HaveOccurred())
-
-			var rawValue string
-			row := conn.QueryRow("SELECT 1")
-			err = row.Scan(&rawValue)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(strings.TrimSpace(rawValue)).To(BeEquivalentTo("1"))
-		}, RetryTimeout).Should(Succeed())
-	})
-}
-
-type TableLocator struct {
-	Namespace    string
-	ClusterName  string
-	DatabaseName string
-	TableName    string
-	Tablespace   string
-}
-
-// AssertCreateTestData create test data on a given TableLocator
-func AssertCreateTestData(env *environment.TestingEnvironment, tl TableLocator) {
-	if tl.DatabaseName == "" {
-		tl.DatabaseName = postgres.AppDBName
-	}
-	if tl.Tablespace == "" {
-		tl.Tablespace = postgres.TablespaceDefaultName
-	}
-
-	By(fmt.Sprintf("creating test data in table %v (cluster %v, database %v, tablespace %v)",
-		tl.TableName, tl.ClusterName, tl.DatabaseName, tl.Tablespace), func() {
-		forward, conn, err := postgres.ForwardPSQLConnection(
-			env.Ctx,
-			env.Client,
-			env.Interface,
-			env.RestClientConfig,
-			tl.Namespace,
-			tl.ClusterName,
-			tl.DatabaseName,
-			apiv1.ApplicationUserSecretSuffix,
-		)
-		defer func() {
-			_ = conn.Close()
-			forward.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
-
-		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);",
-			tl.TableName, tl.Tablespace)
-
-		_, err = conn.Exec(query)
-		Expect(err).ToNot(HaveOccurred())
-	})
-}
-
-// AssertCreateTestDataLargeObject create large objects with oid and data
-func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, data string) {
-	By("creating large object", func() {
-		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS image (name text,raster oid); "+
-			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
-
-		_, err := postgres.RunExecOverForward(
-			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			namespace, clusterName, postgres.AppDBName,
-			apiv1.ApplicationUserSecretSuffix, query)
-		Expect(err).ToNot(HaveOccurred())
-	})
-}
-
-// insertRecordIntoTable insert an entry into a table
-func insertRecordIntoTable(tableName string, value int, conn *sql.DB) {
-	_, err := conn.Exec(fmt.Sprintf("INSERT INTO %s VALUES (%d)", tableName, value))
-	Expect(err).ToNot(HaveOccurred())
-}
-
-func QueryMatchExpectationPredicate(
-	pod *corev1.Pod,
-	dbname exec.DatabaseName,
-	query string,
-	expectedOutput string,
-) func(g Gomega) {
-	return func(g Gomega) {
-		// executor
-		stdout, stderr, err := exec.QueryInInstancePod(
-			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
-			dbname,
-			query,
-		)
-		if err != nil {
-			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
-		}
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo(expectedOutput),
-			fmt.Sprintf("expected query %q to return %q (in database %q)", query, expectedOutput, dbname))
-	}
-}
-
-func roleExistsQuery(roleName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%v')", roleName)
-}
-
-func databaseExistsQuery(dbName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_database WHERE datname='%v')", dbName)
-}
-
-func extensionExistsQuery(extName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_extension WHERE extname='%v')", extName)
-}
-
-func schemaExistsQuery(namespaceName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_namespace WHERE nspname='%v')", namespaceName)
-}
-
-func fdwExistsQuery(fdwName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_data_wrapper WHERE fdwname='%v')", fdwName)
-}
-
-func foreignServerExistsQuery(serverName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_foreign_server WHERE srvname='%v')", serverName)
-}
-
-// AssertDataExpectedCount verifies that an expected amount of rows exists on the table
-func AssertDataExpectedCount(
-	env *environment.TestingEnvironment,
-	tl TableLocator,
-	expectedValue int,
-) {
-	By(fmt.Sprintf("verifying test data in table %v (cluster %v, database %v, tablespace %v)",
-		tl.TableName, tl.ClusterName, tl.DatabaseName, tl.Tablespace), func() {
-		row, err := postgres.RunQueryRowOverForward(
-			env.Ctx,
-			env.Client,
-			env.Interface,
-			env.RestClientConfig,
-			tl.Namespace,
-			tl.ClusterName,
-			tl.DatabaseName,
-			apiv1.ApplicationUserSecretSuffix,
-			fmt.Sprintf("SELECT COUNT(*) FROM %s", tl.TableName),
-		)
-		Expect(err).ToNot(HaveOccurred())
-
-		var nRows int
-		err = row.Scan(&nRows)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(nRows).Should(BeEquivalentTo(expectedValue))
-	})
-}
-
-// AssertLargeObjectValue verifies the presence of a Large Object given by its OID and data
-func AssertLargeObjectValue(namespace, clusterName string, oid int, data string) {
-	By("verifying large object", func() {
-		query := fmt.Sprintf("SELECT encode(lo_get(%v), 'escape');", oid)
-		Eventually(func() (string, error) {
-			// We keep getting the pod, since there could be a new pod with the same name
-			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-			if err != nil {
-				return "", err
-			}
-			stdout, _, err := exec.QueryInInstancePod(
-				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
-					Namespace: primaryPod.Namespace,
-					PodName:   primaryPod.Name,
-				},
-				postgres.AppDBName,
-				query)
-			if err != nil {
-				return "", err
-			}
-			return strings.Trim(stdout, "\n"), nil
-		}, testTimeouts[timeouts.LargeObject]).Should(BeEquivalentTo(data))
-	})
-}
-
 // AssertClusterStandbysAreStreaming verifies that all the standbys of a cluster have a wal-receiver running.
 func AssertClusterStandbysAreStreaming(namespace string, clusterName string, timeout int32) {
 	query := "SELECT count(*) FROM pg_catalog.pg_stat_wal_receiver"
@@ -684,7 +493,8 @@ func AssertClusterStandbysAreStreaming(namespace string, clusterName string, tim
 					PodName:   pod.Name,
 				},
 				postgres.PostgresDBName,
-				query)
+				query,
+			)
 			if err != nil {
 				return err
 			}
@@ -734,7 +544,8 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 						PodName:   pod.Name,
 					},
 					postgres.AppDBName,
-					query)
+					query,
+				)
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"),
 				"Pod %v should have moved to timeline 2", podName)
@@ -958,34 +769,6 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 	return completed, nil
 }
 
-// AssertPgRecoveryMode verifies if the target pod recovery mode is enabled or disabled
-func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
-	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
-		Eventually(func() (string, error) {
-			stdOut, stdErr, err := exec.QueryInInstancePod(
-				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
-					Namespace: pod.Namespace,
-					PodName:   pod.Name,
-				},
-				postgres.PostgresDBName,
-				"select pg_catalog.pg_is_in_recovery()")
-			if err != nil {
-				GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", stdOut, stdErr)
-			}
-			return strings.Trim(stdOut, "\n"), err
-		}, 300, 10).Should(BeEquivalentTo(boolPGOutput(expectedValue)))
-	})
-}
-
-func boolPGOutput(expectedValue bool) string {
-	stringExpectedValue := "f"
-	if expectedValue {
-		stringExpectedValue = "t"
-	}
-	return stringExpectedValue
-}
-
 // AssertReplicaModeCluster checks that, after inserting some data in a source cluster,
 // a replica cluster can be bootstrapped using pg_basebackup and is properly replicating
 // from the source cluster
@@ -999,13 +782,13 @@ func AssertReplicaModeCluster(
 	var primaryReplicaCluster *corev1.Pod
 	checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  srcClusterName,
 		DatabaseName: srcClusterDBName,
 		TableName:    testTableName,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("creating replica cluster", func() {
 		replicaClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSample)
@@ -1017,7 +800,7 @@ func AssertReplicaModeCluster(
 				replicaClusterName)
 			return err
 		}, 30, 3).Should(Succeed())
-		AssertPgRecoveryMode(primaryReplicaCluster, true)
+		pgasserts.AssertPgRecoveryMode(env, primaryReplicaCluster, true)
 	})
 
 	By("checking data have been copied correctly in replica cluster", func() {
@@ -1029,7 +812,8 @@ func AssertReplicaModeCluster(
 					PodName:   primaryReplicaCluster.Name,
 				},
 				exec.DatabaseName(srcClusterDBName),
-				checkQuery)
+				checkQuery,
+			)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 10).Should(BeEquivalentTo("2"))
 	})
@@ -1050,7 +834,7 @@ func AssertReplicaModeCluster(
 			forwardSource.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable(testTableName, 3, connSource)
+		pgasserts.InsertRecordIntoTable(testTableName, 3, connSource)
 	})
 
 	By("checking new data have been copied correctly in replica cluster", func() {
@@ -1062,7 +846,8 @@ func AssertReplicaModeCluster(
 					PodName:   primaryReplicaCluster.Name,
 				},
 				exec.DatabaseName(srcClusterDBName),
-				checkQuery)
+				checkQuery,
+			)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 15).Should(BeEquivalentTo("3"))
 	})
@@ -1071,10 +856,12 @@ func AssertReplicaModeCluster(
 		// verify the replica database created followed the source database, rather than
 		// default to the "app" db and user
 		By("checking that in replica cluster there is no database app and user app", func() {
-			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, postgres.PostgresDBName,
-				databaseExistsQuery("app"), "f"), 30).Should(Succeed())
-			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, postgres.PostgresDBName,
-				roleExistsQuery("app"), "f"), 30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryReplicaCluster, postgres.PostgresDBName,
+				pgasserts.DatabaseExistsQuery("app"), "f"),
+				30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryReplicaCluster, postgres.PostgresDBName,
+				pgasserts.RoleExistsQuery("app"), "f"),
+				30).Should(Succeed())
 		})
 	}
 }
@@ -1101,7 +888,8 @@ func AssertDetachReplicaModeCluster(
 			referenceCondition, err := backups.GetConditionsInClusterStatus(
 				env.Ctx, env.Client,
 				namespace, replicaClusterName,
-				apiv1.ConditionClusterReady)
+				apiv1.ConditionClusterReady,
+			)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(referenceCondition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
 			g.Expect(referenceCondition).ToNot(BeNil())
@@ -1114,7 +902,8 @@ func AssertDetachReplicaModeCluster(
 			_, _, err := run.Unchecked(fmt.Sprintf(
 				"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
 					" --type='merge'",
-				replicaClusterName, namespace))
+				replicaClusterName, namespace,
+			))
 			g.Expect(err).ToNot(HaveOccurred())
 		}, 60, 5).Should(Succeed())
 	})
@@ -1126,7 +915,8 @@ func AssertDetachReplicaModeCluster(
 			condition, err := backups.GetConditionsInClusterStatus(
 				env.Ctx, env.Client,
 				namespace, cluster.Name,
-				apiv1.ConditionClusterReady)
+				apiv1.ConditionClusterReady,
+			)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(condition).ToNot(BeNil())
 			g.Expect(condition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
@@ -1160,20 +950,22 @@ func AssertDetachReplicaModeCluster(
 	By("verifying the replica database doesn't exist in the replica cluster", func() {
 		// Application database configuration is skipped for replica clusters,
 		// so we expect these to not be present
-		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, postgres.PostgresDBName,
-			databaseExistsQuery(replicaDatabaseName), "f"), 30).Should(Succeed())
-		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, postgres.PostgresDBName,
-			roleExistsQuery(replicaUserName), "f"), 30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryReplicaCluster, postgres.PostgresDBName,
+			pgasserts.DatabaseExistsQuery(replicaDatabaseName), "f"),
+			30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryReplicaCluster, postgres.PostgresDBName,
+			pgasserts.RoleExistsQuery(replicaUserName), "f"),
+			30).Should(Succeed())
 	})
 
 	By("writing some new data to the source cluster", func() {
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  srcClusterName,
 			DatabaseName: srcDatabaseName,
 			TableName:    testTableName,
 		}
-		AssertCreateTestData(env, tableLocator)
+		pgasserts.AssertCreateTestData(env, tableLocator)
 	})
 
 	By("verifying that replica cluster was not modified", func() {
@@ -1334,7 +1126,8 @@ func AssertFastFailOver(
 		_, err = postgres.RunExecOverForward(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 			namespace, clusterName, postgres.AppDBName,
-			apiv1.ApplicationUserSecretSuffix, query)
+			apiv1.ApplicationUserSecretSuffix, query,
+		)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -1374,7 +1167,8 @@ func AssertFastFailOver(
 					PodName:   primaryPod.Name,
 				},
 				postgres.AppDBName,
-				query)
+				query,
+			)
 			return strings.TrimSpace(out), err
 		}, RetryTimeout).Should(BeEquivalentTo("t"))
 	})
@@ -1420,95 +1214,6 @@ func AssertCustomMetricsResourcesExist(namespace, sampleFile string, configMapsC
 			)
 			return secretList.Items, err
 		}, timeout).Should(HaveLen(secretsCount))
-	})
-}
-
-func AssertCreationOfTestDataForTargetDB(
-	env *environment.TestingEnvironment,
-	namespace,
-	clusterName,
-	targetDBName,
-	tableName string,
-) {
-	By(fmt.Sprintf("creating target database '%v' and table '%v'", targetDBName, tableName), func() {
-		// We need to gather the cluster primary to create the database via superuser
-		currentPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		appUser, _, err := secrets.GetCredentials(
-			env.Ctx, env.Client,
-			clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
-		)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Create database
-		createDBQuery := fmt.Sprintf("CREATE DATABASE %v OWNER %v", targetDBName, appUser)
-		_, _, err = exec.QueryInInstancePod(
-			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			exec.PodLocator{
-				Namespace: currentPrimary.Namespace,
-				PodName:   currentPrimary.Name,
-			},
-			postgres.PostgresDBName,
-			createDBQuery)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Open a connection to the newly created database
-		forward, conn, err := postgres.ForwardPSQLConnection(
-			env.Ctx,
-			env.Client,
-			env.Interface,
-			env.RestClientConfig,
-			namespace,
-			clusterName,
-			targetDBName,
-			apiv1.ApplicationUserSecretSuffix,
-		)
-		defer func() {
-			_ = conn.Close()
-			forward.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
-
-		// Create table on target database
-		createTableQuery := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (id int);", tableName)
-		_, err = conn.Exec(createTableQuery)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Grant a permission
-		grantRoleQuery := "GRANT SELECT ON all tables in schema public to pg_monitor;"
-		_, err = conn.Exec(grantRoleQuery)
-		Expect(err).ToNot(HaveOccurred())
-	})
-}
-
-// AssertApplicationDatabaseConnection check the connectivity of application database
-func AssertApplicationDatabaseConnection(
-	namespace,
-	clusterName,
-	appUser,
-	appDB,
-	appPassword,
-	appSecretName string,
-) {
-	By("checking cluster can connect with application database user and password", func() {
-		// Get the app user password from the auto generated -app secret if appPassword is not provided
-		if appPassword == "" {
-			if appSecretName == "" {
-				appSecretName = clusterName + "-app"
-			}
-			appSecret := &corev1.Secret{}
-			appSecretNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      appSecretName,
-			}
-			err := env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
-			Expect(err).ToNot(HaveOccurred())
-			appPassword = string(appSecret.Data["password"])
-		}
-		rwService := services.GetReadWriteServiceName(clusterName)
-
-		AssertConnection(namespace, rwService, appDB, appUser, appPassword, env)
 	})
 }
 
@@ -1568,7 +1273,8 @@ func CreateAndAssertClientCertificatesSecrets(
 ) {
 	_, caPair, err := secrets.CreateSecretCA(
 		env.Ctx, env.Client,
-		namespace, clusterName, caSecName, includeCAPrivateKey)
+		namespace, clusterName, caSecName, includeCAPrivateKey,
+	)
 	Expect(err).ToNot(HaveOccurred())
 
 	// Sign tls certificates for streaming_replica user
@@ -1601,7 +1307,8 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 			stdout, stderr, err := exec.Command(
 				env.Ctx, env.Interface, env.RestClientConfig,
 				appPod, appPod.Spec.Containers[0].Name, &timeout,
-				"psql", dsn, "-tAc", "SELECT 1")
+				"psql", dsn, "-tAc", "SELECT 1",
+			)
 			return stdout, stderr, err
 		}, 360).Should(BeEquivalentTo("1\n"))
 	})
@@ -1618,13 +1325,13 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  restoredClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 	})
 
 	By("Ensuring the restored cluster is on timeline 2", func() {
@@ -1654,33 +1361,32 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	appUser, appUserPass, err := secrets.GetCredentials(
 		env.Ctx, env.Client,
 		restoredClusterName, namespace,
-		apiv1.ApplicationUserSecretSuffix)
+		apiv1.ApplicationUserSecretSuffix,
+	)
 	Expect(err).ToNot(HaveOccurred())
 	secretName := restoredClusterName + apiv1.ApplicationUserSecretSuffix
 
 	By("checking the restored cluster with pre-defined app password connectable", func() {
-		AssertApplicationDatabaseConnection(
+		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
 			restoredClusterName,
 			appUser,
 			postgres.AppDBName,
 			appUserPass,
-			secretName,
-		)
+			secretName)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
 		const newPassword = "eeh2Zahohx"
 		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
 
-		AssertApplicationDatabaseConnection(
+		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
 			restoredClusterName,
 			appUser,
 			postgres.AppDBName,
 			newPassword,
-			secretName,
-		)
+			secretName)
 	})
 }
 
@@ -1696,13 +1402,13 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  restoredClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 		// Restored primary should be on timeline 2
 		out, _, err := exec.QueryInInstancePod(
@@ -1712,7 +1418,8 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 				PodName:   primary,
 			},
 			postgres.AppDBName,
-			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
@@ -1883,48 +1590,48 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 		// Restored standby should be attached to restored primary
 		Expect(postgres.CountReplicas(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			primaryInfo, RetryTimeout)).To(BeEquivalentTo(2))
+			primaryInfo, RetryTimeout,
+		)).To(BeEquivalentTo(2))
 	})
 
 	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
 		// Only 2 entries should be present
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  clusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 	})
 
 	// Gather credentials
 	appUser, appUserPass, err := secrets.GetCredentials(
 		env.Ctx, env.Client,
-		clusterName, namespace, apiv1.ApplicationUserSecretSuffix)
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+	)
 	Expect(err).ToNot(HaveOccurred())
 
 	By("checking the restored cluster with auto generated app password connectable", func() {
-		AssertApplicationDatabaseConnection(
+		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
 			clusterName,
 			appUser,
 			postgres.AppDBName,
 			appUserPass,
-			secretName,
-		)
+			secretName)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
 		const newPassword = "eeh2Zahohx"
 		AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
-		AssertApplicationDatabaseConnection(
+		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
 			clusterName,
 			appUser,
 			postgres.AppDBName,
 			newPassword,
-			secretName,
-		)
+			secretName)
 	})
 }
 
@@ -1957,18 +1664,19 @@ func AssertClusterWasRestoredWithPITR(namespace, clusterName, tableName, lsn str
 		// Restored standby should be attached to restored primary
 		Expect(postgres.CountReplicas(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			primaryInfo, RetryTimeout)).To(BeEquivalentTo(2))
+			primaryInfo, RetryTimeout,
+		)).To(BeEquivalentTo(2))
 	})
 
 	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
 		// Only 2 entries should be present
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  clusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 	})
 }
 
@@ -1976,7 +1684,8 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 	By("Waiting for the condition", func() {
 		out, _, err := run.Run(fmt.Sprintf(
 			"kubectl -n %s wait --for=condition=ContinuousArchiving=true cluster/%s --timeout=%s",
-			namespace, clusterName, timeout))
+			namespace, clusterName, timeout,
+		))
 		Expect(err).ToNot(HaveOccurred())
 		outPut := strings.TrimSpace(out)
 		Expect(outPut).Should(ContainSubstring("condition met"))
@@ -2009,7 +1718,8 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 	)
 	Expect(err).ToNot(
 		HaveOccurred(),
-		"failed to get latest wal file name while executing 'switchWalAndGetLatestArchive")
+		"failed to get latest wal file name while executing 'switchWalAndGetLatestArchive",
+	)
 
 	return strings.TrimSpace(out)
 }
@@ -2084,7 +1794,8 @@ func assertReadWriteConnectionUsingPgBouncerService(
 
 	appUser, generatedAppUserPassword, err := secrets.GetCredentials(
 		env.Ctx, env.Client,
-		clusterName, namespace, apiv1.ApplicationUserSecretSuffix)
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+	)
 	Expect(err).ToNot(HaveOccurred())
 
 	// Get the database name from the cluster configuration
@@ -2276,7 +1987,8 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(
 		}
 
 		if env.PostgresVersion > 16 {
-			defaultMetrics = append(defaultMetrics,
+			defaultMetrics = append(
+				defaultMetrics,
 				"cnpg_pg_stat_checkpointer",
 			)
 		}
@@ -2327,14 +2039,16 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 	}
 
 	if env.PostgresVersion >= 14 {
-		cnpgCollectorMetrics = append(cnpgCollectorMetrics,
+		cnpgCollectorMetrics = append(
+			cnpgCollectorMetrics,
 			"cnpg_collector_wal_records",
 			"cnpg_collector_wal_fpi",
 			"cnpg_collector_wal_bytes",
 			"cnpg_collector_wal_buffers_full",
 		)
 		if env.PostgresVersion < 18 {
-			cnpgCollectorMetrics = append(cnpgCollectorMetrics,
+			cnpgCollectorMetrics = append(
+				cnpgCollectorMetrics,
 				"cnpg_collector_wal_write",
 				"cnpg_collector_wal_sync",
 				"cnpg_collector_wal_write_time",
@@ -2378,7 +2092,8 @@ func AssertClusterReadinessStatusIsReached(
 		Eventually(func() (string, error) {
 			clusterCondition, err := backups.GetConditionsInClusterStatus(
 				env.Ctx, env.Client,
-				namespace, clusterName, apiv1.ConditionClusterReady)
+				namespace, clusterName, apiv1.ConditionClusterReady,
+			)
 			if err != nil {
 				return "", err
 			}
@@ -2448,13 +2163,15 @@ func AssertReplicationSlotsOnPod(
 	Eventually(func() ([]string, error) {
 		currentSlots, err := replicationslot.GetReplicationSlotsOnPod(
 			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-			namespace, pod.GetName(), postgres.AppDBName)
+			namespace, pod.GetName(), postgres.AppDBName,
+		)
 		return currentSlots, err
 	}, 300).Should(ContainElements(expectedSlots),
 		func() string {
 			return replicationslot.PrintReplicationSlots(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				namespace, clusterName, postgres.AppDBName)
+				namespace, clusterName, postgres.AppDBName,
+			)
 		})
 
 	GinkgoWriter.Println("Verifying slots status for pod", pod.Name)
@@ -2463,12 +2180,14 @@ func AssertReplicationSlotsOnPod(
 		query := fmt.Sprintf(
 			"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_replication_slots "+
 				"WHERE slot_name = '%v' AND active = '%t' "+
-				"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnReplica)
+				"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnReplica,
+		)
 		if specs.IsPodPrimary(pod) {
 			query = fmt.Sprintf(
 				"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_replication_slots "+
 					"WHERE slot_name = '%v' AND active = '%t' "+
-					"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnPrimary)
+					"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnPrimary,
+			)
 		}
 		Eventually(func() (string, error) {
 			stdout, _, err := exec.QueryInInstancePod(
@@ -2478,13 +2197,15 @@ func AssertReplicationSlotsOnPod(
 					PodName:   pod.Name,
 				},
 				postgres.PostgresDBName,
-				query)
+				query,
+			)
 			return strings.TrimSpace(stdout), err
 		}, 300).Should(BeEquivalentTo("t"),
 			func() string {
 				return replicationslot.PrintReplicationSlots(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					namespace, clusterName, postgres.AppDBName)
+					namespace, clusterName, postgres.AppDBName,
+				)
 			})
 	}
 }
@@ -2505,7 +2226,8 @@ func AssertClusterReplicationSlotsAligned(
 		for _, pod := range podList.Items {
 			out, err := replicationslot.GetReplicationSlotLsnsOnPod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				namespace, clusterName, postgres.AppDBName, pod)
+				namespace, clusterName, postgres.AppDBName, pod,
+			)
 			g.Expect(err).ToNot(HaveOccurred(), "error getting replication slot lsn on pod %v", pod.Name)
 			lsnList = append(lsnList, out...)
 		}
@@ -2514,7 +2236,8 @@ func AssertClusterReplicationSlotsAligned(
 		func() string {
 			return replicationslot.PrintReplicationSlots(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				namespace, clusterName, postgres.AppDBName)
+				namespace, clusterName, postgres.AppDBName,
+			)
 		})
 }
 
@@ -2527,7 +2250,8 @@ func AssertClusterHAReplicationSlots(namespace, clusterName string) {
 		for _, pod := range podList.Items {
 			expectedSlots, err := replicationslot.GetExpectedHAReplicationSlotsOnPod(
 				env.Ctx, env.Client,
-				namespace, clusterName, pod.GetName())
+				namespace, clusterName, pod.GetName(),
+			)
 			Expect(err).ToNot(HaveOccurred())
 			AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 		}

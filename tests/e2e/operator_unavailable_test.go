@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -72,13 +73,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			By("scaling down operator replicas to zero", func() {
 				err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 0)
@@ -139,7 +140,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			AssertDataExpectedCount(env, tableLocator, 2)
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 
@@ -156,13 +157,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
 			operatorNamespace, err := operator.NamespaceName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
@@ -229,7 +230,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			AssertDataExpectedCount(env, tableLocator, 2)
+			pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 			// There is a chance that the webhook is not able to reach the new operator pod yet.
 			// This could make following tests fail, so we need to wait for the webhook to be working again.

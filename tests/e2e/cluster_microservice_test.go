@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -75,25 +76,25 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertCreateTestData(env, tableLocator)
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data)
+		pgasserts.AssertCreateTestData(env, tableLocator)
+		pgasserts.AssertCreateTestDataLargeObject(env, namespace, sourceClusterName, oid, data)
 
 		importedClusterName = "cluster-pgdump-large-object"
 		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		tableLocator = TableLocator{
+		tableLocator = pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
-		AssertLargeObjectValue(namespace, importedClusterName, oid, data)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertLargeObjectValue(env, testTimeouts, namespace, importedClusterName, oid, data)
 		By("deleting the imported database", func() {
 			Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 		})
@@ -112,13 +113,13 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		importedClusterName = "cluster-pgdump"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		tableLocator := TableLocator{
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
 	})
 
@@ -255,8 +256,9 @@ func assertTableAndDataOnImportedCluster(
 		})
 
 		By("verifying the user named 'micro' on source is not in imported database", func() {
-			Eventually(QueryMatchExpectationPredicate(pod, postgres.PostgresDBName,
-				roleExistsQuery("micro"), "f"), 30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, pod, postgres.PostgresDBName,
+				pgasserts.RoleExistsQuery("micro"), "f"),
+				30).Should(Succeed())
 		})
 	})
 }
@@ -316,22 +318,24 @@ func assertImportRenamesSelectedDatabase(
 		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 140)
 	})
 
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  importedClusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableName,
 	}
-	AssertDataExpectedCount(env, tableLocator, 2)
+	pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		importedPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, postgres.PostgresDBName,
-			roleExistsQuery("db2"), "f"), 30).Should(Succeed())
-		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, postgres.PostgresDBName,
-			roleExistsQuery("app"), "t"), 30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, importedPrimaryPod, postgres.PostgresDBName,
+			pgasserts.RoleExistsQuery("db2"), "f"),
+			30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, importedPrimaryPod, postgres.PostgresDBName,
+			pgasserts.RoleExistsQuery("app"), "t"),
+			30).Should(Succeed())
 	})
 
 	By("cleaning up the clusters", func() {

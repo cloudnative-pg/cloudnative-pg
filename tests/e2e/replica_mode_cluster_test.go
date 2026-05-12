@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -137,8 +138,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				for idx := range podList.Items {
 					pod := &podList.Items[idx]
-					Eventually(QueryMatchExpectationPredicate(
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env,
 						pod, postgres.PostgresDBName, "SHOW max_connections", "120"),
+
 						30).Should(Succeed())
 				}
 			})
@@ -170,8 +172,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				for idx := range podList.Items {
 					pod := &podList.Items[idx]
-					Eventually(QueryMatchExpectationPredicate(
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env,
 						pod, postgres.PostgresDBName, "SHOW max_connections", "110"),
+
 						30).Should(Succeed())
 				}
 			})
@@ -270,7 +273,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						clusterOneName)
 					return err
 				}, 30, 3).Should(Succeed())
-				AssertPgRecoveryMode(clusterOnePrimary, true)
+				pgasserts.AssertPgRecoveryMode(env, clusterOnePrimary, true)
 			})
 
 			// turn the dst cluster into a primary
@@ -289,11 +292,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						clusterTwoName)
 					return err
 				}, 30, 3).Should(Succeed())
-				AssertPgRecoveryMode(clusterTwoPrimary, false)
+				pgasserts.AssertPgRecoveryMode(env, clusterTwoPrimary, false)
 			})
 
 			By("creating a new data in the new source cluster", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterTwoName,
 					DatabaseName: sourceDBName,
@@ -310,7 +313,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					)
 					return err
 				}, testTimeouts[timeouts.Short]).Should(Succeed())
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 			})
 
 			// The dst Cluster gets promoted to primary, hence the new appUser password will
@@ -328,13 +331,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterOneName,
 					DatabaseName: sourceDBName,
 					TableName:    "new_test_table",
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})
@@ -779,7 +782,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
+					pgasserts.AssertPgRecoveryMode(env, &pod, true)
 				}
 			})
 
@@ -845,11 +848,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			By("verifying B contains the primary", func() {
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
-				AssertPgRecoveryMode(primary, false)
+				pgasserts.AssertPgRecoveryMode(env, primary, false)
 				podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
+					pgasserts.AssertPgRecoveryMode(env, &pod, true)
 				}
 			})
 

@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -370,7 +371,7 @@ func DeleteTableUsingPgBouncerService(
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
 	)
 	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(namespace, poolerService, testsUtils.AppDBName, appUser, generatedAppUserPassword, env)
+	pgasserts.AssertConnection(env, namespace, poolerService, testsUtils.AppDBName, appUser, generatedAppUserPassword)
 
 	connectionTimeout := time.Second * 10
 	dsn := services.CreateDSN(poolerService, appUser, testsUtils.AppDBName, generatedAppUserPassword,

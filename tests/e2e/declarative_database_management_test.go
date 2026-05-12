@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -129,8 +130,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
-					databaseExistsQuery(dbname), "t"), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					pgasserts.DatabaseExistsQuery(dbname), "t"),
+					30).Should(Succeed())
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
@@ -140,8 +142,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, extSpec := range database.Spec.Extensions {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
-						extensionExistsQuery(extSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						pgasserts.ExtensionExistsQuery(extSpec.Name), pgasserts.BoolPGOutput(true)),
+						30).Should(Succeed())
 				}
 			})
 
@@ -150,8 +153,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, schemaSpec := range database.Spec.Schemas {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
-						schemaExistsQuery(schemaSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						pgasserts.SchemaExistsQuery(schemaSpec.Name), pgasserts.BoolPGOutput(true)),
+						30).Should(Succeed())
 				}
 			})
 
@@ -160,8 +164,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, fdwSpec := range database.Spec.FDWs {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
-						fdwExistsQuery(fdwSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						pgasserts.FDWExistsQuery(fdwSpec.Name), pgasserts.BoolPGOutput(true)),
+						30).Should(Succeed())
 				}
 			})
 
@@ -170,8 +175,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Expect(err).ToNot(HaveOccurred())
 
 				for _, serverSpec := range database.Spec.Servers {
-					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
-						foreignServerExistsQuery(serverSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						pgasserts.ForeignServerExistsQuery(serverSpec.Name), pgasserts.BoolPGOutput(true)),
+						30).Should(Succeed())
 				}
 			})
 
@@ -183,8 +189,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
-					databaseExistsQuery(dbname), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					pgasserts.DatabaseExistsQuery(dbname), pgasserts.BoolPGOutput(retainOnDeletion)),
+					30).Should(Succeed())
 			})
 		}
 
