@@ -187,6 +187,9 @@ The script can be configured through the following environment variables:
 - `CNPG_DEPLOYMENT_METHOD`: the deployment method to choose between `manifest`
   and `helm`; default `manifest`, helm to be used only for kind and k3d
   clusters; other environments will ignore it and use manifest.
+- `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
+  this version (passed as `--version`). Unset by default, in which case the
+  latest published chart is installed.
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -329,6 +332,8 @@ the following ones can be defined:
 
   **Note:** The `helm` method is only supported on Kind and k3d local
   clusters. Other environments will ignore this and always use `manifest`.
+- `CNPG_CHART_VERSION`: when `CNPG_DEPLOYMENT_METHOD=helm`, pin the chart to
+  this version. Unset by default (latest published chart).
 - `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
   Default: `false`
 - `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after

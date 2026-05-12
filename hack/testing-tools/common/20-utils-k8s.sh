@@ -390,6 +390,10 @@ function deploy_operator_with_helm() {
         --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config"
     )
 
+    if [[ -n "${CNPG_CHART_VERSION:-}" ]]; then
+        helm_args+=(--version "${CNPG_CHART_VERSION}")
+    fi
+
     # shellcheck disable=SC2153
     if [[ "${OPERATOR}" == "local" ]]; then
         local helm_image_tag="${CONTROLLER_IMG##*:}"
