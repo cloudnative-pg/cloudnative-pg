@@ -56,6 +56,9 @@ import (
 
 const sharedBuffersParameter = "shared_buffers"
 
+// walLevelMinimal is the "minimal" wal level
+const walLevelMinimal = "minimal"
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -106,7 +109,7 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
 
@@ -1089,7 +1092,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
-	if walLevel == "minimal" {
+	if walLevel == walLevelMinimal {
 		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
 			result = append(
 				result,
@@ -2331,10 +2334,10 @@ func (v *ClusterCustomValidator) validateWALLevelChange(r, old *apiv1.Cluster) f
 	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 
-	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+	if newWALLevel == walLevelMinimal && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
-			"minimal",
+			walLevelMinimal,
 			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
 				oldWALLevel)))
 	}

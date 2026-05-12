@@ -138,14 +138,14 @@ var _ = Describe("normalizeVolumeName", func() {
 
 	It("does not modify system volumes", func() {
 		vol := corev1.Volume{
-			Name: "pgdata",
+			Name: pgdataVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: "pod-1",
 				},
 			},
 		}
-		Expect(normalizeVolumeName(vol)).To(Equal("pgdata"))
+		Expect(normalizeVolumeName(vol)).To(Equal(pgdataVolumeName))
 	})
 })
 
@@ -192,10 +192,10 @@ var _ = Describe("normalizeVolumeMountName", func() {
 
 	It("does not modify system mounts", func() {
 		mount := corev1.VolumeMount{
-			Name:      "pgdata",
+			Name:      pgdataVolumeName,
 			MountPath: "/var/lib/postgresql/data",
 		}
-		Expect(normalizeVolumeMountName(mount)).To(Equal("pgdata"))
+		Expect(normalizeVolumeMountName(mount)).To(Equal(pgdataVolumeName))
 	})
 })
 
