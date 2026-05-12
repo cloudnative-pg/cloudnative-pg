@@ -95,6 +95,9 @@ fi
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
+if [[ "${CNPG_DEPLOYMENT_METHOD}" == "helm" ]]; then
+  echo "Skipping upgrade-test fixture generation: the helm deploy path does not produce a current-manifest.yaml yet."
+fi
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]] && [[ "${CNPG_DEPLOYMENT_METHOD}" != "helm" ]]; then
   # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
   # This manifest uses the default image and tag for the current operator build, and assumes
