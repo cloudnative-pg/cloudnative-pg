@@ -61,7 +61,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"clusters",
@@ -77,7 +77,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"clusters/status",
@@ -94,7 +94,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"backups",
@@ -107,7 +107,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"backups/status",
@@ -132,7 +132,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"databases",
@@ -147,7 +147,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"databases/status",
@@ -160,7 +160,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"publications",
@@ -175,7 +175,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"publications/status",
@@ -188,7 +188,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"subscriptions",
@@ -203,7 +203,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"subscriptions/status",
@@ -216,7 +216,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"failoverquorums",
@@ -232,7 +232,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"failoverquorums/status",

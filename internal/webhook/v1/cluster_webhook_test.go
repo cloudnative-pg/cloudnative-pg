@@ -811,7 +811,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -869,7 +869,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 2,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -933,7 +933,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -954,7 +954,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -974,7 +974,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level": walLevelMinimal,
 					},
 				},
 			},
@@ -1027,7 +1027,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1047,7 +1047,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 					},
 				},
@@ -1065,7 +1065,7 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 1,
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level":       "minimal",
+						"wal_level":       walLevelMinimal,
 						"max_wal_senders": "0",
 						"shared_buffers":  "512MB",
 					},

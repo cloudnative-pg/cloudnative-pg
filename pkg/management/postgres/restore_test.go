@@ -156,7 +156,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"max_connections":           "200",
+						maxConnectionsParameter:     "200",
 						"max_wal_senders":           "20",
 						"max_worker_processes":      "18",
 						"max_prepared_transactions": "50",
@@ -167,7 +167,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(enforcedParamsInPGData).To(HaveLen(4))
-		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
+		Expect(enforcedParamsInPGData[maxConnectionsParameter]).To(Equal(200))
 		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal(20))
 		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal(18))
 		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal(50))
@@ -178,7 +178,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"max_connections":           "200s",
+						maxConnectionsParameter:     "200s",
 						"max_wal_senders":           "20",
 						"max_worker_processes":      "18",
 						"max_prepared_transactions": "50",
@@ -195,8 +195,8 @@ var _ = Describe("testing restore InitInfo methods", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"max_connections":    "200",
-						"wal_sender_timeout": "10min",
+						maxConnectionsParameter: "200",
+						"wal_sender_timeout":    "10min",
 					},
 				},
 			},
@@ -204,7 +204,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(enforcedParamsInPGData).To(HaveLen(1))
-		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
+		Expect(enforcedParamsInPGData[maxConnectionsParameter]).To(Equal(200))
 	})
 })
 

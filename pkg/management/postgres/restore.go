@@ -64,6 +64,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const maxConnectionsParameter = "max_connections"
+
 var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
@@ -78,7 +80,7 @@ var (
 	}
 
 	pgControldataSettingsToParamsMap = map[string]string{
-		"max_connections setting":      "max_connections",
+		"max_connections setting":      maxConnectionsParameter,
 		"max_wal_senders setting":      "max_wal_senders",
 		"max_worker_processes setting": "max_worker_processes",
 		"max_prepared_xacts setting":   "max_prepared_transactions",

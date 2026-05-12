@@ -61,7 +61,7 @@ func Role(pooler *apiv1.Pooler) *rbacv1.Role {
 	}, Rules: []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"poolers",
@@ -76,7 +76,7 @@ func Role(pooler *apiv1.Pooler) *rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				apiv1.SchemeGroupVersion.Group,
 			},
 			Resources: []string{
 				"poolers/status",
