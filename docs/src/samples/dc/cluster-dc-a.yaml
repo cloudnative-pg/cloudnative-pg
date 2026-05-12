@@ -12,8 +12,11 @@ spec:
 
   backup:
     barmanObjectStore:
+      endpointCA:
+        name: minio-server-tls
+        key: tls.crt
       destinationPath: s3://backups/
-      endpointURL: http://minio:9000
+      endpointURL: https://minio:9000
       s3Credentials:
         accessKeyId:
           name: minio
@@ -32,9 +35,12 @@ spec:
   externalClusters:
   - name: cluster-dc-a
     barmanObjectStore: 
+      endpointCA:
+        name: minio-server-tls
+        key: tls.crt
       serverName: cluster-dc-a
       destinationPath: s3://backups/
-      endpointURL: http://minio:9000
+      endpointURL: https://minio:9000
       s3Credentials:
         accessKeyId:
           name: minio
@@ -46,9 +52,12 @@ spec:
         compression: gzip
   - name: cluster-dc-b
     barmanObjectStore: 
+      endpointCA:
+        name: minio-server-tls
+        key: tls.crt
       serverName: cluster-dc-b
       destinationPath: s3://backups/
-      endpointURL: http://minio:9000
+      endpointURL: https://minio:9000
       s3Credentials:
         accessKeyId:
           name: minio
