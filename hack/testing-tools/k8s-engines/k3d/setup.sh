@@ -51,7 +51,7 @@ function create_cluster_k3d() {
   local cluster_name=$2
 
   local latest_k3s_tag
-  latest_k3s_tag=$(k3d version list k3s | { grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' || true; } | tail -n 1)
+  latest_k3s_tag=$(k3d version list k3s -l1 -s desc --include "^${k8s_version}.*")
   if [[ -z "${latest_k3s_tag}" ]]; then
     echo "ERROR: No k3s image found for version ${k8s_version}" >&2
     exit 1
