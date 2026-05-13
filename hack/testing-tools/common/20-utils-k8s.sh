@@ -61,6 +61,13 @@ function retry {
   return 0
 }
 
+# version_gte: returns 0 (true) if version >= threshold
+function version_gte() {
+  local threshold=$1
+  local version=$2
+  [[ "$(printf '%s\n' "$threshold" "$version" | sort -V | head -n1)" == "$threshold" ]]
+}
+
 # get_default_storage_class detects the default K8s storage class
 function get_default_storage_class() {
     ${K8S_CLI} get storageclass -o json | jq -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
