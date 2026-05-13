@@ -332,9 +332,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					apiv1.ApplicationUserSecretSuffix)
 				Expect(err).ToNot(HaveOccurred())
 				secretsasserts.AssertUpdateSecret(
-					env, "password", appSecretPassword,
+					env,
+					namespace,
+					clusterOneName,
 					clusterOneName+apiv1.ApplicationUserSecretSuffix,
-					namespace, clusterOneName, 30,
+					"password",
+					appSecretPassword,
+					30,
 				)
 			})
 

@@ -148,7 +148,7 @@ func AssertWritesToPrimarySucceeds(
 func AssertClusterStandbysAreStreaming(
 	env *environment.TestingEnvironment,
 	namespace, clusterName string,
-	timeout int32,
+	timeout int,
 ) {
 	GinkgoHelper()
 	query := "SELECT count(*) FROM pg_catalog.pg_stat_wal_receiver"
@@ -192,7 +192,7 @@ func AssertStandbysFollowPromotion(
 	env *environment.TestingEnvironment,
 	testTimeouts map[timeouts.Timeout]int,
 	namespace, clusterName string,
-	timeout int32,
+	timeout int,
 ) {
 	GinkgoHelper()
 	start := time.Now()
@@ -242,7 +242,7 @@ func AssertStandbysFollowPromotion(
 func AssertWritesResumedBeforeTimeout(
 	env *environment.TestingEnvironment,
 	namespace, clusterName string,
-	timeout int32,
+	timeout int,
 ) {
 	GinkgoHelper()
 	By(fmt.Sprintf("resuming writing in less than %v sec", timeout), func() {
@@ -507,9 +507,9 @@ func AssertDetachReplicaModeCluster(
 func AssertFastFailOver(
 	env *environment.TestingEnvironment,
 	testTimeouts map[timeouts.Timeout]int,
-	quickDeletionPeriod int64,
 	namespace, sampleFile, clusterName, webTestFile, webTestJob string,
-	maxReattachTime, maxFailoverTime int32,
+	maxReattachTime, maxFailoverTime int,
+	quickDeletionPeriod int64,
 ) {
 	GinkgoHelper()
 	var err error

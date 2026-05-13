@@ -528,8 +528,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			Expect(err).ToNot(HaveOccurred())
 
 			By("update password from secrets", func() {
-				secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName,
-					namespace, clusterName, 30)
+				secretsasserts.AssertUpdateSecret(env,
+					namespace, clusterName, secretName, "password", newPassword,
+					30)
 			})
 
 			By("Verify connectivity using changed password in secret", func() {

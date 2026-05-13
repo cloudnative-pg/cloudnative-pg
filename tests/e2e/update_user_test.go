@@ -78,7 +78,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		By("update user application password", func() {
 			const newPassword = "eeh2Zahohx"
 
-			secretsasserts.AssertUpdateSecret(env, "password", newPassword, appSecretName, namespace, clusterName, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "password", newPassword, 30)
 			pgasserts.AssertConnection(env, namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword)
 		})
 
@@ -86,8 +86,8 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			const newUser = "postgres"
 			const newPassword = "newpassword"
 
-			secretsasserts.AssertUpdateSecret(env, "password", newPassword, appSecretName, namespace, clusterName, 30)
-			secretsasserts.AssertUpdateSecret(env, "username", newUser, appSecretName, namespace, clusterName, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "password", newPassword, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "username", newUser, 30)
 
 			timeout := time.Second * 10
 			dsn := services.CreateDSN(rwService, newUser, postgres.AppDBName, newPassword, services.Require, 5432)
@@ -98,7 +98,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			Expect(err).To(HaveOccurred())
 
 			// Revert the username change
-			secretsasserts.AssertUpdateSecret(env, "username", postgres.AppUser, appSecretName, namespace, clusterName, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "username", postgres.AppUser, 30)
 		})
 
 		By("update superuser password", func() {
@@ -122,7 +122,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			}, 60).Should(Succeed())
 
 			const newPassword = "fi6uCae7"
-			secretsasserts.AssertUpdateSecret(env, "password", newPassword, superUserSecretName, namespace, clusterName, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, superUserSecretName, "password", newPassword, 30)
 			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword)
 		})
 	})

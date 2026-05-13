@@ -50,7 +50,7 @@ import (
 // SecretsResourceVersion.
 func AssertUpdateSecret(
 	env *environment.TestingEnvironment,
-	field, value, secretName, namespace, clusterName string,
+	namespace, clusterName, secretName, field, value string,
 	timeout int,
 ) {
 	GinkgoHelper()

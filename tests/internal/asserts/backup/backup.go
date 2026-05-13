@@ -443,7 +443,7 @@ func AssertClusterRestoreWithApplicationDB(
 
 	By("update user application password for restored cluster and verify connectivity", func() {
 		const newPassword = "eeh2Zahohx"
-		secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName, namespace, restoredClusterName, 30)
+		secretsasserts.AssertUpdateSecret(env, namespace, restoredClusterName, secretName, "password", newPassword, 30)
 
 		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
@@ -523,7 +523,7 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(
 
 	By("update user application password for restored cluster and verify connectivity", func() {
 		const newPassword = "eeh2Zahohx"
-		secretsasserts.AssertUpdateSecret(env, "password", newPassword, secretName, namespace, clusterName, 30)
+		secretsasserts.AssertUpdateSecret(env, namespace, clusterName, secretName, "password", newPassword, 30)
 		pgasserts.AssertApplicationDatabaseConnection(env,
 			namespace,
 			clusterName,

@@ -673,7 +673,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					env,
 					namespace,
 					firstClusterName,
-					int32(testTimeouts[timeouts.ClusterIsReadyQuick]),
+					testTimeouts[timeouts.ClusterIsReadyQuick],
 				)
 			})
 

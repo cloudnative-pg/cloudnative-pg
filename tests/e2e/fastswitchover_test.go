@@ -198,8 +198,8 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	var maxReattachTime int32 = 60
-	var maxSwitchoverTime int32 = 20
+	maxReattachTime := 60
+	maxSwitchoverTime := 20
 
 	replicationasserts.AssertStandbysFollowPromotion(env, testTimeouts, namespace, clusterName, maxReattachTime)
 

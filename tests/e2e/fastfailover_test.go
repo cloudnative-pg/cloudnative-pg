@@ -40,8 +40,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 	var (
 		namespace       string
 		clusterName     string
-		maxReattachTime int32 = 60
-		maxFailoverTime int32 = 10
+		maxReattachTime = 60
+		maxFailoverTime = 10
 	)
 
 	BeforeEach(func() {
@@ -68,9 +68,10 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			replicationasserts.AssertFastFailOver(
-				env, testTimeouts, quickDeletionPeriod,
+				env, testTimeouts,
 				namespace, sampleFileWithoutReplicationSlots, clusterName,
-				webTestFile, webTestJob, maxReattachTime, maxFailoverTime,
+				webTestFile, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
 			)
 		})
 	})
@@ -89,9 +90,10 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			replicationasserts.AssertFastFailOver(
-				env, testTimeouts, quickDeletionPeriod,
+				env, testTimeouts,
 				namespace, sampleFileWithReplicationSlots, clusterName,
-				webTestFile, webTestJob, maxReattachTime, maxFailoverTime,
+				webTestFile, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
 			)
 
 			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
@@ -107,9 +109,10 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			replicationasserts.AssertFastFailOver(
-				env, testTimeouts, quickDeletionPeriod,
+				env, testTimeouts,
 				namespace, sampleFileSyncReplicas, clusterName,
-				webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime,
+				webTestSyncReplicas, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
 			)
 		})
 	})
