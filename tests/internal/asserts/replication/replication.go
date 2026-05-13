@@ -282,8 +282,8 @@ func AssertWritesResumedBeforeTimeout(
 		)
 		Expect(err).ToNot(HaveOccurred())
 		switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
-		if err != nil {
-			fmt.Printf("Write activity resumed in %v seconds\n", switchTime)
+		if err == nil {
+			GinkgoWriter.Printf("Write activity resumed in %v seconds\n", switchTime)
 		}
 		Expect(switchTime, err).Should(BeNumerically("<", timeout))
 	})

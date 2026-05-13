@@ -233,7 +233,7 @@ func CollectAndAssertCollectorMetricsPresentOnEachPod(
 // AssertIncludesMetrics asserts that every expected metric name appears
 // in rawMetricsOutput and that its value matches the supplied regexp.
 func AssertIncludesMetrics(g Gomega, rawMetricsOutput string, expectedMetrics map[string]*regexp.Regexp) {
-	debugDetails := fmt.Sprintf("Priting rawMetricsOutput:\n%s", rawMetricsOutput)
+	debugDetails := fmt.Sprintf("Printing rawMetricsOutput:\n%s", rawMetricsOutput)
 	withDebugDetails := func(baseErrMessage string) string {
 		return fmt.Sprintf("%s\n%s\n", baseErrMessage, debugDetails)
 	}
