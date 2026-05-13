@@ -394,16 +394,11 @@ type ClusterSpec struct {
 	// WalRestoreRetryTimeout bounds how long a single invocation of
 	// `manager wal-restore` retries transient failures (network blips,
 	// flaky object stores, plugin glitches) before asking PostgreSQL to
-	// stop log-shipping replication with exit code 255. Without this
-	// bound, a transient failure during a replica promotion can cause the
-	// replica to promote on a partial archive, losing already-archived
-	// transactions.
+	// stop log-shipping replication.
 	//
-	// "WAL not found" outcomes are never retried: they flow straight back
-	// to PostgreSQL so log-shipping can hand off to streaming replication
-	// as usual. The budget only applies to errors that look recoverable
-	// (any barman-cloud exit code other than 0 or 1, or any gRPC status
-	// from a CNPG-i plugin other than `Ok` or `NotFound`).
+	// Without this bound, a transient failure during a replica promotion
+	// can cause the replica to promote on a partial archive, losing
+	// already-archived transactions.
 	//
 	// Must be positive. Defaults to 5 minutes when unset.
 	// +optional

@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
@@ -33,24 +32,66 @@ import (
 )
 
 // ErrRetryTimeoutReached is returned when the retry loop has exhausted its
-// configurable budget without downloading the WAL. The caller is expected to
-// translate this into exit code 255 so that PostgreSQL stops log-shipping
-// replication instead of promoting itself prematurely.
+// configurable budget without downloading the WAL.
 var ErrRetryTimeoutReached = errors.New("retry timeout reached while restoring WAL")
+
+// retryTimeoutError carries the last attempt error captured by the retry
+// loop alongside the ErrRetryTimeoutReached sentinel. We use a typed
+// error instead of fmt.Errorf("%w ... %w ...") because that older wrapping
+// form makes errors.Unwrap (single-return) return nil, hiding the last
+// attempt error from callers that want to surface it. The Unwrap() []error
+// method keeps errors.Is matching ErrRetryTimeoutReached, the cause (if
+// any), and lastErr — preserving the previous contract.
+type retryTimeoutError struct {
+	attemptCount int
+	// cause is set to ctx.Err() when the context was canceled mid-wait,
+	// nil when the deadline was simply hit between attempts.
+	cause   error
+	lastErr error
+}
+
+func (e *retryTimeoutError) Error() string {
+	if e.cause != nil {
+		return fmt.Sprintf("%v: context canceled while retrying: %v: %v",
+			ErrRetryTimeoutReached, e.cause, e.lastErr)
+	}
+	return fmt.Sprintf("%v after %d attempt(s): last error: %v",
+		ErrRetryTimeoutReached, e.attemptCount, e.lastErr)
+}
+
+func (e *retryTimeoutError) Unwrap() []error {
+	out := []error{ErrRetryTimeoutReached}
+	if e.cause != nil {
+		out = append(out, e.cause)
+	}
+	if e.lastErr != nil {
+		out = append(out, e.lastErr)
+	}
+	return out
+}
+
+// LastError extracts the last attempt error captured by retryUntilDeadline
+// when the retry budget was exhausted. Returns nil if err is not a
+// retry-timeout error produced by this package.
+func LastError(err error) error {
+	var rt *retryTimeoutError
+	if errors.As(err, &rt) {
+		return rt.lastErr
+	}
+	return nil
+}
 
 // ErrTransientRestore marks a wal-restore failure that the retry loop should
 // treat as transient and retry. We use an explicit opt-in marker rather than
 // "anything not in a sentinel list is transient": the latter would loop on
 // genuinely-final errors (cache misses, malformed WAL names, programmer
 // errors), blocking PostgreSQL for the entire retry budget on each
-// invocation. Old behavior — return exit 1, let PostgreSQL fall back to
-// streaming — is the safer default; opt into retries only when we have a
-// positive signal that the failure is recoverable.
+// invocation. Opt into retries only when we have a positive signal that the
+// failure is recoverable.
 var ErrTransientRestore = errors.New("transient WAL restore failure")
 
 // DefaultMaxRetryTimeout is the default budget for retrying transient
-// WAL-restore failures. After this deadline the command will ask PostgreSQL
-// to stop replication (exit 255).
+// WAL-restore failures.
 const DefaultMaxRetryTimeout = 5 * time.Minute
 
 // retryBackoffCap is the maximum interval between retry attempts. We start
@@ -63,84 +104,51 @@ var retryBackoffCap = 30 * time.Second
 // attempt. Subsequent intervals grow exponentially up to retryBackoffCap.
 var retryBackoffInitial = 1 * time.Second
 
-// classifyPluginError categorizes an error returned from a CNPG-i plugin.
+// isTransientPluginError reports whether an error returned from a CNPG-i
+// plugin should be treated as transient (= retry-worthy).
 //
-// Only specific gRPC status codes are considered transient — the same ones
-// gRPC's own retry machinery treats as retryable. Anything else (Internal,
-// InvalidArgument, PermissionDenied, plain non-gRPC errors, ...) maps to
-// "Other" and gets the legacy exit-1 treatment so PostgreSQL can fall back
-// to streaming replication.
-func classifyPluginError(err error) restoreErrorKind {
+// Only specific gRPC status codes count — the same ones gRPC's own retry
+// machinery treats as retryable. Anything else (Internal, InvalidArgument,
+// PermissionDenied, NotFound, plain non-gRPC errors, ...) is considered
+// final and gets the legacy exit-1 treatment so PostgreSQL can fall back
+// to streaming replication. The design philosophy is "opt into retries
+// only on a positive signal": retrying on permanent errors would tie up
+// PostgreSQL for the entire retry budget on every WAL replay.
+func isTransientPluginError(err error) bool {
 	if err == nil {
-		return restoreErrorNone
+		return false
 	}
 	st, ok := status.FromError(err)
 	if !ok {
-		return restoreErrorOther
+		return false
 	}
 	switch st.Code() {
-	case codes.NotFound:
-		return restoreErrorNotFound
 	case codes.Unavailable, codes.DeadlineExceeded, codes.ResourceExhausted, codes.Aborted:
-		return restoreErrorTransient
+		return true
 	}
-	return restoreErrorOther
+	return false
 }
 
-// classifyBarmanError categorizes an error returned from the in-tree
-// barman-cloud path.
+// isTransientBarmanError reports whether an error returned from the in-tree
+// barman-cloud path should be treated as transient (= retry-worthy).
 //
-// barman-cloud-wal-restore exit codes (per barman documentation):
-//   - 0  → success
-//   - 1  → bucket or WAL not found (exposed as ErrWALNotFound by the
-//     vendored library)
-//   - 2  → connectivity failure (the only one whose error message says
-//     "retrying" — the only one we treat as transient)
-//   - 3  → invalid WAL name (programmer error, not transient)
-//   - 4+ → generic / unknown (treated as final to mirror legacy behavior;
-//     the legacy code would have surfaced these as exit 1 to PostgreSQL,
-//     so PG could fall back to streaming)
+// Mirrors the classification chosen by the barman-cloud CNPG-i plugin
+// (cloudnative-pg/plugin-barman-cloud#927), mapped onto the vendored
+// library's sentinels:
 //
-// We string-match the vendored library's connectivity-failure message
-// rather than introducing a sentinel because the library wraps everything
-// in fmt.Errorf today; the tighter path would be to add a sentinel
-// upstream and consume it here.
-func classifyBarmanError(err error) restoreErrorKind {
-	if err == nil {
-		return restoreErrorNone
-	}
-	if errors.Is(err, barmanRestorer.ErrWALNotFound) {
-		return restoreErrorNotFound
-	}
-	if strings.Contains(err.Error(), "connectivity failure") {
-		return restoreErrorTransient
-	}
-	return restoreErrorOther
+//   - ErrConnectivity (exit 2)    → transient (Unavailable in the plugin)
+//   - ErrGeneric     (exit 4)     → transient (Unavailable in the plugin)
+//   - ErrWALNotFound (exit 1)     → terminal  (NotFound)
+//   - ErrInvalidWalName (exit 3)  → terminal  (InvalidArgument)
+//   - anything else (unrecognized exit code, command-execution failure) →
+//     terminal (Internal)
+//
+// Keeping the two paths in lockstep means a plugin-only setup and an
+// in-tree barman-only setup retry on the same exit-code surfaces.
+func isTransientBarmanError(err error) bool {
+	return errors.Is(err, barmanRestorer.ErrConnectivity) ||
+		errors.Is(err, barmanRestorer.ErrGeneric)
 }
-
-// restoreErrorKind categorizes the outcome of a single restore attempt so the
-// retry loop can decide whether to exit immediately, retry, or surface a
-// timeout.
-type restoreErrorKind int
-
-const (
-	// restoreErrorNone means the attempt succeeded.
-	restoreErrorNone restoreErrorKind = iota
-	// restoreErrorNotFound means the WAL is definitively absent. Retrying
-	// won't change that, and PostgreSQL's own retry mechanics already cover
-	// the log-shipping "advance to streaming" transition.
-	restoreErrorNotFound
-	// restoreErrorTransient means the attempt failed for a reason that
-	// is positively known to be retryable (gRPC Unavailable / DeadlineExceeded
-	// / ResourceExhausted / Aborted, or barman exit 2 connectivity failure).
-	restoreErrorTransient
-	// restoreErrorOther means the attempt failed for a reason we cannot
-	// classify as either definitively-not-found or known-transient. We
-	// surface this as exit 1 to PostgreSQL — the safe legacy behavior —
-	// rather than risk blocking the database for a 5-minute retry budget
-	// on a permanent error.
-	restoreErrorOther
-)
 
 // nextBackoff returns the next retry interval, capped at retryBackoffCap.
 func nextBackoff(current time.Duration) time.Duration {
@@ -186,8 +194,7 @@ func retryUntilDeadline(
 	attemptCount := 1
 	for {
 		if !time.Now().Add(backoff).Before(deadline) {
-			return fmt.Errorf("%w after %d attempt(s): last error: %w",
-				ErrRetryTimeoutReached, attemptCount, err)
+			return &retryTimeoutError{attemptCount: attemptCount, lastErr: err}
 		}
 		contextLog.Info("transient WAL restore error, will retry",
 			"attempt", attemptCount, "nextRetryIn", backoff, "deadline", deadline,
@@ -195,8 +202,7 @@ func retryUntilDeadline(
 		select {
 		case <-time.After(backoff):
 		case <-ctx.Done():
-			return fmt.Errorf("%w: context canceled while retrying: %w: %w",
-				ErrRetryTimeoutReached, ctx.Err(), err)
+			return &retryTimeoutError{attemptCount: attemptCount, cause: ctx.Err(), lastErr: err}
 		}
 		attemptCount++
 		err = attempt(ctx)
