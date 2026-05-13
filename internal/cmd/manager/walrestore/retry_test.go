@@ -37,64 +37,65 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("classifyPluginError", func() {
-	DescribeTable("classifies gRPC status codes conservatively",
-		func(err error, expected restoreErrorKind) {
-			Expect(classifyPluginError(err)).To(Equal(expected))
+var _ = Describe("isTransientPluginError", func() {
+	DescribeTable("only specific gRPC codes are transient",
+		func(err error, expected bool) {
+			Expect(isTransientPluginError(err)).To(Equal(expected))
 		},
-		Entry("nil is None", nil, restoreErrorNone),
-		Entry("gRPC NotFound is NotFound",
-			status.Error(codes.NotFound, "wal not in archive"), restoreErrorNotFound),
-		Entry("NotFound through fmt.Errorf %w is still NotFound",
-			fmt.Errorf("plugin foo: %w", status.Error(codes.NotFound, "x")), restoreErrorNotFound),
-		Entry("Unavailable is Transient",
-			status.Error(codes.Unavailable, "dial tcp"), restoreErrorTransient),
-		Entry("DeadlineExceeded is Transient",
-			status.Error(codes.DeadlineExceeded, "deadline"), restoreErrorTransient),
-		Entry("ResourceExhausted is Transient",
-			status.Error(codes.ResourceExhausted, "rate-limited"), restoreErrorTransient),
-		Entry("Aborted is Transient",
-			status.Error(codes.Aborted, "concurrency"), restoreErrorTransient),
-		// Other gRPC codes default to Other (= legacy exit-1 behavior).
+		Entry("nil is not transient", nil, false),
+		Entry("gRPC NotFound is not transient",
+			status.Error(codes.NotFound, "wal not in archive"), false),
+		Entry("NotFound through fmt.Errorf %w is still not transient",
+			fmt.Errorf("plugin foo: %w", status.Error(codes.NotFound, "x")), false),
+		Entry("Unavailable is transient",
+			status.Error(codes.Unavailable, "dial tcp"), true),
+		Entry("DeadlineExceeded is transient",
+			status.Error(codes.DeadlineExceeded, "deadline"), true),
+		Entry("ResourceExhausted is transient",
+			status.Error(codes.ResourceExhausted, "rate-limited"), true),
+		Entry("Aborted is transient",
+			status.Error(codes.Aborted, "concurrency"), true),
 		// Crucial: an unclassified gRPC error must NOT be treated as
 		// transient — that would tie up PostgreSQL on a permanent error.
-		Entry("Internal is Other (not transient)",
-			status.Error(codes.Internal, "boom"), restoreErrorOther),
-		Entry("InvalidArgument is Other",
-			status.Error(codes.InvalidArgument, "bad arg"), restoreErrorOther),
-		Entry("PermissionDenied is Other",
-			status.Error(codes.PermissionDenied, "forbidden"), restoreErrorOther),
-		Entry("a plain (non-gRPC) error is Other",
-			errors.New("something blew up"), restoreErrorOther),
+		Entry("Internal is not transient",
+			status.Error(codes.Internal, "boom"), false),
+		Entry("InvalidArgument is not transient",
+			status.Error(codes.InvalidArgument, "bad arg"), false),
+		Entry("PermissionDenied is not transient",
+			status.Error(codes.PermissionDenied, "forbidden"), false),
+		Entry("a plain (non-gRPC) error is not transient",
+			errors.New("something blew up"), false),
 		// Anti-regression: we must not pattern-match on the message.
-		Entry("'not found' text without a gRPC status is Other",
-			errors.New("the wal file is not found"), restoreErrorOther),
+		Entry("'not found' text without a gRPC status is not transient",
+			errors.New("the wal file is not found"), false),
 	)
 })
 
-var _ = Describe("classifyBarmanError", func() {
-	DescribeTable("only ErrWALNotFound and connectivity-failure are recognized",
-		func(err error, expected restoreErrorKind) {
-			Expect(classifyBarmanError(err)).To(Equal(expected))
+var _ = Describe("isTransientBarmanError", func() {
+	DescribeTable("ErrConnectivity and ErrGeneric are transient; everything else is final",
+		func(err error, expected bool) {
+			Expect(isTransientBarmanError(err)).To(Equal(expected))
 		},
-		Entry("nil is None", nil, restoreErrorNone),
-		Entry("ErrWALNotFound (wrapped or bare) is NotFound",
-			fmt.Errorf("ctx: %w", barmanRestorer.ErrWALNotFound), restoreErrorNotFound),
-		// The vendored barman-cloud library emits this message verbatim for
-		// exit code 2. If the message ever changes upstream this test will
-		// fail and force us to update the matcher.
-		Entry("connectivity-failure message (barman exit 2) is Transient",
+		Entry("nil is not transient", nil, false),
+		// Transient: matches plugin-barman-cloud#927 — connectivity blips
+		// and the generic exit-4 bucket are both worth retrying.
+		Entry("ErrConnectivity (wrapped) is transient",
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrConnectivity), true),
+		Entry("ErrGeneric (wrapped) is transient",
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrGeneric), true),
+		// Terminal sentinels.
+		Entry("ErrWALNotFound is not transient",
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrWALNotFound), false),
+		Entry("ErrInvalidWalName is not transient",
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName), false),
+		Entry("ErrUnrecognizedExitCode is not transient",
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrUnrecognizedExitCode), false),
+		// Anti-regression: we must not pattern-match on the message.
+		Entry("plain 'connectivity failure' string without a sentinel is not transient",
 			errors.New("connectivity failure while executing barman-cloud-wal-restore, retrying"),
-			restoreErrorTransient),
-		// Anything else (exit 3 invalid input, exit 4 generic, unrecognized,
-		// or a plain error) is Other — not transient, falls back to exit 1.
-		Entry("invalid WAL name (barman exit 3) is Other",
-			errors.New("invalid name for a WAL file"), restoreErrorOther),
-		Entry("generic error (barman exit 4) is Other",
-			errors.New("generic error code encountered while executing barman-cloud-wal-restore"),
-			restoreErrorOther),
-		Entry("unrelated error is Other",
-			errors.New("some unexpected failure"), restoreErrorOther),
+			false),
+		Entry("unrelated plain error is not transient",
+			errors.New("some unexpected failure"), false),
 	)
 })
 
@@ -120,6 +121,94 @@ var _ = Describe("isTransientRestoreError", func() {
 		Entry("wrapped ErrTransientRestore IS transient",
 			fmt.Errorf("ctx: %w", ErrTransientRestore), true),
 	)
+})
+
+var _ = Describe("LastError", func() {
+	// Why this exists: the carve-out in runWalRestore strips
+	// ErrRetryTimeoutReached for a steady-state target-primary and surfaces
+	// the underlying transient error instead. If LastError ever returned
+	// nil when the wrapped error was non-nil, the carve-out would silently
+	// degrade to "return ErrRetryTimeoutReached" and the operator would
+	// stop seeing the actual failure cause. Anchoring these cases here
+	// keeps that contract honest.
+
+	// Shrink the backoff knobs so the cases that drive retryUntilDeadline
+	// finish in milliseconds and reliably reach the select{} (otherwise
+	// the deadline check fires first and the ctx-canceled path is never
+	// exercised).
+	var (
+		origInitial time.Duration
+		origCap     time.Duration
+	)
+
+	BeforeEach(func() {
+		origInitial = retryBackoffInitial
+		origCap = retryBackoffCap
+		retryBackoffInitial = 2 * time.Millisecond
+		retryBackoffCap = 10 * time.Millisecond
+	})
+
+	AfterEach(func() {
+		retryBackoffInitial = origInitial
+		retryBackoffCap = origCap
+	})
+
+	It("returns nil for nil", func() {
+		Expect(LastError(nil)).To(Succeed())
+	})
+
+	It("returns nil for an unrelated error", func() {
+		Expect(LastError(errors.New("not from the retry loop"))).To(Succeed())
+	})
+
+	It("returns nil for a bare ErrRetryTimeoutReached sentinel", func() {
+		// Defensive: a hand-built fmt.Errorf("%w", ErrRetryTimeoutReached)
+		// from anywhere else in the tree has no lastErr to recover. The
+		// carve-out's `if last := LastError(err); last != nil` guards
+		// against this exact shape returning nil and being treated as
+		// "success" upstream.
+		Expect(LastError(ErrRetryTimeoutReached)).To(Succeed())
+		Expect(LastError(fmt.Errorf("ctx: %w", ErrRetryTimeoutReached))).To(Succeed())
+	})
+
+	It("recovers the last attempt error from the deadline-hit path", func() {
+		lastErr := fmt.Errorf("flaky bucket: %w", ErrTransientRestore)
+		err := retryUntilDeadline(
+			context.Background(),
+			func(_ context.Context) error { return lastErr },
+			time.Now().Add(20*time.Millisecond),
+		)
+		Expect(errors.Is(err, ErrRetryTimeoutReached)).To(BeTrue())
+		Expect(LastError(err)).To(Equal(lastErr))
+	})
+
+	It("recovers the last attempt error from the context-canceled path", func() {
+		lastErr := fmt.Errorf("transient: %w", ErrTransientRestore)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := retryUntilDeadline(
+			ctx,
+			func(_ context.Context) error { return lastErr },
+			time.Now().Add(1*time.Second),
+		)
+		Expect(errors.Is(err, ErrRetryTimeoutReached)).To(BeTrue())
+		Expect(errors.Is(err, context.Canceled)).To(BeTrue())
+		Expect(LastError(err)).To(Equal(lastErr))
+	})
+
+	It("recovers the last attempt error even when further wrapped", func() {
+		// Belt-and-braces: errors.As walks the chain, so a caller that
+		// adds context with fmt.Errorf("...: %w", err) must still let
+		// LastError reach into the original retryTimeoutError.
+		lastErr := fmt.Errorf("flaky: %w", ErrTransientRestore)
+		inner := retryUntilDeadline(
+			context.Background(),
+			func(_ context.Context) error { return lastErr },
+			time.Now().Add(20*time.Millisecond),
+		)
+		outer := fmt.Errorf("while restoring WAL %q: %w", "0000...", inner)
+		Expect(LastError(outer)).To(Equal(lastErr))
+	})
 })
 
 var _ = Describe("resolveMaxRetryTimeout", func() {
@@ -162,23 +251,35 @@ var _ = Describe("resolveNoBarmanError", func() {
 
 	It("wraps config errors that aren't ErrNoBackupConfigured", func() {
 		original := errors.New("kapow")
-		err := resolveNoBarmanError(context.Background(), cluster, "wal", nil, restoreErrorNone, original)
+		err := resolveNoBarmanError(context.Background(), cluster, "wal", nil, original)
 		Expect(errors.Is(err, original)).To(BeTrue())
 		Expect(errors.Is(err, ErrNoBackupConfigured)).To(BeFalse())
 		Expect(isTransientRestoreError(err)).To(BeFalse())
 	})
 
-	It("propagates ErrNoBackupConfigured for every non-transient plugin outcome", func() {
-		// None / NotFound / Other all let PostgreSQL see exit 1 and move
-		// on to streaming replication.
-		for _, kind := range []restoreErrorKind{restoreErrorNone, restoreErrorNotFound, restoreErrorOther} {
-			err := resolveNoBarmanError(context.Background(), cluster, "wal",
-				nil, kind, ErrNoBackupConfigured)
-			Expect(errors.Is(err, ErrNoBackupConfigured)).To(BeTrue(),
-				"kind=%v should propagate", kind)
-			Expect(isTransientRestoreError(err)).To(BeFalse(),
-				"kind=%v must NOT be transient", kind)
-		}
+	It("returns ErrNoBackupConfigured only when there was no plugin attempt", func() {
+		// With pluginErr == nil there is genuinely nothing configured — the
+		// caller's "tried restoring WALs, but no backup was configured"
+		// debug log applies. PostgreSQL sees exit 1 and falls back to
+		// streaming.
+		err := resolveNoBarmanError(context.Background(), cluster, "wal",
+			nil, ErrNoBackupConfigured)
+		Expect(errors.Is(err, ErrNoBackupConfigured)).To(BeTrue())
+		Expect(isTransientRestoreError(err)).To(BeFalse())
+	})
+
+	It("surfaces the plugin error for non-transient plugin failures (no barman fallback)", func() {
+		// A non-transient plugin failure must NOT be masked as "backup not
+		// configured": backup IS configured (via the plugin), it just
+		// failed. The plugin error is surfaced so operators can see the
+		// real reason; PostgreSQL still gets exit 1 (no transient marker)
+		// and falls back to streaming.
+		pluginErr := errors.New("plugin boom")
+		err := resolveNoBarmanError(context.Background(), cluster, "wal",
+			pluginErr, ErrNoBackupConfigured)
+		Expect(errors.Is(err, pluginErr)).To(BeTrue())
+		Expect(errors.Is(err, ErrNoBackupConfigured)).To(BeFalse())
+		Expect(isTransientRestoreError(err)).To(BeFalse())
 	})
 
 	It("opts into retry when the plugin had a known-transient error and no barman fallback", func() {
@@ -187,7 +288,7 @@ var _ = Describe("resolveNoBarmanError", func() {
 		// PostgreSQL promote on a partial archive.
 		pluginErr := status.Error(codes.Unavailable, "dial tcp")
 		err := resolveNoBarmanError(context.Background(), cluster, "wal",
-			pluginErr, restoreErrorTransient, ErrNoBackupConfigured)
+			pluginErr, ErrNoBackupConfigured)
 		Expect(errors.Is(err, ErrNoBackupConfigured)).To(BeFalse())
 		Expect(errors.Is(err, pluginErr)).To(BeTrue())
 		Expect(isTransientRestoreError(err)).To(BeTrue())
@@ -196,32 +297,38 @@ var _ = Describe("resolveNoBarmanError", func() {
 
 var _ = Describe("combineBarmanFailureWithPluginContext", func() {
 	It("returns the barman error untouched when neither path is transient", func() {
-		err := combineBarmanFailureWithPluginContext(nil, restoreErrorNone, barmanRestorer.ErrWALNotFound)
+		err := combineBarmanFailureWithPluginContext(nil, barmanRestorer.ErrWALNotFound)
 		Expect(errors.Is(err, barmanRestorer.ErrWALNotFound)).To(BeTrue())
 		Expect(isTransientRestoreError(err)).To(BeFalse())
 	})
 
-	It("does NOT opt into retry for an unclassified barman error (legacy exit-1)", func() {
-		// Critical regression guard: exit 3 / 4 / unrecognized barman errors
+	It("does NOT opt into retry for a terminal barman sentinel (legacy exit-1)", func() {
+		// Critical regression guard: ErrInvalidWalName / ErrUnrecognizedExitCode
 		// must surface unwrapped so RunE returns exit 1 and PostgreSQL falls
 		// back to streaming. The first-cut design retried for 5 minutes
 		// here, blocking PG on every WAL replay.
-		barmanErr := errors.New("generic error code encountered")
-		err := combineBarmanFailureWithPluginContext(nil, restoreErrorNone, barmanErr)
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName)
+		err := combineBarmanFailureWithPluginContext(nil, barmanErr)
 		Expect(err).To(Equal(barmanErr))
 		Expect(isTransientRestoreError(err)).To(BeFalse())
 	})
 
 	It("opts into retry when plugin reports a known-transient error", func() {
 		pluginErr := status.Error(codes.Unavailable, "blip")
-		barmanErr := errors.New("generic error code encountered")
-		err := combineBarmanFailureWithPluginContext(pluginErr, restoreErrorTransient, barmanErr)
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName)
+		err := combineBarmanFailureWithPluginContext(pluginErr, barmanErr)
 		Expect(isTransientRestoreError(err)).To(BeTrue())
 	})
 
 	It("opts into retry when barman reports a connectivity failure (exit 2)", func() {
-		barmanErr := errors.New("connectivity failure while executing barman-cloud-wal-restore, retrying")
-		err := combineBarmanFailureWithPluginContext(nil, restoreErrorNone, barmanErr)
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrConnectivity)
+		err := combineBarmanFailureWithPluginContext(nil, barmanErr)
+		Expect(isTransientRestoreError(err)).To(BeTrue())
+	})
+
+	It("opts into retry when barman reports a generic exit-4 failure", func() {
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrGeneric)
+		err := combineBarmanFailureWithPluginContext(nil, barmanErr)
 		Expect(isTransientRestoreError(err)).To(BeTrue())
 	})
 
@@ -232,7 +339,7 @@ var _ = Describe("combineBarmanFailureWithPluginContext", func() {
 		// NOT be errors.Is-detectable as ErrWALNotFound, otherwise the loop
 		// would treat it as final and skip retrying.
 		pluginErr := status.Error(codes.Unavailable, "blip")
-		err := combineBarmanFailureWithPluginContext(pluginErr, restoreErrorTransient, barmanRestorer.ErrWALNotFound)
+		err := combineBarmanFailureWithPluginContext(pluginErr, barmanRestorer.ErrWALNotFound)
 		Expect(errors.Is(err, barmanRestorer.ErrWALNotFound)).To(BeFalse())
 		Expect(isTransientRestoreError(err)).To(BeTrue())
 	})
@@ -348,7 +455,7 @@ var _ = Describe("retryUntilDeadline", func() {
 		Expect(atomic.LoadInt32(&calls)).To(Equal(int32(2)))
 	})
 
-	It("maps context cancellation to ErrRetryTimeoutReached (don't let PostgreSQL promote)", func() {
+	It("maps context cancellation to ErrRetryTimeoutReached", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		err := retryUntilDeadline(

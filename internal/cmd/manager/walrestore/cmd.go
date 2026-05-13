@@ -43,10 +43,12 @@ import (
 )
 
 // exitCodeRetryTimeoutReached is the process exit code used when the retry
-// budget is exhausted on transient errors. PostgreSQL treats this as a fatal
-// failure of restore_command and stops log-shipping replication instead of
-// promoting the replica on a partial archive.
-const exitCodeRetryTimeoutReached = 255
+// budget is exhausted on transient errors. We use 143 (128+SIGTERM) because
+// wait_result_is_any_signal in xlogarchive.c:RestoreArchivedFile detects it
+// as SIGTERM and calls proc_exit(1), causing a clean PostgreSQL shutdown
+// rather than XLREAD_FAIL (which would silently open PostgreSQL as primary
+// with unapplied WAL). See doc.go for the full rationale.
+const exitCodeRetryTimeoutReached = 143
 
 var (
 	// ErrEndOfWALStreamReached is returned when end of WAL is detected in the cloud archive
@@ -77,11 +79,9 @@ func NewCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			// TODO: The command is triggered by PG, resulting in the loss of stdout logs.
-			// TODO: We need to implement a logpipe to prevent this.
 			contextLog := log.WithName("wal-restore")
 			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
-			err := runWithRetry(ctx, pgData, podName, args)
+			err := runWalRestore(ctx, pgData, podName, args)
 			if err == nil {
 				return nil
 			}
@@ -97,7 +97,7 @@ func NewCmd() *cobra.Command {
 						"Exiting with error once to let Postgres try switching to streaming replication")
 				return err
 			case errors.Is(err, ErrRetryTimeoutReached):
-				// The retry budget is exhausted. Exit with 255 so PostgreSQL
+				// The retry budget is exhausted. Exit with 143 so PostgreSQL
 				// stops log-shipping replication instead of promoting itself
 				// on a partial archive. We bypass the cobra error-to-exit-1
 				// wiring by calling os.Exit directly.
@@ -139,35 +139,93 @@ func resolveMaxRetryTimeout(cluster *apiv1.Cluster) time.Duration {
 	return cluster.Spec.WalRestoreRetryTimeout.Duration
 }
 
-// runWithRetry wraps the single-shot restore attempt in a retry loop so that
-// transient errors (flaky network, cloud provider hiccups, plugin glitches)
-// do not cause PostgreSQL to promote a replica on an incomplete archive.
+// runWalRestore runs a single WAL restore attempt. When this pod is the
+// TargetPrimary of a non-replica cluster, or when the cluster is still
+// bootstrapping, transient failures are retried until the configurable budget
+// expires rather than surfaced immediately to PostgreSQL. See doc.go for the
+// full rationale.
 //
-// The loop returns as soon as it has a final answer:
+// In all other cases (including the designated primary of a replica cluster,
+// which stays in standby mode and is never auto-promoted) run() is called
+// directly.
+//
+// Returns:
 //   - nil on success,
-//   - barmanRestorer.ErrWALNotFound when the WAL is definitively absent
-//     (PostgreSQL's own retry logic handles that case — e.g. it will try
-//     streaming replication next),
-//   - ErrNoBackupConfigured / ErrEndOfWALStreamReached to preserve the
-//     existing upstream behaviors,
-//   - ErrRetryTimeoutReached when the retry budget expires on transient
-//     errors (the caller maps this to exit 255 to stop replication).
-func runWithRetry(
+//   - barmanRestorer.ErrWALNotFound when the WAL is definitively absent,
+//   - ErrNoBackupConfigured / ErrEndOfWALStreamReached to preserve existing
+//     upstream behaviors,
+//   - ErrRetryTimeoutReached when the retry budget expires on transient errors.
+func runWalRestore(
 	ctx context.Context,
 	pgData string,
 	podName string,
 	args []string,
 ) error {
-	// Resolve the retry budget before the first attempt. If the cache is
-	// transiently unavailable we fall back to the default, and run() will
-	// surface the real cache error on the first attempt if it persists.
-	timeout := resolveMaxRetryTimeout(loadClusterForTimeout(ctx))
-	return retryUntilDeadline(ctx,
+	cluster := loadClusterFromCache(ctx)
+
+	// We opt into the retry budget only when a failed WAL restore could lead
+	// to this pod being promoted to primary — that is the only situation in
+	// which surfacing a transient failure to PostgreSQL is dangerous, because
+	// PG would otherwise open the database with unapplied WAL. Two cases
+	// qualify:
+	//
+	//   - Bootstrapping: we are replaying a physical base backup and there is
+	//     no live primary yet (cluster.Status.CurrentPrimary == ""). Giving
+	//     up on a transient archive failure here would promote a pod whose
+	//     WAL chain is incomplete. This applies to both standard and replica
+	//     clusters: the first pod of a replica cluster also replays the base
+	//     backup in non-standby mode before transitioning into standby.
+	//   - Designated primary of a standard cluster: this pod is the cluster's
+	//     TargetPrimary, so it is draining the WAL archive in preparation for
+	//     promotion. Same hazard as bootstrap.
+	//
+	// The designated primary of a replica cluster (cluster.IsReplica()) is
+	// explicitly excluded: it stays in standby mode indefinitely, replicating
+	// from the external source, and is never auto-promoted by PostgreSQL. A
+	// transient restore_command failure there falls back to streaming, so the
+	// retry budget is unnecessary and the legacy single-attempt behavior is
+	// safe.
+	//
+	// A genuine replica (live primary exists and it isn't us) likewise keeps
+	// the legacy behavior: streaming replication from the primary is the
+	// natural fallback, so there is no need to block PG on retries.
+	isBootstrapping := cluster != nil && cluster.Status.CurrentPrimary == ""
+	isTargetPrimary := cluster != nil &&
+		cluster.Status.TargetPrimary == podName &&
+		!cluster.IsReplica()
+
+	if cluster == nil || (!isBootstrapping && !isTargetPrimary) {
+		err := run(ctx, pgData, podName, args)
+		return err
+	}
+
+	timeout := resolveMaxRetryTimeout(cluster)
+	err := retryUntilDeadline(ctx,
 		func(ctx context.Context) error {
 			return run(ctx, pgData, podName, args)
 		},
 		time.Now().Add(timeout),
 	)
+
+	// Carve-out: the designated primary of a standard cluster in steady-state
+	// operation must not be permanently blocked by the retry budget. Returning
+	// the last transient error (instead of ErrRetryTimeoutReached) lets RunE
+	// exit 1 so PostgreSQL can either fall back to streaming or — if streaming
+	// is gone too — promote with whatever WAL is on disk. We accept the
+	// possibility of data loss here in exchange for availability.
+	//
+	// Replica clusters never reach this branch: their designated primary is
+	// filtered out of isTargetPrimary above. Bootstrap is explicitly excluded
+	// (!isBootstrapping) because at first-pod startup TargetPrimary already
+	// equals podName, and promoting on a partial archive there is the
+	// unambiguously unsafe case the exit-143 path was designed to prevent.
+	if isTargetPrimary && !isBootstrapping && errors.Is(err, ErrRetryTimeoutReached) {
+		if last := LastError(err); last != nil {
+			return last
+		}
+	}
+
+	return err
 }
 
 // isTransientRestoreError reports whether the caller should retry.
@@ -187,25 +245,37 @@ func isTransientRestoreError(err error) bool {
 // most useful error to surface upstream, taking the plugin attempt's outcome
 // into account.
 //
-// When the plugin had a known-transient failure and there is no barman-cloud
-// fallback to try, we wrap the plugin error with ErrTransientRestore so the
-// retry loop kicks in. For any other plugin outcome we let
-// ErrNoBackupConfigured (or the wrapped config error) flow through — the
-// legacy exit-1 behavior, which lets PostgreSQL fall back to streaming.
+// When configErr is not ErrNoBackupConfigured, it's a genuine configuration
+// failure and we wrap it. Otherwise we look at what the plugin did:
+//
+//   - Known-transient plugin failure: wrap with ErrTransientRestore so the
+//     retry loop kicks in (we cannot let PG see exit 1 on a recoverable
+//     failure during bootstrap / target-primary, lest it promote on a
+//     partial archive).
+//   - Any other plugin failure (NotFound, Other, ...): surface the plugin
+//     error itself. Returning ErrNoBackupConfigured here would be wrong —
+//     backup IS configured, via the plugin — and would hide the real
+//     reason from the operator's logs. Retry semantics are unchanged:
+//     only ErrTransientRestore opts into retries.
+//   - No plugin attempt (pluginErr == nil): there genuinely is no backup
+//     configured. Return ErrNoBackupConfigured so the caller's debug log
+//     line stays accurate.
 func resolveNoBarmanError(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walName string,
 	pluginErr error,
-	pluginKind restoreErrorKind,
 	configErr error,
 ) error {
 	if !errors.Is(configErr, ErrNoBackupConfigured) {
 		return fmt.Errorf("while getting recover configuration: %w", configErr)
 	}
-	if pluginKind == restoreErrorTransient {
+	if isTransientPluginError(pluginErr) {
 		return fmt.Errorf("%w: transient plugin error, no barman-cloud fallback configured: %w",
 			ErrTransientRestore, pluginErr)
+	}
+	if pluginErr != nil {
+		return fmt.Errorf("plugin failed to restore WAL and no barman-cloud fallback configured: %w", pluginErr)
 	}
 	log.FromContext(ctx).Trace("Skipping WAL restore, there is no backup configuration",
 		"walName", walName,
@@ -229,11 +299,9 @@ func resolveNoBarmanError(
 // existed.
 func combineBarmanFailureWithPluginContext(
 	pluginErr error,
-	pluginKind restoreErrorKind,
 	barmanErr error,
 ) error {
-	barmanKind := classifyBarmanError(barmanErr)
-	if pluginKind == restoreErrorTransient || barmanKind == restoreErrorTransient {
+	if isTransientPluginError(pluginErr) || isTransientBarmanError(barmanErr) {
 		// %v on barmanErr (instead of %w) is deliberate: if barmanErr is
 		// ErrWALNotFound, wrapping with %w would let isTransientRestoreError
 		// match — but it would ALSO let an upstream ErrWALNotFound check
@@ -246,16 +314,15 @@ func combineBarmanFailureWithPluginContext(
 	return barmanErr
 }
 
-// loadClusterForTimeout returns the cluster from the local cache, or nil on
-// failure. Cache unavailability is non-fatal for timeout resolution: we
-// simply fall back to the default. The real cache error (if any) will be
-// surfaced by run() itself on the first attempt.
-func loadClusterForTimeout(ctx context.Context) *apiv1.Cluster {
+// loadClusterFromCache returns the cluster from the local cache, or nil on
+// failure. The caller must treat nil as "cache unavailable" and fall back to
+// safe defaults. The real cache error (if any) will be surfaced by run() on
+// the first restore attempt.
+func loadClusterFromCache(ctx context.Context) *apiv1.Cluster {
 	contextLog := log.FromContext(ctx)
 	cluster, err := local.NewClient().Cache().GetCluster()
 	if err != nil {
-		contextLog.Debug("could not load cluster from cache while computing retry timeout, using default",
-			"error", err)
+		contextLog.Debug("could not load cluster from cache", "error", err)
 		return nil
 	}
 	return cluster
@@ -300,15 +367,9 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return nil
 	}
 
-	// Classify the plugin outcome before falling through to barman-cloud.
-	// The retry loop needs to know whether a transient plugin failure
-	// should still trigger retries even when in-tree barman-cloud is not
-	// configured as a fallback.
-	pluginKind := classifyPluginError(pluginErr)
-
 	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
 	if err != nil {
-		return resolveNoBarmanError(ctx, cluster, walName, pluginErr, pluginKind, err)
+		return resolveNoBarmanError(ctx, cluster, walName, pluginErr, err)
 	}
 
 	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
@@ -374,7 +435,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 	// is the one that PostgreSQL has requested to restore.
 	// The failure has already been logged in walRestorer.RestoreList method
 	if walStatus[0].Err != nil {
-		return combineBarmanFailureWithPluginContext(pluginErr, pluginKind, walStatus[0].Err)
+		return combineBarmanFailureWithPluginContext(pluginErr, walStatus[0].Err)
 	}
 
 	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
