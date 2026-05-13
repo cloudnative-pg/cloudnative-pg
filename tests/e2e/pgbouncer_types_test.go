@@ -87,7 +87,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
-			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
+			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRO, podList)
 		})
 
 		By("verify that read-write pooler endpoints contain the correct pod addresses.", func() {
@@ -102,7 +102,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
-			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
+			pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRW, podList)
 		})
 	})
 
@@ -139,7 +139,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
 
-				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
+				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRO, podList)
 			})
 
 			By("verifying that read-write pooler endpoints contain the correct pod addresses.", func() {
@@ -153,7 +153,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
 					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
-				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
+				pgbouncerasserts.AssertPgBouncerHasServiceNameInsideHostParameter(env, poolerServiceRW, podList)
 			})
 		}
 	}

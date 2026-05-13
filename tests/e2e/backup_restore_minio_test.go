@@ -980,7 +980,7 @@ func prepareClusterForPITROnMinio(
 		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
 	minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
 	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 

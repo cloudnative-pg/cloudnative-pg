@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +44,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -142,20 +142,12 @@ func AssertSuspendScheduleBackups(env *environment.TestingEnvironment, namespace
 	GinkgoHelper()
 	var completedBackupsCount int
 	var err error
+	scheduledBackupNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      scheduledBackupName,
+	}
 	By("suspending the scheduled backup", func() {
-		Eventually(func() error {
-			cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":true}}' "+
-				"--type='merge'", scheduledBackupName, namespace)
-			_, _, err = run.Unchecked(cmd)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, 60, 5).Should(Succeed())
-		scheduledBackupNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      scheduledBackupName,
-		}
+		setScheduledBackupSuspend(env, scheduledBackupNamespacedName, true)
 		Eventually(func() bool {
 			scheduledBackup := &apiv1.ScheduledBackup{}
 			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
@@ -187,19 +179,7 @@ func AssertSuspendScheduleBackups(env *environment.TestingEnvironment, namespace
 	By("resuming suspended backup", func() {
 		completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(env, namespace, scheduledBackupName)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(func() error {
-			cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":false}}' "+
-				"--type='merge'", scheduledBackupName, namespace)
-			_, _, err = run.Unchecked(cmd)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, 60, 5).Should(Succeed())
-		scheduledBackupNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      scheduledBackupName,
-		}
+		setScheduledBackupSuspend(env, scheduledBackupNamespacedName, false)
 		Eventually(func() bool {
 			scheduledBackup := &apiv1.ScheduledBackup{}
 			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
@@ -217,18 +197,44 @@ func AssertSuspendScheduleBackups(env *environment.TestingEnvironment, namespace
 	})
 }
 
-// AssertArchiveConditionMet uses kubectl wait to check that
-// ContinuousArchiving=true is reached within the given timeout string.
-func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
+// setScheduledBackupSuspend patches the named ScheduledBackup's
+// spec.suspend, retrying on conflict.
+func setScheduledBackupSuspend(
+	env *environment.TestingEnvironment,
+	key types.NamespacedName,
+	suspend bool,
+) {
 	GinkgoHelper()
-	By("Waiting for the condition", func() {
-		out, _, err := run.Run(fmt.Sprintf(
-			"kubectl -n %s wait --for=condition=ContinuousArchiving=true cluster/%s --timeout=%s",
-			namespace, clusterName, timeout,
-		))
-		Expect(err).ToNot(HaveOccurred())
-		outPut := strings.TrimSpace(out)
-		Expect(outPut).Should(ContainSubstring("condition met"))
+	Eventually(func() error {
+		sb := &apiv1.ScheduledBackup{}
+		if err := env.Client.Get(env.Ctx, key, sb); err != nil {
+			return err
+		}
+		original := sb.DeepCopy()
+		sb.Spec.Suspend = &suspend
+		return env.Client.Patch(env.Ctx, sb, ctrlclient.MergeFrom(original))
+	}, 60, 5).Should(Succeed())
+}
+
+// AssertArchiveConditionMet waits for the Cluster's ContinuousArchiving
+// condition to become True within timeout seconds.
+func AssertArchiveConditionMet(
+	env *environment.TestingEnvironment,
+	namespace, clusterName string,
+	timeout int,
+) {
+	GinkgoHelper()
+	By("Waiting for the ContinuousArchiving condition", func() {
+		Eventually(func(g Gomega) {
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			cond := meta.FindStatusCondition(
+				cluster.Status.Conditions,
+				string(apiv1.ConditionContinuousArchiving),
+			)
+			g.Expect(cond).ToNot(BeNil())
+			g.Expect(cond.Status).To(Equal(metav1.ConditionTrue))
+		}, timeout).Should(Succeed())
 	})
 }
 

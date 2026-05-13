@@ -542,6 +542,6 @@ func prepareClusterForPITROnAzureBlob(
 		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
 	assertArchiveWalOnAzureBlob(namespace, clusterName, azureConfig)
-	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
 	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }

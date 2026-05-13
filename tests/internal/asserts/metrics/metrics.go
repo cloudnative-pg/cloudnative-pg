@@ -31,10 +31,10 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2" //nolint
@@ -51,13 +51,12 @@ func AssertCustomMetricsResourcesExist(
 ) {
 	GinkgoHelper()
 	By("verifying the custom metrics ConfigMaps and Secrets exist", func() {
-		_, _, err := run.Run("kubectl apply -n " + namespace + " -f " + sampleFile)
-		Expect(err).ToNot(HaveOccurred())
+		resources.CreateResourceFromFile(env, namespace, sampleFile)
 
 		timeout := 20
 		Eventually(func() ([]corev1.ConfigMap, error) {
 			cmList := &corev1.ConfigMapList{}
-			err = env.Client.List(
+			err := env.Client.List(
 				env.Ctx, cmList, ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingLabels{"e2e": "metrics"},
 			)
@@ -66,7 +65,7 @@ func AssertCustomMetricsResourcesExist(
 
 		Eventually(func() ([]corev1.Secret, error) {
 			secretList := &corev1.SecretList{}
-			err = env.Client.List(
+			err := env.Client.List(
 				env.Ctx, secretList, ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingLabels{"e2e": "metrics"},
 			)

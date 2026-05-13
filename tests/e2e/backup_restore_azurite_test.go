@@ -289,7 +289,7 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	// Creating cluster
 	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSampleFile)
 
-	backupasserts.AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
 }
 
 func prepareClusterBackupOnAzurite(

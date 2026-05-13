@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -50,7 +51,6 @@ import (
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/replicationslot"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -416,12 +416,11 @@ func AssertDetachReplicaModeCluster(
 
 	By("disabling the replica mode", func() {
 		Eventually(func(g Gomega) {
-			_, _, err := run.Unchecked(fmt.Sprintf(
-				"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
-					" --type='merge'",
-				replicaClusterName, namespace,
-			))
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
+			original := cluster.DeepCopy()
+			cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+			g.Expect(env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(original))).To(Succeed())
 		}, 60, 5).Should(Succeed())
 	})
 
@@ -567,16 +566,12 @@ func AssertFastFailOver(
 	})
 
 	By("starting load", func() {
-		_, _, err = run.Run("kubectl create -n " + namespace +
-			" -f " + webTestFile)
-		Expect(err).ToNot(HaveOccurred())
+		resources.CreateResourceFromFile(env, namespace, webTestFile)
 
 		webtestDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "webtest", Namespace: namespace}}
 		Expect(deployments.WaitForReady(env.Ctx, env.Client, webtestDeploy, 60)).To(Succeed())
 
-		_, _, err = run.Run("kubectl create -n " + namespace +
-			" -f " + webTestJob)
-		Expect(err).ToNot(HaveOccurred())
+		resources.CreateResourceFromFile(env, namespace, webTestJob)
 
 		primaryPodName := clusterName + "-1"
 		primaryPodNamespacedName := types.NamespacedName{

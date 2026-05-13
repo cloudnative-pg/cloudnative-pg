@@ -44,7 +44,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	pgutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -181,9 +180,7 @@ func AssertPodIsRecreated(env *environment.TestingEnvironment, namespace, pooler
 		Expect(len(podList.Items)).Should(BeEquivalentTo(1))
 		podNameBeforeDelete = podList.Items[0].GetName()
 
-		cmd := fmt.Sprintf("kubectl delete pod %s -n %s", podNameBeforeDelete, namespace)
-		_, _, err = run.Run(cmd)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(env.Client.Delete(env.Ctx, &podList.Items[0])).To(Succeed())
 	})
 	By(fmt.Sprintf("verifying pooler '%s' pod has been recreated", poolerName), func() {
 		Eventually(func() (bool, error) {
@@ -309,15 +306,20 @@ func AssertPgBouncerEndpointsContainsPodsIP(
 // AssertPgBouncerHasServiceNameInsideHostParameter verifies that the
 // pgbouncer.ini inside every pooler pod references the given service name
 // in its host= parameter.
-func AssertPgBouncerHasServiceNameInsideHostParameter(namespace, serviceName string, podList *corev1.PodList) {
+func AssertPgBouncerHasServiceNameInsideHostParameter(
+	env *environment.TestingEnvironment,
+	serviceName string,
+	podList *corev1.PodList,
+) {
 	GinkgoHelper()
-	for _, pod := range podList.Items {
-		command := fmt.Sprintf("kubectl exec -n %s %s -- /bin/bash -c 'grep "+
-			" \"host=%s\" controller/configs/pgbouncer.ini'", namespace, pod.Name, serviceName)
-		out, _, err := run.Run(command)
+	expected := fmt.Sprintf("host=%s", serviceName)
+	commandTimeout := 10 * time.Second
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		out, _, err := env.EventuallyExecCommand(env.Ctx, *pod, "pgbouncer", &commandTimeout,
+			"grep", expected, "controller/configs/pgbouncer.ini")
 		Expect(err).ToNot(HaveOccurred())
-		expectedContainedHost := fmt.Sprintf("host=%s", serviceName)
-		Expect(out).To(ContainSubstring(expectedContainedHost))
+		Expect(out).To(ContainSubstring(expected))
 	}
 }
 
