@@ -114,6 +114,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		level               = tests.Lowest
 	)
 
+	storageResource := &minio.Instance{}
+
 	BeforeAll(func() {
 		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
 			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
@@ -158,10 +160,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
 			latestTar := minio.GetFilePath(serverName, "data.tar.gz")
-			currentBackups, err := minio.CountFiles(minioEnv, latestTar)
+			currentBackups, err := storageResource.CountFiles(latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				return minio.CountFiles(minioEnv, latestTar)
+				return storageResource.CountFiles(latestTar)
 			}, 120).Should(BeNumerically(">", currentBackups))
 		})
 	}
@@ -399,7 +401,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// Dump the minio namespace when failed
 			namespaces.DumpNamespaceObjects(
 				env.Ctx, env.Client,
-				minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log",
+				storageResource.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log",
 			)
 			// Dump the operator namespace, as operator is changing too
 			operator.Dump(
@@ -414,11 +416,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := minio.CleanFiles(minioEnv, minioPath1); err != nil {
+		if _, err := storageResource.CleanFiles(minioPath1); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
-		if _, err := minio.CleanFiles(minioEnv, minioPath2); err != nil {
+		if _, err := storageResource.CleanFiles(minioPath2); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
@@ -494,7 +496,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
 		})
+		By("request minio resources", func() {
+			var err error
+			storageResource, err = minio.RequestInstance(env, upgradeNamespace)
+			Expect(err).NotTo(HaveOccurred())
+		})
 		By("creating the cloud storage credentials", func() {
+			// The upgrade fixtures reference a secret named "aws-creds" instead of the
+			// standard "backup-storage-creds" — create it alongside the one that
+			// RequestInstance provisions.
 			_, err := secrets.CreateObjectStorageSecret(
 				env.Ctx,
 				env.Client,
@@ -504,10 +514,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"minio123",
 			)
 			Expect(err).NotTo(HaveOccurred())
-		})
-		By("create the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, upgradeNamespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 		// Create the cluster. Since it will take a while, we'll do more stuff
 		// in parallel and check for it to be up later.
@@ -567,7 +573,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		storageResource.AssertArchiveWalOnMinio(
+			upgradeNamespace, clusterName1, serverName1, testTimeouts[timeouts.WalsInMinio],
+		)
 
 		By("uploading a backup on minio", func() {
 			// We create a Backup
@@ -590,7 +598,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// across upgrade sub-tests).
 			latestTar := minio.GetFilePath(serverName1, "data.tar.gz")
 			Eventually(func() (int, error) {
-				return minio.CountFiles(minioEnv, latestTar)
+				return storageResource.CountFiles(latestTar)
 			}, 60).Should(BeEquivalentTo(1))
 		})
 
@@ -725,7 +733,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})
-		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		storageResource.AssertArchiveWalOnMinio(
+			upgradeNamespace, clusterName1, serverName1, testTimeouts[timeouts.WalsInMinio],
+		)
 		AssertScheduledBackupsAreScheduled(serverName1)
 
 		By("scaling down the pooler to 0", func() {

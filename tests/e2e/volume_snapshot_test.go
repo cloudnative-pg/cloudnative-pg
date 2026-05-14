@@ -42,7 +42,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -180,6 +179,7 @@ var _ = Describe("Verify Volume Snapshot",
 			)
 
 			var clusterToSnapshotName string
+			storageResource := &minio.Instance{}
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -192,20 +192,10 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("create the certificates for MinIO", func() {
-					err := minioEnv.CreateCaSecret(env, namespace)
+				By("request minio resources", func() {
+					storageResource, err = minio.RequestInstance(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
-
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("correctly executes PITR with a cold snapshot", func() {
@@ -233,7 +223,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Eventually(func() (bool, error) {
 						connectionStatus, err := minio.TestBarmanConnectivity(
 							namespace, clusterToSnapshotName, primaryPod.Name,
-							"minio", "minio123", minioEnv.ServiceName)
+							"minio", "minio123", storageResource.ServiceName)
 						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
@@ -334,7 +324,9 @@ var _ = Describe("Verify Volume Snapshot",
 					insertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					storageResource.AssertArchiveWalOnMinio(
+						namespace, clusterToSnapshotName, clusterToSnapshotName, testTimeouts[timeouts.WalsInMinio],
+					)
 				})
 
 				assertRecoveryIsAtExpectedPointInTime := func(restoreFile string) {
@@ -664,6 +656,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 			var clusterToSnapshotName string
 			var backupTaken *apiv1.Backup
+			storageResource := &minio.Instance{}
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -676,20 +669,8 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("create the certificates for MinIO", func() {
-					err := minioEnv.CreateCaSecret(env, namespace)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				By("creating the credentials for minio", func() {
-					_, err = secrets.CreateObjectStorageSecret(
-						env.Ctx,
-						env.Client,
-						namespace,
-						"backup-storage-creds",
-						"minio",
-						"minio123",
-					)
+				By("request minio resources", func() {
+					storageResource, err = minio.RequestInstance(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -703,7 +684,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Eventually(func() (bool, error) {
 						connectionStatus, err := minio.TestBarmanConnectivity(
 							namespace, clusterToSnapshotName, primaryPod.Name,
-							"minio", "minio123", minioEnv.ServiceName)
+							"minio", "minio123", storageResource.ServiceName)
 						return connectionStatus, err
 					}, 60).Should(BeTrue())
 				})
@@ -748,7 +729,9 @@ var _ = Describe("Verify Volume Snapshot",
 					insertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					storageResource.AssertArchiveWalOnMinio(
+						namespace, clusterToSnapshotName, clusterToSnapshotName, testTimeouts[timeouts.WalsInMinio],
+					)
 				})
 
 				By("creating a snapshot and waiting until it's completed", func() {
@@ -841,7 +824,9 @@ var _ = Describe("Verify Volume Snapshot",
 					insertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					storageResource.AssertArchiveWalOnMinio(
+						namespace, clusterToSnapshotName, clusterToSnapshotName, testTimeouts[timeouts.WalsInMinio],
+					)
 				})
 
 				// reuse the snapshot taken from the clusterToSnapshot cluster

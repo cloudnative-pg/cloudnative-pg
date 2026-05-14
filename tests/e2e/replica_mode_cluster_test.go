@@ -352,20 +352,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					replicaNamespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, replicaNamespace)
+			storageResource := &minio.Instance{}
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, replicaNamespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -405,7 +394,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("verify the WALs are archived from the designated primary", func() {
 				// only replica cluster has backup configure to minio,
 				// need the server name  be replica cluster name here
-				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName, replicaClusterName)
+				storageResource.AssertArchiveWalOnMinio(
+					replicaNamespace, srcClusterName, replicaClusterName, testTimeouts[timeouts.WalsInMinio],
+				)
 			})
 		})
 	})
@@ -423,20 +414,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("request minio resources", func() {
+				_, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -607,7 +586,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+		_ = minio.SwitchWalAndGetLatestArchive(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			namespace, primary.Name,
+		)
 
 		Eventually(func(g Gomega) {
 			podListA, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterAName)
@@ -657,14 +639,21 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			var err error
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
+
+			storageResource := &minio.Instance{}
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			DeferCleanup(func() error {
 				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
 				// between tests
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				_, err = storageResource.CleanFiles(path.Join("minio", "cluster-backups", clusterAName))
 				if err != nil {
 					return err
 				}
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				_, err = storageResource.CleanFiles(path.Join("minio", "cluster-backups", clusterBName))
 				if err != nil {
 					return err
 				}
@@ -673,23 +662,6 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 
 			stopLoad := make(chan struct{})
 			DeferCleanup(func() { close(stopLoad) })
-
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
 
 			By("creating the A cluster", func() {
 				var err error
@@ -747,7 +719,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 				// Speed up backup finalization
 				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
-				_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+				_ = minio.SwitchWalAndGetLatestArchive(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					namespace, primary.Name,
+				)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(

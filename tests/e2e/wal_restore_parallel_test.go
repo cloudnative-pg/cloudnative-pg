@@ -29,7 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -76,20 +75,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		By("creating the credentials for minio", func() {
-			_, err = secrets.CreateObjectStorageSecret(
-				env.Ctx,
-				env.Client,
-				namespace,
-				"backup-storage-creds",
-				"minio",
-				"minio123",
-			)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("create the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
+		storageResource := &minio.Instance{}
+		By("request minio resources", func() {
+			storageResource, err = minio.RequestInstance(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -119,11 +107,14 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
-			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
+			latestWAL = minio.SwitchWalAndGetLatestArchive(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				namespace, primary,
+			)
 			latestWALPath := minio.GetFilePath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return minio.CountFiles(minioEnv, latestWALPath)
+				return storageResource.CountFiles(latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
 				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
@@ -134,21 +125,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			walFile3 = "0000000100000000000000F3"
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile1)).
-				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile2)).
-				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile3)).
-				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile4)).
-				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile5)).
-				ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile1)).ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile2)).ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile3)).ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile4)).ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile5)).ShouldNot(HaveOccurred())
 		})
 
 		By("asserting the spool directory is empty on the standby", func() {
@@ -285,9 +266,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Generate a new wal file; the archive also contains WAL #6.
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
-				walFile6)).
-				ShouldNot(HaveOccurred())
+			Expect(storageResource.ForgeArchiveWal(clusterName, latestWAL, walFile6)).ShouldNot(HaveOccurred())
 		})
 
 		// Invoke the wal-restore command through exec requesting the #5 file.
