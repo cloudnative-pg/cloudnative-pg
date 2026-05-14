@@ -238,7 +238,7 @@ process, please refer to it.
 Once the release is completed, make sure that both the CloudNativePG versions
 and the Kubernetes ones are aligned with the supported release page.
 
-Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
+Open the `.github/ISSUE_TEMPLATE/bug.yml` file and update it accordingly.
 
 ## Release artifacts
 
@@ -256,11 +256,6 @@ released:
   release notes attached.
 - The container images on the registry, published as
   `ghcr.io/cloudnative-pg/cloudnative-pg:X.Y.Z`.
-- The OLM bundle and catalog images (suffixed `-bundle` and `-catalog` on
-  the registry), together with a pull request opened against
-  [`k8s-operatorhub/community-operators`](https://github.com/k8s-operatorhub/community-operators)
-  so the new version becomes available through
-  [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
 - Supply-chain attestations attached to the GitHub release:
   [cosign](https://docs.sigstore.dev/cosign/) signatures (`.sig`) and
   [Sigstore](https://www.sigstore.dev/) bundles (`.sigstore.json`) covering
@@ -287,6 +282,16 @@ how many supported versions are released together:
   file updated so that the listed CloudNativePG (and Kubernetes) versions
   stay consistent with the supported releases (see
   [Versions in the bug issue template](#versions-in-the-bug-issue-template)).
+- The OLM bundle and catalog images (suffixed `-bundle` and `-catalog` on
+  the registry), together with a pull request opened against
+  [`k8s-operatorhub/community-operators`](https://github.com/k8s-operatorhub/community-operators)
+  so the new version becomes available through
+  [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
+  The bundle is also archived in the
+  [`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+  repository.
+- The [Krew](https://krew.sigs.k8s.io/) plugin manifest for the `cnpg`
+  kubectl plugin, published for the latest stable version only.
 - The Git tag on the
   [`cloudnative-pg/api`](https://github.com/cloudnative-pg/api) repository
   matching the newest released version.
