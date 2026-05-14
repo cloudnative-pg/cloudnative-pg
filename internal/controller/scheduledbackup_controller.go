@@ -238,9 +238,9 @@ func (r *ScheduledBackupReconciler) reconcileScheduledBackup(
 
 	// Observe the apiserver state for this iteration before acting. The Backup
 	// name is deterministic (<sb-name>-<compactISO8601(nextTime)>), so we can
-	// look it up directly. If it already exists, a previous reconcile created
-	// it but did not land the status patch — adopt that observation and advance
-	// the status. Otherwise, create the Backup.
+	// look it up directly. If it already exists and carries our parent label,
+	// a previous reconcile created it but did not land the status patch: adopt
+	// that observation and advance the status. Otherwise, create the Backup.
 	var existing apiv1.Backup
 	switch err := r.Get(ctx, types.NamespacedName{
 		Name:      scheduledBackup.BackupName(nextTime),
@@ -251,8 +251,47 @@ func (r *ScheduledBackupReconciler) reconcileScheduledBackup(
 	case err != nil:
 		return ctrl.Result{}, err
 	default:
+		if existing.Labels[utils.ParentScheduledBackupLabelName] != scheduledBackup.GetName() {
+			return r.skipIterationOnNameCollision(ctx, scheduledBackup, &existing, nextTime, now, schedule.Next(now))
+		}
 		return r.advanceScheduledBackupStatus(ctx, scheduledBackup, nextTime, now, schedule)
 	}
+}
+
+// skipIterationOnNameCollision handles a Backup that occupies this iteration's
+// deterministic name but was not created by this ScheduledBackup. Adopting it
+// would advance the schedule over a backup we did not run; creating ours would
+// loop on AlreadyExists. We skip the colliding slot and resume at the next
+// slot from now (cron semantics: missed slots are not retroactively run).
+// LastScheduleTime is left untouched so the user can see we did not run this
+// iteration. Recovery (deleting the conflicting Backup, retroactively running
+// the missed backup) is left to the operator.
+func (r *ScheduledBackupReconciler) skipIterationOnNameCollision(
+	ctx context.Context,
+	scheduledBackup *apiv1.ScheduledBackup,
+	existing *apiv1.Backup,
+	iteration time.Time,
+	now time.Time,
+	nextBackupTime time.Time,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Warning("Backup name collision; not adopting",
+		"backupName", existing.Name, "iteration", iteration)
+	r.Recorder.Eventf(scheduledBackup, "Warning", "BackupAdoptionRefused",
+		"Backup %q exists but is not owned by this ScheduledBackup; skipping iteration %s",
+		existing.Name, iteration.Format(time.RFC3339))
+
+	origScheduled := scheduledBackup.DeepCopy()
+	scheduledBackup.Status.LastCheckTime = &metav1.Time{Time: now}
+	scheduledBackup.Status.NextScheduleTime = &metav1.Time{Time: nextBackupTime}
+	if err := r.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {
+		if apierrs.IsConflict(err) {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
@@ -314,9 +353,9 @@ func (r *ScheduledBackupReconciler) createBackup(
 }
 
 // advanceScheduledBackupStatus records that a Backup for backupTime exists in
-// the apiserver and schedules the next iteration. It is the single point that
-// patches the ScheduledBackup status; both the Get-first observation path and
-// the createBackup path funnel through here so the invariants stay aligned.
+// the apiserver and requeues for the next iteration. Both the Get-first
+// observation path and the createBackup path funnel through here so the
+// invariants stay aligned.
 func (r *ScheduledBackupReconciler) advanceScheduledBackupStatus(
 	ctx context.Context,
 	scheduledBackup *apiv1.ScheduledBackup,

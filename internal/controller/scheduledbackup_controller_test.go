@@ -231,6 +231,55 @@ var _ = Describe("scheduledbackup reconcileScheduledBackup", func() {
 			Expect(stored.Status.LastScheduleTime).ToNot(BeNil())
 			Expect(stored.Status.LastScheduleTime.Time).To(BeTemporally("==", expectedBackupTime))
 		})
+
+	DescribeTable("skips the iteration when an unrelated Backup occupies the deterministic name",
+		func(ctx context.Context, squatterLabels map[string]string) {
+			// A Backup with this iteration's deterministic name exists but does
+			// not carry our parent label (squatter, manual creation, leftover
+			// from a different SB with the same name pattern). The reconciler
+			// must not adopt it, must not loop on AlreadyExists, and must
+			// advance LastCheckTime so the schedule resumes at the next slot.
+			originalLastCheck := sb.Status.LastCheckTime.Time
+			schedule, err := cron.Parse(sb.Spec.Schedule)
+			Expect(err).ToNot(HaveOccurred())
+			expectedBackupTime := schedule.Next(originalLastCheck)
+			expectedName := sb.BackupName(expectedBackupTime)
+
+			squatter := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      expectedName,
+					Namespace: ns,
+					Labels:    squatterLabels,
+				},
+				Spec: apiv1.BackupSpec{Cluster: sb.Spec.Cluster},
+			}
+			Expect(cli.Create(ctx, squatter)).To(Succeed())
+
+			result, err := r.reconcileScheduledBackup(ctx, sb)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
+
+			var backups apiv1.BackupList
+			Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
+			Expect(backups.Items).To(HaveLen(1))
+			Expect(backups.Items[0].Name).To(Equal(expectedName))
+
+			// LastCheckTime advanced (so the next reconcile computes a different
+			// nextTime), but LastScheduleTime is unchanged: we did not run this
+			// iteration.
+			var stored apiv1.ScheduledBackup
+			Expect(cli.Get(ctx, types.NamespacedName{Name: sb.Name, Namespace: ns}, &stored)).To(Succeed())
+			Expect(stored.Status.LastCheckTime).ToNot(BeNil())
+			Expect(stored.Status.LastCheckTime.Time).To(BeTemporally(">", originalLastCheck))
+			Expect(stored.Status.LastScheduleTime).To(BeNil())
+
+			Expect(recorder.Events).To(Receive(ContainSubstring("BackupAdoptionRefused")))
+		},
+		Entry("no labels", nil),
+		Entry("parent label points to a different SB", map[string]string{
+			ParentScheduledBackupLabelName: "other-sb",
+		}),
+	)
 })
 
 var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {

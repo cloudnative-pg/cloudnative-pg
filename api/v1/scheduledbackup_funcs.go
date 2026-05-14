@@ -70,8 +70,8 @@ func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 
 // BackupName returns the deterministic name of the Backup that this
 // ScheduledBackup creates for an iteration scheduled at the given time.
-// The name is unique per (ScheduledBackup, scheduledTime) pair, which is
-// what makes the controller idempotent against retries.
+// The name is unique per (ScheduledBackup, scheduledTime) pair at second
+// resolution, which is what makes the controller idempotent against retries.
 func (scheduledBackup *ScheduledBackup) BackupName(scheduledTime time.Time) string {
 	return fmt.Sprintf("%s-%s", scheduledBackup.Name, pgTime.ToCompactISO8601(scheduledTime))
 }
