@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -199,8 +200,14 @@ func (r *ScheduledBackupReconciler) reconcileScheduledBackup(
 			return ctrl.Result{}, err
 		}
 		if len(existingImmediate.Items) > 0 {
+			// Upgrade from a pre-fix operator may have created several immediate
+			// Backups for the same SB (one per failed status patch). Pick the
+			// oldest so LastScheduleTime is stable across reconciles.
+			sort.Slice(existingImmediate.Items, func(i, j int) bool {
+				return existingImmediate.Items[i].CreationTimestamp.Before(&existingImmediate.Items[j].CreationTimestamp)
+			})
 			adopted := existingImmediate.Items[0].CreationTimestamp.Time
-			return r.advanceScheduledBackupStatus(ctx, scheduledBackup, adopted, now, schedule)
+			return r.advanceScheduledBackupStatus(ctx, scheduledBackup, adopted, now, schedule.Next(now))
 		}
 
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
@@ -254,7 +261,7 @@ func (r *ScheduledBackupReconciler) reconcileScheduledBackup(
 		if existing.Labels[utils.ParentScheduledBackupLabelName] != scheduledBackup.GetName() {
 			return r.skipIterationOnNameCollision(ctx, scheduledBackup, &existing, nextTime, now, schedule.Next(now))
 		}
-		return r.advanceScheduledBackupStatus(ctx, scheduledBackup, nextTime, now, schedule)
+		return r.advanceScheduledBackupStatus(ctx, scheduledBackup, nextTime, now, schedule.Next(now))
 	}
 }
 
@@ -349,7 +356,7 @@ func (r *ScheduledBackupReconciler) createBackup(
 		return ctrl.Result{}, err
 	}
 
-	return r.advanceScheduledBackupStatus(ctx, scheduledBackup, backupTime, now, schedule)
+	return r.advanceScheduledBackupStatus(ctx, scheduledBackup, backupTime, now, schedule.Next(now))
 }
 
 // advanceScheduledBackupStatus records that a Backup for backupTime exists in
@@ -361,14 +368,13 @@ func (r *ScheduledBackupReconciler) advanceScheduledBackupStatus(
 	scheduledBackup *apiv1.ScheduledBackup,
 	backupTime time.Time,
 	now time.Time,
-	schedule cron.Schedule,
+	nextBackupTime time.Time,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	origScheduled := scheduledBackup.DeepCopy()
 	scheduledBackup.Status.LastCheckTime = &metav1.Time{Time: now}
 	scheduledBackup.Status.LastScheduleTime = &metav1.Time{Time: backupTime}
-	nextBackupTime := schedule.Next(now)
 	scheduledBackup.Status.NextScheduleTime = &metav1.Time{Time: nextBackupTime}
 
 	if err := r.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {

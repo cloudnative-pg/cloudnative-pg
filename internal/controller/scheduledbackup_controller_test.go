@@ -110,7 +110,7 @@ var _ = Describe("scheduledbackup createBackup", func() {
 		// In production, the up-front Get in reconcileScheduledBackup catches a
 		// pre-existing Backup before reaching createBackup. This branch fires
 		// only when the cache was stale at Get time but the Backup is already
-		// in the apiserver — a transient race. We requeue so the next reconcile
+		// in the apiserver (a transient race). We requeue so the next reconcile
 		// observes the existing Backup and advances the status from there.
 		backupName := sb.BackupName(backupTime)
 		existing := &apiv1.Backup{
@@ -282,15 +282,12 @@ var _ = Describe("scheduledbackup reconcileScheduledBackup", func() {
 	)
 })
 
-var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
+var _ = Describe("scheduledbackup reconcileScheduledBackup immediate", func() {
 	It("adopts an existing immediate Backup instead of creating a duplicate", func(ctx context.Context) {
-		// Operator-restart corner case: a previous reconcile created the
-		// immediate Backup but did not land the status patch, so
-		// LastCheckTime is still nil. On retry, time.Now() differs from the
-		// previous attempt, so the deterministic name is different. Without
-		// observing what's already there, the controller would create a
-		// second immediate Backup. This test pins that the existing
-		// immediate Backup is adopted instead.
+		// Operator-restart case: a previous reconcile created the immediate
+		// Backup but did not land the status patch. LastCheckTime is still
+		// nil, and time.Now() on retry produces a different deterministic
+		// name, so the orphan must be discovered via the label-based List.
 		cli := newScheduledBackupTestClient()
 		ns := newFakeNamespace(cli)
 
@@ -304,14 +301,15 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
 		}
 		Expect(cli.Create(ctx, sb)).To(Succeed())
 
-		// Pre-create an immediate Backup as if a previous reconcile had
-		// created it. The compactISO8601 time intentionally differs from
-		// what time.Now() would produce now, to mimic the restart-after-Create
-		// scenario.
+		// The real apiserver sets CreationTimestamp on Create; the fake client
+		// does not, so we set it explicitly. The reconciler uses it as the
+		// adopted iteration's timestamp.
+		createdAt := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		existing := &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      sb.BackupName(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)),
-				Namespace: ns,
+				Name:              sb.BackupName(createdAt),
+				Namespace:         ns,
+				CreationTimestamp: metav1.Time{Time: createdAt},
 				Labels: map[string]string{
 					ParentScheduledBackupLabelName: sb.Name,
 					utils.ImmediateBackupLabelName: "true",
@@ -327,7 +325,6 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(BeNumerically(">", time.Duration(0)))
 
-		// Only the pre-existing Backup remains; the controller did not create a duplicate.
 		var backups apiv1.BackupList
 		Expect(cli.List(ctx, &backups, client.InNamespace(ns))).To(Succeed())
 		Expect(backups.Items).To(HaveLen(1))
@@ -336,6 +333,8 @@ var _ = Describe("scheduledbackup ReconcileScheduledBackup immediate", func() {
 		var stored apiv1.ScheduledBackup
 		Expect(cli.Get(ctx, types.NamespacedName{Name: sb.Name, Namespace: ns}, &stored)).To(Succeed())
 		Expect(stored.Status.LastCheckTime).ToNot(BeNil())
+		Expect(stored.Status.LastScheduleTime).ToNot(BeNil())
+		Expect(stored.Status.LastScheduleTime.Time).To(BeTemporally("==", existing.CreationTimestamp.Time))
 	})
 })
 
@@ -378,13 +377,12 @@ var _ = Describe("scheduledbackup advanceScheduledBackupStatus", func() {
 		}
 		Expect(cli.Create(ctx, sb)).To(Succeed())
 
-		schedule, err := cron.Parse(sb.Spec.Schedule)
-		Expect(err).ToNot(HaveOccurred())
 		r := &ScheduledBackupReconciler{Client: cli, Recorder: record.NewFakeRecorder(10)}
 		now := time.Now()
-		backupTime := schedule.Next(now)
+		backupTime := now
+		nextBackupTime := now.Add(24 * time.Hour)
 
-		result, err := r.advanceScheduledBackupStatus(ctx, sb, backupTime, now, schedule)
+		result, err := r.advanceScheduledBackupStatus(ctx, sb, backupTime, now, nextBackupTime)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result.RequeueAfter).To(Equal(time.Second))
 	})
