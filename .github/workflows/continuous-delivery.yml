@@ -1209,7 +1209,7 @@ jobs:
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS} \
               --tier standard \
-              --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
+              --node-count 3 --node-vm-size Standard_D4s_v5 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
@@ -1945,8 +1945,8 @@ jobs:
               --num-nodes=1 \
               --cluster-version=${{ env.K8S_VERSION }} \
               --region=${{ env.REGION }} \
-              --disk-size=20 \
-              --machine-type=e2-standard-2 \
+              --disk-size=80 \
+              --machine-type=e2-standard-4 \
               --labels=cluster=${{ env.CLUSTER_NAME }}
             then
               exit 0
