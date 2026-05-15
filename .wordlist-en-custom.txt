@@ -1505,7 +1505,6 @@ substatement
 successThreshold
 successfullyExtracted
 sudo
-summarises
 superuserSecret
 superuserSecretVersion
 sv

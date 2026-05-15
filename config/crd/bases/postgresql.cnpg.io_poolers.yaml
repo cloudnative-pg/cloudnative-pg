@@ -9371,7 +9371,7 @@ spec:
             properties:
               image:
                 description: |-
-                  Image is the fully-resolved pgbouncer container image that the operator is
+                  Image is the resolved pgbouncer container image that the operator is
                   using for this Pooler, including any override coming from spec.template.
                   While Phase is Active or Paused this field reflects what the Deployment
                   actually runs; while Phase is Inactive or Failed it may carry the last
@@ -9383,7 +9383,7 @@ spec:
                 format: int32
                 type: integer
               phase:
-                description: Phase summarises the overall lifecycle state of the Pooler.
+                description: Phase summarizes the overall lifecycle state of the Pooler.
                 enum:
                 - active
                 - paused

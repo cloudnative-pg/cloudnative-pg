@@ -41,8 +41,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
-// Deployment create the deployment of pgbouncer, given
-// the configurations we have in the pooler specifications
+// Deployment creates the pgbouncer Deployment for the given Pooler. The
+// container image and deployment hash both derive from
+// pooler.Status.Image; the caller (updateDeployment) must populate it
+// first.
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
 	operatorImageName := config.Current.OperatorImageName
 

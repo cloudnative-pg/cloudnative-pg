@@ -225,9 +225,8 @@ type ImageCatalogExtraRef struct {
 	Key string `json:"key"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.image) && has(self.imageCatalogRef))",message="image and imageCatalogRef are mutually exclusive"
-
 // PgBouncerSpec defines how to configure PgBouncer
+// +kubebuilder:validation:XValidation:rule="!(has(self.image) && has(self.imageCatalogRef))",message="image and imageCatalogRef are mutually exclusive"
 type PgBouncerSpec struct {
 	// The pool mode. Default: `session`.
 	// +kubebuilder:default:=session
@@ -312,7 +311,7 @@ type PoolerStatus struct {
 	// +optional
 	Instances int32 `json:"instances,omitempty"`
 
-	// Phase summarises the overall lifecycle state of the Pooler.
+	// Phase summarizes the overall lifecycle state of the Pooler.
 	// +optional
 	Phase PoolerPhase `json:"phase,omitempty"`
 
@@ -320,7 +319,7 @@ type PoolerStatus struct {
 	// +optional
 	PhaseReason string `json:"phaseReason,omitempty"`
 
-	// Image is the fully-resolved pgbouncer container image that the operator is
+	// Image is the resolved pgbouncer container image that the operator is
 	// using for this Pooler, including any override coming from spec.template.
 	// While Phase is Active or Paused this field reflects what the Deployment
 	// actually runs; while Phase is Inactive or Failed it may carry the last
