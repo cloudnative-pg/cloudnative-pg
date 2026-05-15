@@ -103,9 +103,8 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("while getting referenced cluster: %w", err)
 	}
 	if cluster == nil {
-		contextLogger.Info("Cluster not found, will retry in 30 seconds",
-			"cluster", pooler.Spec.Cluster.Name)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return *r.markInactiveAndWait(ctx, &pooler,
+			fmt.Sprintf("Cluster %q not found", pooler.Spec.Cluster.Name)), nil
 	}
 
 	// Get the set of resources we directly manage and their status
