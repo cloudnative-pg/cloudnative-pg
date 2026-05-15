@@ -99,7 +99,6 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		r.Recorder.Event(pooler, "Warning", "ImageCatalogError", err.Error())
 		updatedStatus.Phase = apiv1.PoolerPhaseFailed
 		updatedStatus.PhaseReason = err.Error()
-		updatedStatus.Image = ""
 	case isPgBouncerPaused(pooler):
 		// The deployment still runs while paused; the manager calls PgBouncer's
 		// PAUSE command so existing connections are kept open and new clients
