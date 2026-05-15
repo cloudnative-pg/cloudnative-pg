@@ -131,6 +131,7 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			contextLogger.Debug("Conflict while reconciling pooler status", "error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
+		return ctrl.Result{}, fmt.Errorf("while updating pooler status: %w", err)
 	}
 
 	// Take the required actions to align the spec with the collected status.
