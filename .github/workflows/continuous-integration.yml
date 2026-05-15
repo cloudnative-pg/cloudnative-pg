@@ -636,7 +636,7 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04 # master
+        uses: snyk/actions/docker@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master
         if: |
           !github.event.repository.fork &&
           !github.event.pull_request.head.repo.fork
