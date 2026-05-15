@@ -115,4 +115,92 @@ var _ = Describe("resolvePoolerImage", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(image).To(Equal("explicit:9"))
 	})
+
+	Context("with imageCatalogRef", func() {
+		const (
+			imageCatalogName        = "pgbouncer-catalog"
+			clusterImageCatalogName = "global-pgbouncer-catalog"
+			catalogKey              = "pgbouncer"
+			resolvedImage           = "ghcr.io/example/pgbouncer:1.2.3"
+		)
+
+		var ctx context.Context
+
+		BeforeEach(func() {
+			ctx = context.Background()
+		})
+
+		newRef := func(kind, name string) *apiv1.ImageCatalogExtraRef {
+			return &apiv1.ImageCatalogExtraRef{
+				TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+					Kind: kind,
+					Name: name,
+				},
+				Key: catalogKey,
+			}
+		}
+
+		It("resolves through a namespaced ImageCatalog", func() {
+			Expect(env.client.Create(ctx, &apiv1.ImageCatalog{
+				ObjectMeta: metav1.ObjectMeta{Name: imageCatalogName, Namespace: "ns"},
+				Spec: apiv1.ImageCatalogSpec{
+					ExtraImages: []apiv1.CatalogExtraImage{{Key: catalogKey, Image: resolvedImage}},
+				},
+			})).To(Succeed())
+
+			pooler := newPooler()
+			pooler.Spec.PgBouncer.ImageCatalogRef = newRef(apiv1.ImageCatalogKind, imageCatalogName)
+
+			image, err := env.poolerReconciler.resolvePoolerImage(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(image).To(Equal(resolvedImage))
+		})
+
+		It("resolves through a cluster-scoped ClusterImageCatalog", func() {
+			Expect(env.client.Create(ctx, &apiv1.ClusterImageCatalog{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterImageCatalogName},
+				Spec: apiv1.ImageCatalogSpec{
+					ExtraImages: []apiv1.CatalogExtraImage{{Key: catalogKey, Image: resolvedImage}},
+				},
+			})).To(Succeed())
+
+			pooler := newPooler()
+			pooler.Spec.PgBouncer.ImageCatalogRef = newRef(apiv1.ClusterImageCatalogKind, clusterImageCatalogName)
+
+			image, err := env.poolerReconciler.resolvePoolerImage(ctx, pooler)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(image).To(Equal(resolvedImage))
+		})
+
+		It("returns an error when the catalog cannot be found", func() {
+			pooler := newPooler()
+			pooler.Spec.PgBouncer.ImageCatalogRef = newRef(apiv1.ImageCatalogKind, "missing")
+
+			_, err := env.poolerReconciler.resolvePoolerImage(ctx, pooler)
+			Expect(err).To(MatchError(ContainSubstring(`ImageCatalog "missing" not found`)))
+		})
+
+		It("returns an error when the key is missing in the catalog", func() {
+			Expect(env.client.Create(ctx, &apiv1.ImageCatalog{
+				ObjectMeta: metav1.ObjectMeta{Name: imageCatalogName, Namespace: "ns"},
+				Spec: apiv1.ImageCatalogSpec{
+					ExtraImages: []apiv1.CatalogExtraImage{{Key: "other-key", Image: resolvedImage}},
+				},
+			})).To(Succeed())
+
+			pooler := newPooler()
+			pooler.Spec.PgBouncer.ImageCatalogRef = newRef(apiv1.ImageCatalogKind, imageCatalogName)
+
+			_, err := env.poolerReconciler.resolvePoolerImage(ctx, pooler)
+			Expect(err).To(MatchError(ContainSubstring(`key "pgbouncer" not found`)))
+		})
+
+		It("returns an error for an unknown catalog Kind", func() {
+			pooler := newPooler()
+			pooler.Spec.PgBouncer.ImageCatalogRef = newRef("WeirdKind", imageCatalogName)
+
+			_, err := env.poolerReconciler.resolvePoolerImage(ctx, pooler)
+			Expect(err).To(MatchError(ContainSubstring("invalid image catalog kind")))
+		})
+	})
 })

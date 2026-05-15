@@ -224,6 +224,29 @@ var _ = Describe("pooler_status unit tests", func() {
 		Expect(pooler.Status.PhaseReason).To(BeEmpty())
 	})
 
+	It("marks the pooler Failed when the image catalog cannot be resolved", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Kind: apiv1.ImageCatalogKind,
+				Name: "missing",
+			},
+			Key: "pgbouncer",
+		}
+		const lastGoodImage = "ghcr.io/example/pgbouncer:last-good"
+		pooler.Status.Image = lastGoodImage
+
+		res := &poolerManagedResources{Cluster: cluster}
+
+		Expect(env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)).To(Succeed())
+		Expect(pooler.Status.Phase).To(Equal(apiv1.PoolerPhaseFailed))
+		Expect(pooler.Status.PhaseReason).To(ContainSubstring(`ImageCatalog "missing" not found`))
+		Expect(pooler.Status.Image).To(Equal(lastGoodImage))
+	})
+
 	It("should clear ServerTLS status when not using manual TLS authentication (migration to v1.28)", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
