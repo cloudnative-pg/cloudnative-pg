@@ -89,40 +89,40 @@ var _ = Describe("image catalog", func() {
 	})
 })
 
-var _ = Describe("image catalog extra images", func() {
+var _ = Describe("image catalog component images", func() {
 	catalogSpec := ImageCatalogSpec{
 		Images: []CatalogImage{
 			{Image: "test:16", Major: 16},
 		},
-		ExtraImages: []CatalogExtraImage{
+		ComponentImages: []CatalogComponentImage{
 			{Key: "pgbouncer", Image: "pgbouncer:1.24.0"},
 			{Key: "other-tool", Image: "other-tool:1.0.0"},
 		},
 	}
 
-	It("looks up an extra image by key", func() {
-		image, ok := catalogSpec.FindExtraImageForKey("pgbouncer")
+	It("looks up a component image by key", func() {
+		image, ok := catalogSpec.FindComponentImageForKey("pgbouncer")
 		Expect(ok).To(BeTrue())
 		Expect(image).To(Equal("pgbouncer:1.24.0"))
 	})
 
-	It("looks up a second extra image by key", func() {
-		image, ok := catalogSpec.FindExtraImageForKey("other-tool")
+	It("looks up a second component image by key", func() {
+		image, ok := catalogSpec.FindComponentImageForKey("other-tool")
 		Expect(ok).To(BeTrue())
 		Expect(image).To(Equal("other-tool:1.0.0"))
 	})
 
 	It("returns false when the key is not present", func() {
-		image, ok := catalogSpec.FindExtraImageForKey("nonexistent")
+		image, ok := catalogSpec.FindComponentImageForKey("nonexistent")
 		Expect(ok).To(BeFalse())
 		Expect(image).To(BeEmpty())
 	})
 
-	It("returns false when extraImages is empty", func() {
+	It("returns false when componentImages is empty", func() {
 		emptySpec := ImageCatalogSpec{
 			Images: []CatalogImage{{Image: "test:16", Major: 16}},
 		}
-		image, ok := emptySpec.FindExtraImageForKey("pgbouncer")
+		image, ok := emptySpec.FindComponentImageForKey("pgbouncer")
 		Expect(ok).To(BeFalse())
 		Expect(image).To(BeEmpty())
 	})

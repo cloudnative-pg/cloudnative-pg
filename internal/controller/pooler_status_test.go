@@ -229,7 +229,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
-		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
 			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 				Kind: apiv1.ImageCatalogKind,
 				Name: "missing",

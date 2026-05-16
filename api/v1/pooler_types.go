@@ -212,14 +212,14 @@ type ServiceTemplateSpec struct {
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 }
 
-// ImageCatalogExtraRef identifies a named image within the extraImages list of an
+// ImageCatalogComponentRef identifies a named image within the componentImages list of an
 // ImageCatalog or ClusterImageCatalog.
-type ImageCatalogExtraRef struct {
+type ImageCatalogComponentRef struct {
 	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only ImageCatalog and ClusterImageCatalog are supported"
 	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="apiGroup must be postgresql.cnpg.io"
 	corev1.TypedLocalObjectReference `json:",inline"`
 
-	// Key identifies the entry within the catalog's extraImages list.
+	// Key identifies the entry within the catalog's componentImages list.
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	// +kubebuilder:validation:MaxLength=63
 	Key string `json:"key"`
@@ -298,7 +298,7 @@ type PgBouncerSpec struct {
 	// ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.
 	// Mutually exclusive with Image.
 	// +optional
-	ImageCatalogRef *ImageCatalogExtraRef `json:"imageCatalogRef,omitempty"`
+	ImageCatalogRef *ImageCatalogComponentRef `json:"imageCatalogRef,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler

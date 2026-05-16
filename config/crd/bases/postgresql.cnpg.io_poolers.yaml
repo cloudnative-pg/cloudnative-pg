@@ -391,7 +391,7 @@ spec:
                         type: string
                       key:
                         description: Key identifies the entry within the catalog's
-                          extraImages list.
+                          componentImages list.
                         maxLength: 63
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                         type: string

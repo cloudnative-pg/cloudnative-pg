@@ -114,7 +114,7 @@ func (r *PoolerReconciler) resolveImageFromCatalog(ctx context.Context, pooler *
 		return "", fmt.Errorf("error getting %s %q: %w", ref.Kind, ref.Name, err)
 	}
 
-	image, ok := catalog.GetSpec().FindExtraImageForKey(ref.Key)
+	image, ok := catalog.GetSpec().FindComponentImageForKey(ref.Key)
 	if !ok {
 		return "", fmt.Errorf("key %q not found in %s %q", ref.Key, ref.Kind, ref.Name)
 	}

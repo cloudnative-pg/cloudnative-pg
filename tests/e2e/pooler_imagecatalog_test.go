@@ -51,7 +51,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 		}
 	})
 
-	newPooler := func(namespace, clusterName string, ref *apiv1.ImageCatalogExtraRef) *apiv1.Pooler {
+	newPooler := func(namespace, clusterName string, ref *apiv1.ImageCatalogComponentRef) *apiv1.Pooler {
 		return &apiv1.Pooler{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      poolerName,
@@ -103,7 +103,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 						Images: []apiv1.CatalogImage{
 							{Image: pgbouncerImage, Major: 17},
 						},
-						ExtraImages: []apiv1.CatalogExtraImage{
+						ComponentImages: []apiv1.CatalogComponentImage{
 							{Key: catalogKey, Image: pgbouncerImage},
 						},
 					},
@@ -112,7 +112,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			})
 
 			By("creating a pooler referencing the ImageCatalog", func() {
-				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogExtraRef{
+				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogComponentRef{
 					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 						APIGroup: &apiv1.SchemeGroupVersion.Group,
 						Kind:     apiv1.ImageCatalogKind,
@@ -146,12 +146,12 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 
 			updatedImage := pgbouncerImage + "-updated"
 
-			By("updating the catalog extra image", func() {
+			By("updating the catalog component image", func() {
 				var catalog apiv1.ImageCatalog
 				Expect(env.Client.Get(env.Ctx,
 					client.ObjectKey{Namespace: namespace, Name: catalogName},
 					&catalog)).To(Succeed())
-				catalog.Spec.ExtraImages[0].Image = updatedImage
+				catalog.Spec.ComponentImages[0].Image = updatedImage
 				Expect(env.Client.Update(env.Ctx, &catalog)).To(Succeed())
 			})
 
@@ -201,7 +201,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 						Images: []apiv1.CatalogImage{
 							{Image: pgbouncerImage, Major: 17},
 						},
-						ExtraImages: []apiv1.CatalogExtraImage{
+						ComponentImages: []apiv1.CatalogComponentImage{
 							{Key: catalogKey, Image: pgbouncerImage},
 						},
 					},
@@ -213,7 +213,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			})
 
 			By("creating a pooler referencing the ClusterImageCatalog", func() {
-				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogExtraRef{
+				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogComponentRef{
 					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 						APIGroup: &apiv1.SchemeGroupVersion.Group,
 						Kind:     apiv1.ClusterImageCatalogKind,
@@ -278,7 +278,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 			})
 
 			By("creating a pooler referencing a non-existent key in the catalog", func() {
-				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogExtraRef{
+				pooler := newPooler(namespace, clusterName, &apiv1.ImageCatalogComponentRef{
 					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 						APIGroup: &apiv1.SchemeGroupVersion.Group,
 						Kind:     apiv1.ImageCatalogKind,
@@ -312,7 +312,7 @@ var _ = Describe("Pooler ImageCatalog", Label(tests.LabelBasic), func() {
 				Expect(env.Client.Get(env.Ctx,
 					client.ObjectKey{Namespace: namespace, Name: catalogName},
 					&catalog)).To(Succeed())
-				catalog.Spec.ExtraImages = []apiv1.CatalogExtraImage{
+				catalog.Spec.ComponentImages = []apiv1.CatalogComponentImage{
 					{Key: "nonexistent-key", Image: pgbouncerImage},
 				}
 				Expect(env.Client.Update(env.Ctx, &catalog)).To(Succeed())

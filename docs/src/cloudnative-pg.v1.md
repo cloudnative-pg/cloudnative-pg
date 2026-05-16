@@ -429,11 +429,11 @@ _Appears in:_
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
-#### CatalogExtraImage
+#### CatalogComponentImage
 
 
 
-CatalogExtraImage is a named image entry for a non-PostgreSQL component.
+CatalogComponentImage is a named image entry for a non-PostgreSQL component.
 
 
 
@@ -1168,11 +1168,11 @@ ImageCatalog is the Schema for the imagecatalogs API
 | `spec` _[ImageCatalogSpec](#imagecatalogspec)_ | Specification of the desired behavior of the ImageCatalog.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
 
 
-#### ImageCatalogExtraRef
+#### ImageCatalogComponentRef
 
 
 
-ImageCatalogExtraRef identifies a named image within the extraImages list of an
+ImageCatalogComponentRef identifies a named image within the componentImages list of an
 ImageCatalog or ClusterImageCatalog.
 
 
@@ -1186,7 +1186,7 @@ _Appears in:_
 | `apiGroup` _string_ | APIGroup is the group for the resource being referenced.<br />If APIGroup is not specified, the specified Kind must be in the core API group.<br />For any other third-party types, APIGroup is required. |  |  |  |
 | `kind` _string_ | Kind is the type of resource being referenced | True |  |  |
 | `name` _string_ | Name is the name of resource being referenced | True |  |  |
-| `key` _string_ | Key identifies the entry within the catalog's extraImages list. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+| `key` _string_ | Key identifies the entry within the catalog's componentImages list. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
 
 
 #### ImageCatalogRef
@@ -1225,7 +1225,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `images` _[CatalogImage](#catalogimage) array_ | List of CatalogImages available in the catalog | True |  | MaxItems: 8 <br />MinItems: 1 <br /> |
-| `extraImages` _[CatalogExtraImage](#catalogextraimage) array_ | ExtraImages is a list of named images for components other than PostgreSQL<br />(e.g. pgbouncer). Keys must be unique within a catalog. |  |  | MaxItems: 32 <br /> |
+| `componentImages` _[CatalogComponentImage](#catalogcomponentimage) array_ | ComponentImages is a list of named images for components other than PostgreSQL<br />(e.g. pgbouncer). Keys must be unique within a catalog. |  |  | MaxItems: 32 <br /> |
 
 
 #### ImageInfo
@@ -1738,7 +1738,7 @@ _Appears in:_
 | `pg_hba` _string array_ | PostgreSQL Host Based Authentication rules (lines to be appended<br />to the pg_hba.conf file) |  |  |  |
 | `paused` _boolean_ | When set to `true`, PgBouncer will disconnect from the PostgreSQL<br />server, first waiting for all queries to complete, and pause all new<br />client connections until this value is set to `false` (default). Internally,<br />the operator calls PgBouncer's `PAUSE` and `RESUME` commands. |  | false |  |
 | `image` _string_ | Image is the pgbouncer container image to use. When set, it takes<br />precedence over ImageCatalogRef and the operator default, but is<br />overridden by an explicit image set in the pod template. |  |  |  |
-| `imageCatalogRef` _[ImageCatalogExtraRef](#imagecatalogextraref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
+| `imageCatalogRef` _[ImageCatalogComponentRef](#imagecatalogcomponentref)_ | ImageCatalogRef points to an entry in an ImageCatalog or ClusterImageCatalog.<br />Mutually exclusive with Image. |  |  |  |
 
 
 #### PluginConfiguration

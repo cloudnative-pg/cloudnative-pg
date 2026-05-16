@@ -130,8 +130,8 @@ var _ = Describe("resolvePoolerImage", func() {
 			ctx = context.Background()
 		})
 
-		newRef := func(kind, name string) *apiv1.ImageCatalogExtraRef {
-			return &apiv1.ImageCatalogExtraRef{
+		newRef := func(kind, name string) *apiv1.ImageCatalogComponentRef {
+			return &apiv1.ImageCatalogComponentRef{
 				TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 					Kind: kind,
 					Name: name,
@@ -144,7 +144,7 @@ var _ = Describe("resolvePoolerImage", func() {
 			Expect(env.client.Create(ctx, &apiv1.ImageCatalog{
 				ObjectMeta: metav1.ObjectMeta{Name: imageCatalogName, Namespace: "ns"},
 				Spec: apiv1.ImageCatalogSpec{
-					ExtraImages: []apiv1.CatalogExtraImage{{Key: catalogKey, Image: resolvedImage}},
+					ComponentImages: []apiv1.CatalogComponentImage{{Key: catalogKey, Image: resolvedImage}},
 				},
 			})).To(Succeed())
 
@@ -160,7 +160,7 @@ var _ = Describe("resolvePoolerImage", func() {
 			Expect(env.client.Create(ctx, &apiv1.ClusterImageCatalog{
 				ObjectMeta: metav1.ObjectMeta{Name: clusterImageCatalogName},
 				Spec: apiv1.ImageCatalogSpec{
-					ExtraImages: []apiv1.CatalogExtraImage{{Key: catalogKey, Image: resolvedImage}},
+					ComponentImages: []apiv1.CatalogComponentImage{{Key: catalogKey, Image: resolvedImage}},
 				},
 			})).To(Succeed())
 
@@ -184,7 +184,7 @@ var _ = Describe("resolvePoolerImage", func() {
 			Expect(env.client.Create(ctx, &apiv1.ImageCatalog{
 				ObjectMeta: metav1.ObjectMeta{Name: imageCatalogName, Namespace: "ns"},
 				Spec: apiv1.ImageCatalogSpec{
-					ExtraImages: []apiv1.CatalogExtraImage{{Key: "other-key", Image: resolvedImage}},
+					ComponentImages: []apiv1.CatalogComponentImage{{Key: "other-key", Image: resolvedImage}},
 				},
 			})).To(Succeed())
 

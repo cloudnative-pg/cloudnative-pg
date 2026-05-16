@@ -44,20 +44,20 @@ must ensure the declared major version matches the actual PostgreSQL images to
 maintain compatibility.
 :::
 
-## Extra images
+## Component images
 
 In addition to PostgreSQL images, a catalog can store images for other
-components via the `extraImages` field. Each entry is identified by a string
+components via the `componentImages` field. Each entry is identified by a string
 **key** — a lowercase alphanumeric identifier (hyphens allowed, 1–63
 characters) that must be unique within the catalog.
 
-Currently, the supported consumer of extra images is the `Pooler` resource,
-which can use an extra image entry to manage the pgbouncer container image
+Currently, the supported consumer of component images is the `Pooler` resource,
+which can use an component image entry to manage the pgbouncer container image
 centrally (see
 [Pooler image catalog reference](connection_pooling.md#pooler-image-catalog-reference)).
 
 The following example defines a namespaced `ImageCatalog` with a pgbouncer
-extra image:
+component image:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -69,7 +69,7 @@ spec:
   images:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
-  extraImages:
+  componentImages:
     - key: pgbouncer
       image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 ```
@@ -85,13 +85,13 @@ spec:
   images:
     - major: 17
       image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
-  extraImages:
+  componentImages:
     - key: pgbouncer
       image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 ```
 
 :::info
-A catalog may contain up to 32 extra image entries. Keys follow the same
+A catalog may contain up to 32 component image entries. Keys follow the same
 format as Kubernetes label values: lowercase alphanumeric characters or
 hyphens, starting and ending with an alphanumeric character, up to 63
 characters long.

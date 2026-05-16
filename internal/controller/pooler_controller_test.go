@@ -444,7 +444,7 @@ var _ = Describe("poolerImageCatalogIndexer", func() {
 
 	It("returns Kind/Name for namespaced catalog references", func() {
 		pooler := newPooler()
-		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
 			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 				Kind: apiv1.ImageCatalogKind,
 				Name: "foo",
@@ -456,7 +456,7 @@ var _ = Describe("poolerImageCatalogIndexer", func() {
 
 	It("returns Kind/Name for cluster-scoped catalog references", func() {
 		pooler := newPooler()
-		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+		pooler.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
 			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 				Kind: apiv1.ClusterImageCatalogKind,
 				Name: "foo",
@@ -468,7 +468,7 @@ var _ = Describe("poolerImageCatalogIndexer", func() {
 
 	It("uses different index values for same-named catalogs of different kinds", func() {
 		namespaced := newPooler()
-		namespaced.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+		namespaced.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
 			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 				Kind: apiv1.ImageCatalogKind,
 				Name: "shared-name",
@@ -477,7 +477,7 @@ var _ = Describe("poolerImageCatalogIndexer", func() {
 		}
 
 		clusterScoped := newPooler()
-		clusterScoped.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogExtraRef{
+		clusterScoped.Spec.PgBouncer.ImageCatalogRef = &apiv1.ImageCatalogComponentRef{
 			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
 				Kind: apiv1.ClusterImageCatalogKind,
 				Name: "shared-name",

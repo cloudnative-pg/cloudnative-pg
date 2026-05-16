@@ -71,7 +71,7 @@ CVE
 CVEs
 CannotReconcile
 Canovai
-CatalogExtraImage
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -98,6 +98,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -168,7 +169,6 @@ ExtensionEnvVar
 ExtensionSpec
 ExtensionStatus
 ExternalCluster
-ExtraImages
 FDW
 FDWSpec
 FDWs
@@ -217,7 +217,7 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
-ImageCatalogExtraRef
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
@@ -706,7 +706,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
-catalogextraimage
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -752,6 +752,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
@@ -892,7 +893,6 @@ externalClusterSecretVersion
 externalClusters
 externalcluster
 externalclusters
-extraImages
 facto
 failover
 failoverDelay
@@ -973,7 +973,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
-imagecatalogextraref
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec

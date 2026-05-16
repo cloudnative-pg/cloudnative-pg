@@ -6,7 +6,7 @@ spec:
   images:
     - image: ghcr.io/cloudnative-pg/postgresql:17
       major: 17
-  extraImages:
+  componentImages:
     - key: pgbouncer
       image: ghcr.io/cloudnative-pg/pgbouncer:1.24.0
 ---
