@@ -921,19 +921,43 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
 func (instance *Instance) WithActiveInstance(inner func() error) error {
-	// Start the CSV logpipe to redirect log to stdout
+	// Start all log pipe readers so the FIFOs are created before postgres or other
+	// components (e.g. the archive/restore command implementation) try to write logs.
+	// Without these readers nothing calls Mkfifo on the log paths, the writers fall
+	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	csvPipe := logpipe.NewLogPipe()
 
+	csvPipe := logpipe.NewLogPipe()
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
-			log.Info("csv pipeline encountered an error", "err", err)
+			log.Info("csv log pipe encountered an error", "err", err)
+		}
+	}()
+
+	rawPipe := logpipe.NewRawLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName),
+		logpipe.LoggingCollectorRecordName,
+	)
+	go func() {
+		if err := rawPipe.Start(ctx); err != nil {
+			log.Info("raw log pipe encountered an error", "err", err)
+		}
+	}()
+
+	jsonPipe := logpipe.NewJSONLineLogPipe(
+		filepath.Join(postgres.LogPath, postgres.LogFileName+".json"),
+	)
+	go func() {
+		if err := jsonPipe.Start(ctx); err != nil {
+			log.Info("json log pipe encountered an error", "err", err)
 		}
 	}()
 
 	defer func() {
 		ctxCancel()
 		csvPipe.GetExitedCondition().Wait()
+		rawPipe.GetExitedCondition().Wait()
+		jsonPipe.GetExitedCondition().Wait()
 	}()
 
 	err := instance.Startup()
