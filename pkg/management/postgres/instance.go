@@ -921,7 +921,10 @@ func setExtensionEnvVars(extensionList []apiv1.ExtensionConfiguration, envMap en
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
 func (instance *Instance) WithActiveInstance(inner func() error) error {
-	// Start all log pipes to ensure postgres doesn't block on FIFO writes during bootstrap.
+	// Start all log pipe readers so the FIFOs are created before postgres or other
+	// components (e.g. the archive/restore command implementation) try to write logs.
+	// Without these readers nothing calls Mkfifo on the log paths, the writers fall
+	// back to creating regular files, and their log output is silently lost.
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
 	csvPipe := logpipe.NewLogPipe()
