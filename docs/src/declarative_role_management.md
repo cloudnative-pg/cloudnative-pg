@@ -184,7 +184,7 @@ make sure the base64 payload does not contain a trailing newline
 (`echo -n "..." | base64`): a stray newline in the username or password
 prevents the value from being recognized as a valid hash and breaks login.
 
-### Safety when transmitting passwords
+### Safety when transmitting cleartext passwords
 
 Role passwords are safely managed in Kubernetes using Secrets, but the
 SQL path between the operator and PostgreSQL is also a concern. As noted
