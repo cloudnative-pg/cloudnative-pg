@@ -1045,7 +1045,7 @@ method should be used with extreme care, by authorized personnel only.
 ```console
 $ kubectl cnpg psql cluster-example
 
-psql (18.3 (Debian 18.3-1.pgdg110+1))
+psql (18.4 (Debian 18.4-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -1057,7 +1057,7 @@ select to work against a replica by using the `--replica` option:
 ```console
 $ kubectl cnpg psql --replica cluster-example
 
-psql (18.3 (Debian 18.3-1.pgdg110+1))
+psql (18.4 (Debian 18.4-1.pgdg110+1))
 
 Type "help" for help.
 
@@ -1080,7 +1080,7 @@ specific database:
 ```console
 $ kubectl cnpg psql cluster-example -- app
 
-psql (18.3 (Debian 18.3-1.pgdg110+1))
+psql (18.4 (Debian 18.4-1.pgdg110+1))
 Type "help" for help.
 
 app=#

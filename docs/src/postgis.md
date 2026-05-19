@@ -81,7 +81,7 @@ metadata:
   name: postgis-example
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgis:18.3-3.6.2-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgis:18.4-3.6.2-system-trixie
   bootstrap:
     initdb:
       postInitTemplateSQL:
