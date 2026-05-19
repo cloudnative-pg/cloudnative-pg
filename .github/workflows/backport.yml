@@ -123,7 +123,7 @@ jobs:
           else
             eff_go=${branch_go}
           fi
-          if [ "${picked_tc}" != "${parent_tc}" ]; then
+          if [ -n "${picked_tc}" ] && [ "${picked_tc}" != "${parent_tc}" ]; then
             eff_tc=${picked_tc}
           else
             eff_tc=${branch_tc}
@@ -187,7 +187,7 @@ jobs:
           go.sum merge=keep-ours
           EOF
 
-          git cherry-pick -x --mainline 1 --keep-redundant-commits "${COMMIT}"
+          git cherry-pick -x --mainline 1 --empty=keep "${COMMIT}"
 
           # Replay the picked commit's go.mod intent surgically (no-op when
           # the picked commit doesn't touch go.mod).
