@@ -81,9 +81,15 @@ func ExecWithSuppressedLogging(ctx context.Context, db *sql.DB, statement string
 	return tx.Commit()
 }
 
-// SetUserPassword changes the password of a user in the PostgreSQL database
+// SetUserPassword changes the password of a user in the PostgreSQL database.
+// Cleartext passwords are SCRAM-SHA-256 encoded before being sent so the
+// literal in the ALTER ROLE statement is never cleartext.
 func SetUserPassword(ctx context.Context, username string, password string, db *sql.DB) error {
+	encoded, err := EnsureEncryptedPassword(password)
+	if err != nil {
+		return err
+	}
 	return ExecWithSuppressedLogging(ctx, db, fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
 		pgx.Identifier{username}.Sanitize(),
-		pq.QuoteLiteral(password)))
+		pq.QuoteLiteral(encoded)))
 }

@@ -110,18 +110,22 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
+	const wantedRolePassword = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+		"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+		"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
+
 	wantedRoleWithPassExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
-		wantedRole.Name)
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD '%s' VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name, wantedRolePassword)
 
 	wantedLogStatementSuppressionStmt := "SET LOCAL log_statement = 'none'"
 	wantedLogPreventionStmt := "SET LOCAL log_min_error_statement = 'PANIC'"
 
 	wantedRoleWithoutValidUntilExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD 'myPassword'",
-		wantedRole.Name)
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE \"pg_monitoring\" PASSWORD '%s'",
+		wantedRole.Name, wantedRolePassword)
 
 	wantedRoleWithPassDeletionExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
@@ -142,8 +146,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		wantedRole.Name)
 	wantedRoleExpectedAltWithPasswordStmt := fmt.Sprintf(
 		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
-			"PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
-		wantedRole.Name)
+			"PASSWORD '%s' VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name, wantedRolePassword)
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 
 	// Testing List
@@ -274,7 +278,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.password = sql.NullString{Valid: true, String: wantedRolePassword}
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -298,7 +302,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.password = sql.NullString{Valid: true, String: wantedRolePassword}
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -319,7 +323,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.password = sql.NullString{Valid: true, String: wantedRolePassword}
 		err = Create(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
@@ -397,7 +401,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectCommit()
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.password = sql.NullString{Valid: true, String: wantedRolePassword}
 		err = Update(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -416,7 +420,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectRollback()
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.password = sql.NullString{Valid: true, String: wantedRolePassword}
 		err = Update(ctx, db, dbRole)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
@@ -566,7 +570,11 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
 
-	It("Password with null and with valid until password", func() {
+	It("emits the encrypted password literal supplied by the caller", func() {
+		const encryptedPassword = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+			"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+			"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
+
 		role := apiv1.RoleConfiguration{}
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
@@ -574,25 +582,32 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(dbRole.password.Valid).To(BeTrue())
 
 		var query strings.Builder
-		expectedQuery := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy'"
+		expectedQuery := fmt.Sprintf("ALTER ROLE \"alighieri\" PASSWORD '%s'", encryptedPassword)
 
 		fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
-		appendPasswordOption(dbRole, &query)
+		appendPasswordOption(dbRole, encryptedPassword, &query)
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
 
 	It("password with valid until", func() {
+		const encryptedPassword = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+			"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+			"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
+
 		role := apiv1.RoleConfiguration{}
 		var queryValidUntil strings.Builder
 		fmt.Fprintf(&queryValidUntil, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
-		expectedQueryValidUntil := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy' VALID UNTIL '2100-01-01 01:01:00Z'"
+		expectedQueryValidUntil := fmt.Sprintf(
+			"ALTER ROLE \"alighieri\" PASSWORD '%s' VALID UNTIL '2100-01-01 01:01:00Z'",
+			encryptedPassword,
+		)
 		validUntil := metav1.Date(2100, 0o1, 0o1, 0o1, 0o1, 0o0, 0o0, time.UTC)
 		role.ValidUntil = &validUntil
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
-		appendPasswordOption(dbRole, &queryValidUntil)
+		appendPasswordOption(dbRole, encryptedPassword, &queryValidUntil)
 		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
 	})
 

@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
 
@@ -79,42 +80,57 @@ var _ = Describe("Credentials management functions", func() {
 		Expect(DisableSuperuserPassword(db)).To(Succeed())
 	})
 
-	It("can set the password for a PostgreSQL role", func(ctx context.Context) {
-		mock.ExpectBegin()
-		mock.ExpectExec("SET LOCAL log_statement = 'none'").
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'testpassword'").
-			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectCommit()
-		Expect(SetUserPassword(ctx, "testuser", "testpassword", db)).To(Succeed())
-	})
+	It("forwards an already encrypted password unchanged", func(ctx context.Context) {
+		const scramHash = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+			"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+			"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
 
-	It("will correctly escape the password if needed", func(ctx context.Context) {
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL log_statement = 'none'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
+		mock.ExpectExec(fmt.Sprintf("ALTER ROLE \"testuser\" WITH PASSWORD '%s'", scramHash)).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
-		Expect(SetUserPassword(ctx, "testuser", "this \"is\" weird but 'possible'", db)).To(Succeed())
+		Expect(SetUserPassword(ctx, "testuser", scramHash, db)).To(Succeed())
 	})
 
 	It("will rollback setting of the password if there is an error", func(ctx context.Context) {
+		const scramHash = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+			"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+			"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
+
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL log_statement = 'none'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		dbError := errors.New("kaboom")
-		mock.ExpectExec("ALTER ROLE \"testuser\" WITH PASSWORD 'this \"is\" weird but ''possible'''").
+		mock.ExpectExec(fmt.Sprintf("ALTER ROLE \"testuser\" WITH PASSWORD '%s'", scramHash)).
 			WillReturnError(dbError)
 		mock.ExpectRollback()
-		err := SetUserPassword(ctx, "testuser", "this \"is\" weird but 'possible'", db)
+		err := SetUserPassword(ctx, "testuser", scramHash, db)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
+	})
+
+	It("SCRAM-encodes a plaintext password before sending it", func(ctx context.Context) {
+		regexDB, regexMock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		Expect(err).ToNot(HaveOccurred())
+
+		regexMock.ExpectBegin()
+		regexMock.ExpectExec("SET LOCAL log_statement = 'none'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		regexMock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		regexMock.ExpectExec(`ALTER ROLE "testuser" WITH PASSWORD 'SCRAM-SHA-256\$.+'`).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		regexMock.ExpectCommit()
+		regexMock.ExpectClose()
+
+		Expect(SetUserPassword(ctx, "testuser", "hunter2", regexDB)).To(Succeed())
+		Expect(regexDB.Close()).To(Succeed())
+		Expect(regexMock.ExpectationsWereMet()).To(Succeed())
 	})
 })
