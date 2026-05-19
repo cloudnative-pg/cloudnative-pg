@@ -135,7 +135,7 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	go run github.com/onsi/ginkgo/v2/ginkgo -r -p \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites \
-	  ./api/... ./cmd/... ./internal/... ./pkg/... ;\
+	  ./api/... ./cmd/... ./internal/... ./pkg/...
 	cd tests && go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
