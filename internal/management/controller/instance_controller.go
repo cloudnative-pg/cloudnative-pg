@@ -62,6 +62,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -1353,7 +1354,13 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
-	err = postgresutils.SetUserPassword(ctx, username, password, db)
+	err = postgresutils.SetUserPassword(
+		ctx,
+		username,
+		password,
+		cnpgutils.IsPasswordPassthroughEnabled(&secret.ObjectMeta),
+		db,
+	)
 	if err != nil {
 		return err
 	}

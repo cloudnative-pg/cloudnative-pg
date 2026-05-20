@@ -405,6 +405,32 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = Update(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
+	It("Update with passthrough forwards the cleartext password unchanged", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		const cleartext = "divine comedy"
+		expectedStmt := fmt.Sprintf(
+			"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER "+
+				"CONNECTION LIMIT 2 PASSWORD '%s' VALID UNTIL '2100-01-01 00:00:00Z'",
+			wantedRoleWithPass.Name, cleartext)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(wantedLogStatementSuppressionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(wantedLogPreventionStmt).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(expectedStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectCommit()
+
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
+		dbRole.password = sql.NullString{Valid: true, String: cleartext}
+		dbRole.passwordPassthrough = true
+		err = Update(ctx, db, dbRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
 	It("Update with password will rollback ALTER if there is an error", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())

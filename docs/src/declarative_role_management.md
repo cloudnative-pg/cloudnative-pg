@@ -211,6 +211,22 @@ CloudNativePG protects this path in two complementary ways:
 The Status section of the cluster does not print the query statement for any
 managed role operation.
 
+#### Opting out of client-side encoding
+
+If you need PostgreSQL — not the operator — to decide how the password
+is hashed (for example, on a cluster running `password_encryption = md5`),
+set the annotation `cnpg.io/passwordPassthrough: "enabled"` on the
+basic-auth Secret. The operator will then forward the password value
+verbatim, restoring the behavior it had before client-side encoding.
+
+The opt-in is per-Secret and applies to every basic-auth Secret the
+operator consumes — managed-role secrets, but also the superuser and
+application-user secrets — so a single cluster can mix passthrough
+secrets and encoded secrets freely. The statement-logging suppression
+layer described above still applies in both modes, but be aware that
+extensions such as `pg_stat_statements` or `pgaudit` will observe the
+cleartext password whenever this annotation is enabled.
+
 ## Unrealizable role configurations
 
 In PostgreSQL, in some cases, commands cannot be honored by the database and

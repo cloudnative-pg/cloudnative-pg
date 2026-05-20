@@ -41,6 +41,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -942,6 +943,7 @@ const (
 	secretNameNoUser   = "vinci-secret-no-user"
 	secretNameNoPass   = "vinci-secret-no-pass"
 	secretNameNotExist = "vinci-secret-name-not-exist"
+	secretNamePassthru = "vinci-secret-passthrough"
 	userNameNotExist   = "vinci-not-exist"
 )
 
@@ -985,8 +987,21 @@ var _ = DescribeTable("getPassword test",
 				corev1.BasicAuthUsernameKey: []byte(userName),
 			},
 		}
+		secretPassthrough := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretNamePassthru,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					cnpgutils.PasswordPassthroughAnnotationName: "enabled",
+				},
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
 		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(&secret, &secretNoUser, &secretNoPass).
+			WithObjects(&secret, &secretNoUser, &secretNoPass, &secretPassthrough).
 			Build()
 		ctx := context.Background()
 		decoded, err := getPassword(ctx, cl, roleConfigurationAdapter{RoleConfiguration: *roleConfig}, namespace)
@@ -998,6 +1013,7 @@ var _ = DescribeTable("getPassword test",
 
 		Expect(decoded.username).To(Equal(expectedResult.username))
 		Expect(decoded.password).To(Equal(expectedResult.password))
+		Expect(decoded.passthrough).To(Equal(expectedResult.passthrough))
 		if (expectedResult == passwordSecret{}) {
 			Expect(decoded).To(BeZero())
 		}
@@ -1061,5 +1077,19 @@ var _ = DescribeTable("getPassword test",
 		},
 		passwordSecret{},
 		true,
+	),
+	Entry("Surfaces the passwordPassthrough annotation on the secret",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNamePassthru,
+			},
+		},
+		passwordSecret{
+			username:    userName,
+			password:    password,
+			passthrough: true,
+		},
+		false,
 	),
 )

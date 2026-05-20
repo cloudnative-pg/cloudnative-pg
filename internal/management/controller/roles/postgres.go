@@ -389,11 +389,16 @@ func roleHasPassword(role DatabaseRole) bool {
 // resolveRolePassword returns the value that should be embedded in the
 // PASSWORD clause of CREATE/ALTER ROLE for the given role. Cleartext
 // passwords are SCRAM-SHA-256 encoded so the SQL literal is never
-// cleartext. Returns an empty string when the role has no password to
-// set (ignorePassword, or PASSWORD NULL).
+// cleartext, unless the Secret carries the passthrough annotation, in
+// which case the value is forwarded verbatim. Returns an empty string
+// when the role has no password to set (ignorePassword, or PASSWORD
+// NULL).
 func resolveRolePassword(role DatabaseRole) (string, error) {
 	if !roleHasPassword(role) || !role.password.Valid {
 		return "", nil
+	}
+	if role.passwordPassthrough {
+		return role.password.String, nil
 	}
 	return postgresutils.EnsureEncryptedPassword(role.password.String)
 }

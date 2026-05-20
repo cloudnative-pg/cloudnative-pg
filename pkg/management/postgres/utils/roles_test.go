@@ -93,7 +93,7 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectExec(fmt.Sprintf("ALTER ROLE \"testuser\" WITH PASSWORD '%s'", scramHash)).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectCommit()
-		Expect(SetUserPassword(ctx, "testuser", scramHash, db)).To(Succeed())
+		Expect(SetUserPassword(ctx, "testuser", scramHash, false, db)).To(Succeed())
 	})
 
 	It("will rollback setting of the password if there is an error", func(ctx context.Context) {
@@ -110,7 +110,7 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectExec(fmt.Sprintf("ALTER ROLE \"testuser\" WITH PASSWORD '%s'", scramHash)).
 			WillReturnError(dbError)
 		mock.ExpectRollback()
-		err := SetUserPassword(ctx, "testuser", scramHash, db)
+		err := SetUserPassword(ctx, "testuser", scramHash, false, db)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(dbError))
 	})
@@ -129,8 +129,22 @@ var _ = Describe("Credentials management functions", func() {
 		regexMock.ExpectCommit()
 		regexMock.ExpectClose()
 
-		Expect(SetUserPassword(ctx, "testuser", "hunter2", regexDB)).To(Succeed())
+		Expect(SetUserPassword(ctx, "testuser", "hunter2", false, regexDB)).To(Succeed())
 		Expect(regexDB.Close()).To(Succeed())
 		Expect(regexMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("forwards the password literal unchanged when passthrough is enabled", func(ctx context.Context) {
+		const cleartext = "hunter2"
+
+		mock.ExpectBegin()
+		mock.ExpectExec("SET LOCAL log_statement = 'none'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec("SET LOCAL log_min_error_statement = 'PANIC'").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(fmt.Sprintf("ALTER ROLE \"testuser\" WITH PASSWORD '%s'", cleartext)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectCommit()
+		Expect(SetUserPassword(ctx, "testuser", cleartext, true, db)).To(Succeed())
 	})
 })
