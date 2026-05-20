@@ -40,6 +40,7 @@ var _ = Describe("BackupStatus structure", func() {
 		status.SetAsPending()
 		Expect(status.Phase).To(BeEquivalentTo(BackupPhasePending))
 		Expect(status.IsInProgress()).To(BeTrue())
+		Expect(status.IsExecuting()).To(BeFalse())
 		Expect(status.IsDone()).To(BeFalse())
 	})
 
@@ -131,6 +132,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseRunning,
 				}
 				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsExecuting()).To(BeTrue())
 				Expect(b.IsDone()).To(BeFalse())
 			})
 		})
@@ -141,6 +143,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhasePending,
 				}
 				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeFalse())
 			})
 		})
@@ -151,6 +154,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseCompleted,
 				}
 				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeTrue())
 			})
 		})
@@ -161,6 +165,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseFailed,
 				}
 				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeTrue())
 			})
 		})
@@ -228,6 +233,70 @@ var _ = Describe("BackupList structure", func() {
 		Expect(backupList.Items[2].Name).To(Equal("backup-ten-minutes"))
 	})
 
+	It("can be sorted by creation time and name", func() {
+		now := time.Now()
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-now",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-ten-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-five-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute)),
+					},
+				},
+			},
+		}
+		backupList.SortByCreationTimeAndName()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-ten-minutes"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-five-minutes"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-now"))
+	})
+
+	It("breaks ties by name when creation times are equal", func() {
+		now := time.Now()
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-c",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-a",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-b",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+			},
+		}
+		backupList.SortByCreationTimeAndName()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-a"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-b"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-c"))
+	})
+
 	It("can isolate pending backups", func() {
 		backupList := BackupList{
 			Items: []Backup{
@@ -265,12 +334,20 @@ var _ = Describe("BackupList structure", func() {
 						Phase: BackupPhaseFailed,
 					},
 				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-7",
+					},
+					Status: BackupStatus{
+						Phase: BackupPhasePending,
+					},
+				},
 			},
 		}
 		backupList.SortByName()
 
 		pendingBackups := backupList.GetPendingBackupNames()
-		Expect(pendingBackups).To(ConsistOf("backup-1", "backup-2"))
+		Expect(pendingBackups).To(ConsistOf("backup-1", "backup-2", "backup-7"))
 	})
 })
 
