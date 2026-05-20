@@ -21,9 +21,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // updatePoolerStatus sets the status of the pooler and writes it inside kubernetes
@@ -90,6 +93,13 @@ func (r *PoolerReconciler) updatePoolerStatus(
 
 	if resources.Deployment != nil {
 		updatedStatus.Instances = resources.Deployment.Status.Replicas
+	}
+
+	cont := utils.GetContainerForDeployment(resources.Deployment, "pgbouncer")
+	if cont == nil {
+		log.FromContext(ctx).Warning("Failed to find pgbouncer image in Deployment", "while getting updating pooler status", "pooler", pooler.GetName())
+	} else {
+		updatedStatus.Image = cont.Image
 	}
 
 	// then update the status if anything changed
