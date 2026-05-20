@@ -41,6 +41,7 @@ const (
 // PublicationSpec defines the desired state of Publication
 type PublicationSpec struct {
 	// The name of the PostgreSQL cluster that identifies the "publisher"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster is immutable once set"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
 	// The name of the publication inside PostgreSQL

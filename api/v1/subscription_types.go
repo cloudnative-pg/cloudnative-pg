@@ -41,6 +41,7 @@ const (
 // SubscriptionSpec defines the desired state of Subscription
 type SubscriptionSpec struct {
 	// The name of the PostgreSQL cluster that identifies the "subscriber"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster is immutable once set"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
 	// The name of the subscription inside PostgreSQL
