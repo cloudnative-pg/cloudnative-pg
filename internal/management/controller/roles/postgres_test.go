@@ -596,14 +596,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
 
-	It("emits the encrypted password literal supplied by the caller", func() {
+	It("emits the password literal verbatim when passthrough is enabled", func() {
 		const encryptedPassword = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
 			"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
 			"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
 
 		role := apiv1.RoleConfiguration{}
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.password = sql.NullString{Valid: true, String: encryptedPassword}
+		dbRole.passwordPassthrough = true
 		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())
 
@@ -611,7 +612,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		expectedQuery := fmt.Sprintf("ALTER ROLE \"alighieri\" PASSWORD '%s'", encryptedPassword)
 
 		fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize())
-		appendPasswordOption(dbRole, encryptedPassword, &query)
+		Expect(appendPasswordOption(dbRole, &query)).To(Succeed())
 		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
 	})
 
@@ -631,9 +632,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		role.ValidUntil = &validUntil
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.password = sql.NullString{Valid: true, String: encryptedPassword}
+		dbRole.passwordPassthrough = true
 		dbRole.ignorePassword = false
-		appendPasswordOption(dbRole, encryptedPassword, &queryValidUntil)
+		Expect(appendPasswordOption(dbRole, &queryValidUntil)).To(Succeed())
 		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
 	})
 
