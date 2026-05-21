@@ -433,8 +433,9 @@ kubectl get pooler pooler-example-rw -o jsonpath='{.status.image}'
 
 ## Service Template
 
-Sometimes, your pooler will require some different labels, annotations, or even change
-of the Service type. You can achieve that by using the `serviceTemplate` field:
+Sometimes, your pooler will require some different labels, annotations, or
+even a different Service type. You can achieve that by using the
+`serviceTemplate` field:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
