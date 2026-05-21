@@ -34,6 +34,9 @@ Both resources share a common schema:
 - **Uniqueness**: The `major` field must be unique within a single catalog.
 - **Extensions**: Support for certified extension container images (available for
   PostgreSQL 18+ via `extension_control_path`).
+- **Component images**: An optional list of named images for non-PostgreSQL
+  components such as PgBouncer (see
+  [Component images](#component-images)).
 
 :::warning
 While the operator trusts the user-defined `major` version without performing
@@ -51,9 +54,9 @@ components via the `componentImages` field. Each entry is identified by a string
 **key** — a lowercase alphanumeric identifier (hyphens allowed, 1–63
 characters) that must be unique within the catalog.
 
-Currently, the supported consumer of component images is the `Pooler` resource,
-which can use an component image entry to manage the pgbouncer container image
-centrally (see
+Currently, the only consumer of component images is the `Pooler` resource,
+which can reference a component image entry to centrally manage the PgBouncer
+container image (see
 [Pooler image catalog reference](connection_pooling.md#pooler-image-catalog-reference)).
 
 The following example defines a namespaced `ImageCatalog` with a pgbouncer
@@ -91,10 +94,9 @@ spec:
 ```
 
 :::info
-A catalog may contain up to 32 component image entries. Keys follow the same
-format as Kubernetes label values: lowercase alphanumeric characters or
-hyphens, starting and ending with an alphanumeric character, up to 63
-characters long.
+A catalog may contain up to 32 component image entries. Keys are lowercase
+alphanumeric characters or hyphens, starting and ending with an alphanumeric
+character, up to 63 characters long.
 :::
 
 ## Configuration examples
