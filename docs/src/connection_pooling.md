@@ -283,31 +283,20 @@ spec:
             topologyKey: "kubernetes.io/hostname"
 ```
 
-#### Custom image and resource limits
+#### Resource limits
 
-You can specify a custom image and define resource requests/limits. Note that
-the container name is explicitly set to `pgbouncer`.
+You can define resource requests and limits by adding a container named
+`pgbouncer` to the `template` section:
 
 ```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Pooler
-metadata:
-  name: pooler-example-rw
-spec:
-  cluster:
-    name: cluster-example
-  instances: 3
-  type: rw
-
+# ...
   template:
     metadata:
-      labels:
-        app: pooler
+      # ...
     spec:
       containers:
         # This name MUST be "pgbouncer"
         - name: pgbouncer
-          image: my-pgbouncer:latest
           resources:
             requests:
               cpu: "0.1"
@@ -317,9 +306,24 @@ spec:
               memory: 500Mi
 ```
 
+#### Image overrides
+
+By default, CloudNativePG deploys the latest stable PgBouncer image. To use a
+specific version or a private registry, specify the `image` within the
+`pgbouncer` container:
+
+```yaml
+# ...
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          image: my-pgbouncer:latest
+```
+
 ## Pooler image catalog reference
 
-The `Pooler` resource supports managing the pgbouncer container image
+The `Pooler` resource supports managing the PgBouncer container image
 centrally via an `ImageCatalog` or `ClusterImageCatalog`, following the same
 pattern as `Cluster` resources (see [Image Catalog](image_catalog.md)).
 
