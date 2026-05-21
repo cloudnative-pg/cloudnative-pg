@@ -1491,7 +1491,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `byStatus` _object (keys:[RoleStatus](#rolestatus), values:string array)_ | ByStatus gives the list of roles in each state |  |  |  |
-| `cannotReconcile` _object (keys:string, values:string array)_ | CannotReconcile lists roles that cannot be reconciled in PostgreSQL,<br />with an explanation of the cause |  |  |  |
+| `cannotReconcile` _object (keys:string, values:string array)_ | CannotReconcile lists roles that cannot be reconciled, with an<br />explanation of the cause. Failures may originate in PostgreSQL<br />(e.g. dropping a role that owns objects) or in Kubernetes (e.g.<br />the referenced password Secret cannot be fetched). |  |  |  |
 | `passwordStatus` _object (keys:string, values:[PasswordState](#passwordstate))_ | PasswordStatus gives the last transaction id and password secret version for each managed role |  |  |  |
 
 

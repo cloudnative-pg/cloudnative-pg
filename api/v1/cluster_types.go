@@ -795,8 +795,10 @@ type ManagedRoles struct {
 	// +optional
 	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
 
-	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-	// with an explanation of the cause
+	// CannotReconcile lists roles that cannot be reconciled, with an
+	// explanation of the cause. Failures may originate in PostgreSQL
+	// (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+	// the referenced password Secret cannot be fetched).
 	// +optional
 	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
 

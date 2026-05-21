@@ -7093,8 +7093,10 @@ spec:
                         type: string
                       type: array
                     description: |-
-                      CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-                      with an explanation of the cause
+                      CannotReconcile lists roles that cannot be reconciled, with an
+                      explanation of the cause. Failures may originate in PostgreSQL
+                      (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+                      the referenced password Secret cannot be fetched).
                     type: object
                   passwordStatus:
                     additionalProperties:
