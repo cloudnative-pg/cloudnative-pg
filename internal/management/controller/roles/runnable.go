@@ -183,8 +183,10 @@ func getRoleNames(roles []roleConfigurationAdapter) []string {
 // synchronizeRoles aligns roles in the database to the spec
 // It returns
 //   - the PasswordState for any updated roles
-//   - any roles that had expectable postgres errors
-//   - any unexpected error
+//   - the per-role errors encountered while applying role actions (e.g.
+//     unrealizable postgres operations, missing password secret)
+//   - any error that prevents the whole synchronization from running
+//     (e.g. listing the roles in the database failed)
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	db *sql.DB,
@@ -210,14 +212,12 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	return storedPasswordState, unreconciledRoles, nil
 }
 
-// applyRoleActions applies the actions to reconcile roles in the DB with the Spec
-// It returns the apiv1.PasswordState for each role, as well as a map of roles that
-// cannot be reconciled for expectable errors, e.g. dropping a role owning content
-//
-// NOTE: applyRoleActions will carry on after an expectable error, i.e. an error
-// due to an invalid request for postgres. This is so that other actions will not
-// be blocked by a user error.
-// It will, however, error out on unexpected errors.
+// applyRoleActions applies the actions to reconcile roles in the DB with the Spec.
+// It returns the apiv1.PasswordState for each successfully applied role, and a
+// map collecting the errors encountered per role. Both expectable errors
+// (e.g. dropping a role that owns content) and unexpected errors are recorded
+// in the map, so that an error on one role does not block the reconciliation
+// of the others.
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	db *sql.DB,
