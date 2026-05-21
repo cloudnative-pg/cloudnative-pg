@@ -194,6 +194,12 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return err
 	}
 
+	tx.Commit()
+	tx, err = db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
+	}
+
 	if err = postgres.SetupMetricsExporterRole(ctx, tx); err != nil {
 		_ = tx.Rollback()
 		return err
