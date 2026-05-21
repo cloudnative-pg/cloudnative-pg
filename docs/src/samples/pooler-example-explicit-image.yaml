@@ -4,7 +4,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
   storage:
     size: 1Gi
 ---
@@ -19,4 +19,4 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
-    image: ghcr.io/cloudnative-pg/pgbouncer:1.24.0
+    image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1

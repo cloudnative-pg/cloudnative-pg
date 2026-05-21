@@ -4,11 +4,11 @@ metadata:
   name: image-catalog-example
 spec:
   images:
-    - image: ghcr.io/cloudnative-pg/postgresql:17
-      major: 17
+    - image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+      major: 18
   componentImages:
     - key: pgbouncer
-      image: ghcr.io/cloudnative-pg/pgbouncer:1.24.0
+      image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -20,7 +20,7 @@ spec:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog
     name: image-catalog-example
-    major: 17
+    major: 18
   storage:
     size: 1Gi
 ---
