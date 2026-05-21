@@ -364,7 +364,7 @@ an `ImageCatalog` or `ClusterImageCatalog`, following the same pattern as
 entry is selected by the `key` defined in the catalog's `componentImages`
 list.
 
-Reference a namespaced catalog entry with `spec.pgbouncer.imageCatalogRef`:
+Reference a catalog entry with `spec.pgbouncer.imageCatalogRef`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -385,27 +385,9 @@ spec:
       key: pgbouncer
 ```
 
-For a cluster-wide catalog, use `kind: ClusterImageCatalog` — the rest of
-the spec is identical:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Pooler
-metadata:
-  name: pooler-example-rw
-spec:
-  cluster:
-    name: cluster-example
-  instances: 3
-  type: rw
-  pgbouncer:
-    poolMode: session
-    imageCatalogRef:
-      apiGroup: postgresql.cnpg.io
-      kind: ClusterImageCatalog
-      name: my-global-catalog
-      key: pgbouncer
-```
+To use a cluster-wide catalog instead, set `kind: ClusterImageCatalog` and
+point `name` at the corresponding resource — the rest of the spec is
+identical.
 
 When a catalog entry is updated, the operator automatically reconciles all
 poolers referencing it and rolls out the new image without any change to the
