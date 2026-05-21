@@ -390,20 +390,25 @@ func getPassword(
 }
 
 // getPasswordSecretResourceVersion returns a list of resource version of the password secrets for managed roles
-// stored as Kubernetes secrets
+// stored as Kubernetes secrets. Roles whose secret cannot be fetched are
+// omitted from the result; the action evaluator will route them through the
+// update path so the failure surfaces in CannotReconcile.
 func getPasswordSecretResourceVersion(
 	ctx context.Context,
-	client client.Client,
+	cl client.Client,
 	rolesInSpec []apiv1.RoleConfiguration,
 	namespace string,
 ) map[string]string {
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	re := make(map[string]string)
 	for _, role := range rolesInSpec {
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
+		passwordSecret, err := getPassword(ctx, cl, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
 		if err != nil {
+			contextLog.Debug("could not fetch password secret for role; will be flagged for reconciliation",
+				"role", role.Name, "secret", role.PasswordSecret.Name, "err", err.Error())
 			continue
 		}
 		re[role.Name] = passwordSecret.version
