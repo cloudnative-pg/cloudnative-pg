@@ -306,38 +306,65 @@ You can define resource requests and limits by adding a container named
               memory: 500Mi
 ```
 
-#### Image overrides
+## PgBouncer image
 
-By default, CloudNativePG deploys the latest stable PgBouncer image. To use a
-specific version or a private registry, specify the `image` within the
-`pgbouncer` container:
-
-```yaml
-# ...
-  template:
-    spec:
-      containers:
-        - name: pgbouncer
-          image: my-pgbouncer:latest
-```
-
-## Pooler image catalog reference
-
-The `Pooler` resource supports managing the PgBouncer container image
-centrally via an `ImageCatalog` or `ClusterImageCatalog`, following the same
-pattern as `Cluster` resources (see [Image Catalog](image_catalog.md)).
-
-The operator resolves the image to use for each pooler according to the
-following priority (highest wins):
+By default, CloudNativePG deploys the
+[latest stable PgBouncer image](https://ghcr.io/cloudnative-pg/pgbouncer)
+the operator was built against. You can override that default in three ways.
+When more than one is set, the sources are evaluated top-down — the first
+match in the list below is used:
 
 1. An explicit image set on the `pgbouncer` container inside
-   `spec.template.spec.containers` (see [Pod templates](#pod-templates)).
-2. `spec.pgbouncer.image` — a direct image reference on the pooler spec.
+   `spec.template.spec.containers` (escape hatch — see
+   [Pod-template override](#pod-template-override) below).
+2. `spec.pgbouncer.image` — an image reference set directly on the `Pooler`.
 3. `spec.pgbouncer.imageCatalogRef` — a reference to an entry in an
    `ImageCatalog` or `ClusterImageCatalog`.
-4. The operator's built-in default pgbouncer image (lowest priority).
+4. The operator's built-in default PgBouncer image.
 
-### Referencing a namespaced ImageCatalog
+`spec.pgbouncer.image` and `spec.pgbouncer.imageCatalogRef` are mutually
+exclusive — set at most one.
+
+:::warning[Policy gating]
+    If you enforce admission policies that restrict which PgBouncer images
+    may run, those policies **must gate all three** image sources:
+    `spec.pgbouncer.image`, `spec.pgbouncer.imageCatalogRef`, and the
+    `image` field on a `pgbouncer` container inside
+    `spec.template.spec.containers`. A policy that covers only the first
+    two leaves the pod-template override as an unguarded escape hatch.
+    The same consideration applies to `Cluster.spec.imageName` and
+    `Cluster.spec.imageCatalogRef`.
+:::
+
+### Setting an explicit image
+
+Use `spec.pgbouncer.image` to pin a specific PgBouncer version or pull from
+a private registry:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
+```
+
+### Using an image catalog
+
+The `Pooler` resource can manage the PgBouncer container image centrally via
+an `ImageCatalog` or `ClusterImageCatalog`, following the same pattern as
+`Cluster` resources (see [Image Catalog](image_catalog.md)). The catalog
+entry is selected by the `key` defined in the catalog's `componentImages`
+list.
+
+Reference a namespaced catalog entry with `spec.pgbouncer.imageCatalogRef`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -358,7 +385,8 @@ spec:
       key: pgbouncer
 ```
 
-### Referencing a cluster-wide ClusterImageCatalog
+For a cluster-wide catalog, use `kind: ClusterImageCatalog` — the rest of
+the spec is identical:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -383,14 +411,27 @@ When a catalog entry is updated, the operator automatically reconciles all
 poolers referencing it and rolls out the new image without any change to the
 `Pooler` spec.
 
-:::warning[Policy gating]
-    If you enforce admission policies that restrict which pgbouncer images
-    may run, those policies **must gate both** `spec.pgbouncer.image` **and**
-    `spec.pgbouncer.imageCatalogRef`: either field can determine the
-    container image, so a policy that covers only one is incomplete. The
-    same consideration applies to `Cluster.spec.imageName` and
-    `Cluster.spec.imageCatalogRef`.
-:::
+### Pod-template override
+
+The pod template can also carry an `image` on the `pgbouncer` container, in
+which case it overrides every other source (including `spec.pgbouncer.image`
+and `spec.pgbouncer.imageCatalogRef`). Treat this as an **escape hatch** —
+use it only when you need to customize other container-level settings
+(resources, environment, security context) and happen to want to pin the
+image in the same place. For routine image changes, prefer
+`spec.pgbouncer.image` or an image catalog: those fields are validated,
+mutually exclusive, and visible to admission policies that gate the
+PgBouncer image (see [Pod templates](#pod-templates) for the broader
+template mechanics):
+
+```yaml
+# ...
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          image: my-pgbouncer:latest
+```
 
 ### Monitoring the resolved image
 
