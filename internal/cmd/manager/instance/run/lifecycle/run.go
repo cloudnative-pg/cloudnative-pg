@@ -194,7 +194,10 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return err
 	}
 
-	tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
 	tx, err = db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
