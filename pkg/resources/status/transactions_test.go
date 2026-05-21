@@ -147,39 +147,6 @@ var _ = Describe("Status transactions", func() {
 		})
 	})
 
-	Describe("RemoveCondition", func() {
-		It("removes a condition that is present", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					Conditions: []metav1.Condition{
-						{Type: "Foo", Status: metav1.ConditionTrue, Reason: "R", Message: "m"},
-						{Type: "Bar", Status: metav1.ConditionFalse, Reason: "R", Message: "m"},
-					},
-				},
-			}
-
-			RemoveCondition("Foo")(cluster)
-
-			Expect(cluster.Status.Conditions).To(HaveLen(1))
-			Expect(cluster.Status.Conditions[0].Type).To(Equal("Bar"))
-		})
-
-		It("is a no-op when the condition is absent", func() {
-			cluster := &apiv1.Cluster{
-				Status: apiv1.ClusterStatus{
-					Conditions: []metav1.Condition{
-						{Type: "Bar", Status: metav1.ConditionFalse, Reason: "R", Message: "m"},
-					},
-				},
-			}
-
-			RemoveCondition("Foo")(cluster)
-
-			Expect(cluster.Status.Conditions).To(HaveLen(1))
-			Expect(cluster.Status.Conditions[0].Type).To(Equal("Bar"))
-		})
-	})
-
 	Describe("SetTimelineID", func() {
 		It("sets the cluster timeline ID", func() {
 			cluster := &apiv1.Cluster{
