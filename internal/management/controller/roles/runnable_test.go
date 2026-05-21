@@ -460,6 +460,38 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(unreconciled["role_to_test1"][0]).To(ContainSubstring("failed to get password secret"))
 		})
 
+		It("it will surface a missing-secret error even when the role would otherwise be in sync",
+			func(ctx context.Context) {
+				managedConf := apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{
+						{
+							Name:            "role_to_test1",
+							Superuser:       true,
+							Inherit:         ptr.To(true),
+							Comment:         "This is a role to test with",
+							ConnectionLimit: -1,
+							PasswordSecret: &api.LocalObjectReference{
+								Name: "not-findable",
+							},
+						},
+					},
+				}
+				// The role has the same TransactionID as the DB and no
+				// previously-stored SecretResourceVersion, so the password-diff
+				// heuristic alone would classify it as Reconciled. We still
+				// expect the missing secret to surface in the unreconciled map
+				// because the spec references a secret that does not exist.
+				_, unreconciled, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+					"role_to_test1": {
+						TransactionID: 11, // matches the mock DB row's xmin
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(unreconciled).To(HaveLen(1))
+				Expect(unreconciled["role_to_test1"]).To(HaveLen(1))
+				Expect(unreconciled["role_to_test1"][0]).To(ContainSubstring("failed to get password secret"))
+			})
+
 		It("it will ignore ensure:absent roles in spec missing from DB", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
