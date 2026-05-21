@@ -59,7 +59,7 @@ which can reference a component image entry to centrally manage the PgBouncer
 container image (see
 [Pooler image catalog reference](connection_pooling.md#pooler-image-catalog-reference)).
 
-The following example defines a namespaced `ImageCatalog` with a pgbouncer
+The following example defines a namespaced `ImageCatalog` with a PgBouncer
 component image:
 
 ```yaml
@@ -70,28 +70,15 @@ metadata:
   namespace: default
 spec:
   images:
-    - major: 17
-      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
   componentImages:
     - key: pgbouncer
       image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
 ```
 
-The equivalent cluster-wide `ClusterImageCatalog`:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: ClusterImageCatalog
-metadata:
-  name: my-global-catalog
-spec:
-  images:
-    - major: 17
-      image: ghcr.io/cloudnative-pg/postgresql:17.6-system-trixie
-  componentImages:
-    - key: pgbouncer
-      image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
-```
+For a cluster-wide catalog, use `kind: ClusterImageCatalog` and drop the
+`metadata.namespace` field (the `spec` is otherwise identical).
 
 :::info
 A catalog may contain up to 32 component image entries. Keys are lowercase
