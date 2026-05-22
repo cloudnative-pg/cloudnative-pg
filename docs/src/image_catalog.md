@@ -57,7 +57,7 @@ characters) that must be unique within the catalog.
 Currently, the only consumer of component images is the `Pooler` resource,
 which can reference a component image entry to centrally manage the PgBouncer
 container image (see
-[Pooler image catalog reference](connection_pooling.md#pooler-image-catalog-reference)).
+[Using an image catalog](connection_pooling.md#using-an-image-catalog)).
 
 The following example defines a namespaced `ImageCatalog` with a PgBouncer
 component image:

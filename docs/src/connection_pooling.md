@@ -312,7 +312,8 @@ By default, CloudNativePG deploys the
 [latest stable PgBouncer image](https://ghcr.io/cloudnative-pg/pgbouncer)
 the operator was built against. You can override that default in three ways.
 When more than one is set, the sources are evaluated top-down — the first
-match in the list below is used:
+match in the list below is used; if none match, the operator's built-in
+default applies:
 
 1. An explicit image set on the `pgbouncer` container inside
    `spec.template.spec.containers` (escape hatch — see
@@ -320,7 +321,6 @@ match in the list below is used:
 2. `spec.pgbouncer.image` — an image reference set directly on the `Pooler`.
 3. `spec.pgbouncer.imageCatalogRef` — a reference to an entry in an
    `ImageCatalog` or `ClusterImageCatalog`.
-4. The operator's built-in default PgBouncer image.
 
 `spec.pgbouncer.image` and `spec.pgbouncer.imageCatalogRef` are mutually
 exclusive — set at most one.
@@ -418,9 +418,10 @@ template mechanics):
 ### Monitoring the resolved image
 
 The operator stores the resolved image in `status.image` and reflects the
-outcome in `status.phase` (`active` on success, `failed` if resolution
-fails — for example, if the catalog or key does not exist). You can inspect
-the current state with:
+outcome in `status.phase`, one of `active`, `paused`, `inactive`, or
+`failed`. On `failed`, `status.phaseReason` describes the cause (for
+example, if the catalog or key does not exist). You can inspect the
+current state with:
 
 ```shell
 kubectl get pooler pooler-example-rw -o jsonpath='{.status.image}'
@@ -855,7 +856,7 @@ following example:
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`
-and `RESUME` commands, using only declarative configuration. You can ado this
+and `RESUME` commands, using only declarative configuration. You can do this
 using the `paused` option, which by default is set to `false`. When set to
 `true`, the operator internally invokes the `PAUSE` command in PgBouncer,
 which:
