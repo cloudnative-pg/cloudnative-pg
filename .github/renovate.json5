@@ -10,9 +10,6 @@
   prConcurrentLimit: 5,
   baseBranches: [
     'main',
-    'release-1.25',
-    'release-1.28',
-    'release-1.29',
   ],
   ignorePaths: [
     'docs/**',
@@ -27,7 +24,6 @@
   semanticCommits: 'enabled',
   labels: [
     'automated',
-    'do not backport',
     'no-issue',
   ],
   'pip-compile': {
