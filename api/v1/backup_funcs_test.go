@@ -481,6 +481,71 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
 		})
 	})
+
+	When("a newer pending backup sorts alphabetically before an older started one", func() {
+		// Regression guard for the preemption bug fixed in this change:
+		// an alphabetically-earlier Pending backup must not preempt an
+		// older Started backup that has already acquired resources.
+		It("keeps the older started backup as the elected one", func() {
+			now := time.Now()
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-a-newer",
+							CreationTimestamp: metav1.NewTime(now),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-z-older",
+							CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseStarted,
+						},
+					},
+				},
+			}
+
+			Expect(backupList.CanExecuteBackup("backup-z-older")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-a-newer")).To(BeFalse())
+		})
+	})
+
+	When("the only pending backups have diverging name and creation order", func() {
+		It("elects the oldest pending backup regardless of name", func() {
+			now := time.Now()
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-a-newer",
+							CreationTimestamp: metav1.NewTime(now),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-z-older",
+							CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+				},
+			}
+
+			Expect(backupList.CanExecuteBackup("backup-z-older")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-a-newer")).To(BeFalse())
+		})
+	})
 })
 
 var _ = Describe("IsCompletedVolumeSnapshot", func() {
