@@ -429,6 +429,24 @@ _Appears in:_
 | `secret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Name of the secret containing the initial credentials for the<br />owner of the user database. If empty a new secret will be<br />created from scratch |  |  |  |
 
 
+#### CatalogComponentImage
+
+
+
+CatalogComponentImage is a named image entry for a non-PostgreSQL component.
+
+
+
+_Appears in:_
+
+- [ImageCatalogSpec](#imagecatalogspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `key` _string_ | Key is the unique identifier for this image within the catalog. | True |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+| `image` _string_ | Image is the container image reference. | True |  |  |
+
+
 #### CatalogImage
 
 
@@ -1186,6 +1204,7 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `images` _[CatalogImage](#catalogimage) array_ | List of CatalogImages available in the catalog | True |  | MaxItems: 8 <br />MinItems: 1 <br /> |
+| `componentImages` _[CatalogComponentImage](#catalogcomponentimage) array_ | ComponentImages is a list of named images for components other than PostgreSQL<br />(e.g. pgbouncer). Keys must be unique within a catalog. |  |  | MaxItems: 32 <br /> |
 
 
 #### ImageInfo
