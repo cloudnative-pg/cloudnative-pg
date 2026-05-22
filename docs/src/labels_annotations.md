@@ -206,7 +206,7 @@ CloudNativePG manages the following predefined annotations:
     operator (superuser, application user, or a managed-role password
     secret), the operator forwards the password value verbatim in the
     `CREATE`/`ALTER ROLE` statement instead of SCRAM-SHA-256 encoding
-    it client-side. PostgreSQL then encodes the value according to its
+    it operator-side. PostgreSQL then encodes the value according to its
     own `password_encryption` setting.
 
     Opt-in is per-Secret. Use this if you need PostgreSQL — not the

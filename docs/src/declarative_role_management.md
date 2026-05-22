@@ -196,12 +196,13 @@ in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-cr
 CloudNativePG protects this path in two complementary ways:
 
 1. Before emitting `CREATE`/`ALTER ROLE ... PASSWORD '...'`, the operator
-   SCRAM-SHA-256 encodes any cleartext password client-side, so the
-   literal that PostgreSQL parses (and that extensions such as
-   `pg_stat_statements` or `pgaudit` may capture) is the same hash that
-   ends up in `pg_authid.rolpassword` — never the cleartext secret.
-   Passwords already provided in MD5 or SCRAM-SHA-256 shadow form are
-   passed through unchanged.
+   SCRAM-SHA-256 encodes any cleartext password operator-side — that is,
+   client-side from PostgreSQL's point of view, since the operator is
+   the PostgreSQL client issuing the statement. As a result, the literal
+   that PostgreSQL parses (and that extensions such as `pg_stat_statements`
+   or `pgaudit` may capture) is the same hash that ends up in
+   `pg_authid.rolpassword` — never the cleartext secret. Passwords already
+   provided in MD5 or SCRAM-SHA-256 shadow form are passed through unchanged.
 2. The same `CREATE`/`ALTER ROLE` statements are executed inside a
    transaction that temporarily suppresses both statement logging
    (`log_statement`) and error statement logging
@@ -211,13 +212,13 @@ CloudNativePG protects this path in two complementary ways:
 The Status section of the cluster does not print the query statement for any
 managed role operation.
 
-#### Opting out of client-side encoding
+#### Opting out of operator-side encoding
 
 If you need PostgreSQL — not the operator — to decide how the password
 is hashed (for example, on a cluster running `password_encryption = md5`),
 set the annotation `cnpg.io/passwordPassthrough: "enabled"` on the
 basic-auth Secret. The operator will then forward the password value
-verbatim, restoring the behavior it had before client-side encoding.
+verbatim, restoring the behavior it had before operator-side encoding.
 
 The opt-in is per-Secret and applies to every basic-auth Secret the
 operator consumes — managed-role secrets, but also the superuser and
