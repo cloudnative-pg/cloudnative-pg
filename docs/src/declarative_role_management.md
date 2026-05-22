@@ -179,10 +179,15 @@ stringData:
   password: SCRAM-SHA-256$<iteration count>:<salt>$<StoredKey>:<ServerKey>
 ```
 
-Prefer `stringData:` for pre-hashed secrets. When using `data:` instead,
-make sure the base64 payload does not contain a trailing newline
-(`echo -n "..." | base64`): a stray newline in the username or password
-prevents the value from being recognized as a valid hash and breaks login.
+:::warning
+The example above uses `stringData:` — Kubernetes encodes the value for
+you, which is the safest path for pre-hashed passwords. If you must use
+`data:`, encode the bytes exactly with `printf '%s' "$hash" | base64`
+(or `echo -n "$hash" | base64`). A trailing newline from a naive
+`echo "$hash" | base64` makes the value miss the SCRAM/MD5 shadow-format
+check, so the operator falls back to treating it as cleartext and
+re-hashes it — and login stops working.
+:::
 
 ### Safety when transmitting cleartext passwords
 
@@ -218,12 +223,12 @@ If you need PostgreSQL — not the operator — to decide how the password
 is hashed (for example, on a cluster running `password_encryption = md5`),
 set the annotation `cnpg.io/passwordPassthrough: "enabled"` on the
 basic-auth Secret. The operator will then forward the password value
-verbatim, restoring the behavior it had before operator-side encoding.
+verbatim.
 
 The opt-in is per-Secret and applies to every basic-auth Secret the
 operator consumes — managed-role secrets, but also the superuser and
 application-user secrets — so a single cluster can mix passthrough
-secrets and encoded secrets freely. The statement-logging suppression
+secrets and operator-encoded secrets freely. The statement-logging suppression
 layer described above still applies in both modes, but be aware that
 extensions such as `pg_stat_statements` or `pgaudit` will observe the
 cleartext password whenever this annotation is enabled.

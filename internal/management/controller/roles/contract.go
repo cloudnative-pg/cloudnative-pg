@@ -47,7 +47,7 @@ type DatabaseRole struct {
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
-	// passwordPassthrough, when true, instructs the SQL emitter to send the
+	// passwordPassthrough, when true, instructs the instance manager to send the
 	// password literal verbatim rather than SCRAM-SHA-256 encoding it
 	// client-side. It is populated from the cnpg.io/passwordPassthrough
 	// annotation on the Secret backing the role.
