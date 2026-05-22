@@ -167,10 +167,11 @@ func (list BackupList) GetPendingBackupNames() []string {
 // CanExecuteBackup control if we can start a reconciliation loop for a certain backup.
 //
 // A reconciliation loop can start if:
-// - there's no backup running, and the backup is the first of the sorted list of backups
-// - the current backup is running and is the first running backup of the list
+//   - the backup is currently being executed (Started or Running), or
+//   - no other backup is being executed and the backup is the oldest pending one
+//     (with backup name used as a tie-breaker for backups created at the same time).
 //
-// As a side effect, this function will sort the backup list
+// As a side effect, this function will sort the backup list by creation time.
 func (list *BackupList) CanExecuteBackup(backupName string) bool {
 	list.SortByCreationTimeAndName()
 
