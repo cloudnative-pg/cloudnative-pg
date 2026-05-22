@@ -178,7 +178,6 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 
 	contextLogger.Debug("Validating DB configuration")
 
-	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
