@@ -60,3 +60,14 @@ func (spec *ImageCatalogSpec) FindExtensionsForMajor(major int) ([]ExtensionConf
 
 	return nil, false
 }
+
+// FindComponentImageForKey finds the image string for a given component-image key.
+func (spec *ImageCatalogSpec) FindComponentImageForKey(key string) (string, bool) {
+	for _, entry := range spec.ComponentImages {
+		if entry.Key == key {
+			return entry.Image, true
+		}
+	}
+
+	return "", false
+}

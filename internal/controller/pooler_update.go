@@ -76,6 +76,17 @@ func (r *PoolerReconciler) updateDeployment(
 ) error {
 	contextLog := log.FromContext(ctx)
 
+	// Skip deployment reconciliation while the image cannot be resolved:
+	// either Phase=Failed (catalog currently broken) or Status.Image is empty
+	// (no prior success). Unrelated spec changes wait until
+	// updatePoolerStatus resolves the image again.
+	if pooler.Status.Phase == apiv1.PoolerPhaseFailed || pooler.Status.Image == "" {
+		contextLog.Info("Skipping deployment reconciliation: pgbouncer image is not resolved",
+			"phase", pooler.Status.Phase,
+			"reason", pooler.Status.PhaseReason)
+		return nil
+	}
+
 	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
 		return err

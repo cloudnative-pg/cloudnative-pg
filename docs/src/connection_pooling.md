@@ -283,10 +283,63 @@ spec:
             topologyKey: "kubernetes.io/hostname"
 ```
 
-#### Custom image and resource limits
+#### Resource limits
 
-You can specify a custom image and define resource requests/limits. Note that
-the container name is explicitly set to `pgbouncer`.
+You can define resource requests and limits by adding a container named
+`pgbouncer` to the `template` section:
+
+```yaml
+# ...
+  template:
+    metadata:
+      # ...
+    spec:
+      containers:
+        # This name MUST be "pgbouncer"
+        - name: pgbouncer
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: 100Mi
+            limits:
+              cpu: "0.5"
+              memory: 500Mi
+```
+
+## PgBouncer image
+
+By default, CloudNativePG deploys the
+[latest stable PgBouncer image](https://ghcr.io/cloudnative-pg/pgbouncer)
+the operator was built against. You can override that default in three ways.
+When more than one is set, the sources are evaluated top-down — the first
+match in the list below is used; if none match, the operator's built-in
+default applies:
+
+1. An explicit image set on the `pgbouncer` container inside
+   `spec.template.spec.containers` (escape hatch — see
+   [Pod-template override](#pod-template-override) below).
+2. `spec.pgbouncer.image` — an image reference set directly on the `Pooler`.
+3. `spec.pgbouncer.imageCatalogRef` — a reference to an entry in an
+   `ImageCatalog` or `ClusterImageCatalog`.
+
+`spec.pgbouncer.image` and `spec.pgbouncer.imageCatalogRef` are mutually
+exclusive — set at most one.
+
+:::warning[Policy gating]
+    If you enforce admission policies that restrict which PgBouncer images
+    may run, those policies **must gate all three** image sources:
+    `spec.pgbouncer.image`, `spec.pgbouncer.imageCatalogRef`, and the
+    `image` field on a `pgbouncer` container inside
+    `spec.template.spec.containers`. A policy that covers only the first
+    two leaves the pod-template override as an unguarded escape hatch.
+    The same consideration applies to `Cluster.spec.imageName` and
+    `Cluster.spec.imageCatalogRef`.
+:::
+
+### Setting an explicit image
+
+Use `spec.pgbouncer.image` to pin a specific PgBouncer version or pull from
+a private registry:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -298,29 +351,92 @@ spec:
     name: cluster-example
   instances: 3
   type: rw
+  pgbouncer:
+    poolMode: session
+    image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
+```
 
+### Using an image catalog
+
+The `Pooler` resource can manage the PgBouncer container image centrally via
+an `ImageCatalog` or `ClusterImageCatalog`, following the same pattern as
+`Cluster` resources (see [Image Catalog](image_catalog.md)). The catalog
+entry is selected by the `key` defined in the catalog's `componentImages`
+list.
+
+Reference a catalog entry with `spec.pgbouncer.imageCatalogRef`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: session
+    imageCatalogRef:
+      apiGroup: postgresql.cnpg.io
+      kind: ImageCatalog
+      name: my-catalog
+      key: pgbouncer
+```
+
+To use a cluster-wide catalog instead, set `kind: ClusterImageCatalog` and
+point `name` at the corresponding resource — the rest of the spec is
+identical.
+
+When a catalog entry is updated, the operator automatically reconciles all
+poolers referencing it and rolls out the new image without any change to the
+`Pooler` spec.
+
+### Pod-template override
+
+The pod template can also carry an `image` on the `pgbouncer` container, in
+which case it overrides every other source (including `spec.pgbouncer.image`
+and `spec.pgbouncer.imageCatalogRef`). Treat this as an **escape hatch** —
+use it only when you need to customize other container-level settings
+(resources, environment, security context) and happen to want to pin the
+image in the same place. For routine image changes, prefer
+`spec.pgbouncer.image` or an image catalog: those fields are validated,
+mutually exclusive, and visible to admission policies that gate the
+PgBouncer image (see [Pod templates](#pod-templates) for the broader
+template mechanics):
+
+```yaml
+# ...
   template:
-    metadata:
-      labels:
-        app: pooler
     spec:
       containers:
-        # This name MUST be "pgbouncer"
         - name: pgbouncer
           image: my-pgbouncer:latest
-          resources:
-            requests:
-              cpu: "0.1"
-              memory: 100Mi
-            limits:
-              cpu: "0.5"
-              memory: 500Mi
 ```
+
+### Monitoring the resolved image
+
+The operator stores the resolved image in `status.image` and reflects the
+outcome in `status.phase`, one of `active`, `paused`, `inactive`, or
+`failed`. On `failed`, `status.phaseReason` describes the cause (for
+example, if the catalog or key does not exist). You can inspect the
+current state with:
+
+```shell
+kubectl get pooler pooler-example-rw -o jsonpath='{.status.image}'
+```
+
+:::note[API reference]
+    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#pgbouncerspec)
+    in the API reference.
+:::
 
 ## Service Template
 
-Sometimes, your pooler will require some different labels, annotations, or even change
-the type of the service, you can achieve that by using the `serviceTemplate` field:
+Sometimes, your pooler will require some different labels, annotations, or
+even a different Service type. You can achieve that by using the
+`serviceTemplate` field:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -740,7 +856,7 @@ following example:
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`
-and `RESUME` commands, using only declarative configuration. You can ado this
+and `RESUME` commands, using only declarative configuration. You can do this
 using the `paused` option, which by default is set to `false`. When set to
 `true`, the operator internally invokes the `PAUSE` command in PgBouncer,
 which:

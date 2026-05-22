@@ -41,8 +41,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
-// Deployment create the deployment of pgbouncer, given
-// the configurations we have in the pooler specifications
+// Deployment creates the pgbouncer Deployment for the given Pooler. The
+// container image and deployment hash both derive from
+// pooler.Status.Image; the caller (updateDeployment) must populate it
+// first.
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
 	operatorImageName := config.Current.OperatorImageName
 
@@ -76,7 +78,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			},
 		}).
 		WithSecurityContext(createPodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
-		WithContainerImage("pgbouncer", config.Current.PgbouncerImageName, false).
+		WithContainerImage("pgbouncer", pooler.Status.Image, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
 			"pgbouncer",
@@ -176,12 +178,14 @@ func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string
 	type deploymentHash struct {
 		poolerSpec                      apiv1.PoolerSpec
 		operatorImageName               string
+		pgbouncerImage                  string
 		isPodSpecReconciliationDisabled bool
 	}
 
 	return hash.ComputeHash(deploymentHash{
 		poolerSpec:                      pooler.Spec,
 		operatorImageName:               operatorImageName,
+		pgbouncerImage:                  pooler.Status.Image,
 		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
 	})
 }

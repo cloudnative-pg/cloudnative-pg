@@ -71,6 +71,7 @@ CVE
 CVEs
 CannotReconcile
 Canovai
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -97,6 +98,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -215,6 +217,7 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
@@ -369,6 +372,11 @@ PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
 PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -698,6 +706,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -743,6 +752,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
@@ -963,6 +973,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -1251,6 +1262,7 @@ poolerName
 poolerintegrations
 poolermonitoringconfiguration
 poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
