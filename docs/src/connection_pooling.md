@@ -59,6 +59,12 @@ spec:
     The pooler name can't be the same as any cluster name in the same namespace.
 :::
 
+:::info[Important]
+    The `spec.cluster` field is immutable once set. To point a pooler at a
+    different `Cluster`, create a new `Pooler` resource instead of updating an
+    existing one.
+:::
+
 This example creates a `Pooler` resource called `pooler-example-rw`
 that's strictly associated with the Postgres `Cluster` resource called
 `cluster-example`. It points to the primary, identified by the read/write
