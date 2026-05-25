@@ -151,6 +151,47 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		})
 	})
 
+	// Regression test for CWE-426 search_path operator hijack.
+	// postInitApplicationSQL plants a `=` (name, text) overload in
+	// public and flips ALTER DATABASE app SET search_path = public,
+	// pg_catalog. The operator's connection-level search_path pin
+	// must keep operator-issued queries on pg_catalog so the planted
+	// shadow is never invoked.
+	Context("search_path operator hijack regression", func() {
+		const (
+			clusterName    = "p-search-path-hijack"
+			clusterFixture = fixturesInitdbDir + "/cluster-postinit-search-path-hijack.yaml.template"
+		)
+
+		var namespace string
+
+		It("does not invoke shadow operators planted in the application database", func() {
+			const namespacePrefix = "initdb-search-path-hijack"
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertCreateCluster(namespace, clusterName, clusterFixture, env)
+
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("verifying public.shadow_calls stays empty across a reconcile window", func() {
+				Consistently(func() string {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: namespace,
+							PodName:   primary.Name,
+						}, "app",
+						"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
+					Expect(err).ToNot(HaveOccurred())
+					return strings.TrimSpace(stdout)
+				}, "30s", "5s").Should(Equal("0"))
+			})
+		})
+	})
+
 	Context("custom default locale", func() {
 		const (
 			clusterName        = "p-locale"
