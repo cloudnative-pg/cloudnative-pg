@@ -159,7 +159,3 @@ type PublicationList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Publication `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Publication{}, &PublicationList{})
-}

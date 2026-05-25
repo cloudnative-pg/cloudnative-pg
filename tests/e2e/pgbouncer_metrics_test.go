@@ -38,10 +38,11 @@ import (
 
 var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	const (
-		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
-		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
-		namespacePrefix             = "pgbouncer-metrics-e2e"
-		level                       = tests.Low
+		cnpgCluster                  = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
+		poolerBasicAuthRWSampleFile  = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
+		poolerMetricsTLSRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-metrics-tls-rw.yaml"
+		namespacePrefix              = "pgbouncer-metrics-e2e"
+		level                        = tests.Low
 	)
 	var namespace, clusterName string
 	BeforeEach(func() {
@@ -100,7 +101,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
-				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod)
+				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, false)
 				Expect(err).ToNot(HaveOccurred())
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(
@@ -109,6 +110,43 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 					podName,
 					out,
 				)
+			}
+		})
+
+	It("serves the metrics endpoint over HTTPS when monitoring.tls.enabled is set",
+		func() {
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix+"-tls")
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, cnpgCluster)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, clusterName, cnpgCluster, env)
+
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerMetricsTLSRWSampleFile, 1)
+
+			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerMetricsTLSRWSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			podList := &corev1.PodList{}
+			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(podList.Items).ToNot(BeEmpty())
+
+			for _, pod := range podList.Items {
+				podName := pod.GetName()
+
+				// Plaintext requests must be refused: the metrics server should only
+				// speak TLS on the metrics port.
+				_, errHTTP := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, false)
+				Expect(errHTTP).To(HaveOccurred(),
+					"HTTP scrape of %v must fail when monitoring.tls.enabled=true", podName)
+
+				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod, true)
+				Expect(err).ToNot(HaveOccurred(),
+					"HTTPS scrape of %v must succeed when monitoring.tls.enabled=true", podName)
+				Expect(out).To(ContainSubstring("cnpg_pgbouncer_"),
+					"HTTPS scrape of %v did not return pgbouncer metrics; got:\n%v", podName, out)
 			}
 		})
 })

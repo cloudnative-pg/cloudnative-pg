@@ -61,6 +61,26 @@ func newTLSConfigFromSecret(
 	return NewTLSConfigFromCertPool(caCertPool), nil
 }
 
+// verifyCertificates validates the peer certificate chain against the trusted CA pool.
+func verifyCertificates(certPool *x509.CertPool, certs []*x509.Certificate) error {
+	if len(certs) == 0 {
+		return fmt.Errorf("no certificates provided")
+	}
+	opts := x509.VerifyOptions{
+		Roots:         certPool,
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range certs[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := certs[0].Verify(opts)
+	if err != nil {
+		return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
+	}
+
+	return nil
+}
+
 // NewTLSConfigFromCertPool creates a tls.Config object from X509 cert pool
 // containing the expected server CA
 func NewTLSConfigFromCertPool(
@@ -70,35 +90,11 @@ func NewTLSConfigFromCertPool(
 		MinVersion:         tls.VersionTLS13,
 		RootCAs:            certPool,
 		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
-		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
-			if len(rawCerts) == 0 {
-				return fmt.Errorf("no raw certificates provided")
-			}
-
-			certs := make([]*x509.Certificate, len(rawCerts))
-			for i, rawCert := range rawCerts {
-				cert, err := x509.ParseCertificate(rawCert)
-				if err != nil {
-					return fmt.Errorf("failed to parse certificate: %v", err)
-				}
-				certs[i] = cert
-			}
-
-			opts := x509.VerifyOptions{
-				Roots:         certPool,
-				Intermediates: x509.NewCertPool(),
-			}
-
-			for _, cert := range certs[1:] {
-				opts.Intermediates.AddCert(cert)
-			}
-			_, err := certs[0].Verify(opts)
-			if err != nil {
-				return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
-			}
-
-			return nil
+		// VerifyConnection runs on every completed handshake, including resumed
+		// TLS 1.3 sessions where no certificate exchange occurs but the original
+		// peer certificates remain available in tls.ConnectionState.
+		VerifyConnection: func(conn tls.ConnectionState) error {
+			return verifyCertificates(certPool, conn.PeerCertificates)
 		},
 	}
 

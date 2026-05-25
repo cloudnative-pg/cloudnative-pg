@@ -133,7 +133,3 @@ type ScheduledBackupList struct {
 	// List of clusters
 	Items []ScheduledBackup `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ScheduledBackup{}, &ScheduledBackupList{})
-}

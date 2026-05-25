@@ -586,17 +586,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 200).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 
 			// A file called data.tar.gz should be available on minio
-			Eventually(func() (int, error, error) {
-				out, _, err := exec.CommandInContainer(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					exec.ContainerLocator{
-						Namespace:     minioEnv.Namespace,
-						PodName:       minioEnv.Client.Name,
-						ContainerName: "mc",
-					}, nil,
-					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
-				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-				return value, err, atoiErr
+			// under this cluster's server name path (MinIO is shared
+			// across upgrade sub-tests).
+			latestTar := minio.GetFilePath(serverName1, "data.tar.gz")
+			Eventually(func() (int, error) {
+				return minio.CountFiles(minioEnv, latestTar)
 			}, 60).Should(BeEquivalentTo(1))
 		})
 

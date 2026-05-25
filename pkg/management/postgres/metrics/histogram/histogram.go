@@ -94,7 +94,16 @@ func NewFromRawData(values []interface{}, columns []string, name string) (*Value
 		if i >= len(histogramValue.Values) {
 			break
 		}
-		histogramValue.Buckets[key] = uint64(histogramValue.Values[i])
+
+		// pq.Array scans into int64 (uint64 is unsupported), so we must cast manually.
+		// Histogram bucket counts are non-negative by definition, so capping at 0
+		// is safe: a negative scan result indicates corruption or overflow, not a
+		// meaningful count.
+		if histogramValue.Values[i] >= 0 {
+			histogramValue.Buckets[key] = uint64(histogramValue.Values[i])
+		} else {
+			histogramValue.Buckets[key] = 0
+		}
 	}
 
 	return histogramValue, nil

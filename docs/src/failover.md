@@ -103,6 +103,49 @@ expected outage.
 Enabling a new configuration option to delay failover provides a mechanism to
 prevent premature failover for short-lived network or node instability.
 
+## Detection of node-level failures
+
+When the node hosting the primary becomes unreachable (for example, due to a
+kubelet crash or a network partition between the node and the Kubernetes API
+server), the operator relies on the pod's `Ready` condition to decide that the
+primary is no longer serviceable. While the node is healthy the kubelet keeps
+that condition up to date from the readiness probe; once the node stops
+reporting, the Kubernetes node lifecycle controller is the one that flips the
+condition to `False` as soon as it declares the node `Unknown`.
+
+With stock kube-controller-manager settings, the transition is governed by
+`--node-monitor-grace-period` (default `40s` on Kubernetes 1.29-1.31, raised
+to `50s` in 1.32 and later): after that window the controller marks the node
+`Unknown` and, in the same monitoring pass, issues a patch per pod on that
+node to flip the `Ready` condition. In practice the operator observes the
+primary as unready about **40 to 55 seconds** after the node becomes
+unreachable (the grace period plus up to one `--node-monitor-period` poll,
+default `5s`). Managed Kubernetes distributions (GKE, EKS, AKS) may tune
+these values; consult the provider's documentation if the observed timing
+does not match. After that, the failover procedure starts (further gated by
+`.spec.failoverDelay`).
+
+The `Ready` condition flip is not subject to the rate limiters that throttle
+pod *eviction* during partial-zonal or large-cluster disruptions
+(`--node-eviction-rate`, `--secondary-node-eviction-rate`,
+`--unhealthy-zone-threshold`). The operator reacts to the condition flip as
+soon as the controller emits the patch, regardless of the zone or cluster-wide
+health state.
+
+Pod *eviction* (actual deletion from the unreachable node) is a separate
+mechanism, driven by `tolerationSeconds` on the
+`node.kubernetes.io/unreachable` `NoExecute` taint (`300s` by default). That
+timer does not hold up the operator's failover decision; CloudNativePG
+promotes a new primary as soon as the `Ready` condition flips. By that point
+the kubelet on the isolated node has already stopped the old PostgreSQL
+container locally: with the default
+`.spec.probes.liveness.isolationCheck.enabled: true`, the instance manager
+fails its own liveness probe once it can reach neither the API server nor
+the rest of the cluster, and the kubelet kills the container within
+approximately three probe periods (`~30s`). Full high availability
+(recreation of the old primary on a healthy node by the operator) is still
+gated on the taint-based eviction actually deleting the pod.
+
 ## Failover Quorum (Quorum-based Failover)
 
 Failover quorum is a mechanism that enhances data durability and safety during

@@ -188,7 +188,25 @@ This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
 
-*Note:* For a list of options, run `./hack/setup-cluster.sh`.
+Alternatively, you can deploy a published release or development snapshot
+instead of building from sources by using the `-o` flag:
+
+```shell
+# Deploy a specific published release
+./hack/setup-cluster.sh -o 1.28.1 create deploy
+
+# Deploy the latest snapshot from the main branch
+./hack/setup-cluster.sh -o main create deploy
+
+# Deploy the latest snapshot for a release branch
+./hack/setup-cluster.sh -o release-1.28 create deploy
+```
+
+Branch snapshots are pulled from the
+[`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+repository.
+
+> **Note:** For a list of options, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go
 > binaries in your system. For this reason, from time to time, we recommend
@@ -205,7 +223,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 Now that your system has been validated, you can tear down the local cluster with:
 
 ```shell
-./hack/setup-cluster.sh destroy
+./hack/setup-cluster.sh teardown
 ```
 
 Congratulations, you have a suitable development environment. You are now able

@@ -110,6 +110,12 @@ const (
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 
+	// MetricsExporterUserName is the name of the dedicated role used by the
+	// metrics exporter to connect to PostgreSQL. This role has pg_monitor
+	// granted and is never a superuser, so session_user never escalates via
+	// RESET ROLE.
+	MetricsExporterUserName = "cnpg_metrics_exporter"
+
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
@@ -2732,8 +2738,4 @@ type ConfigMapResourceVersion struct {
 	// Map keys are the config map names, map values are the versions
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }

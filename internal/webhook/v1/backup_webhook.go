@@ -81,7 +81,7 @@ func (v *BackupCustomValidator) ValidateCreate(_ context.Context, backup *apiv1.
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
 
@@ -98,7 +98,7 @@ func (v *BackupCustomValidator) ValidateUpdate(
 	}
 
 	return nil, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Backup"},
 		backup.Name, allErrs)
 }
 

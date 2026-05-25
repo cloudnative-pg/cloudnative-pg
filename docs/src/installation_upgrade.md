@@ -14,12 +14,12 @@ title: Installation and upgrades
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-1.29.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-1.29.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-1.29.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-1.29.1.yaml
 ```
 
 You can verify that with:
@@ -266,6 +266,22 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
+
+### Upgrading to 1.29.1 or 1.28.3
+
+Version 1.29.1 and 1.28.3 ship the fix for `CVE-2026-44477` /
+`GHSA-423p-g724-fr39`. The metrics exporter now authenticates as a
+dedicated `cnpg_metrics_exporter` role with `pg_monitor` privileges
+only, instead of the `postgres` superuser.
+
+Custom monitoring queries that read user-owned tables, or use
+`target_databases: '*'` against databases where `PUBLIC` `CONNECT`
+has been revoked, need explicit `GRANT` statements to
+`cnpg_metrics_exporter`. See ["Custom query privileges and
+safety"](monitoring.md#custom-query-privileges-and-safety) and ["Manually creating
+the metrics exporter
+role"](monitoring.md#manually-creating-the-metrics-exporter-role) in
+the monitoring documentation.
 
 ### Upgrading to 1.29.0 or 1.28.x
 

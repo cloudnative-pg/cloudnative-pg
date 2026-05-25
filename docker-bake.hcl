@@ -62,12 +62,12 @@ now = timestamp()
 distros = {
   distroless = {
     # renovate: datasource=docker
-    baseImage = "gcr.io/distroless/static-debian12:nonroot@sha256:a9329520abc449e3b14d5bc3a6ffae065bdde0f02667fa10880c49b35c109fd1",
+    baseImage = "gcr.io/distroless/static-debian12:nonroot@sha256:d093aa3e30dbadd3efe1310db061a14da60299baff8450a17fe0ccc514a16639",
     tag = ""
   }
   ubi = {
     # renovate: datasource=docker
-    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:2173487b3b72b1a7b11edc908e9bbf1726f9df46a4f78fd6d19a2bab0a701f38",
+    baseImage = "registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:4b45a7cbeab6b02e6db359ce007439ce612b296c29d9d0fb688a9d24d3b56f02",
     tag = "-ubi9"
   }
 }
@@ -96,7 +96,7 @@ target "default" {
   }
 
   output = [
-    "type=image,registry.insecure=${insecure}",
+    "type=image,registry.insecure=${insecure},oci-mediatypes=true,oci-artifact=true",
   ]
 
   attest = [

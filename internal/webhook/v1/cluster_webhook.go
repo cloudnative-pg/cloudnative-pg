@@ -56,6 +56,9 @@ import (
 
 const sharedBuffersParameter = "shared_buffers"
 
+// walLevelMinimal is the "minimal" wal level
+const walLevelMinimal = "minimal"
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -106,7 +109,7 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, cluster *apiv
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
 
@@ -1089,7 +1092,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
-	if walLevel == "minimal" {
+	if walLevel == walLevelMinimal {
 		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
 			result = append(
 				result,
@@ -1404,6 +1407,39 @@ func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.
 				recoveryTarget.TargetLSN,
 				"Invalid TargetLSN"))
 		}
+	}
+
+	// PostgreSQL casts recovery_target_xid to TransactionId (uint32); a value
+	// above 2^32-1 would be silently truncated. Use bitSize 32 so we reject
+	// rather than admit a different XID than the user wrote.
+	if recoveryTarget.TargetXID != "" {
+		if _, err := strconv.ParseUint(recoveryTarget.TargetXID, 10, 32); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetXID"),
+				recoveryTarget.TargetXID,
+				"recovery target xid must be a non-negative 32-bit integer"))
+		}
+	}
+
+	// PostgreSQL enforces MAXFNAMELEN (64) on recovery_target_name and on
+	// pg_create_restore_point; mirror it at admission for a better error.
+	if len(recoveryTarget.TargetName) >= 64 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must be shorter than 64 bytes"))
+	}
+
+	// pg_create_restore_point accepts arbitrary text, but a name with
+	// newlines or NUL is never legitimate and is a strong signal of a
+	// malformed or hostile spec.
+	if strings.ContainsFunc(recoveryTarget.TargetName, func(r rune) bool {
+		return r < 0x20 || r == 0x7F
+	}) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetName"),
+			recoveryTarget.TargetName,
+			"recovery target name must not contain ASCII control characters"))
 	}
 
 	// When using a backup catalog, we can identify the backup to be restored
@@ -2298,10 +2334,10 @@ func (v *ClusterCustomValidator) validateWALLevelChange(r, old *apiv1.Cluster) f
 	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
 
-	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+	if newWALLevel == walLevelMinimal && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
-			"minimal",
+			walLevelMinimal,
 			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
 				oldWALLevel)))
 	}
@@ -2452,10 +2488,7 @@ func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.Er
 
 // validateManagedExtensions validate the managed extensions parameters set by the user
 func (v *ClusterCustomValidator) validateManagedExtensions(r *apiv1.Cluster) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	allErrors = append(allErrors, v.validatePgFailoverSlots(r)...)
-	return allErrors
+	return v.validatePgFailoverSlots(r)
 }
 
 func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field.ErrorList {

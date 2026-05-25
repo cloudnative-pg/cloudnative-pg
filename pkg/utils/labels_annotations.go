@@ -553,7 +553,7 @@ func GetInstanceRole(labels map[string]string) (string, bool) {
 }
 
 // SetInstanceRole sets both ClusterRoleLabelName and ClusterInstanceRoleLabelName on the given ObjectMeta
-func SetInstanceRole(meta metav1.ObjectMeta, role string) {
+func SetInstanceRole(meta *metav1.ObjectMeta, role string) {
 	if meta.Labels == nil {
 		meta.Labels = map[string]string{}
 	}

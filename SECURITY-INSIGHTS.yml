@@ -29,9 +29,6 @@ project:
     - name: Armando Ruocco
       email: armando.ruocco@enterprisedb.com
       primary: false
-    - name: Philippe Scorsolini
-      email: philippe.scorsolini@upbound.io
-      primary: false
   repositories:
     - name: CloudNativePG
       url: https://github.com/cloudnative-pg/cloudnative-pg
@@ -120,9 +117,6 @@ repository:
       primary: false
     - name: Armando Ruocco
       email: armando.ruocco@enterprisedb.com
-      primary: false
-    - name: Philippe Scorsolini
-      email: philippe.scorsolini@upbound.io
       primary: false
   documentation:
     # OSPS-DO-02.01, OSPS-GV-03.01, OSPS-DO-07.01, OSPS-GV-03.02, OSPS-DO-03.02
