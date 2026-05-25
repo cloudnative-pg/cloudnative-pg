@@ -72,6 +72,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
               immediate:
                 description: If the first backup has to be immediately start after
                   creation or not

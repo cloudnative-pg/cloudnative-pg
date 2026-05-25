@@ -149,6 +149,12 @@ The `Publication` object must reference a specific `Cluster`, determining where
 the publication will be created. It is managed by the cluster's primary instance,
 ensuring the publication is created or updated as needed.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To create a
+    publication on a different `Cluster`, create a new `Publication` resource
+    instead of updating an existing one.
+:::
+
 ### Reconciliation and Status
 
 After creating a `Publication`, CloudNativePG manages it on the primary
@@ -286,6 +292,12 @@ The `Subscription` object must reference a specific `Cluster`, determining
 where the subscription will be managed. CloudNativePG ensures that the
 subscription is created or updated on the primary instance of the specified
 cluster.
+
+:::warning
+    The `spec.cluster` field is immutable after creation. To manage the
+    subscription on a different `Cluster`, create a new `Subscription`
+    resource instead of updating an existing one.
+:::
 
 ### Reconciliation and Status
 
