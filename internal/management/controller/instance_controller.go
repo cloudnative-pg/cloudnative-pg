@@ -811,7 +811,11 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 	}
 
 	var existsFunction bool
-	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname='%s' and prosrc='%s'",
+	// proconfig holds the function's SET clauses; we require the pinned
+	// search_path to be present so old (pre-pin) function definitions
+	// are re-created on upgrade.
+	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc "+
+		"WHERE proname='%s' AND prosrc='%s' AND proconfig IS NOT NULL",
 		userSearchFunctionName,
 		userSearchFunction))
 	err = row.Scan(&existsFunction)
@@ -819,10 +823,15 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 		return err
 	}
 	if !existsFunction {
+		// The function is SECURITY DEFINER and runs as the cluster
+		// superuser. Pin search_path on the function so calls coming in
+		// over the pgbouncer auth connection cannot resolve operators
+		// inside the body through a tenant-controlled search_path.
 		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
 			"as '%s' "+
-			"LANGUAGE sql SECURITY DEFINER",
+			"LANGUAGE sql SECURITY DEFINER "+
+			"SET search_path = pg_catalog, pg_temp",
 			userSearchFunctionSchema,
 			userSearchFunctionName,
 			userSearchFunction))
