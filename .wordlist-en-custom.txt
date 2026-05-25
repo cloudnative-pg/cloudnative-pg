@@ -70,6 +70,7 @@ CVE
 CVEs
 CannotReconcile
 Canovai
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -96,6 +97,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -266,6 +268,7 @@ ManagedRolesStatus
 ManagedService
 ManagedServices
 MaxItems
+MaxLength
 MetricDescription
 MetricName
 MetricType
@@ -689,6 +692,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -734,6 +738,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
