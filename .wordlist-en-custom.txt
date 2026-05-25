@@ -54,6 +54,7 @@ Buildx
 Burstable
 ByStatus
 CAs
+CIDR
 CIS
 CKA
 CN
@@ -188,6 +189,7 @@ GKE
 GPL
 GUC
 GUCs
+GabriFedi
 Gabriele
 GaugeVec
 GeoSpatial
@@ -208,12 +210,14 @@ Huß
 IAM
 INPLACE
 IOPS
+IPs
 IPv
 IRSA
 IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
@@ -353,6 +357,9 @@ PodDisruptionBudgets
 PodMonitor
 PodName
 PodSecurityContext
+PodSelectorRef
+PodSelectorRefStatus
+PodSelectorRefs
 PodSpec
 PodStatus
 PodTemplateSpec
@@ -364,6 +371,12 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -681,6 +694,7 @@ bootstrapconfiguration
 bootstrapinitdb
 bootstrappgbasebackup
 bootstraprecovery
+bozkayasalihx
 br
 bs
 builtinLocale
@@ -868,6 +882,7 @@ eu
 excludePatterns
 executables
 expirations
+extName
 extensibility
 extensionconfiguration
 extensionenvvar
@@ -958,6 +973,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -1085,6 +1101,7 @@ managedservices
 matchExpressions
 matchLabels
 mateusoliveira
+maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
@@ -1203,6 +1220,7 @@ pgbouncerspec
 pgdata
 pgpass
 pgstatstatements
+pgvector
 phaseReason
 pid
 pinger
@@ -1226,9 +1244,13 @@ podMonitorRelabelings
 podMonitors
 podName
 podSecurityContext
+podSelectorRefs
 podStatuses
 podmonitor
 podname
+podselector
+podselectorref
+podselectorrefstatus
 podstatus
 podtemplates
 podtemplatespec
@@ -1239,6 +1261,8 @@ poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
@@ -1312,6 +1336,8 @@ readyInstances
 reconciler
 reconcilers
 reconciliationLoop
+reconciliationStartedAt
+reconciliationTerminatedAt
 reconnection
 recoverability
 recoveredCluster
