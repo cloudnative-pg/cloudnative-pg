@@ -436,12 +436,34 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 		return nil
 	}
 
+	// The pool pins search_path to pg_catalog. User-authored init scripts
+	// expect the standard `"$user", public` resolution, so we set that
+	// once at the start of the batch on a dedicated *sql.Conn and reset
+	// at the end. Any user SET inside the script persists across
+	// statements within the same batch, matching PostgreSQL's default
+	// session semantics.
+	ctx := context.Background()
+	conn, err := sqlUser.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for init queries: %w", err)
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before init queries: %w", err)
+	}
+
 	for _, sqlQuery := range queries {
 		log.Debug("Executing query", "sqlQuery", sqlQuery)
-		_, err := sqlUser.Exec(sqlQuery)
-		if err != nil {
+		if _, err := conn.ExecContext(ctx, sqlQuery); err != nil {
 			return err
 		}
+	}
+
+	if _, err := conn.ExecContext(ctx, `RESET search_path`); err != nil {
+		return fmt.Errorf("resetting search_path after init queries: %w", err)
 	}
 
 	return nil
