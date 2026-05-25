@@ -73,6 +73,13 @@ func (connectionProfilePgbouncer) Enrich(config *pgx.ConnConfig) {
 	// this function to connect to the PgBouncer administrative
 	// interface, which doesn't support the extended one.
 	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	// The PgBouncer admin console does not execute catalog SQL and
+	// only accepts the startup parameters listed in
+	// ignore_startup_parameters (extra_float_digits,options by default).
+	// The pinned search_path is therefore unnecessary here and would
+	// cause the admin connection to be rejected.
+	delete(config.RuntimeParams, "search_path")
 }
 
 func fillDefaultParameters(config *pgx.ConnConfig) {
@@ -84,4 +91,14 @@ func fillDefaultParameters(config *pgx.ConnConfig) {
 	// a standard date format for the operator to manage the dates
 	// when it's needed
 	config.RuntimeParams["datestyle"] = "ISO"
+
+	// Pin search_path so a tenant-controlled ALTER DATABASE / ALTER ROLE
+	// setting cannot influence operator-issued queries. pg_catalog is
+	// first so any built-in overload defeats a planted shadow in public.
+	// public stays in the path so CREATE EXTENSION (in initdb post-init
+	// and the Database controller) can resolve required-extension types
+	// — PostgreSQL's CREATE EXTENSION uses the connection-level value
+	// when computing the install-time search_path, not the session-level
+	// SET.
+	config.RuntimeParams["search_path"] = "pg_catalog, public"
 }
