@@ -88,7 +88,7 @@ const (
 type PoolerSpec struct {
 	// This is the cluster reference on which the Pooler will work.
 	// Pooler name should never match with any cluster name within the same namespace.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster is immutable once set"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	Cluster LocalObjectReference `json:"cluster"`
 
 	// Type of service to forward traffic to. Default: `rw`.

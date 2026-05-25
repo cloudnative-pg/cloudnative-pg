@@ -39,7 +39,7 @@ type ScheduledBackupSpec struct {
 	Schedule string `json:"schedule"`
 
 	// The cluster to backup
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster is immutable once set"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	Cluster LocalObjectReference `json:"cluster"`
 
 	// Indicates which ownerReference should be put inside the created backup resources.<br />

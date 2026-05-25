@@ -59,10 +59,10 @@ spec:
     The pooler name can't be the same as any cluster name in the same namespace.
 :::
 
-:::info[Important]
-    The `spec.cluster` field is immutable once set. To point a pooler at a
-    different `Cluster`, create a new `Pooler` resource instead of updating an
-    existing one.
+:::warning
+    The `spec.cluster` field is immutable after creation. To point a pooler at
+    a different `Cluster`, create a new `Pooler` resource instead of updating
+    an existing one.
 :::
 
 This example creates a `Pooler` resource called `pooler-example-rw`

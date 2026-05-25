@@ -88,7 +88,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
                 x-kubernetes-validations:
-                - message: cluster is immutable once set
+                - message: cluster reference is immutable after creation
                   rule: self == oldSelf
               collationVersion:
                 description: |-
