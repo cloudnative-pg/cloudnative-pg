@@ -397,6 +397,10 @@ function deploy_operator_with_helm() {
         --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config"
     )
 
+    if ${K8S_CLI} get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
+        helm_args+=(--set "imagePullSecrets[0].name=cnpg-pull-secret")
+    fi
+
     if [[ -n "${CNPG_CHART_VERSION:-}" ]]; then
         helm_args+=(--version "${CNPG_CHART_VERSION}")
     fi
