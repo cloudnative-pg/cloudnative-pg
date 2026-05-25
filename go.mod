@@ -129,5 +129,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
-
-replace github.com/cloudnative-pg/machinery => github.com/leonardoce/machinery v0.0.0-20260521112458-075df142657b
