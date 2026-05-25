@@ -588,12 +588,13 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 		}
 	}()
 
-	// Prepend pg_catalog to the connection's search_path so unqualified
-	// catalog references (e.g. current_database()) cannot be shadowed by
-	// objects planted in user-owned schemas.
-	_, err = tx.Exec(
-		"SELECT pg_catalog.set_config('search_path', " +
-			"'pg_catalog, ' OPERATOR(pg_catalog.||) pg_catalog.current_setting('search_path'), true)")
+	// The pool pins search_path to pg_catalog. Custom monitoring
+	// queries may reference unqualified objects in public, so we
+	// widen the search_path inside the read-only monitoring
+	// transaction. pg_catalog stays first, defeating shadow-object
+	// attacks; SET LOCAL is rolled back at COMMIT so the connection
+	// returns to the pool with the pinned default.
+	_, err = tx.Exec("SET LOCAL search_path = pg_catalog, public")
 	if err != nil {
 		return nil, err
 	}
