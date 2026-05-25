@@ -68,6 +68,12 @@ The `Database` object must reference a specific `Cluster`, determining where
 the database will be created. It is managed by the cluster's primary instance,
 ensuring the database is created or updated as needed.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To target a
+    different `Cluster`, create a new `Database` resource instead of updating
+    an existing one.
+:::
+
 :::info
     The distinction between `metadata.name` and `spec.name` allows multiple
     `Database` resources to reference databases with the same name across different

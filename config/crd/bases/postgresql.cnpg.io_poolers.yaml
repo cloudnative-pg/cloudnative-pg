@@ -62,6 +62,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
               deploymentStrategy:
                 description: The deployment strategy to use for pgbouncer to replace
                   existing pods with new ones

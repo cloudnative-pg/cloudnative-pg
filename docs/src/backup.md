@@ -209,6 +209,12 @@ for day of the month, month, and day of the week.
 In Kubernetes CronJobs, the equivalent expression is `0 0 * * *` because seconds
 are not included.
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To schedule backups
+    for a different `Cluster`, create a new `ScheduledBackup` resource instead
+    of updating an existing one.
+:::
+
 :::tip[Hint]
     Backup frequency might impact your recovery time objective ([RTO](before_you_start.md#postgresql-terminology)) after a
     disaster which requires a full or Point-In-Time recovery operation. Our
