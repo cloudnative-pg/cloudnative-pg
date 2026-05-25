@@ -87,6 +87,9 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
               collationVersion:
                 description: |-
                   Maps to the `COLLATION_VERSION` parameter of `CREATE DATABASE`. This
