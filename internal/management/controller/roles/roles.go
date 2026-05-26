@@ -114,6 +114,22 @@ func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
 	return rolesByStatus
 }
 
+// passwordSecretIsRequiredButMissing reports whether the spec asks for a
+// password secret that getPasswordSecretResourceVersion was unable to fetch.
+// Such roles must be routed through the update path so the synchronizer can
+// surface the failure in CannotReconcile rather than silently classifying
+// them as reconciled.
+func passwordSecretIsRequiredButMissing(
+	inSpec apiv1.RoleConfiguration,
+	latestSecretResourceVersion map[string]string,
+) bool {
+	if inSpec.PasswordSecret == nil || inSpec.DisablePassword {
+		return false
+	}
+	_, ok := latestSecretResourceVersion[inSpec.Name]
+	return !ok
+}
+
 // evaluateNextRoleActions evaluates the action needed for each role in the DB and/or the Spec.
 // It has no side effects
 func evaluateNextRoleActions(
@@ -148,7 +164,8 @@ func evaluateNextRoleActions(
 				roleAdapterFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
-				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
+				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion) ||
+				passwordSecretIsRequiredButMissing(inSpec, latestSecretResourceVersion)):
 			internalRole := roleConfigurationAdapter{
 				RoleConfiguration:        inSpec,
 				validUntilNullIsInfinity: role.ValidUntil.Valid,
