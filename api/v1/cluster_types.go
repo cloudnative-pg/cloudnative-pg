@@ -2571,8 +2571,10 @@ type RoleConfiguration struct {
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	// Secret containing the password of the role (if present)
-	// If null, the password will be ignored unless DisablePassword is set
+	// Secret containing the password of the role (if present).
+	// If null, the password will be ignored unless DisablePassword is set.
+	// When set, the secret must follow the `kubernetes.io/basic-auth` format
+	// and contain both a `username` and a `password` field.
 	// +optional
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
 

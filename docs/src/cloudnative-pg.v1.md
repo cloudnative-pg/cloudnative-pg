@@ -2484,7 +2484,7 @@ _Appears in:_
 | `name` _string_ | Name of the role | True |  |  |
 | `comment` _string_ | Description of the role |  |  |  |
 | `ensure` _[EnsureOption](#ensureoption)_ | Ensure the role is `present` or `absent` - defaults to "present" |  | present | Enum: [present absent] <br /> |
-| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present)<br />If null, the password will be ignored unless DisablePassword is set |  |  |  |
+| `passwordSecret` _[LocalObjectReference](https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api#LocalObjectReference)_ | Secret containing the password of the role (if present).<br />If null, the password will be ignored unless DisablePassword is set.<br />When set, the secret must follow the `kubernetes.io/basic-auth` format<br />and contain both a `username` and a `password` field. |  |  |  |
 | `connectionLimit` _integer_ | If the role can log in, this specifies how many concurrent<br />connections the role can make. `-1` (the default) means no limit. |  | -1 |  |
 | `validUntil` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#time-v1-meta)_ | Date and time after which the role's password is no longer valid.<br />When omitted, the password will never expire (default). |  |  |  |
 | `inRoles` _string array_ | List of one or more existing roles to which this role will be<br />immediately added as a new member. Default empty. |  |  |  |

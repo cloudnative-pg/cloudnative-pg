@@ -3321,8 +3321,10 @@ spec:
                           type: string
                         passwordSecret:
                           description: |-
-                            Secret containing the password of the role (if present)
-                            If null, the password will be ignored unless DisablePassword is set
+                            Secret containing the password of the role (if present).
+                            If null, the password will be ignored unless DisablePassword is set.
+                            When set, the secret must follow the `kubernetes.io/basic-auth` format
+                            and contain both a `username` and a `password` field.
                           properties:
                             name:
                               description: Name of the referent.
