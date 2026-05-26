@@ -180,13 +180,13 @@ stringData:
 ```
 
 :::warning
-The example above uses `stringData:` — Kubernetes encodes the value for
-you, which is the safest path for pre-hashed passwords. If you must use
-`data:`, encode the bytes exactly with `printf '%s' "$hash" | base64`
+The example above uses `stringData:`, where Kubernetes encodes the value
+for you, which is the safest path for pre-hashed passwords. If you must
+use `data:`, encode the bytes exactly with `printf '%s' "$hash" | base64`
 (or `echo -n "$hash" | base64`). A trailing newline from a naive
 `echo "$hash" | base64` makes the value miss the SCRAM/MD5 shadow-format
 check, so the operator falls back to treating it as cleartext and
-re-hashes it — and login stops working.
+re-hashes it, and login stops working.
 :::
 
 ### Safety when transmitting cleartext passwords
@@ -201,13 +201,14 @@ in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/sql-cr
 CloudNativePG protects this path in two complementary ways:
 
 1. Before emitting `CREATE`/`ALTER ROLE ... PASSWORD '...'`, the operator
-   SCRAM-SHA-256 encodes any cleartext password operator-side — that is,
-   client-side from PostgreSQL's point of view, since the operator is
-   the PostgreSQL client issuing the statement. As a result, the literal
-   that PostgreSQL parses (and that extensions such as `pg_stat_statements`
-   or `pgaudit` may capture) is the same hash that ends up in
-   `pg_authid.rolpassword` — never the cleartext secret. Passwords already
-   provided in MD5 or SCRAM-SHA-256 shadow form are passed through unchanged.
+   SCRAM-SHA-256 encodes any cleartext password operator-side (client-side
+   from PostgreSQL's point of view). This is the standard PostgreSQL
+   practice for keeping cleartext out of server logs and extensions like
+   `pg_stat_statements` or `pgaudit`, and is the same encoding that
+   `psql \password` and libpq's `PQencryptPasswordConn` perform. The
+   literal PostgreSQL receives is the SCRAM-SHA-256 verifier stored in
+   `pg_authid.rolpassword`. Passwords already provided in MD5 or
+   SCRAM-SHA-256 shadow form are forwarded unchanged.
 2. The same `CREATE`/`ALTER ROLE` statements are executed inside a
    transaction that temporarily suppresses both statement logging
    (`log_statement`) and error statement logging
@@ -219,22 +220,22 @@ managed role operation.
 
 #### Opting out of operator-side encoding
 
-If you need PostgreSQL — not the operator — to decide how the password
-is hashed (for example, on a cluster running `password_encryption = md5`),
+If you need PostgreSQL (not the operator) to decide how the password is
+hashed (for example, on a cluster running `password_encryption = md5`),
 set the annotation `cnpg.io/passwordPassthrough: "enabled"` on the
 basic-auth Secret. The operator will then forward the password value
 verbatim.
 
 :::warning
 The `cnpg.io/passwordPassthrough` annotation must be set on the
-**basic-auth Secret** itself — not on the `Cluster` resource. Placing it
+**basic-auth Secret** itself, not on the `Cluster` resource. Placing it
 on the `Cluster` has no effect, and the operator will continue to apply
 SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::
 
 The opt-in is per-Secret and applies to every basic-auth Secret the
-operator consumes — managed-role secrets, but also the superuser and
-application-user secrets — so a single cluster can mix passthrough
+operator consumes (managed-role secrets, but also the superuser and
+application-user secrets), so a single cluster can mix passthrough
 secrets and operator-encoded secrets freely. The statement-logging suppression
 layer described above still applies in both modes, but be aware that
 extensions such as `pg_stat_statements` or `pgaudit` will observe the

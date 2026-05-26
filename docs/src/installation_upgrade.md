@@ -280,8 +280,8 @@ Starting from versions 1.30.0 and 1.29.2, for security reasons,
 CloudNativePG SCRAM-SHA-256 encodes role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
 `CREATE`/`ALTER ROLE` statements. As a result, the literal that reaches
-the PostgreSQL parser — and that extensions such as `pg_stat_statements`
-or `pgaudit` may observe — is the same hash that ends up in
+the PostgreSQL parser (and that extensions such as `pg_stat_statements`
+or `pgaudit` may observe) is the same hash that ends up in
 `pg_authid.rolpassword`, never the cleartext secret. The encoding is
 applied to every basic-auth `Secret` the operator consumes: the
 `postgres` superuser secret, the application-user secret, and any
@@ -294,7 +294,7 @@ existing installations to be affected by this change.
 
 If your cluster has explicitly overridden `password_encryption` to a
 value other than `scram-sha-256` (for example, `md5`) and you want
-PostgreSQL — not the operator — to decide how the password is hashed,
+PostgreSQL (not the operator) to decide how the password is hashed,
 opt out by setting the annotation `cnpg.io/passwordPassthrough: "enabled"`
 on each basic-auth `Secret` the operator consumes. The operator will
 then forward the password value verbatim, and PostgreSQL will encode it
@@ -302,7 +302,7 @@ according to its own `password_encryption` GUC.
 
 :::warning
 The `cnpg.io/passwordPassthrough` annotation must be set on the
-**basic-auth Secret** itself — not on the `Cluster` resource. Placing it
+**basic-auth Secret** itself, not on the `Cluster` resource. Placing it
 on the `Cluster` has no effect, and the operator will continue to apply
 SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::

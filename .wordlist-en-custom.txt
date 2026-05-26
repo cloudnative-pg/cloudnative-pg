@@ -1062,6 +1062,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1603,6 +1604,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode
