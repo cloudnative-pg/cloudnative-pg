@@ -858,7 +858,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			})
 		},
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
-		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
+		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 2),
 	)
 })
 
