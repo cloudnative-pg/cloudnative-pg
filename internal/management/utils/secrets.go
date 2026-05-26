@@ -30,13 +30,15 @@ import (
 // GetUserPasswordFromSecret gets the username and the password from
 // a secret of type basic-auth
 func GetUserPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
-	if _, ok := secret.Data["username"]; !ok {
+	if _, ok := secret.Data[corev1.BasicAuthUsernameKey]; !ok {
 		return "", "", fmt.Errorf("username key doesn't exist inside the secret")
 	}
 
-	if _, ok := secret.Data["password"]; !ok {
+	if _, ok := secret.Data[corev1.BasicAuthPasswordKey]; !ok {
 		return "", "", fmt.Errorf("password key doesn't exist inside the secret")
 	}
 
-	return string(secret.Data["username"]), string(secret.Data["password"]), nil
+	return string(secret.Data[corev1.BasicAuthUsernameKey]),
+		string(secret.Data[corev1.BasicAuthPasswordKey]),
+		nil
 }
