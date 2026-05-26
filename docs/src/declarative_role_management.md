@@ -180,13 +180,13 @@ stringData:
 ```
 
 :::warning
-The example above uses `stringData:`, where Kubernetes encodes the value
-for you, which is the safest path for pre-hashed passwords. If you must
-use `data:`, encode the bytes exactly with `printf '%s' "$hash" | base64`
-(or `echo -n "$hash" | base64`). A trailing newline from a naive
-`echo "$hash" | base64` makes the value miss the SCRAM/MD5 shadow-format
-check, so the operator falls back to treating it as cleartext and
-re-hashes it, and login stops working.
+    The example above uses `stringData:`, where Kubernetes encodes the value
+    for you, which is the safest path for pre-hashed passwords. If you must
+    use `data:`, encode the bytes exactly with `printf '%s' "$hash" | base64`
+    (or `echo -n "$hash" | base64`). A trailing newline from a naive
+    `echo "$hash" | base64` makes the value miss the SCRAM/MD5 shadow-format
+    check, so the operator falls back to treating it as cleartext and
+    re-hashes it, and login stops working.
 :::
 
 ### Safety when transmitting cleartext passwords
@@ -227,10 +227,10 @@ basic-auth Secret. The operator will then forward the password value
 verbatim.
 
 :::warning
-The `cnpg.io/passwordPassthrough` annotation must be set on the
-**basic-auth Secret** itself, not on the `Cluster` resource. Placing it
-on the `Cluster` has no effect, and the operator will continue to apply
-SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
+    The `cnpg.io/passwordPassthrough` annotation must be set on the
+    **basic-auth Secret** itself, not on the `Cluster` resource. Placing it
+    on the `Cluster` has no effect, and the operator will continue to apply
+    SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::
 
 The opt-in is per-Secret and applies to every basic-auth Secret the
@@ -240,11 +240,11 @@ secrets and operator-encoded secrets freely. The statement-logging
 suppression layer described above still applies in both modes.
 
 :::warning
-With `cnpg.io/passwordPassthrough: "enabled"`, the operator forwards
-the Secret's `password` value verbatim. If that value is cleartext (the
-common case on a `password_encryption = md5` cluster), extensions such
-as `pg_stat_statements` or `pgaudit` will observe it. This is the
-expected trade-off for letting PostgreSQL choose the hash format.
+    With `cnpg.io/passwordPassthrough: "enabled"`, the operator forwards
+    the Secret's `password` value verbatim. If that value is cleartext (the
+    common case on a `password_encryption = md5` cluster), extensions such
+    as `pg_stat_statements` or `pgaudit` will observe it. This is the
+    expected trade-off for letting PostgreSQL choose the hash format.
 :::
 
 ## Unrealizable role configurations

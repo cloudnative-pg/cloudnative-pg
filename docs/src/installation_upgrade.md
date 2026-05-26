@@ -271,9 +271,9 @@ only the operator itself.
 ### Upgrading to 1.30.0 or 1.29.2
 
 :::info[Important]
-We strongly recommend that all CloudNativePG users upgrade to version
-1.30.0, or at least to the latest stable version of your current minor release
-(e.g., 1.29.2).
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.30.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.29.2).
 :::
 
 Starting from versions 1.30.0 and 1.29.2, for security reasons,
@@ -301,17 +301,17 @@ then forward the password value verbatim, and PostgreSQL will encode it
 according to its own `password_encryption` GUC.
 
 :::warning
-The `cnpg.io/passwordPassthrough` annotation must be set on the
-**basic-auth Secret** itself, not on the `Cluster` resource. Placing it
-on the `Cluster` has no effect, and the operator will continue to apply
-SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
+    The `cnpg.io/passwordPassthrough` annotation must be set on the
+    **basic-auth Secret** itself, not on the `Cluster` resource. Placing it
+    on the `Cluster` has no effect, and the operator will continue to apply
+    SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::
 
 :::warning
-With `cnpg.io/passwordPassthrough: "enabled"` the operator forwards the
-Secret's `password` value verbatim. If that value is cleartext, as is
-common on `password_encryption = md5` clusters, extensions such as
-`pg_stat_statements` or `pgaudit` will observe it.
+    With `cnpg.io/passwordPassthrough: "enabled"` the operator forwards the
+    Secret's `password` value verbatim. If that value is cleartext, as is
+    common on `password_encryption = md5` clusters, extensions such as
+    `pg_stat_statements` or `pgaudit` will observe it.
 :::
 
 See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
@@ -322,9 +322,9 @@ for details.
 ### Upgrading to 1.29.1 or 1.28.3
 
 :::info[Important]
-We strongly recommend that all CloudNativePG users upgrade to version
-1.29.1, or at least to the latest stable version of your current minor release
-(e.g., 1.28.x).
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.29.1, or at least to the latest stable version of your current minor release
+    (e.g., 1.28.x).
 :::
 
 Version 1.29.1 and 1.28.3 ship the fix for `CVE-2026-44477` /
