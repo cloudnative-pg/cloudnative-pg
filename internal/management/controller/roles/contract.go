@@ -50,7 +50,8 @@ type DatabaseRole struct {
 	// passwordPassthrough, when true, instructs the instance manager to send the
 	// password literal verbatim rather than SCRAM-SHA-256 encoding it
 	// client-side. It is populated from the cnpg.io/passwordPassthrough
-	// annotation on the Secret backing the role.
+	// annotation on the Secret backing the role. Write-only: List() results
+	// always carry false, since PostgreSQL has no concept of the annotation.
 	passwordPassthrough bool  `json:"-"`
 	transactionID       int64 `json:"-"`
 }
