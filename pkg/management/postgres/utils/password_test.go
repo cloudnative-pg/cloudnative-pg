@@ -50,4 +50,16 @@ var _ = Describe("EnsureEncryptedPassword", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(out).To(Equal(md5Hash))
 	})
+
+	It("does not leak the cleartext password in the error", func() {
+		// A NUL byte trips SASLprep's prohibition on ASCII control
+		// characters (RFC 4013 §2.3, table C.2.1).
+		const secret = "leaky-secret\x00value"
+
+		out, err := EnsureEncryptedPassword(secret)
+		Expect(err).To(HaveOccurred())
+		Expect(out).To(BeEmpty())
+		Expect(err.Error()).ToNot(ContainSubstring("leaky-secret"))
+		Expect(err.Error()).ToNot(ContainSubstring("value"))
+	})
 })

@@ -20,7 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/cloudnative-pg/machinery/pkg/postgres/password"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/scram"
@@ -39,7 +39,10 @@ func EnsureEncryptedPassword(p string) (string, error) {
 
 	hashed, err := (&scram.GenerateOptions{PlainText: p}).Generate()
 	if err != nil {
-		return "", fmt.Errorf("encrypting password as SCRAM-SHA-256: %w", err)
+		// Do not wrap err: xdg-go/scram embeds the cleartext password in
+		// its SASLprep failure message, which would then surface in
+		// operator logs through the error chain.
+		return "", errors.New("encrypting password as SCRAM-SHA-256 failed")
 	}
 	return hashed, nil
 }
