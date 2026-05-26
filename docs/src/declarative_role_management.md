@@ -225,6 +225,13 @@ set the annotation `cnpg.io/passwordPassthrough: "enabled"` on the
 basic-auth Secret. The operator will then forward the password value
 verbatim.
 
+:::warning
+The `cnpg.io/passwordPassthrough` annotation must be set on the
+**basic-auth Secret** itself — not on the `Cluster` resource. Placing it
+on the `Cluster` has no effect, and the operator will continue to apply
+SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
+:::
+
 The opt-in is per-Secret and applies to every basic-auth Secret the
 operator consumes — managed-role secrets, but also the superuser and
 application-user secrets — so a single cluster can mix passthrough
