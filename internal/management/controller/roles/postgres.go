@@ -125,7 +125,10 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
-	// will change no matter what, the next reconciliation cycle we would update the password
+	// will change no matter what, the next reconciliation cycle would diff anyway.
+	// The new xmin is recorded in PasswordState after this call, so subsequent
+	// reconciles compare equal and do not re-issue ALTER ROLE despite the fresh
+	// SCRAM salt.
 	if err := appendPasswordOption(role, &query); err != nil {
 		return wrapErr(err)
 	}
