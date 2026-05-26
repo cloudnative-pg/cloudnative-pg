@@ -307,6 +307,13 @@ on the `Cluster` has no effect, and the operator will continue to apply
 SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 :::
 
+:::warning
+With `cnpg.io/passwordPassthrough: "enabled"` the operator forwards the
+Secret's `password` value verbatim. If that value is cleartext, as is
+common on `password_encryption = md5` clusters, extensions such as
+`pg_stat_statements` or `pgaudit` will observe it.
+:::
+
 See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
 for details.
 

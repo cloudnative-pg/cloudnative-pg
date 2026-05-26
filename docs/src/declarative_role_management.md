@@ -236,10 +236,16 @@ SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
 The opt-in is per-Secret and applies to every basic-auth Secret the
 operator consumes (managed-role secrets, but also the superuser and
 application-user secrets), so a single cluster can mix passthrough
-secrets and operator-encoded secrets freely. The statement-logging suppression
-layer described above still applies in both modes, but be aware that
-extensions such as `pg_stat_statements` or `pgaudit` will observe the
-cleartext password whenever this annotation is enabled.
+secrets and operator-encoded secrets freely. The statement-logging
+suppression layer described above still applies in both modes.
+
+:::warning
+With `cnpg.io/passwordPassthrough: "enabled"`, the operator forwards
+the Secret's `password` value verbatim. If that value is cleartext (the
+common case on a `password_encryption = md5` cluster), extensions such
+as `pg_stat_statements` or `pgaudit` will observe it. This is the
+expected trade-off for letting PostgreSQL choose the hash format.
+:::
 
 ## Unrealizable role configurations
 
