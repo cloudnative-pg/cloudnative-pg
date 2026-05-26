@@ -323,7 +323,7 @@ for details.
 
 :::info[Important]
 We strongly recommend that all CloudNativePG users upgrade to version
-r.29.1, or at least to the latest stable version of your current minor release
+1.29.1, or at least to the latest stable version of your current minor release
 (e.g., 1.28.x).
 :::
 
