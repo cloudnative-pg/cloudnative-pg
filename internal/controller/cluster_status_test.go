@@ -21,11 +21,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
@@ -33,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -175,6 +178,28 @@ var _ = Describe("cluster_status unit tests", func() {
 					len(mr.pvcs.Items) == len(pvcs)
 			}))
 		})
+	})
+
+	It("produces a scale-subresource selector matching managed instance pods", func() {
+		// The scale subresource uses .status.selectorLabels (set in updateResourceStatus)
+		// so VPA/HPA can discover instance pods. The format must remain a valid serialized
+		// label selector and must match the labels actually applied to instance pods.
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pods := generateFakeClusterPods(env.client, cluster, true)
+		Expect(pods).ToNot(BeEmpty())
+
+		expected := fmt.Sprintf("%s=%s,%s=%s",
+			utils.ClusterLabelName, cluster.Name,
+			utils.PodRoleLabelName, string(utils.PodRoleInstance))
+
+		selector, err := labels.Parse(expected)
+		Expect(err).ToNot(HaveOccurred())
+
+		for i := range pods {
+			Expect(selector.Matches(labels.Set(pods[i].Labels))).To(BeTrue(),
+				"selector %q must match pod %s labels %v", expected, pods[i].Name, pods[i].Labels)
+		}
 	})
 })
 
