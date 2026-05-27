@@ -390,6 +390,11 @@ jobs:
           BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
           CATALOG_IMG: ${{ env.CATALOG_IMG }}
         run: |
+          # opm requires registries.conf in v2 format; the runner default may be v1.
+          # Override with a v2 file matching the runner's search registries.
+          REGCONF="${RUNNER_TEMP}/registries.conf"
+          printf 'unqualified-search-registries = ["docker.io", "quay.io"]\n' > "${REGCONF}"
+          export CONTAINERS_REGISTRIES_CONF="${REGCONF}"
           make olm-catalog
 
       - name: Archive the bundle manifests
