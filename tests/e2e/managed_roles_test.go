@@ -71,6 +71,15 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			unrealizableUser       = "petrarca"
 			userWithPerpetualPass  = "boccaccio"
 			userWithHashedPassword = "cavalcanti"
+			// Cleartext that the SCRAM hash in
+			// cluster-example-cavalcanti was generated from.
+			userWithHashedPasswordCleartext = "cavalcanti"
+			// Pre-hashed SCRAM-SHA-256 secret stored in the
+			// cluster-example-cavalcanti secret. The operator must
+			// pass this through to pg_authid.rolpassword unchanged.
+			userWithHashedPasswordHash = "SCRAM-SHA-256$4096:Y2F2YWxjYW50aQ==$" +
+				"eCIyo2QEZvwlcMThm1zwQDPnw0jOHlCapCE+QFpHsGs=:" +
+				"YKhSEcd4QiX3SBzmtTOHHA/9yaTBGJWAMMw7+92OyHM="
 		)
 		var clusterName, namespace string
 
@@ -182,6 +191,36 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				rwService := services.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(namespace, rwService, postgres.PostgresDBName, username, password, env)
+			})
+
+			By("ensuring a pre-hashed password secret is stored verbatim in pg_authid", func() {
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				query := fmt.Sprintf(
+					"SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname=%s",
+					pq.QuoteLiteral(userWithHashedPassword),
+				)
+				Eventually(func(g Gomega) {
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: primaryPod.Namespace,
+							PodName:   primaryPod.Name,
+						},
+						postgres.PostgresDBName,
+						query)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdout)).To(Equal(userWithHashedPasswordHash))
+				}, 30).Should(Succeed())
+			})
+
+			By("verifying connectivity of the role configured with a pre-hashed password", func() {
+				rwService := services.GetReadWriteServiceName(clusterName)
+				AssertConnection(
+					namespace, rwService, postgres.PostgresDBName,
+					userWithHashedPassword, userWithHashedPasswordCleartext, env,
+				)
 			})
 
 			By("ensuring the app role has been granted createdb in the managed stanza", func() {
