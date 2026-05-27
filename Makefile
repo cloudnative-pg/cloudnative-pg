@@ -67,7 +67,7 @@ WOKE_VERSION ?= 0.19.0
 # renovate: datasource=github-releases depName=operator-framework/operator-sdk versioning=loose
 OPERATOR_SDK_VERSION ?= v1.42.2
 # renovate: datasource=github-tags depName=operator-framework/operator-registry
-OPM_VERSION ?= v1.68.0
+OPM_VERSION ?= v1.69.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.18.0
 OPENSHIFT_VERSIONS ?= v4.12-v4.21
