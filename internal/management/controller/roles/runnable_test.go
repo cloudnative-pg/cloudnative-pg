@@ -41,6 +41,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -207,13 +208,14 @@ var _ = Describe("Role synchronizer tests", func() {
 	const (
 		secretName                        = "vinci-secret-name"
 		secretNameWithUpdates             = "vinci-secret-with-updates-name"
+		secretNameWithUpdatesPassthrough  = "vinci-secret-with-updates-passthrough-name"
 		secretInDBName                    = "vinci-secret-in-db-name"
 		wantedLogStatementSuppressionStmt = "SET LOCAL log_statement = 'none'"
 		wantedLogPreventionStmt           = "SET LOCAL log_min_error_statement = 'PANIC'"
 	)
 	testDate := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)
 	BeforeEach(func() {
-		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(scramAwareMatcher))
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() {
 			Expect(mock.ExpectationsWereMet()).To(Succeed())
@@ -277,8 +279,21 @@ var _ = Describe("Role synchronizer tests", func() {
 				corev1.BasicAuthPasswordKey: []byte(password),
 			},
 		}
+		secretWithUpdatesPassthrough := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretNameWithUpdatesPassthrough,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					cnpgutils.PasswordPassthroughAnnotationName: "enabled",
+				},
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte("role_to_test1"),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
 		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(&secret, &secretWithUpdates, &secretInDB).
+			WithObjects(&secret, &secretWithUpdates, &secretWithUpdatesPassthrough, &secretInDB).
 			Build()
 
 		roleSynchronizer = RoleSynchronizer{
@@ -345,7 +360,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			alterStmt := fmt.Sprintf(
 				"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
 					"CONNECTION LIMIT -1 PASSWORD '%s'",
-				"role_to_test1", password)
+				"role_to_test1", "${SCRAM}")
 			mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
 			rows := mock.NewRows([]string{"xmin"}).AddRow("11")
 			mock.ExpectCommit()
@@ -359,6 +374,49 @@ var _ = Describe("Role synchronizer tests", func() {
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
+
+		It("it will update a role password verbatim if passthrough is enabled and the secret resourceVersion changed",
+			func(ctx context.Context) {
+				managedConf := apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{
+						{
+							Name:            "role_to_test1",
+							Superuser:       true,
+							Inherit:         ptr.To(true),
+							Comment:         "This is a role to test with",
+							ConnectionLimit: -1,
+							PasswordSecret: &api.LocalObjectReference{
+								Name: secretNameWithUpdatesPassthrough,
+							},
+						},
+					},
+				}
+				var secret corev1.Secret
+				Expect(roleSynchronizer.client.Get(ctx,
+					client.ObjectKey{Namespace: namespace, Name: secretName},
+					&secret)).To(Succeed())
+				mock.ExpectBegin()
+				mock.ExpectExec(wantedLogStatementSuppressionStmt).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec(wantedLogPreventionStmt).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				alterStmt := fmt.Sprintf(
+					"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
+						"CONNECTION LIMIT -1 PASSWORD '%s'",
+					"role_to_test1", password)
+				mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+				rows := mock.NewRows([]string{"xmin"}).AddRow("11")
+				mock.ExpectCommit()
+				lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+				mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
+				_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+					"role_to_test1": {
+						TransactionID:         11, // defined in the mock query to the DB above
+						SecretResourceVersion: "1" + secret.ResourceVersion,
+					},
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+			})
 
 		It("it will update a role password if the password was changed in the DB", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
@@ -387,7 +445,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			alterStmt := fmt.Sprintf(
 				"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
 					"CONNECTION LIMIT -1 PASSWORD '%s'",
-				"role_to_test1", password)
+				"role_to_test1", "${SCRAM}")
 			mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
 			mock.ExpectCommit()
 			// xmin set to 12 where the old value was 11
@@ -402,6 +460,50 @@ var _ = Describe("Role synchronizer tests", func() {
 			})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
+
+		It("it will update a role password verbatim if passthrough is enabled and the password was changed in the DB",
+			func(ctx context.Context) {
+				managedConf := apiv1.ManagedConfiguration{
+					Roles: []apiv1.RoleConfiguration{
+						{
+							Name:            "role_to_test1",
+							Superuser:       true,
+							Inherit:         ptr.To(true),
+							Comment:         "This is a role to test with",
+							ConnectionLimit: -1,
+							PasswordSecret: &api.LocalObjectReference{
+								Name: secretNameWithUpdatesPassthrough,
+							},
+						},
+					},
+				}
+				var secret corev1.Secret
+				Expect(roleSynchronizer.client.Get(ctx,
+					client.ObjectKey{Namespace: namespace, Name: secretName},
+					&secret)).To(Succeed())
+				mock.ExpectBegin()
+				mock.ExpectExec(wantedLogStatementSuppressionStmt).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec(wantedLogPreventionStmt).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				alterStmt := fmt.Sprintf(
+					"ALTER ROLE \"%s\"  NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION SUPERUSER "+
+						"CONNECTION LIMIT -1 PASSWORD '%s'",
+					"role_to_test1", password)
+				mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+				mock.ExpectCommit()
+				// xmin set to 12 where the old value was 11
+				rows := mock.NewRows([]string{"xmin"}).AddRow("13")
+				lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+				mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
+				_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+					"role_to_test1": {
+						TransactionID:         12, // defined in the mock query to the DB above
+						SecretResourceVersion: secret.ResourceVersion,
+					},
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+			})
 
 		It("it will not update a role password if role is in sync with the DB", func(ctx context.Context) {
 			validUntil := metav1.NewTime(testDate)
@@ -942,6 +1044,7 @@ const (
 	secretNameNoUser   = "vinci-secret-no-user"
 	secretNameNoPass   = "vinci-secret-no-pass"
 	secretNameNotExist = "vinci-secret-name-not-exist"
+	secretNamePassthru = "vinci-secret-passthrough"
 	userNameNotExist   = "vinci-not-exist"
 )
 
@@ -985,8 +1088,21 @@ var _ = DescribeTable("getPassword test",
 				corev1.BasicAuthUsernameKey: []byte(userName),
 			},
 		}
+		secretPassthrough := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretNamePassthru,
+				Namespace: namespace,
+				Annotations: map[string]string{
+					cnpgutils.PasswordPassthroughAnnotationName: "enabled",
+				},
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
 		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(&secret, &secretNoUser, &secretNoPass).
+			WithObjects(&secret, &secretNoUser, &secretNoPass, &secretPassthrough).
 			Build()
 		ctx := context.Background()
 		decoded, err := getPassword(ctx, cl, roleConfigurationAdapter{RoleConfiguration: *roleConfig}, namespace)
@@ -998,6 +1114,7 @@ var _ = DescribeTable("getPassword test",
 
 		Expect(decoded.username).To(Equal(expectedResult.username))
 		Expect(decoded.password).To(Equal(expectedResult.password))
+		Expect(decoded.passthrough).To(Equal(expectedResult.passthrough))
 		if (expectedResult == passwordSecret{}) {
 			Expect(decoded).To(BeZero())
 		}
@@ -1061,5 +1178,19 @@ var _ = DescribeTable("getPassword test",
 		},
 		passwordSecret{},
 		true,
+	),
+	Entry("Surfaces the passwordPassthrough annotation on the secret",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNamePassthru,
+			},
+		},
+		passwordSecret{
+			username:    userName,
+			password:    password,
+			passthrough: true,
+		},
+		false,
 	),
 )
