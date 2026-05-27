@@ -267,7 +267,65 @@ removed before installing the new one. This won't affect user data but
 only the operator itself.
 
 
+<!--
+### Upgrading to 1.30.0 or 1.29.2
+
+:::info[Important]
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.30.0, or at least to the latest stable version of your current minor release
+    (e.g., 1.29.2).
+:::
+
+Starting from versions 1.30.0 and 1.29.2, for security reasons,
+CloudNativePG SCRAM-SHA-256 encodes role passwords **operator-side**
+(client-side from PostgreSQL's point of view) before issuing
+`CREATE`/`ALTER ROLE` statements. As a result, the literal that reaches
+the PostgreSQL parser (and that extensions such as `pg_stat_statements`
+or `pgaudit` may observe) is the same hash that ends up in
+`pg_authid.rolpassword`, never the cleartext secret. The encoding is
+applied to every basic-auth `Secret` the operator consumes: the
+`postgres` superuser secret, the application-user secret, and any
+managed-role password secret. Passwords already supplied in MD5 or
+SCRAM-SHA-256 shadow form are passed through unchanged.
+
+Since PostgreSQL [14](https://www.postgresql.org/docs/release/14.0/),
+`password_encryption` defaults to `scram-sha-256`, so we do not expect
+existing installations to be affected by this change.
+
+If your cluster has explicitly overridden `password_encryption` to a
+value other than `scram-sha-256` (for example, `md5`) and you want
+PostgreSQL (not the operator) to decide how the password is hashed,
+opt out by setting the annotation `cnpg.io/passwordPassthrough: "enabled"`
+on each basic-auth `Secret` the operator consumes. The operator will
+then forward the password value verbatim, and PostgreSQL will encode it
+according to its own `password_encryption` GUC.
+
+:::warning
+    The `cnpg.io/passwordPassthrough` annotation must be set on the
+    **basic-auth Secret** itself, not on the `Cluster` resource. Placing it
+    on the `Cluster` has no effect, and the operator will continue to apply
+    SCRAM-SHA-256 encoding to the password before sending it to PostgreSQL.
+:::
+
+:::warning
+    With `cnpg.io/passwordPassthrough: "enabled"` the operator forwards the
+    Secret's `password` value verbatim. If that value is cleartext, as is
+    common on `password_encryption = md5` clusters, extensions such as
+    `pg_stat_statements` or `pgaudit` will observe it.
+:::
+
+See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
+for details.
+
+-->
+
 ### Upgrading to 1.29.1 or 1.28.3
+
+:::info[Important]
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.29.1, or at least to the latest stable version of your current minor release
+    (e.g., 1.28.x).
+:::
 
 Version 1.29.1 and 1.28.3 ship the fix for `CVE-2026-44477` /
 `GHSA-423p-g724-fr39`. The metrics exporter now authenticates as a
@@ -282,14 +340,6 @@ safety"](monitoring.md#custom-query-privileges-and-safety) and ["Manually creati
 the metrics exporter
 role"](monitoring.md#manually-creating-the-metrics-exporter-role) in
 the monitoring documentation.
-
-### Upgrading to 1.28.0 or 1.27.x
-
-:::info[Important]
-    We strongly recommend that all CloudNativePG users upgrade to version
-    1.28.0, or at least to the latest stable version of your current minor release
-    (e.g., 1.27.x).
-:::
 
 ### Upgrading to 1.27 from a previous minor version
 

@@ -47,7 +47,13 @@ type DatabaseRole struct {
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
-	transactionID   int64            `json:"-"`
+	// passwordPassthrough, when true, instructs the instance manager to send the
+	// password literal verbatim rather than SCRAM-SHA-256 encoding it
+	// client-side. It is populated from the cnpg.io/passwordPassthrough
+	// annotation on the Secret backing the role. Write-only: List() results
+	// always carry false, since PostgreSQL has no concept of the annotation.
+	passwordPassthrough bool  `json:"-"`
+	transactionID       int64 `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
