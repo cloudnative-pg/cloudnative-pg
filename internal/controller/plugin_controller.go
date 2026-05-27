@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -367,14 +368,18 @@ func (r *PluginReconciler) mapSecretToPlugin(ctx context.Context, obj client.Obj
 func (r *PluginReconciler) SetupWithManager(
 	mgr ctrl.Manager,
 	maxConcurrentReconciles int,
+	extraPredicates ...predicate.Predicate,
 ) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	newController := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&corev1.Service{}).
 		Named("plugin").
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPlugin),
-		).
-		Complete(r)
+		)
+	for _, p := range extraPredicates {
+		newController = newController.WithEventFilter(p)
+	}
+	return newController.Complete(r)
 }

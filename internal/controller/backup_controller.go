@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -966,7 +967,11 @@ func startInstanceManagerBackup(
 }
 
 // SetupWithManager sets up this controller given a controller manager
-func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *BackupReconciler) SetupWithManager(
+	ctx context.Context,
+	mgr ctrl.Manager,
+	extraPredicates ...predicate.Predicate,
+) error {
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&apiv1.Backup{},
@@ -985,7 +990,11 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		return err
 	}
 
-	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr)
+	for _, p := range extraPredicates {
+		controllerBuilder = controllerBuilder.WithEventFilter(p)
+	}
+	controllerBuilder = controllerBuilder.
 		For(&apiv1.Backup{}).
 		Named("backup").
 		Watches(&apiv1.Cluster{},

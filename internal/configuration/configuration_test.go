@@ -133,6 +133,29 @@ var _ = Describe("Annotation and label inheritance", func() {
 		})
 	})
 
+	When("excluded namespaces are specified", func() {
+		It("matches exact names and glob patterns", func() {
+			config := Data{}
+			config.ReadConfigMap(map[string]string{
+				"EXCLUDE_NAMESPACES": "qa, team-*, prod",
+			})
+
+			Expect(config.IsNamespaceExcluded("qa")).To(BeTrue())
+			Expect(config.IsNamespaceExcluded("team-app")).To(BeTrue())
+			Expect(config.IsNamespaceExcluded("prod")).To(BeTrue())
+			Expect(config.IsNamespaceExcluded("dev")).To(BeFalse())
+		})
+
+		It("returns false for empty namespaces", func() {
+			config := Data{}
+			config.ReadConfigMap(map[string]string{
+				"EXCLUDE_NAMESPACES": "qa,*-tmp",
+			})
+
+			Expect(config.IsNamespaceExcluded("")).To(BeFalse())
+		})
+	})
+
 	Context("included plugin list", func() {
 		It("is empty by default", func() {
 			Expect(newDefaultConfig().GetIncludePlugins()).To(BeEmpty())

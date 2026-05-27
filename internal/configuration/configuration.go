@@ -93,6 +93,13 @@ type Data struct {
 	// Multiple namespaces can be specified separated by comma
 	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
 
+	// ExcludeNamespaces is a comma-separated list of namespace names or glob patterns
+	// the operator should ignore. It only applies when WatchNamespace is empty.
+	ExcludeNamespaces string `json:"excludeNamespaces" env:"EXCLUDE_NAMESPACES"`
+
+	// ExcludedNamespacePatterns holds the parsed exclusion list.
+	ExcludedNamespacePatterns []string `json:"-"`
+
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
@@ -208,6 +215,7 @@ func NewConfiguration() *Data {
 // ReadConfigMap reads the configuration from the environment and the passed in data map
 func (config *Data) ReadConfigMap(data map[string]string) {
 	configparser.ReadConfigMap(config, newDefaultConfig(), data)
+	config.ExcludedNamespacePatterns = cleanNamespaceList(config.ExcludeNamespaces)
 }
 
 // IsAnnotationInherited checks if an annotation with a certain name should
@@ -238,6 +246,15 @@ func (config *Data) GetInstancesRolloutDelay() time.Duration {
 // each namespace is separated by comma
 func (config *Data) WatchedNamespaces() []string {
 	return cleanNamespaceList(config.WatchNamespace)
+}
+
+// IsNamespaceExcluded checks if a namespace should be excluded from reconciliation.
+func (config *Data) IsNamespaceExcluded(namespace string) bool {
+	if namespace == "" || len(config.ExcludedNamespacePatterns) == 0 {
+		return false
+	}
+
+	return evaluateGlobPatterns(config.ExcludedNamespacePatterns, namespace)
 }
 
 // GetIncludePlugins gets the list of plugins to be always

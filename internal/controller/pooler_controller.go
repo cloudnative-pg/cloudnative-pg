@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // PoolerReconciler reconciles a Pooler object
@@ -64,6 +65,10 @@ type PoolerReconciler struct {
 
 // Reconcile implements the main reconciliation loop for pooler objects
 func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if configuration.Current.IsNamespaceExcluded(req.Namespace) {
+		return ctrl.Result{}, nil
+	}
+
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	var pooler apiv1.Pooler
@@ -143,12 +148,17 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager setup this controller inside the controller manager
-func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *PoolerReconciler) SetupWithManager(
+	ctx context.Context,
+	mgr ctrl.Manager,
+	maxConcurrentReconciles int,
+	extraPredicates ...predicate.Predicate,
+) error {
 	if err := r.createFieldIndexes(ctx, mgr); err != nil {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	newController := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.Pooler{}).
 		Named("pooler").
@@ -171,8 +181,11 @@ func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			&apiv1.ClusterImageCatalog{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogToPoolers()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+	for _, p := range extraPredicates {
+		newController = newController.WithEventFilter(p)
+	}
+	return newController.Complete(r)
 }
 
 // poolerImageCatalogKey is the field index key for Poolers referencing an image catalog.
