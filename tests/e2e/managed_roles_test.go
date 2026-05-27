@@ -224,9 +224,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By("verifying connectivity of the role configured with a pre-hashed password", func() {
 				rwService := services.GetReadWriteServiceName(clusterName)
-				AssertConnection(
-					namespace, rwService, postgres.PostgresDBName,
-					userWithHashedPassword, userWithHashedPasswordCleartext, env,
+				pgasserts.AssertConnection(
+					env, namespace, rwService, postgres.PostgresDBName,
+					userWithHashedPassword, userWithHashedPasswordCleartext,
 				)
 			})
 

@@ -41,9 +41,9 @@ import (
 	. "github.com/onsi/gomega"    //nolint
 )
 
-// AssertCustomMetricsResourcesExist applies the given sample file and
-// verifies it produces the expected number of ConfigMaps and Secrets
-// tagged with e2e=metrics.
+// AssertCustomMetricsResourcesExist creates the resources defined in the
+// given sample file and verifies they produce the expected number of
+// ConfigMaps and Secrets tagged with e2e=metrics.
 func AssertCustomMetricsResourcesExist(
 	env *environment.TestingEnvironment,
 	namespace, sampleFile string,

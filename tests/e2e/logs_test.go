@@ -108,7 +108,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 
 					// Gather the record containing the wrong query result
-					return logsasserts.AssertQueryRecord(
+					return logsasserts.HasQueryRecord(
 						logEntries,
 						errorTestQuery,
 						queryError.Error(),
@@ -146,7 +146,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				}
 
 				// Gather the record containing the wrong query result
-				return logsasserts.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
+				return logsasserts.HasQueryRecord(logEntries, errorTestQuery, queryError.Error(),
 						logpipe.LoggingCollectorRecordName),
 					nil
 			}, timeout).Should(BeTrue())
@@ -171,7 +171,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				Expect(logEntries).ToNot(BeEmpty())
 
 				// No record should be returned in this case
-				isQueryRecordContained := logsasserts.AssertQueryRecord(
+				isQueryRecordContained := logsasserts.HasQueryRecord(
 					logEntries,
 					queryError.Error(),
 					errorTestQuery,

@@ -231,7 +231,7 @@ func AssertStandbysFollowPromotion(
 
 	By(fmt.Sprintf("restoring full cluster functionality within %v seconds", timeout), func() {
 		elapsed := time.Since(start)
-		fmt.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
+		GinkgoWriter.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
 		Expect(elapsed.Seconds()).To(BeNumerically("<", timeout))
 	})
 }
