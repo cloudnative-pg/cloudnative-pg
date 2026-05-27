@@ -1070,6 +1070,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1192,6 +1193,7 @@ ownerReference
 parseable
 paru
 passfile
+passthrough
 passwd
 passwordSecret
 passwordStatus
@@ -1611,6 +1613,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode

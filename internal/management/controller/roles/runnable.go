@@ -34,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
@@ -319,6 +320,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 		}
 
 		databaseRole.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		databaseRole.passwordPassthrough = passwordSecret.passthrough
 		passVersion = passwordSecret.version
 	}
 
@@ -346,9 +348,10 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 
 // passwordSecret contains the decoded credentials from a Secret
 type passwordSecret struct {
-	username string
-	password string
-	version  string
+	username    string
+	password    string
+	version     string
+	passthrough bool
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
@@ -382,9 +385,10 @@ func getPassword(
 		return passwordSecret{}, err
 	}
 	return passwordSecret{
-			strings.TrimSpace(usernameFromSecret),
-			strings.TrimSpace(passwordFromSecret),
-			secret.GetResourceVersion(),
+			username:    strings.TrimSpace(usernameFromSecret),
+			password:    strings.TrimSpace(passwordFromSecret),
+			version:     secret.GetResourceVersion(),
+			passthrough: cnpgutils.IsPasswordPassthroughEnabled(&secret.ObjectMeta),
 		},
 		nil
 }

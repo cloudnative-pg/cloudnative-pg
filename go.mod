@@ -11,7 +11,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.5.1
 	github.com/cloudnative-pg/cnpg-i v0.5.0
-	github.com/cloudnative-pg/machinery v0.4.0
+	github.com/cloudnative-pg/machinery v0.5.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.3
@@ -103,6 +103,9 @@ require (
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.2.0 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/mod v0.35.0 // indirect

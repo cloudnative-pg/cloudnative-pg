@@ -176,6 +176,14 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/operatorVersion`
 :   Version of the operator.
 
+`cnpg.io/passwordPassthrough`
+:   When set to `enabled` on a basic-auth `Secret` consumed by the
+    operator (superuser, application user, or a managed-role password
+    secret), the operator forwards the password value verbatim in the
+    `CREATE`/`ALTER ROLE` statement instead of SCRAM-SHA-256 encoding
+    it operator-side. PostgreSQL then encodes the value according to its
+    own `password_encryption` setting. See [Opting out of operator-side encoding](declarative_role_management.md#opting-out-of-operator-side-encoding).
+
 `cnpg.io/pgControldata`
 :   Output of the `pg_controldata` command. This annotation replaces the old,
     deprecated `cnpg.io/hibernatePgControlData` annotation.

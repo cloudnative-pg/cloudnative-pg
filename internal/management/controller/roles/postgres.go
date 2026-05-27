@@ -117,6 +117,7 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while updating role %s with role reconciler: %w", role.Name, err)
 	}
+
 	var query strings.Builder
 
 	fmt.Fprintf(&query, "ALTER ROLE %s", pgx.Identifier{role.Name}.Sanitize())
@@ -124,8 +125,13 @@ func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
-	// will change no matter what, the next reconciliation cycle we would update the password
-	appendPasswordOption(role, &query)
+	// will change no matter what, the next reconciliation cycle would diff anyway.
+	// The new xmin is recorded in PasswordState after this call, so subsequent
+	// reconciles compare equal and do not re-issue ALTER ROLE despite the fresh
+	// SCRAM salt.
+	if err := appendPasswordOption(role, &query); err != nil {
+		return wrapErr(err)
+	}
 
 	if err := executeRoleStatement(ctx, db, query.String(), roleHasPassword(role)); err != nil {
 		return wrapErr(err)
@@ -148,7 +154,9 @@ func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	appendInRoleOptions(role, &query)
 	// Log before appending password to prevent password leakage in operator logs
 	contextLog.Debug("Creating", "query", query.String())
-	appendPasswordOption(role, &query)
+	if err := appendPasswordOption(role, &query); err != nil {
+		return wrapErr(err)
+	}
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
@@ -375,7 +383,12 @@ func roleHasPassword(role DatabaseRole) bool {
 	return !role.ignorePassword && role.password.Valid
 }
 
-func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
+// appendPasswordOption appends the PASSWORD and VALID UNTIL clauses of a
+// CREATE/ALTER ROLE statement to query. Cleartext passwords are
+// SCRAM-SHA-256 encoded so the SQL literal is never cleartext, unless
+// the Secret backing the role carries the passthrough annotation, in
+// which case the value is forwarded verbatim.
+func appendPasswordOption(role DatabaseRole, query *strings.Builder) error {
 	switch {
 	case role.ignorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of
@@ -384,7 +397,15 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	case !role.password.Valid:
 		query.WriteString(" PASSWORD NULL")
 	default:
-		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
+		literal := role.password.String
+		if !role.passwordPassthrough {
+			encoded, err := postgresutils.EnsureEncryptedPassword(literal)
+			if err != nil {
+				return err
+			}
+			literal = encoded
+		}
+		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(literal))
 	}
 
 	if role.ValidUntil.Valid {
@@ -396,4 +417,5 @@ func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 		}
 		fmt.Fprintf(query, " VALID UNTIL %s", pq.QuoteLiteral(value))
 	}
+	return nil
 }
