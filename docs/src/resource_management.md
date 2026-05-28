@@ -116,3 +116,55 @@ section in the PostgreSQL documentation.
     ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
     page from the Kubernetes documentation.
 :::
+
+## Sizing recommendations with the Vertical Pod Autoscaler
+
+The `Cluster` CRD exposes the `scale` subresource together with the label
+selector for its instance pods. This makes a `Cluster` a valid `targetRef` for
+the
+[Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) <!-- wokeignore:rule=master -->
+(VPA), so VPA can observe the instance pods and emit CPU and memory
+recommendations for them.
+
+We recommend running VPA in **recommendation-only** mode
+(`updatePolicy.updateMode: Off`). In this mode VPA only reports its
+recommendations, which an operator can then apply to `spec.resources` of the
+`Cluster` through a normal manifest update; CloudNativePG performs the rolling
+update of the instances using its usual switchover-aware procedure.
+
+Example targeting a `Cluster`:
+
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: my-cluster-vpa
+spec:
+  targetRef:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: my-cluster
+  updatePolicy:
+    updateMode: "Off"
+```
+
+:::warning
+Do not use `updateMode: Auto`, `Recreate`, or `Initial` against a
+CloudNativePG-managed `Cluster`. The operator owns the pod specification and
+will roll any instance whose `resources` drift from `spec.resources` of the
+`Cluster`. Combined with a VPA mode that actively mutates pods this can lead
+to ping-pong restarts, where VPA changes a pod's resources, CloudNativePG
+detects the drift and re-creates the pod with the declared values, and VPA
+changes them again. Apply the VPA recommendations to the `Cluster` manifest
+manually instead.
+:::
+
+## Horizontal scaling
+
+The `scale` subresource also exposes `spec.instances`, so a
+`HorizontalPodAutoscaler` can change the number of instances in a `Cluster`.
+For PostgreSQL this only adds or removes standby replicas — it does not
+relieve write load on the primary — and the chosen metrics need to make sense
+for a stateful database (CPU/memory typically do not). Review the impact on
+replication and quorum carefully before enabling HPA against a database
+cluster.
