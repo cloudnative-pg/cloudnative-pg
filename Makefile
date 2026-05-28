@@ -132,9 +132,22 @@ test-race: generate fmt vet manifests envtest ## Run tests enabling race detecti
 	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
 	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
-fuzz: ## Run native fuzzing targets.
-	go test -run=^$$ ./pkg/postgres -fuzz=FuzzCreatePostgresqlConfigurationSanitization -fuzztime=$(FUZZ_TIME)
-	go test -run=^$$ ./internal/configuration/... -fuzz=FuzzConfigurationParsing -fuzztime=$(FUZZ_TIME)
+.PHONY: fuzz
+fuzz: ## Run every native fuzz target discovered in the tree.
+	trap 'exit 130' INT ;\
+	rc=0 ;\
+	pairs=$$(go test -list '^Fuzz' ./... | awk '\
+		/^ok[ \t]/ { for (i in p) print $$2, p[i]; delete p; next } \
+		/^Fuzz/    { p[NR] = $$0 }') ;\
+	if [ -z "$$pairs" ]; then \
+		echo "No fuzz targets found." ;\
+		exit 0 ;\
+	fi ;\
+	while read -r pkg name; do \
+		echo "==> $$pkg::$$name (FUZZ_TIME=$(FUZZ_TIME))" ;\
+		go test -run=^$$ "$$pkg" -fuzz="^$$name$$" -fuzztime=$(FUZZ_TIME) || rc=$$? ;\
+	done <<< "$$pairs" ;\
+	exit $$rc
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	CLUSTER_ENGINE=kind hack/e2e/run-e2e-local.sh

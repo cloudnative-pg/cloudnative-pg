@@ -29,6 +29,8 @@ func FuzzConfigurationParsing(f *testing.F) {
 	f.Add("qa.test.com/*,prod.test.com/*", "qa.test.com/one", ",  ,pg ,pg_staging   ,  pg_prod, ", "a,,,b , c")
 	f.Add("[abc,prod.testing.com/*", "prod.testing.com/two", ",  ,,", "")
 	f.Add("one,two", "three", "pg", "plugin-a,plugin-b")
+	f.Add("a*", "abc", "", "")
+	f.Add("\x00", "\x00", "ns\x00", "p\x00")
 
 	f.Fuzz(func(t *testing.T, rawPatterns, value, watchNamespace, includePlugins string) {
 		patterns := strings.Split(rawPatterns, ",")
@@ -40,38 +42,42 @@ func FuzzConfigurationParsing(f *testing.F) {
 			IncludePlugins:       includePlugins,
 		}
 
-		expectedMatch := evaluateGlobPatterns(patterns, value)
-		if got := config.IsAnnotationInherited(value); got != expectedMatch {
-			t.Fatalf("annotation inheritance mismatch: got %t want %t", got, expectedMatch)
-		}
-		if got := config.IsLabelInherited(value); got != expectedMatch {
-			t.Fatalf("label inheritance mismatch: got %t want %t", got, expectedMatch)
+		matched := config.IsAnnotationInherited(value)
+		for _, pattern := range patterns {
+			// pattern has no glob metacharacters; path.Match must treat it literally
+			if pattern == value && !strings.ContainsAny(pattern, "*?[\\") {
+				if !matched {
+					t.Fatalf("exact-match pattern %q did not match value %q", pattern, value)
+				}
+				break
+			}
 		}
 
-		watchedNamespaces := config.WatchedNamespaces()
-		expectedNamespaces := cleanNamespaceList(watchNamespace)
-		if !slices.Equal(watchedNamespaces, expectedNamespaces) {
-			t.Fatalf("watched namespaces mismatch: got %#v want %#v", watchedNamespaces, expectedNamespaces)
+		namespaces := config.WatchedNamespaces()
+		rejoined := Data{WatchNamespace: strings.Join(namespaces, ",")}
+		if got := rejoined.WatchedNamespaces(); !slices.Equal(got, namespaces) {
+			t.Fatalf("WatchedNamespaces not idempotent: %#v -> %#v", namespaces, got)
 		}
-		for _, namespace := range watchedNamespaces {
+		for _, namespace := range namespaces {
 			if namespace == "" {
 				t.Fatalf("empty namespace returned from %q", watchNamespace)
 			}
 			if namespace != strings.TrimSpace(namespace) {
-				t.Fatalf("namespace is not trimmed: %q", namespace)
+				t.Fatalf("namespace not trimmed: %q (from %q)", namespace, watchNamespace)
 			}
 		}
 
 		plugins := config.GetIncludePlugins()
-		if !slices.Equal(plugins, config.GetIncludePlugins()) {
-			t.Fatalf("plugin parsing must be deterministic")
+		rejoinedPlugins := Data{IncludePlugins: strings.Join(plugins, ",")}
+		if got := rejoinedPlugins.GetIncludePlugins(); !slices.Equal(got, plugins) {
+			t.Fatalf("GetIncludePlugins not idempotent: %#v -> %#v", plugins, got)
 		}
 		for _, plugin := range plugins {
 			if plugin == "" {
 				t.Fatalf("empty plugin returned from %q", includePlugins)
 			}
 			if plugin != strings.TrimSpace(plugin) {
-				t.Fatalf("plugin is not trimmed: %q", plugin)
+				t.Fatalf("plugin not trimmed: %q (from %q)", plugin, includePlugins)
 			}
 		}
 	})

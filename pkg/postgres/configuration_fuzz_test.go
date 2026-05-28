@@ -19,12 +19,16 @@ SPDX-License-Identifier: Apache-2.0
 
 package postgres
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-func FuzzCreatePostgresqlConfigurationSanitization(f *testing.F) { //nolint: gocognit
+func FuzzCreatePostgresqlConfigurationSanitization(f *testing.F) {
 	f.Add(uint8(17), "off", "target_name", "128MB", "internal'value", true, false, false, false, false)
 	f.Add(uint8(14), "on", "", "256MB", "", false, true, true, false, false)
 	f.Add(uint8(16), "off", "restore_target", "512MB", "quoted'value", false, false, false, true, true)
+	f.Add(uint8(15), "on", "", "64MB", "with\nnewline\tand\\backslash", true, false, false, false, true)
 
 	f.Fuzz(func(
 		t *testing.T,
@@ -49,68 +53,110 @@ func FuzzCreatePostgresqlConfigurationSanitization(f *testing.F) { //nolint: goc
 			},
 		})
 
-		if got := cfg.GetConfig("shared_buffers"); got != sharedBuffers {
-			t.Fatalf("non-fixed parameter changed: got %q want %q", got, sharedBuffers)
-		}
+		checkFixedSettings(t, cfg, sslValue, recoveryTargetName, includingMandatory, preserveFixedSettingsFromUser)
+		checkArchiveMode(t, cfg, isWalArchivingDisabled, isReplicaCluster)
+		checkAlterSystem(t, cfg, majorVersion, includingMandatory, alterSystemEnabled)
 
-		switch {
-		case includingMandatory:
-			if got := cfg.GetConfig("ssl"); got != "on" {
-				t.Fatalf("ssl must be sanitized to mandatory value, got %q", got)
-			}
-			if got := cfg.GetConfig("recovery_target_name"); got != "" {
-				t.Fatalf("recovery_target_name must be dropped, got %q", got)
-			}
-		case preserveFixedSettingsFromUser:
-			if got := cfg.GetConfig("ssl"); got != sslValue {
-				t.Fatalf("ssl user value not preserved: got %q want %q", got, sslValue)
-			}
-			if got := cfg.GetConfig("recovery_target_name"); got != recoveryTargetName {
-				t.Fatalf(
-					"recovery_target_name user value not preserved: got %q want %q",
-					got,
-					recoveryTargetName,
-				)
-			}
-		default:
-			if got := cfg.GetConfig("ssl"); got != "" {
-				t.Fatalf("ssl should be removed when fixed settings are not preserved, got %q", got)
-			}
-			if got := cfg.GetConfig("recovery_target_name"); got != "" {
-				t.Fatalf("recovery_target_name should be removed, got %q", got)
-			}
-		}
-
-		expectedArchiveMode := "on"
-		switch {
-		case isWalArchivingDisabled:
-			expectedArchiveMode = "off"
-		case isReplicaCluster:
-			expectedArchiveMode = "always"
-		}
-		if got := cfg.GetConfig("archive_mode"); got != expectedArchiveMode {
-			t.Fatalf("archive_mode mismatch: got %q want %q", got, expectedArchiveMode)
-		}
-
-		if includingMandatory && majorVersion >= 17 {
-			want := "off"
-			if alterSystemEnabled {
-				want = "on"
-			}
-			if got := cfg.GetConfig("allow_alter_system"); got != want {
-				t.Fatalf("allow_alter_system mismatch: got %q want %q", got, want)
-			}
-		}
-
+		cfg.OverwriteConfig("custom.fuzz_value", internalValue)
 		_, sha1 := CreatePostgresqlConfFile(cfg)
 		cfg.OverwriteConfig("cnpg.fuzz_internal", internalValue)
-		_, sha2 := CreatePostgresqlConfFile(cfg)
-
+		rendered, sha2 := CreatePostgresqlConfFile(cfg)
 		if sha1 == "" || sha2 == "" {
 			t.Fatalf("empty config hash")
 		}
 		if sha1 != sha2 {
 			t.Fatalf("cnpg.* entries must not affect config hash")
 		}
+
+		checkRenderedConfWellFormed(t, rendered)
 	})
+}
+
+func checkFixedSettings(
+	t *testing.T,
+	cfg *PgConfiguration,
+	sslValue, recoveryTargetName string,
+	includingMandatory, preserveFixedSettingsFromUser bool,
+) {
+	t.Helper()
+	switch {
+	case includingMandatory:
+		if got := cfg.GetConfig("ssl"); got != "on" {
+			t.Fatalf("ssl must be sanitized to mandatory value, got %q", got)
+		}
+		if got := cfg.GetConfig("recovery_target_name"); got != "" {
+			t.Fatalf("recovery_target_name must be dropped, got %q", got)
+		}
+	case preserveFixedSettingsFromUser:
+		if got := cfg.GetConfig("ssl"); got != sslValue {
+			t.Fatalf("ssl user value not preserved: got %q want %q", got, sslValue)
+		}
+		if got := cfg.GetConfig("recovery_target_name"); got != recoveryTargetName {
+			t.Fatalf("recovery_target_name user value not preserved: got %q want %q", got, recoveryTargetName)
+		}
+	default:
+		if got := cfg.GetConfig("ssl"); got != "" {
+			t.Fatalf("ssl should be removed when fixed settings are not preserved, got %q", got)
+		}
+		if got := cfg.GetConfig("recovery_target_name"); got != "" {
+			t.Fatalf("recovery_target_name should be removed, got %q", got)
+		}
+	}
+}
+
+func checkArchiveMode(t *testing.T, cfg *PgConfiguration, isWalArchivingDisabled, isReplicaCluster bool) {
+	t.Helper()
+	want := "on"
+	switch {
+	case isWalArchivingDisabled:
+		want = "off"
+	case isReplicaCluster:
+		want = "always"
+	}
+	if got := cfg.GetConfig("archive_mode"); got != want {
+		t.Fatalf("archive_mode mismatch: got %q want %q", got, want)
+	}
+}
+
+func checkAlterSystem(
+	t *testing.T,
+	cfg *PgConfiguration,
+	majorVersion int,
+	includingMandatory, alterSystemEnabled bool,
+) {
+	t.Helper()
+	if !includingMandatory || majorVersion < 17 {
+		return
+	}
+	want := "off"
+	if alterSystemEnabled {
+		want = "on"
+	}
+	if got := cfg.GetConfig("allow_alter_system"); got != want {
+		t.Fatalf("allow_alter_system mismatch: got %q want %q", got, want)
+	}
+}
+
+// checkRenderedConfWellFormed enforces the postgresql.conf injection
+// invariant: a user-controlled value cannot break out of its `key = 'value'`
+// line through an unescaped newline or quote.
+func checkRenderedConfWellFormed(t *testing.T, rendered string) {
+	t.Helper()
+	for i, line := range strings.Split(rendered, "\n") {
+		if line == "" {
+			continue
+		}
+		eq := strings.Index(line, " = ")
+		if eq < 0 {
+			t.Fatalf("line %d has no `key = value` separator: %q", i, line)
+		}
+		key := line[:eq]
+		value := line[eq+len(" = "):]
+		if key == "" || strings.ContainsAny(key, " \t'\"") {
+			t.Fatalf("line %d has malformed key %q", i, key)
+		}
+		if len(value) < 2 || value[0] != '\'' || value[len(value)-1] != '\'' {
+			t.Fatalf("line %d value not single-quoted: %q", i, value)
+		}
+	}
 }
