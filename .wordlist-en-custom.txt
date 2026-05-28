@@ -203,6 +203,7 @@ GoogleCredentials
 Grafana
 GrantUsageSpecType
 HH
+HPA
 HashiCorp
 HistoryTags
 Homebrew
@@ -564,6 +565,7 @@ VLDBs
 VM
 VMs
 VOLNAME
+VPA
 ValidationError
 VirtualBox
 VolumeSnapshot

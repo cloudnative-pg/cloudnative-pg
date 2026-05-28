@@ -181,7 +181,7 @@ var _ = Describe("cluster_status unit tests", func() {
 	})
 
 	It("produces a scale-subresource selector matching managed instance pods", func() {
-		// The scale subresource uses .status.selectorLabels (set in updateResourceStatus)
+		// The scale subresource uses .status.selector (set in updateResourceStatus)
 		// so VPA/HPA can discover instance pods. The format must remain a valid serialized
 		// label selector and must match the labels actually applied to instance pods.
 		namespace := newFakeNamespace(env.client)

@@ -7411,11 +7411,12 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
-              selectorLabels:
+              selector:
                 description: |-
-                  SelectorLabels is the label query used to select pods managed by this cluster.
-                  This field is populated by the operator and used by the scale sub-resource
-                  to enable VPA (Vertical Pod Autoscaler) support.
+                  Selector is the serialized form of the label selector that identifies
+                  the pods managed by this cluster. Populated by the operator and exposed
+                  through the scale sub-resource so an autoscaler (such as HPA or VPA)
+                  can discover the managed instance pods.
                 type: string
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
@@ -7510,7 +7511,7 @@ spec:
     storage: true
     subresources:
       scale:
-        labelSelectorPath: .status.selectorLabels
+        labelSelectorPath: .status.selector
         specReplicasPath: .spec.instances
         statusReplicasPath: .status.instances
       status: {}
