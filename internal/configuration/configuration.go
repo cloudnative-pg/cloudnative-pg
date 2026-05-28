@@ -175,6 +175,12 @@ type Data struct {
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// WEBHOOK_PREFIX is an optional setting that if specified will be
+	// prepended to the object names of the mutating and validating webhooks. i.e.
+	// they will be created as `${WEBHOOK_PREFIX}cnpg-mutating-webhook-configuration`
+	// and `${WEBHOOK_PREFIX}cnpg-validating-webhook-configuration`
+	WebhookPrefix string `json:"webhookPrefix" env:"WEBHOOK_PREFIX"`
 }
 
 // Current is the configuration used by the operator
