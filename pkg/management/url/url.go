@@ -21,7 +21,9 @@ SPDX-License-Identifier: Apache-2.0
 package url
 
 import (
-	"fmt"
+	"net"
+	neturl "net/url"
+	"strconv"
 )
 
 const (
@@ -78,9 +80,10 @@ func Local(path string, port int32) string {
 
 // Build builds an url given the hostname and the path, pointing to the status web server
 func Build(scheme, hostname, path string, port int32) string {
-	// If path already starts with '/' we remove it
-	if path[0] == '/' {
-		path = path[1:]
+	url := neturl.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(hostname, strconv.Itoa(int(port))),
+		Path:   path,
 	}
-	return fmt.Sprintf("%s://%s:%d/%s", scheme, hostname, port, path)
+	return url.String()
 }
