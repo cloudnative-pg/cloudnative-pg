@@ -304,7 +304,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			if err != nil {
 				continue
 			}
-			var statusFields map[string]interface{}
+			var statusFields map[string]any
 			err = json.Unmarshal([]byte(status), &statusFields)
 			if err != nil {
 				continue

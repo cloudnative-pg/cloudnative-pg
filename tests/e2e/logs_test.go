@@ -236,7 +236,7 @@ var _ = Describe("JSON log output unit tests", Label(tests.LabelObservability), 
 		"\"detail\":\"\",\"hint\":\"\",\"internal_query\":\"\",\"internal_query_pos\":\"\",\"context\":\"\"," +
 		"\"query\":\"selecct 1\\nwith newlines\\n\",\"query_pos\":\"1\",\"location\":\"\",\"application_name\":\"psql\"," +
 		"\"backend_type\":\"client backend\"}}"
-	var parsedRecord map[string]interface{}
+	var parsedRecord map[string]any
 	err := json.Unmarshal([]byte(record), &parsedRecord)
 	Expect(err).ToNot(HaveOccurred())
 	It("Can check valid logging_collector record for query", func() {
