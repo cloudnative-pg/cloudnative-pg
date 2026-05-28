@@ -25,9 +25,21 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
+
+// primaryLeasePredicate enqueues the parent Cluster only when the owned Lease
+// is deleted. Renew/holder updates happen every few seconds and would otherwise
+// trigger a reconcile storm.
+var primaryLeasePredicate = predicate.Funcs{
+	CreateFunc:  func(event.CreateEvent) bool { return false },
+	UpdateFunc:  func(event.UpdateEvent) bool { return false },
+	DeleteFunc:  func(event.DeleteEvent) bool { return true },
+	GenericFunc: func(event.GenericEvent) bool { return false },
+}
 
 // reconcilePrimaryLease ensures a Lease object named after the cluster exists and is owned by it.
 // The instance manager uses this lease as a primary-election mutex.
