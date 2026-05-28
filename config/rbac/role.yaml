@@ -110,7 +110,9 @@ rules:
   verbs:
   - create
   - get
+  - list
   - update
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
