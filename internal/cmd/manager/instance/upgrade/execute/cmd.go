@@ -301,6 +301,26 @@ func (ui upgradeInfo) upgradeSubCommand(ctx context.Context, instance *postgres.
 
 	contextLogger.Info("Upgrade completed successfully")
 
+	return logExtensionUpdateScript(ctx, ui.pgData, instance.GetPodName())
+}
+
+func logExtensionUpdateScript(ctx context.Context, pgData, primaryPodName string) error {
+	contextLogger := log.FromContext(ctx)
+
+	scriptPath := path.Join(pgData, "update_extensions.sql")
+	exists, err := fileutils.FileExists(scriptPath)
+	if err != nil {
+		return fmt.Errorf("checking for update_extensions.sql at %q: %w", scriptPath, err)
+	}
+	if exists {
+		contextLogger.Info(
+			"pg_upgrade emitted update_extensions.sql in PGDATA on the primary. "+
+				"Once the cluster is back online, review the script and apply extension updates as needed.",
+			"scriptPath", scriptPath,
+			"primaryPodName", primaryPodName,
+		)
+	}
+
 	return nil
 }
 
