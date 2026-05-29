@@ -25,7 +25,6 @@ import (
 	"os"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,28 +84,6 @@ func GetVolumeSnapshot(
 		return nil, err
 	}
 	return volumeSnapshot, nil
-}
-
-// AssertBackupConditionInClusterStatus check that the backup condition in the Cluster's Status
-// eventually returns true
-func AssertBackupConditionInClusterStatus(
-	ctx context.Context,
-	crudClient client.Client,
-	namespace, clusterName string,
-) {
-	ginkgo.By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
-		gomega.Eventually(func() (string, error) {
-			getBackupCondition, err := GetConditionsInClusterStatus(
-				ctx, crudClient,
-				namespace, clusterName,
-				apiv1.ConditionBackup,
-			)
-			if err != nil {
-				return "", err
-			}
-			return string(getBackupCondition.Status), nil
-		}, 300, 5).Should(gomega.BeEquivalentTo("True"))
-	})
 }
 
 // CreateOnDemandBackupViaKubectlPlugin uses the kubectl plugin to create a backup
