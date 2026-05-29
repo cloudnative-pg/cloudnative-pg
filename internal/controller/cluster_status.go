@@ -58,13 +58,42 @@ type managedResources struct {
 	jobs      batchv1.JobList
 }
 
-// Count the number of jobs that are still running
-func (resources *managedResources) runningJobNames() []string {
+// Count the number of jobs that are still running.
+//
+// A Job whose instance PGDATA PVC is missing AND whose serial is not yet
+// covered by cluster.Status.LatestGeneratedNode is excluded: its Pod cannot
+// make progress without a volume to mount, and the instance-creation path
+// must reach the adoption branch to create the missing PVC. Treating it as
+// "running" would wedge the reconciler in the 5s requeue loop.
+//
+// When the PVC is missing from cache but the serial is already covered by
+// LatestGeneratedNode, we know the PVC exists on the API server (the
+// counter persists only after both the Job and the PVC are committed);
+// the PVC informer is simply stale, so the Job still counts as running.
+func (resources *managedResources) runningJobNames(cluster *apiv1.Cluster) []string {
+	pvcNames := make(map[string]struct{}, len(resources.pvcs.Items))
+	for _, pvc := range resources.pvcs.Items {
+		pvcNames[pvc.Name] = struct{}{}
+	}
 	result := make([]string, 0, len(resources.jobs.Items))
 	for _, job := range resources.jobs.Items {
-		if !utils.JobHasOneCompletion(job) {
-			result = append(result, job.Name)
+		if utils.JobHasOneCompletion(job) {
+			continue
 		}
+		instanceName, hasLabel := job.Labels[utils.InstanceNameLabelName]
+		if !hasLabel {
+			result = append(result, job.Name)
+			continue
+		}
+		if _, hasPVC := pvcNames[instanceName]; hasPVC {
+			result = append(result, job.Name)
+			continue
+		}
+		if serial, err := specs.GetNodeSerial(job.ObjectMeta); err == nil &&
+			serial > cluster.Status.LatestGeneratedNode {
+			continue
+		}
+		result = append(result, job.Name)
 	}
 	return result
 }
