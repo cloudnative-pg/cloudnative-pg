@@ -153,7 +153,7 @@ func checkRenderedConfWellFormed(t *testing.T, rendered string) {
 		if key == "" || strings.ContainsAny(key, " \t'\"") {
 			t.Fatalf("line %d has malformed key %q", i, key)
 		}
-		if len(value) < 2 || value[0] != '\'' || value[len(value)-1] != '\'' {
+		if len(value) < 2 || !strings.HasPrefix(value, "'") || !strings.HasSuffix(value, "'") {
 			t.Fatalf("line %d value not single-quoted: %q", i, value)
 		}
 	}
