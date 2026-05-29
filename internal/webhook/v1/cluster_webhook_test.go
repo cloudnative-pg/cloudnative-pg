@@ -1703,6 +1703,39 @@ var _ = Describe("recovery target", func() {
 		Expect(v.validateRecoveryTarget(cluster)).To(BeEmpty())
 	})
 
+	It("allows TargetImmediate without BackupID (auto-selects latest backup)", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						RecoveryTarget: &apiv1.RecoveryTarget{
+							TargetImmediate: ptr.To(true),
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateRecoveryTarget(cluster)).To(BeEmpty())
+	})
+
+	It("allows TargetImmediate with explicit BackupID", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						RecoveryTarget: &apiv1.RecoveryTarget{
+							TargetImmediate: ptr.To(true),
+							BackupID:        "20220616T031500",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(v.validateRecoveryTarget(cluster)).To(BeEmpty())
+	})
+
 	When("recoveryTLI is specified", func() {
 		It("allows 'latest'", func() {
 			cluster := &apiv1.Cluster{
