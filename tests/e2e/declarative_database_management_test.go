@@ -27,6 +27,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
@@ -73,7 +76,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster and declarative database CRD", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 		})
 
@@ -104,7 +107,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				databaseObjectName string
 			)
 			By("applying Database CRD manifest", func() {
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -128,8 +131,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
-					databaseExistsQuery(dbname), "t"), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					pgasserts.DatabaseExistsQuery(dbname), "t"),
+					30).Should(Succeed())
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
@@ -142,8 +146,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
-					databaseExistsQuery(dbname), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+					pgasserts.DatabaseExistsQuery(dbname), pgasserts.BoolPGOutput(retainOnDeletion)),
+					30).Should(Succeed())
 			})
 		}
 
@@ -181,14 +186,14 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 			By("creating the database", func() {
 				databaseManifest := fixturesDir +
 					"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
 				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
-				CreateResourceFromFile(namespace, databaseManifest)
+				resources.CreateResourceFromFile(env, namespace, databaseManifest)
 			})
 			By("ensuring the database is reconciled successfully", func() {
 				// get database object

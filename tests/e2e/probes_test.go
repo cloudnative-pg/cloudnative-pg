@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -87,7 +88,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		})
 
 		By("getting the default probes configuration", func() {
@@ -120,9 +121,10 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		})
 
 		By("waiting for the cluster to restart", func() {
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 120)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 		})
 
 		By("checking the applied settings", func() {
@@ -162,9 +164,10 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		})
 
 		By("waiting for the cluster to restart", func() {
-			AssertClusterEventuallyReachesPhase(namespace, clusterName,
+			clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 				[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 120)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 		})
 
 		By("checking the applied settings", func() {

@@ -30,6 +30,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
@@ -62,7 +65,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		rwService := services.GetReadWriteServiceName(clusterName)
 
@@ -75,16 +78,16 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		By("update user application password", func() {
 			const newPassword = "eeh2Zahohx"
 
-			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertConnection(namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword, env)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "password", newPassword, 30)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.AppDBName, postgres.AppUser, newPassword)
 		})
 
 		By("fail updating user application password with wrong user in secret", func() {
 			const newUser = "postgres"
 			const newPassword = "newpassword"
 
-			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertUpdateSecret("username", newUser, appSecretName, namespace, clusterName, 30, env)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "password", newPassword, 30)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "username", newUser, 30)
 
 			timeout := time.Second * 10
 			dsn := services.CreateDSN(rwService, newUser, postgres.AppDBName, newPassword, services.Require, 5432)
@@ -95,7 +98,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			Expect(err).To(HaveOccurred())
 
 			// Revert the username change
-			AssertUpdateSecret("username", postgres.AppUser, appSecretName, namespace, clusterName, 30, env)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, appSecretName, "username", postgres.AppUser, 30)
 		})
 
 		By("update superuser password", func() {
@@ -119,8 +122,8 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			}, 60).Should(Succeed())
 
 			const newPassword = "fi6uCae7"
-			AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
-			AssertConnection(namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword, env)
+			secretsasserts.AssertUpdateSecret(env, namespace, clusterName, superUserSecretName, "password", newPassword, 30)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, postgres.PostgresUser, newPassword)
 		})
 	})
 })
@@ -146,7 +149,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		Expect(err).ToNot(HaveOccurred())
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		rwService := services.GetReadWriteServiceName(clusterName)
 
@@ -205,7 +208,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 				clusterName, namespace, apiv1.SuperUserSecretSuffix,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			AssertConnection(namespace, rwService, postgres.PostgresDBName, superUser, superUserPass, env)
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, superUser, superUserPass)
 		})
 
 		By("disable superuser access", func() {

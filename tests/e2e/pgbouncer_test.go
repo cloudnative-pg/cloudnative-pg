@@ -25,6 +25,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -57,32 +60,34 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Expect(err).ToNot(HaveOccurred())
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 		})
 		JustAfterEach(func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, primaryPod)
+			pgbouncerasserts.DeleteTableUsingPgBouncerService(
+				env, namespace, clusterName, poolerBasicAuthRWSampleFile, primaryPod,
+			)
 		})
 
 		It("can connect to Postgres via pgbouncer service using basic authentication", func() {
 			By("setting up read write type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
-				assertPgBouncerPoolerDeploymentStrategy(namespace, poolerBasicAuthRWSampleFile, "25%", "25%")
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerBasicAuthRWSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerDeploymentStrategy(env, namespace, poolerBasicAuthRWSampleFile, "25%", "25%")
 			})
 
 			By("setting up read only type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile, 1)
-				assertPgBouncerPoolerDeploymentStrategy(namespace, poolerBasicAuthROSampleFile, "24%", "24%")
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerBasicAuthROSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerDeploymentStrategy(env, namespace, poolerBasicAuthROSampleFile, "24%", "24%")
 			})
 
 			By("verifying read and write connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthRWSampleFile, true)
 			})
 
 			By("verifying read connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthROSampleFile, false)
 			})
 
@@ -97,50 +102,50 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 
 		It("can connect to Postgres via pgbouncer service using tls certificates", func() {
 			By("setting up read write type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateRWSampleFile, 1)
 			})
 
 			By("setting up read only type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateROSampleFile, 1)
 			})
 
 			By("verifying read and write connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerCertificateRWSampleFile, true)
 			})
 
 			By("verifying read connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerCertificateROSampleFile, false)
 			})
 		})
 
 		It("should recreate after deleting pgbouncer pod", func() {
-			assertPodIsRecreated(namespace, poolerBasicAuthRWSampleFile)
+			pgbouncerasserts.AssertPodIsRecreated(env, namespace, poolerBasicAuthRWSampleFile)
 			By("verifying pgbouncer read write service connections after deleting pod", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthRWSampleFile, true)
 			})
 
-			assertPodIsRecreated(namespace, poolerBasicAuthROSampleFile)
+			pgbouncerasserts.AssertPodIsRecreated(env, namespace, poolerBasicAuthROSampleFile)
 			By("verifying pgbouncer read only service connections after pod deleting", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthROSampleFile, false)
 			})
 		})
 
 		It("should recreate after deleting pgbouncer deployment", func() {
-			assertDeploymentIsRecreated(namespace, poolerBasicAuthRWSampleFile)
+			pgbouncerasserts.AssertDeploymentIsRecreated(env, namespace, poolerBasicAuthRWSampleFile)
 			By("verifying pgbouncer read write service connections after deleting deployment", func() {
 				// verify read and write connections after pgbouncer deployment deletion
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthRWSampleFile, true)
 			})
 
-			assertDeploymentIsRecreated(namespace, poolerBasicAuthROSampleFile)
+			pgbouncerasserts.AssertDeploymentIsRecreated(env, namespace, poolerBasicAuthROSampleFile)
 			By("verifying pgbouncer read only service connections after deleting deployment", func() {
 				// verify read and write connections after pgbouncer deployment deletion
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerBasicAuthROSampleFile, false)
 			})
 		})
@@ -165,30 +170,30 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create certificates secret for server
-			CreateAndAssertServerCertificatesSecrets(namespace, clusterName,
+			secretsasserts.CreateAndAssertServerCertificatesSecrets(env, namespace, clusterName,
 				caSecName, tlsSecName, true)
 
 			// Create certificates secret for client
-			CreateAndAssertClientCertificatesSecrets(namespace, clusterName,
+			secretsasserts.CreateAndAssertClientCertificatesSecrets(env, namespace, clusterName,
 				caSecNameClient, tlsSecNameClient, "app-user-cert", true)
 
-			AssertCreateCluster(namespace, clusterName, sampleFileWithCertificate, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithCertificate)
 
 			By("setting up read write type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateRWSampleFile, 1)
 			})
 
 			By("setting up read only type pgbouncer pooler", func() {
-				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile, 1)
+				pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerCertificateROSampleFile, 1)
 			})
 
 			By("verifying read and write connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerCertificateRWSampleFile, true)
 			})
 
 			By("verifying read connections using pgbouncer service", func() {
-				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				pgbouncerasserts.AssertReadWriteConnectionUsingPgBouncerService(env, namespace, clusterName,
 					poolerCertificateROSampleFile, false)
 			})
 		})

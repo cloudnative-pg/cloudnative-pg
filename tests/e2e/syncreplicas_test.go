@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
@@ -103,7 +104,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// First we check that the starting situation is the expected one
 			By("checking that we have the correct amount of sync replicas", func() {
@@ -171,8 +172,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			AssertClusterIsReady(namespace, clusterName, 30, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, 30)
 
 			By("checking that have 2 quorum-based replicas", func() {
 				getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -195,7 +196,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			By("verifying we have 2 quorum-based replicas", func() {
 				getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -252,7 +253,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 				By("verifying we have 2 quorum-based replicas", func() {
 					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
