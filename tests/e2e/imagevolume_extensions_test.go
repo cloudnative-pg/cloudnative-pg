@@ -35,6 +35,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -202,9 +205,10 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			g.Expect(env.Client.Update(env.Ctx, database)).To(Succeed())
 		}, 60, 5).Should(Succeed())
 
-		AssertClusterEventuallyReachesPhase(namespace, clusterName,
+		clusterasserts.AssertClusterEventuallyReachesPhase(env, namespace, clusterName,
 			[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 300)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick])
 
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -221,8 +225,8 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			Expect(err).ToNot(HaveOccurred())
 			databaseName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 			Expect(err).NotTo(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
-			CreateResourceFromFile(namespace, databaseManifest)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
+			resources.CreateResourceFromFile(env, namespace, databaseManifest)
 		})
 
 		By("checking volumes and volumeMounts", func() {
@@ -255,8 +259,17 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
+			pgasserts.QueryMatchExpectationPredicate(
+				env, primary, postgresutils.PostgresDBName,
+				"SHOW hnsw.iterative_scan", "on",
+			)
+			pgasserts.QueryMatchExpectationPredicate(
+				env,
+				primary,
+				postgresutils.PostgresDBName,
+				"SHOW ivfflat.iterative_scan",
+				"on",
+			)
 		})
 
 		By("verifying the extension's usage ", func() {
@@ -350,8 +363,8 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			clusterutils.AddTopologySpreadConstraint(cluster)
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
-			CreateResourceFromFile(namespace, databaseManifest)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+			resources.CreateResourceFromFile(env, namespace, databaseManifest)
 		})
 
 		By("checking volumes and volumeMounts", func() {
@@ -396,8 +409,17 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW hnsw.iterative_scan", "on")
-			QueryMatchExpectationPredicate(primary, postgresutils.PostgresDBName, "SHOW ivfflat.iterative_scan", "on")
+			pgasserts.QueryMatchExpectationPredicate(
+				env, primary, postgresutils.PostgresDBName,
+				"SHOW hnsw.iterative_scan", "on",
+			)
+			pgasserts.QueryMatchExpectationPredicate(
+				env,
+				primary,
+				postgresutils.PostgresDBName,
+				"SHOW ivfflat.iterative_scan",
+				"on",
+			)
 		})
 
 		By("verifying the extension's usage ", func() {

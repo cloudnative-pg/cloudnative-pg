@@ -29,6 +29,8 @@ import (
 
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -59,9 +61,9 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, cnpgCluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, cnpgCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, cnpgCluster)
 
-			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
+			pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerBasicAuthRWSampleFile, 1)
 
 			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerBasicAuthRWSampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -121,9 +123,9 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, cnpgCluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, cnpgCluster, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, cnpgCluster)
 
-			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerMetricsTLSRWSampleFile, 1)
+			pgbouncerasserts.AssertPgBouncerPoolerIsSetUp(env, namespace, poolerMetricsTLSRWSampleFile, 1)
 
 			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerMetricsTLSRWSampleFile)
 			Expect(err).ToNot(HaveOccurred())
