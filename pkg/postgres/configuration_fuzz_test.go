@@ -146,12 +146,10 @@ func checkRenderedConfWellFormed(t *testing.T, rendered string) {
 		if line == "" {
 			continue
 		}
-		eq := strings.Index(line, " = ")
-		if eq < 0 {
+		key, value, ok := strings.Cut(line, " = ")
+		if !ok {
 			t.Fatalf("line %d has no `key = value` separator: %q", i, line)
 		}
-		key := line[:eq]
-		value := line[eq+len(" = "):]
 		if key == "" || strings.ContainsAny(key, " \t'\"") {
 			t.Fatalf("line %d has malformed key %q", i, key)
 		}
