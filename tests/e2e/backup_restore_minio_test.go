@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/onsi/ginkgo/v2/types"
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,6 +122,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		AfterAll(func() {
+			if CurrentSpecReport().State.Is(types.SpecStateSkipped) {
+				return
+			}
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
 			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
 			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
