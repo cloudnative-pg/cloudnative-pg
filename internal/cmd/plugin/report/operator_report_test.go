@@ -56,7 +56,7 @@ var _ = Describe("configureRedactors", func() {
 		// Restore stdout
 		_ = w.Close()
 		os.Stdout = oldStdout
-		_, _ = io.Copy(io.Discard, r)
+		_, _ = io.Copy(GinkgoWriter, r)
 
 		// Verify they are pass-through functions
 		secret := corev1.Secret{Data: map[string][]byte{"key": []byte("value")}}
@@ -90,7 +90,7 @@ var _ = Describe("tryCollectConfigurations", func() {
 		// Restore stdout
 		_ = w.Close()
 		os.Stdout = oldStdout
-		_, _ = io.Copy(io.Discard, r)
+		_, _ = io.Copy(GinkgoWriter, r)
 
 		// When errors occur, function returns nil slices (not empty slices)
 		// This is acceptable as writeToZip checks for nil/empty
