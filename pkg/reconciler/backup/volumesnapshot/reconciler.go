@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
@@ -501,7 +502,7 @@ func (se *Reconciler) createSnapshot(
 		return err
 	}
 
-	if err := se.cli.Create(ctx, &snapshot); err != nil {
+	if err := se.cli.Create(ctx, &snapshot); err != nil && !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
 	}
 

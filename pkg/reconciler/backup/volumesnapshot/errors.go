@@ -60,6 +60,7 @@ func isCSIErrorMessageRetriable(msg string) bool {
 		isRetryableHTTPError,
 		isConflictError,
 		isContextDeadlineExceededError,
+		isOCIConflictError,
 	}
 
 	for _, isRetryableFunc := range isRetryableFuncs {
@@ -116,4 +117,12 @@ func isRetryableHTTPError(msg string) bool {
 	}
 
 	return false
+}
+
+// isOCIConflictError detects the 409 Conflict returned by the OCI Blockstorage
+// Service while a snapshot is still being created.
+func isOCIConflictError(msg string) bool {
+	return strings.Contains(msg, "Error returned by Blockstorage Service") &&
+		strings.Contains(msg, "Http Status Code: 409") &&
+		strings.Contains(msg, "Error Code: Conflict")
 }
