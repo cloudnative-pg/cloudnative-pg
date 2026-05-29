@@ -11,8 +11,23 @@ on:
 permissions: read-all
 
 jobs:
+  # Expose whether a Snyk token is configured so the security job can gate
+  # on it. The secrets context is not available in a job-level 'if', so it
+  # is checked here and surfaced as a job output.
+  check-secret:
+    name: Check for Snyk token
+    runs-on: ubuntu-24.04
+    outputs:
+      has_token: ${{ steps.check.outputs.has_token }}
+    steps:
+      - id: check
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: echo "has_token=${{ env.SNYK_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
   security:
-    if: ${{ github.repository_owner == 'cloudnative-pg' }}
+    needs: check-secret
+    if: ${{ needs.check-secret.outputs.has_token == 'true' }}
     name: Security scan
     runs-on: ubuntu-24.04
     permissions:
