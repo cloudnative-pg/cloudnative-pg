@@ -59,6 +59,7 @@ func getTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
 func createMajorUpgradeJobDefinition(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
+	oldVersionImage string,
 	extensions []apiv1.ExtensionConfiguration,
 ) *batchv1.Job {
 	// The init container runs the old image and needs old extensions
@@ -76,7 +77,7 @@ func createMajorUpgradeJobDefinition(
 	}
 	oldVersionInitContainer := corev1.Container{
 		Name:            "prepare",
-		Image:           cluster.Status.PGDataImageInfo.Image,
+		Image:           oldVersionImage,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command:         prepareCommand,
 		VolumeMounts:    specs.CreatePostgresVolumeMounts(*cluster, oldExtensions),
