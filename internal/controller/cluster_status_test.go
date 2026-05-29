@@ -181,24 +181,29 @@ var _ = Describe("cluster_status unit tests", func() {
 	})
 
 	It("produces a scale-subresource selector matching managed instance pods", func() {
-		// The scale subresource uses .status.selector (set in updateResourceStatus)
-		// so VPA/HPA can discover instance pods. The format must remain a valid serialized
-		// label selector and must match the labels actually applied to instance pods.
+		// updateResourceStatus publishes cluster.GetInstancesSelector() into
+		// .status.selector so VPA/HPA can discover instance pods through the scale
+		// subresource. We exercise the production code (GetInstancesSelector) and
+		// verify both that it has the expected format and that it actually matches
+		// the labels the operator applies to every instance pod.
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pods := generateFakeClusterPods(env.client, cluster, true)
 		Expect(pods).ToNot(BeEmpty())
 
+		selectorString := cluster.GetInstancesSelector()
+
 		expected := fmt.Sprintf("%s=%s,%s=%s",
 			utils.ClusterLabelName, cluster.Name,
 			utils.PodRoleLabelName, string(utils.PodRoleInstance))
+		Expect(selectorString).To(Equal(expected))
 
-		selector, err := labels.Parse(expected)
+		selector, err := labels.Parse(selectorString)
 		Expect(err).ToNot(HaveOccurred())
 
 		for i := range pods {
 			Expect(selector.Matches(labels.Set(pods[i].Labels))).To(BeTrue(),
-				"selector %q must match pod %s labels %v", expected, pods[i].Name, pods[i].Labels)
+				"selector %q must match pod %s labels %v", selectorString, pods[i].Name, pods[i].Labels)
 		}
 	})
 })

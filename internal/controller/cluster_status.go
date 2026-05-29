@@ -35,7 +35,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -250,10 +249,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	// Expose the label selector for the scale sub-resource so autoscalers
 	// (HPA, VPA) can discover the instance pods managed by this cluster.
-	cluster.Status.Selector = labels.SelectorFromSet(labels.Set{
-		utils.ClusterLabelName: cluster.Name,
-		utils.PodRoleLabelName: string(utils.PodRoleInstance),
-	}).String()
+	cluster.Status.Selector = cluster.GetInstancesSelector()
 
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
