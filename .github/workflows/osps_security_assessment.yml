@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Open Source Project Security Baseline Scanner
-        uses: revanite-io/osps-baseline-action@3bf988fa8e4b59568dcfac138a1854df87c15aff # v1.3.2
+        uses: revanite-io/osps-baseline-action@ace75cc1fb748be898275f16f59f78363405bc0a # v1.3.3
         with:
           owner: ${{ github.repository_owner }}
           repo: ${{ github.event.repository.name }}
