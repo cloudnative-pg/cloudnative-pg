@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -84,7 +85,7 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterDefaultName, clusterDefaultMonitoringFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterDefaultName, clusterDefaultMonitoringFile)
 
 		By("verifying PodMonitor existence", func() {
 			podMonitor, err := getPodMonitorFunc(env.Ctx, env.Client, namespace, clusterDefaultName)

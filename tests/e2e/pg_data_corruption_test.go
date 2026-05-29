@@ -30,6 +30,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -66,14 +70,14 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		tableName := "test_pg_data_corruption"
 		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		tableLocator := TableLocator{
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  clusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertCreateTestData(env, tableLocator)
+		pgasserts.AssertCreateTestData(env, tableLocator)
 
 		By("gathering current primary pod and pvc", func() {
 			oldPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -211,16 +215,16 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 				}, 300).Should(BeTrue())
 			})
 		})
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
-		AssertDataExpectedCount(env, tableLocator, 2)
-		AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick])
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+		replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, clusterName, 140)
 	}
 
 	Context("plain cluster", func() {
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})
@@ -230,7 +234,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-no-slots.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})
@@ -240,7 +244,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-roles.yaml.template"
 			DeferCleanup(func() {
-				_ = DeleteResourcesFromFile(namespace, sampleFile)
+				_ = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 			})
 			testDataCorruption(namespace, sampleFile)
 		})

@@ -24,6 +24,10 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
@@ -91,7 +95,13 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 
 		It("restores a backed up cluster", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestoreWithApplicationDB(
+				env,
+				testTimeouts,
+				namespace,
+				clusterRestoreSampleFile,
+				tableName,
+			)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled.
@@ -100,7 +110,12 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupImmediateSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertScheduledBackupsImmediate(namespace, scheduledBackupImmediateSampleFile, scheduledBackupName)
+			backupasserts.AssertScheduledBackupsImmediate(
+				env,
+				namespace,
+				scheduledBackupImmediateSampleFile,
+				scheduledBackupName,
+			)
 
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
@@ -128,10 +143,17 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 				*currentTimestamp,
 			)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
+			backupasserts.AssertClusterWasRestoredWithPITR(
+				env,
+				testTimeouts,
+				namespace,
+				restoredClusterName,
+				tableName,
+				"00000002",
+			)
 
 			By("deleting the restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
@@ -147,13 +169,13 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
-				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
 					return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 3))
 			})
 
-			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+			backupasserts.AssertSuspendScheduleBackups(env, namespace, scheduledBackupName)
 		})
 	})
 })
@@ -208,7 +230,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestoreWithApplicationDB(namespace, externalClusterFileAzurite, tableName)
+			backupasserts.AssertClusterRestoreWithApplicationDB(
+				env,
+				testTimeouts,
+				namespace,
+				externalClusterFileAzurite,
+				tableName,
+			)
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -226,12 +254,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
 			Expect(err).NotTo(HaveOccurred())
 
-			AssertClusterWasRestoredWithPITRAndApplicationDB(
+			backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 				namespace,
 				externalClusterRestoreName,
 				tableName,
-				"00000002",
-			)
+				"00000002")
 
 			By("delete restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
@@ -260,9 +287,9 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	})
 
 	// Creating cluster
-	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSampleFile)
 
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
+	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
 }
 
 func prepareClusterBackupOnAzurite(
@@ -275,13 +302,13 @@ func prepareClusterBackupOnAzurite(
 	// Setting up Azurite and az cli along with Postgresql cluster
 	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
 	// Write a table and some data on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableName,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 	assertArchiveWalOnAzurite(namespace, clusterName)
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
@@ -301,7 +328,7 @@ func prepareClusterBackupOnAzurite(
 			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty()) //nolint:staticcheck
 		}, 30).Should(Succeed())
 	})
-	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzurite(
@@ -329,13 +356,13 @@ func prepareClusterForPITROnAzurite(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    "for_restore",
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := postgres.GetCurrentTimestamp(
@@ -361,7 +388,7 @@ func prepareClusterForPITROnAzurite(
 			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable("for_restore", 3, conn)
+		pgasserts.InsertRecordIntoTable("for_restore", 3, conn)
 	})
 	assertArchiveWalOnAzurite(namespace, clusterName)
 }
@@ -370,7 +397,7 @@ func assertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
+		latestWAL := minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
 		// verifying on blob storage using az
 		// Define what file we are looking for in Azurite.
 		// Escapes are required since az expects forward slashes to be escaped
