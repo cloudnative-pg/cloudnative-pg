@@ -31,6 +31,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	secretsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -68,7 +70,8 @@ var _ = Describe("Certificates", func() {
 			certName,
 			cluster.Name,
 			userName,
-			cluster.Namespace))
+			cluster.Namespace,
+		))
 		if err != nil {
 			return err
 		}
@@ -187,7 +190,7 @@ var _ = Describe("Certificates", func() {
 			Expect(err).ToNot(HaveOccurred())
 			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 			// Create the client certificate
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -212,18 +215,17 @@ var _ = Describe("Certificates", func() {
 					defaultCASecretName, kubectlCNPGClientCertSecretName)
 				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 
 		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity),
 			func() {
-				CreateAndAssertServerCertificatesSecrets(
+				secretsasserts.CreateAndAssertServerCertificatesSecrets(env,
 					namespace,
 					clusterName,
 					serverCASecretName,
 					serverCertSecretName,
-					false,
-				)
+					false)
 
 				var err error
 				// Updating defaults certificates entries with user provided certificates,
@@ -233,7 +235,8 @@ var _ = Describe("Certificates", func() {
 						"kubectl patch cluster %v -n %v -p "+
 							"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
 							"\"serverTLSSecret\":\"%v\"}}}'"+
-							" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
+							" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName,
+					))
 					if err != nil {
 						return err
 					}
@@ -259,13 +262,13 @@ var _ = Describe("Certificates", func() {
 				)
 				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 
 		It("can connect after switching to user-supplied client certificates", Label(tests.LabelServiceConnectivity),
 			func() {
 				// Create certificates secret for client
-				CreateAndAssertClientCertificatesSecrets(namespace, clusterName, clientCASecretName,
+				secretsasserts.CreateAndAssertClientCertificatesSecrets(env, namespace, clusterName, clientCASecretName,
 					replicaCertSecretName,
 					clientCertSecretName, false)
 
@@ -276,7 +279,8 @@ var _ = Describe("Certificates", func() {
 						"kubectl patch cluster %v -n %v -p "+
 							"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
 							"\"replicationTLSSecret\":\"%v\"}}}'"+
-							" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
+							" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName,
+					))
 					if err != nil {
 						return err
 					}
@@ -292,7 +296,7 @@ var _ = Describe("Certificates", func() {
 				pod := defaultPodFunc(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
 				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 
 		It("can connect after switching both server and client certificates to user-supplied mode",
@@ -330,7 +334,7 @@ var _ = Describe("Certificates", func() {
 				pod := defaultPodFunc(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
 				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 	})
 
@@ -349,14 +353,14 @@ var _ = Describe("Certificates", func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			CreateAndAssertServerCertificatesSecrets(
+			secretsasserts.CreateAndAssertServerCertificatesSecrets(env,
 				namespace,
 				clusterName,
 				serverCASecretName,
 				serverCertSecretName,
-				false,
-			)
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				false)
+
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			err = createClientCertificatesViaKubectlPluginFunc(
@@ -376,7 +380,7 @@ var _ = Describe("Certificates", func() {
 			)
 			err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 			Expect(err).ToNot(HaveOccurred())
-			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+			secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 		})
 	})
 
@@ -397,19 +401,19 @@ var _ = Describe("Certificates", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create certificates secret for client
-				CreateAndAssertClientCertificatesSecrets(
+				secretsasserts.CreateAndAssertClientCertificatesSecrets(env,
 					namespace,
 					clusterName,
 					clientCASecretName,
 					replicaCertSecretName,
 					clientCertSecretName,
-					false,
-				)
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+					false)
+
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 				pod := defaultPodFunc(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
 				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 	})
 
@@ -430,27 +434,26 @@ var _ = Describe("Certificates", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create certificates secret for server
-				CreateAndAssertServerCertificatesSecrets(
+				secretsasserts.CreateAndAssertServerCertificatesSecrets(env,
 					namespace,
 					clusterName,
 					serverCASecretName,
 					serverCertSecretName,
-					false,
-				)
+					false)
 
-				CreateAndAssertClientCertificatesSecrets(
+				secretsasserts.CreateAndAssertClientCertificatesSecrets(env,
 					namespace,
 					clusterName,
 					clientCASecretName,
 					replicaCertSecretName,
 					clientCertSecretName,
-					false,
-				)
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+					false)
+
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 				pod := defaultPodFunc(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
 				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
-				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+				secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 			})
 	})
 })

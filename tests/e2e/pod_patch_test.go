@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,7 +53,7 @@ var _ = Describe("Pod patch", Label(tests.LabelSmoke, tests.LabelBasic), func() 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		By("adding the podPatch annotation", func() {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
