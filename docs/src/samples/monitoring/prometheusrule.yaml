@@ -4,68 +4,97 @@ metadata:
   name: cnpg-default-alerts
 spec:
   groups:
-  - name: cnp-default.rules
-    rules:
-    - alert: LongRunningTransaction
-      annotations:
-        description: Pod {{ $labels.pod }} is taking more than 5 minutes (300 seconds) for a query.
-        summary: A query is taking longer than 5 minutes.
-      expr: |-
-        cnpg_backends_max_tx_duration_seconds > 300
-      for: 1m
-      labels:
-        severity: warning
-    - alert: BackendsWaiting
-      annotations:
-        description: Pod {{ $labels.pod  }} has been waiting for longer than 5 minutes
-        summary: If a backend is waiting for longer than 5 minutes
-      expr: |-
-        cnpg_backends_waiting_total > 300
-      for: 1m
-      labels:
-        severity: warning
-    - alert: PGDatabaseXidAge
-      annotations:
-        description: Over 300,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
-        summary: Number of transactions from the frozen XID to the current one
-      expr: |-
-        cnpg_pg_database_xid_age > 300000000
-      for: 1m
-      labels:
-        severity: warning
-    - alert: PGReplication
-      annotations:
-        description: Standby is lagging behind by over 300 seconds (5 minutes)
-        summary: The standby is lagging behind the primary
-      expr: |-
-        cnpg_pg_replication_lag > 300
-      for: 1m
-      labels:
-        severity: warning
-    - alert: LastFailedArchiveTime
-      annotations:
-        description: Archiving failed for {{ $labels.pod }}
-        summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
-      expr: |-
-        (cnpg_pg_stat_archiver_last_failed_time - cnpg_pg_stat_archiver_last_archived_time) > 1
-      for: 1m
-      labels:
-        severity: warning
-    - alert: DatabaseDeadlockConflicts
-      annotations:
-        description: There are over 10 deadlock conflicts in {{ $labels.pod }}
-        summary: Checks the number of database conflicts
-      expr: |-
-        cnpg_pg_stat_database_deadlocks > 10
-      for: 1m
-      labels:
-        severity: warning
-    - alert: ReplicaFailingReplication
-      annotations:
-        description: Replica {{ $labels.pod }} is failing to replicate
-        summary: Checks if the replica is failing to replicate
-      expr: |-
-        cnpg_pg_replication_in_recovery > cnpg_pg_replication_is_wal_receiver_up
-      for: 1m
-      labels:
-        severity: warning
+    - name: cnp-default.rules
+      rules:
+        - alert: LongRunningTransaction
+          annotations:
+            description: Pod {{ $labels.pod }} is taking more than 5 minutes (300 seconds) for a query.
+            summary: A query is taking longer than 5 minutes.
+          expr: |-
+            cnpg_backends_max_tx_duration_seconds > 300
+          for: 1m
+          labels:
+            severity: warning
+        - alert: BackendsWaiting
+          annotations:
+            description: Pod {{ $labels.pod  }} has been waiting for longer than 5 minutes
+            summary: If a backend is waiting for longer than 5 minutes
+          expr: |-
+            cnpg_backends_waiting_total > 300
+          for: 1m
+          labels:
+            severity: warning
+        - alert: PGDatabaseXidAge
+          annotations:
+            description: Over 300,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
+            summary: Number of transactions from the frozen XID to the current one
+          expr: |-
+            cnpg_pg_database_xid_age > 300000000
+          for: 1m
+          labels:
+            severity: warning
+        - alert: PGReplication
+          annotations:
+            description: Standby is lagging behind by over 300 seconds (5 minutes)
+            summary: The standby is lagging behind the primary
+          expr: |-
+            cnpg_pg_replication_lag > 300
+          for: 1m
+          labels:
+            severity: warning
+        - alert: LastFailedArchiveTime
+          annotations:
+            description: Archiving failed for {{ $labels.pod }}
+            summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
+          expr: |-
+            (cnpg_pg_stat_archiver_last_failed_time - cnpg_pg_stat_archiver_last_archived_time) > 1
+          for: 1m
+          labels:
+            severity: warning
+        - alert: DatabaseDeadlockConflicts
+          annotations:
+            description: There are over 10 deadlock conflicts in {{ $labels.pod }}
+            summary: Checks the number of database conflicts
+          expr: |-
+            cnpg_pg_stat_database_deadlocks > 10
+          for: 1m
+          labels:
+            severity: warning
+        # NOTE: ReplicaFailingReplication is designed for standard CNPG clusters where
+        # replicas should always have the WAL receiver running. It may produce false
+        # positives in Distributed CNPG setups with Barman Cloud, where the failover
+        # primary temporarily pauses the WAL receiver during normal backup operations.
+        # For Distributed CNPG with Barman Cloud, use ReplicaFailingReplicationDistributed
+        # instead.
+        - alert: ReplicaFailingReplication
+          annotations:
+            description: Replica {{ $labels.pod }} is failing to replicate
+            summary: Checks if the replica is failing to replicate
+          expr: |-
+            cnpg_pg_replication_in_recovery > cnpg_pg_replication_is_wal_receiver_up
+          for: 1m
+          labels:
+            severity: warning
+        # NOTE: ReplicaFailingReplicationDistributed is designed for Distributed CNPG
+        # setups using Barman Cloud. It avoids false positives caused by temporary WAL
+        # receiver pauses during Barman operations by also requiring significant
+        # replication lag (>300s) that is actively increasing over a 5-minute window.
+        # A brief Barman pause will not accumulate meaningful lag; only a genuine
+        # replication failure will show continuous lag growth. Use this alert instead of
+        # ReplicaFailingReplication when running Distributed CNPG with Barman Cloud.
+        - alert: ReplicaFailingReplicationDistributed
+          annotations:
+            description: >-
+              Replica {{ $labels.pod }} is failing to replicate. Replication lag is
+              significant and actively increasing, indicating a real replication failure
+              rather than a temporary WAL receiver pause from Barman operations.
+            summary: >-
+              Checks if a replica in a Distributed CNPG setup is failing to replicate
+              by requiring both significant lag (>300s) and an increasing lag trend.
+          expr: |-
+            (cnpg_pg_replication_in_recovery > cnpg_pg_replication_is_wal_receiver_up)
+              and (cnpg_pg_replication_lag > 300)
+              and (rate(cnpg_pg_replication_lag[5m]) > 0)
+          for: 5m
+          labels:
+            severity: warning
