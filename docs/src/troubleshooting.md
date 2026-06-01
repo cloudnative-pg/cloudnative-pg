@@ -494,6 +494,7 @@ event to occur instead of relying on the overall cluster health state. Available
 - LastBackupSucceeded
 - ContinuousArchiving
 - Ready
+- RecoveryTargetReached
 
 `LastBackupSucceeded` is reporting the status of the latest backup. If set to `True` the
 last backup has been taken correctly, it is set to `False` otherwise.
@@ -504,6 +505,12 @@ last WAL archival process has been terminated correctly, it is set to `False` ot
 `Ready` is `True` when the cluster has the number of instances specified by the user
 and the primary instance is ready. This condition can be used in scripts to wait for
 the cluster to be created.
+
+`RecoveryTargetReached` is `True` when a cluster that has been point in time recovered to
+a specific target has successfully reached the target. This can be `False` when a WAL has
+not (yet) been archived that covers the recovery target, or if WAL replaying fails. This
+condition is _only_ set for clusters that have been restored with a specific PITR recovery
+target.
 
 ### How to wait for a particular condition
 

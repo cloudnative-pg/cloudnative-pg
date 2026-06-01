@@ -60,6 +60,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -220,7 +221,81 @@ func (info InitInfo) concludeRestore(
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
+	err := info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
+	info.reportRecoveryTargetOutcome(ctx, cli, cluster, err)
+	return err
+}
+
+// hasRecoveryTarget reports whether the cluster bootstraps to an explicit
+// recovery target.
+func hasRecoveryTarget(cluster *apiv1.Cluster) bool {
+	return cluster != nil &&
+		cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil
+}
+
+// recoveryEndedInRecoveryState reports whether a pg_controldata cluster state
+// indicates recovery stopped without promoting. A recovery that reached its
+// target promotes (leaving "shut down" once stopped); one that ran out of WAL
+// first is left in a recovery state.
+func recoveryEndedInRecoveryState(state string) bool {
+	switch state {
+	case "shut down in recovery", "in archive recovery":
+		return true
+	default:
+		return false
+	}
+}
+
+// reportRecoveryTargetOutcome maintains the RecoveryTargetReached condition for a
+// recovery to an explicit target: True once the target is reached (the instance
+// promoted), False when recovery ran out of WAL first (for example targetTime is
+// beyond the last archived WAL). The failure is confirmed from the pg_controldata
+// cluster state, not the PostgreSQL log, and only when the data directory is still
+// in a recovery state, so a failure after a successful promotion is not mislabeled.
+// It is best-effort: any error here is logged and the recovery error left to propagate.
+func (info InitInfo) reportRecoveryTargetOutcome(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	recoveryErr error,
+) {
+	contextLogger := log.FromContext(ctx)
+
+	if !hasRecoveryTarget(cluster) {
+		return
+	}
+
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionRecoveryTargetReached),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonRecoveryTargetReached),
+		Message: "Recovery reached the configured target",
+	}
+
+	if recoveryErr != nil {
+		out, err := info.GetInstance(cluster).GetPgControldata()
+		if err != nil {
+			contextLogger.Error(err, "while reading pg_controldata to classify a recovery failure")
+			return
+		}
+
+		state := utils.ParsePgControldataOutput(out).GetDatabaseClusterState()
+		if !recoveryEndedInRecoveryState(state) {
+			return
+		}
+
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = string(apiv1.ConditionReasonRecoveryEndedBeforeReachingTarget)
+		condition.Message = fmt.Sprintf(
+			"PostgreSQL exited while still in recovery (pg_controldata state %q), so the configured recovery target "+
+				"was not reached. Recovery error: %v", state, recoveryErr)
+	}
+
+	if patchErr := status.PatchConditionsWithOptimisticLock(ctx, cli, cluster, condition); patchErr != nil {
+		contextLogger.Error(patchErr, "while reporting the recovery target outcome")
+	}
 }
 
 // createEnvAndConfigForSnapshotRestore creates env and config for snapshot restore

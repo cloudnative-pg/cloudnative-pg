@@ -1112,6 +1112,9 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
+	// ConditionRecoveryTargetReached represents whether a recovery bootstrap
+	// has reached its configured recovery target.
+	ConditionRecoveryTargetReached ClusterConditionType = "RecoveryTargetReached"
 )
 
 // ConditionStatus defines conditions of resources
@@ -1151,6 +1154,14 @@ const (
 	// ConditionReasonContinuousArchivingFailing means that the condition has changed because
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
+
+	// ConditionReasonRecoveryEndedBeforeReachingTarget means that recovery ended before
+	// reaching the configured target because no WAL at or after it was available
+	ConditionReasonRecoveryEndedBeforeReachingTarget ConditionReason = "RecoveryEndedBeforeReachingTarget"
+
+	// ConditionReasonRecoveryTargetReached means that recovery reached the
+	// configured target and the instance was promoted
+	ConditionReasonRecoveryTargetReached ConditionReason = "RecoveryTargetReached"
 
 	// ClusterReady means that the condition changed because the cluster is ready and working properly
 	ClusterReady ConditionReason = "ClusterIsReady"
