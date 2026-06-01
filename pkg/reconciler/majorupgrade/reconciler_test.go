@@ -258,7 +258,7 @@ var _ = Describe("Major upgrade job definition", func() {
 				},
 			},
 		}
-		job := createMajorUpgradeJobDefinition(cluster, 1, nil)
+		job := createMajorUpgradeJobDefinition(cluster, 1, "postgres:15", nil)
 		Expect(job.Spec.BackoffLimit).ToNot(BeNil())
 		Expect(*job.Spec.BackoffLimit).To(Equal(int32(0)))
 	})

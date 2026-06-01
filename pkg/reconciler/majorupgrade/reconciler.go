@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -82,8 +84,18 @@ func Reconcile(
 		contextLogger.Error(err, "Unable to retrieve the requested PostgreSQL version")
 		return nil, err
 	}
-	if cluster.Status.PGDataImageInfo == nil || requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
-		return nil, nil
+	oldVersionImage := ""
+	if cluster.Status.PGDataImageInfo != nil {
+		if requestedMajor <= cluster.Status.PGDataImageInfo.MajorVersion {
+			return nil, nil
+		}
+		oldVersionImage = cluster.Status.PGDataImageInfo.Image
+	} else {
+		imgVersion, err := version.FromTag(reference.New(cluster.Status.Image).Tag)
+		if err == nil && requestedMajor <= int(imgVersion.Major()) {
+			return nil, nil
+		}
+		oldVersionImage = cluster.Status.Image
 	}
 
 	primaryNodeSerial, err := getPrimarySerial(pvcs)
@@ -108,7 +120,7 @@ func Reconcile(
 		return result, err
 	}
 
-	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial); err != nil {
+	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial, oldVersionImage); err != nil {
 		contextLogger.Error(err, "Unable to create major upgrade job")
 		return nil, err
 	} else if result != nil {
@@ -179,6 +191,7 @@ func createMajorUpgradeJob(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	primaryNodeSerial int,
+	oldVersionImage string,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -207,7 +220,7 @@ func createMajorUpgradeJob(
 			requestedMajor, err)
 	}
 
-	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, extensions)
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial, oldVersionImage, extensions)
 
 	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
