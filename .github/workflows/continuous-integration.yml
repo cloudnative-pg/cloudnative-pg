@@ -451,6 +451,8 @@ jobs:
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
       images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -637,11 +639,9 @@ jobs:
 
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@8e119fbb6c251787721d34ba683ed48eba792766 # master
-        if: |
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        # Only run when a Snyk token is configured. Forks and downstream
+        # repositories without the secret skip this step automatically.
+        if: env.SNYK_TOKEN != ''
         with:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
