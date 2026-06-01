@@ -255,7 +255,7 @@ API server rejects any Pod that violates the policy, including Pods created by
 the operator.
 
 Because the trusted Cluster writers described above can set any Pod field, this
-admission control chain — not the operator — is the boundary that enforces Pod
+admission control chain (not the operator) is the boundary that enforces Pod
 security policies in your environment.
 
 #### Namespace Isolation
@@ -263,9 +263,9 @@ security policies in your environment.
 The operator confines all managed resources to the namespace of their parent
 Cluster. Instance Pods are always created in the same namespace as their
 Cluster, set explicitly and deterministically rather than inferred from any
-other relationship. Because Kubernetes owner references cannot cross namespace
-boundaries, the operator cannot be induced to create or own resources outside
-the Cluster's namespace.
+other relationship. Because Kubernetes owner references are confined to a
+single namespace, the operator also cannot establish ownership of resources in
+any other namespace.
 
 #### RBAC on Custom Resources
 
@@ -290,8 +290,8 @@ itself relies on to manage Kubernetes resources on your behalf.
 
 ### Role Based Access Control (RBAC)
 
-This section covers the operator's *own* RBAC — the service account and roles it
-uses to manage Kubernetes resources on your behalf — as opposed to the user
+This section covers the operator's *own* RBAC (the service account and roles it
+uses to manage Kubernetes resources on your behalf), as opposed to the user
 access to custom resources discussed in
 [RBAC on Custom Resources](#rbac-on-custom-resources) above.
 
@@ -699,7 +699,7 @@ spec:
     `restricted` profile, which has strict requirements for pod and container
     security contexts. As described in
     [Kubernetes Admission Control](#kubernetes-admission-control), it is this
-    admission chain — not the operator — that enforces such profiles on the
+    admission chain (not the operator) that enforces such profiles on the
     resulting Pods.
 :::
 
