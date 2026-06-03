@@ -516,10 +516,14 @@ func sanitizeGrantee(name string) string {
 	return pgx.Identifier{name}.Sanitize()
 }
 
-// applyObjectPrivilege grants or revoke a single privilege keyword (e.g. USAGE,
+// applyObjectPrivilege grants or revokes a single privilege keyword (e.g. USAGE,
 // CREATE, CONNECT, TEMPORARY) on the given object for the listed grantees. It is
 // the shared primitive behind object-level privilege management; callers wrap it
 // with the privilege and object type relevant to their resource.
+//
+// The privilege and objectType arguments are interpolated into the SQL verbatim
+// (they are not escapable identifiers), so callers MUST pass trusted, in-code
+// constants for them and never user-controlled input.
 func applyObjectPrivilege(
 	ctx context.Context,
 	db *sql.DB,
