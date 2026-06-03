@@ -51,9 +51,9 @@ type connectionProfilePostgresqlPhysicalReplication profile
 func (connectionProfilePostgresqlPhysicalReplication) Enrich(config *pgx.ConnConfig) {
 	fillDefaultParameters(config)
 
-	// The simple query protocol is needed since we're going to use
-	// this function to connect to the PgBouncer administrative
-	// interface, which doesn't support the extended one.
+	// The simple query protocol is needed since this connection issues
+	// physical replication commands (such as IDENTIFY_SYSTEM), which are
+	// not supported over the extended query protocol.
 	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	// To initiate streaming replication, the frontend sends the replication parameter
