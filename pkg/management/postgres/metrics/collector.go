@@ -592,9 +592,11 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 	// queries may reference unqualified objects in public, so we
 	// widen the search_path inside the read-only monitoring
 	// transaction. pg_catalog stays first, defeating shadow-object
-	// attacks; SET LOCAL is rolled back at COMMIT so the connection
-	// returns to the pool with the pinned default.
-	_, err = tx.Exec("SET LOCAL search_path = pg_catalog, public")
+	// attacks; pg_temp is listed last so the session temp schema is
+	// not searched ahead of pg_catalog/public for relations and types.
+	// SET LOCAL is rolled back at COMMIT so the connection returns to
+	// the pool with the pinned default.
+	_, err = tx.Exec("SET LOCAL search_path = pg_catalog, public, pg_temp")
 	if err != nil {
 		return nil, err
 	}

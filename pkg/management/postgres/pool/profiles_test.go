@@ -42,8 +42,9 @@ var _ = Describe("Connection profile defaults", func() {
 			// search_path so that no tenant-controlled ALTER DATABASE /
 			// ALTER ROLE setting can influence operator queries.
 			// pg_catalog must be first so built-in overloads defeat
-			// shadows planted in public.
-			Expect(cfg.RuntimeParams).To(HaveKeyWithValue("search_path", "pg_catalog, public"))
+			// shadows planted in public; pg_temp must be last so the
+			// session temp schema is not searched ahead of pg_catalog.
+			Expect(cfg.RuntimeParams).To(HaveKeyWithValue("search_path", "pg_catalog, public, pg_temp"))
 
 			// The pre-existing defaults are still present.
 			Expect(cfg.RuntimeParams).To(HaveKeyWithValue("client_encoding", "UTF8"))

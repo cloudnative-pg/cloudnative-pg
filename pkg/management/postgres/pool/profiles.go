@@ -94,11 +94,19 @@ func fillDefaultParameters(config *pgx.ConnConfig) {
 
 	// Pin search_path so a tenant-controlled ALTER DATABASE / ALTER ROLE
 	// setting cannot influence operator-issued queries. pg_catalog is
-	// first so any built-in overload defeats a planted shadow in public.
-	// public stays in the path so CREATE EXTENSION (in initdb post-init
-	// and the Database controller) can resolve required-extension types
-	// — PostgreSQL's CREATE EXTENSION uses the connection-level value
-	// when computing the install-time search_path, not the session-level
-	// SET.
-	config.RuntimeParams["search_path"] = "pg_catalog, public"
+	// first so any built-in overload defeats an operator/function shadow
+	// planted in public.
+	//
+	// public is kept in the path so that the common case keeps working
+	// for queries that legitimately reference unqualified objects there;
+	// the CREATE EXTENSION paths (initdb post-init and the Database
+	// controller) do not rely on this default — they SET search_path on
+	// their own connection before issuing CREATE EXTENSION so a
+	// relocatable extension lands in the user-data schema.
+	//
+	// pg_temp is listed last so the session temp schema is searched after
+	// pg_catalog and public for relation and data-type names; by default
+	// (when pg_temp is not listed) it is searched first, even before
+	// pg_catalog.
+	config.RuntimeParams["search_path"] = "pg_catalog, public, pg_temp"
 }

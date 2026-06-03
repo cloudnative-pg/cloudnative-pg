@@ -220,7 +220,8 @@ var _ = Describe("QueryRunner tests", func() {
 			}
 			_ = metricMap
 			dbMock.ExpectBegin()
-			dbMock.ExpectExec("SET LOCAL search_path = pg_catalog, public").WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.ExpectExec("SET LOCAL search_path = pg_catalog, public, pg_temp").
+				WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectExec("SET standard_conforming_strings TO on").WillReturnResult(sqlmock.NewResult(0, 1))
 			dbMock.ExpectQuery(loPagesQuery).WillReturnRows(sqlmock.NewRows(
 				[]string{"datname", "lo_pages"}).

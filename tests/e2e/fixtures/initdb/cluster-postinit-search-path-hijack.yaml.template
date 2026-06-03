@@ -5,9 +5,11 @@
 # database-level search_path so that the planted operator is resolved
 # before pg_catalog. With the operator's connection-level search_path
 # pin in place, every operator-issued query to `app` carries
-# search_path = pg_catalog, so the planted operator must never be
-# invoked. The shadow body inserts into public.shadow_calls; the e2e
-# test asserts that table stays empty after a reconcile window.
+# search_path = pg_catalog, public, pg_temp with pg_catalog first, so
+# the built-in `=` operator always resolves ahead of the planted one
+# and the shadow must never be invoked. The shadow body inserts into
+# public.shadow_calls; the e2e test asserts that table stays empty
+# after a reconcile window.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
