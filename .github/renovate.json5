@@ -12,7 +12,9 @@
     'main',
   ],
   ignorePaths: [
-    'docs/**',
+    // Keep the example manifests pinned, but allow custom managers below to
+    // update specific tool images referenced elsewhere in the docs.
+    'docs/src/samples/**',
     'releases/**',
     'contribute/**',
     'licenses/**',
@@ -106,6 +108,17 @@
       ],
       datasourceTemplate: 'docker',
       versioningTemplate: 'regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T\\d{2}-\\d{2}-\\d{2}Z$',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^docs\\/src\\/monitoring\\.md$/',
+      ],
+      matchStrings: [
+        'image: (?<depName>curlimages/curl):(?<currentValue>\\S+)',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'docker',
     },
     {
       customType: 'regex',
@@ -265,6 +278,15 @@
         'getwoke{/,}**',
         'jonasbn/github-action-spellcheck',
         'registry',
+      ],
+      pinDigests: false,
+      separateMajorMinor: false,
+    },
+    {
+      // The curl image is only used in a documentation example, so keep it as a
+      // readable tag without a pinned digest.
+      matchPackageNames: [
+        'curlimages/curl',
       ],
       pinDigests: false,
       separateMajorMinor: false,
