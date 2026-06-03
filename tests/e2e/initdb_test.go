@@ -176,18 +176,48 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("verifying public.shadow_calls stays empty across a reconcile window", func() {
-				Consistently(func() string {
-					stdout, _, err := exec.QueryInInstancePod(
-						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-						exec.PodLocator{
-							Namespace: namespace,
-							PodName:   primary.Name,
-						}, "app",
-						"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
-					Expect(err).ToNot(HaveOccurred())
-					return strings.TrimSpace(stdout)
-				}, "30s", "5s").Should(Equal("0"))
+			// shadowCalls returns how many times the planted public.shadow_eq
+			// function has been invoked in the application database. The query
+			// is fully schema-qualified so it cannot itself trigger the shadow.
+			shadowCalls := func() string {
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"SELECT pg_catalog.count(*)::text FROM public.shadow_calls")
+				Expect(err).ToNot(HaveOccurred())
+				return strings.TrimSpace(stdout)
+			}
+
+			By("verifying operator-issued queries never invoke the planted shadow operator", func() {
+				// The operator connects to `app` (e.g. the managed-extension
+				// probe runs `... WHERE extname = $1`). The connection-level
+				// search_path pin keeps pg_catalog first, so the planted
+				// public.=(name,text) operator must never be resolved.
+				//
+				// To validate this test red/green: remove the search_path pin
+				// in pkg/management/postgres/pool/profiles.go (fillDefaultParameters)
+				// and re-run; this assertion must then fail with shadow_calls > 0.
+				Consistently(shadowCalls, "30s", "5s").Should(Equal("0"))
+			})
+
+			By("confirming the planted shadow operator is actually reachable (positive control)", func() {
+				// Guard against a false pass where shadow_calls stays 0 only
+				// because the shadow is unreachable. A name=text comparison
+				// issued through psql under the tenant-controlled search_path
+				// (public, pg_catalog) resolves to public.=(name,text) and must
+				// increment shadow_calls, proving the detector is live.
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "app",
+					"SELECT 'x'::name = 'y'::text")
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(shadowCalls, "10s", "2s").ShouldNot(Equal("0"))
 			})
 		})
 	})
