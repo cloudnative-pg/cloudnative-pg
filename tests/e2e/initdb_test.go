@@ -171,7 +171,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, clusterFixture, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterFixture)
 
 			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
