@@ -291,6 +291,7 @@ var _ = Describe("Managed Extensions SQL", func() {
 
 	Context("createDatabaseExtension", func() {
 		setSearchPathSQL := `SET search_path TO "$user", public`
+		resetSearchPathSQL := `RESET search_path`
 		createExtensionSQL := "CREATE EXTENSION \"testext\" VERSION \"1.0\" SCHEMA \"default\""
 
 		It("returns success when the extension has been created", func(ctx SpecContext) {
@@ -300,6 +301,9 @@ var _ = Describe("Managed Extensions SQL", func() {
 			dbMock.
 				ExpectExec(createExtensionSQL).
 				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec(resetSearchPathSQL).
+				WillReturnResult(sqlmock.NewResult(0, 0))
 			Expect(createDatabaseExtension(ctx, db, ext)).Error().NotTo(HaveOccurred())
 		})
 
@@ -310,6 +314,11 @@ var _ = Describe("Managed Extensions SQL", func() {
 			dbMock.
 				ExpectExec(createExtensionSQL).
 				WillReturnError(testError)
+			// search_path is reset even when CREATE EXTENSION fails, so the
+			// connection returns to the pool with the pinned default.
+			dbMock.
+				ExpectExec(resetSearchPathSQL).
+				WillReturnResult(sqlmock.NewResult(0, 0))
 			Expect(createDatabaseExtension(ctx, db, ext)).Error().To(Equal(testError))
 		})
 	})

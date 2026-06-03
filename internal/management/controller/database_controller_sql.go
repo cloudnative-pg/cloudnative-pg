@@ -287,6 +287,14 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.Extensio
 		return fmt.Errorf("acquiring dedicated connection for CREATE EXTENSION: %w", err)
 	}
 	defer func() {
+		// Restore the pinned search_path before the connection returns
+		// to the pool. The pgx stdlib driver does not reset session GUCs
+		// on release, so without this RESET a subsequent operator query
+		// reusing this connection would run with the "$user", public
+		// search_path and could resolve objects planted by a tenant.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after CREATE EXTENSION")
+		}
 		_ = conn.Close()
 	}()
 
