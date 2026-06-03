@@ -83,7 +83,7 @@ func (v *DatabaseCustomValidator) ValidateCreate(
 	}
 
 	return allWarnings, apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Database "},
+		schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: "Database "},
 		database.Name, allErrs)
 }
 
@@ -220,7 +220,7 @@ func (v *DatabaseCustomValidator) validateForeignServers(d *apiv1.Database) fiel
 	}
 
 	nameSet := stringset.New()
-	var allErrs field.ErrorList
+	allErrs := make(field.ErrorList, 0, len(d.Spec.Servers))
 	for i, server := range d.Spec.Servers {
 		itemPath := basePath.Index(i)
 

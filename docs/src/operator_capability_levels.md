@@ -85,6 +85,9 @@ Beyond just the core PostgreSQL engine, image catalogs now allow you to define
 ensuring that the database and its associated modules are always compatible,
 version-aligned, and treated as a single cohesive unit across your entire
 infrastructure.
+The same catalog mechanism also governs [PgBouncer](connection_pooling.md)
+pooler images, making image catalogs a unified supply-chain primitive across
+the entire PostgreSQL stack managed by the operator.
 
 ### Labels and annotations
 

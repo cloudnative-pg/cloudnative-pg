@@ -87,7 +87,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		}
 		return s
 	}
-	_, _ = fmt.Fprintf(GinkgoWriter, `
+	_, _ = fmt.Fprintf(
+		GinkgoWriter, `
 E2E test configuration:
   Postgres image:                %s:%s
   Postgres version:              %d
@@ -98,6 +99,7 @@ E2E test configuration:
   Default storage class:         %s
   CSI storage class:             %s
   Default volume snapshot class: %s
+  CNPG deployment method:        %s
 `,
 		env.PostgresImageName, env.PostgresImageTag,
 		env.PostgresVersion,
@@ -108,6 +110,7 @@ E2E test configuration:
 		display(env.DefaultStorageClass),
 		display(env.CSIStorageClass),
 		display(env.DefaultVolumeSnapshotClass),
+		display(os.Getenv("CNPG_DEPLOYMENT_METHOD")),
 	)
 
 	// Export detected storage class values as environment variables for

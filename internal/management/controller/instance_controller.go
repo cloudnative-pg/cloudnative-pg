@@ -62,6 +62,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch/conditions"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
+	cnpgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -318,6 +319,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	if err := r.reconcilePgbouncerAuthUser(ctx, postgresDB, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile pgbouncer integration: %w", err)
+	}
+
+	if err := r.reconcileMetricsExporterAuthUser(ctx, postgresDB); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile metrics exporter integration: %w", err)
 	}
 
 	// Reconcile postgresql.auto.conf file permissions (< PG 17)
@@ -841,6 +846,43 @@ func (r *InstanceReconciler) reconcilePgbouncerAuthUser(
 	return tx.Commit()
 }
 
+// reconcileMetricsExporterAuthUser ensures the dedicated cnpg_metrics_exporter
+// PostgreSQL role exists and has pg_monitor granted. This role is used by the
+// metrics exporter instead of the postgres superuser so that session_user is
+// never a superuser and RESET ROLE has no escalation effect.
+func (r *InstanceReconciler) reconcileMetricsExporterAuthUser(
+	ctx context.Context,
+	db *sql.DB,
+) error {
+	ok, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("unable to check if instance is primary: %w", err)
+	}
+	if !ok {
+		return nil
+	}
+	return setupMetricsExporterRole(ctx, db)
+}
+
+// setupMetricsExporterRole opens a transaction and delegates to the shared
+// helper that creates or repairs the cnpg_metrics_exporter role.
+func setupMetricsExporterRole(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	if err := postgresManagement.SetupMetricsExporterRole(ctx, tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // reconcileClusterRoleWithoutDB updates this instance's configuration files
 // according to the role written in the cluster status
 func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
@@ -1312,7 +1354,13 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
-	err = postgresutils.SetUserPassword(ctx, username, password, db)
+	err = postgresutils.SetUserPassword(
+		ctx,
+		username,
+		password,
+		cnpgutils.IsPasswordPassthroughEnabled(&secret.ObjectMeta),
+		db,
+	)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -137,5 +138,74 @@ var _ = Describe("Pooler validation", func() {
 			},
 		}
 		Expect(v.validatePgbouncerGenericParameters(pooler)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Pooler validateMonitoring", func() {
+	var v *PoolerCustomValidator
+	BeforeEach(func() {
+		v = &PoolerCustomValidator{}
+	})
+
+	// tlsOnPooler builds a Pooler with monitoring.tls.enabled=true and the
+	// requested PodMonitor/clientTLSSecret state. Every validateMonitoring
+	// test below exercises the tls-enabled branch; the tls-disabled short-
+	// circuit has its own dedicated test above.
+	tlsOnPooler := func(enablePodMonitor bool, clientTLSSecret *apiv1.LocalObjectReference) *apiv1.Pooler {
+		return &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					ClientTLSSecret: clientTLSSecret,
+				},
+				Monitoring: &apiv1.PoolerMonitoringConfiguration{ //nolint:staticcheck
+					EnablePodMonitor: enablePodMonitor,
+					TLSConfig:        &apiv1.PoolerMonitoringTLSConfiguration{Enabled: true},
+				},
+			},
+		}
+	}
+
+	It("returns no error when metrics TLS is disabled", func() {
+		Expect(v.validateMonitoring(&apiv1.Pooler{})).To(BeEmpty())
+	})
+
+	It("returns no error when metrics TLS is enabled and clientTLSSecret is set", func() {
+		pooler := tlsOnPooler(true, &apiv1.LocalObjectReference{Name: "my-tls"})
+		Expect(v.validateMonitoring(pooler)).To(BeEmpty())
+	})
+
+	It("returns no error when metrics TLS is enabled and the generated PodMonitor is disabled",
+		func() {
+			// Escape hatch: with enablePodMonitor=false (the default) the operator does not
+			// generate a PodMonitor, so there is no misleading operator-side TLS config to
+			// prevent. The user is wiring up their own scraper.
+			pooler := tlsOnPooler(false, nil)
+			Expect(v.validateMonitoring(pooler)).To(BeEmpty())
+		})
+
+	It("rejects when metrics TLS is enabled, generated PodMonitor is on, and clientTLSSecret is missing",
+		func() {
+			pooler := tlsOnPooler(true, nil)
+			errs := v.validateMonitoring(pooler)
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Field).To(Equal("spec.pgbouncer.clientTLSSecret"))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeRequired))
+		})
+
+	It("rejects when clientTLSSecret has an empty name", func() {
+		pooler := tlsOnPooler(true, &apiv1.LocalObjectReference{Name: ""})
+		Expect(v.validateMonitoring(pooler)).To(HaveLen(1))
+	})
+
+	It("rejects when pgbouncer is nil", func() {
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				Monitoring: &apiv1.PoolerMonitoringConfiguration{ //nolint:staticcheck
+					EnablePodMonitor: true,
+					TLSConfig:        &apiv1.PoolerMonitoringTLSConfiguration{Enabled: true},
+				},
+			},
+		}
+		Expect(v.validateMonitoring(pooler)).To(HaveLen(1))
 	})
 })

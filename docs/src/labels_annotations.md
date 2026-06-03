@@ -102,15 +102,21 @@ This label is available only on `VolumeSnapshot` resources.
   default users created by CloudNativePG (typically `postgres` and `app`).
 
 `role` - **deprecated**
-:  Whether the instance running in a pod is a `primary` or a `replica`.
-   This label is deprecated, you should use `cnpg.io/instanceRole` instead.
+:  Role of the instance running in a pod: `primary`, `replica`, or
+   `unhealthy`. The `unhealthy` value is transient: the operator sets
+   it on the old primary during a failover or switchover and clears it
+   automatically once the transition completes. This label is deprecated,
+   you should use `cnpg.io/instanceRole` instead.
 
 `cnpg.io/scheduled-backup`
 :  When available, name of the `ScheduledBackup` resource that created a given
    `Backup` object.
 
 `cnpg.io/instanceRole`
-: Whether the instance running in a pod is a `primary` or a `replica`.
+: Role of the instance running in a pod: `primary`, `replica`, or
+  `unhealthy`. The `unhealthy` value is transient: the operator sets
+  it on the old primary during a failover or switchover and clears it
+  automatically once the transition completes.
 
 `app.kubernetes.io/managed-by`
 : Name of the manager. It will always be `cloudnative-pg`.
@@ -194,6 +200,14 @@ CloudNativePG manages the following predefined annotations:
 
 `cnpg.io/operatorVersion`
 :   Version of the operator.
+
+`cnpg.io/passwordPassthrough`
+:   When set to `enabled` on a basic-auth `Secret` consumed by the
+    operator (superuser, application user, or a managed-role password
+    secret), the operator forwards the password value verbatim in the
+    `CREATE`/`ALTER ROLE` statement instead of SCRAM-SHA-256 encoding
+    it operator-side. PostgreSQL then encodes the value according to its
+    own `password_encryption` setting. See [Opting out of operator-side encoding](declarative_role_management.md#opting-out-of-operator-side-encoding).
 
 `cnpg.io/pgControldata`
 :   Output of the `pg_controldata` command. This annotation replaces the old,

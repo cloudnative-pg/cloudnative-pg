@@ -45,6 +45,13 @@ export MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/mi
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
 
+# Define the operator source and deployment method.
+export OPERATOR=${OPERATOR:-"local"}
+export CNPG_DEPLOYMENT_METHOD=${CNPG_DEPLOYMENT_METHOD:-"manifest"}
+
+# Path to the generated operator manifest (mirrors the Makefile default).
+export OPERATOR_MANIFEST_PATH="${OPERATOR_MANIFEST_PATH:-${ROOT_DIR}/dist/operator-manifest.yaml}"
+
 # Validate that required images were successfully extracted
 if [ -z "${POSTGRES_IMG}" ]; then
   echo "ERROR: Failed to extract POSTGRES_IMG from ${ROOT_DIR}/pkg/versions/versions.go" >&2

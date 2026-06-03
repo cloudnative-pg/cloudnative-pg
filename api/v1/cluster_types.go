@@ -110,6 +110,12 @@ const (
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 
+	// MetricsExporterUserName is the name of the dedicated role used by the
+	// metrics exporter to connect to PostgreSQL. This role has pg_monitor
+	// granted and is never a superuser, so session_user never escalates via
+	// RESET ROLE.
+	MetricsExporterUserName = "cnpg_metrics_exporter"
+
 	// MissingWALDiskSpaceExitCode is the exit code the instance manager
 	// will use to signal that there's no more WAL disk space
 	MissingWALDiskSpaceExitCode = 4
@@ -789,8 +795,10 @@ type ManagedRoles struct {
 	// +optional
 	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
 
-	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-	// with an explanation of the cause
+	// CannotReconcile lists roles that cannot be reconciled, with an
+	// explanation of the cause. Failures may originate in PostgreSQL
+	// (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+	// the referenced password Secret cannot be fetched).
 	// +optional
 	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
 
@@ -2563,8 +2571,10 @@ type RoleConfiguration struct {
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	// Secret containing the password of the role (if present)
-	// If null, the password will be ignored unless DisablePassword is set
+	// Secret containing the password of the role (if present).
+	// If null, the password will be ignored unless DisablePassword is set.
+	// When set, the secret must follow the `kubernetes.io/basic-auth` format
+	// and contain both a `username` and a `password` field.
 	// +optional
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
 
@@ -2732,8 +2742,4 @@ type ConfigMapResourceVersion struct {
 	// Map keys are the config map names, map values are the versions
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }

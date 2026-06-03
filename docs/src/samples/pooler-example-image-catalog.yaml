@@ -1,0 +1,42 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: image-catalog-example
+spec:
+  images:
+    - image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
+      major: 18
+  componentImages:
+    - key: pgbouncer
+      image: ghcr.io/cloudnative-pg/pgbouncer:1.25.1
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 1
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: image-catalog-example
+    major: 18
+  storage:
+    size: 1Gi
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    imageCatalogRef:
+      apiGroup: postgresql.cnpg.io
+      kind: ImageCatalog
+      name: image-catalog-example
+      key: pgbouncer

@@ -122,3 +122,12 @@ func (in *Pooler) GetServiceAccountName() string {
 	}
 	return in.Name
 }
+
+// IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
+func (in *Pooler) IsMetricsTLSEnabled() bool {
+	if in.Spec.Monitoring != nil && in.Spec.Monitoring.TLSConfig != nil {
+		return in.Spec.Monitoring.TLSConfig.Enabled
+	}
+
+	return false
+}

@@ -30,7 +30,7 @@ function wait_for() {
   local retries=$5
 
   ITER=0
-  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ $ITER -lt "$retries" ]; do
+  while ! ${K8S_CLI} get -n "$namespace" "$type" "$name" && [ "$ITER" -lt "$retries" ]; do
     ITER=$((ITER + 1))
     echo "$name $type doesn't exist yet. Waiting $interval seconds ($ITER of $retries)."
     sleep "$interval"
@@ -50,15 +50,22 @@ function retry {
     local exit=$?
     local wait=$((2 ** count))
     count=$((count + 1))
-    if [ $count -lt "$retries" ]; then
+    if [ "$count" -lt "$retries" ]; then
       echo "Retry $count/$retries exited $exit, retrying in $wait seconds..." >&2
-      sleep $wait
+      sleep "$wait"
     else
       echo "Retry $count/$retries exited $exit, no more retries left." >&2
-      return $exit
+      return "$exit"
     fi
   done
   return 0
+}
+
+# version_gte: returns 0 (true) if version >= threshold
+function version_gte() {
+  local threshold=$1
+  local version=$2
+  [[ "$(printf '%s\n' "$threshold" "$version" | sort -V | head -n1)" == "$threshold" ]]
 }
 
 # get_default_storage_class detects the default K8s storage class
@@ -78,11 +85,11 @@ function deploy_prometheus_crds() {
   echo -e "${bright}Starting deployment of Prometheus CRDs...${reset}"
 
   # 1. Add Prometheus Community Helm Repository
-  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  retry 3 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
   # 2. Install only the CRDs required by the Prometheus operator
   # We install into kube-system as that namespace is standard and always exists.
-  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
+  retry 3 helm -n kube-system upgrade --install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 
   echo -e "${bright}Prometheus CRDs deployed.${reset}"
 }
@@ -93,7 +100,7 @@ function deploy_pyroscope() {
   echo -e "${bright}Deploying Pyroscope and enabling pprof profiling on the operator...${reset}"
 
   # 1. Add Pyroscope Helm Repository
-  helm repo add pyroscope-io https://grafana.github.io/helm-charts
+  retry 3 helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
   # 2. Define Pyroscope configuration values and install via Helm
   local values_file="${TEMP_DIR}/pyroscope_values.yaml"
@@ -101,7 +108,7 @@ function deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
 EOF
-  helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
+  retry 3 helm upgrade --install --create-namespace -n pyroscope pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   # 3. Create patch file to enable operator profiling annotations
   # These annotations tell Pyroscope's agent what ports and profiles to scrape.
@@ -138,6 +145,103 @@ EOF
   "${K8S_CLI}" -n cnpg-system patch configmap "${configMapName}" --patch-file "${configMaps}"
 
   echo -e "${bright}Pyroscope deployment successful and operator patched to expose profiling data.${reset}"
+}
+
+# print_operator_image: prints the operator image reference (as set on the
+# controller-manager Deployment's first container) when the deployment exists.
+function print_operator_image() {
+    local image
+    image=$(${K8S_CLI} get deployment cnpg-controller-manager -n cnpg-system \
+        --ignore-not-found \
+        -o jsonpath='{.spec.template.spec.containers[0].image}')
+    if [[ -n "${image}" ]]; then
+        printf '%bOperator image: %s%b\n' "${bright}" "${image}" "${reset}"
+    fi
+}
+
+# reset_operator_namespace: deletes the cnpg-system namespace and any
+# cluster-scoped resources left by a previous operator installation, then waits
+# for finalization so the next apply doesn't race a terminating namespace.
+# Cluster-scoped resources (webhooks, ClusterRoles, ClusterRoleBindings) must be
+# removed explicitly because they survive namespace deletion and would block Helm
+# from adopting them (missing ownership labels).
+function reset_operator_namespace() {
+    if command -v helm &>/dev/null && helm status cnpg -n cnpg-system &>/dev/null; then
+        helm uninstall cnpg -n cnpg-system --wait
+    fi
+
+    if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
+        ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
+        ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
+    fi
+
+    # Clean up cluster-scoped resources that survive namespace deletion.
+    ${K8S_CLI} get mutatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get validatingwebhookconfigurations -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterroles -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+    ${K8S_CLI} get clusterrolebindings -o name | { grep '/cnpg-' || true; } | xargs -r "${K8S_CLI}" delete
+}
+
+# wait_operator_ready: waits for the operator deployment rollout to finish and
+# prints a completion banner. Accepts an optional deployment name.
+# When installed via manifest or the cnpg plugin the deployment is called
+# cnpg-controller-manager; when installed via Helm it is called
+# cnpg-cloudnative-pg. See:
+# https://cloudnative-pg.io/docs/1.29/installation_upgrade#using-the-helm-chart
+function wait_operator_ready() {
+    local deploy_name="${1:-cnpg-controller-manager}"
+    ${K8S_CLI} -n cnpg-system rollout status deploy/"${deploy_name}" --timeout=5m
+    printf '%bOperator deployment complete.%b\n' "${bright}" "${reset}"
+    print_operator_image
+}
+
+# deploy_operator_from_manifest <operator>
+# Deploys the operator by applying its manifest. The <operator> argument is
+# interpreted either as a semver version (e.g. 1.28.1 or v1.28.1, with optional
+# prerelease suffix), in which case the published release manifest from the main
+# repository is used, or as a branch name (e.g. main, release-1.28), in which
+# case the snapshot manifest from the cloudnative-pg/artifacts repository is
+# used.
+function deploy_operator_from_manifest() {
+    local operator="${1:?operator is required}"
+    local mode
+    local manifest_url
+
+    if [[ "${operator}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+        local version="${operator#v}"
+        mode="version"
+        manifest_url="https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v${version}/cnpg-${version}.yaml"
+    elif [[ "${operator}" =~ ^v?[0-9] ]]; then
+        # Looks version-like but isn't valid semver -- refuse rather than silently
+        # fall through to branch mode and produce a misleading "not found" error.
+        printf '%bError: %s is not a valid operator version (expected e.g. 1.28.1 or v1.28.1)%b\n' \
+            "${bright}" "${operator}" "${reset}" >&2
+        exit 1
+    elif [[ "${operator}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] && [[ "${operator}" != *..* ]]; then
+        mode="branch"
+        manifest_url="https://raw.githubusercontent.com/cloudnative-pg/artifacts/${operator}/manifests/operator-manifest.yaml"
+    else
+        printf '%bError: %s is not a valid operator value%b\n' \
+            "${bright}" "${operator}" "${reset}" >&2
+        printf '%bExpected a semver (e.g. 1.28.1) or a branch name (e.g. main, release-1.28).%b\n' \
+            "${bright}" "${reset}" >&2
+        exit 1
+    fi
+
+    local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
+    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+        printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
+        printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
+        exit 1
+    fi
+
+    printf '%bDeploying operator from %s%b\n' "${bright}" "${operator}" "${reset}"
+    reset_operator_namespace
+    # --server-side avoids the last-applied-configuration annotation exceeding
+    # the 262144 byte limit on large CRDs; --force-conflicts lets us adopt
+    # existing field ownership when re-deploying or switching operator version.
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${manifest_file}"
+    wait_operator_ready
 }
 
 # deploy_csi_host_path: Deploys the host path CSI driver and snapshotter components.
@@ -254,4 +358,72 @@ function deploy_fluentd() {
   done
 }
 
+# deploy_operator_from_source: applies the pre-generated operator manifest.
+# Requires generate_operator_manifest (via setup-cluster.sh) to have been
+# called first.
+function deploy_operator_from_source() {
+    # shellcheck disable=SC2154
+    echo -e "${bright}Deploying CNPG operator from ${OPERATOR_MANIFEST_PATH}${reset}"
+    ${K8S_CLI} apply --server-side --force-conflicts -f "${OPERATOR_MANIFEST_PATH}"
+    wait_operator_ready
+}
 
+# deploy_operator_with_helm: installs the operator from the published CNPG Helm
+# chart, overriding the chart's default image with the locally-built one so the
+# same binary under test is used. Only supported with OPERATOR=local.
+#
+# CRDs are applied from the local source tree (config/helm) so they always
+# match the locally-built operator binary under test. The chart's built-in CRD
+# management is disabled via --set crds.create=false.
+function deploy_operator_with_helm() {
+    if ! command -v helm &>/dev/null; then
+        echo "ERROR: 'helm' not found in PATH. Install Helm before running with CNPG_DEPLOYMENT_METHOD=helm." >&2
+        exit 1
+    fi
+
+    echo -e "${bright}Deploying CNPG operator via Helm chart...${reset}"
+
+    # Apply CRDs from the local source tree to ensure they match the operator binary under test.
+    ${K8S_CLI} apply --server-side -k "${ROOT_DIR}/config/helm"
+
+    helm repo add cnpg https://cloudnative-pg.github.io/charts
+    helm repo update cnpg
+
+    local -a helm_args=(
+        --namespace cnpg-system
+        --create-namespace
+        --set crds.create=false
+        --set config.create=false
+        --set "additionalArgs[0]=--secret-name=cnpg-controller-manager-config"
+    )
+
+    if ${K8S_CLI} get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
+        helm_args+=(--set "imagePullSecrets[0].name=cnpg-pull-secret")
+    fi
+
+    if [[ -n "${CNPG_CHART_VERSION:-}" ]]; then
+        helm_args+=(--version "${CNPG_CHART_VERSION}")
+    fi
+
+    # shellcheck disable=SC2153
+    if [[ "${OPERATOR}" == "local" ]]; then
+        local helm_image_tag="${CONTROLLER_IMG##*:}"
+        if [[ -n "${CONTROLLER_IMG_DIGEST:-}" ]]; then
+            helm_image_tag="${helm_image_tag}@${CONTROLLER_IMG_DIGEST}"
+        fi
+        helm_args+=(
+            --set "image.repository=${CONTROLLER_IMG%:*}"
+            --set "image.tag=${helm_image_tag}"
+            --set "additionalEnv[0].name=POSTGRES_IMAGE_NAME"
+            --set "additionalEnv[0].value=${POSTGRES_IMG}"
+            --set "additionalEnv[1].name=PGBOUNCER_IMAGE_NAME"
+            --set "additionalEnv[1].value=${PGBOUNCER_IMG}"
+        )
+    fi
+
+    helm upgrade --install cnpg cnpg/cloudnative-pg "${helm_args[@]}"
+    # When installed via Helm the deployment is called cnpg-cloudnative-pg, not
+    # cnpg-controller-manager. See:
+    # https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
+    wait_operator_ready "cnpg-cloudnative-pg"
+}

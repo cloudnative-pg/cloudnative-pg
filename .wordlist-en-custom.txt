@@ -71,6 +71,7 @@ CVE
 CVEs
 CannotReconcile
 Canovai
+CatalogComponentImage
 CatalogImage
 CatalogImages
 Cecchi
@@ -97,6 +98,7 @@ ClusterSpec
 ClusterStatus
 CodeQL
 ColumnName
+ComponentImages
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
@@ -139,6 +141,7 @@ DigitalOcean
 DisablePassword
 DisabledDefaultServices
 DoD
+DoS
 DockerHub
 Dockle
 EBS
@@ -214,6 +217,7 @@ IaC
 Ibryam
 IfNotPresent
 ImageCatalog
+ImageCatalogComponentRef
 ImageCatalogRef
 ImageCatalogSpec
 ImageInfo
@@ -367,6 +371,12 @@ Pooler's
 PoolerIntegrations
 PoolerList
 PoolerMonitoringConfiguration
+PoolerMonitoringTLSConfiguration
+PoolerPhase
+PoolerPhaseActive
+PoolerPhaseFailed
+PoolerPhaseInactive
+PoolerPhasePaused
 PoolerSecrets
 PoolerSpec
 PoolerStatus
@@ -696,6 +706,7 @@ cGFzc
 caSecretVersion
 cannotReconcile
 catalogName
+catalogcomponentimage
 catalogimage
 cb
 cd
@@ -741,6 +752,7 @@ collationVersion
 columnValue
 commandError
 commandOutput
+componentImages
 conf
 config
 config's
@@ -961,6 +973,7 @@ imagePullPolicy
 imagePullSecrets
 imageVolume
 imagecatalog
+imagecatalogcomponentref
 imagecatalogref
 imagecatalogs
 imagecatalogspec
@@ -1049,6 +1062,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1170,6 +1184,7 @@ ownerReference
 parseable
 paru
 passfile
+passthrough
 passwd
 passwordSecret
 passwordStatus
@@ -1248,6 +1263,8 @@ poolerIntegrations
 poolerName
 poolerintegrations
 poolermonitoringconfiguration
+poolermonitoringtlsconfiguration
+poolerphase
 poolers
 poolersecrets
 poolerspec
@@ -1587,6 +1604,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode
@@ -1607,6 +1625,7 @@ webhook
 webhooks
 webserver
 webtest
+whitespace
 wp
 writeService
 wsl

@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,8 +40,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 	var (
 		namespace       string
 		clusterName     string
-		maxReattachTime int32 = 60
-		maxFailoverTime int32 = 10
+		maxReattachTime = 60
+		maxFailoverTime = 10
 	)
 
 	BeforeEach(func() {
@@ -66,8 +67,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
-				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts,
+				namespace, sampleFileWithoutReplicationSlots, clusterName,
+				webTestFile, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
+			)
 		})
 	})
 
@@ -84,9 +89,14 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
-				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
-			AssertClusterHAReplicationSlots(namespace, clusterName)
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts,
+				namespace, sampleFileWithReplicationSlots, clusterName,
+				webTestFile, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
+			)
+
+			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
 		})
 	})
 
@@ -98,8 +108,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			AssertFastFailOver(
-				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)
+			replicationasserts.AssertFastFailOver(
+				env, testTimeouts,
+				namespace, sampleFileSyncReplicas, clusterName,
+				webTestSyncReplicas, webTestJob,
+				maxReattachTime, maxFailoverTime, quickDeletionPeriod,
+			)
 		})
 	})
 })

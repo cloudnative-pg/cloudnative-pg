@@ -93,77 +93,77 @@ func NewShowPoolsMetrics(subsystem string) *ShowPoolsMetrics {
 			Subsystem: subsystem,
 			Name:      "cl_active",
 			Help:      "Client connections that are linked to server connection and can process queries.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		ClWaiting: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "cl_waiting",
 			Help:      "Client connections that have sent queries but have not yet got a server connection.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		ClCancelReq: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "cl_cancel_req",
 			Help:      "Client connections that have not forwarded query cancellations to the server yet.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		ClActiveCancelReq: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "cl_active_cancel_req",
 			Help: "Client connections that have forwarded query cancellations to the server and " +
 				"are waiting for the server response.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		ClWaitingCancelReq: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "cl_waiting_cancel_req",
 			Help:      "Client connections that have not forwarded query cancellations to the server yet.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvActive: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_active",
 			Help:      "Server connections that are linked to a client.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvActiveCancel: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_active_cancel",
 			Help:      "Server connections that are currently forwarding a cancel request",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvBeingCanceled: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_wait_cancels",
 			Help: "Servers that normally could become idle, but are waiting to do so until all in-flight cancel " +
 				"requests have completed that were sent to cancel a query on this server.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvIdle: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_idle",
 			Help:      "Server connections that are unused and immediately usable for client queries.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvUsed: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_used",
 			Help: "Server connections that have been idle for more than server_check_delay, so they need " +
 				"server_check_query to run on them before they can be used again.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvTested: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_tested",
 			Help: "Server connections that are currently running either server_reset_query or " +
 				"server_check_query.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		SvLogin: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_login",
 			Help:      "Server connections currently in the process of logging in.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		MaxWait: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -171,25 +171,25 @@ func NewShowPoolsMetrics(subsystem string) *ShowPoolsMetrics {
 			Help: "How long the first (oldest) client in the queue has waited, in seconds. If this starts " +
 				"increasing, then the current pool of servers does not handle requests quickly enough. The " +
 				"reason may be either an overloaded server or just too small of a pool_size setting.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		MaxWaitUs: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "maxwait_us",
 			Help:      "Microsecond part of the maximum waiting time.",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		PoolMode: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "pool_mode",
 			Help:      "The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 		LoadBalanceHosts: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "load_balance_hosts",
 			Help:      "Number of hosts not load balancing between hosts",
-		}, []string{"database", "user"}),
+		}, []string{databaseLabel, userLabel}),
 	}
 }
 

@@ -28,6 +28,13 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	metricsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/metrics"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
@@ -96,10 +103,10 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
-			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
+			metricsasserts.AssertCustomMetricsResourcesExist(env, namespace, customQueriesSampleFile, 1, 1)
 
 			// Create the cluster
-			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
 
 			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -116,7 +123,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		AfterAll(func() {
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
 			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
-			err := DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -136,20 +143,20 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 			latestTar := minio.GetFilePath(clusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -157,7 +164,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				func() {
 					backup = backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
 						testTimeouts[timeouts.BackupIsReady])
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 					Eventually(func() (int, error) {
 						return minio.CountFiles(minioEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(1))
@@ -250,11 +257,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
+			metricsasserts.AssertMetricsData(env, testTimeouts, namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
@@ -264,7 +271,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertSwitchover(namespace, clusterName, env)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
@@ -273,7 +280,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the restored cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -294,23 +301,29 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbySampleFile, env)
+			clusterasserts.AssertCreateCluster(
+				env,
+				testTimeouts,
+				namespace,
+				targetClusterName,
+				clusterWithMinioStandbySampleFile,
+			)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  targetClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -321,7 +334,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupStandbyFile, true,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
@@ -332,7 +345,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the standby cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioStandbySampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioStandbySampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -353,23 +366,23 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, targetClusterName, clusterWithMinioSampleFile)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  targetClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -380,7 +393,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupWithTargetFile, true,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
@@ -391,7 +404,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -416,23 +429,23 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, customClusterName, clusterWithMinioCustomSampleFile)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBSecret, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBTwo, testTableName)
+			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  customClusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, customClusterName, clusterServerName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, customClusterName, clusterServerName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -441,7 +454,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupFileCustom, false,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, customClusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, customClusterName)
 				latestBaseTar := minio.GetFilePath(clusterServerName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestBaseTar)
@@ -455,15 +468,15 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			// Restore backup in a new cluster
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the primary cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterWithMinioCustomSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioCustomSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("deleting the restored cluster", func() {
-				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterRestoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -475,7 +488,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+			backupasserts.AssertScheduledBackupsImmediate(env, namespace, scheduledBackupSampleFile, scheduledBackupName)
 			latestBaseTar := minio.GetFilePath(clusterName, "data.tar")
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
@@ -509,10 +522,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				*currentTimestamp,
 			)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReady])
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000003")
+			backupasserts.AssertClusterWasRestoredWithPITR(
+				env, testTimeouts, namespace, restoredClusterName, tableName, "00000003",
+			)
 
 			By("deleting the restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
@@ -530,7 +545,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
-				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 300)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -538,11 +553,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					fmt.Sprintf("verify the number of backup %v is great than 2", latestTar))
 			})
 
-			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+			backupasserts.AssertSuspendScheduleBackups(env, namespace, scheduledBackupName)
 		})
 
 		It("verify tags in backed files", func() {
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 			tags, err := minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*1.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
@@ -557,7 +572,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			err = pods.Delete(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertNewPrimary(namespace, clusterName, oldPrimary)
+			clusterasserts.AssertNewPrimary(env, namespace, clusterName, oldPrimary)
 
 			tags, err = minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
@@ -607,7 +622,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating first cluster with 1 instance", func() {
-				AssertCreateCluster(namespace, firstClusterName, firstClusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, firstClusterName, firstClusterFile)
 			})
 
 			By("creating backup", func() {
@@ -616,7 +631,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("creating second cluster from backup", func() {
-				AssertCreateCluster(namespace, secondClusterName, secondClusterFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, secondClusterName, secondClusterFile)
 			})
 
 			By("verifying second cluster is on timeline 2", func() {
@@ -627,7 +642,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("verifying timeline 2 history file is archived", func() {
-				AssertArchiveWalOnMinio(namespace, secondClusterName, "shared-timeline-test")
+				minioasserts.AssertArchiveWalOnMinio(
+					env, testTimeouts, minioEnv, namespace, secondClusterName, "shared-timeline-test",
+				)
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, minio.GetFilePath("shared-timeline-test", "00000002.history*"))
 				}, 60).Should(BeNumerically(">", 0))
@@ -652,16 +669,21 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				// "requested timeline 2 is not a child of this server's history" and enter
 				// a crash-loop, causing this assertion to timeout. The validation logic must
 				// reject the future timeline file to allow the replica to join successfully.
-				AssertClusterStandbysAreStreaming(namespace, firstClusterName, int32(testTimeouts[timeouts.ClusterIsReadyQuick]))
+				replicationasserts.AssertClusterStandbysAreStreaming(
+					env,
+					namespace,
+					firstClusterName,
+					testTimeouts[timeouts.ClusterIsReadyQuick],
+				)
 			})
 
 			By("deleting the first cluster", func() {
-				err = DeleteResourcesFromFile(namespace, firstClusterFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, firstClusterFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("deleting the second cluster", func() {
-				err = DeleteResourcesFromFile(namespace, secondClusterFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, secondClusterFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -720,7 +742,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			})
 
 			// Create the cluster
-			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileMinio)
 
 			By("verify connectivity of barman to minio", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -740,26 +762,26 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				Expect(err).ToNot(HaveOccurred())
 
 				// Write a table and some data on the "app" database
-				tableLocator := TableLocator{
+				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertCreateTestData(env, tableLocator)
+				pgasserts.AssertCreateTestData(env, tableLocator)
 
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 				// There should be a backup resource and
 				By("backing up a cluster and verifying it exists on minio", func() {
 					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileMinio,
 						false,
 						testTimeouts[timeouts.BackupIsReady])
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 
 					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 					// This should be better handled inside Execute
-					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 					latestTar := minio.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
@@ -777,19 +799,19 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestore(namespace, externalClusterFileMinio, tableName)
+				backupasserts.AssertClusterRestore(env, testTimeouts, namespace, externalClusterFileMinio, tableName)
 
 				// verify test data on restored external cluster
-				tableLocator = TableLocator{
+				tableLocator = pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  externalClusterName,
 					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
-				AssertDataExpectedCount(env, tableLocator, 2)
+				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 				By("deleting the restored cluster", func() {
-					err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
+					err = resources.DeleteResourcesFromFile(env, namespace, externalClusterFileMinio)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -826,14 +848,14 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				}()
 				Expect(err).ToNot(HaveOccurred())
 				// insert 2 more rows entries 3,4 on the "app" database
-				insertRecordIntoTable(tableName, 3, conn)
-				insertRecordIntoTable(tableName, 4, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+				pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 			})
 			By("creating second backup and verifying it exists on minio", func() {
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio,
 					false,
 					testTimeouts[timeouts.BackupIsReady])
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -848,12 +870,12 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 					namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			AssertClusterWasRestoredWithPITRAndApplicationDB(
+			backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
 				namespace,
 				externalClusterRestoreName,
 				tableName,
-				"00000002",
-			)
+				"00000002")
+
 			By("delete restored cluster", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 			})
@@ -861,20 +883,20 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 		It("restore cluster from barman object using replica option in spec", func() {
 			// Write a table and some data on the "app" database
-			tableLocator := TableLocator{
+			tableLocator := pgasserts.TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "for_restore_repl",
 			}
-			AssertCreateTestData(env, tableLocator)
+			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
 
 			By("backing up a cluster and verifying it exists on minio", func() {
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
 					testTimeouts[timeouts.BackupIsReady])
-				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return minio.CountFiles(minioEnv, latestTar)
@@ -922,13 +944,13 @@ func prepareClusterForPITROnMinio(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableNamePitr,
 	}
-	AssertCreateTestData(env, tableLocator)
+	pgasserts.AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := postgres.GetCurrentTimestamp(
@@ -955,9 +977,97 @@ func prepareClusterForPITROnMinio(
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
-		insertRecordIntoTable(tableNamePitr, 3, conn)
+		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
-	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+	minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
+	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+}
+
+func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {
+	By("Async Replication into external cluster", func() {
+		restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		// Add additional data to the source cluster
+		sourceClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sourceClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		resources.CreateResourceFromFile(env, namespace, restoreClusterFile)
+		// We give more time than the usual 600s, since the recovery is slower
+		clusterasserts.AssertClusterIsReady(env, namespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow])
+
+		// Test data should be present on restored primary
+		restoredPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// We need the credentials from the source cluster because the replica cluster
+		// doesn't create the credentials on its own namespace
+		appUser, appUserPass, err := secrets.GetCredentials(
+			env.Ctx,
+			env.Client,
+			sourceClusterName,
+			namespace,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		forwardRestored, connRestored, err := postgres.ForwardPSQLConnectionWithCreds(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			restoredClusterName,
+			postgres.AppDBName,
+			appUser,
+			appUserPass,
+		)
+		defer func() {
+			_ = connRestored.Close()
+			forwardRestored.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+
+		row := connRestored.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s", tableName))
+		var countString string
+		err = row.Scan(&countString)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(countString).To(BeEquivalentTo("2"))
+
+		forwardSource, connSource, err := postgres.ForwardPSQLConnection(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
+			namespace,
+			sourceClusterName,
+			postgres.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		defer func() {
+			_ = connSource.Close()
+			forwardSource.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+
+		// Insert new data in the source cluster
+		pgasserts.InsertRecordIntoTable(tableName, 3, connSource)
+		minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, sourceClusterName, sourceClusterName)
+		tableLocator := pgasserts.TableLocator{
+			Namespace:    namespace,
+			ClusterName:  sourceClusterName,
+			DatabaseName: postgres.AppDBName,
+			TableName:    tableName,
+		}
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 3)
+
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		expectedReplicas := cluster.Spec.Instances - 1
+		// Cascading replicas should be attached to primary replica
+		connectedReplicas, err := postgres.CountReplicas(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			restoredPrimary, RetryTimeout,
+		)
+		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
+	})
 }

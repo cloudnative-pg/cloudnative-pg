@@ -1,7 +1,7 @@
 {
   "image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+    "ghcr.io/devcontainers/features/docker-in-docker:3": {
       "moby": false
     },
     "ghcr.io/mpriscella/features/kind:1": {},
@@ -17,10 +17,6 @@
     "ghcr.io/devcontainers-extra/features/kubectx-kubens:1": {},
     "ghcr.io/dhoeric/features/stern:1": {}
   },
-
-  // Needed by kind to enable kube-proxy's ipvs mode
-  "mounts":["type=bind,source=/lib/modules,target=/lib/modules"],
-
   // Enable kubectl short alias with completion
   "postCreateCommand": "echo 'alias k=kubectl; complete -F __start_kubectl k' >> ~/.bash_aliases; git clone https://github.com/magicmonty/bash-git-prompt.git ~/.bash-git-prompt --depth=1; echo 'if [ -f \"$HOME/.bash-git-prompt/gitprompt.sh\" ]; then . \"$HOME/.bash-git-prompt/gitprompt.sh\"; fi' >> ~/.bashrc"
 }

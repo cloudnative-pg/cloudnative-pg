@@ -70,8 +70,9 @@ func RetrieveMetricsFromPgBouncer(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	pod corev1.Pod,
+	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(ctx, kubeInterface, &pod, false, url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(ctx, kubeInterface, &pod, tlsEnabled, url.PathMetrics, int(url.PgBouncerMetricsPort))
 	return string(body), err
 }
 

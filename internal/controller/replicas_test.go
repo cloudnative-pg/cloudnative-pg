@@ -20,11 +20,18 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"context"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,7 +50,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -61,7 +68,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -79,7 +86,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
-					Type:   corev1.ContainersReady,
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -97,7 +104,32 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{
 				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	// unreachable mimics a Pod whose node has stopped reporting to the API
+	// server: the node lifecycle controller flips PodReady to False, but the
+	// stale ContainersReady left by the kubelet remains True.
+	unreachable := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "unreachable",
+			Namespace: "default",
+			Annotations: map[string]string{
+				utils.ClusterSerialAnnotationName: "5",
+			},
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
 					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.PodReady,
 					Status: corev1.ConditionFalse,
 				},
 			},
@@ -126,6 +158,122 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
+	})
+
+	It("skips a Pod whose node is unreachable even if it has the highest serial", func() {
+		podList := []corev1.Pod{car1, car2, unreachable}
+		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
+		Expect(resultName).To(Equal("car-2"))
+	})
+})
+
+var _ = Describe("markOldPrimaryAsUnhealthy", func() {
+	var env *testingEnvironment
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	makePod := func(name, namespace, role string) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels:    map[string]string{},
+			},
+		}
+		if role != "" {
+			utils.SetInstanceRole(&pod.ObjectMeta, role)
+		}
+		return pod
+	}
+
+	It("changes the primary label from the old primary pod", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		primary := makePod("cluster-1", namespace, specs.ClusterRoleLabelPrimary)
+		replica1 := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
+		replica2 := makePod("cluster-3", namespace, specs.ClusterRoleLabelReplica)
+
+		for i, pod := range []corev1.Pod{primary, replica1, replica2} {
+			p := pod
+			Expect(env.client.Create(ctx, &p)).To(Succeed())
+			// refresh the local copy with server-assigned fields
+			if i == 0 {
+				primary = p
+			}
+		}
+
+		pods := []corev1.Pod{primary, replica1, replica2}
+
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", pods)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Verify the old primary's label was changed to unhealthy on the API server
+		var updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&primary), &updated)).To(Succeed())
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
+		//nolint:staticcheck
+		Expect(updated.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
+
+		// Verify replica pods are unchanged
+		var replica1Updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&replica1), &replica1Updated)).To(Succeed())
+		Expect(replica1Updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+	})
+
+	It("does not error when the old primary is not in the pod list", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		replica := makePod("cluster-2", namespace, specs.ClusterRoleLabelReplica)
+		Expect(env.client.Create(ctx, &replica)).To(Succeed())
+
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{replica})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("is a no-op when the old primary already has the unhealthy label", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		pod := makePod("cluster-1", namespace, specs.ClusterRoleLabelUnhealthy)
+		Expect(env.client.Create(ctx, &pod)).To(Succeed())
+
+		err := env.clusterReconciler.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{pod})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updated corev1.Pod
+		Expect(env.client.Get(ctx, client.ObjectKeyFromObject(&pod), &updated)).To(Succeed())
+		Expect(updated.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelUnhealthy))
+	})
+
+	It("surfaces the Patch error so callers can apply their best-effort or retry strategy", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+
+		primary := makePod("cluster-1", namespace, specs.ClusterRoleLabelPrimary)
+
+		failingClient := fake.NewClientBuilder().
+			WithScheme(env.scheme).
+			WithObjects(&primary).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Patch: func(_ context.Context, _ client.WithWatch, obj client.Object,
+					_ client.Patch, _ ...client.PatchOption,
+				) error {
+					Expect(obj).To(BeAssignableToTypeOf(&corev1.Pod{}))
+					Expect(obj.GetName()).To(Equal("cluster-1"))
+					Expect(obj.GetNamespace()).To(Equal(namespace))
+					return fmt.Errorf("simulated API server error")
+				},
+			}).
+			Build()
+
+		r := &ClusterReconciler{Client: failingClient, Scheme: env.scheme}
+
+		err := r.markOldPrimaryAsUnhealthy(ctx, "cluster-1", []corev1.Pod{primary})
+		Expect(err).To(MatchError(ContainSubstring("simulated API server error")))
 	})
 })
 
