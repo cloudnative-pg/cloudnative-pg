@@ -740,6 +740,17 @@ func (r *InstanceReconciler) reconcileExtensions(
 		// a DDL when it is not really needed.
 
 		if !extension.SkipCreateExtension && extensionIsUsed && !extensionIsInstalled {
+			// The pool pins search_path with pg_catalog first. Under that pin a
+			// relocatable extension without an explicit SCHEMA targets pg_catalog,
+			// where object creation is denied ("System catalog modifications are
+			// currently disallowed"), so CREATE EXTENSION would fail. Set the
+			// standard "$user", public resolution for the statement so the
+			// extension lands in the user-data schema, matching pre-pin behavior.
+			// SET LOCAL is reverted at COMMIT, so the connection returns to the
+			// pool with the pinned search_path.
+			if _, err = tx.Exec(`SET LOCAL search_path TO "$user", public`); err != nil {
+				break
+			}
 			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", extension.Name))
 		} else if !extensionIsUsed && extensionIsInstalled {
 			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", extension.Name))
