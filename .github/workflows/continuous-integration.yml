@@ -451,6 +451,8 @@ jobs:
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
       images_matrix: ${{ steps.images_matrix.outputs.images_matrix }}
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -573,7 +575,7 @@ jobs:
           RACE: "true"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -636,12 +638,10 @@ jobs:
           accept-keywords: key
 
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master
-        if: |
-          !github.event.repository.fork &&
-          !github.event.pull_request.head.repo.fork
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        uses: snyk/actions/docker@8e119fbb6c251787721d34ba683ed48eba792766 # master
+        # Only run when a Snyk token is configured. Forks and downstream
+        # repositories without the secret skip this step automatically.
+        if: env.SNYK_TOKEN != ''
         with:
           image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile --username=${{ env.REGISTRY_USER }} --password=${{ env.REGISTRY_PASSWORD }}
@@ -729,7 +729,7 @@ jobs:
           ref: ${{ needs.buildx.outputs.commit }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false
@@ -850,7 +850,7 @@ jobs:
           version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           cache-image: false

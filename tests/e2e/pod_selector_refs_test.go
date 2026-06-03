@@ -29,6 +29,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -96,7 +98,7 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 			}
 			err = env.Client.Create(env.Ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 		})
 
 		It("resolves pod IPs in cluster status and expands pg_hba rules", func() {
@@ -120,8 +122,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 				query := "SELECT count(*) FROM pg_catalog.pg_hba_file_rules " +
 					"WHERE type = 'hostssl' AND auth_method = 'scram-sha-256' " +
 					"AND address IS NOT NULL AND netmask IS NOT NULL"
-				Eventually(QueryMatchExpectationPredicate(&podList.Items[0], postgres.PostgresDBName,
-					query, "0"), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, &podList.Items[0], postgres.PostgresDBName,
+					query, "0"),
+					RetryTimeout).Should(Succeed())
 			})
 
 			By("creating matching pods", func() {
@@ -171,8 +174,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 				query := "SELECT count(*) FROM pg_catalog.pg_hba_file_rules " +
 					"WHERE type = 'hostssl' AND auth_method = 'scram-sha-256' " +
 					"AND address IS NOT NULL AND (netmask = '255.255.255.255' OR netmask = 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')"
-				Eventually(QueryMatchExpectationPredicate(pod, postgres.PostgresDBName,
-					query, expectedCount), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, pod, postgres.PostgresDBName,
+					query, expectedCount),
+					RetryTimeout).Should(Succeed())
 
 				// Verify each pod IP appears in pg_hba_file_rules
 				for _, ip := range resolvedIPs {
@@ -180,8 +184,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 						"SELECT count(*) FROM pg_catalog.pg_hba_file_rules "+
 							"WHERE type = 'hostssl' AND auth_method = 'scram-sha-256' "+
 							"AND address = '%s'", ip)
-					Eventually(QueryMatchExpectationPredicate(pod, postgres.PostgresDBName,
-						ipQuery, "1"), RetryTimeout).Should(Succeed())
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, pod, postgres.PostgresDBName,
+						ipQuery, "1"),
+						RetryTimeout).Should(Succeed())
 				}
 			})
 
@@ -211,8 +216,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 				query := "SELECT count(*) FROM pg_catalog.pg_hba_file_rules " +
 					"WHERE type = 'hostssl' AND auth_method = 'scram-sha-256' " +
 					"AND address IS NOT NULL AND (netmask = '255.255.255.255' OR netmask = 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')"
-				Eventually(QueryMatchExpectationPredicate(instancePod, postgres.PostgresDBName,
-					query, "1"), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, instancePod, postgres.PostgresDBName,
+					query, "1"),
+					RetryTimeout).Should(Succeed())
 			})
 		})
 
@@ -276,8 +282,9 @@ var _ = Describe("Pod selector refs for pg_hba", Label(tests.LabelPostgresConfig
 				query := "SELECT count(*) FROM pg_catalog.pg_hba_file_rules " +
 					"WHERE type = 'host' AND auth_method = 'trust' " +
 					"AND address IS NOT NULL AND (netmask = '255.255.255.255' OR netmask = 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')"
-				Eventually(QueryMatchExpectationPredicate(instancePod, postgres.PostgresDBName,
-					query, "1"), RetryTimeout).Should(Succeed())
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, instancePod, postgres.PostgresDBName,
+					query, "1"),
+					RetryTimeout).Should(Succeed())
 			})
 		})
 	})

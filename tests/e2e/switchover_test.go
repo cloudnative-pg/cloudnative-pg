@@ -21,6 +21,9 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,10 +53,10 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
-			AssertSwitchover(namespace, clusterName, env)
-			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterHAReplicationSlots(namespace, clusterName)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithReplicationSlots)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
+			replicationasserts.AssertClusterHAReplicationSlots(env, namespace, clusterName)
 		})
 	})
 	Context("without HA Replication slots", func() {
@@ -66,9 +69,9 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithoutReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
-			AssertSwitchover(namespace, clusterName, env)
-			AssertPvcHasLabels(namespace, clusterName)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFileWithoutReplicationSlots)
+			clusterasserts.AssertSwitchover(env, testTimeouts, namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 	})
 })

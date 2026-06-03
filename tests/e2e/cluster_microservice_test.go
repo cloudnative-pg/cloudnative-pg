@@ -29,6 +29,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/importdb"
@@ -73,26 +78,28 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
-		tableLocator := TableLocator{
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertCreateTestData(env, tableLocator)
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data)
+		pgasserts.AssertCreateTestData(env, tableLocator)
+		pgasserts.AssertCreateTestDataLargeObject(env, namespace, sourceClusterName, oid, data)
 
 		importedClusterName = "cluster-pgdump-large-object"
-		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		tableLocator = TableLocator{
+		cluster := backupasserts.AssertClusterImport(
+			env, testTimeouts, namespace, importedClusterName, sourceClusterName, "app",
+		)
+		tableLocator = pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
-		AssertLargeObjectValue(namespace, importedClusterName, oid, data)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertLargeObjectValue(env, testTimeouts, namespace, importedClusterName, oid, data)
 		By("deleting the imported database", func() {
 			Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 		})
@@ -106,18 +113,18 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
 		importedClusterName = "cluster-pgdump"
-		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		tableLocator := TableLocator{
+		backupasserts.AssertClusterImport(env, testTimeouts, namespace, importedClusterName, sourceClusterName, "app")
+		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  importedClusterName,
 			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
-		AssertDataExpectedCount(env, tableLocator, 2)
+		pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
 	})
 
@@ -141,11 +148,11 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		Expect(err).ToNot(HaveOccurred())
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, sourceClusterName, sourceSampleFile)
 
 		importedClusterName = "cluster-pgdump-error"
 		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
-		CreateResourceFromFile(namespace, importClusterNonexistentDB)
+		resources.CreateResourceFromFile(env, namespace, importClusterNonexistentDB)
 		By("having a imported Cluster in failed state", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
@@ -254,8 +261,9 @@ func assertTableAndDataOnImportedCluster(
 		})
 
 		By("verifying the user named 'micro' on source is not in imported database", func() {
-			Eventually(QueryMatchExpectationPredicate(pod, postgres.PostgresDBName,
-				roleExistsQuery("micro"), "f"), 30).Should(Succeed())
+			Eventually(pgasserts.QueryMatchExpectationPredicate(env, pod, postgres.PostgresDBName,
+				pgasserts.RoleExistsQuery("micro"), "f"),
+				30).Should(Succeed())
 		})
 	})
 }
@@ -275,7 +283,7 @@ func assertImportRenamesSelectedDatabase(
 	clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 	Expect(err).ToNot(HaveOccurred())
 
-	AssertCreateCluster(namespace, clusterName, sampleFile, env)
+	clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 	primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -311,30 +319,32 @@ func assertImportRenamesSelectedDatabase(
 			importedClusterName, imageName, dbToImport)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, importedClusterName, 1000, env)
-		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 140)
+		clusterasserts.AssertClusterIsReady(env, namespace, importedClusterName, 1000)
+		replicationasserts.AssertClusterStandbysAreStreaming(env, namespace, importedClusterName, 140)
 	})
 
-	tableLocator := TableLocator{
+	tableLocator := pgasserts.TableLocator{
 		Namespace:    namespace,
 		ClusterName:  importedClusterName,
 		DatabaseName: postgres.AppDBName,
 		TableName:    tableName,
 	}
-	AssertDataExpectedCount(env, tableLocator, 2)
+	pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		importedPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, postgres.PostgresDBName,
-			roleExistsQuery("db2"), "f"), 30).Should(Succeed())
-		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, postgres.PostgresDBName,
-			roleExistsQuery("app"), "t"), 30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, importedPrimaryPod, postgres.PostgresDBName,
+			pgasserts.RoleExistsQuery("db2"), "f"),
+			30).Should(Succeed())
+		Eventually(pgasserts.QueryMatchExpectationPredicate(env, importedPrimaryPod, postgres.PostgresDBName,
+			pgasserts.RoleExistsQuery("app"), "t"),
+			30).Should(Succeed())
 	})
 
 	By("cleaning up the clusters", func() {
-		err = DeleteResourcesFromFile(namespace, sampleFile)
+		err = resources.DeleteResourcesFromFile(env, namespace, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(objects.Delete(env.Ctx, env.Client, importedCluster)).To(Succeed())

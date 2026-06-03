@@ -20,7 +20,7 @@ following the next three steps:
 ## Installation
 
 Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems),
-[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
+[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](#microsoft-wsl2)
 (feel free to submit a PR for any improvement you might think of).
 
 Once you have followed the instructions for your system, run the following
@@ -155,7 +155,7 @@ export GPG_TTY=$(tty)
 If you are using Docker Desktop, please make sure you follow the instructions in the
 ["Settings for Docker Desktop" section of the `kind` documentation](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop).
 
-MacOS Airplay uses port 5000 and can interfere with docker repository port. Make sure Airplay is off (System Preferences -> Share -> uncheck the Airplay checkbox).
+MacOS Airplay uses port 5000 and can interfere with the docker repository port. Make sure Airplay is off (System Preferences -> General -> Airdrop & Continuity -> uncheck the Airplay Receiver checkbox).
 
 ## Forking the repository
 
