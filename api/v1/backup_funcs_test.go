@@ -40,6 +40,7 @@ var _ = Describe("BackupStatus structure", func() {
 		status.SetAsPending()
 		Expect(status.Phase).To(BeEquivalentTo(BackupPhasePending))
 		Expect(status.IsInProgress()).To(BeTrue())
+		Expect(status.IsExecuting()).To(BeFalse())
 		Expect(status.IsDone()).To(BeFalse())
 	})
 
@@ -131,6 +132,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseRunning,
 				}
 				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsExecuting()).To(BeTrue())
 				Expect(b.IsDone()).To(BeFalse())
 			})
 		})
@@ -141,6 +143,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhasePending,
 				}
 				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeFalse())
 			})
 		})
@@ -151,6 +154,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseCompleted,
 				}
 				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeTrue())
 			})
 		})
@@ -161,6 +165,7 @@ var _ = Describe("BackupStatus structure", func() {
 					Phase: BackupPhaseFailed,
 				}
 				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsExecuting()).To(BeFalse())
 				Expect(b.IsDone()).To(BeTrue())
 			})
 		})
@@ -228,6 +233,70 @@ var _ = Describe("BackupList structure", func() {
 		Expect(backupList.Items[2].Name).To(Equal("backup-ten-minutes"))
 	})
 
+	It("can be sorted by creation time and name", func() {
+		now := time.Now()
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-now",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-ten-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-five-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute)),
+					},
+				},
+			},
+		}
+		backupList.SortByCreationTimeAndName()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-ten-minutes"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-five-minutes"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-now"))
+	})
+
+	It("breaks ties by name when creation times are equal", func() {
+		now := time.Now()
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-c",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-a",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-b",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+			},
+		}
+		backupList.SortByCreationTimeAndName()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-a"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-b"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-c"))
+	})
+
 	It("can isolate pending backups", func() {
 		backupList := BackupList{
 			Items: []Backup{
@@ -265,12 +334,20 @@ var _ = Describe("BackupList structure", func() {
 						Phase: BackupPhaseFailed,
 					},
 				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-7",
+					},
+					Status: BackupStatus{
+						Phase: BackupPhasePending,
+					},
+				},
 			},
 		}
 		backupList.SortByName()
 
 		pendingBackups := backupList.GetPendingBackupNames()
-		Expect(pendingBackups).To(ConsistOf("backup-1", "backup-2"))
+		Expect(pendingBackups).To(ConsistOf("backup-1", "backup-2", "backup-7"))
 	})
 })
 
@@ -402,6 +479,71 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
 			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
 			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("a newer pending backup sorts alphabetically before an older started one", func() {
+		// Regression guard for the preemption bug fixed in this change:
+		// an alphabetically-earlier Pending backup must not preempt an
+		// older Started backup that has already acquired resources.
+		It("keeps the older started backup as the elected one", func() {
+			now := time.Now()
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-a-newer",
+							CreationTimestamp: metav1.NewTime(now),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-z-older",
+							CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseStarted,
+						},
+					},
+				},
+			}
+
+			Expect(backupList.CanExecuteBackup("backup-z-older")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-a-newer")).To(BeFalse())
+		})
+	})
+
+	When("the only pending backups have diverging name and creation order", func() {
+		It("elects the oldest pending backup regardless of name", func() {
+			now := time.Now()
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-a-newer",
+							CreationTimestamp: metav1.NewTime(now),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "backup-z-older",
+							CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+						},
+						Status: BackupStatus{
+							Phase: BackupPhasePending,
+						},
+					},
+				},
+			}
+
+			Expect(backupList.CanExecuteBackup("backup-z-older")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-a-newer")).To(BeFalse())
 		})
 	})
 })
