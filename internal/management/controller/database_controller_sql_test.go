@@ -1050,7 +1050,6 @@ var _ = Describe("applyObjectPrivilege", func() {
 
 	AfterEach(func() {
 		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
-		Expect(db.Close()).To(Succeed())
 	})
 
 	It("is a no-op when there are no grantees", func(ctx SpecContext) {
