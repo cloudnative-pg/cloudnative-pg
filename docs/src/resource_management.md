@@ -116,3 +116,75 @@ section in the PostgreSQL documentation.
     ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
     page from the Kubernetes documentation.
 :::
+
+## Integration with the Vertical Pod Autoscaler (VPA)
+
+The `Cluster` CRD exposes the `scale` subresource together with the label
+selector for its instance pods. This makes a `Cluster` a valid `targetRef` for the
+[Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) <!-- wokeignore:rule=master -->
+(VPA), so VPA can observe the instance pods and emit CPU and memory
+recommendations for them.
+
+We recommend running VPA in **recommendation-only** mode
+(`updatePolicy.updateMode: Off`). In this mode VPA only reports its
+recommendations, which an operator can then apply to `spec.resources` of the
+`Cluster` through a normal manifest update; CloudNativePG performs the rolling
+update of the instances using its usual switchover-aware procedure. VPA
+produces a recommendation per container: use the one for the `postgres`
+container, since that is what `spec.resources` configures.
+
+Example targeting a `Cluster`:
+
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: cluster-example-vpa
+spec:
+  targetRef:
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: cluster-example
+  updatePolicy:
+    updateMode: "Off"
+```
+
+:::warning
+Do not use `updateMode: Auto`, `Recreate`, or `Initial` against a
+CloudNativePG-managed `Cluster`. The operator owns the pod specification and
+treats `spec.resources` of the `Cluster` as the source of truth: it does not
+adopt the resources VPA writes onto a running pod, so the live pod and the
+declared `spec.resources` silently diverge. Any tuning you sized against the
+declared resources (for example a `shared_buffers` value the operator
+validated against the memory request) no longer matches the pod's actual
+limits. VPA also evicts pods through the Kubernetes eviction API, bypassing
+the operator's switchover-aware sequencing; the default primary
+`PodDisruptionBudget` then blocks eviction of the primary, so VPA stalls
+instead of completing. Apply the VPA recommendations to the `Cluster` manifest
+manually instead.
+:::
+
+## Integration with the Horizontal Pod Autoscaler (HPA)
+
+The `scale` subresource also exposes `spec.instances`, so a
+[Horizontal Pod Autoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
+(HPA) can technically change the number of instances in a `Cluster`.
+In practice this is **not recommended** for a PostgreSQL cluster, for several
+reasons.
+
+Scaling a `Cluster` only adds or removes standby replicas; it never relieves
+write load on the primary. The selector exposed through the scale subresource
+matches the primary and all replicas, which have opposite workload profiles
+(write-heavy primary, read-only replicas), so the per-pod average that HPA
+computes from a CPU or memory metric is not a meaningful signal for any of
+them. Adding a replica only dilutes that average further without addressing a
+hot primary.
+
+HPA is also unaware of CloudNativePG's own constraints on `spec.instances`. If
+you configure synchronous replicas, a scale-down below `maxSyncReplicas + 1`
+instances is rejected by the validating webhook, and HPA keeps retrying a
+value it cannot satisfy.
+If you nonetheless drive `spec.instances` from an HPA, base it on a custom
+metric that actually reflects read replica load, and set `minReplicas` above
+the synchronous-replica floor. Review the impact on replication and quorum
+carefully first.

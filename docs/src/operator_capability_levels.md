@@ -586,7 +586,12 @@ The operator allows you to scale up and down the number of instances in a
 PostgreSQL cluster. New replicas are started up from the
 primary server and participate in the cluster's HA infrastructure.
 The CRD declares a "scale" subresource that allows you to use the
-`kubectl scale` command.
+`kubectl scale` command. The scale subresource also publishes the label
+selector of the managed instance pods, which lets autoscalers discover them.
+See the [Vertical Pod Autoscaler integration](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+for the recommended use, and the
+[Horizontal Pod Autoscaler integration](resource_management.md#integration-with-the-horizontal-pod-autoscaler-hpa)
+for the caveats that apply to HPA.
 
 ### Maintenance window and PodDisruptionBudget for Kubernetes nodes
 
@@ -635,6 +640,10 @@ to clone the data from the primary again.
 The operator allows administrators to control and manage resource usage by
 the cluster's pods in the `resources` section of the manifest. In
 particular, you can set `requests` and `limits` values for both CPU and RAM.
+Because the `Cluster` exposes a label selector through its scale subresource,
+it can also be used as a target for the
+[Vertical Pod Autoscaler](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+in recommendation-only mode, to obtain sizing suggestions for these values.
 
 ### Connection pooling with PgBouncer
 
