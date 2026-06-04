@@ -121,7 +121,7 @@ section in the PostgreSQL documentation.
 
 The `Cluster` CRD exposes the `scale` subresource together with the label
 selector for its instance pods. This makes a `Cluster` a valid `targetRef` for the
-[Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
+[Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) <!-- wokeignore:rule=master -->
 (VPA), so VPA can observe the instance pods and emit CPU and memory
 recommendations for them.
 
