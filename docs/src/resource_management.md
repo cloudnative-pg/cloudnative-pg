@@ -117,12 +117,11 @@ section in the PostgreSQL documentation.
     page from the Kubernetes documentation.
 :::
 
-## Sizing recommendations with the Vertical Pod Autoscaler
+## Integration with the Vertical Pod Autoscaler (VPA)
 
 The `Cluster` CRD exposes the `scale` subresource together with the label
-selector for its instance pods. This makes a `Cluster` a valid `targetRef` for
-the
-[Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) <!-- wokeignore:rule=master -->
+selector for its instance pods. This makes a `Cluster` a valid `targetRef` for the
+[Vertical Pod Autoscaler](https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/)
 (VPA), so VPA can observe the instance pods and emit CPU and memory
 recommendations for them.
 
@@ -159,10 +158,11 @@ changes them again. Apply the VPA recommendations to the `Cluster` manifest
 manually instead.
 :::
 
-## Horizontal scaling
+## Integration with the Horizontal Pod Autoscaler (HPA)
 
-The `scale` subresource also exposes `spec.instances`, so a
-`HorizontalPodAutoscaler` can change the number of instances in a `Cluster`.
+The `scale` subresource also exposes `spec.instances`, so the
+[Horizontal Pod Autoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
+(HPA) can change the number of instances in a `Cluster`.
 For PostgreSQL this only adds or removes standby replicas — it does not
 relieve write load on the primary — and the chosen metrics need to make sense
 for a stateful database (CPU/memory typically do not). Review the impact on
