@@ -2,7 +2,7 @@ title: CloudNativePG Operator Capability Catalog
 metadata:
   id: CNPG.CAPABILITIES
   type: CapabilityCatalog
-  gemara-version: "1.0.0"
+  gemara-version: "1.2.0"
   description: >
     Capabilities provided by the CloudNativePG operator for managing
     PostgreSQL clusters on Kubernetes.
