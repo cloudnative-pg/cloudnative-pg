@@ -2,7 +2,7 @@ title: CloudNativePG Operator Threat Catalog
 metadata:
   id: CNPG.THREATS
   type: ThreatCatalog
-  gemara-version: "1.0.0"
+  gemara-version: "1.2.0"
   description: >
     Threat catalog for the CloudNativePG operator, documenting threats
     specific to operating PostgreSQL clusters on Kubernetes.
