@@ -36,29 +36,61 @@ import (
 )
 
 const (
-	// leaseDuration is how long a lease is valid before it expires.
-	leaseDuration = 15 * time.Second
+	// defaultLeaseDuration is how long a lease is valid before it expires.
+	defaultLeaseDuration = 15 * time.Second
 
-	// renewDeadline is how long the holder tries to renew before giving up.
-	renewDeadline = 10 * time.Second
+	// defaultRenewDeadline is how long the holder tries to renew before giving up.
+	defaultRenewDeadline = 10 * time.Second
 
-	// retryPeriod is how frequently a non-holder retries acquiring the lease.
-	retryPeriod = 2 * time.Second
+	// defaultRetryPeriod is how frequently a non-holder retries acquiring the lease.
+	defaultRetryPeriod = 2 * time.Second
 
-	// releasedLeaseDurationSeconds is the TTL written when explicitly releasing
+	// defaultReleasedLeaseDuration is the TTL written when explicitly releasing
 	// the lease. An empty HolderIdentity already marks the lease as free, but
 	// setting the duration to 1 second mirrors the k8s leaderelection.release()
 	// behaviour and acts as belt-and-suspenders: even if an acquirer does not
 	// treat an empty identity as immediately available, it waits at most one
 	// second before the TTL expires and it can take the lease.
-	releasedLeaseDurationSeconds = 1
+	defaultReleasedLeaseDuration = 1 * time.Second
 )
+
+// Config holds the tunable timings of the primary lease. They mirror the
+// underlying Kubernetes leader-election parameters and are sourced from the
+// Cluster's `.spec.primaryLease` stanza (falling back to the defaults above
+// when unset).
+type Config struct {
+	// LeaseDuration is how long a lease is valid before it expires.
+	LeaseDuration time.Duration
+
+	// RenewDeadline is how long the holder tries to renew before giving up.
+	RenewDeadline time.Duration
+
+	// RetryPeriod is how frequently a non-holder retries acquiring the lease.
+	RetryPeriod time.Duration
+
+	// ReleasedLeaseDuration is the TTL written when explicitly releasing the lease.
+	ReleasedLeaseDuration time.Duration
+}
+
+// defaultConfig returns the built-in primary lease timings.
+func defaultConfig() Config {
+	return Config{
+		LeaseDuration:         defaultLeaseDuration,
+		RenewDeadline:         defaultRenewDeadline,
+		RetryPeriod:           defaultRetryPeriod,
+		ReleasedLeaseDuration: defaultReleasedLeaseDuration,
+	}
+}
 
 // Runnable manages the primary lease for this instance.
 // It starts idle and enters the acquisition/renewal loop only after Acquire is called.
 type Runnable struct {
 	instance *postgres.Instance
 	lock     *resourcelock.LeaseLock
+
+	// config holds the lease timings. It is initialised to the defaults by New
+	// and overwritten by the first Acquire call before the runnable activates.
+	config Config
 
 	// activateCh is closed by the first Acquire call to unblock Start.
 	activateCh   chan struct{}
@@ -76,6 +108,7 @@ func New(
 ) *Runnable {
 	return &Runnable{
 		instance: instance,
+		config:   defaultConfig(),
 		lock: &resourcelock.LeaseLock{
 			LeaseMeta: metav1.ObjectMeta{
 				Namespace: instance.GetNamespaceName(),
@@ -91,12 +124,17 @@ func New(
 	}
 }
 
-// Acquire signals the runnable to start competing for the lease,
-// then blocks until the lease is held or ctx is cancelled.
-func (r *Runnable) Acquire(ctx context.Context) error {
+// Acquire signals the runnable to start competing for the lease using the
+// provided configuration, then blocks until the lease is held or ctx is
+// cancelled. The configuration is only applied by the first call; subsequent
+// calls reuse the timings captured at activation time.
+func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 	contextLogger := log.FromContext(ctx)
 
 	r.activateOnce.Do(func() {
+		// Set the config before closing activateCh: the channel close
+		// establishes the happens-before edge that lets Start read it safely.
+		r.config = config
 		contextLogger.Info("Acquiring primary lease")
 		close(r.activateCh)
 	})
@@ -136,7 +174,7 @@ func (r *Runnable) Release(ctx context.Context) error {
 		return nil
 	}
 	return r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
-		LeaseDurationSeconds: releasedLeaseDurationSeconds,
+		LeaseDurationSeconds: int(r.config.ReleasedLeaseDuration / time.Second),
 	})
 }
 
@@ -186,9 +224,9 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	for {
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            r.lock,
-			LeaseDuration:   leaseDuration,
-			RenewDeadline:   renewDeadline,
-			RetryPeriod:     retryPeriod,
+			LeaseDuration:   r.config.LeaseDuration,
+			RenewDeadline:   r.config.RenewDeadline,
+			RetryPeriod:     r.config.RetryPeriod,
 			ReleaseOnCancel: false, // lease is released explicitly via Release()
 			Name:            r.instance.GetClusterName(),
 			Callbacks: leaderelection.LeaderCallbacks{
@@ -219,7 +257,7 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		// le.Run exited unexpectedly. Read the lease to distinguish a transient
 		// renewal failure (we still hold it) from genuine preemption (another pod
 		// holds it or the object is gone).
-		checkCtx, checkCancel := context.WithTimeout(ctx, retryPeriod)
+		checkCtx, checkCancel := context.WithTimeout(ctx, r.config.RetryPeriod)
 		record, _, checkErr := r.lock.Get(checkCtx)
 		checkCancel()
 

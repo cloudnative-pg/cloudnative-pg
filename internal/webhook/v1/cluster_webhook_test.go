@@ -1997,6 +1997,60 @@ var _ = Describe("Number of synchronous replicas", func() {
 	})
 })
 
+var _ = Describe("validatePrimaryLease", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("is valid when the stanza is omitted", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("is valid with the default timings", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("rejects a lease duration not greater than the renew deadline", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("validates a partially-specified stanza against the defaults", func() {
+		// Only renewDeadline is set; leaseDuration falls back to the default (15),
+		// which is still greater than the configured renew deadline.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					RenewDeadlineSeconds: ptr.To(int32(12)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+
+		// A renew deadline at or above the default lease duration is rejected.
+		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = ptr.To(int32(20))
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+})
+
 var _ = Describe("validateSynchronousReplicaConfiguration", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {

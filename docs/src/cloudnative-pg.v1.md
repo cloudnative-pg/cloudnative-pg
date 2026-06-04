@@ -639,6 +639,7 @@ _Appears in:_
 | `enablePDB` _boolean_ | Manage the `PodDisruptionBudget` resources within the cluster. When<br />configured as `true` (default setting), the pod disruption budgets<br />will safeguard the primary node from being terminated. Conversely,<br />setting it to `false` will result in the absence of any<br />`PodDisruptionBudget` resource, permitting the shutdown of all nodes<br />hosting the PostgreSQL cluster. This latter configuration is<br />advisable for any PostgreSQL cluster employed for<br />development/staging purposes. |  | true |  |
 | `plugins` _[PluginConfiguration](#pluginconfiguration) array_ | The plugins configuration, containing<br />any plugin to be loaded with the corresponding configuration |  |  |  |
 | `probes` _[ProbesConfiguration](#probesconfiguration)_ | The configuration of the probes to be injected<br />in the PostgreSQL Pods. |  |  |  |
+| `primaryLease` _[PrimaryLeaseConfiguration](#primaryleaseconfiguration)_ | Configuration of the Kubernetes `Lease` used to coordinate safe primary<br />election within the cluster. When omitted, the operator applies built-in<br />defaults; tune these values only if you understand the consequences for<br />failover timing. |  |  |  |
 
 
 #### ClusterStatus
@@ -2223,6 +2224,29 @@ _Appears in:_
 | `promotionTimeout` _integer_ | Specifies the maximum number of seconds to wait when promoting an instance to primary.<br />Default value is 40000000, greater than one year in seconds,<br />big enough to simulate an infinite timeout |  |  |  |
 | `enableAlterSystem` _boolean_ | If this parameter is true, the user will be able to invoke `ALTER SYSTEM`<br />on this CloudNativePG Cluster.<br />This should only be used for debugging and troubleshooting.<br />Defaults to false. |  |  |  |
 | `extensions` _[ExtensionConfiguration](#extensionconfiguration) array_ | The configuration of the extensions to be added |  |  |  |
+
+
+#### PrimaryLeaseConfiguration
+
+
+
+PrimaryLeaseConfiguration configures the timings of the Kubernetes `Lease`
+that the primary instance holds and renews to coordinate a safe primary
+election. These values map directly onto the underlying Kubernetes
+leader-election parameters.
+
+
+
+_Appears in:_
+
+- [ClusterSpec](#clusterspec)
+
+| Field | Description | Required | Default | Validation |
+| --- | --- | --- | --- | --- |
+| `leaseDurationSeconds` _integer_ | How long, in seconds, the primary lease is considered valid before it<br />expires and another instance may acquire it. It must be greater than<br />`renewDeadlineSeconds`.<br />Defaults to 15. |  | 15 | Minimum: 1 <br /> |
+| `renewDeadlineSeconds` _integer_ | How long, in seconds, the current primary keeps retrying to renew the<br />lease before giving up and stopping. It must be smaller than<br />`leaseDurationSeconds`.<br />Defaults to 10. |  | 10 | Minimum: 1 <br /> |
+| `retryPeriodSeconds` _integer_ | How frequently, in seconds, a non-holder instance retries acquiring or<br />renewing the lease.<br />Defaults to 2. |  | 2 | Minimum: 1 <br /> |
+| `releasedLeaseDurationSeconds` _integer_ | The TTL, in seconds, written when the primary explicitly releases the<br />lease on a clean shutdown, allowing a replica to promote without waiting<br />for the full lease duration to expire.<br />Defaults to 1. |  | 1 | Minimum: 1 <br /> |
 
 
 #### PrimaryUpdateMethod

@@ -202,6 +202,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validatePodSelectorRefs,
 		v.validateExtensions,
 		v.validateServiceAccountConfig,
+		v.validatePrimaryLease,
 	}
 
 	for _, validate := range validations {
@@ -1571,6 +1572,39 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 			field.NewPath("spec", "minSyncReplicas"),
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
+	}
+
+	return result
+}
+
+// validatePrimaryLease checks the consistency of the primary lease timings.
+// The underlying Kubernetes leader election requires the lease duration to be
+// strictly greater than the renew deadline, otherwise the holder can never
+// renew in time and the cluster would flap.
+func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	lease := r.Spec.PrimaryLease
+	if lease == nil {
+		return result
+	}
+
+	basePath := field.NewPath("spec", "primaryLease")
+
+	leaseDuration := apiv1.DefaultPrimaryLeaseDurationSeconds
+	if lease.LeaseDurationSeconds != nil {
+		leaseDuration = int(*lease.LeaseDurationSeconds)
+	}
+	renewDeadline := apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds
+	if lease.RenewDeadlineSeconds != nil {
+		renewDeadline = int(*lease.RenewDeadlineSeconds)
+	}
+
+	if leaseDuration <= renewDeadline {
+		result = append(result, field.Invalid(
+			basePath.Child("leaseDurationSeconds"),
+			leaseDuration,
+			"leaseDurationSeconds must be greater than renewDeadlineSeconds"))
 	}
 
 	return result
