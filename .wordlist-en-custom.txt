@@ -398,6 +398,7 @@ PostInitSQLRefs
 PostInitTemplateSQLRefs
 Postgres
 PostgresConfiguration
+PrimaryLeaseConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateMethodRestart
 PrimaryUpdateMethodSwitchover
@@ -546,6 +547,7 @@ TLS
 TLSv
 TOC
 TODO
+TTL
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
@@ -1320,6 +1322,7 @@ preload
 prepended
 primaryUpdateMethod
 primaryUpdateStrategy
+primaryleaseconfiguration
 primaryupdatemethod
 primaryupdatestrategy
 priorityClassName

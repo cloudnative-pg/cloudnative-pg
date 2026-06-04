@@ -21,6 +21,7 @@ package lease
 
 import (
 	"context"
+	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +74,12 @@ var _ = Describe("Runnable.Release", func() {
 		return *lease.Spec.HolderIdentity
 	}
 
+	getDuration := func(ctx context.Context, kubeClient *fake.Clientset) *int32 {
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		return lease.Spec.LeaseDurationSeconds
+	}
+
 	It("is a no-op when the lease object does not exist", func(ctx context.Context) {
 		kubeClient := fake.NewClientset()
 		r := newRunnable(kubeClient)
@@ -111,4 +118,25 @@ var _ = Describe("Runnable.Release", func() {
 			Expect(r.Release(ctx)).To(Succeed())
 			Expect(getHolder(ctx, kubeClient)).To(BeEmpty())
 		})
+
+	It("writes the default released-lease TTL when no config was applied", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		createLease(ctx, kubeClient, thisPod)
+
+		Expect(r.Release(ctx)).To(Succeed())
+		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(1))))
+	})
+
+	It("writes the configured released-lease TTL", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		createLease(ctx, kubeClient, thisPod)
+		// Simulate the config captured by a previous Acquire call.
+		r.config.ReleasedLeaseDuration = 5 * time.Second
+
+		Expect(r.Release(ctx)).To(Succeed())
+		Expect(getHolder(ctx, kubeClient)).To(BeEmpty())
+		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(5))))
+	})
 })

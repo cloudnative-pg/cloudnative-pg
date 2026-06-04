@@ -4747,6 +4747,53 @@ spec:
                         || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
                         || self.standbyNamesPost.size()==0))
                 type: object
+              primaryLease:
+                description: |-
+                  Configuration of the Kubernetes `Lease` used to coordinate safe primary
+                  election within the cluster. When omitted, the operator applies built-in
+                  defaults; tune these values only if you understand the consequences for
+                  failover timing.
+                properties:
+                  leaseDurationSeconds:
+                    default: 15
+                    description: |-
+                      How long, in seconds, the primary lease is considered valid before it
+                      expires and another instance may acquire it. It must be greater than
+                      `renewDeadlineSeconds`.
+                      Defaults to 15.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  releasedLeaseDurationSeconds:
+                    default: 1
+                    description: |-
+                      The TTL, in seconds, written when the primary explicitly releases the
+                      lease on a clean shutdown, allowing a replica to promote without waiting
+                      for the full lease duration to expire.
+                      Defaults to 1.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  renewDeadlineSeconds:
+                    default: 10
+                    description: |-
+                      How long, in seconds, the current primary keeps retrying to renew the
+                      lease before giving up and stopping. It must be smaller than
+                      `leaseDurationSeconds`.
+                      Defaults to 10.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  retryPeriodSeconds:
+                    default: 2
+                    description: |-
+                      How frequently, in seconds, a non-holder instance retries acquiring or
+                      renewing the lease.
+                      Defaults to 2.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
               primaryUpdateMethod:
                 default: restart
                 description: |-

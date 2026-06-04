@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lease"
 	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
@@ -1189,7 +1190,13 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	acquireCtx, acquireCancel := context.WithTimeout(ctx, primaryLeaseAcquireTimeout)
 	defer acquireCancel()
-	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx); err != nil {
+	leaseConfig := lease.Config{
+		LeaseDuration:         cluster.GetPrimaryLeaseDuration(),
+		RenewDeadline:         cluster.GetPrimaryLeaseRenewDeadline(),
+		RetryPeriod:           cluster.GetPrimaryLeaseRetryPeriod(),
+		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
+	}
+	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			contextLogger.Warning("Primary lease not yet acquired, retrying")
 			return reconcile.Result{RequeueAfter: primaryLeaseAcquireTimeout}, nil

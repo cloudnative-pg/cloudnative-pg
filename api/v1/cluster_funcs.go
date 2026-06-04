@@ -757,6 +757,40 @@ func (cluster *Cluster) GetRestartTimeout() time.Duration {
 	return time.Duration(cluster.GetMaxStopDelay()+cluster.GetMaxStartDelay()) * time.Second
 }
 
+// GetPrimaryLeaseDuration returns how long the primary lease is valid before it expires
+func (cluster *Cluster) GetPrimaryLeaseDuration() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.LeaseDurationSeconds != nil {
+		return time.Duration(*l.LeaseDurationSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseDurationSeconds * time.Second
+}
+
+// GetPrimaryLeaseRenewDeadline returns how long the primary keeps trying to renew the lease
+// before giving up
+func (cluster *Cluster) GetPrimaryLeaseRenewDeadline() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.RenewDeadlineSeconds != nil {
+		return time.Duration(*l.RenewDeadlineSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseRenewDeadlineSeconds * time.Second
+}
+
+// GetPrimaryLeaseRetryPeriod returns how frequently a non-holder retries acquiring the lease
+func (cluster *Cluster) GetPrimaryLeaseRetryPeriod() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.RetryPeriodSeconds != nil {
+		return time.Duration(*l.RetryPeriodSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseRetryPeriodSeconds * time.Second
+}
+
+// GetPrimaryLeaseReleasedDuration returns the TTL written when the primary explicitly releases
+// the lease on a clean shutdown
+func (cluster *Cluster) GetPrimaryLeaseReleasedDuration() time.Duration {
+	if l := cluster.Spec.PrimaryLease; l != nil && l.ReleasedLeaseDurationSeconds != nil {
+		return time.Duration(*l.ReleasedLeaseDurationSeconds) * time.Second
+	}
+	return DefaultPrimaryLeaseReleasedDurationSeconds * time.Second
+}
+
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
 func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	if cluster.Spec.MaxSwitchoverDelay > 0 {
