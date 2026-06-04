@@ -959,6 +959,7 @@ historyTags
 hostPort
 hostname
 hostssl
+hpa
 href
 html
 http
@@ -1616,6 +1617,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vpa
 waitForArchive
 wal
 walCapabilities
