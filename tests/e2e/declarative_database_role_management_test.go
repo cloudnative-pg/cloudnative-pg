@@ -35,6 +35,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
@@ -79,7 +82,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 		})
 
@@ -179,7 +182,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				roleObjectName string
 			)
 			By("applying DatabaseRole CRD manifest", func() {
-				CreateResourceFromFile(namespace, roleManifest)
+				resources.CreateResourceFromFile(env, namespace, roleManifest)
 				roleObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, roleManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -203,7 +206,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
 					roleExistsQuery(role.Spec.Name), "t"), 30).Should(Succeed())
 
 				assertRoleHasExpectedFields(namespace, primaryPodInfo.Name, role)
@@ -213,7 +216,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
 					roleExistsQuery(role.Spec.Name), "t"), 30).Should(Succeed())
 
 				assertInRoles(namespace, primaryPodInfo.Name, role.Spec.Name, role.Spec.InRoles)
@@ -227,7 +230,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
+				Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
 					roleExistsQuery(role.Spec.Name), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
 			})
 		}
@@ -515,7 +518,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 				By("checking if we can connect to PostgreSQL using specified password", func() {
 					rwService := services.GetReadWriteServiceName(clusterName)
-					AssertConnection(namespace, rwService, postgres.PostgresDBName, pgRoleName, initialPassword, env)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, pgRoleName, initialPassword)
 				})
 
 				By("changing the password in the secret", func() {
@@ -533,7 +536,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 
 				By("checking if we can connect to PostgreSQL using the new password", func() {
 					rwService := services.GetReadWriteServiceName(clusterName)
-					AssertConnection(namespace, rwService, postgres.PostgresDBName, pgRoleName, newPassword, env)
+					pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, pgRoleName, newPassword)
 				})
 			})
 		})
@@ -558,7 +561,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 		})
 
@@ -651,14 +654,14 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 			})
 			By("creating the role", func() {
 				roleManifest := fixturesDir +
 					"/declarative_roles/databaserole-with-delete-reclaim-policy.yaml.template"
 				roleObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, roleManifest)
 				Expect(err).NotTo(HaveOccurred())
-				CreateResourceFromFile(namespace, roleManifest)
+				resources.CreateResourceFromFile(env, namespace, roleManifest)
 			})
 			By("ensuring the role is reconciled successfully", func() {
 				// get role object
@@ -683,3 +686,15 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 		})
 	})
 })
+
+func roleExistsQuery(roleName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%v')", roleName)
+}
+
+func boolPGOutput(expectedValue bool) string {
+	stringExpectedValue := "f"
+	if expectedValue {
+		stringExpectedValue = "t"
+	}
+	return stringExpectedValue
+}
