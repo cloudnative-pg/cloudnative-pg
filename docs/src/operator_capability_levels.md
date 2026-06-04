@@ -590,8 +590,11 @@ PostgreSQL cluster. New replicas are started up from the
 primary server and participate in the cluster's HA infrastructure.
 The CRD declares a "scale" subresource that allows you to use the
 `kubectl scale` command. The scale subresource also publishes the label
-selector of the managed instance pods, so the `Cluster` can be targeted by a
-[Horizontal Pod Autoscaler](resource_management.md#integration-with-the-horizontal-pod-autoscaler-hpa).
+selector of the managed instance pods, which lets autoscalers discover them.
+See the [Vertical Pod Autoscaler integration](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+for the recommended use, and the
+[Horizontal Pod Autoscaler integration](resource_management.md#integration-with-the-horizontal-pod-autoscaler-hpa)
+for the caveats that apply to HPA.
 
 ### Maintenance window and PodDisruptionBudget for Kubernetes nodes
 

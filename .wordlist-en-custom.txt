@@ -638,6 +638,7 @@ authn
 authz
 autocompletion
 autoscaler
+autoscalers
 autovacuum
 availableArchitectures
 availablearchitecture

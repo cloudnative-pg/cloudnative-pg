@@ -193,6 +193,9 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		selectorString := cluster.GetInstancesSelector()
 
+		// GetInstancesSelector serializes through labels.SelectorFromSet, which
+		// sorts requirements by key. The cluster label key sorts before the pod
+		// role label key, so the expected string lists them in that order.
 		expected := fmt.Sprintf("%s=%s,%s=%s",
 			utils.ClusterLabelName, cluster.Name,
 			utils.PodRoleLabelName, string(utils.PodRoleInstance))
