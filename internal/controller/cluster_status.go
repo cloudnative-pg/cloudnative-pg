@@ -281,6 +281,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
 	cluster.Status.ReadService = cluster.GetServiceReadName()
 
+	// Expose the label selector for the scale sub-resource so autoscalers
+	// (HPA, VPA) can discover the instance pods managed by this cluster.
+	cluster.Status.Selector = cluster.GetInstancesSelector()
+
 	// If we are switching, check if the target primary is still active
 	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&

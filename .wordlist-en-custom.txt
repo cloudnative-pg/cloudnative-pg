@@ -206,6 +206,7 @@ GoogleCredentials
 Grafana
 GrantUsageSpecType
 HH
+HPA
 HashiCorp
 HistoryTags
 Homebrew
@@ -570,6 +571,7 @@ VLDBs
 VM
 VMs
 VOLNAME
+VPA
 ValidationError
 VirtualBox
 VolumeSnapshot
@@ -642,6 +644,7 @@ authn
 authz
 autocompletion
 autoscaler
+autoscalers
 autovacuum
 availableArchitectures
 availablearchitecture
@@ -964,6 +967,7 @@ historyTags
 hostPort
 hostname
 hostssl
+hpa
 href
 html
 http
@@ -1622,6 +1626,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vpa
 waitForArchive
 wal
 walCapabilities

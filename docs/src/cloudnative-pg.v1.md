@@ -647,6 +647,7 @@ _Appears in:_
 | --- | --- | --- | --- | --- |
 | `instances` _integer_ | The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods. |  |  |  |
 | `readyInstances` _integer_ | The total number of ready instances in the cluster. It is equal to the number of ready instance pods. |  |  |  |
+| `selector` _string_ | Selector is the serialized form of the label selector that identifies<br />the pods managed by this cluster. Populated by the operator and exposed<br />through the scale sub-resource so an autoscaler (such as HPA or VPA)<br />can discover the managed instance pods. |  |  |  |
 | `instancesStatus` _object (keys:[PodStatus](#podstatus), values:string array)_ | InstancesStatus indicates in which status the instances are |  |  |  |
 | `instancesReportedState` _object (keys:[PodName](#podname), values:[InstanceReportedState](#instancereportedstate))_ | The reported state of the instances during the last reconciliation loop |  |  |  |
 | `managedRolesStatus` _[ManagedRoles](#managedroles)_ | ManagedRolesStatus reports the state of the managed roles in the cluster |  |  |  |
