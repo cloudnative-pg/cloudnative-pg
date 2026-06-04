@@ -138,12 +138,12 @@ Example targeting a `Cluster`:
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: my-cluster-vpa
+  name: cluster-example-vpa
 spec:
   targetRef:
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
-    name: my-cluster
+    name: cluster-example
   updatePolicy:
     updateMode: "Off"
 ```
