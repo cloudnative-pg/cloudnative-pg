@@ -46,7 +46,7 @@ permissions: read-all
 env:
   KUBEBUILDER_VERSION: "2.3.1"
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
-  KIND_VERSION: "v0.31.0"
+  KIND_VERSION: "v0.32.0"
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
   K3D_VERSION: "v5.8.3"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
@@ -340,7 +340,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
@@ -557,7 +557,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -644,7 +644,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -727,7 +727,7 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -920,7 +920,7 @@ jobs:
           df -h
           echo "-----------------------------------------------------"
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
       - name: Install Go
@@ -1136,7 +1136,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1486,7 +1486,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-test-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX}" | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -1523,7 +1523,7 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo@v2.29.0
       -
         name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -1874,7 +1874,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
       -
@@ -2203,7 +2203,7 @@ jobs:
           echo "CLUSTER_NAME=${E2E_SUFFIX}-ocp-${GITHUB_RUN_NUMBER}-$( echo "${MATRIX_K8S_VERSION}" | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
