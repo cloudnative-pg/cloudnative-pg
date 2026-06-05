@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +45,8 @@ var primaryLeasePredicate = predicate.Funcs{
 // reconcilePrimaryLease ensures a Lease object named after the cluster exists and is owned by it.
 // The instance manager uses this lease as a primary-election mutex.
 func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	lease := coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
@@ -52,10 +55,18 @@ func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *
 	}
 	cluster.SetInheritedDataAndOwnership(&lease.ObjectMeta)
 
-	err := r.Create(ctx, &lease)
-	if err != nil && !apierrs.IsAlreadyExists(err) {
+	switch err := r.Create(ctx, &lease); {
+	case apierrs.IsAlreadyExists(err):
+		// Steady state: the lease already exists, nothing to do. This is the
+		// common path on every reconcile, so it is intentionally not logged.
+		return nil
+	case err != nil:
 		return err
 	}
 
+	// The Create succeeded, meaning the lease was absent: either the cluster was
+	// just bootstrapped, or the lease was deleted and this reconcile (triggered by
+	// the deletion watch) is recreating it.
+	contextLogger.Info("Created primary lease", "leaseName", lease.Name)
 	return nil
 }
