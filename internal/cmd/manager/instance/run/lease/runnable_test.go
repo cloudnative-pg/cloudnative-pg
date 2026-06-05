@@ -140,3 +140,80 @@ var _ = Describe("Runnable.Release", func() {
 		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(5))))
 	})
 })
+
+var _ = Describe("Runnable.Acquire", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+	)
+
+	var first, second Config
+
+	newRunnable := func() *Runnable {
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		return New(fake.NewClientset(), instance)
+	}
+
+	// markHeld simulates the lease having been acquired so Acquire can return
+	// without a running leader-election loop behind it.
+	markHeld := func(r *Runnable) {
+		r.heldOnce.Do(func() { close(r.heldCh) })
+	}
+
+	BeforeEach(func() {
+		first = Config{
+			LeaseDuration:         30 * time.Second,
+			RenewDeadline:         20 * time.Second,
+			RetryPeriod:           4 * time.Second,
+			ReleasedLeaseDuration: 2 * time.Second,
+		}
+		second = Config{
+			LeaseDuration:         60 * time.Second,
+			RenewDeadline:         40 * time.Second,
+			RetryPeriod:           8 * time.Second,
+			ReleasedLeaseDuration: 5 * time.Second,
+		}
+	})
+
+	It("returns nil once the lease is held", func(ctx context.Context) {
+		r := newRunnable()
+		markHeld(r)
+
+		Expect(r.Acquire(ctx, first)).To(Succeed())
+	})
+
+	It("captures the configuration and activates the runnable on the first call", func(ctx context.Context) {
+		r := newRunnable()
+		markHeld(r)
+
+		Expect(r.Acquire(ctx, first)).To(Succeed())
+		Expect(r.config).To(Equal(first))
+		// activateCh is closed so a started Start() would proceed to the election loop.
+		Expect(r.activateCh).To(BeClosed())
+	})
+
+	It("ignores the configuration supplied by later calls", func(ctx context.Context) {
+		r := newRunnable()
+		markHeld(r)
+
+		Expect(r.Acquire(ctx, first)).To(Succeed())
+		Expect(r.Acquire(ctx, second)).To(Succeed())
+		// The second config must be dropped: timings are captured once, at activation.
+		Expect(r.config).To(Equal(first))
+	})
+
+	It("returns the context error when the lease is not acquired before the deadline",
+		func(specCtx context.Context) {
+			r := newRunnable()
+			// heldCh is never closed: no leader-election loop is running here, so the
+			// only way Acquire returns is by hitting the caller-provided deadline.
+			acquireCtx, cancel := context.WithTimeout(specCtx, 50*time.Millisecond)
+			defer cancel()
+
+			Expect(r.Acquire(acquireCtx, first)).To(MatchError(context.DeadlineExceeded))
+		})
+})
