@@ -67,6 +67,30 @@ election, and complements the [primary isolation](instance_manager.md#primary-is
 check performed by the liveness probe: the lease coordinates *who is allowed to
 promote*, while the isolation check fences a primary that has lost connectivity.
 
+### Inspecting the primary lease
+
+The lease shares the cluster's name, so you can inspect it directly. For a
+cluster called `cluster-example`:
+
+```sh
+kubectl get lease cluster-example
+```
+
+The `HOLDER` column reports the pod that currently holds the lease, which is the
+current primary:
+
+```console
+NAME              HOLDER              AGE
+cluster-example   cluster-example-1   5m
+```
+
+For the full picture — including the lease duration in effect and the last
+renewal time — use:
+
+```sh
+kubectl get lease cluster-example -o yaml
+```
+
 ### Tuning the primary lease
 
 The lease timings are exposed under `.spec.primaryLease` and default to values
