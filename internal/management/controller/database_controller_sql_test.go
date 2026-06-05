@@ -1016,3 +1016,100 @@ var _ = Describe("Managed Foreign Server SQL", func() {
 		})
 	})
 })
+
+var _ = Describe("sanitizeGrantee", func() {
+	It("renders the PUBLIC pseudo-role verbatim, case-insensitively", func() {
+		Expect(sanitizeGrantee("public")).To(Equal("PUBLIC"))
+		Expect(sanitizeGrantee("PUBLIC")).To(Equal("PUBLIC"))
+		Expect(sanitizeGrantee("Public")).To(Equal("PUBLIC"))
+	})
+
+	It("quotes ordinary roles as identifiers", func() {
+		Expect(sanitizeGrantee("app")).To(Equal("\"app\""))
+	})
+
+	It("safely quotes roles containing special characters", func() {
+		Expect(sanitizeGrantee("weird\"name")).To(Equal("\"weird\"\"name\""))
+	})
+})
+
+var _ = Describe("applyObjectPrivilege", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("is a no-op when there are no grantees", func(ctx SpecContext) {
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", nil)).
+			Error().NotTo(HaveOccurred())
+	})
+
+	It("emits the supplied privilege keyword on GRANT", func(ctx SpecContext) {
+		dbMock.ExpectExec("GRANT CONNECT ON DATABASE \"app\" TO \"angus\"").
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		grantees := []apiv1.UsageSpec{{Name: "angus", Type: apiv1.GrantUsageSpecType}}
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
+			Error().NotTo(HaveOccurred())
+	})
+
+	It("emits the supplied privilege keyword on REVOKE", func(ctx SpecContext) {
+		dbMock.ExpectExec("REVOKE CREATE ON DATABASE \"app\" FROM \"brian\"").
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		grantees := []apiv1.UsageSpec{{Name: "brian", Type: apiv1.RevokeUsageSpecType}}
+		Expect(applyObjectPrivilege(ctx, db, "CREATE", "DATABASE", "app", grantees)).
+			Error().NotTo(HaveOccurred())
+	})
+
+	It("revokes a privilege from PUBLIC without quoting the pseudo-role", func(ctx SpecContext) {
+		dbMock.ExpectExec("REVOKE CONNECT ON DATABASE \"app\" FROM PUBLIC").
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		grantees := []apiv1.UsageSpec{{Name: "public", Type: apiv1.RevokeUsageSpecType}}
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
+			Error().NotTo(HaveOccurred())
+	})
+
+	It("applies each grantee in order", func(ctx SpecContext) {
+		dbMock.ExpectExec("REVOKE CONNECT ON DATABASE \"app\" FROM PUBLIC").
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		dbMock.ExpectExec("GRANT CONNECT ON DATABASE \"app\" TO \"app\"").
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		grantees := []apiv1.UsageSpec{
+			{Name: "public", Type: apiv1.RevokeUsageSpecType},
+			{Name: "app", Type: apiv1.GrantUsageSpecType},
+		}
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
+			Error().NotTo(HaveOccurred())
+	})
+
+	It("wraps the privilege keyword in the error on failure", func(ctx SpecContext) {
+		dbMock.ExpectExec("GRANT CONNECT ON DATABASE \"app\" TO \"angus\"").
+			WillReturnError(testError)
+
+		grantees := []apiv1.UsageSpec{{Name: "angus", Type: apiv1.GrantUsageSpecType}}
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
+			Error().To(MatchError(testError))
+	})
+
+	It("ignores entries with an unknown type", func(ctx SpecContext) {
+		grantees := []apiv1.UsageSpec{{Name: "angus", Type: "bogus"}}
+		Expect(applyObjectPrivilege(ctx, db, "CONNECT", "DATABASE", "app", grantees)).
+			Error().NotTo(HaveOccurred())
+	})
+})

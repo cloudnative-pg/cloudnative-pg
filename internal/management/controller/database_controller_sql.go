@@ -501,6 +501,71 @@ func updateDatabaseForeignServerUsage(ctx context.Context, db *sql.DB, server *a
 	return applyUsagePermissions(ctx, db, objectTypeForeignServer, server.Name, server.Usages)
 }
 
+// publicRole is the special PostgreSQL grantee `PUBLIC`, which grants or
+// revokes a privilege for all roles at once. It must be emitted verbatim as a
+// keyword and never quoted as an identifier: quoting it would target a role
+// literally named "public", which does not (and cannot) exist.
+const publicRole = "PUBLIC"
+
+// sanitizeGrantee renders a grantee for use in a GRANT/REVOKE statement,
+// special-casing the PUBLIC pseudo-role.
+func sanitizeGrantee(name string) string {
+	if strings.EqualFold(name, publicRole) {
+		return publicRole
+	}
+	return pgx.Identifier{name}.Sanitize()
+}
+
+// applyObjectPrivilege grants or revokes a single privilege keyword (e.g. USAGE,
+// CREATE, CONNECT, TEMPORARY) on the given object for the listed grantees. It is
+// the shared primitive behind object-level privilege management; callers wrap it
+// with the privilege and object type relevant to their resource.
+//
+// The privilege and objectType arguments are interpolated into the SQL verbatim
+// (they are not escapable identifiers), so callers MUST pass trusted, in-code
+// constants for them and never user-controlled input.
+func applyObjectPrivilege(
+	ctx context.Context,
+	db *sql.DB,
+	privilege string,
+	objectType string,
+	objectName string,
+	grantees []apiv1.UsageSpec,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, grantee := range grantees {
+		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
+		sanitizedGrantee := sanitizeGrantee(grantee.Name)
+
+		switch grantee.Type {
+		case apiv1.GrantUsageSpecType:
+			mutation := fmt.Sprintf("GRANT %s ON %s %s TO %s", //nolint:gosec
+				privilege, objectType, sanitizedObject, sanitizedGrantee)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("granting %s on %s: %w", privilege, objectType, err)
+			}
+			contextLogger.Info("granted privilege",
+				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
+
+		case apiv1.RevokeUsageSpecType:
+			mutation := fmt.Sprintf("REVOKE %s ON %s %s FROM %s", //nolint:gosec
+				privilege, objectType, sanitizedObject, sanitizedGrantee)
+			if _, err := db.ExecContext(ctx, mutation); err != nil {
+				return fmt.Errorf("revoking %s on %s: %w", privilege, objectType, err)
+			}
+			contextLogger.Info("revoked privilege",
+				"privilege", privilege, "type", objectType, "name", objectName, "grantee", grantee.Name)
+
+		default:
+			contextLogger.Warning("unknown privilege type",
+				"type", grantee.Type, "privilege", privilege, "objectType", objectType, "name", objectName)
+		}
+	}
+
+	return nil
+}
+
 // applyUsagePermissions is a generic helper to grant or revoke USAGE permissions
 // for FOREIGN DATA WRAPPER / FOREIGN SERVER objects, avoiding duplicated logic.
 func applyUsagePermissions(
@@ -510,38 +575,7 @@ func applyUsagePermissions(
 	objectName string,
 	usages []apiv1.UsageSpec,
 ) error {
-	contextLogger := log.FromContext(ctx)
-
-	if len(usages) == 0 {
-		return nil
-	}
-
-	for _, usageSpec := range usages {
-		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
-		sanitizedUser := pgx.Identifier{usageSpec.Name}.Sanitize()
-
-		switch usageSpec.Type {
-		case apiv1.GrantUsageSpecType:
-			mutation := fmt.Sprintf("GRANT USAGE ON %s %s TO %s", objectType, sanitizedObject, sanitizedUser)
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("granting usage of %s: %w", objectType, err)
-			}
-			contextLogger.Info("granted usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
-
-		case apiv1.RevokeUsageSpecType:
-			mutation := fmt.Sprintf("REVOKE USAGE ON %s %s FROM %s", objectType, sanitizedObject, sanitizedUser) //nolint:gosec
-			if _, err := db.ExecContext(ctx, mutation); err != nil {
-				return fmt.Errorf("revoking usage of %s: %w", objectType, err)
-			}
-			contextLogger.Info("revoked usage", "type", objectType, "name", objectName, "user", usageSpec.Name)
-
-		default:
-			contextLogger.Warning(
-				"unknown usage type", "type", usageSpec.Type, "objectType", objectType, "name", objectName)
-		}
-	}
-
-	return nil
+	return applyObjectPrivilege(ctx, db, "USAGE", objectType, objectName, usages)
 }
 
 func createDatabaseFDW(ctx context.Context, db *sql.DB, fdw apiv1.FDWSpec) error {
