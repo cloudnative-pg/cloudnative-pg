@@ -118,8 +118,18 @@ spec:
 :::warning
 Tune these values only if you understand the impact on failover timing: longer
 intervals make the cluster more tolerant of transient API server unavailability
-but slow down legitimate promotions. `leaseDurationSeconds` must be greater than
-`renewDeadlineSeconds`; this invariant is enforced by the admission webhook.
+but slow down legitimate promotions. Two invariants are enforced by the
+admission webhook: `leaseDurationSeconds` must be greater than
+`renewDeadlineSeconds`, and `renewDeadlineSeconds` must be greater than
+`retryPeriodSeconds` multiplied by `1.2`. Both mirror the requirements of the
+underlying Kubernetes leader election.
+:::
+
+:::note
+The primary instance captures these timings the first time it acquires the
+lease. Changing `.spec.primaryLease` on a running cluster therefore takes effect
+only after the affected primary Pod restarts; until then the primary keeps using
+the values it started with.
 :::
 
 ## RTO and RPO impact
