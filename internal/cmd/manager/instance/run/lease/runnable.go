@@ -161,18 +161,22 @@ func (r *Runnable) Acquire(ctx context.Context, config Config) error {
 // the pod-restart window in that case so no other pod can promote.
 func (r *Runnable) Release(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("Releasing primary lease")
 
 	record, _, err := r.lock.Get(ctx)
 	if errors.IsNotFound(err) {
+		contextLogger.Debug("Primary lease does not exist, nothing to release")
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 	if record.HolderIdentity != r.lock.LockConfig.Identity {
+		contextLogger.Debug("Primary lease held by another identity, nothing to release",
+			"holder", record.HolderIdentity)
 		return nil
 	}
+
+	contextLogger.Info("Releasing primary lease")
 	return r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
 		LeaseDurationSeconds: int(r.config.ReleasedLeaseDuration / time.Second),
 	})
@@ -276,8 +280,14 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			continue
 		}
 		if record.HolderIdentity != r.lock.LockConfig.Identity {
-			// Another pod holds the lease — we have been preempted.
-			return fmt.Errorf("primary lease is now held by %q", record.HolderIdentity)
+			// Another pod holds the lease — we have been preempted. This is a
+			// terminal event: the returned error shuts down the manager and stops
+			// PostgreSQL. Log it explicitly at the point of detection so the cause
+			// is visible, rather than only surfacing as a generic manager error.
+			err := fmt.Errorf("primary lease is now held by %q", record.HolderIdentity)
+			contextLogger.Error(err, "Primary lease preempted, shutting down",
+				"newHolder", record.HolderIdentity)
+			return err
 		}
 
 		// We still hold the lease — transient API server blip. Loop.
