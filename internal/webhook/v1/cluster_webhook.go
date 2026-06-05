@@ -1578,9 +1578,13 @@ func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field
 }
 
 // validatePrimaryLease checks the consistency of the primary lease timings.
-// The underlying Kubernetes leader election requires the lease duration to be
-// strictly greater than the renew deadline, otherwise the holder can never
-// renew in time and the cluster would flap.
+// These mirror the invariants that client-go's leaderelection.NewLeaderElector
+// enforces at runtime: the lease duration must be strictly greater than the
+// renew deadline, and the renew deadline must be greater than the retry period
+// times the jitter factor. Rejecting violations here is important because a
+// combination that slips through admission would not "just" misbehave: it makes
+// NewLeaderElector return an error, which is fatal to the primary's lease
+// runnable and crash-loops the primary Pod.
 func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
@@ -1599,12 +1603,27 @@ func (v *ClusterCustomValidator) validatePrimaryLease(r *apiv1.Cluster) field.Er
 	if lease.RenewDeadlineSeconds != nil {
 		renewDeadline = int(*lease.RenewDeadlineSeconds)
 	}
+	retryPeriod := apiv1.DefaultPrimaryLeaseRetryPeriodSeconds
+	if lease.RetryPeriodSeconds != nil {
+		retryPeriod = int(*lease.RetryPeriodSeconds)
+	}
 
 	if leaseDuration <= renewDeadline {
 		result = append(result, field.Invalid(
 			basePath.Child("leaseDurationSeconds"),
 			leaseDuration,
 			"leaseDurationSeconds must be greater than renewDeadlineSeconds"))
+	}
+
+	// client-go rejects renewDeadline <= retryPeriod*JitterFactor (JitterFactor
+	// is 1.2). We replicate the check with exact integer arithmetic, since the
+	// fields are whole seconds: renewDeadline > 1.2*retryPeriod is equivalent to
+	// 5*renewDeadline > 6*retryPeriod.
+	if 5*renewDeadline <= 6*retryPeriod {
+		result = append(result, field.Invalid(
+			basePath.Child("renewDeadlineSeconds"),
+			renewDeadline,
+			"renewDeadlineSeconds must be greater than retryPeriodSeconds multiplied by 1.2"))
 	}
 
 	return result
