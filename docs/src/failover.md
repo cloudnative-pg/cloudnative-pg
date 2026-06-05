@@ -53,6 +53,51 @@ During the time the failing primary is being shut down:
     without a clean shutdown.
 :::
 
+## Safe primary election
+
+To guarantee that at most one instance promotes itself to primary at any given
+time, CloudNativePG backs the election described above with a Kubernetes
+`Lease` object, named after the `Cluster` and living in its namespace. An
+instance must acquire and hold this lease before it promotes to primary. On a
+clean shutdown the former primary releases the lease, so an eligible replica
+can take over without waiting for the lease to expire.
+
+This mechanism is independent of the operator's own controller-manager leader
+election, and complements the [primary isolation](instance_manager.md#primary-isolation)
+check performed by the liveness probe: the lease coordinates *who is allowed to
+promote*, while the isolation check fences a primary that has lost connectivity.
+
+### Tuning the primary lease
+
+The lease timings are exposed under `.spec.primaryLease` and default to values
+suitable for most clusters. They map directly onto the underlying Kubernetes
+leader-election parameters.
+
+| Field                          | Default | Description                                                                |
+| ------------------------------ | ------- | -------------------------------------------------------------------------- |
+| `leaseDurationSeconds`         | `15`    | How long the lease is valid before another instance may acquire it.        |
+| `renewDeadlineSeconds`         | `10`    | How long the primary keeps retrying to renew the lease before giving up.   |
+| `retryPeriodSeconds`           | `2`     | How frequently a non-holder retries acquiring or renewing the lease.       |
+| `releasedLeaseDurationSeconds` | `1`     | TTL written when the primary releases the lease on a clean shutdown.       |
+
+For example, to make the cluster more tolerant of a slow or briefly unreachable
+API server:
+
+```yaml
+spec:
+  primaryLease:
+    leaseDurationSeconds: 30
+    renewDeadlineSeconds: 20
+    retryPeriodSeconds: 4
+```
+
+:::warning
+Tune these values only if you understand the impact on failover timing: longer
+intervals make the cluster more tolerant of transient API server unavailability
+but slow down legitimate promotions. `leaseDurationSeconds` must be greater than
+`renewDeadlineSeconds`; this invariant is enforced by the admission webhook.
+:::
+
 ## RTO and RPO impact
 
 Failover may result in the service being impacted ([RTO](before_you_start.md#postgresql-terminology))

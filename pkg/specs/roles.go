@@ -243,7 +243,7 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 				"update",
 			},
 			ResourceNames: []string{
-				cluster.Name,
+				opts.Cluster.Name,
 			},
 		},
 		{
