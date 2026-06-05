@@ -75,7 +75,6 @@ export TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 
 # Feature flags for enabling optional components
 export ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
-export ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 export ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 
 # --- GENERIC ADD-ON CONSTANTS (Shared CSI/Snapshotter versions for Renovate) ---
