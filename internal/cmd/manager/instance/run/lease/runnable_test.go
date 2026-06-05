@@ -21,11 +21,15 @@ package lease
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -216,4 +220,38 @@ var _ = Describe("Runnable.Acquire", func() {
 
 			Expect(r.Acquire(acquireCtx, first)).To(MatchError(context.DeadlineExceeded))
 		})
+})
+
+var _ = Describe("classifyLeaseAfterRun", func() {
+	const ourIdentity = "test-cluster-1"
+
+	record := func(holder string) *resourcelock.LeaderElectionRecord {
+		return &resourcelock.LeaderElectionRecord{HolderIdentity: holder}
+	}
+
+	It("treats a missing lease as recoverable (retry)", func() {
+		notFound := apierrors.NewNotFound(schema.GroupResource{Resource: "leases"}, "test-cluster")
+		Expect(classifyLeaseAfterRun(notFound, nil, ourIdentity)).To(Equal(leaseMissing))
+	})
+
+	It("treats any other read error as unverifiable (retry, no fencing)", func() {
+		Expect(classifyLeaseAfterRun(errors.New("connection refused"), nil, ourIdentity)).
+			To(Equal(leaseUnverifiable))
+	})
+
+	It("treats a different holder as preemption (the branch that stops PostgreSQL)", func() {
+		Expect(classifyLeaseAfterRun(nil, record("test-cluster-2"), ourIdentity)).
+			To(Equal(leasePreempted))
+	})
+
+	It("treats a cleared holder as preemption", func() {
+		// An empty holder means we no longer own the lease; we must not keep
+		// running as primary.
+		Expect(classifyLeaseAfterRun(nil, record(""), ourIdentity)).To(Equal(leasePreempted))
+	})
+
+	It("treats our own identity as still held (transient blip, retry)", func() {
+		Expect(classifyLeaseAfterRun(nil, record(ourIdentity), ourIdentity)).
+			To(Equal(leaseStillHeld))
+	})
 })
