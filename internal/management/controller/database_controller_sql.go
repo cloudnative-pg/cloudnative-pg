@@ -534,10 +534,6 @@ func applyObjectPrivilege(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if len(grantees) == 0 {
-		return nil
-	}
-
 	for _, grantee := range grantees {
 		sanitizedObject := pgx.Identifier{objectName}.Sanitize()
 		sanitizedGrantee := sanitizeGrantee(grantee.Name)
