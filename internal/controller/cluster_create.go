@@ -1152,13 +1152,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		//
 		// 1 - the user deletes all the PVCs and all the Pods in a cluster
 		//    (and why would a user do that?)
-		// 2 - the cache isn't ready for Pods and ready for the Cluster,
-		//     so we actually haven't the first pod in our managed list
+		// 2 - the cache isn't ready for Pods but is ready for the Cluster,
+		//     so we actually don't have the first pod in our managed list,
 		//     but it's still in the API Server
 		//
 		// As far as the first option is concerned, we can just stop
 		// healing this cluster as we have nothing to do.
-		// For the second option we can just retry when the next
+		// For the second option, we can just retry when the next
 		// reconciliation loop is started by the informers.
 		contextLogger.Info("refusing to create the primary instance because the cluster already initialized")
 
