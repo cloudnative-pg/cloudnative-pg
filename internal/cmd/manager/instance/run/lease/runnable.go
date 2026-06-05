@@ -195,6 +195,49 @@ func (r *Runnable) Start(ctx context.Context) error {
 	return r.runLeaderElection(ctx)
 }
 
+// leaseCheckOutcome is the result of inspecting the primary lease after the
+// leader-election loop exits unexpectedly (i.e. without a context cancellation).
+type leaseCheckOutcome int
+
+const (
+	// leaseMissing means the lease object no longer exists; the cluster
+	// controller recreates it on its deletion watch, so we retry.
+	leaseMissing leaseCheckOutcome = iota
+	// leaseUnverifiable means the lease could not be read (e.g. the API server is
+	// unreachable). We have no evidence of preemption, so we retry and rely on
+	// the liveness probe to fence us if we are genuinely isolated.
+	leaseUnverifiable
+	// leasePreempted means the lease is held by a different (or empty) identity:
+	// we no longer own it. This is terminal — the primary must stop.
+	leasePreempted
+	// leaseStillHeld means we are still the holder: a transient renewal blip, retry.
+	leaseStillHeld
+)
+
+// classifyLeaseAfterRun decides what the primary should do after the
+// leader-election loop returns unexpectedly, based on the post-run read of the
+// lease. It is intentionally pure so the high-consequence preemption branch —
+// the one that stops PostgreSQL — can be unit-tested without driving a real
+// election loop.
+func classifyLeaseAfterRun(
+	checkErr error,
+	record *resourcelock.LeaderElectionRecord,
+	ourIdentity string,
+) leaseCheckOutcome {
+	switch {
+	case errors.IsNotFound(checkErr):
+		return leaseMissing
+	case checkErr != nil:
+		return leaseUnverifiable
+	// A nil checkErr means the lock returned a non-nil record, so the deref below
+	// is safe.
+	case record.HolderIdentity != ourIdentity:
+		return leasePreempted
+	default:
+		return leaseStillHeld
+	}
+}
+
 // runLeaderElection runs the leader election loop. It is the core of the
 // primary lease mechanism and handles three distinct exit scenarios:
 //
@@ -265,32 +308,29 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 		record, _, checkErr := r.lock.Get(checkCtx)
 		checkCancel()
 
-		if errors.IsNotFound(checkErr) {
+		switch classifyLeaseAfterRun(checkErr, record, r.lock.LockConfig.Identity) {
+		case leaseMissing:
 			// The lease object is gone (e.g. someone deleted it). The cluster
 			// controller will recreate it on its next reconcile; loop and let
 			// le.Run re-acquire it once it reappears.
 			contextLogger.Warning("Primary lease object missing, waiting for it to be recreated")
-			continue
-		}
-		if checkErr != nil {
+		case leaseUnverifiable:
 			// Cannot reach the API server to verify the holder. We have no evidence
 			// of preemption, so loop back and let le.Run retry. If we are genuinely
 			// isolated, the liveness probe isolation checker will fence us.
 			contextLogger.Warning("Primary lease lost, cannot verify holder, retrying", "error", checkErr)
-			continue
-		}
-		if record.HolderIdentity != r.lock.LockConfig.Identity {
-			// Another pod holds the lease — we have been preempted. This is a
-			// terminal event: the returned error shuts down the manager and stops
+		case leasePreempted:
+			// A different identity holds the lease — we have been preempted. This is
+			// a terminal event: the returned error shuts down the manager and stops
 			// PostgreSQL. Log it explicitly at the point of detection so the cause
 			// is visible, rather than only surfacing as a generic manager error.
 			err := fmt.Errorf("primary lease is now held by %q", record.HolderIdentity)
 			contextLogger.Error(err, "Primary lease preempted, shutting down",
 				"newHolder", record.HolderIdentity)
 			return err
+		case leaseStillHeld:
+			// We still hold the lease — transient API server blip. Loop.
+			contextLogger.Warning("Primary lease renewal failed transiently, retrying")
 		}
-
-		// We still hold the lease — transient API server blip. Loop.
-		contextLogger.Warning("Primary lease renewal failed transiently, retrying")
 	}
 }
