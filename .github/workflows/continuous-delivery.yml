@@ -49,7 +49,7 @@ env:
   # renovate: datasource=github-tags depName=kubernetes-sigs/kind versioning=semver
   KIND_VERSION: "v0.32.0"
   # renovate: datasource=github-releases depName=k3d-io/k3d versioning=semver
-  K3D_VERSION: "v5.8.3"
+  K3D_VERSION: "v5.9.0"
   # renovate: datasource=github-releases depName=rook/rook versioning=loose
   ROOK_VERSION: "v1.19.6"
   # renovate: datasource=github-releases depName=kubernetes-csi/external-snapshotter
