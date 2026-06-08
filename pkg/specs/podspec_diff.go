@@ -95,6 +95,7 @@ func ComparePodSpecs(
 		"hostname": func() bool {
 			return currentPodSpec.Hostname == targetPodSpec.Hostname
 		},
+		"subdomain": func() bool { return currentPodSpec.Subdomain == targetPodSpec.Subdomain },
 		"termination-grace-period": func() bool {
 			return (currentPodSpec.TerminationGracePeriodSeconds == nil && targetPodSpec.TerminationGracePeriodSeconds == nil) ||
 				(currentPodSpec.TerminationGracePeriodSeconds != nil && targetPodSpec.TerminationGracePeriodSeconds != nil &&
