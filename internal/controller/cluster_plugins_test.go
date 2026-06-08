@@ -118,6 +118,30 @@ var _ = Describe("mapPluginEndpointSlicesToClusters", func() {
 		))
 	})
 
+	It("enqueues only the clusters using the plugin whose EndpointSlice changed", func() {
+		// A cluster wired to a different plugin must not be enqueued. This is
+		// what the usedPlugins field-index filter guarantees: without it, every
+		// cluster would be reconciled on any plugin rollout. The ConsistOf below
+		// is exact, so it fails if the unrelated cluster leaks into the result.
+		clusterUsingOtherPlugin := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "other-cluster", Namespace: "app-ns-other"},
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{{Name: "some-other-plugin"}},
+			},
+		}
+		reconciler = buildReconciler(
+			pluginService(),
+			clusterUsingPlugin("app-ns-1", "cluster-1"),
+			clusterUsingOtherPlugin,
+		)
+		mapFn := reconciler.mapPluginEndpointSlicesToClusters(operatorNamespace)
+
+		requests := mapFn(ctx, endpointSlice())
+		Expect(requests).To(ConsistOf(
+			reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "app-ns-1", Name: "cluster-1"}},
+		))
+	})
+
 	It("returns nil when the owning Service does not look like a plugin", func() {
 		// Service exists but is missing the plugin annotations.
 		nonPlugin := &corev1.Service{
