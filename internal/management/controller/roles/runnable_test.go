@@ -735,7 +735,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test1")
+			roleDeletionStmt := fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", "role_to_test1")
 			mock.ExpectExec(roleDeletionStmt).WillReturnResult(sqlmock.NewResult(2, 3))
 			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
@@ -827,7 +827,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				Detail: "owner of database edbDatabase",
 			}
 
-			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test2")
+			roleDeletionStmt := fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", "role_to_test2")
 			mock.ExpectExec(roleDeletionStmt).WillReturnError(&impossibleDeleteError)
 
 			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{

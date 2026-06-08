@@ -186,7 +186,9 @@ func Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 		return fmt.Errorf("while deleting role %s with role reconciler: %w", role.Name, err)
 	}
 
-	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
+	// IF EXISTS keeps deletion idempotent: a retry after the role is already
+	// gone (e.g. a failed finalizer update) must not error.
+	query := fmt.Sprintf("DROP ROLE IF EXISTS %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
 	_, err := db.ExecContext(ctx, query)
 	if err != nil {
