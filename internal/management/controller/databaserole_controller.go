@@ -80,7 +80,25 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if result, err := r.shouldReconcile(ctx, &role); result != nil || err != nil {
+	// Roles for other clusters are handled by their own instance managers.
+	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+		return ctrl.Result{}, nil
+	}
+
+	// Fetch the Cluster once; shared by shouldReconcile and handleDeletion.
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
+		}
+		// Cluster gone: nothing to reconcile, and no finalizer to release here.
+		// The operator strips DatabaseRole finalizers during cluster deletion,
+		// before the Cluster object disappears (see notifyOwnedResourceDeletion).
+		contextLogger.Debug("Could not find Cluster")
+		return ctrl.Result{}, nil
+	}
+
+	if result, err := r.shouldReconcile(ctx, &role, cluster); result != nil || err != nil {
 		if result == nil {
 			return ctrl.Result{}, err
 		}
@@ -95,7 +113,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 	} else {
-		return r.handleDeletion(ctx, &role)
+		return r.handleDeletion(ctx, &role, cluster)
 	}
 
 	// ensure: absent is not supported for DatabaseRole CRDs. Users should
@@ -126,18 +144,19 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return r.succeededReconciliation(ctx, &role, passVersion, transactionID)
 }
 
-// handleDeletion processes finalizer removal and optional role deletion
-// when the DatabaseRole is being deleted. Only the ReclaimDelete policy
-// requires a database connection; ReclaimRetain just removes the finalizer.
+// handleDeletion drops the role when this cluster owns it (see shouldDropRole)
+// and then releases the finalizer.
 func (r *DatabaseRoleReconciler) handleDeletion(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
+	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(role, utils.RoleFinalizerName) {
 		return ctrl.Result{}, nil
 	}
 
-	if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
+	dropRole := shouldDropRole(role, cluster)
+	if dropRole {
 		db, err := r.instance.GetSuperUserDB()
 		if err != nil {
 			return r.failedReconciliation(ctx, role, fmt.Errorf(
@@ -150,6 +169,11 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 		if err := roles.Delete(ctx, db, dbRole); err != nil {
 			return r.failedReconciliation(ctx, role, err)
 		}
+	} else if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
+		log.FromContext(ctx).Info(
+			"not dropping role on deletion: not owned by this cluster "+
+				"(managed inline, or replica cluster); releasing finalizer only",
+			"role", role.Spec.Name)
 	}
 
 	controllerutil.RemoveFinalizer(role, utils.RoleFinalizerName)
@@ -158,6 +182,14 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// shouldDropRole reports whether a deleted DatabaseRole's role must be dropped:
+// only when reclaimPolicy is delete and this cluster owns it (not shadowed by an
+// inline managed.roles entry, nor on a replica cluster).
+func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
+	return role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete &&
+		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
 }
 
 func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
@@ -184,29 +216,14 @@ func (r *DatabaseRoleReconciler) detectMissingPasswordSecret(
 // shouldReconcile checks if the role should be reconciled by this instance.
 // Returns nil, nil if reconciliation should proceed.
 // Returns a non-nil result or error if reconciliation should stop.
-func (r *DatabaseRoleReconciler) shouldReconcile(ctx context.Context, role *apiv1.DatabaseRole) (*ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	// This is not for me!
-	if role.Spec.ClusterRef.Name != r.instance.GetClusterName() {
-		return &ctrl.Result{}, nil
-	}
-
+func (r *DatabaseRoleReconciler) shouldReconcile(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	cluster *apiv1.Cluster,
+) (*ctrl.Result, error) {
 	// If everything is reconciled and the password did not change, we're done here
 	if r.isAlreadyReconciled(role) {
 		return &ctrl.Result{}, nil
-	}
-
-	// Fetch the Cluster from the cache
-	cluster, err := r.GetCluster(ctx)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The cluster has been deleted.
-			// We just need to wait for this instance manager to be terminated
-			contextLogger.Debug("Could not find Cluster")
-			return nil, fmt.Errorf("could not find Cluster: %w", err)
-		}
-		return nil, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
 	// This is not for me, at least now
@@ -217,6 +234,13 @@ func (r *DatabaseRoleReconciler) shouldReconcile(ctx context.Context, role *apiv
 	// Still not for me, we're waiting for a switchover
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		return &ctrl.Result{RequeueAfter: databaseRoleReconciliationInterval}, nil
+	}
+
+	// The remaining gates only constrain the apply path; skip them while
+	// deleting, or a role shadowed by inline managed.roles, or on a replica
+	// cluster, would never reach handleDeletion and stay stuck in Terminating.
+	if !role.DeletionTimestamp.IsZero() {
+		return nil, nil
 	}
 
 	// If the role is already managed by the cluster, we stop the
