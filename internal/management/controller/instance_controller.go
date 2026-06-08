@@ -1128,11 +1128,22 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 			return r.triggerRestartForDecrease(ctx, cluster)
 		}
 		reason := "decrease of hot standby sensitive parameters"
-		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
+		contextLogger.Info("Waiting for the user to request a restart of the primary instance "+
 			"to complete the rolling update",
 			"cluster", cluster.Name, "primaryPod", status.Pod.Name, "reason", reason)
 		phase = apiv1.PhaseWaitingForUser
-		phaseReason = "User must issue a supervised switchover"
+		// A decrease of hot standby sensitive parameters is applied by restarting
+		// the primary in place: a switchover does not help, because the promoted
+		// replica still carries the higher value (it is kept aligned upwards while
+		// it follows the primary). Point the user to the action that actually
+		// converges the cluster.
+		//
+		// NOTE: this guidance is intentionally specific to a parameter decrease.
+		// Other supervised rollouts (e.g. image upgrades) are handled in
+		// internal/controller/cluster_upgrade.go, which keeps PhaseWaitingForUser
+		// with the "User must issue a supervised switchover" reason. Keep the two
+		// messages in sync with their respective scenarios.
+		phaseReason = "User must issue a restart of the primary instance to apply the decreased parameters"
 	}
 	if phase == apiv1.PhaseApplyingConfiguration &&
 		(cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||

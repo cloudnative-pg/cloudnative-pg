@@ -108,6 +108,49 @@ var _ = Describe("Supervised decrease of an enforced parameter", Serial,
 			return clusterName
 		}
 
+		It("asks for a primary restart (not a switchover) and converges after one", func() {
+			clusterName := setupClusterWithPendingDecrease("supervised-decrease-restart")
+
+			// The status must point the user to the action that actually
+			// converges the cluster: an in-place primary restart, not a switchover.
+			By("reporting that the user must restart the primary", func() {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.Status.PhaseReason).To(ContainSubstring("restart of the primary instance"))
+			})
+
+			// The documented action for a decrease is an in-place restart of the
+			// primary. This is what `kubectl cnpg restart <cluster> <primary>`
+			// does for the primary: it sets the cluster phase to
+			// PhaseInplacePrimaryRestart, which the operator then performs.
+			By("requesting an in-place restart of the primary", func() {
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					if err != nil {
+						return err
+					}
+					cluster.Status.Phase = apiv1.PhaseInplacePrimaryRestart
+					cluster.Status.PhaseReason = "Requested by the e2e test"
+					return env.Client.Status().Update(env.Ctx, cluster)
+				})
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			// After the restart the cluster must become ready again and every
+			// instance must run with the decreased value.
+			clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
+
+			By("every instance converged to max_connections=100", func() {
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				for i := range podList.Items {
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, &podList.Items[i],
+						postgres.PostgresDBName, "SHOW max_connections", "100"),
+						RetryTimeout).Should(Succeed())
+				}
+			})
+		})
+
 		It("does not abort recovery on the old primary if a switchover happens during the pending decrease",
 			func() {
 				clusterName := setupClusterWithPendingDecrease("supervised-decrease-switchover")
