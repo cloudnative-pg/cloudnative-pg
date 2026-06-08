@@ -121,6 +121,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		AfterAll(func() {
+			// The AfterAll runs even when the BeforeAll skipped before
+			// creating the namespace; with no namespace there is nothing to
+			// clean up.
+			if namespace == "" {
+				return
+			}
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
 			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
 			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
