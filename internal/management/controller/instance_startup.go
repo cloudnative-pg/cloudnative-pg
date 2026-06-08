@@ -67,7 +67,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		// In this case, we're demoting the cluster immediately.
 		contextLogger.Info("Detected transition to replica cluster after reconciliation " +
 			"of the cluster is resumed, demoting immediately")
-		return r.instance.Demote(ctx, cluster)
+		if err := r.instance.Demote(ctx, cluster); err != nil {
+			return err
+		}
+		// We are now a follower: align the enforced parameters so we do not abort
+		// recovery if one of them was decreased on the spec while we were primary.
+		return r.alignEnforcedParametersForFollower(ctx, cluster)
 
 	case targetPrimary == r.instance.GetPodName():
 		if currentPrimary == "" {
@@ -143,7 +148,13 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		}
 
 		// Now I can demote myself
-		return r.instance.Demote(ctx, cluster)
+		if err := r.instance.Demote(ctx, cluster); err != nil {
+			return err
+		}
+		// We are now a follower of the new primary: align the enforced parameters
+		// so we do not abort recovery with "insufficient parameter settings" if one
+		// of them carried a higher value while we were the primary (issue #10716).
+		return r.alignEnforcedParametersForFollower(ctx, cluster)
 	}
 }
 

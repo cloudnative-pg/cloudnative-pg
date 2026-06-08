@@ -504,6 +504,11 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 		return err
 	}
 
+	// verifyPgDataCoherenceForPrimary may demote this instance (writing
+	// standby.signal) during a supervised switchover. When it does, it re-aligns
+	// the enforced parameters for the freshly demoted follower itself, so there
+	// is no need to repeat that here (see alignEnforcedParametersForFollower and
+	// https://github.com/cloudnative-pg/cloudnative-pg/issues/10716).
 	if err := r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
 		return err
 	}
@@ -550,6 +555,28 @@ func (r *InstanceReconciler) verifyParametersForFollower(
 		return err
 	}
 	contextLogger.Info("Found previous run flag", "filename", filename)
+
+	return r.alignEnforcedParametersForFollower(ctx, cluster)
+}
+
+// alignEnforcedParametersForFollower writes the enforced parameter values taken
+// from `pg_controldata` into the local PostgreSQL configuration whenever they are
+// higher than the values declared in the cluster spec. This keeps a follower able
+// to start when an enforced parameter was decreased on the spec: a standby must
+// not start with a value lower than the primary's, otherwise it aborts recovery
+// with "insufficient parameter settings".
+//
+// Unlike verifyParametersForFollower, this does not consult the startup flag
+// file: callers use it when the instance has just become a follower (e.g. right
+// after a demotion) and the alignment must happen even on a pod that was never a
+// follower before, which therefore has no startup flag yet
+// (https://github.com/cloudnative-pg/cloudnative-pg/issues/10716).
+func (r *InstanceReconciler) alignEnforcedParametersForFollower(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
 	controldataParams, err := postgresManagement.LoadEnforcedParametersFromPgControldata(r.instance.PgData)
 	if err != nil {
 		return err

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
@@ -39,8 +40,20 @@ func ParseJSONLogs(
 	kubeInterface kubernetes.Interface,
 	namespace string, podName string,
 ) ([]map[string]interface{}, error) {
+	return ParseJSONLogsWithOptions(ctx, kubeInterface, namespace, podName, &corev1.PodLogOptions{})
+}
+
+// ParseJSONLogsWithOptions returns the pod's logs of a given pod name honoring the
+// provided PodLogOptions (e.g. Previous: true to inspect a crashed container),
+// in the form of a list of JSON entries
+func ParseJSONLogsWithOptions(
+	ctx context.Context,
+	kubeInterface kubernetes.Interface,
+	namespace string, podName string,
+	options *corev1.PodLogOptions,
+) ([]map[string]interface{}, error) {
 	// Gather pod logs
-	podLogs, err := pods.Logs(ctx, kubeInterface, namespace, podName)
+	podLogs, err := pods.LogsWithOptions(ctx, kubeInterface, namespace, podName, options)
 	if err != nil {
 		return nil, err
 	}
