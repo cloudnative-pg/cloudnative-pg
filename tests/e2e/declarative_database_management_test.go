@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -184,6 +185,18 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 
 			By("removing the Database object", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
+			})
+
+			By("verifying the Database object is removed from Kubernetes", func() {
+				// The object is deleted while fully reconciled
+				// (Generation == ObservedGeneration), so this asserts the
+				// finalizer is released rather than left stuck in Terminating.
+				Eventually(func(g Gomega) {
+					err := env.Client.Get(env.Ctx,
+						types.NamespacedName{Namespace: namespace, Name: databaseObjectName},
+						&apiv1.Database{})
+					g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				}, 120).WithPolling(5 * time.Second).Should(Succeed())
 			})
 
 			By("verifying the retention policy in the postgres database", func() {

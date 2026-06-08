@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -311,6 +312,25 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				}, 60, 5).Should(Succeed())
 			})
 
+			By("ensuring the reclaim policy change has been reconciled", func() {
+				// Delete must act on a fully reconciled object
+				// (Generation == ObservedGeneration); otherwise the reclaim
+				// policy update would mask the finalizer path under test.
+				Eventually(func(g Gomega) {
+					g.Expect(objects.Get(env.Ctx, env.Client,
+						types.NamespacedName{Namespace: namespace, Name: publication.Name},
+						&publication)).To(Succeed())
+					g.Expect(publication.Status.Applied).Should(HaveValue(BeTrue()))
+					g.Expect(publication.Status.ObservedGeneration).To(Equal(publication.Generation))
+
+					g.Expect(objects.Get(env.Ctx, env.Client,
+						types.NamespacedName{Namespace: namespace, Name: subscription.Name},
+						&subscription)).To(Succeed())
+					g.Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
+					g.Expect(subscription.Status.ObservedGeneration).To(Equal(subscription.Generation))
+				}, 60, 5).Should(Succeed())
+			})
+
 			By("checking that the data is present inside the destination cluster database", func() {
 				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
@@ -342,6 +362,22 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			By("removing the objects", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &publication)).To(Succeed())
 				Expect(objects.Delete(env.Ctx, env.Client, &subscription)).To(Succeed())
+			})
+
+			By("verifying the Publication and Subscription objects are removed from Kubernetes", func() {
+				// The objects are deleted while fully reconciled, so this
+				// asserts their finalizers are released rather than left stuck
+				// in Terminating.
+				Eventually(func(g Gomega) {
+					err := objects.Get(env.Ctx, env.Client,
+						types.NamespacedName{Namespace: namespace, Name: publication.Name},
+						&apiv1.Publication{})
+					g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+					err = objects.Get(env.Ctx, env.Client,
+						types.NamespacedName{Namespace: namespace, Name: subscription.Name},
+						&apiv1.Subscription{})
+					g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				}, 120, 5).Should(Succeed())
 			})
 
 			By("verifying the publication reclaim policy outcome", func() {
