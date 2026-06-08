@@ -68,4 +68,22 @@ var _ = Describe("operatorNamespaceServiceEndpointSlicePredicate", func() {
 		slice.Labels = map[string]string{discoveryv1.LabelServiceName: ""}
 		Expect(predicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
 	})
+
+	// A plugin rollout does not create the EndpointSlice from scratch: the
+	// slice already exists and its endpoints transition Ready/NotReady, so in
+	// production the triggering event is almost always an Update. These cases
+	// lock in that the predicate is evaluated against the updated object.
+	It("accepts an update when the new slice is in the operator namespace and backs a Service", func() {
+		Expect(predicate.Update(event.UpdateEvent{
+			ObjectOld: newSlice(operatorNamespace, "some-plugin"),
+			ObjectNew: newSlice(operatorNamespace, "some-plugin"),
+		})).To(BeTrue())
+	})
+
+	It("rejects an update when the new slice is outside the operator namespace", func() {
+		Expect(predicate.Update(event.UpdateEvent{
+			ObjectOld: newSlice("other-namespace", "some-plugin"),
+			ObjectNew: newSlice("other-namespace", "some-plugin"),
+		})).To(BeFalse())
+	})
 })
