@@ -70,7 +70,6 @@ spec:
   cluster:
     name: cluster-example
   name: dante
-  ensure: present
   comment: "Dante Alighieri"
   login: true
   superuser: false
@@ -104,6 +103,25 @@ If a role owns objects (tables, schemas, etc.), `DROP ROLE` fails and the
 are reassigned or dropped. The operator never drops owned objects on your
 behalf: reassign or drop them in PostgreSQL, or switch to `retain`, to let the
 deletion complete.
+:::
+
+### Removing a role
+
+How you remove a role depends on how it was created:
+
+- **Created through a `DatabaseRole`:** set `roleReclaimPolicy: delete` and delete
+  the Custom Resource; the operator then drops the role (subject to the note
+  above). With the default `retain`, deleting the resource leaves the role in
+  place.
+- **Pre-existing, or managed elsewhere:** a `DatabaseRole` is not the tool to drop
+  it. Declare it `absent` through the inline [`managed.roles`](#inline-managed-roles)
+  stanza, or run `DROP ROLE` directly.
+
+:::warning
+Creating a `DatabaseRole` for a role that already exists **adopts** it: the
+operator alters the existing role to match the manifest. Do not point a
+`DatabaseRole` at a role you only want to drop, since it will be modified before
+it can be removed.
 :::
 
 ### Status of `DatabaseRole` resources

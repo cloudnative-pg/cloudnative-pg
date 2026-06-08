@@ -16,7 +16,6 @@ spec:
   cluster:
     name: cluster-example
   name: dante
-  ensure: present
   comment: my database-side comment
   login: true
   superuser: false
