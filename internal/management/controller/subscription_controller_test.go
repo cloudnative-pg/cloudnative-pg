@@ -374,43 +374,54 @@ var _ = Describe("Managed subscription controller tests", func() {
 	})
 
 	When("reclaim policy is delete but the cluster is a replica", func() {
-		It("on deletion it releases the finalizer without dropping the subscription", func(ctx SpecContext) {
-			// Mocking detection of subscriptions
-			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-				WillReturnRows(expectedValue)
+		DescribeTable("on deletion it releases the finalizer without dropping the subscription",
+			func(ctx SpecContext, demote func()) {
+				// Mocking detection of subscriptions
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+					WillReturnRows(expectedValue)
 
-			// Mocking create subscription
-			expectedCreate := sqlmock.NewResult(0, 1)
-			expectedQuery := fmt.Sprintf(
-				"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
-				pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-				pq.QuoteLiteral(connString),
-				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
-			)
-			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking create subscription
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+					pq.QuoteLiteral(connString),
+					pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-			// Reconcile while the cluster is still primary: the finalizer is added.
-			err = reconcileSubscription(ctx, fakeClient, r, subscription)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+				// Reconcile while the cluster is still primary: the finalizer is added.
+				err = reconcileSubscription(ctx, fakeClient, r, subscription)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
 
-			// Demote the cluster to a replica after the finalizer was added.
-			initialCluster := cluster.DeepCopy()
-			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
-			}
-			Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+				// Demote the cluster to a replica after the finalizer was added.
+				initialCluster := cluster.DeepCopy()
+				demote()
+				Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-			// Deleting on a replica must release the finalizer without issuing a
-			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
-			// ExpectationsWereMet check.
-			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
+				// Deleting on a replica must release the finalizer without issuing a
+				// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+				// ExpectationsWereMet check.
+				Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
 
-			err = reconcileSubscription(ctx, fakeClient, r, subscription)
-			Expect(err).To(HaveOccurred())
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
-		})
+				err = reconcileSubscription(ctx, fakeClient, r, subscription)
+				Expect(err).To(HaveOccurred())
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			},
+			Entry("via the legacy enabled flag", func() {
+				cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				}
+			}),
+			Entry("via distributed topology", func() {
+				cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+					Self:    cluster.Name,
+					Primary: "cluster-elsewhere",
+				}
+			}),
+		)
 	})
 })
 

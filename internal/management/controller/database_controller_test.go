@@ -236,42 +236,53 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	When("reclaim policy is delete but the cluster is a replica", func() {
-		It("on deletion it releases the finalizer without dropping the DB", func(ctx SpecContext) {
-			// Mocking DetectDB
-			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-				WillReturnRows(expectedValue)
+		DescribeTable("on deletion it releases the finalizer without dropping the DB",
+			func(ctx SpecContext, demote func()) {
+				// Mocking DetectDB
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+					WillReturnRows(expectedValue)
 
-			// Mocking CreateDB
-			expectedCreate := sqlmock.NewResult(0, 1)
-			expectedQuery := fmt.Sprintf(
-				"CREATE DATABASE %s OWNER %s",
-				pgx.Identifier{database.Spec.Name}.Sanitize(),
-				pgx.Identifier{database.Spec.Owner}.Sanitize(),
-			)
-			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking CreateDB
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE DATABASE %s OWNER %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+					pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-			// Reconcile while the cluster is still primary: the finalizer is added.
-			err := reconcileDatabase(ctx, fakeClient, r, database)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+				// Reconcile while the cluster is still primary: the finalizer is added.
+				err := reconcileDatabase(ctx, fakeClient, r, database)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(database.GetFinalizers()).NotTo(BeEmpty())
 
-			// Demote the cluster to a replica after the finalizer was added.
-			initialCluster := cluster.DeepCopy()
-			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-				Enabled: ptr.To(true),
-			}
-			Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+				// Demote the cluster to a replica after the finalizer was added.
+				initialCluster := cluster.DeepCopy()
+				demote()
+				Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-			// Deleting on a replica must release the finalizer without issuing a
-			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
-			// ExpectationsWereMet check.
-			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+				// Deleting on a replica must release the finalizer without issuing a
+				// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+				// ExpectationsWereMet check.
+				Expect(fakeClient.Delete(ctx, database)).To(Succeed())
 
-			err = reconcileDatabase(ctx, fakeClient, r, database)
-			Expect(err).To(HaveOccurred())
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
-		})
+				err = reconcileDatabase(ctx, fakeClient, r, database)
+				Expect(err).To(HaveOccurred())
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			},
+			Entry("via the legacy enabled flag", func() {
+				cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				}
+			}),
+			Entry("via distributed topology", func() {
+				cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+					Self:    cluster.Name,
+					Primary: "cluster-elsewhere",
+				}
+			}),
+		)
 	})
 
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
