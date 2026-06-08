@@ -188,14 +188,8 @@ var _ = Describe("Managed Database status", func() {
 			Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(database.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			database.SetGeneration(database.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, database)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
 
 			err = reconcileDatabase(ctx, fakeClient, r, database)
@@ -231,17 +225,51 @@ var _ = Describe("Managed Database status", func() {
 			Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(database.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			database.SetGeneration(database.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, database)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
 
 			err = reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	When("reclaim policy is delete but the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the DB", func(ctx SpecContext) {
+			// Mocking DetectDB
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking CreateDB
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			// Reconcile while the cluster is still primary: the finalizer is added.
+			err := reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			initialCluster := cluster.DeepCopy()
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+
+			err = reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).To(HaveOccurred())
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})

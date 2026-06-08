@@ -86,8 +86,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if publication.Generation == publication.Status.ObservedGeneration {
+	// Skip when fully reconciled, except during deletion: Kubernetes does not
+	// bump metadata.generation when it sets deletionTimestamp, so without the
+	// deletionTimestamp check the finalizer would never run and the object
+	// would stay stuck in Terminating.
+	if publication.Generation == publication.Status.ObservedGeneration && publication.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
@@ -112,8 +115,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		contextLogger.Info("Reconciliation loop of publication exited")
 	}()
 
-	// Cannot do anything on a replica cluster
-	if cluster.IsReplica() {
+	// Gate the apply path on a replica, but let deletion through: an object
+	// that acquired its finalizer while this cluster was primary must release
+	// it after a demotion. The drop itself is skipped on a replica (see
+	// evaluateDropPublication).
+	if cluster.IsReplica() && publication.GetDeletionTimestamp().IsZero() {
 		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -156,6 +162,16 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub *apiv1.Publication) error {
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
+		return nil
+	}
+	// On a replica we cannot drop the publication: return without touching
+	// PostgreSQL so the finalizer is released. Dropping it is left to the
+	// primary cluster's own Publication object, if any.
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("while fetching the cluster: %w", err)
+	}
+	if cluster.IsReplica() {
 		return nil
 	}
 	db, err := r.getDB(pub.Spec.DBName)

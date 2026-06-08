@@ -220,14 +220,8 @@ var _ = Describe("Managed subscription controller tests", func() {
 			Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(subscription.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			subscription.SetGeneration(subscription.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
 
 			err = reconcileSubscription(ctx, fakeClient, r, subscription)
@@ -264,14 +258,8 @@ var _ = Describe("Managed subscription controller tests", func() {
 			Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(subscription.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			subscription.SetGeneration(subscription.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
 
 			err = reconcileSubscription(ctx, fakeClient, r, subscription)
@@ -383,6 +371,46 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 		Expect(subscription.Status.Applied).Should(BeNil())
 		Expect(subscription.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+	})
+
+	When("reclaim policy is delete but the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the subscription", func(ctx SpecContext) {
+			// Mocking detection of subscriptions
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking create subscription
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+				pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+				pq.QuoteLiteral(connString),
+				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			// Reconcile while the cluster is still primary: the finalizer is added.
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			initialCluster := cluster.DeepCopy()
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
+
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
 	})
 })
 

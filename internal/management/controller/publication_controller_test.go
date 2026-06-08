@@ -190,14 +190,8 @@ var _ = Describe("Managed publication controller tests", func() {
 			Expect(publication.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(publication.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			publication.SetGeneration(publication.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
 
 			err = reconcilePublication(ctx, fakeClient, r, publication)
@@ -232,14 +226,8 @@ var _ = Describe("Managed publication controller tests", func() {
 			Expect(publication.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(publication.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			publication.SetGeneration(publication.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Delete while fully reconciled (Generation == ObservedGeneration):
+			// the finalizer must still run.
 			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
 
 			err = reconcilePublication(ctx, fakeClient, r, publication)
@@ -349,6 +337,44 @@ var _ = Describe("Managed publication controller tests", func() {
 
 		Expect(publication.Status.Applied).Should(BeNil())
 		Expect(publication.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+	})
+
+	When("reclaim policy is delete but the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the Publication", func(ctx SpecContext) {
+			// Mocking Detect publication
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking Create publication
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE PUBLICATION %s FOR ALL TABLES",
+				pgx.Identifier{publication.Spec.Name}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			// Reconcile while the cluster is still primary: the finalizer is added.
+			err := reconcilePublication(ctx, fakeClient, r, publication)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(publication.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			initialCluster := cluster.DeepCopy()
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
+
+			err = reconcilePublication(ctx, fakeClient, r, publication)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
 	})
 })
 

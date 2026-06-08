@@ -115,8 +115,11 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if database.Generation == database.Status.ObservedGeneration {
+	// Skip when fully reconciled, except during deletion: Kubernetes does not
+	// bump metadata.generation when it sets deletionTimestamp, so without the
+	// deletionTimestamp check the finalizer would never run and the object
+	// would stay stuck in Terminating.
+	if database.Generation == database.Status.ObservedGeneration && database.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
@@ -141,8 +144,11 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	// Cannot do anything on a replica cluster
-	if cluster.IsReplica() {
+	// Gate the apply path on a replica, but let deletion through: an object
+	// that acquired its finalizer while this cluster was primary must release
+	// it after a demotion. The drop itself is skipped on a replica (see
+	// evaluateDropDatabase).
+	if cluster.IsReplica() && database.GetDeletionTimestamp().IsZero() {
 		if err := markAsUnknown(ctx, r.Client, &database, errClusterIsReplica); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -183,6 +189,16 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1.Database) error {
 	if db.Spec.ReclaimPolicy != apiv1.DatabaseReclaimDelete {
+		return nil
+	}
+	// On a replica we cannot drop the database: return without touching
+	// PostgreSQL so the finalizer is released. Dropping it is left to the
+	// primary cluster's own Database object, if any.
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("while fetching the cluster: %w", err)
+	}
+	if cluster.IsReplica() {
 		return nil
 	}
 	sqlDB, err := r.getSuperUserDB()
