@@ -28,9 +28,11 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -128,6 +130,29 @@ func RunController(
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+	}
+
+	// EndpointSlices are watched only to detect CNPG-i plugin rollouts, and
+	// plugins are deployed in the operator namespace. Restricting the informer
+	// to that namespace avoids listing and watching every EndpointSlice in the
+	// cluster (one or more per Service in every namespace), which would
+	// otherwise be cached just to be dropped by the controller predicate.
+	//
+	// The restriction is only applied when the operator namespace is known: an
+	// empty namespace key is interpreted by controller-runtime as "all
+	// namespaces", which would silently widen the cache instead of narrowing
+	// it. When the namespace is unknown (e.g. local development without
+	// OPERATOR_NAMESPACE set) we simply fall back to the default caching.
+	if conf.OperatorNamespace != "" {
+		managerOptions.Cache = cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&discoveryv1.EndpointSlice{}: {
+					Namespaces: map[string]cache.Config{
+						conf.OperatorNamespace: {},
+					},
+				},
+			},
+		}
 	}
 
 	if conf.WatchNamespace != "" {
