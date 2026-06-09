@@ -280,6 +280,50 @@ var _ = Describe("Managed subscription controller tests", func() {
 		})
 	})
 
+	When("the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the subscription", func(ctx SpecContext) {
+			// Mocking detection of subscriptions
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking create subscription
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+				pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+				pq.QuoteLiteral(connString),
+				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Update(ctx, cluster)).To(Succeed())
+
+			// A real apiserver bumps the generation when deletionTimestamp is
+			// set, which the fake client does not; simulate it so the reconciler
+			// does not skip on Generation == ObservedGeneration.
+			subscription.SetGeneration(subscription.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
+
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// Since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
