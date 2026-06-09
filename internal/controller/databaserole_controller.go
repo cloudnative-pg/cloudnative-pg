@@ -71,8 +71,9 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// If passwordSecret was removed, clear any stale PasswordSecretChange
 		// condition left over from a previously configured secret.
 		if meta.FindStatusCondition(role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange)) != nil {
+			oldRole := role.DeepCopy()
 			meta.RemoveStatusCondition(&role.Status.Conditions, string(apiv1.ConditionPasswordSecretChange))
-			if err := r.Status().Update(ctx, &role); err != nil {
+			if err := r.Status().Patch(ctx, &role, client.MergeFrom(oldRole)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("while clearing stale password condition: %w", err)
 			}
 		}
@@ -110,6 +111,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// storing the Secret's ResourceVersion. This status update triggers a
 	// reconciliation cycle in the instance manager, which then reads the updated
 	// password and applies it to PostgreSQL.
+	oldRole := role.DeepCopy()
 	changed := meta.SetStatusCondition(&role.Status.Conditions, metav1.Condition{
 		Type:    string(apiv1.ConditionPasswordSecretChange),
 		Status:  metav1.ConditionTrue,
@@ -117,7 +119,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Message: secret.ResourceVersion,
 	})
 	if changed {
-		if err := r.Status().Update(ctx, &role); err != nil {
+		if err := r.Status().Patch(ctx, &role, client.MergeFrom(oldRole)); err != nil {
 			return ctrl.Result{}, fmt.Errorf("while setting role status: %w", err)
 		}
 	}
