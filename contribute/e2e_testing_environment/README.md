@@ -235,6 +235,7 @@ type provided.
 | `observability`                   |
 | `replication`                     |
 | `plugin`                          |
+| `plugin-barman-cloud`             |
 | `postgres-configuration`          |
 | `pod-scheduling`                  |
 | `cluster-metadata`                |

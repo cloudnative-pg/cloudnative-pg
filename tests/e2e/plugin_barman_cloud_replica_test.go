@@ -38,7 +38,7 @@ import (
 // Barman Cloud support is removed. Runs on kind/k3d only, where the plugin and
 // the shared MinIO are installed.
 var _ = Describe("plugin-barman-cloud replica cluster from backup",
-	Label(tests.LabelPlugin, tests.LabelReplication, tests.LabelBackupRestore), func() {
+	Label(tests.LabelPluginBarmanCloud, tests.LabelReplication, tests.LabelBackupRestore), func() {
 		const (
 			srcManifest     = fixturesDir + "/replica_mode_cluster/cluster-replica-src-with-plugin.yaml.template"
 			replicaManifest = fixturesDir + "/replica_mode_cluster/cluster-replica-from-plugin-backup.yaml.template"
