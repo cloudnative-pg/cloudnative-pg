@@ -278,10 +278,10 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.Extensio
 
 	// The pool pins search_path with pg_catalog first; under that pin a
 	// relocatable extension without an explicit SCHEMA would target
-	// pg_catalog (the first writable schema for the superuser). Acquire
-	// a dedicated *sql.Conn and SET search_path to "$user", public so
-	// extensions land in the standard user-data schema, matching the
-	// pre-pin default behavior.
+	// pg_catalog, where object creation is denied, so CREATE EXTENSION
+	// would fail. Acquire a dedicated *sql.Conn and SET search_path to
+	// "$user", public so extensions land in the standard user-data
+	// schema, matching the pre-pin default behavior.
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return fmt.Errorf("acquiring dedicated connection for CREATE EXTENSION: %w", err)
