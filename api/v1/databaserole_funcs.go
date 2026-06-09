@@ -37,24 +37,6 @@ func (r *DatabaseRole) SetAsApplied() {
 	r.Status.ObservedGeneration = r.Generation
 }
 
-// GetRoleSecretName gets the name of the secret holding the role password
-func (roleSpec *DatabaseRoleSpec) GetRoleSecretName() string {
-	if roleSpec.PasswordSecret == nil {
-		return ""
-	}
-	return roleSpec.PasswordSecret.Name
-}
-
-// GetRoleName gets the role name
-func (roleSpec *DatabaseRoleSpec) GetRoleName() string {
-	return roleSpec.Name
-}
-
-// ShouldDisablePassword checks if the password should be disabled in Postgres
-func (roleSpec *DatabaseRoleSpec) ShouldDisablePassword() bool {
-	return roleSpec.DisablePassword
-}
-
 // HasReconciliations returns true if the role has been reconciled at least once
 func (r *DatabaseRole) HasReconciliations() bool {
 	return r.Status.ObservedGeneration > 0
