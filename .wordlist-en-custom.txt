@@ -69,6 +69,7 @@ CSV
 CSVs
 CVE
 CVEs
+CWE
 CannotReconcile
 Canovai
 CatalogComponentImage
@@ -550,6 +551,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
