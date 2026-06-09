@@ -345,6 +345,33 @@ cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
 
+## Volume decrease
+
+Kubernetes does not provide an API allowing decreasing PVC's and CloudNativePG's validating webhook prohibit to decrease the value of `.spec.storage.size` / `.spec.walStorage.size`.
+However there is a procedure that allows you to decrese the size of your PVC's.
+
+:::info[Important]
+    ⚠️ WARNING: If you follow this procedure, you will temporarily disable the validating webhook. Disabling validation may permit unsafe or destructive operations. Use this setting with caution and at your own risk.
+:::
+
+To decrease the persistent volume:
+
+1. disable the validating webhook by setting `.metadata.annotations:cnpg.io/validation: disabled`, change `.spec.storage.size` / `.spec.walStorage.size` to the new value and increase `.spec.instnaces` by 1.
+2. enable the validation webhook
+3. remove one standby instance that has the old PVC size
+```
+kubectl-cnpg destroy CLUSTER INSTANCE
+```
+4. wait for the operator create a new instance
+5. repeate this step for every other standby instance
+6. promote one of the new standby instances
+```
+kubectl-cnpg promote CLUSTER INSTANCE
+```
+7. wait until all instances are healthy
+8. decrease `.spec.instnaces` to the initial value
+
+
 ## Static provisioning of persistent volumes
 
 CloudNativePG was designed to work with dynamic volume provisioning. This
