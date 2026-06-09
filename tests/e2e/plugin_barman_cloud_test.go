@@ -43,79 +43,80 @@ import (
 // cluster can both back up to and recover from an object store through it. It
 // is a stopgap that the fuller plugin-barman-cloud backup/restore ports will
 // absorb or replace.
-var _ = Describe("plugin-barman-cloud", Label(tests.LabelSmoke, tests.LabelPlugin, tests.LabelBackupRestore), func() {
-	const (
-		clusterManifest = fixturesDir + "/plugin_barman_cloud/cluster-with-plugin-minio.yaml.template"
-		backupManifest  = fixturesDir + "/plugin_barman_cloud/backup-plugin.yaml"
-		restoreManifest = fixturesDir + "/plugin_barman_cloud/cluster-restore-plugin-minio.yaml.template"
-		// Matches metadata.name of the cluster fixture and the barmanObjectName
-		// parameter it references.
-		clusterName           = "pg-backup-plugin-minio"
-		barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
-		restoreTable          = "to_restore"
-		level                 = tests.High
-	)
+var _ = Describe("plugin-barman-cloud",
+	Label(tests.LabelSmoke, tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
+		const (
+			clusterManifest = fixturesDir + "/plugin_barman_cloud/cluster-with-plugin-minio.yaml.template"
+			backupManifest  = fixturesDir + "/plugin_barman_cloud/backup-plugin.yaml"
+			restoreManifest = fixturesDir + "/plugin_barman_cloud/cluster-restore-plugin-minio.yaml.template"
+			// Matches metadata.name of the cluster fixture and the barmanObjectName
+			// parameter it references.
+			clusterName           = "pg-backup-plugin-minio"
+			barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
+			restoreTable          = "to_restore"
+			level                 = tests.High
+		)
 
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-		// The plugin (and the shared MinIO it backs up to) is only installed on
-		// local kind/k3d engines; see hack/e2e/run-e2e.sh.
-		if !(IsKind() || IsK3D()) {
-			Skip("This test only runs on kind or k3d clusters")
-		}
+		BeforeEach(func() {
+			if testLevelEnv.Depth < int(level) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
+			// The plugin (and the shared MinIO it backs up to) is only installed on
+			// local kind/k3d engines; see hack/e2e/run-e2e.sh.
+			if !(IsKind() || IsK3D()) {
+				Skip("This test only runs on kind or k3d clusters")
+			}
+		})
+
+		It("backs up and restores a cluster through the selected plugin-barman-cloud", func() {
+			const namespacePrefix = "plugin-barman-cloud-smoke"
+			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+
+			setupPluginObjectStore(namespace, clusterName)
+
+			By("creating a cluster that uses the plugin as WAL archiver", func() {
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
+			})
+
+			By("verifying the plugin is loaded and reported in the cluster status", func() {
+				clusterasserts.AssertPluginLoaded(env, namespace, clusterName, barmanCloudPluginName, 120)
+			})
+
+			By("verifying WAL archiving through the plugin is working", func() {
+				// Fail early and descriptively if the plugin is loaded but cannot
+				// archive WALs, rather than later as an opaque backup timeout.
+				backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 120)
+			})
+
+			// Write known data so the restore can be verified end to end.
+			pgasserts.AssertCreateTestData(env, pgasserts.TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: postgres.AppDBName,
+				TableName:    restoreTable,
+			})
+
+			By("backing up the cluster through the plugin", func() {
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupManifest, false,
+					testTimeouts[timeouts.BackupIsReady])
+				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+			})
+
+			By("archiving the WAL that closes the backup", func() {
+				// The plugin backup does not force the WAL segment holding the
+				// backup-stop record to be archived; on an otherwise idle cluster it
+				// would never be flushed and the standalone restore below could not
+				// reach a consistent recovery point. Switch WAL and wait for it to
+				// reach the object store.
+				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+			})
+
+			// Recover into a new cluster from the backup and confirm the data is
+			// there, exercising the plugin's restore path end to end.
+			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, restoreManifest, restoreTable)
+		})
 	})
-
-	It("backs up and restores a cluster through the selected plugin-barman-cloud", func() {
-		const namespacePrefix = "plugin-barman-cloud-smoke"
-		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-
-		setupPluginObjectStore(namespace, clusterName)
-
-		By("creating a cluster that uses the plugin as WAL archiver", func() {
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
-		})
-
-		By("verifying the plugin is loaded and reported in the cluster status", func() {
-			clusterasserts.AssertPluginLoaded(env, namespace, clusterName, barmanCloudPluginName, 120)
-		})
-
-		By("verifying WAL archiving through the plugin is working", func() {
-			// Fail early and descriptively if the plugin is loaded but cannot
-			// archive WALs, rather than later as an opaque backup timeout.
-			backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 120)
-		})
-
-		// Write known data so the restore can be verified end to end.
-		pgasserts.AssertCreateTestData(env, pgasserts.TableLocator{
-			Namespace:    namespace,
-			ClusterName:  clusterName,
-			DatabaseName: postgres.AppDBName,
-			TableName:    restoreTable,
-		})
-
-		By("backing up the cluster through the plugin", func() {
-			backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupManifest, false,
-				testTimeouts[timeouts.BackupIsReady])
-			backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
-		})
-
-		By("archiving the WAL that closes the backup", func() {
-			// The plugin backup does not force the WAL segment holding the
-			// backup-stop record to be archived; on an otherwise idle cluster it
-			// would never be flushed and the standalone restore below could not
-			// reach a consistent recovery point. Switch WAL and wait for it to
-			// reach the object store.
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-		})
-
-		// Recover into a new cluster from the backup and confirm the data is
-		// there, exercising the plugin's restore path end to end.
-		backupasserts.AssertClusterRestore(env, testTimeouts, namespace, restoreManifest, restoreTable)
-	})
-})
 
 // barmanCloudCredentialSecret is the Secret holding the MinIO credentials that
 // the e2e plugin ObjectStores reference; the tests create it with keys ID/KEY.

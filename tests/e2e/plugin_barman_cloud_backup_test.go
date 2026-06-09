@@ -41,7 +41,7 @@ import (
 // through plugin-barman-cloud; the in-core variants are left in place. Runs on
 // kind/k3d only.
 var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR",
-	Label(tests.LabelPlugin, tests.LabelBackupRestore), func() {
+	Label(tests.LabelPluginBarmanCloud, tests.LabelBackupRestore), func() {
 		const (
 			clusterManifest       = fixturesDir + "/plugin_barman_cloud/cluster-plugin-backup-features.yaml.template"
 			scheduledManifest     = fixturesDir + "/plugin_barman_cloud/scheduled-backup-immediate-plugin.yaml"

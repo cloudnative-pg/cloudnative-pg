@@ -861,104 +861,105 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
 		})
 
-		It("keeps a plugin-backed cluster working across an operator upgrade", Label(tests.LabelPlugin), func() {
-			const (
-				pluginClusterName     = "cluster-plugin-upgrade"
-				pluginClusterManifest = fixturesDir + "/upgrade/cluster-with-plugin.yaml.template"
-				pluginBackupManifest  = fixturesDir + "/upgrade/backup-plugin.yaml"
-				barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
-			)
+		It("keeps a plugin-backed cluster working across an operator upgrade",
+			Label(tests.LabelPluginBarmanCloud), func() {
+				const (
+					pluginClusterName     = "cluster-plugin-upgrade"
+					pluginClusterManifest = fixturesDir + "/upgrade/cluster-with-plugin.yaml.template"
+					pluginBackupManifest  = fixturesDir + "/upgrade/backup-plugin.yaml"
+					barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
+				)
 
-			By("applying environment changes for current upgrade to be performed", func() {
-				operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
-			})
+				By("applying environment changes for current upgrade to be performed", func() {
+					operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
+				})
 
-			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
-			deployOperator(currentOperatorManifest)
-			// This spec owns its operator lifecycle, so it tears down cnpg-system
-			// itself. cleanupOperatorAndMinio is not reused: it also cleans MinIO
-			// paths that only the in-core upgrade specs create, which would fail
-			// here. The plugin is removed before cnpg-system because the operator
-			// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
-			// deleting cnpg-system wholesale would otherwise wedge the namespace
-			// on that finalizer; removing the plugin while the operator is still
-			// up lets it be cleared.
-			DeferCleanup(func() {
-				if CurrentSpecReport().Failed() {
-					namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
-						minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
-					operator.Dump(env.Ctx, env.Client,
-						operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+				GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
+				deployOperator(currentOperatorManifest)
+				// This spec owns its operator lifecycle, so it tears down cnpg-system
+				// itself. cleanupOperatorAndMinio is not reused: it also cleans MinIO
+				// paths that only the in-core upgrade specs create, which would fail
+				// here. The plugin is removed before cnpg-system because the operator
+				// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
+				// deleting cnpg-system wholesale would otherwise wedge the namespace
+				// on that finalizer; removing the plugin while the operator is still
+				// up lets it be cleared.
+				DeferCleanup(func() {
+					if CurrentSpecReport().Failed() {
+						namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
+							minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
+						operator.Dump(env.Ctx, env.Client,
+							operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+					}
+					_, stderr, err := run.Run(fmt.Sprintf(
+						"kubectl delete deployment,service barman-cloud -n %s "+
+							"--ignore-not-found --wait=true --timeout=2m",
+						operatorNamespace))
+					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+					Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120)).
+						To(Succeed())
+				})
+
+				// The upgrade test owns its operator lifecycle and recreates
+				// cnpg-system, so the plugin has to be installed here, after the
+				// operator is up. cert-manager is cluster-scoped and the plugin's
+				// Deployment lives outside the operator manifest, so both survive the
+				// in-place upgrade to the prime build below.
+				By("installing cert-manager and the Barman Cloud plugin", func() {
+					_, stderr, err := run.Run("../../hack/e2e/install-barman-cloud-plugin.sh")
+					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+				})
+
+				upgradeNamespace := assertCreateNamespace("plugin-upgrade")
+
+				setupPluginObjectStore(upgradeNamespace, pluginClusterName)
+
+				By("creating a cluster that archives through the plugin", func() {
+					resources.CreateResourceFromFile(env, upgradeNamespace, pluginClusterManifest)
+					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName,
+						testTimeouts[timeouts.ClusterIsReady])
+				})
+
+				assertPluginLoaded := func() {
+					clusterasserts.AssertPluginLoaded(env, upgradeNamespace, pluginClusterName,
+						barmanCloudPluginName, 120)
 				}
-				_, stderr, err := run.Run(fmt.Sprintf(
-					"kubectl delete deployment,service barman-cloud -n %s "+
-						"--ignore-not-found --wait=true --timeout=2m",
-					operatorNamespace))
-				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
-				Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120)).
-					To(Succeed())
+
+				By("verifying the plugin is loaded before the upgrade", assertPluginLoaded)
+
+				By("upgrading the operator to the prime build", func() {
+					deployOperator(primeOperatorManifest)
+				})
+
+				By("waiting for the in-place instance manager rollout to complete", func() {
+					// This spec enables ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES, so
+					// the upgrade replaces the instance manager process inside each
+					// pod. The backup below must not race that rollout: a backup
+					// started on an instance whose manager is replaced moments later
+					// dies with it, leaving the Backup resource in the "started"
+					// phase forever.
+					Expect(assertOnlineManagerRollout(upgradeNamespace, pluginClusterName, 2)).To(BeTrue(),
+						"expected an online instance manager rollout on both instances")
+				})
+
+				By("verifying the plugin-backed cluster is still healthy after the upgrade", func() {
+					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName, 300)
+				})
+				By("verifying the plugin is still loaded after the upgrade", assertPluginLoaded)
+
+				By("verifying WAL archiving still works after the upgrade", func() {
+					// Switch a WAL after the upgrade and require it to reach the
+					// object store: the archiving condition on the cluster may still
+					// reflect pre-upgrade activity, so it is not enough here.
+					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv,
+						upgradeNamespace, pluginClusterName, pluginClusterName)
+				})
+
+				By("taking a backup through the plugin after the upgrade", func() {
+					backups.Execute(env.Ctx, env.Client, env.Scheme, upgradeNamespace, pluginBackupManifest, false,
+						testTimeouts[timeouts.BackupIsReady])
+					backupasserts.AssertBackupConditionInClusterStatus(env, upgradeNamespace, pluginClusterName)
+				})
 			})
-
-			// The upgrade test owns its operator lifecycle and recreates
-			// cnpg-system, so the plugin has to be installed here, after the
-			// operator is up. cert-manager is cluster-scoped and the plugin's
-			// Deployment lives outside the operator manifest, so both survive the
-			// in-place upgrade to the prime build below.
-			By("installing cert-manager and the Barman Cloud plugin", func() {
-				_, stderr, err := run.Run("../../hack/e2e/install-barman-cloud-plugin.sh")
-				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
-			})
-
-			upgradeNamespace := assertCreateNamespace("plugin-upgrade")
-
-			setupPluginObjectStore(upgradeNamespace, pluginClusterName)
-
-			By("creating a cluster that archives through the plugin", func() {
-				resources.CreateResourceFromFile(env, upgradeNamespace, pluginClusterManifest)
-				clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName,
-					testTimeouts[timeouts.ClusterIsReady])
-			})
-
-			assertPluginLoaded := func() {
-				clusterasserts.AssertPluginLoaded(env, upgradeNamespace, pluginClusterName,
-					barmanCloudPluginName, 120)
-			}
-
-			By("verifying the plugin is loaded before the upgrade", assertPluginLoaded)
-
-			By("upgrading the operator to the prime build", func() {
-				deployOperator(primeOperatorManifest)
-			})
-
-			By("waiting for the in-place instance manager rollout to complete", func() {
-				// This spec enables ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES, so
-				// the upgrade replaces the instance manager process inside each
-				// pod. The backup below must not race that rollout: a backup
-				// started on an instance whose manager is replaced moments later
-				// dies with it, leaving the Backup resource in the "started"
-				// phase forever.
-				Expect(assertOnlineManagerRollout(upgradeNamespace, pluginClusterName, 2)).To(BeTrue(),
-					"expected an online instance manager rollout on both instances")
-			})
-
-			By("verifying the plugin-backed cluster is still healthy after the upgrade", func() {
-				clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName, 300)
-			})
-			By("verifying the plugin is still loaded after the upgrade", assertPluginLoaded)
-
-			By("verifying WAL archiving still works after the upgrade", func() {
-				// Switch a WAL after the upgrade and require it to reach the
-				// object store: the archiving condition on the cluster may still
-				// reflect pre-upgrade activity, so it is not enough here.
-				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv,
-					upgradeNamespace, pluginClusterName, pluginClusterName)
-			})
-
-			By("taking a backup through the plugin after the upgrade", func() {
-				backups.Execute(env.Ctx, env.Client, env.Scheme, upgradeNamespace, pluginBackupManifest, false,
-					testTimeouts[timeouts.BackupIsReady])
-				backupasserts.AssertBackupConditionInClusterStatus(env, upgradeNamespace, pluginClusterName)
-			})
-		})
 	})
 })
