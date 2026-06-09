@@ -43,7 +43,7 @@ import (
 // owner/temporary-tablespace and volume-snapshot sub-tests) is left in place.
 // Runs on kind/k3d only.
 var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
-	Label(tests.LabelPlugin, tests.LabelTablespaces, tests.LabelBackupRestore), func() {
+	Label(tests.LabelPluginBarmanCloud, tests.LabelTablespaces, tests.LabelBackupRestore), func() {
 		const (
 			srcManifest         = fixturesDir + "/tablespaces/cluster-with-tablespaces-plugin.yaml.template"
 			restoreManifest     = fixturesDir + "/tablespaces/restore-cluster-from-plugin-tablespaces.yaml.template"
