@@ -305,7 +305,13 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 }
 
 func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
+	var svcTemplate *apiv1.ServiceTemplateSpec
+	if cluster.Spec.Managed != nil && cluster.Spec.Managed.Services != nil {
+		svcTemplate = cluster.Spec.Managed.Services.ServiceTemplate
+	}
+
 	anyService := specs.CreateClusterAnyService(*cluster)
+	specs.ApplyDefaultsTemplate(anyService, svcTemplate)
 	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, cluster, anyService, configuration.Current.CreateAnyService); err != nil {
@@ -313,6 +319,7 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
+	specs.ApplyDefaultsTemplate(readService, svcTemplate)
 	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, cluster, readService, cluster.IsReadServiceEnabled()); err != nil {
@@ -320,6 +327,7 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
+	specs.ApplyDefaultsTemplate(readOnlyService, svcTemplate)
 	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, cluster, readOnlyService, cluster.IsReadOnlyServiceEnabled()); err != nil {
@@ -327,6 +335,7 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
+	specs.ApplyDefaultsTemplate(readWriteService, svcTemplate)
 	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, cluster, readWriteService, cluster.IsReadWriteServiceEnabled()); err != nil {
