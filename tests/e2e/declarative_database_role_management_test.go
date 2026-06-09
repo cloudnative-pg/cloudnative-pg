@@ -511,8 +511,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(role.Status.Applied).Should(HaveValue(BeTrue()))
 						g.Expect(role.Status.Message).Should(BeEmpty())
-						// check if the transaction ID has been set in the status
-						g.Expect(role.Status.PasswordState.SecretResourceVersion).ShouldNot(BeZero())
+						g.Expect(role.Status.SecretResourceVersion).ShouldNot(BeZero())
 					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 				})
 

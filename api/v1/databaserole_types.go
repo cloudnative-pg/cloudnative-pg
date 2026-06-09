@@ -87,9 +87,10 @@ type DatabaseRoleState struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// PasswordState holds the last applied version of the passwordSecret, and
-	// the last transaction ID of the role in postgres
-	PasswordState PasswordState `json:"passwordState,omitempty"`
+	// SecretResourceVersion is the resource version of the password secret
+	// last applied to the role; a change to it triggers reconciliation.
+	// +optional
+	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
 
 	// Conditions for the DatabaseRole object
 	// +optional

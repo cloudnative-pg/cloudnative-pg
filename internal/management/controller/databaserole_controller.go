@@ -133,7 +133,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return res, err
 	}
 
-	passVersion, transactionID, err := r.reconcileRole(
+	passVersion, err := r.reconcileRole(
 		ctx,
 		&role,
 	)
@@ -141,7 +141,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.failedReconciliation(ctx, &role, err)
 	}
 
-	return r.succeededReconciliation(ctx, &role, passVersion, transactionID)
+	return r.succeededReconciliation(ctx, &role, passVersion)
 }
 
 // handleDeletion drops the role when this cluster owns it (see shouldDropRole)
@@ -279,7 +279,7 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 	}
 
 	return role.Generation == role.Status.ObservedGeneration &&
-		role.Status.PasswordState.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
+		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
 }
 
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
@@ -329,14 +329,12 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	passVersion string,
-	transactionID int64,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
 	role.Status.Message = ""
 	role.Status.Applied = ptr.To(true)
 	role.Status.ObservedGeneration = role.Generation
-	role.Status.PasswordState.SecretResourceVersion = passVersion
-	role.Status.PasswordState.TransactionID = transactionID
+	role.Status.SecretResourceVersion = passVersion
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
@@ -426,23 +424,23 @@ func updateExistingRole(
 	return nil
 }
 
-func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, int64, error) {
+func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.DatabaseRole) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// Guard against reserved roles (belt-and-suspenders with CEL validation on the CRD)
 	if pgpostgres.IsRoleReserved(role.Spec.Name) {
-		return "", 0, fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
+		return "", fmt.Errorf("role name %q is reserved and cannot be managed via DatabaseRole", role.Spec.Name)
 	}
 
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		contextLogger.Error(err, "while connecting to postgres", "role", role)
-		return "", 0, fmt.Errorf("while connecting to the database to reconcile role %q: %w", role.Spec.Name, err)
+		return "", fmt.Errorf("while connecting to the database to reconcile role %q: %w", role.Spec.Name, err)
 	}
 
 	rolesInDB, err := roles.List(ctx, db)
 	if err != nil {
-		return "", 0, fmt.Errorf("while listing roles in postgres: %w", err)
+		return "", fmt.Errorf("while listing roles in postgres: %w", err)
 	}
 
 	// Check if the role already exists in the database to determine the
@@ -470,21 +468,16 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 		ctx, r.Client, &role.Spec, r.instance.GetNamespaceName(),
 	)
 	if err != nil {
-		return "", 0, fmt.Errorf("while getting the role password: %w", err)
+		return "", fmt.Errorf("while getting the role password: %w", err)
 	}
 
 	if existingDBRole != nil {
 		if err := updateExistingRole(ctx, db, dbRole, existingDBRole); err != nil {
-			return "", 0, err
+			return "", err
 		}
 	} else if err := roles.Create(ctx, db, dbRole); err != nil {
-		return "", 0, err
+		return "", err
 	}
 
-	transactionID, err := roles.GetLastTransactionID(ctx, db, dbRole)
-	if err != nil {
-		return "", 0, fmt.Errorf("while getting last transaction ID for role %q: %w", role.Spec.Name, err)
-	}
-
-	return passwordVersion, transactionID, nil
+	return passwordVersion, nil
 }

@@ -163,14 +163,14 @@ var _ = Describe("DatabaseRole isAlreadyReconciled", func() {
 		It("is true when the applied secret version matches the observed one", func() {
 			role := newRoleWithSecret()
 			setObservedSecretVersion(role, "rv-1")
-			role.Status.PasswordState.SecretResourceVersion = "rv-1"
+			role.Status.SecretResourceVersion = "rv-1"
 			Expect(r.isAlreadyReconciled(role)).To(BeTrue())
 		})
 
 		It("is false when the secret version changed", func() {
 			role := newRoleWithSecret()
 			setObservedSecretVersion(role, "rv-2")
-			role.Status.PasswordState.SecretResourceVersion = "rv-1"
+			role.Status.SecretResourceVersion = "rv-1"
 			Expect(r.isAlreadyReconciled(role)).To(BeFalse())
 		})
 	})

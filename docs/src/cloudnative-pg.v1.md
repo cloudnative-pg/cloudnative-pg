@@ -976,7 +976,7 @@ _Appears in:_
 | `observedGeneration` _integer_ | A sequence number representing the latest<br />desired state that was synchronized |  |  |  |
 | `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
 | `message` _string_ | Message is the reconciliation error message |  |  |  |
-| `passwordState` _[PasswordState](#passwordstate)_ | PasswordState holds the last applied version of the passwordSecret, and<br />the last transaction ID of the role in postgres | True |  |  |
+| `secretResourceVersion` _string_ | SecretResourceVersion is the resource version of the password secret<br />last applied to the role; a change to it triggers reconciliation. |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#condition-v1-meta) array_ | Conditions for the DatabaseRole object |  |  |  |
 
 
@@ -1771,7 +1771,6 @@ PasswordState represents the state of the password of a managed RoleConfiguratio
 
 _Appears in:_
 
-- [DatabaseRoleState](#databaserolestate)
 - [ManagedRoles](#managedroles)
 
 | Field | Description | Required | Default | Validation |

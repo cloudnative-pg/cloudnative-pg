@@ -1275,7 +1275,6 @@ func (in *DatabaseRoleState) DeepCopyInto(out *DatabaseRoleState) {
 		*out = new(bool)
 		**out = **in
 	}
-	out.PasswordState = in.PasswordState
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))
