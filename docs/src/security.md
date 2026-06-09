@@ -759,6 +759,45 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
     Examples assume that the Kubernetes cluster runs in a private and secure network.
 :::
 
+#### Schema resolution and `search_path` hardening
+
+A user with privileges on a database can plant objects (functions,
+operators, tables, or types) in a writable schema such as `public` and
+change the database- or role-level `search_path` (for example with
+`ALTER DATABASE ... SET search_path` or `ALTER ROLE ... SET
+search_path`). A privileged session that later connects to that database
+inherits the tenant-controlled `search_path`, so an unqualified
+reference in one of its queries could resolve to the planted object
+instead of the intended one. This is a privilege-escalation vector
+analogous to
+[CWE-426 (Untrusted Search Path)](https://cwe.mitre.org/data/definitions/426.html),
+and the same class of issue as the well-known
+[CVE-2018-1058](https://www.postgresql.org/support/security/CVE-2018-1058/).
+
+To prevent this, CloudNativePG pins the `search_path` on every
+connection it opens to PostgreSQL to a fixed value of
+`pg_catalog, public, pg_temp`, regardless of any `search_path`
+configured on the database or the connecting role:
+
+- `pg_catalog` is searched first, so a built-in object always takes
+  precedence over a same-named object planted in another schema;
+- `pg_temp` (the session-private temporary schema) is searched last
+  rather than first, so it cannot shadow relations or data types.
+
+In addition, the `SECURITY DEFINER` lookup function used by the
+PgBouncer integration is created with its own pinned `search_path`, and
+the monitoring queries run inside a transaction whose `search_path` is
+pinned as described in the ["Monitoring" page](monitoring.md).
+
+:::note
+User-authored SQL — `postInitSQL`/`postInitApplicationSQL`/`postInitTemplateSQL`
+during bootstrap, and the post-import queries of a logical import — runs
+with the standard `"$user", public` resolution so that it keeps behaving
+as it would in a plain PostgreSQL session. Schema-qualify object
+references in those scripts if you need them to be independent of the
+`search_path`.
+:::
+
 ### Storage
 
 CloudNativePG delegates encryption at rest to the underlying storage class. For

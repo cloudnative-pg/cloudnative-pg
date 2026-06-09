@@ -276,8 +276,33 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.Extensio
 		fmt.Fprintf(&sqlCreateExtension, " SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize())
 	}
 
-	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
+	// The pool pins search_path with pg_catalog first; under that pin a
+	// relocatable extension without an explicit SCHEMA would target
+	// pg_catalog, where object creation is denied, so CREATE EXTENSION
+	// would fail. Acquire a dedicated *sql.Conn and SET search_path to
+	// "$user", public so extensions land in the standard user-data
+	// schema, matching the pre-pin default behavior.
+	conn, err := db.Conn(ctx)
 	if err != nil {
+		return fmt.Errorf("acquiring dedicated connection for CREATE EXTENSION: %w", err)
+	}
+	defer func() {
+		// Restore the pinned search_path before the connection returns
+		// to the pool. The pgx stdlib driver does not reset session GUCs
+		// on release, so without this RESET a subsequent operator query
+		// reusing this connection would run with the "$user", public
+		// search_path and could resolve objects planted by a tenant.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after CREATE EXTENSION")
+		}
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, `SET search_path TO "$user", public`); err != nil {
+		return fmt.Errorf("setting search_path before CREATE EXTENSION: %w", err)
+	}
+
+	if _, err := conn.ExecContext(ctx, sqlCreateExtension.String()); err != nil {
 		contextLogger.Error(err, "while creating extension", "query", sqlCreateExtension.String())
 		return err
 	}
