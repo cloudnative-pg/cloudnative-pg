@@ -370,8 +370,8 @@ func getPassword(
 		return passwordSecret{}, err
 	}
 	if strings.TrimSpace(rolePassword.GetRoleName()) != strings.TrimSpace(usernameFromSecret) {
-		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, rolePassword.GetRoleName())
-		return passwordSecret{}, err
+		return passwordSecret{},
+			fmt.Errorf("the username in secret %q does not match role %q", secretName, rolePassword.GetRoleName())
 	}
 	return passwordSecret{
 			username:    strings.TrimSpace(usernameFromSecret),
