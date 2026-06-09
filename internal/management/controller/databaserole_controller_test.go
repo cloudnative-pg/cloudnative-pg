@@ -226,6 +226,36 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 				makeReplica(cluster)
 			}, requeue),
 	)
+
+	It("persists Applied=false when shadowed by inline managed.roles", func() {
+		role := newTestDatabaseRole()
+		role.Status.Applied = ptr.To(true)
+		cluster := newTestCluster()
+		shadowRole(cluster)
+		r := reconcilerFor(role)
+
+		_, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		got := &apiv1.DatabaseRole{}
+		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
+	})
+
+	It("persists Applied=Unknown (nil) on a replica cluster", func() {
+		role := newTestDatabaseRole()
+		role.Status.Applied = ptr.To(true)
+		cluster := newTestCluster()
+		makeReplica(cluster)
+		r := reconcilerFor(role)
+
+		_, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		got := &apiv1.DatabaseRole{}
+		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Applied).To(BeNil())
+	})
 })
 
 var _ = Describe("DatabaseRole handleDeletion", func() {

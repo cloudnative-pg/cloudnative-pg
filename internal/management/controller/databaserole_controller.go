@@ -250,9 +250,10 @@ func (r *DatabaseRoleReconciler) shouldReconcile(
 		return &result, err
 	}
 
-	// Cannot do anything on a replica cluster
+	// On a replica cluster the role is owned by the primary cluster, not here.
+	// Report "unknown" (Applied=nil) like the sibling reconcilers, not a failure.
 	if cluster.IsReplica() {
-		result, err := r.failedReconciliation(ctx, role, errClusterIsReplica)
+		result, err := r.unknownReconciliation(ctx, role, errClusterIsReplica)
 		return &result, err
 	}
 
@@ -290,6 +291,29 @@ func (r *DatabaseRoleReconciler) failedReconciliation(
 	oldRole := role.DeepCopy()
 	role.Status.Message = err.Error()
 	role.Status.Applied = ptr.To(false)
+
+	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{
+		RequeueAfter: databaseRoleReconciliationInterval,
+	}, nil
+}
+
+// unknownReconciliation marks the role's applied state as unknown (Applied=nil)
+// because this instance is not the one managing it right now (for example on a
+// read-only replica cluster, where the primary cluster owns the role). It mirrors
+// the sibling Database/Publication/Subscription reconcilers, which report Unknown
+// rather than a failure in this case.
+func (r *DatabaseRoleReconciler) unknownReconciliation(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	err error,
+) (ctrl.Result, error) {
+	oldRole := role.DeepCopy()
+	role.Status.Message = err.Error()
+	role.Status.Applied = nil
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
