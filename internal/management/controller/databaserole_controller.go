@@ -163,9 +163,7 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 				"while connecting to the database to delete role %q: %w",
 				role.Spec.Name, err))
 		}
-		dbRole := roleAdapter{
-			RoleConfiguration: role.Spec.RoleConfiguration,
-		}.toDatabaseRole()
+		dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, false)
 		if err := roles.Delete(ctx, db, dbRole); err != nil {
 			return r.failedReconciliation(ctx, role, err)
 		}
@@ -453,16 +451,11 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 		}
 	}
 
-	adapter := roleAdapter{
-		RoleConfiguration: role.Spec.RoleConfiguration,
-	}
 	// When updating an existing role that has a non-null ValidUntil in the
 	// database, a nil ValidUntil in the spec should translate to
 	// VALID UNTIL 'infinity' (PostgreSQL cannot restore a NULL ValidUntil).
-	if existingDBRole != nil {
-		adapter.validUntilNullIsInfinity = existingDBRole.ValidUntil.Valid
-	}
-	dbRole := adapter.toDatabaseRole()
+	validUntilNullIsInfinity := existingDBRole != nil && existingDBRole.ValidUntil.Valid
+	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
 
 	passwordVersion, err := dbRole.ApplyPassword(
 		ctx, r.Client, &role.Spec, r.instance.GetNamespaceName(),
