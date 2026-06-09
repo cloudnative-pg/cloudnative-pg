@@ -37,6 +37,12 @@ func (r *DatabaseRole) SetAsApplied() {
 	r.Status.ObservedGeneration = r.Generation
 }
 
+// SetAsUnknown sets the role's applied state as unknown with the given error
+func (r *DatabaseRole) SetAsUnknown(err error) {
+	r.Status.Applied = nil
+	r.Status.Message = err.Error()
+}
+
 // HasReconciliations returns true if the role has been reconciled at least once
 func (r *DatabaseRole) HasReconciliations() bool {
 	return r.Status.ObservedGeneration > 0

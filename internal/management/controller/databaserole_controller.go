@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -287,8 +286,7 @@ func (r *DatabaseRoleReconciler) failedReconciliation(
 	err error,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
-	role.Status.Message = err.Error()
-	role.Status.Applied = ptr.To(false)
+	role.SetAsFailed(err)
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
@@ -310,8 +308,7 @@ func (r *DatabaseRoleReconciler) unknownReconciliation(
 	err error,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
-	role.Status.Message = err.Error()
-	role.Status.Applied = nil
+	role.SetAsUnknown(err)
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
@@ -329,9 +326,7 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	passVersion string,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
-	role.Status.Message = ""
-	role.Status.Applied = ptr.To(true)
-	role.Status.ObservedGeneration = role.Generation
+	role.SetAsApplied()
 	role.Status.SecretResourceVersion = passVersion
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
