@@ -180,12 +180,16 @@ GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
 ```
 
 Finally, as a *superuser* connect in each application database, and then create
-the authentication function inside each of the application databases:
+the authentication function inside each of the application databases. Because it
+runs as the function owner, its `search_path` is pinned to `pg_catalog, pg_temp`
+so that the function body cannot resolve operators or objects through a caller-
+or tenant-controlled `search_path`:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
   RETURNS TABLE (usename name, passwd text)
-  LANGUAGE sql SECURITY DEFINER AS
+  LANGUAGE sql SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp AS
   'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
 
 REVOKE ALL ON FUNCTION public.user_search(text)
@@ -194,6 +198,13 @@ REVOKE ALL ON FUNCTION public.user_search(text)
 GRANT EXECUTE ON FUNCTION public.user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
+
+:::note
+Clusters created with an earlier version of CloudNativePG carry a
+`user_search` function without the pinned `search_path`. The operator
+recreates the function with the `SET search_path` clause automatically
+during reconciliation when the cluster is upgraded.
+:::
 
 :::info[Important]
     Given that `user_search` is a `SECURITY DEFINER` function, you need to

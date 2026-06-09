@@ -657,6 +657,17 @@ func (r *InstanceReconciler) reconcileExtensions(
 		// a DDL when it is not really needed.
 
 		if !extension.SkipCreateExtension && extensionIsUsed && !extensionIsInstalled {
+			// The pool pins search_path with pg_catalog first. Under that pin a
+			// relocatable extension without an explicit SCHEMA targets pg_catalog,
+			// where object creation is denied ("System catalog modifications are
+			// currently disallowed"), so CREATE EXTENSION would fail. Set the
+			// standard "$user", public resolution for the statement so the
+			// extension lands in the user-data schema, matching pre-pin behavior.
+			// SET LOCAL is reverted at COMMIT, so the connection returns to the
+			// pool with the pinned search_path.
+			if _, err = tx.Exec(`SET LOCAL search_path TO "$user", public`); err != nil {
+				break
+			}
 			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", extension.Name))
 		} else if !extensionIsUsed && extensionIsInstalled {
 			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", extension.Name))
@@ -710,7 +721,11 @@ func (r *InstanceReconciler) reconcilePoolers(
 	}
 
 	var existsFunction bool
-	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname='%s' and prosrc='%s'",
+	// proconfig holds the function's SET clauses; we require the pinned
+	// search_path to be present so old (pre-pin) function definitions
+	// are re-created on upgrade.
+	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc "+
+		"WHERE proname='%s' AND prosrc='%s' AND proconfig IS NOT NULL",
 		userSearchFunctionName,
 		userSearchFunction))
 	err = row.Scan(&existsFunction)
@@ -718,10 +733,15 @@ func (r *InstanceReconciler) reconcilePoolers(
 		return err
 	}
 	if !existsFunction {
+		// The function is SECURITY DEFINER and runs as the cluster
+		// superuser. Pin search_path on the function so calls coming in
+		// over the pgbouncer auth connection cannot resolve operators
+		// inside the body through a tenant-controlled search_path.
 		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
 			"as '%s' "+
-			"LANGUAGE sql SECURITY DEFINER",
+			"LANGUAGE sql SECURITY DEFINER "+
+			"SET search_path = pg_catalog, pg_temp",
 			userSearchFunctionSchema,
 			userSearchFunctionName,
 			userSearchFunction))
