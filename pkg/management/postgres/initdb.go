@@ -448,6 +448,11 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 		return fmt.Errorf("acquiring dedicated connection for init queries: %w", err)
 	}
 	defer func() {
+		// Reset in a defer so the pin is restored even if a query fails;
+		// pooled pgx connections keep session GUCs across reuse.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			log.Error(resetErr, "while resetting search_path after init queries")
+		}
 		_ = conn.Close()
 	}()
 
@@ -460,10 +465,6 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 		if _, err := conn.ExecContext(ctx, sqlQuery); err != nil {
 			return err
 		}
-	}
-
-	if _, err := conn.ExecContext(ctx, `RESET search_path`); err != nil {
-		return fmt.Errorf("resetting search_path after init queries: %w", err)
 	}
 
 	return nil

@@ -297,6 +297,11 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 		return fmt.Errorf("acquiring dedicated connection for post-import queries: %w", err)
 	}
 	defer func() {
+		// Reset in a defer so the pin is restored even if a query fails;
+		// pooled pgx connections keep session GUCs across reuse.
+		if _, resetErr := conn.ExecContext(ctx, `RESET search_path`); resetErr != nil {
+			contextLogger.Error(resetErr, "while resetting search_path after post-import queries")
+		}
 		_ = conn.Close()
 	}()
 
@@ -308,10 +313,6 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 		if _, err := conn.ExecContext(ctx, query); err != nil {
 			return err
 		}
-	}
-
-	if _, err := conn.ExecContext(ctx, `RESET search_path`); err != nil {
-		return fmt.Errorf("resetting search_path after post-import queries: %w", err)
 	}
 
 	return nil

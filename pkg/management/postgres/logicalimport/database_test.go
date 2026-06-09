@@ -126,8 +126,12 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			mock.ExpectExec(`SET search_path TO "$user", public`).
 				WillReturnResult(sqlmock.NewResult(0, 0))
 			mock.ExpectExec(createQuery).WillReturnError(expectedErr)
+			// RESET runs even when the query fails
+			mock.ExpectExec(`RESET search_path`).
+				WillReturnResult(sqlmock.NewResult(0, 0))
 			err := ds.executePostImportQueries(ctx, fp, "test")
 			Expect(err).To(Equal(expectedErr))
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
 		})
 	})
 
