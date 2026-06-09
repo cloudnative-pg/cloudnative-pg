@@ -228,4 +228,92 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			}, 60).Should(Succeed())
 		})
 	})
+
+	FIt("restores the superuser password after a disable/re-enable cycle with a user-supplied secret", func() {
+		const (
+			cycleSampleFile  = fixturesDir + "/secrets/cluster-user-supplied-superuser-cycle.yaml.template"
+			cycleClusterName = "cluster-superuser-cycle"
+			superuserName    = "postgres"
+			superuserPass    = "super"
+		)
+
+		var err error
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, cycleClusterName, cycleSampleFile)
+
+		rwService := services.GetReadWriteServiceName(cycleClusterName)
+
+		primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, cycleClusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		passwdNullQuery := "SELECT passwd IS NULL FROM pg_catalog.pg_shadow WHERE usename='postgres'"
+
+		By("connecting as superuser with the user-supplied password", func() {
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, superuserName, superuserPass)
+		})
+
+		By("disabling superuser access and waiting for pg_shadow.passwd to become NULL", func() {
+			Eventually(func(g Gomega) {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, cycleClusterName)
+				g.Expect(err).NotTo(HaveOccurred())
+				cluster.Spec.EnableSuperuserAccess = ptr.To(false)
+				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+			}, 60, 5).Should(Succeed())
+
+			Eventually(func() string {
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: primaryPod.Namespace,
+						PodName:   primaryPod.Name,
+					},
+					postgres.PostgresDBName,
+					passwdNullQuery)
+				if err != nil {
+					return ""
+				}
+				return stdout
+			}, 60).Should(Equal("t\n"))
+		})
+
+		By("failing to connect as superuser while access is disabled", func() {
+			timeout := time.Second * 10
+			dsn := services.CreateDSN(rwService, superuserName, postgres.PostgresDBName, superuserPass, services.Require, 5432)
+			Eventually(func(g Gomega) {
+				_, _, execErr := exec.Command(env.Ctx, env.Interface, env.RestClientConfig, *primaryPod,
+					specs.PostgresContainerName, &timeout,
+					"psql", dsn, "-tAc", "SELECT 1")
+				g.Expect(execErr).To(HaveOccurred())
+			}, 30).Should(Succeed())
+		})
+
+		By("re-enabling superuser access and waiting for pg_shadow.passwd to be restored", func() {
+			Eventually(func(g Gomega) {
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, cycleClusterName)
+				g.Expect(err).NotTo(HaveOccurred())
+				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+			}, 60, 5).Should(Succeed())
+
+			Eventually(func() string {
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: primaryPod.Namespace,
+						PodName:   primaryPod.Name,
+					},
+					postgres.PostgresDBName,
+					passwdNullQuery)
+				if err != nil {
+					return ""
+				}
+				return stdout
+			}, 60).Should(Equal("f\n"))
+		})
+
+		By("connecting as superuser again with the user-supplied password", func() {
+			pgasserts.AssertConnection(env, namespace, rwService, postgres.PostgresDBName, superuserName, superuserPass)
+		})
+	})
 })
