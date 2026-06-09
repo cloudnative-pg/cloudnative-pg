@@ -770,8 +770,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 			roleKey: cluster.Name,
 		},
 	); err != nil {
-		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
-		return r.createRole(ctx, cluster, originBackup)
+		return fmt.Errorf("while listing database roles: %w", err)
 	}
 
 	generatedRole := specs.CreateRole(
