@@ -152,7 +152,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 	})
 
 	// Regression test for CWE-426 search_path operator hijack.
-	// postInitApplicationSQL plants a `=` (name, text) overload in
+	// postInitApplicationSQL plants a `=` (name, name) overload in
 	// public and flips ALTER DATABASE app SET search_path = public,
 	// pg_catalog. The operator's connection-level search_path pin
 	// must keep operator-issued queries on pg_catalog so the planted
@@ -192,30 +192,34 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			}
 
 			By("verifying operator-issued queries never invoke the planted shadow operator", func() {
-				// The operator connects to `app` (e.g. the managed-extension
-				// probe runs `... WHERE extname = $1`). The connection-level
-				// search_path pin keeps pg_catalog first, so the planted
-				// public.=(name,text) operator must never be resolved.
+				// The operator's catalog probes against `app` resolve to name
+				// equality (e.g. `... WHERE extname = $1`, extname being `name`
+				// and $1 inferred as `name`). The connection-level pin keeps
+				// pg_catalog first, so they hit pg_catalog.=(name,name) and never
+				// reach the planted public.=(name,name).
 				//
-				// To validate this test red/green: remove the search_path pin
-				// in pkg/management/postgres/pool/profiles.go (fillDefaultParameters)
-				// and re-run; this assertion must then fail with shadow_calls > 0.
+				// To validate red/green: remove the pin in
+				// pkg/management/postgres/pool/profiles.go (fillDefaultParameters)
+				// and re-run; the probes then inherit the tenant search_path and
+				// this assertion fails with shadow_calls > 0.
 				Consistently(shadowCalls, "30s", "5s").Should(Equal("0"))
 			})
 
 			By("confirming the planted shadow operator is actually reachable (positive control)", func() {
 				// Guard against a false pass where shadow_calls stays 0 only
-				// because the shadow is unreachable. A name=text comparison
-				// issued through psql under the tenant-controlled search_path
-				// (public, pg_catalog) resolves to public.=(name,text) and must
-				// increment shadow_calls, proving the detector is live.
+				// because the shadow is unreachable. Mirror the operator's
+				// resolution path with an inferred $1 (PREPARE infers it just
+				// like the extended protocol), which under the tenant search_path
+				// (public, pg_catalog) resolves to public.=(name,name) and must
+				// increment shadow_calls. PREPARE and EXECUTE share one psql -c
+				// command so the prepared plan survives.
 				_, _, err := exec.QueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "app",
-					"SELECT 'x'::name = 'y'::text")
+					"PREPARE shadow_probe AS SELECT 'x'::name = $1; EXECUTE shadow_probe('y')")
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(shadowCalls, "10s", "2s").ShouldNot(Equal("0"))
 			})
