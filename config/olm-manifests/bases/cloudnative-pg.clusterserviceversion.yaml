@@ -1011,6 +1011,107 @@ spec:
       - path: message
         displayName: Message
         description: Message is the reconciliation output message
+    - kind: DatabaseRole
+      name: databaseroles.postgresql.cnpg.io
+      displayName: Postgres Role
+      description: Declarative creation and management of a PostgreSQL role in a Cluster
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Role name
+          description: Name of the PostgreSQL role
+        - path: cluster
+          displayName: Cluster requested to create the role
+          description: Cluster in which to create the role
+        - path: roleReclaimPolicy
+          displayName: Role reclaim policy
+          description: Specifies the action to take for the role inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the role or retain it for future management.
+        - path: passwordSecret.name
+          displayName: Password secret
+          description: Secret containing the password of the role, in `kubernetes.io/basic-auth` format
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - path: comment
+          displayName: Comment
+          description: Description of the role, stored as a comment on the role in PostgreSQL
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:text'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: validUntil
+          displayName: Valid until
+          description: Date and time after which the role's password is no longer valid
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: inRoles
+          displayName: In roles
+          description: List of existing roles this role will be an immediate member of
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: connectionLimit
+          displayName: Connection limit
+          description: How many concurrent connections the role can make
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:number'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: disablePassword
+          displayName: Disable password
+          description: If true, the role's password is set to NULL in PostgreSQL
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: login
+          displayName: Login
+          description: Whether the role is allowed to log in
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: superuser
+          displayName: Superuser
+          description: Whether the role is a superuser who can override all access restrictions
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: createdb
+          displayName: Create DB
+          description: Whether the role will be allowed to create new databases
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: createrole
+          displayName: Create role
+          description: Whether the role will be permitted to manage other roles
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: inherit
+          displayName: Inherit
+          description: Whether the role inherits the privileges of roles it is a member of
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: replication
+          displayName: Replication
+          description: Whether the role is a replication role
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: bypassrls
+          displayName: Bypass RLS
+          description: Whether the role bypasses every row-level security policy
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      statusDescriptors:
+      - path: applied
+        displayName: Applied
+        description: Applied is true if the role was reconciled correctly
+      - path: message
+        displayName: Message
+        description: Message is the reconciliation output message
     - kind: FailoverQuorum
       name: failoverquorums.postgresql.cnpg.io
       displayName: Failover Quorum
