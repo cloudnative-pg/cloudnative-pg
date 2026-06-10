@@ -20,17 +20,10 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"fmt"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -47,13 +40,13 @@ import (
 var _ = Describe("plugin-barman-cloud replica cluster from backup",
 	Label(tests.LabelPlugin, tests.LabelReplication, tests.LabelBackupRestore), func() {
 		const (
-			srcManifest           = fixturesDir + "/replica_mode_cluster/cluster-replica-src-with-plugin.yaml.template"
-			replicaManifest       = fixturesDir + "/replica_mode_cluster/cluster-replica-from-plugin-backup.yaml.template"
-			srcClusterName        = "cluster-replica-src-plugin"
-			srcDBName             = "appSrc"
-			testTableName         = "replica_mode_backup"
-			barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
-			level                 = tests.High
+			srcManifest     = fixturesDir + "/replica_mode_cluster/cluster-replica-src-with-plugin.yaml.template"
+			replicaManifest = fixturesDir + "/replica_mode_cluster/cluster-replica-from-plugin-backup.yaml.template"
+			backupManifest  = fixturesDir + "/replica_mode_cluster/backup-cluster-replica-src-plugin.yaml"
+			srcClusterName  = "cluster-replica-src-plugin"
+			srcDBName       = "appSrc"
+			testTableName   = "replica_mode_backup"
+			level           = tests.High
 		)
 
 		BeforeEach(func() {
@@ -70,42 +63,15 @@ var _ = Describe("plugin-barman-cloud replica cluster from backup",
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the MinIO CA secret", func() {
-				Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
-			})
-
-			By("creating the MinIO credentials secret", func() {
-				_, err := secrets.CreateObjectStorageSecret(
-					env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("creating the ObjectStore pointing at the shared MinIO", func() {
-				Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, srcClusterName))).
-					To(Succeed())
-			})
+			setupPluginObjectStore(namespace, srcClusterName)
 
 			By("creating the source cluster that archives through the plugin", func() {
 				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcManifest)
 			})
 
 			By("taking a backup of the source through the plugin", func() {
-				backupName := fmt.Sprintf("%v-backup", srcClusterName)
-				backup, err := backups.Create(env.Ctx, env.Client, apiv1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: backupName},
-					Spec: apiv1.BackupSpec{
-						Target:              apiv1.BackupTargetStandby,
-						Method:              apiv1.BackupMethodPlugin,
-						PluginConfiguration: &apiv1.BackupPluginConfiguration{Name: barmanCloudPluginName},
-						Cluster:             apiv1.LocalObjectReference{Name: srcClusterName},
-					},
-				})
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(func() (apiv1.BackupPhase, error) {
-					err = env.Client.Get(env.Ctx,
-						types.NamespacedName{Namespace: namespace, Name: backupName}, backup)
-					return backup.Status.Phase, err
-				}, testTimeouts[timeouts.BackupIsReady]).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupManifest, false,
+					testTimeouts[timeouts.BackupIsReady])
 			})
 
 			By("bootstrapping a replica cluster from the plugin backup", func() {

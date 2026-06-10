@@ -20,12 +20,6 @@ SPDX-License-Identifier: Apache-2.0
 package e2e
 
 import (
-	"fmt"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
@@ -35,7 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -54,9 +47,9 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 		const (
 			srcManifest         = fixturesDir + "/tablespaces/cluster-with-tablespaces-plugin.yaml.template"
 			restoreManifest     = fixturesDir + "/tablespaces/restore-cluster-from-plugin-tablespaces.yaml.template"
+			backupManifest      = fixturesDir + "/tablespaces/backup-cluster-tablespaces-plugin.yaml"
 			srcClusterName      = "cluster-tablespaces-plugin"
 			restoredClusterName = "cluster-restore-tablespaces-plugin"
-			pluginName          = "barman-cloud.cloudnative-pg.io"
 			numTablespaces      = 2
 			testTablespace      = "atablespace"
 			testTableName       = "tbs_restore"
@@ -77,20 +70,7 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 			namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the MinIO CA secret", func() {
-				Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
-			})
-
-			By("creating the MinIO credentials secret", func() {
-				_, err := secrets.CreateObjectStorageSecret(
-					env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("creating the ObjectStore pointing at the shared MinIO", func() {
-				Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, srcClusterName))).
-					To(Succeed())
-			})
+			setupPluginObjectStore(namespace, srcClusterName)
 
 			By("creating the source cluster with tablespaces archiving through the plugin", func() {
 				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, srcClusterName, srcManifest)
@@ -111,21 +91,8 @@ var _ = Describe("plugin-barman-cloud tablespaces backup and restore",
 			})
 
 			By("backing up the source cluster through the plugin", func() {
-				backupName := fmt.Sprintf("%v-backup", srcClusterName)
-				backup, err := backups.Create(env.Ctx, env.Client, apiv1.Backup{
-					ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: backupName},
-					Spec: apiv1.BackupSpec{
-						Method:              apiv1.BackupMethodPlugin,
-						PluginConfiguration: &apiv1.BackupPluginConfiguration{Name: pluginName},
-						Cluster:             apiv1.LocalObjectReference{Name: srcClusterName},
-					},
-				})
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(func() (apiv1.BackupPhase, error) {
-					err = env.Client.Get(env.Ctx,
-						types.NamespacedName{Namespace: namespace, Name: backupName}, backup)
-					return backup.Status.Phase, err
-				}, testTimeouts[timeouts.BackupIsReady]).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupManifest, false,
+					testTimeouts[timeouts.BackupIsReady])
 			})
 
 			By("archiving the WAL that closes the backup", func() {
