@@ -29,7 +29,6 @@ import (
 	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -73,39 +72,14 @@ var _ = Describe("plugin-barman-cloud", Label(tests.LabelSmoke, tests.LabelPlugi
 		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		By("creating the MinIO CA secret", func() {
-			Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
-		})
-
-		By("creating the MinIO credentials secret", func() {
-			_, err := secrets.CreateObjectStorageSecret(
-				env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("creating the ObjectStore pointing at the shared MinIO", func() {
-			Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, clusterName))).
-				To(Succeed())
-		})
+		setupPluginObjectStore(namespace, clusterName)
 
 		By("creating a cluster that uses the plugin as WAL archiver", func() {
 			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
 		})
 
 		By("verifying the plugin is loaded and reported in the cluster status", func() {
-			Eventually(func(g Gomega) {
-				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-
-				var pluginVersion string
-				for _, plugin := range cluster.Status.PluginStatus {
-					if plugin.Name == barmanCloudPluginName {
-						pluginVersion = plugin.Version
-					}
-				}
-				g.Expect(pluginVersion).ToNot(BeEmpty(),
-					"the %s plugin is not reported as loaded in the cluster status", barmanCloudPluginName)
-			}, 120).Should(Succeed())
+			clusterasserts.AssertPluginLoaded(env, namespace, clusterName, barmanCloudPluginName, 120)
 		})
 
 		By("verifying WAL archiving through the plugin is working", func() {
@@ -146,6 +120,28 @@ var _ = Describe("plugin-barman-cloud", Label(tests.LabelSmoke, tests.LabelPlugi
 // barmanCloudCredentialSecret is the Secret holding the MinIO credentials that
 // the e2e plugin ObjectStores reference; the tests create it with keys ID/KEY.
 const barmanCloudCredentialSecret = "backup-storage-creds"
+
+// setupPluginObjectStore prepares a namespace for plugin-barman-cloud
+// archiving against the shared MinIO: the CA secret, the credentials secret,
+// and an ObjectStore named after the cluster that uses them.
+func setupPluginObjectStore(namespace, name string) {
+	GinkgoHelper()
+
+	By("creating the MinIO CA secret", func() {
+		Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
+	})
+
+	By("creating the MinIO credentials secret", func() {
+		_, err := secrets.CreateObjectStorageSecret(
+			env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("creating the ObjectStore pointing at the shared MinIO", func() {
+		Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, name))).
+			To(Succeed())
+	})
+}
 
 // newMinioObjectStore builds a plugin-barman-cloud ObjectStore custom resource
 // (barmancloud.cnpg.io/v1) pointing at the shared e2e MinIO. It is built as an

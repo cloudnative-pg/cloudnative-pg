@@ -29,7 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -75,20 +74,7 @@ var _ = Describe("plugin-barman-cloud scheduled backups, standby target and PITR
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
-				By("creating the MinIO CA secret", func() {
-					Expect(minioEnv.CreateCaSecret(env, namespace)).To(Succeed())
-				})
-
-				By("creating the MinIO credentials secret", func() {
-					_, err := secrets.CreateObjectStorageSecret(
-						env.Ctx, env.Client, namespace, barmanCloudCredentialSecret, "minio", "minio123")
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				By("creating the ObjectStore pointing at the shared MinIO", func() {
-					Expect(env.Client.Create(env.Ctx, newMinioObjectStore(namespace, clusterName))).
-						To(Succeed())
-				})
+				setupPluginObjectStore(namespace, clusterName)
 
 				By("creating a cluster that archives through the plugin", func() {
 					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterManifest)
