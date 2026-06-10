@@ -169,7 +169,8 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 	} else if role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete {
 		log.FromContext(ctx).Info(
 			"not dropping role on deletion: not owned by this cluster "+
-				"(managed inline, or replica cluster); releasing finalizer only",
+				"(managed inline, replica cluster, or never reconciled by this "+
+				"object); releasing finalizer only",
 			"role", role.Spec.Name)
 	}
 
@@ -182,10 +183,13 @@ func (r *DatabaseRoleReconciler) handleDeletion(
 }
 
 // shouldDropRole reports whether a deleted DatabaseRole's role must be dropped:
-// only when reclaimPolicy is delete and this cluster owns it (not shadowed by an
+// only when reclaimPolicy is delete, this object reconciled the role at least
+// once (a conflicting duplicate never does, and must not drop the role owned by
+// the surviving DatabaseRole), and this cluster owns it (not shadowed by an
 // inline managed.roles entry, nor on a replica cluster).
 func shouldDropRole(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) bool {
 	return role.Spec.ReclaimPolicy == apiv1.DatabaseRoleReclaimDelete &&
+		role.HasReconciliations() &&
 		!isClusterManagingRole(cluster, role.Spec.Name) && !cluster.IsReplica()
 }
 

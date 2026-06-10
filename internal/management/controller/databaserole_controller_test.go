@@ -94,6 +94,12 @@ func makeReplica(cluster *apiv1.Cluster) {
 	cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{Enabled: ptr.To(true)}
 }
 
+// markReconciled records a successful past reconciliation, as
+// succeededReconciliation would have.
+func markReconciled(role *apiv1.DatabaseRole) {
+	role.Status.ObservedGeneration = role.Generation
+}
+
 func markDeleting(role *apiv1.DatabaseRole) {
 	now := metav1.Now()
 	role.DeletionTimestamp = &now
@@ -106,19 +112,27 @@ func markDeleting(role *apiv1.DatabaseRole) {
 
 var _ = Describe("DatabaseRole shouldDropRole", func() {
 	DescribeTable("decides whether a deleted role must be dropped",
-		func(policy apiv1.DatabaseRoleReclaimPolicy, mutateCluster func(*apiv1.Cluster), expected bool) {
+		func(policy apiv1.DatabaseRoleReclaimPolicy, reconciled bool,
+			mutateCluster func(*apiv1.Cluster), expected bool,
+		) {
 			role := newTestDatabaseRole()
 			role.Spec.ReclaimPolicy = policy
+			if reconciled {
+				markReconciled(role)
+			}
 			cluster := newTestCluster()
 			if mutateCluster != nil {
 				mutateCluster(cluster)
 			}
 			Expect(shouldDropRole(role, cluster)).To(Equal(expected))
 		},
-		Entry("delete policy, role owned by this cluster", apiv1.DatabaseRoleReclaimDelete, nil, true),
-		Entry("retain policy", apiv1.DatabaseRoleReclaimRetain, nil, false),
-		Entry("delete policy, shadowed by inline managed.roles", apiv1.DatabaseRoleReclaimDelete, shadowRole, false),
-		Entry("delete policy, replica cluster", apiv1.DatabaseRoleReclaimDelete, makeReplica, false),
+		Entry("delete policy, role owned by this cluster", apiv1.DatabaseRoleReclaimDelete, true, nil, true),
+		Entry("retain policy", apiv1.DatabaseRoleReclaimRetain, true, nil, false),
+		Entry("delete policy, shadowed by inline managed.roles",
+			apiv1.DatabaseRoleReclaimDelete, true, shadowRole, false),
+		Entry("delete policy, replica cluster", apiv1.DatabaseRoleReclaimDelete, true, makeReplica, false),
+		Entry("delete policy, never reconciled (conflicting duplicate)",
+			apiv1.DatabaseRoleReclaimDelete, false, nil, false),
 	)
 })
 
@@ -315,6 +329,7 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 	It("drops an owned role and releases the finalizer for the delete policy", func() {
 		role := newTestDatabaseRole()
 		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markReconciled(role)
 		markDeleting(role)
 		dbMock.ExpectExec(`DROP ROLE IF EXISTS "app_role"`).WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -326,6 +341,7 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 	It("does not drop a role shadowed by inline managed.roles", func() {
 		role := newTestDatabaseRole()
 		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markReconciled(role)
 		markDeleting(role)
 		cluster := newTestCluster()
 		shadowRole(cluster)
@@ -338,6 +354,7 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 	It("does not drop a role on a replica cluster", func() {
 		role := newTestDatabaseRole()
 		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markReconciled(role)
 		markDeleting(role)
 		cluster := newTestCluster()
 		makeReplica(cluster)
@@ -347,9 +364,20 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 		expectFinalizerReleased(c, role)
 	})
 
+	It("does not drop a role it never reconciled, releasing the finalizer", func() {
+		role := newTestDatabaseRole()
+		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markDeleting(role)
+
+		c, result := run(role, newTestCluster())
+		Expect(result).To(Equal(ctrl.Result{}))
+		expectFinalizerReleased(c, role)
+	})
+
 	It("keeps the finalizer and reports the error when the drop fails", func() {
 		role := newTestDatabaseRole()
 		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markReconciled(role)
 		markDeleting(role)
 		dbMock.ExpectExec(`DROP ROLE IF EXISTS "app_role"`).
 			WillReturnError(&pq.Error{
