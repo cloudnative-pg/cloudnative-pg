@@ -277,7 +277,7 @@ spec:
    - The PVC groups of the replicas (`cluster-example-2` and
      `cluster-example-3`) are removed.
    - The primary pod is restarted.
-   - Two new replicas (`cluster-example-4` and `cluster-example-5`) are
+   - Two new replicas (`cluster-example-2` and `cluster-example-3`) are
      re-cloned from the upgraded primary.
 
 Once the upgrade is complete, you can verify the new major version by running

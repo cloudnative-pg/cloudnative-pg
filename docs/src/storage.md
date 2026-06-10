@@ -341,8 +341,8 @@ $ kubectl get pods
 NAME                           READY   STATUS      RESTARTS   AGE
 cluster-example-1              1/1     Running     0          5m58s
 cluster-example-2              1/1     Running     0          5m43s
-cluster-example-4-join-v2      0/1     Completed   0          17s
-cluster-example-4              1/1     Running     0          10s
+cluster-example-3-join-v2      0/1     Completed   0          17s
+cluster-example-3              1/1     Running     0          10s
 ```
 
 ## Static provisioning of persistent volumes
