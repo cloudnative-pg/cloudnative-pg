@@ -158,6 +158,12 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
 		return nil
 	}
+	// An object that never reconciled does not own the publication: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the publication owned by the surviving object.
+	if !pub.HasReconciliations() {
+		return nil
+	}
 	db, err := r.getDB(pub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
