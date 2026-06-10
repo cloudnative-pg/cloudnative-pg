@@ -396,6 +396,8 @@ func ensurePKI(
 		return nil
 	}
 
+	mutatingWebhook, validatingWebhook := getWebhookConfigurationNames(conf.WebhookPrefix)
+
 	// We need to self-manage required PKI infrastructure and install the certificates into
 	// the webhooks configuration
 	pkiConfig := certs.PublicKeyInfrastructure{
@@ -404,8 +406,8 @@ func ensurePKI(
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
 		OperatorNamespace:                  conf.OperatorNamespace,
-		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
-		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
+		MutatingWebhookConfigurationName:   mutatingWebhook,
+		ValidatingWebhookConfigurationName: validatingWebhook,
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
@@ -413,6 +415,18 @@ func ensurePKI(
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
 	return err
+}
+
+func getWebhookConfigurationNames(webhookPrefix string) (string, string) {
+	mutatingWebhook := MutatingWebhookConfigurationName
+	validatingWebhook := ValidatingWebhookConfigurationName
+
+	if webhookPrefix != "" {
+		mutatingWebhook = webhookPrefix + mutatingWebhook
+		validatingWebhook = webhookPrefix + validatingWebhook
+	}
+
+	return mutatingWebhook, validatingWebhook
 }
 
 // readConfigMap reads the configMap and returns its content as map
