@@ -157,7 +157,7 @@ If a `DatabaseRole` CRD targets a name already managed in the Cluster spec, the
 
 ```
 database role is already managed by the CNPG cluster
-````
+```
 
 ---
 
@@ -455,5 +455,6 @@ above could be fixed by creating the role `poets` or dropping the database
 `inferno` respectively, but they might have originated due to human error, and
 in such case, the "fix" proposed might be the wrong thing to do.
 
-CloudNativePG  will record when such fundamental errors occur, and will display
-them in the cluster Status. Which segues into…
+CloudNativePG will record when such fundamental errors occur, and will display
+them in the cluster Status, as described in
+[Status of Inline Managed Roles](#status-of-inline-managed-roles).
