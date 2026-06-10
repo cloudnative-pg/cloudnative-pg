@@ -59,6 +59,14 @@ This is the recommended approach for modern environments and
 GitOps workflows, as it decouples role lifecycle from the cluster
 infrastructure.
 
+:::note
+A `DatabaseRole` is applied when its specification or its password Secret
+changes. Changes made directly in the database, such as a manual
+`ALTER ROLE`, are not detected or reverted until the next time the resource
+is applied. Inline managed roles, by contrast, are periodically compared
+with the database catalog and brought back to their specification.
+:::
+
 ### Example Manifest
 
 ```yaml
