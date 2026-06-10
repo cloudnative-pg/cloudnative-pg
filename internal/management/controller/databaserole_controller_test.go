@@ -24,6 +24,7 @@ import (
 	"database/sql"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -344,5 +345,25 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 		c, result := run(role, cluster)
 		Expect(result).To(Equal(ctrl.Result{}))
 		expectFinalizerReleased(c, role)
+	})
+
+	It("keeps the finalizer and reports the error when the drop fails", func() {
+		role := newTestDatabaseRole()
+		role.Spec.ReclaimPolicy = apiv1.DatabaseRoleReclaimDelete
+		markDeleting(role)
+		dbMock.ExpectExec(`DROP ROLE IF EXISTS "app_role"`).
+			WillReturnError(&pq.Error{
+				Code:    "2BP01",
+				Message: `role "app_role" cannot be dropped because some objects depend on it`,
+			})
+
+		c, result := run(role, newTestCluster())
+		Expect(result.RequeueAfter).To(Equal(databaseRoleReconciliationInterval))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(c.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Finalizers).To(ContainElement(utils.RoleFinalizerName))
+		Expect(got.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(got.Status.Message).To(ContainSubstring("depend on it"))
 	})
 })
