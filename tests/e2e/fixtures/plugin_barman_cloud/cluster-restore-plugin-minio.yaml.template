@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-backup-plugin-minio-restore
+spec:
+  instances: 2
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      source: source
+
+  # Recover from the backup the source cluster took through the plugin. The
+  # ObjectStore is the same one the source used (same namespace), and serverName
+  # points at the source cluster's name, where its backups were stored.
+  externalClusters:
+    - name: source
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: pg-backup-plugin-minio
+          serverName: pg-backup-plugin-minio
