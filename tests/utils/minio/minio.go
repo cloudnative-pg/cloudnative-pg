@@ -414,10 +414,6 @@ func defaultClient(namespace string) corev1.Pod {
 							Name:  "AWS_DEFAULT_REGION",
 							Value: "us-east-1",
 						},
-						{
-							Name:  "AWS_PAGER",
-							Value: "",
-						},
 						// The CRC-based default checksums introduced in
 						// AWS CLI 2.23 are not supported by every
 						// S3-compatible object store
@@ -597,13 +593,23 @@ func globToRegexp(pattern string) string {
 	return "^" + strings.Join(fragments, ".*") + "$"
 }
 
-// listFilesScript builds a shell pipeline printing every object in the store
-// as a `bucket/key` line, filtered by the glob expressed in the given path
+// listFilesScript builds a shell script printing every object in the store
+// as a `bucket/key` line, filtered by the glob expressed in the given path.
+// A failure enumerating the buckets aborts the script, so an unreachable
+// endpoint is not mistaken for an empty store, and the per-bucket listings
+// run in parallel (eight at a time) to keep the cost of a poll from growing
+// linearly with the number of buckets. The script ends with the pipeline
+// emitting the matches, so callers can append further stages (e.g. `| wc -l`)
 func listFilesScript(path string) string {
 	return fmt.Sprintf(
-		`for b in $(aws s3api list-buckets --query "Buckets[].Name" --output text); do `+
+		`buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text) || exit 1; `+
+			`dir=$(mktemp -d) || exit 1; trap "rm -rf $dir" EXIT; n=0; `+
+			`for b in $buckets; do `+
 			`aws s3api list-objects-v2 --bucket "$b" --query "Contents[].Key" --output text | `+
-			`tr "\t" "\n" | sed "s|^|$b/|"; done | { grep -E "%v" || true; }`,
+			`tr "\t" "\n" | sed "s|^|$b/|" > "$dir/$b" & `+
+			`n=$((n+1)); [ $((n %% 8)) -eq 0 ] && wait; `+
+			`done; wait; `+
+			`cat /dev/null "$dir"/* 2>/dev/null | { grep -E "%v" || true; }`,
 		globToRegexp(path))
 }
 
