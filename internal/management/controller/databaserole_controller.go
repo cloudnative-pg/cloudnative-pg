@@ -307,8 +307,9 @@ func (r *DatabaseRoleReconciler) failedReconciliation(
 	oldRole := role.DeepCopy()
 	role.SetAsFailed(err)
 
-	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
-		return ctrl.Result{}, err
+	if patchErr := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); patchErr != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"while setting the failed status: %w, original error: %w", patchErr, err)
 	}
 
 	return ctrl.Result{
@@ -329,8 +330,9 @@ func (r *DatabaseRoleReconciler) unknownReconciliation(
 	oldRole := role.DeepCopy()
 	role.SetAsUnknown(err)
 
-	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
-		return ctrl.Result{}, err
+	if patchErr := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); patchErr != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"while setting the unknown status: %w, original error: %w", patchErr, err)
 	}
 
 	return ctrl.Result{
@@ -350,8 +352,10 @@ func (r *DatabaseRoleReconciler) shadowedReconciliation(
 	role.SetAsFailed(errClusterIsManagingRole)
 	role.Status.ObservedGeneration = 0
 
-	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
-		return ctrl.Result{}, err
+	if patchErr := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); patchErr != nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"while setting the shadowed status: %w, original error: %w",
+			patchErr, errClusterIsManagingRole)
 	}
 
 	return ctrl.Result{
