@@ -279,6 +279,13 @@ metadata:
 type: kubernetes.io/basic-auth
 ```
 
+:::important
+Label the Secret with `cnpg.io/reload: "true"`, as shown above. Password
+changes in labeled Secrets are applied immediately, while changes in
+unlabeled Secrets are only applied at a subsequent reconciliation, for
+example when the operator refreshes its internal cache.
+:::
+
 If no `passwordSecret` is specified, the instance manager will not try to
 `CREATE/ALTER` the role with a password, keeping with PostgreSQL conventions.
 
