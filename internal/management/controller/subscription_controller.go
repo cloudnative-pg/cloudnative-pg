@@ -28,8 +28,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -80,15 +83,27 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if subscription.Generation == subscription.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &subscription, fmt.Errorf("while fetching the cluster: %w", err))
+	}
+
+	// If everything is reconciled, we're done here
+	if subscription.Generation == subscription.Status.ObservedGeneration {
+		// ...unless the cluster was demoted to a replica after the
+		// subscription was applied: report the replica condition and void
+		// the recorded reconciliation, so the subscription is evaluated
+		// again once the cluster is promoted back to primary.
+		if subscription.DeletionTimestamp.IsZero() &&
+			cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
+			cluster.IsReplica() {
+			if err := markAsUnknownAndForget(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -230,6 +245,13 @@ func NewSubscriptionReconciler(
 func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Subscription{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterToManagedResources(
+				r.instance, mgr.GetClient(),
+				func() client.ObjectList { return &apiv1.SubscriptionList{} })),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-subscription").
 		Complete(r)
 }
