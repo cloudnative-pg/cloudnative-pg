@@ -39,6 +39,7 @@ import (
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/cloudvendors"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
@@ -90,6 +91,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_, _ = fmt.Fprintf(
 		GinkgoWriter, `
 E2E test configuration:
+  Operator version:              %s
   Postgres image:                %s:%s
   Postgres version:              %d
   Postgres image repository:     %s
@@ -100,7 +102,10 @@ E2E test configuration:
   CSI storage class:             %s
   Default volume snapshot class: %s
   CNPG deployment method:        %s
+  Barman plugin selector:        %s
+  Barman plugin version:         %s
 `,
+		versions.Version,
 		env.PostgresImageName, env.PostgresImageTag,
 		env.PostgresVersion,
 		display(env.PostgresImageRepository),
@@ -111,6 +116,8 @@ E2E test configuration:
 		display(env.CSIStorageClass),
 		display(env.DefaultVolumeSnapshotClass),
 		display(os.Getenv("CNPG_DEPLOYMENT_METHOD")),
+		display(os.Getenv("BARMAN_PLUGIN_VERSION")),
+		display(os.Getenv("BARMAN_PLUGIN_VERSION_RESOLVED")),
 	)
 
 	// Export detected storage class values as environment variables for
