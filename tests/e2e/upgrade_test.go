@@ -909,18 +909,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			upgradeNamespace := assertCreateNamespace("plugin-upgrade")
 
-			By("creating the MinIO credentials secret", func() {
-				_, err := secrets.CreateObjectStorageSecret(
-					env.Ctx, env.Client, upgradeNamespace, barmanCloudCredentialSecret, "minio", "minio123")
-				Expect(err).NotTo(HaveOccurred())
-			})
-			By("creating the MinIO CA secret", func() {
-				Expect(minioEnv.CreateCaSecret(env, upgradeNamespace)).To(Succeed())
-			})
-			By("creating the ObjectStore pointing at the shared MinIO", func() {
-				Expect(env.Client.Create(env.Ctx,
-					newMinioObjectStore(upgradeNamespace, pluginClusterName))).To(Succeed())
-			})
+			setupPluginObjectStore(upgradeNamespace, pluginClusterName)
 
 			By("creating a cluster that archives through the plugin", func() {
 				resources.CreateResourceFromFile(env, upgradeNamespace, pluginClusterManifest)
@@ -929,18 +918,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			})
 
 			assertPluginLoaded := func() {
-				Eventually(func(g Gomega) {
-					cluster, err := clusterutils.Get(env.Ctx, env.Client, upgradeNamespace, pluginClusterName)
-					g.Expect(err).ToNot(HaveOccurred())
-					var version string
-					for _, plugin := range cluster.Status.PluginStatus {
-						if plugin.Name == barmanCloudPluginName {
-							version = plugin.Version
-						}
-					}
-					g.Expect(version).ToNot(BeEmpty(),
-						"the %s plugin is not reported as loaded", barmanCloudPluginName)
-				}, 120).Should(Succeed())
+				clusterasserts.AssertPluginLoaded(env, upgradeNamespace, pluginClusterName,
+					barmanCloudPluginName, 120)
 			}
 
 			By("verifying the plugin is loaded before the upgrade", assertPluginLoaded)
