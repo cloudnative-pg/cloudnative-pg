@@ -377,6 +377,43 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(pubDuplicate.Status.Applied).To(HaveValue(BeFalse()))
 		Expect(pubDuplicate.Status.Message).To(ContainSubstring(expectedError))
 		Expect(pubDuplicate.Status.ObservedGeneration).To(BeZero())
+		// The conflicting managers detection runs before the finalizer
+		// reconciler, so a conflicting publication never acquires the
+		// finalizer and its deletion never drops the contested publication.
+		Expect(pubDuplicate.GetFinalizers()).To(BeEmpty())
+	})
+
+	It("releases the finalizer on deletion even if the publication is managed by another object", func(ctx SpecContext) {
+		// Let's force the publication to have a past reconciliation
+		publication.Status.ObservedGeneration = 2
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		// A conflicting Publication targeting the same "pub-all": it carries
+		// the finalizer but was never reconciled, so it doesn't short-circuit
+		// the conflicting managers detection.
+		pubDuplicate := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pub-duplicate",
+				Namespace:  "default",
+				Generation: 1,
+				Finalizers: []string{utils.PublicationFinalizerName},
+			},
+			Spec: apiv1.PublicationSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:          "pub-all",
+				ReclaimPolicy: apiv1.PublicationReclaimRetain,
+			},
+		}
+		Expect(fakeClient.Create(ctx, pubDuplicate)).To(Succeed())
+		Expect(fakeClient.Delete(ctx, pubDuplicate)).To(Succeed())
+
+		// Deletion must release the finalizer instead of being re-marked as
+		// failed by the conflicting managers detection.
+		err := reconcilePublication(ctx, fakeClient, r, pubDuplicate)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
 	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
