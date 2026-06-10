@@ -110,7 +110,7 @@ func StreamLogs(
 	go func() {
 		err := stern.Run(ctx, client, config)
 		if err != nil {
-			fmt.Printf("stern failed: %v", err)
+			   log.Printf("stern failed: %v", err)
 		}
 		if <-ctx.Done(); true {
 			_ = outPipeWriter.Close()
@@ -139,7 +139,7 @@ func outputWriter(baseDir string, logReader io.Reader) {
 		lineBytes, readErr := r.ReadBytes('\n')
 		// If we have a read error, skip the line
 		if readErr != nil && readErr != io.EOF {
-			fmt.Printf("could not read log line from pipe: %v\n", readErr)
+			   log.Printf("could not read log line from pipe: %v", readErr)
 			continue
 		}
 
@@ -152,19 +152,19 @@ func outputWriter(baseDir string, logReader io.Reader) {
 		var logLine stern.Log
 		err := json.Unmarshal(lineBytes, &logLine)
 		if err != nil {
-			fmt.Printf("could not unmarshal log line %v: %v\n", logLine, err)
+			   log.Printf("could not unmarshal log line %v: %v", logLine, err)
 			continue
 		}
 
 		file, err := getLogFile(baseDir, logLine, openFilesMap)
 		if err != nil {
-			fmt.Printf("no file to write log line %v: %v\n", logLine, err)
+			   log.Printf("no file to write log line %v: %v", logLine, err)
 			continue
 		}
 
 		_, err = fmt.Fprintf(file, "%v\n", logLine.Message)
 		if err != nil {
-			fmt.Printf("could not write message to file %v: %v\n", file.Name(), err)
+			   log.Printf("could not write message to file %v: %v", file.Name(), err)
 			continue
 		}
 	}
