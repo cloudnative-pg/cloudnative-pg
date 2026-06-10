@@ -39,8 +39,8 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 # PGBouncer Image
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
-# MINIO Image
-export MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+# RustFS Image
+export RUSTFS_IMG=${RUSTFS_IMG:-$(grep 'rustfsImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
@@ -61,13 +61,13 @@ if [ -z "${PGBOUNCER_IMG}" ]; then
   echo "ERROR: Failed to extract PGBOUNCER_IMG from ${ROOT_DIR}/pkg/versions/versions.go" >&2
   exit 1
 fi
-if [ -z "${MINIO_IMG}" ]; then
-  echo "ERROR: Failed to extract MINIO_IMG from ${ROOT_DIR}/tests/utils/minio/minio.go" >&2
+if [ -z "${RUSTFS_IMG}" ]; then
+  echo "ERROR: Failed to extract RUSTFS_IMG from ${ROOT_DIR}/tests/utils/minio/minio.go" >&2
   exit 1
 fi
 
 # Define the full array of helper images used by load-helper-images
-HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$MINIO_IMG" "$APACHE_IMG")
+HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$RUSTFS_IMG" "$APACHE_IMG")
 export HELPER_IMGS
 
 # Testing the upgrade will require generating a second operator image, `-prime`

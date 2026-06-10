@@ -101,7 +101,17 @@
         '/^tests\\/utils\\/minio\\/minio\\.go$/',
       ],
       matchStrings: [
-        'minioImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+        'rustfsImage = "(?<depName>.+?):(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+    },
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^tests\\/utils\\/minio\\/minio\\.go$/',
+      ],
+      matchStrings: [
         'minioClientImage = "(?<depName>.+?):(?<currentValue>.*?)"',
       ],
       datasourceTemplate: 'docker',
@@ -230,6 +240,7 @@
       matchPackageNames: [
         'vmware-tanzu{/,}**',
         'minio{/,}**',
+        'rustfs{/,}**',
       ],
     },
     {
