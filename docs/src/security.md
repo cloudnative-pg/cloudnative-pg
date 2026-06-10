@@ -284,6 +284,13 @@ by the same actor who can write the Cluster, so it is not a security boundary.
 Kubernetes admission control still applies to the resulting Pods regardless of
 this annotation.
 
+The same reasoning applies to the `DatabaseRole` resource: its specification
+allows `superuser: true` and membership of any existing role through
+`inRoles`, including the `postgres` role itself. Write access to
+`DatabaseRole` objects in a namespace is therefore equivalent to superuser
+access on the PostgreSQL clusters in that namespace, and deserves the same
+care as write access to the `Cluster` resource.
+
 The RBAC discussed here governs access to CloudNativePG's own custom resources.
 The next section covers the complementary side: the RBAC that the operator
 itself relies on to manage Kubernetes resources on your behalf.

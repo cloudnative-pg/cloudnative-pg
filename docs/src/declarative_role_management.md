@@ -67,6 +67,9 @@ is applied. Inline managed roles, by contrast, are periodically compared
 with the database catalog and brought back to their specification.
 :::
 
+See [Security](security.md#rbac-on-custom-resources) for the RBAC
+implications of granting access to `DatabaseRole` resources.
+
 ### Example Manifest
 
 ```yaml
