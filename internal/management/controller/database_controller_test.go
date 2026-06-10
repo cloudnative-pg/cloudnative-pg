@@ -412,6 +412,9 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(database.Status.Applied).Should(BeNil())
 		Expect(database.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		// The replica gate runs before the finalizer reconciler, so no
+		// finalizer is added while the cluster is a replica.
+		Expect(database.GetFinalizers()).Should(BeEmpty())
 	})
 })
 
