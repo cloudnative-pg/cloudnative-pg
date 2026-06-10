@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-minio
+  name: pg-backup-object-store
 spec:
   instances: 2
 
@@ -44,7 +44,7 @@ spec:
     target: primary
     barmanObjectStore:
         destinationPath: s3://cluster-backups/
-        endpointURL: http://minio-service.backup-safety-1.svc.cluster.local:9000
+        endpointURL: http://object-store-service.backup-safety-1.svc.cluster.local:9000
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds

@@ -17,10 +17,10 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package minio contains all the require functions to setup a RustFS
-// deployment serving the historical in-cluster `minio-service` S3 endpoint,
-// and query it through an AWS CLI client pod
-package minio
+// Package objectstore contains the functions to deploy the S3-compatible
+// object storage service used by the e2e tests (currently RustFS) and to
+// query it through an AWS CLI client pod
+package objectstore
 
 import (
 	"encoding/json"
@@ -55,10 +55,15 @@ const (
 	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
 	// awsCliImage is the image used to run the AWS CLI S3 client
 	awsCliImage = "docker.io/amazon/aws-cli:2.35.1"
+
+	// AccessKeyID is the access key used to authenticate against the object store
+	AccessKeyID = "objectstore"
+	// SecretAccessKey is the secret key used to authenticate against the object store
+	SecretAccessKey = "objectstore123"
 )
 
-// Env contains all the information related or required by MinIO deployment and
-// used by the functions on every test
+// Env contains all the information related or required by the object storage
+// deployment and used by the functions on every test
 type Env struct {
 	Client       *corev1.Pod
 	CaPair       *certs.KeyPair
@@ -70,8 +75,8 @@ type Env struct {
 	Timeout      uint
 }
 
-// Setup contains the resources needed for a working minio server deployment:
-// a PersistentVolumeClaim, a Deployment and a Service
+// Setup contains the resources needed for a working object storage server
+// deployment: a PersistentVolumeClaim, a Deployment and a Service
 type Setup struct {
 	PersistentVolumeClaim corev1.PersistentVolumeClaim
 	Deployment            appsv1.Deployment
@@ -83,16 +88,16 @@ type TagSet struct {
 	Tags map[string]string
 }
 
-// installMinio installs minio in a given namespace
-func installMinio(
+// installObjectStore installs the object storage server in a given namespace
+func installObjectStore(
 	env *environment.TestingEnvironment,
-	minioSetup Setup,
+	setup Setup,
 	timeoutSeconds uint,
 ) error {
-	if err := env.Client.Create(env.Ctx, &minioSetup.PersistentVolumeClaim); err != nil {
+	if err := env.Client.Create(env.Ctx, &setup.PersistentVolumeClaim); err != nil {
 		return err
 	}
-	if err := env.Client.Create(env.Ctx, &minioSetup.Deployment); err != nil {
+	if err := env.Client.Create(env.Ctx, &setup.Deployment); err != nil {
 		return err
 	}
 	err := retry.New(
@@ -104,14 +109,14 @@ func installMinio(
 				deployment := &appsv1.Deployment{}
 				if err := env.Client.Get(
 					env.Ctx,
-					client.ObjectKey{Namespace: minioSetup.Deployment.Namespace, Name: minioSetup.Deployment.Name},
+					client.ObjectKey{Namespace: setup.Deployment.Namespace, Name: setup.Deployment.Name},
 					deployment,
 				); err != nil {
 					return err
 				}
-				if deployment.Status.ReadyReplicas != *minioSetup.Deployment.Spec.Replicas {
+				if deployment.Status.ReadyReplicas != *setup.Deployment.Spec.Replicas {
 					return fmt.Errorf("not all replicas are ready. Expected %v, found %v",
-						*minioSetup.Deployment.Spec.Replicas,
+						*setup.Deployment.Spec.Replicas,
 						deployment.Status.ReadyReplicas,
 					)
 				}
@@ -121,11 +126,11 @@ func installMinio(
 	if err != nil {
 		return err
 	}
-	err = env.Client.Create(env.Ctx, &minioSetup.Service)
+	err = env.Client.Create(env.Ctx, &setup.Service)
 	return err
 }
 
-// defaultSetup returns the definition for the default minio setup
+// defaultSetup returns the definition for the default object storage setup
 func defaultSetup(namespace string) (Setup, error) {
 	pvc, err := defaultPVC(namespace)
 	if err != nil {
@@ -142,23 +147,23 @@ func defaultSetup(namespace string) (Setup, error) {
 }
 
 // defaultDeployment returns a default Deployment for the RustFS server
-func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
+func defaultDeployment(namespace string, pvc corev1.PersistentVolumeClaim) appsv1.Deployment {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
 
-	minioDeployment := appsv1.Deployment{
+	deployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "minio",
+			Name:      "object-store",
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "minio"},
+				MatchLabels: map[string]string{"app": "object-store"},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": "minio"},
+					Labels: map[string]string{"app": "object-store"},
 				},
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
@@ -166,7 +171,7 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 							Name: "data",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: minioPVC.Name,
+									ClaimName: pvc.Name,
 								},
 							},
 						},
@@ -179,7 +184,7 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 					},
 					Containers: []corev1.Container{
 						{
-							Name:    "minio",
+							Name:    "object-store",
 							Image:   rustfsImage,
 							Command: []string{"/usr/bin/rustfs"},
 							Ports: []corev1.ContainerPort{
@@ -202,11 +207,11 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 								},
 								{
 									Name:  "RUSTFS_ACCESS_KEY",
-									Value: "minio",
+									Value: AccessKeyID,
 								},
 								{
 									Name:  "RUSTFS_SECRET_KEY",
-									Value: "minio123",
+									Value: SecretAccessKey,
 								},
 								{
 									Name:  "RUSTFS_CONSOLE_ENABLE",
@@ -266,14 +271,14 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 			},
 		},
 	}
-	return minioDeployment
+	return deployment
 }
 
-// defaultSVC returns a default Service for minio
+// defaultSVC returns a default Service for the object storage server
 func defaultSVC(namespace string) corev1.Service {
-	minioService := corev1.Service{
+	service := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "minio-service",
+			Name:      "object-store",
 			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
@@ -286,21 +291,21 @@ func defaultSVC(namespace string) corev1.Service {
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
-			Selector: map[string]string{"app": "minio"},
+			Selector: map[string]string{"app": "object-store"},
 		},
 	}
-	return minioService
+	return service
 }
 
-// defaultPVC returns a default PVC for minio
+// defaultPVC returns a default PVC for the object storage server
 func defaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
-	const claimName = "minio-pv-claim"
+	const claimName = "object-store-pv-claim"
 	storageClass, ok := os.LookupEnv("E2E_DEFAULT_STORAGE_CLASS")
 	if !ok {
 		return corev1.PersistentVolumeClaim{}, fmt.Errorf("storage class not defined")
 	}
 
-	minioPVC := corev1.PersistentVolumeClaim{
+	pvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: namespace,
@@ -317,10 +322,10 @@ func defaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 			StorageClassName: &storageClass,
 		},
 	}
-	return minioPVC, nil
+	return pvc, nil
 }
 
-// sslSetup returns the definition for a minio setup using SSL
+// sslSetup returns the definition for an object storage setup using SSL
 func sslSetup(namespace string) (Setup, error) {
 	setup, err := defaultSetup(namespace)
 	if err != nil {
@@ -353,7 +358,7 @@ func sslSetup(namespace string) (Setup, error) {
 						{
 							Secret: &corev1.SecretProjection{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "minio-server-tls-secret",
+									Name: "object-store-tls-secret",
 								},
 								Items: []corev1.KeyToPath{
 									{
@@ -386,7 +391,7 @@ func defaultClient(namespace string) corev1.Pod {
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
 
-	minioClient := corev1.Pod{
+	clientPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "s3-client",
@@ -400,15 +405,15 @@ func defaultClient(namespace string) corev1.Pod {
 					Env: []corev1.EnvVar{
 						{
 							Name:  "AWS_ENDPOINT_URL",
-							Value: "http://minio-service.minio:9000",
+							Value: "http://object-store.object-store:9000",
 						},
 						{
 							Name:  "AWS_ACCESS_KEY_ID",
-							Value: "minio",
+							Value: AccessKeyID,
 						},
 						{
 							Name:  "AWS_SECRET_ACCESS_KEY",
-							Value: "minio123",
+							Value: SecretAccessKey,
 						},
 						{
 							Name:  "AWS_DEFAULT_REGION",
@@ -440,86 +445,86 @@ func defaultClient(namespace string) corev1.Pod {
 			RestartPolicy: corev1.RestartPolicyAlways,
 		},
 	}
-	return minioClient
+	return clientPod
 }
 
 // sslClient returns the Pod definition for an S3 client using SSL
 func sslClient(namespace string) corev1.Pod {
 	const (
-		minioServerCASecret = "minio-server-ca-secret" // #nosec
-		tlsVolumeName       = "secret-volume"
-		tlsVolumeMountPath  = "/etc/secrets/ca"
+		caSecretName       = "object-store-ca-secret"
+		tlsVolumeName      = "secret-volume"
+		tlsVolumeMountPath = "/etc/secrets/ca"
 	)
 	var secretMode int32 = 0o600
 
-	minioClient := defaultClient(namespace)
-	minioClient.Spec.Volumes = append(minioClient.Spec.Volumes,
+	clientPod := defaultClient(namespace)
+	clientPod.Spec.Volumes = append(clientPod.Spec.Volumes,
 		corev1.Volume{
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  minioServerCASecret,
+					SecretName:  caSecretName,
 					DefaultMode: &secretMode,
 				},
 			},
 		},
 	)
-	minioClient.Spec.Containers[0].VolumeMounts = append(
-		minioClient.Spec.Containers[0].VolumeMounts,
+	clientPod.Spec.Containers[0].VolumeMounts = append(
+		clientPod.Spec.Containers[0].VolumeMounts,
 		corev1.VolumeMount{
 			Name:      tlsVolumeName,
 			MountPath: tlsVolumeMountPath,
 		},
 	)
-	minioClient.Spec.Containers[0].Env[0].Value = "https://minio-service.minio:9000"
-	minioClient.Spec.Containers[0].Env = append(
-		minioClient.Spec.Containers[0].Env,
+	clientPod.Spec.Containers[0].Env[0].Value = "https://object-store.object-store:9000"
+	clientPod.Spec.Containers[0].Env = append(
+		clientPod.Spec.Containers[0].Env,
 		corev1.EnvVar{
 			Name:  "AWS_CA_BUNDLE",
 			Value: tlsVolumeMountPath + "/ca.crt",
 		},
 	)
 
-	return minioClient
+	return clientPod
 }
 
-// Deploy will create a full MinIO deployment defined inthe minioEnv variable
-func Deploy(minioEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, error) {
+// Deploy will create a full object storage deployment defined in the storeEnv variable
+func Deploy(storeEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, error) {
 	var err error
-	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio")
+	storeEnv.CaPair, err = certs.CreateRootCA(storeEnv.Namespace, "object-store")
 	if err != nil {
 		return nil, err
 	}
 
-	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	if _, err = objects.Create(env.Ctx, env.Client, &minioEnv.CaSecretObj); err != nil {
+	storeEnv.CaSecretObj = *storeEnv.CaPair.GenerateCASecret(storeEnv.Namespace, storeEnv.CaSecretName)
+	if _, err = objects.Create(env.Ctx, env.Client, &storeEnv.CaSecretObj); err != nil {
 		return nil, err
 	}
 
 	// sign and create secret using CA certificate and key
-	serverPair, err := minioEnv.CaPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
-		[]string{"minio.useless.domain.not.verified", "minio-service.minio"},
+	serverPair, err := storeEnv.CaPair.CreateAndSignPair("object-store", certs.CertTypeServer,
+		[]string{"object-store.useless.domain.not.verified", "object-store.object-store"},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	serverSecret := serverPair.GenerateCertificateSecret(minioEnv.Namespace, minioEnv.TLSSecret)
+	serverSecret := serverPair.GenerateCertificateSecret(storeEnv.Namespace, storeEnv.TLSSecret)
 	if err = env.Client.Create(env.Ctx, serverSecret); err != nil {
 		return nil, err
 	}
 
-	setup, err := sslSetup(minioEnv.Namespace)
+	setup, err := sslSetup(storeEnv.Namespace)
 	if err != nil {
 		return nil, err
 	}
-	if err = installMinio(env, setup, minioEnv.Timeout); err != nil {
+	if err = installObjectStore(env, setup, storeEnv.Timeout); err != nil {
 		return nil, err
 	}
 
-	minioClient := sslClient(minioEnv.Namespace)
+	clientPod := sslClient(storeEnv.Namespace)
 
-	return &minioClient, pods.CreateAndWaitForReady(env.Ctx, env.Client, &minioClient, 240)
+	return &clientPod, pods.CreateAndWaitForReady(env.Ctx, env.Client, &clientPod, 240)
 }
 
 func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string) (*corev1.Secret, error) {
@@ -542,7 +547,7 @@ func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string)
 	}, nil
 }
 
-// CreateCaSecret creates the certificates required to authenticate against the MinIO service
+// CreateCaSecret creates the certificates required to authenticate against the object storage service
 func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace string) error {
 	caSecret, err := m.getCaSecret(env, namespace)
 	if err != nil {
@@ -552,14 +557,14 @@ func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace stri
 	return err
 }
 
-// CountFiles uses the minioClient in the given `namespace` to count the
-// amount of files matching the given `path`
-func CountFiles(minioEnv *Env, path string) (value int, err error) {
+// CountFiles uses the client pod to count the amount of files matching the
+// given `path`
+func CountFiles(storeEnv *Env, path string) (value int, err error) {
 	var stdout string
 	stdout, _, err = run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
+		storeEnv.Namespace,
+		storeEnv.Client.Name,
 		composeFindCmd(path)))
 	if err != nil {
 		return -1, err
@@ -568,14 +573,13 @@ func CountFiles(minioEnv *Env, path string) (value int, err error) {
 	return value, err
 }
 
-// ListFiles uses the minioClient in the given `namespace` to list the
-// paths matching the given `path`
-func ListFiles(minioEnv *Env, path string) (string, error) {
+// ListFiles uses the client pod to list the paths matching the given `path`
+func ListFiles(storeEnv *Env, path string) (string, error) {
 	var stdout string
 	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
+		storeEnv.Namespace,
+		storeEnv.Client.Name,
 		composeListFiles(path)))
 	if err != nil {
 		return "", err
@@ -629,14 +633,14 @@ func composeFindCmd(path string) string {
 	return fmt.Sprintf("sh -c '%v | wc -l'", listFilesScript(path))
 }
 
-// GetFileTags will use the minioClient to retrieve the tags in a specified path
-func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
+// GetFileTags will use the client pod to retrieve the tags in a specified path
+func GetFileTags(storeEnv *Env, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
 	out, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c '%v | head -n1'",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
+		storeEnv.Namespace,
+		storeEnv.Client.Name,
 		listFilesScript(path)))
 	if err != nil {
 		return output, err
@@ -650,8 +654,8 @@ func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
 
 	stdout, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- aws s3api get-object-tagging --bucket %v --key %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
+		storeEnv.Namespace,
+		storeEnv.Client.Name,
 		bucket,
 		key))
 	if err != nil {
@@ -674,19 +678,19 @@ func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
 	return output, nil
 }
 
-// TestBarmanConnectivity validates the barman connectivity to the minio endpoint
+// TestBarmanConnectivity validates the barman connectivity to the object storage endpoint
 func TestBarmanConnectivity(
 	namespace,
 	clusterName,
 	primaryPodName,
-	minioID,
-	minioKey string,
-	minioSvcName string,
+	id,
+	key string,
+	svcName string,
 ) (bool, error) {
 	env := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;",
-		postgres.BarmanBackupEndpointCACertificateLocation, minioID, minioKey)
+		postgres.BarmanBackupEndpointCACertificateLocation, id, key)
 
-	endpointURL := fmt.Sprintf("https://%s:9000", minioSvcName)
+	endpointURL := fmt.Sprintf("https://%s:9000", svcName)
 	destinationPath := fmt.Sprintf("s3://%s/", "not-evaluated")
 	cmd := fmt.Sprintf("barman-cloud-check-wal-archive --cloud-provider aws-s3 --endpoint-url %s %s %s --test",
 		endpointURL, destinationPath, clusterName)
@@ -705,12 +709,12 @@ func TestBarmanConnectivity(
 }
 
 // CleanFiles removes every object under the given `bucket[/prefix]` path
-func CleanFiles(minioEnv *Env, path string) (string, error) {
+func CleanFiles(storeEnv *Env, path string) (string, error) {
 	var stdout string
 	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
+		storeEnv.Namespace,
+		storeEnv.Client.Name,
 		composeCleanFiles(path)))
 	if err != nil {
 		return "", err

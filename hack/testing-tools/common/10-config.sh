@@ -40,10 +40,10 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
 # RustFS Image
-export RUSTFS_IMG=${RUSTFS_IMG:-$(grep 'rustfsImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+export RUSTFS_IMG=${RUSTFS_IMG:-$(grep 'rustfsImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
 # AWS CLI Image (S3 client used by the e2e object storage tests)
-export AWSCLI_IMG=${AWSCLI_IMG:-$(grep 'awsCliImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
+export AWSCLI_IMG=${AWSCLI_IMG:-$(grep 'awsCliImage.*=' "${ROOT_DIR}/tests/utils/objectstore/objectstore.go" | awk -F '"' '{print $2}' | tr -d '[:space:]')}
 
 # Apache Image (Hardcoded stable default)
 export APACHE_IMG=${APACHE_IMG:-"httpd"}
@@ -65,11 +65,11 @@ if [ -z "${PGBOUNCER_IMG}" ]; then
   exit 1
 fi
 if [ -z "${RUSTFS_IMG}" ]; then
-  echo "ERROR: Failed to extract RUSTFS_IMG from ${ROOT_DIR}/tests/utils/minio/minio.go" >&2
+  echo "ERROR: Failed to extract RUSTFS_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
   exit 1
 fi
 if [ -z "${AWSCLI_IMG}" ]; then
-  echo "ERROR: Failed to extract AWSCLI_IMG from ${ROOT_DIR}/tests/utils/minio/minio.go" >&2
+  echo "ERROR: Failed to extract AWSCLI_IMG from ${ROOT_DIR}/tests/utils/objectstore/objectstore.go" >&2
   exit 1
 fi
 

@@ -4,4 +4,4 @@ metadata:
   name: cluster-backup-1
 spec:
   cluster:
-    name: pg-backup-minio
+    name: pg-backup-object-store

@@ -233,21 +233,21 @@ func printNamespaceEvents(clusterInfo *tabby.Tabby, eventList *eventsv1.EventLis
 	}
 }
 
-// ForgeArchiveWalOnMinio instead of using `switchWalCmd` to generate a real WAL archive, directly forges a WAL archive
-// file on Minio by copying and renaming an existing WAL archive file for the sake of more control of testing. To make
-// sure the forged one won't be a real WAL archive, we let the sequence in newWALName to be big enough so that it can't
-// be a real WAL archive name in an idle postgresql.
-func ForgeArchiveWalOnMinio(namespace, clusterName, miniClientPodName, existingWALName, newWALName string) error {
+// ForgeArchiveWalOnObjectStore instead of using `switchWalCmd` to generate a real WAL archive, directly forges a
+// WAL archive file on the object store by copying and renaming an existing WAL archive file for the sake of more
+// control of testing. To make sure the forged one won't be a real WAL archive, we let the sequence in newWALName
+// to be big enough so that it can't be a real WAL archive name in an idle postgresql.
+func ForgeArchiveWalOnObjectStore(namespace, clusterName, clientPodName, existingWALName, newWALName string) error {
 	// Forge a WAL archive by copying and renaming the 1st WAL archive
-	minioWALBasePath := clusterName + "/" + clusterName + "/wals/0000000100000000"
-	existingWALPath := minioWALBasePath + "/" + existingWALName + ".gz"
-	newWALNamePath := minioWALBasePath + "/" + newWALName
-	forgeWALOnMinioCmd := "aws s3 cp s3://" + existingWALPath + " s3://" + newWALNamePath
+	walBasePath := clusterName + "/" + clusterName + "/wals/0000000100000000"
+	existingWALPath := walBasePath + "/" + existingWALName + ".gz"
+	newWALNamePath := walBasePath + "/" + newWALName
+	forgeWALCmd := "aws s3 cp s3://" + existingWALPath + " s3://" + newWALNamePath
 	_, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
-		miniClientPodName,
-		forgeWALOnMinioCmd))
+		clientPodName,
+		forgeWALCmd))
 
 	return err
 }

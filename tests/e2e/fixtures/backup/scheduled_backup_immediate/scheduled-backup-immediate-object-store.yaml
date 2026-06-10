@@ -1,10 +1,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: scheduled-backups-immediate-minio
+  name: scheduled-backups-immediate-object-store
 spec:
   # The cron should never run so we can test the immediate option
   schedule: "0 0 0 31 1 0"
   cluster:
-    name: pg-backup-minio
+    name: pg-backup-object-store
   immediate: true

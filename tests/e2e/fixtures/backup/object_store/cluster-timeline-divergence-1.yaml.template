@@ -24,10 +24,10 @@ spec:
     barmanObjectStore:
         destinationPath: s3://cluster-timeline-shared/
         serverName: shared-timeline-test
-        endpointURL: https://minio-service.minio:9000
+        endpointURL: https://object-store.object-store:9000
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
+          name: object-store-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds
