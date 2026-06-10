@@ -147,7 +147,7 @@ func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.DatabaseRole{}).
-		Named("role").
+		Named("database-role").
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.mapSecretToRole()),

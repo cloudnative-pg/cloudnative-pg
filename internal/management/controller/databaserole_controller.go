@@ -353,7 +353,7 @@ func NewDatabaseRoleReconciler(
 func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.DatabaseRole{}).
-		Named("instance-role-reconciler").
+		Named("instance-database-role").
 		Complete(r)
 }
 
