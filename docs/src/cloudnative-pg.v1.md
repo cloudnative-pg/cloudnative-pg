@@ -868,7 +868,7 @@ _Appears in:_
 | `kind` _string_ | `DatabaseRole` | True | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
 | `spec` _[DatabaseRoleSpec](#databaserolespec)_ |  | True |  |  |
-| `status` _[DatabaseRoleState](#databaserolestate)_ |  | True |  |  |
+| `status` _[DatabaseRoleStatus](#databaserolestatus)_ |  | True |  |  |
 
 
 
@@ -959,11 +959,11 @@ _Appears in:_
 | `roleReclaimPolicy` _[DatabaseRoleReclaimPolicy](#databaserolereclaimpolicy)_ | The policy for end-of-life maintenance of this role |  | retain | Enum: [delete retain] <br /> |
 
 
-#### DatabaseRoleState
+#### DatabaseRoleStatus
 
 
 
-DatabaseRoleState defines the observed state of a DatabaseRole
+DatabaseRoleStatus defines the observed state of a DatabaseRole
 
 
 

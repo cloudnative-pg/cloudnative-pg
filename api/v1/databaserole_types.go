@@ -72,8 +72,8 @@ type DatabaseRoleSpec struct {
 	ReclaimPolicy DatabaseRoleReclaimPolicy `json:"roleReclaimPolicy,omitempty"`
 }
 
-// DatabaseRoleState defines the observed state of a DatabaseRole
-type DatabaseRoleState struct {
+// DatabaseRoleStatus defines the observed state of a DatabaseRole
+type DatabaseRoleStatus struct {
 	// A sequence number representing the latest
 	// desired state that was synchronized
 	// +optional
@@ -110,8 +110,8 @@ type DatabaseRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DatabaseRoleSpec  `json:"spec,omitempty"`
-	Status DatabaseRoleState `json:"status,omitempty"`
+	Spec   DatabaseRoleSpec   `json:"spec,omitempty"`
+	Status DatabaseRoleStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -200,7 +200,7 @@ spec:
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
           status:
-            description: DatabaseRoleState defines the observed state of a DatabaseRole
+            description: DatabaseRoleStatus defines the observed state of a DatabaseRole
             properties:
               applied:
                 description: Applied is true if the role was reconciled correctly

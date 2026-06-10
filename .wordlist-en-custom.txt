@@ -137,7 +137,6 @@ DatabaseRoleReclaimPolicy
 DatabaseRoleReclaimRetain
 DatabaseRoleRef
 DatabaseRoleSpec
-DatabaseRoleState
 DatabaseRoleStatus
 DatabaseRoles
 DatabaseSpec
@@ -837,7 +836,7 @@ databaserolereclaimpolicy
 databaseroleref
 databaseroles
 databaserolespec
-databaserolestate
+databaserolestatus
 databasespec
 databasestatus
 datacenter
