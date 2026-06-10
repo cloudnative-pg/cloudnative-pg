@@ -175,6 +175,7 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 	if sub.Spec.ReclaimPolicy != apiv1.SubscriptionReclaimDelete {
 		return nil
 	}
+
 	// On a replica we cannot drop the subscription: return without touching
 	// PostgreSQL so the finalizer is released. Dropping it is left to the
 	// primary cluster's own Subscription object, if any.
@@ -185,6 +186,14 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 	if cluster.IsReplica() {
 		return nil
 	}
+
+	// An object that never reconciled does not own the subscription: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the subscription owned by the surviving object.
+	if !sub.HasReconciliations() {
+		return nil
+	}
+
 	db, err := r.getDB(sub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
