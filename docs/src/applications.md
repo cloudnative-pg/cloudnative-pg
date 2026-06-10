@@ -72,18 +72,19 @@ every PostgreSQL cluster it deploys:
 
 Each secret contain the following:
 
-* username
-* password
-* hostname to the RW service
-* port number
-* database name
-* a working [`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
-* [uri](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
-* [jdbc-uri](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
-* [fqdn-uri](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
-* [fqdn-jdbc-uri](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
+* `user` and its alias `username`
+* `password`
+* `hostname` to the RW service
+* `host`, a FQDN to the RW service
+* `port` number
+* `dbname` database name
+* `pgpass`, a working [`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
+* [`uri`](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
+* [`jdbc-uri`](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
+* [`fqdn-uri`](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
+* [`fqdn-jdbc-uri`](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
 
-The FQDN to be used in the URIs is calculated using the Kubernetes cluster
+The FQDN to be used in the URIs and `host` is calculated using the Kubernetes cluster
 domain specified in the `KUBERNETES_CLUSTER_DOMAIN` configuration parameter.
 See [the operator configuration documentation](operator_conf.md) for more information
 about that.
