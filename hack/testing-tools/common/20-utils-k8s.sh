@@ -479,13 +479,17 @@ function install_barman_cloud_plugin() {
         main)
             manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/main/manifest.yaml"
             ;;
-        v[0-9]*.[0-9]*.[0-9]* | [0-9]*.[0-9]*.[0-9]*)
-            manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
-            ;;
         *)
-            printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
-                "${bright}" "${selector}" "${reset}" >&2
-            return 1
+            # A pinned version, validated with the same anchored pattern used by
+            # deploy_operator_from_manifest so a malformed value fails fast with a
+            # clear message instead of a confusing 404.
+            if [[ "${selector}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+                manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            else
+                printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
+                    "${bright}" "${selector}" "${reset}" >&2
+                return 1
+            fi
             ;;
     esac
 
