@@ -1298,6 +1298,9 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Watches(
 			&apiv1.DatabaseRole{},
 			handler.EnqueueRequestsFromMapFunc(r.mapDatabaseRolesToClusters()),
+			// The cluster only consumes spec.passwordSecret (to maintain the
+			// instance RBAC), so status-only changes are irrelevant here.
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Complete(r)
 }
