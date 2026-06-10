@@ -26,11 +26,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -40,7 +40,7 @@ import (
 
 // This e2e test is to test the wal-restore handling when maxParallel (specified as "3" in this testing) is specified in
 // wal section under backup for wal archive storing/recovering. To facilitate controlling the testing, we directly forge
-// wals on the object storage ("minio" in this testing) by copying and renaming an existing wal file.
+// wals on the object storage by copying and renaming an existing wal file.
 
 var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), func() {
 	const (
@@ -61,42 +61,42 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		}
 	})
 
-	It("Wal-restore in parallel using minio as object storage for backup", func() {
-		// This is a set of tests using a minio server deployed in the same
-		// namespace as the cluster. Since each cluster is installed in its
-		// own namespace, they can share the configuration file
+	It("Wal-restore in parallel using the object store for backup", func() {
+		// This is a set of tests using an object storage server deployed in
+		// the same namespace as the cluster. Since each cluster is installed
+		// in its own namespace, they can share the configuration file
 
 		const (
-			clusterWithMinioSampleFile = fixturesDir +
-				"/backup/minio/cluster-with-backup-minio-with-wal-max-parallel.yaml.template"
+			clusterWithObjectStoreSampleFile = fixturesDir +
+				"/backup/object_store/cluster-with-backup-object-store-with-wal-max-parallel.yaml.template"
 		)
 
-		const namespacePrefix = "pg-backup-minio-wal-max-parallel"
-		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
+		const namespacePrefix = "pg-backup-object-store-wal-max-parallel"
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		By("creating the credentials for minio", func() {
+		By("creating the credentials for the object store", func() {
 			_, err = secrets.CreateObjectStorageSecret(
 				env.Ctx,
 				env.Client,
 				namespace,
 				"backup-storage-creds",
-				"minio",
-				"minio123",
+				objectstore.AccessKeyID,
+				objectstore.SecretAccessKey,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("create the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
+		By("create the certificates for the object store", func() {
+			err := objectStoreEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Create the cluster and assert it be ready
-		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithObjectStoreSampleFile)
 
 		// Get the primary
 		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
@@ -115,40 +115,45 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		}
 		Expect(err).ToNot(HaveOccurred())
 
-		// Make sure both Wal-archive and Minio work
-		// Create a WAL on the primary and check if it arrives at minio, within a short time
+		// Make sure both Wal-archive and the object store work
+		// Create a WAL on the primary and check if it arrives at the object store, within a short time
 		By("archiving WALs and verifying they exist", func() {
 			pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
-			latestWAL = minioasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
-			latestWALPath := minio.GetFilePath(clusterName, latestWAL+".gz")
+			latestWAL = objectstoreasserts.SwitchWalAndGetLatestArchive(env, namespace, primary)
+			latestWALPath := objectstore.GetFilePath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return minio.CountFiles(minioEnv, latestWALPath)
+				return objectstore.CountFiles(objectStoreEnv, latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
-				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
+				fmt.Sprintf("verify the existence of WAL %v in the object store", latestWALPath))
 		})
 
-		By("forging 5 wals on Minio by copying and renaming an existing archive file", func() {
+		By("forging 5 wals on the object store by copying and renaming an existing archive file", func() {
 			walFile1 = "0000000100000000000000F1"
 			walFile2 = "0000000100000000000000F2"
 			walFile3 = "0000000100000000000000F3"
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile1)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile2)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile3)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile4)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile5)).
 				ShouldNot(HaveOccurred())
 		})
@@ -287,7 +292,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Generate a new wal file; the archive also contains WAL #6.
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+			Expect(testUtils.ForgeArchiveWalOnObjectStore(
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
 				walFile6)).
 				ShouldNot(HaveOccurred())
 		})
