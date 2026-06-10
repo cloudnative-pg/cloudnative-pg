@@ -145,7 +145,7 @@ E2E test configuration:
 	_ = corev1.AddToScheme(env.Scheme)
 	_ = appsv1.AddToScheme(env.Scheme)
 
-	// Set up a global MinIO service on his own namespace
+	// Set up a global object storage service in its own namespace
 	err = namespaces.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
