@@ -17,8 +17,9 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-// Package minio contains all the require functions to setup a MinIO deployment and
-// query this MinIO deployment using the MinIO API
+// Package minio contains all the require functions to setup a RustFS
+// deployment serving the historical in-cluster `minio-service` S3 endpoint,
+// and query it using the MinIO client API
 package minio
 
 import (
@@ -49,8 +50,8 @@ import (
 )
 
 const (
-	// minioImage is the image used to run a MinIO server
-	minioImage = "docker.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+	// rustfsImage is the image used to run a RustFS server
+	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
 	// minioClientImage is the image used to run a MinIO client
 	minioClientImage = "docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z"
 )
@@ -139,7 +140,7 @@ func defaultSetup(namespace string) (Setup, error) {
 	return setup, nil
 }
 
-// defaultDeployment returns a default Deployment for minio
+// defaultDeployment returns a default Deployment for the RustFS server
 func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
@@ -168,14 +169,18 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 								},
 							},
 						},
+						{
+							Name: "logs",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
-							Name: "minio",
-							// Latest Apache License release
-							Image:   minioImage,
-							Command: nil,
-							Args:    []string{"server", "data"},
+							Name:    "minio",
+							Image:   rustfsImage,
+							Command: []string{"/usr/bin/rustfs"},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 9000,
@@ -183,12 +188,32 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name:  "MINIO_ACCESS_KEY",
+									Name:  "RUSTFS_ADDRESS",
+									Value: ":9000",
+								},
+								{
+									Name:  "RUSTFS_VOLUMES",
+									Value: "/data",
+								},
+								{
+									Name:  "RUSTFS_REGION",
+									Value: "us-east-1",
+								},
+								{
+									Name:  "RUSTFS_ACCESS_KEY",
 									Value: "minio",
 								},
 								{
-									Name:  "MINIO_SECRET_KEY",
+									Name:  "RUSTFS_SECRET_KEY",
 									Value: "minio123",
+								},
+								{
+									Name:  "RUSTFS_CONSOLE_ENABLE",
+									Value: "false",
+								},
+								{
+									Name:  "RUSTFS_OBS_LOG_DIRECTORY",
+									Value: "/logs",
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -196,11 +221,15 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 									Name:      "data",
 									MountPath: "/data",
 								},
+								{
+									Name:      "logs",
+									MountPath: "/logs",
+								},
 							},
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/minio/health/live",
+										Path: "/health",
 										Port: intstr.IntOrString{
 											IntVal: 9000,
 										},
@@ -211,7 +240,7 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/minio/health/ready",
+										Path: "/health",
 										Port: intstr.IntOrString{
 											IntVal: 9000,
 										},
@@ -227,6 +256,10 @@ func defaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) 
 					},
 					SecurityContext: &corev1.PodSecurityContext{
 						SeccompProfile: seccompProfile,
+						// The RustFS image runs as the non-root `rustfs`
+						// user (10001): make the data volume and the
+						// projected TLS certificates group-accessible
+						FSGroup: ptr.To(int64(10001)),
 					},
 				},
 			},
@@ -295,9 +328,14 @@ func sslSetup(namespace string) (Setup, error) {
 	const tlsVolumeName = "secret-volume"
 	const tlsVolumeMountPath = "/etc/secrets/certs"
 	var secretMode int32 = 0o600
-	setup.Deployment.Spec.Template.Spec.Containers[0].Args = []string{
-		"--certs-dir", tlsVolumeMountPath, "server", "/data",
-	}
+	// RustFS enables TLS when it finds `rustfs_cert.pem` and `rustfs_key.pem`
+	// in the directory pointed to by RUSTFS_TLS_PATH
+	setup.Deployment.Spec.Template.Spec.Containers[0].Env = append(
+		setup.Deployment.Spec.Template.Spec.Containers[0].Env,
+		corev1.EnvVar{
+			Name:  "RUSTFS_TLS_PATH",
+			Value: tlsVolumeMountPath,
+		})
 	setup.Deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 		setup.Deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
 		corev1.VolumeMount{
@@ -319,24 +357,11 @@ func sslSetup(namespace string) (Setup, error) {
 								Items: []corev1.KeyToPath{
 									{
 										Key:  "tls.crt",
-										Path: "public.crt",
+										Path: "rustfs_cert.pem",
 									},
 									{
 										Key:  "tls.key",
-										Path: "private.key",
-									},
-								},
-							},
-						},
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "minio-server-ca-secret",
-								},
-								Items: []corev1.KeyToPath{
-									{
-										Key:  "ca.crt",
-										Path: "CAs/public.crt",
+										Path: "rustfs_key.pem",
 									},
 								},
 							},
