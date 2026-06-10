@@ -20,6 +20,13 @@
 
 # This file contains functions for interacting with the Kubernetes API using $K8S_CLI.
 
+# cert-manager is a prerequisite for plugin-barman-cloud: the plugin manifest
+# ships cert-manager Issuer/Certificate resources used for the operator<->plugin
+# mTLS. This default is kept in sync with the version plugin-barman-cloud tests
+# against.
+# renovate: datasource=github-releases depName=cert-manager/cert-manager
+CERT_MANAGER_VERSION="v1.15.1"
+
 # wait_for(type, namespace, name, interval, retries)
 # Waits until a specified Kubernetes object exists.
 function wait_for() {
@@ -426,4 +433,81 @@ function deploy_operator_with_helm() {
     # cnpg-controller-manager. See:
     # https://cloudnative-pg.io/docs/current/installation_upgrade#using-the-helm-chart
     wait_operator_ready "cnpg-cloudnative-pg"
+}
+
+# ensure_cert_manager: installs cert-manager (idempotently) and waits for it to
+# become ready. plugin-barman-cloud requires cert-manager because its manifest
+# creates the Issuer/Certificate resources used for the operator<->plugin mTLS.
+function ensure_cert_manager() {
+    # shellcheck disable=SC2154
+    if ${K8S_CLI} get namespace cert-manager >/dev/null 2>&1; then
+        echo -e "${bright}cert-manager already present, skipping install.${reset}"
+    else
+        echo -e "${bright}Installing cert-manager ${CERT_MANAGER_VERSION}...${reset}"
+        # Download once, then retry only the apply, as deploy_operator_from_manifest does.
+        local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
+        if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" \
+            "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"; then
+            printf '%bError: could not download the cert-manager %s manifest%b\n' \
+                "${bright}" "${CERT_MANAGER_VERSION}" "${reset}" >&2
+            return 1
+        fi
+        retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
+    fi
+    ${K8S_CLI} wait --for=condition=Available --timeout=300s -n cert-manager \
+        deployment/cert-manager deployment/cert-manager-webhook deployment/cert-manager-cainjector
+}
+
+# install_barman_cloud_plugin: installs plugin-barman-cloud into cnpg-system.
+# The version is selected via the BARMAN_PLUGIN_VERSION environment variable:
+#   - "release" (default): the latest published release
+#   - "main":              the current snapshot from the main branch
+#   - "vX.Y.Z" / "X.Y.Z":  a specific pinned release
+# Requires the operator to be installed first. Exports
+# BARMAN_PLUGIN_VERSION_RESOLVED with the concrete version that was deployed
+# (read back from the running deployment image) so the test suite can log it.
+function install_barman_cloud_plugin() {
+    # shellcheck disable=SC2154
+    local selector="${BARMAN_PLUGIN_VERSION:-release}"
+    local repo="cloudnative-pg/plugin-barman-cloud"
+    local manifest_url
+
+    case "${selector}" in
+        release)
+            manifest_url="https://github.com/${repo}/releases/latest/download/manifest.yaml"
+            ;;
+        main)
+            manifest_url="https://raw.githubusercontent.com/${repo}/refs/heads/main/manifest.yaml"
+            ;;
+        v[0-9]*.[0-9]*.[0-9]* | [0-9]*.[0-9]*.[0-9]*)
+            manifest_url="https://github.com/${repo}/releases/download/v${selector#v}/manifest.yaml"
+            ;;
+        *)
+            printf '%bError: invalid BARMAN_PLUGIN_VERSION "%s" (expected "release", "main" or a version like v0.12.0)%b\n' \
+                "${bright}" "${selector}" "${reset}" >&2
+            return 1
+            ;;
+    esac
+
+    ensure_cert_manager
+
+    echo -e "${bright}Installing plugin-barman-cloud (${selector}) from ${manifest_url}${reset}"
+    # Download once, then retry only the apply, as deploy_operator_from_manifest
+    # does. The retry absorbs the cert-manager webhook readiness race: the
+    # plugin manifest creates cert-manager Issuer/Certificate resources.
+    local manifest_file="${TEMP_DIR:-/tmp}/plugin-barman-cloud-manifest.yaml"
+    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+        printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
+        return 1
+    fi
+    retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
+
+    ${K8S_CLI} -n cnpg-system rollout status deploy/barman-cloud --timeout=5m
+
+    local image
+    image=$(${K8S_CLI} get deployment barman-cloud -n cnpg-system \
+        -o jsonpath='{.spec.template.spec.containers[0].image}')
+    export BARMAN_PLUGIN_VERSION_RESOLVED="${image##*:}"
+    printf '%bplugin-barman-cloud installed: selector=%s resolved=%s (image %s)%b\n' \
+        "${bright}" "${selector}" "${BARMAN_PLUGIN_VERSION_RESOLVED}" "${image}" "${reset}"
 }
