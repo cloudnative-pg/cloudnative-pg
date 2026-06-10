@@ -31,9 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
@@ -224,6 +228,17 @@ func (r *DatabaseRoleReconciler) shouldReconcile(
 ) (*ctrl.Result, error) {
 	// If everything is reconciled and the password did not change, we're done here
 	if r.isAlreadyReconciled(role) {
+		// ...unless the role was added to cluster.spec.managed.roles after the
+		// apply: the inline synchronizer takes over, so surface the conflict
+		// and void the recorded reconciliation instead of keeping a stale
+		// Applied=true. Voiding it lets the normal flow re-apply (adopt the
+		// role back) once the inline entry is removed.
+		if role.DeletionTimestamp.IsZero() &&
+			cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
+			isClusterManagingRole(cluster, role.Spec.Name) {
+			result, err := r.shadowedReconciliation(ctx, role)
+			return &result, err
+		}
 		return &ctrl.Result{}, nil
 	}
 
@@ -323,6 +338,27 @@ func (r *DatabaseRoleReconciler) unknownReconciliation(
 	}, nil
 }
 
+// shadowedReconciliation marks a previously-applied role as taken over by an
+// inline managed.roles entry, voiding the recorded reconciliation so the
+// DatabaseRole reconciles again (and can adopt the role back) once the
+// inline entry is removed.
+func (r *DatabaseRoleReconciler) shadowedReconciliation(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+) (ctrl.Result, error) {
+	oldRole := role.DeepCopy()
+	role.SetAsFailed(errClusterIsManagingRole)
+	role.Status.ObservedGeneration = 0
+
+	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{
+		RequeueAfter: databaseRoleReconciliationInterval,
+	}, nil
+}
+
 // succeededReconciliation marks the reconciliation as succeeded
 func (r *DatabaseRoleReconciler) succeededReconciliation(
 	ctx context.Context,
@@ -357,8 +393,44 @@ func NewDatabaseRoleReconciler(
 func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.DatabaseRole{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterToDatabaseRoles),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-database-role").
 		Complete(r)
+}
+
+// mapClusterToDatabaseRoles enqueues every DatabaseRole targeting this
+// instance's cluster when the cluster spec changes (e.g. an inline
+// managed.roles entry is added or removed).
+func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	if obj.GetName() != r.instance.GetClusterName() ||
+		obj.GetNamespace() != r.instance.GetNamespaceName() {
+		return nil
+	}
+
+	var roles apiv1.DatabaseRoleList
+	if err := r.List(ctx, &roles, client.InNamespace(obj.GetNamespace())); err != nil {
+		log.FromContext(ctx).Error(err, "while listing DatabaseRoles to react to a cluster change")
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(roles.Items))
+	for i := range roles.Items {
+		if roles.Items[i].Spec.ClusterRef.Name != obj.GetName() {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&roles.Items[i]),
+		})
+	}
+
+	return requests
 }
 
 // GetCluster gets the managed cluster through the client

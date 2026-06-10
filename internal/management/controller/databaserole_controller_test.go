@@ -32,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -236,6 +237,17 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 			func(_ *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
 				shadowRole(cluster)
 			}, requeue),
+		Entry("surfaces the inline takeover of an already-reconciled role",
+			func(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
+				markReconciled(role)
+				shadowRole(cluster)
+			}, requeue),
+		Entry("stays dormant when already reconciled and shadowed on a non-primary pod",
+			func(role *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
+				markReconciled(role)
+				shadowRole(cluster)
+				cluster.Status.CurrentPrimary = "other-pod"
+			}, &ctrl.Result{}),
 		Entry("stops on a replica cluster",
 			func(_ *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
 				makeReplica(cluster)
@@ -255,6 +267,25 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		got := &apiv1.DatabaseRole{}
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
+	})
+
+	It("voids the recorded reconciliation when shadowed after a successful apply", func() {
+		role := newTestDatabaseRole()
+		markReconciled(role)
+		role.Status.Applied = ptr.To(true)
+		cluster := newTestCluster()
+		shadowRole(cluster)
+		r := reconcilerFor(role)
+
+		result, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(requeue))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
+		Expect(got.Status.Message).To(ContainSubstring("managed by the CNPG cluster"))
+		Expect(got.Status.ObservedGeneration).To(BeZero())
 	})
 
 	It("persists Applied=Unknown (nil) on a replica cluster", func() {
@@ -393,5 +424,46 @@ var _ = Describe("DatabaseRole handleDeletion", func() {
 		Expect(got.Finalizers).To(ContainElement(utils.RoleFinalizerName))
 		Expect(got.Status.Applied).To(HaveValue(BeFalse()))
 		Expect(got.Status.Message).To(ContainSubstring("depend on it"))
+	})
+})
+
+var _ = Describe("DatabaseRole mapClusterToDatabaseRoles", func() {
+	var (
+		r    *DatabaseRoleReconciler
+		mine *apiv1.DatabaseRole
+	)
+
+	BeforeEach(func() {
+		mine = newTestDatabaseRole()
+		other := newTestDatabaseRole()
+		other.Name = "role-cr-other-cluster"
+		other.Spec.ClusterRef.Name = "another-cluster"
+		// Same cluster name, different namespace: only the namespace guard
+		// in mapClusterToDatabaseRoles keeps this one out.
+		foreign := newTestDatabaseRole()
+		foreign.Name = "role-cr-other-namespace"
+		foreign.Namespace = "another-namespace"
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(mine, other, foreign).
+			Build()
+		r = &DatabaseRoleReconciler{Client: fakeClient, instance: &fakeRoleInstance{}}
+	})
+
+	It("enqueues only the roles targeting this instance's cluster", func() {
+		requests := r.mapClusterToDatabaseRoles(context.Background(), newTestCluster())
+		Expect(requests).To(ConsistOf(reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(mine),
+		}))
+	})
+
+	It("ignores other clusters and other namespaces", func() {
+		otherCluster := newTestCluster()
+		otherCluster.Name = "another-cluster"
+		Expect(r.mapClusterToDatabaseRoles(context.Background(), otherCluster)).To(BeEmpty())
+
+		otherNamespace := newTestCluster()
+		otherNamespace.Namespace = "another-namespace"
+		Expect(r.mapClusterToDatabaseRoles(context.Background(), otherNamespace)).To(BeEmpty())
 	})
 })
