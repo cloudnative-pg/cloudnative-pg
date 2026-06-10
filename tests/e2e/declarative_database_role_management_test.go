@@ -28,6 +28,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -414,9 +415,33 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 				})
 
-				By("deleting both of them", func() {
-					Expect(objects.Delete(env.Ctx, env.Client, firstRole)).To(Succeed())
+				By("deleting the conflicting Role CR", func() {
 					Expect(objects.Delete(env.Ctx, env.Client, secondRole)).To(Succeed())
+					roleNamespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      secondRole.Name,
+					}
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, roleNamespacedName, &apiv1.DatabaseRole{})
+						g.Expect(apierrs.IsNotFound(err)).To(BeTrue())
+					}, 120).WithPolling(5 * time.Second).Should(Succeed())
+				})
+
+				By("verifying the role managed by the surviving CR was not dropped", func() {
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+						roleExistsQuery(pgRoleName), "t"), 30).Should(Succeed())
+				})
+
+				By("deleting the managing Role CR and verifying the role is dropped", func() {
+					Expect(objects.Delete(env.Ctx, env.Client, firstRole)).To(Succeed())
+					primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(pgasserts.QueryMatchExpectationPredicate(env, primaryPodInfo, postgres.PostgresDBName,
+						roleExistsQuery(pgRoleName), "f"), 60).Should(Succeed())
 				})
 			})
 		})
