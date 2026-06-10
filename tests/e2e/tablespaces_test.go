@@ -1266,7 +1266,7 @@ func latestBaseBackupContainsExpectedTars(
 		report := fmt.Sprintf("directories:\n%s\n", strings.Join(frags, "\n"))
 		g.Expect(frags).To(HaveLen(numBackups), report)
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
-		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
+		tarsInLastBackup := filepath.Join(latestBaseBackup, "*.tar")
 		listing, err := minio.ListFiles(minioEnv, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		report += fmt.Sprintf("tar listing:\n%s\n", listing)

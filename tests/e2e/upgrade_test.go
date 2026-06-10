@@ -101,12 +101,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// This is a cluster of the previous version, created before the operator upgrade
 		clusterName1 = "cluster1"
 		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
-		minioPath1   = "minio/cluster-full-backup"
+		minioPath1   = "cluster-full-backup"
 
 		// This is a cluster of the previous version, created after the operator upgrade
 		clusterName2 = "cluster2"
 		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
-		minioPath2   = "minio/cluster2-full-backup"
+		minioPath2   = "cluster2-full-backup"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"

@@ -675,11 +675,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication, tests.Label
 			DeferCleanup(func() error {
 				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
 				// between tests
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				_, err = minio.CleanFiles(minioEnv, path.Join("cluster-backups", clusterAName))
 				if err != nil {
 					return err
 				}
-				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				_, err = minio.CleanFiles(minioEnv, path.Join("cluster-backups", clusterBName))
 				if err != nil {
 					return err
 				}
