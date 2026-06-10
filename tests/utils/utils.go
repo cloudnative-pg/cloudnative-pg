@@ -239,10 +239,10 @@ func printNamespaceEvents(clusterInfo *tabby.Tabby, eventList *eventsv1.EventLis
 // be a real WAL archive name in an idle postgresql.
 func ForgeArchiveWalOnMinio(namespace, clusterName, miniClientPodName, existingWALName, newWALName string) error {
 	// Forge a WAL archive by copying and renaming the 1st WAL archive
-	minioWALBasePath := "minio/" + clusterName + "/" + clusterName + "/wals/0000000100000000"
+	minioWALBasePath := clusterName + "/" + clusterName + "/wals/0000000100000000"
 	existingWALPath := minioWALBasePath + "/" + existingWALName + ".gz"
 	newWALNamePath := minioWALBasePath + "/" + newWALName
-	forgeWALOnMinioCmd := "mc cp " + existingWALPath + " " + newWALNamePath
+	forgeWALOnMinioCmd := "aws s3 cp s3://" + existingWALPath + " s3://" + newWALNamePath
 	_, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,

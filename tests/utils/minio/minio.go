@@ -19,7 +19,7 @@ SPDX-License-Identifier: Apache-2.0
 
 // Package minio contains all the require functions to setup a RustFS
 // deployment serving the historical in-cluster `minio-service` S3 endpoint,
-// and query it using the MinIO client API
+// and query it through an AWS CLI client pod
 package minio
 
 import (
@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -52,8 +53,8 @@ import (
 const (
 	// rustfsImage is the image used to run a RustFS server
 	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
-	// minioClientImage is the image used to run a MinIO client
-	minioClientImage = "docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z"
+	// awsCliImage is the image used to run the AWS CLI S3 client
+	awsCliImage = "docker.io/amazon/aws-cli:2.35.1"
 )
 
 // Env contains all the information related or required by MinIO deployment and
@@ -77,9 +78,9 @@ type Setup struct {
 	Service               corev1.Service
 }
 
-// TagSet will contain the `tagset` section of the minio output command
+// TagSet contains the tags of an object in the object store
 type TagSet struct {
-	Tags map[string]string `json:"tagset"`
+	Tags map[string]string
 }
 
 // installMinio installs minio in a given namespace
@@ -379,7 +380,7 @@ func sslSetup(namespace string) (Setup, error) {
 	return setup, nil
 }
 
-// defaultClient returns the default Pod definition for a minio client
+// defaultClient returns the default Pod definition for the S3 client
 func defaultClient(namespace string) corev1.Pod {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
@@ -388,40 +389,45 @@ func defaultClient(namespace string) corev1.Pod {
 	minioClient := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      "mc",
-			Labels:    map[string]string{"run": "mc"},
+			Name:      "s3-client",
+			Labels:    map[string]string{"run": "s3-client"},
 		},
 		Spec: corev1.PodSpec{
-			Volumes: []corev1.Volume{
-				{
-					Name: "mc",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			},
 			Containers: []corev1.Container{
 				{
-					Name:  "mc",
-					Image: minioClientImage,
+					Name:  "s3-client",
+					Image: awsCliImage,
 					Env: []corev1.EnvVar{
 						{
-							Name:  "MC_HOST_minio",
-							Value: "http://minio:minio123@minio-service.minio:9000",
+							Name:  "AWS_ENDPOINT_URL",
+							Value: "http://minio-service.minio:9000",
 						},
 						{
-							Name:  "MC_URL",
-							Value: "https://minio-service.minio:9000",
+							Name:  "AWS_ACCESS_KEY_ID",
+							Value: "minio",
 						},
 						{
-							Name:  "HOME",
-							Value: "/mc",
+							Name:  "AWS_SECRET_ACCESS_KEY",
+							Value: "minio123",
 						},
-					},
-					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:      "mc",
-							MountPath: "/mc",
+							Name:  "AWS_DEFAULT_REGION",
+							Value: "us-east-1",
+						},
+						{
+							Name:  "AWS_PAGER",
+							Value: "",
+						},
+						// The CRC-based default checksums introduced in
+						// AWS CLI 2.23 are not supported by every
+						// S3-compatible object store
+						{
+							Name:  "AWS_REQUEST_CHECKSUM_CALCULATION",
+							Value: "when_required",
+						},
+						{
+							Name:  "AWS_RESPONSE_CHECKSUM_VALIDATION",
+							Value: "when_required",
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
@@ -441,25 +447,17 @@ func defaultClient(namespace string) corev1.Pod {
 	return minioClient
 }
 
-// sslClient returns the Pod definition for a minio client using SSL
+// sslClient returns the Pod definition for an S3 client using SSL
 func sslClient(namespace string) corev1.Pod {
 	const (
-		configVolumeMountPath = "/mc/.mc"
-		configVolumeName      = "mc-config"
-		minioServerCASecret   = "minio-server-ca-secret" // #nosec
-		tlsVolumeName         = "secret-volume"
-		tlsVolumeMountPath    = configVolumeMountPath + "/certs/CAs"
+		minioServerCASecret = "minio-server-ca-secret" // #nosec
+		tlsVolumeName       = "secret-volume"
+		tlsVolumeMountPath  = "/etc/secrets/ca"
 	)
 	var secretMode int32 = 0o600
 
 	minioClient := defaultClient(namespace)
 	minioClient.Spec.Volumes = append(minioClient.Spec.Volumes,
-		corev1.Volume{
-			Name: configVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
 		corev1.Volume{
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -473,15 +471,18 @@ func sslClient(namespace string) corev1.Pod {
 	minioClient.Spec.Containers[0].VolumeMounts = append(
 		minioClient.Spec.Containers[0].VolumeMounts,
 		corev1.VolumeMount{
-			Name:      configVolumeName,
-			MountPath: configVolumeMountPath,
-		},
-		corev1.VolumeMount{
 			Name:      tlsVolumeName,
 			MountPath: tlsVolumeMountPath,
 		},
 	)
-	minioClient.Spec.Containers[0].Env[0].Value = "https://minio:minio123@minio-service.minio:9000"
+	minioClient.Spec.Containers[0].Env[0].Value = "https://minio-service.minio:9000"
+	minioClient.Spec.Containers[0].Env = append(
+		minioClient.Spec.Containers[0].Env,
+		corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: tlsVolumeMountPath + "/ca.crt",
+		},
+	)
 
 	return minioClient
 }
@@ -563,11 +564,11 @@ func CountFiles(minioEnv *Env, path string) (value int, err error) {
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
-		composeFindCmd(path, "minio")))
+		composeFindCmd(path)))
 	if err != nil {
 		return -1, err
 	}
-	value, err = strconv.Atoi(strings.Trim(stdout, "\n"))
+	value, err = strconv.Atoi(strings.TrimSpace(stdout))
 	return value, err
 }
 
@@ -579,26 +580,47 @@ func ListFiles(minioEnv *Env, path string) (string, error) {
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
-		composeListFiles(path, "minio")))
+		composeListFiles(path)))
 	if err != nil {
 		return "", err
 	}
 	return strings.Trim(stdout, "\n"), nil
 }
 
-// composeListFiles builds the Minio command to list the filenames matching a given path
-func composeListFiles(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --path %v'", serviceName, path)
+// globToRegexp converts a path glob, where `*` matches any sequence of
+// characters including `/`, into an anchored extended regular expression
+func globToRegexp(pattern string) string {
+	fragments := strings.Split(pattern, "*")
+	for i, fragment := range fragments {
+		fragments[i] = regexp.QuoteMeta(fragment)
+	}
+	return "^" + strings.Join(fragments, ".*") + "$"
 }
 
-// composeCleanFiles builds the Minio command to list the filenames matching a given path
+// listFilesScript builds a shell pipeline printing every object in the store
+// as a `bucket/key` line, filtered by the glob expressed in the given path
+func listFilesScript(path string) string {
+	return fmt.Sprintf(
+		`for b in $(aws s3api list-buckets --query "Buckets[].Name" --output text); do `+
+			`aws s3api list-objects-v2 --bucket "$b" --query "Contents[].Key" --output text | `+
+			`tr "\t" "\n" | sed "s|^|$b/|"; done | { grep -E "%v" || true; }`,
+		globToRegexp(path))
+}
+
+// composeListFiles builds the command to list the filenames matching a given path
+func composeListFiles(path string) string {
+	return fmt.Sprintf("sh -c '%v'", listFilesScript(path))
+}
+
+// composeCleanFiles builds the command removing every object under the given
+// `bucket[/prefix]` path
 func composeCleanFiles(path string) string {
-	return fmt.Sprintf("sh -c 'mc rm --force --recursive %v'", path)
+	return fmt.Sprintf(`sh -c 'aws s3 rm --recursive "s3://%v"'`, path)
 }
 
-// composeFindCmd builds the Minio find command
-func composeFindCmd(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
+// composeFindCmd builds the command counting the objects matching a given path
+func composeFindCmd(path string) string {
+	return fmt.Sprintf("sh -c '%v | wc -l'", listFilesScript(path))
 }
 
 // GetFileTags will use the minioClient to retrieve the tags in a specified path
@@ -606,28 +628,42 @@ func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
 	out, _, err := run.UncheckedRetry(fmt.Sprintf(
-		"kubectl exec -n %v %v -- sh -c 'mc find minio --path %v | head -n1'",
+		"kubectl exec -n %v %v -- sh -c '%v | head -n1'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
-		path))
+		listFilesScript(path)))
 	if err != nil {
 		return output, err
 	}
 
-	walFile := strings.Trim(out, "\n")
+	walFile := strings.TrimSpace(out)
+	bucket, key, found := strings.Cut(walFile, "/")
+	if !found {
+		return output, fmt.Errorf("no file matching %q found in the object store", path)
+	}
 
 	stdout, _, err := run.UncheckedRetry(fmt.Sprintf(
-		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
+		"kubectl exec -n %v %v -- aws s3api get-object-tagging --bucket %v --key %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
-		walFile))
+		bucket,
+		key))
 	if err != nil {
 		return output, err
 	}
 
-	err = json.Unmarshal([]byte(stdout), &output)
-	if err != nil {
+	var tagging struct {
+		TagSet []struct {
+			Key   string `json:"Key"`
+			Value string `json:"Value"`
+		} `json:"TagSet"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &tagging); err != nil {
 		return output, err
+	}
+	output.Tags = make(map[string]string, len(tagging.TagSet))
+	for _, tag := range tagging.TagSet {
+		output.Tags[tag.Key] = tag.Value
 	}
 	return output, nil
 }
@@ -662,7 +698,7 @@ func TestBarmanConnectivity(
 	return true, nil
 }
 
-// CleanFiles clean files on minio for a given path
+// CleanFiles removes every object under the given `bucket[/prefix]` path
 func CleanFiles(minioEnv *Env, path string) (string, error) {
 	var stdout string
 	stdout, _, err := run.Unchecked(fmt.Sprintf(
@@ -676,11 +712,11 @@ func CleanFiles(minioEnv *Env, path string) (string, error) {
 	return strings.Trim(stdout, "\n"), nil
 }
 
-// GetFilePath gets the MinIO file string for WAL/backup objects in a configured bucket
+// GetFilePath gets the glob matching WAL/backup objects in a configured bucket
 func GetFilePath(serverName, fileName string) string {
-	// the * regexes enable matching these typical paths:
-	// 	minio/backups/serverName/base/20220618T140300/data.tar
-	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
-	//  minio/backups/serverName/wals/00000002.history.gz
+	// the * globs enable matching these typical paths:
+	// 	bucketName/serverName/base/20220618T140300/data.tar
+	// 	bucketName/serverName/wals/0000000100000000/000000010000000000000002.gz
+	//  bucketName/serverName/wals/00000002.history.gz
 	return filepath.Join("*", serverName, "*", fileName)
 }
