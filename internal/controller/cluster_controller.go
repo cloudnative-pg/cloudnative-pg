@@ -151,6 +151,10 @@ var ErrNextLoop = utils.ErrNextLoop
 
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if configuration.Current.IsNamespaceExcluded(req.Namespace) {
+		return ctrl.Result{}, nil
+	}
+
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	contextLogger.Debug("Reconciliation loop start")
@@ -1241,13 +1245,18 @@ func (r *ClusterReconciler) handleRollingUpdate(
 }
 
 // SetupWithManager creates a ClusterReconciler
-func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
+func (r *ClusterReconciler) SetupWithManager(
+	ctx context.Context,
+	mgr ctrl.Manager,
+	maxConcurrentReconciles int,
+	extraPredicates ...predicate.Predicate,
+) error {
 	err := r.createFieldIndexes(ctx, mgr)
 	if err != nil {
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	newController := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1293,8 +1302,13 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&apiv1.ClusterImageCatalog{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
+		)
+
+	for _, p := range extraPredicates {
+		newController = newController.WithEventFilter(p)
+	}
+
+	return newController.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and

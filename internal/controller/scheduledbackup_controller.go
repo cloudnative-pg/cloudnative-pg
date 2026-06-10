@@ -37,6 +37,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -415,6 +416,7 @@ func (r *ScheduledBackupReconciler) SetupWithManager(
 	ctx context.Context,
 	mgr ctrl.Manager,
 	maxConcurrentReconciles int,
+	extraPredicates ...predicate.Predicate,
 ) error {
 	// Create a field indexer on the parent ScheduledBackup label to efficiently
 	// find all backups created by a ScheduledBackup, regardless of the
@@ -436,9 +438,12 @@ func (r *ScheduledBackupReconciler) SetupWithManager(
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	newController := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.ScheduledBackup{}).
-		Named("scheduled-backup").
-		Complete(r)
+		Named("scheduled-backup")
+	for _, p := range extraPredicates {
+		newController = newController.WithEventFilter(p)
+	}
+	return newController.Complete(r)
 }

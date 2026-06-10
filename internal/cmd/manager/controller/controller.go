@@ -32,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -140,6 +142,14 @@ func RunController(
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
+	if conf.ExcludeNamespaces != "" {
+		setupLog.Info("Not listening for changes", "excludeNamespaces", conf.ExcludeNamespaces)
+	}
+
+	if conf.WatchNamespace != "" && conf.ExcludeNamespaces != "" {
+		setupLog.Info("Warning: ExcludeNamespaces is ignored when WatchNamespace is set")
+	}
+
 	if conf.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
@@ -220,12 +230,14 @@ func RunController(
 	}
 	defer pluginRepository.Close()
 
+	nsFilter := newNamespaceIgnorePredicate(conf)
+
 	if err = controller.NewClusterReconciler(
 		mgr,
 		discoveryClient,
 		pluginRepository,
 		conf.DrainTaints,
-	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
+	).SetupWithManager(ctx, mgr, maxConcurrentReconciles, nsFilter); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
@@ -234,13 +246,13 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
-	).SetupWithManager(ctx, mgr); err != nil {
+	).SetupWithManager(ctx, mgr, nsFilter); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
 
 	if err = controller.NewPluginReconciler(mgr, conf.OperatorNamespace, pluginRepository).
-		SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
+		SetupWithManager(mgr, maxConcurrentReconciles, nsFilter); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		return err
 	}
@@ -249,7 +261,7 @@ func RunController(
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"), //nolint:staticcheck
-	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
+	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles, nsFilter); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
 	}
@@ -259,7 +271,7 @@ func RunController(
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"), //nolint:staticcheck
-	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
+	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles, nsFilter); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}
@@ -488,4 +500,33 @@ func getPprofServerAddress(enabled bool) string {
 	}
 
 	return ""
+}
+
+func newNamespaceIgnorePredicate(conf *configuration.Data) predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			if e.Object == nil {
+				return false
+			}
+			return !conf.IsNamespaceExcluded(e.Object.GetNamespace())
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if e.ObjectNew == nil {
+				return false
+			}
+			return !conf.IsNamespaceExcluded(e.ObjectNew.GetNamespace())
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			if e.Object == nil {
+				return false
+			}
+			return !conf.IsNamespaceExcluded(e.Object.GetNamespace())
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			if e.Object == nil {
+				return false
+			}
+			return !conf.IsNamespaceExcluded(e.Object.GetNamespace())
+		},
+	}
 }
