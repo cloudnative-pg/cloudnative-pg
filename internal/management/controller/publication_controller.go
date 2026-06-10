@@ -123,9 +123,15 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
-		!res.IsZero() {
-		return res, err
+	// The detection only gates the apply path: a publication being deleted
+	// must release its finalizer regardless of conflicting managers. It stays
+	// ahead of the finalizer reconciler so that a conflicting publication
+	// never acquires the finalizer.
+	if publication.GetDeletionTimestamp().IsZero() {
+		if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
+			!res.IsZero() {
+			return res, err
+		}
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
