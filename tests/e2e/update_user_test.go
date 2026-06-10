@@ -229,7 +229,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		})
 	})
 
-	FIt("restores the superuser password after a disable/re-enable cycle with a user-supplied secret", func() {
+	It("restores the superuser password after a disable/re-enable cycle with a user-supplied secret", func() {
 		const (
 			cycleSampleFile  = fixturesDir + "/secrets/cluster-user-supplied-superuser-cycle.yaml.template"
 			cycleClusterName = "cluster-superuser-cycle"
