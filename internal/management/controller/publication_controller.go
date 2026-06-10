@@ -28,8 +28,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -86,15 +89,27 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if publication.Generation == publication.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &publication, fmt.Errorf("while fetching the cluster: %w", err))
+	}
+
+	// If everything is reconciled, we're done here
+	if publication.Generation == publication.Status.ObservedGeneration {
+		// ...unless the cluster was demoted to a replica after the
+		// publication was applied: report the replica condition and void the
+		// recorded reconciliation, so the publication is evaluated again
+		// once the cluster is promoted back to primary.
+		if publication.DeletionTimestamp.IsZero() &&
+			cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
+			cluster.IsReplica() {
+			if err := markAsUnknownAndForget(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -192,6 +207,13 @@ func NewPublicationReconciler(
 func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Publication{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterToManagedResources(
+				r.instance, mgr.GetClient(),
+				func() client.ObjectList { return &apiv1.PublicationList{} })),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-publication").
 		Complete(r)
 }

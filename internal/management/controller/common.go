@@ -32,9 +32,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
+	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -82,6 +86,26 @@ func markAsUnknown(
 	return cli.Status().Update(ctx, resource)
 }
 
+type markableAsUnknownAndForgettable interface {
+	markableAsUnknown
+	SetStatusObservedGeneration(obsGeneration int64)
+}
+
+// markAsUnknownAndForget reports the replica condition on an object that was
+// applied before its cluster was demoted, and voids the recorded
+// reconciliation so the object is evaluated again once the cluster is
+// promoted back to primary.
+func markAsUnknownAndForget(
+	ctx context.Context,
+	cli client.Client,
+	resource markableAsUnknownAndForgettable,
+	err error,
+) error {
+	resource.SetAsUnknown(err)
+	resource.SetStatusObservedGeneration(0)
+	return cli.Status().Update(ctx, resource)
+}
+
 type markableAsReady interface {
 	client.Object
 	SetAsReady()
@@ -95,6 +119,59 @@ func markAsReady(
 ) error {
 	resource.SetAsReady()
 	return cli.Status().Update(ctx, resource)
+}
+
+// clusterScopedResource is a resource bound to a Cluster through a local
+// object reference.
+type clusterScopedResource interface {
+	client.Object
+	GetClusterRef() corev1.LocalObjectReference
+}
+
+// mapClusterToManagedResources builds a watch mapper that enqueues every item
+// of the given list type targeting this instance's cluster, to react to
+// cluster spec changes (e.g. a demotion to replica).
+func mapClusterToManagedResources(
+	instance instanceInterface,
+	cli client.Client,
+	newList func() client.ObjectList,
+) handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+		if obj.GetName() != instance.GetClusterName() ||
+			obj.GetNamespace() != instance.GetNamespaceName() {
+			return nil
+		}
+
+		list := newList()
+		if err := cli.List(ctx, list, client.InNamespace(obj.GetNamespace())); err != nil {
+			log.FromContext(ctx).Error(err, "while listing resources to react to a cluster change",
+				"kind", fmt.Sprintf("%T", list))
+			return nil
+		}
+
+		items, err := apimeta.ExtractList(list)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "while extracting the resource list",
+				"kind", fmt.Sprintf("%T", list))
+			return nil
+		}
+
+		requests := make([]reconcile.Request, 0, len(items))
+		for _, item := range items {
+			resource, ok := item.(clusterScopedResource)
+			if !ok || resource.GetClusterRef().Name != obj.GetName() {
+				continue
+			}
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: resource.GetNamespace(),
+					Name:      resource.GetName(),
+				},
+			})
+		}
+
+		return requests
+	}
 }
 
 func getClusterFromInstance(
