@@ -427,6 +427,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 		Expect(subscription.Status.Applied).Should(BeNil())
 		Expect(subscription.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		// The replica gate runs before the finalizer reconciler, so no
+		// finalizer is added while the cluster is a replica.
+		Expect(subscription.GetFinalizers()).Should(BeEmpty())
 	})
 })
 

@@ -428,6 +428,9 @@ var _ = Describe("Managed publication controller tests", func() {
 
 		Expect(publication.Status.Applied).Should(BeNil())
 		Expect(publication.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		// The replica gate runs before the finalizer reconciler, so no
+		// finalizer is added while the cluster is a replica.
+		Expect(publication.GetFinalizers()).Should(BeEmpty())
 	})
 })
 
