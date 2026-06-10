@@ -59,12 +59,6 @@ type DatabaseRole struct {
 	transactionID       int64 `json:"-"`
 }
 
-// MarkPasswordAsIgnored marks the password as to be ignored.
-// When this happens, no password will be set in the database.
-func (d *DatabaseRole) MarkPasswordAsIgnored() {
-	d.ignorePassword = true
-}
-
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
 func (d *DatabaseRole) passwordNeedsUpdating(
 	storedPasswordState map[string]apiv1.PasswordState,
