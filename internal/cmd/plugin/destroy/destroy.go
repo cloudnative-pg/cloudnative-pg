@@ -38,37 +38,16 @@ import (
 
 // Destroy implements destroy subcommand
 func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
-	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
-		return err
-	}
-
-	var jobList batchv1.JobList
-	if err := plugin.Client.List(
-		ctx,
-		&jobList,
-		client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{
-			utils.InstanceNameLabelName: instanceName,
-		},
-	); err != nil {
-		return err
-	}
-	for idx := range jobList.Items {
-		if err := plugin.Client.Delete(
-			ctx,
-			&jobList.Items[idx],
-			client.PropagationPolicy(metav1.DeletePropagationBackground),
-		); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
-		}
-	}
-
 	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
 	if err != nil {
 		return err
 	}
 
 	if keepPVC {
+		if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
+			return err
+		}
+
 		// we remove the ownership from the pvcs if present
 		for i := range pvcs {
 			if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
@@ -91,6 +70,9 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		return nil
 	}
 
+	// Delete PVCs before the pod to prevent a race where the operator sees
+	// dangling PVCs and recreates the pod before we can delete them.
+	// This matches the deletion order in ensureInstanceIsDeleted.
 	for i := range pvcs {
 		if pvcs[i].Labels == nil {
 			pvcs[i].Labels = map[string]string{}
@@ -107,6 +89,31 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 			if err = plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
 				return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
 			}
+		}
+	}
+
+	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
+		return err
+	}
+
+	var jobList batchv1.JobList
+	if err := plugin.Client.List(
+		ctx,
+		&jobList,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{
+			utils.InstanceNameLabelName: instanceName,
+		},
+	); err != nil {
+		return err
+	}
+	for idx := range jobList.Items {
+		if err := plugin.Client.Delete(
+			ctx,
+			&jobList.Items[idx],
+			client.PropagationPolicy(metav1.DeletePropagationBackground),
+		); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
 		}
 	}
 
