@@ -290,7 +290,6 @@ func CreateRole(opts RoleOptions) rbacv1.Role {
 				"get",
 				"patch",
 				"update",
-				"watch",
 			},
 		},
 	}
