@@ -35,6 +35,9 @@ export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pk
 export PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 OPERATOR="${OPERATOR:-local}"
 CNPG_DEPLOYMENT_METHOD="${CNPG_DEPLOYMENT_METHOD:-manifest}"
+# plugin-barman-cloud version to install for the plugin-based backup tests:
+# "release" (default), "main", or a pinned version such as "v0.12.0".
+export BARMAN_PLUGIN_VERSION="${BARMAN_PLUGIN_VERSION:-release}"
 export OPERATOR_MANIFEST_PATH="${OPERATOR_MANIFEST_PATH:-${ROOT_DIR}/dist/operator-manifest.yaml}"
 
 # Override pgbouncer image repository if PGBOUNCER_IMG_REPOSITORY is set
@@ -160,6 +163,18 @@ if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   else
     deploy_operator_from_source
   fi
+
+  # Install plugin-barman-cloud for the plugin-based backup tests. Restricted to
+  # local engines (kind/k3d) for now; cloud-vendor coverage will follow with the
+  # backup test ports.
+  case "${TEST_CLOUD_VENDOR:-}" in
+    kind | k3d)
+      install_barman_cloud_plugin
+      ;;
+    *)
+      echo "Skipping plugin-barman-cloud install on '${TEST_CLOUD_VENDOR:-}' (only kind/k3d for now)."
+      ;;
+  esac
 fi
 
 # Run the main (non-upgrade) test suite via run-e2e-suite.sh,

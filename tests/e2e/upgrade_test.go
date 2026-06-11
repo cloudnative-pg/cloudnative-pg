@@ -39,10 +39,12 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
 	pgbouncerasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
@@ -322,7 +324,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// assertOnlineManagerRollout checks for the presence of InstanceManagerUpgraded
 	// events, which are produced on online upgrades.
 	// returns a boolean indicating success
-	assertOnlineManagerRollout := func() bool {
+	assertOnlineManagerRollout := func(namespace, clusterName string, expectedUpgrades int) bool {
 		backoffCheckingEvents := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    5,
@@ -336,9 +338,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			err := env.Client.List(
 				env.Ctx,
 				&eventList,
+				ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
-					"involvedObject.name": clusterName1,
+					"involvedObject.name": clusterName,
 				},
 			)
 			if err != nil {
@@ -358,8 +361,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				}
 			}
 
-			if count != 3 {
-				return fmt.Errorf("expected 3 online rollouts, but %d happened: %w", count, notUpdated)
+			if count != expectedUpgrades {
+				return fmt.Errorf("expected %d online rollouts, but %d happened: %w",
+					expectedUpgrades, count, notUpdated)
 			}
 
 			return nil
@@ -642,7 +646,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			GinkgoWriter.Printf("online upgrade\n")
 			testOnlineUpgrade = true
 			// Pods shouldn't change and there should be an event
-			onlineUpgradeDone = assertOnlineManagerRollout()
+			onlineUpgradeDone = assertOnlineManagerRollout(upgradeNamespace, clusterName1, 3)
 			if onlineUpgradeDone {
 				GinkgoWriter.Printf("online manager rollout is done\n")
 				// equivalent to waiting for 300 sec as before
@@ -854,5 +858,106 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
 		})
+
+		It("keeps a plugin-backed cluster working across an operator upgrade",
+			Label(tests.LabelPluginBarmanCloud), func() {
+				const (
+					pluginClusterName     = "cluster-plugin-upgrade"
+					pluginClusterManifest = fixturesDir + "/upgrade/cluster-with-plugin.yaml.template"
+					pluginBackupManifest  = fixturesDir + "/upgrade/backup-plugin.yaml"
+					barmanCloudPluginName = "barman-cloud.cloudnative-pg.io"
+				)
+
+				By("applying environment changes for current upgrade to be performed", func() {
+					operator.CreateConfigMap(env.Ctx, env.Client, operatorNamespace, configName, true)
+				})
+
+				GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
+				deployOperator(currentOperatorManifest)
+				// This spec owns its operator lifecycle, so it tears down cnpg-system
+				// itself. cleanupOperatorAndMinio is not reused: it also cleans MinIO
+				// paths that only the in-core upgrade specs create, which would fail
+				// here. The plugin is removed before cnpg-system because the operator
+				// puts a cnpg.io/cleanupPlugin finalizer on the plugin Service, so
+				// deleting cnpg-system wholesale would otherwise wedge the namespace
+				// on that finalizer; removing the plugin while the operator is still
+				// up lets it be cleared.
+				DeferCleanup(func() {
+					if CurrentSpecReport().Failed() {
+						namespaces.DumpNamespaceObjects(env.Ctx, env.Client,
+							minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
+						operator.Dump(env.Ctx, env.Client,
+							operatorNamespace, "out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+					}
+					_, stderr, err := run.Run(fmt.Sprintf(
+						"kubectl delete deployment,service barman-cloud -n %s "+
+							"--ignore-not-found --wait=true --timeout=2m",
+						operatorNamespace))
+					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+					Expect(namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 120)).
+						To(Succeed())
+				})
+
+				// The upgrade test owns its operator lifecycle and recreates
+				// cnpg-system, so the plugin has to be installed here, after the
+				// operator is up. cert-manager is cluster-scoped and the plugin's
+				// Deployment lives outside the operator manifest, so both survive the
+				// in-place upgrade to the prime build below.
+				By("installing cert-manager and the Barman Cloud plugin", func() {
+					_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
+					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+				})
+
+				upgradeNamespace := assertCreateNamespace("plugin-upgrade")
+
+				setupPluginObjectStore(upgradeNamespace, pluginClusterName)
+
+				By("creating a cluster that archives through the plugin", func() {
+					resources.CreateResourceFromFile(env, upgradeNamespace, pluginClusterManifest)
+					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName,
+						testTimeouts[timeouts.ClusterIsReady])
+				})
+
+				assertPluginLoaded := func() {
+					clusterasserts.AssertPluginLoaded(env, upgradeNamespace, pluginClusterName,
+						barmanCloudPluginName, 120)
+				}
+
+				By("verifying the plugin is loaded before the upgrade", assertPluginLoaded)
+
+				By("upgrading the operator to the prime build", func() {
+					deployOperator(primeOperatorManifest)
+				})
+
+				By("waiting for the in-place instance manager rollout to complete", func() {
+					// This spec enables ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES, so
+					// the upgrade replaces the instance manager process inside each
+					// pod. The backup below must not race that rollout: a backup
+					// started on an instance whose manager is replaced moments later
+					// dies with it, leaving the Backup resource in the "started"
+					// phase forever.
+					Expect(assertOnlineManagerRollout(upgradeNamespace, pluginClusterName, 2)).To(BeTrue(),
+						"expected an online instance manager rollout on both instances")
+				})
+
+				By("verifying the plugin-backed cluster is still healthy after the upgrade", func() {
+					clusterasserts.AssertClusterIsReady(env, upgradeNamespace, pluginClusterName, 300)
+				})
+				By("verifying the plugin is still loaded after the upgrade", assertPluginLoaded)
+
+				By("verifying WAL archiving still works after the upgrade", func() {
+					// Switch a WAL after the upgrade and require it to reach the
+					// object store: the archiving condition on the cluster may still
+					// reflect pre-upgrade activity, so it is not enough here.
+					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv,
+						upgradeNamespace, pluginClusterName, pluginClusterName)
+				})
+
+				By("taking a backup through the plugin after the upgrade", func() {
+					backups.Execute(env.Ctx, env.Client, env.Scheme, upgradeNamespace, pluginBackupManifest, false,
+						testTimeouts[timeouts.BackupIsReady])
+					backupasserts.AssertBackupConditionInClusterStatus(env, upgradeNamespace, pluginClusterName)
+				})
+			})
 	})
 })

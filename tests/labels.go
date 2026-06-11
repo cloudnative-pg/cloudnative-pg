@@ -59,6 +59,10 @@ const (
 	// LabelPlugin is a label for selecting plugin tests
 	LabelPlugin = "plugin"
 
+	// LabelPluginBarmanCloud is a label for selecting the tests that back up
+	// and restore through plugin-barman-cloud
+	LabelPluginBarmanCloud = "plugin-barman-cloud"
+
 	// LabelPodScheduling is a label for selecting pod-scheduling test
 	LabelPodScheduling = "pod-scheduling"
 
