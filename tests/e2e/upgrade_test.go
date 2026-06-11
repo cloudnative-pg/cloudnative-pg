@@ -906,7 +906,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				// Deployment lives outside the operator manifest, so both survive the
 				// in-place upgrade to the prime build below.
 				By("installing cert-manager and the Barman Cloud plugin", func() {
-					_, stderr, err := run.Run("../../hack/e2e/install-barman-cloud-plugin.sh")
+					_, stderr, err := run.Run("../../hack/setup-cluster.sh plugin-barman-cloud")
 					Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 				})
 
