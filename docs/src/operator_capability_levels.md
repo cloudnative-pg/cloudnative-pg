@@ -67,8 +67,9 @@ requested registry.
 The operator orchestrates the deployment by creating and managing standard
 Kubernetes resources (`Pod`, `Service`, `Secret`, `ConfigMap`,
 `PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
-`RoleBinding`, and `Role`) as well as CNPG-specific resources like `DatabaseRole`
-and `Database` to ensure the database environment matches the desired state.
+`RoleBinding`, and `Role`), and reconciles user-defined CNPG resources such as
+`Database` and `DatabaseRole` to ensure the database environment matches the
+desired state.
 
 You can optionally provide a pre-existing ServiceAccount for both `Cluster` and
 `Pooler` resources. This shared ServiceAccount support enables seamless

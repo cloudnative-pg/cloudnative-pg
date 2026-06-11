@@ -130,9 +130,14 @@ How you remove a role depends on how it was created:
 
 :::warning
 Creating a `DatabaseRole` for a role that already exists **adopts** it: the
-operator alters the existing role to match the manifest. Do not point a
-`DatabaseRole` at a role you only want to drop, since it will be modified before
-it can be removed.
+operator alters the existing role so that **every** attribute matches the
+manifest, including the attributes you omit, which are forced back to their
+defaults. In particular, memberships not listed in `inRoles` are revoked, an
+omitted `connectionLimit` is reset to `-1` (unlimited), and an omitted
+`validUntil` becomes `infinity` if the role had an expiration date. Review
+the current attributes and memberships of a role before adopting it, and do
+not point a `DatabaseRole` at a role you only want to drop, since it will be
+modified before it can be removed.
 :::
 
 ### Status of `DatabaseRole` resources
@@ -151,6 +156,13 @@ status:
     status: "True"
     type: PasswordSecretChange
 ```
+
+The `PasswordSecretChange` condition is maintained by the operator as an
+internal signal for the instance manager: its message carries the
+`resourceVersion` of the password Secret the operator last observed, and a
+change in that value triggers the re-application of the password. The
+condition appears once a password Secret is in use and is removed when
+`passwordSecret` is removed from the specification.
 
 If a `DatabaseRole` CRD targets a name already managed in the Cluster spec, the
 `applied` field will be `false` with the message:
