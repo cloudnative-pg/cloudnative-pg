@@ -20,13 +20,6 @@
 
 # This file contains functions for interacting with the Kubernetes API using $K8S_CLI.
 
-# cert-manager is a prerequisite for plugin-barman-cloud: the plugin manifest
-# ships cert-manager Issuer/Certificate resources used for the operator<->plugin
-# mTLS. This default is kept in sync with the version plugin-barman-cloud tests
-# against.
-# renovate: datasource=github-releases depName=cert-manager/cert-manager
-CERT_MANAGER_VERSION="v1.15.1"
-
 # wait_for(type, namespace, name, interval, retries)
 # Waits until a specified Kubernetes object exists.
 function wait_for() {
@@ -178,6 +171,13 @@ function reset_operator_namespace() {
     fi
 
     if ${K8S_CLI} get ns cnpg-system >/dev/null 2>&1; then
+        # Delete plugin services while the operator is still running: the
+        # reconciler handles the cnpg.io/cleanupPlugin finalizer on deletion.
+        # If we skip this, deleting the namespace kills the operator pod before
+        # it can clear the finalizer, wedging the namespace.
+        ${K8S_CLI} delete services -n cnpg-system -l cnpg.io/pluginName \
+            --ignore-not-found --wait=true --timeout=60s 2>/dev/null || true
+
         ${K8S_CLI} delete ns cnpg-system --ignore-not-found --wait=false
         ${K8S_CLI} wait --for=delete ns/cnpg-system --timeout=60s
     fi
@@ -439,17 +439,20 @@ function deploy_operator_with_helm() {
 # become ready. plugin-barman-cloud requires cert-manager because its manifest
 # creates the Issuer/Certificate resources used for the operator<->plugin mTLS.
 function ensure_cert_manager() {
+    # renovate: datasource=github-releases depName=cert-manager/cert-manager
+    local cert_manager_version="${CERT_MANAGER_VERSION:-v1.20.2}"
+
     # shellcheck disable=SC2154
     if ${K8S_CLI} get namespace cert-manager >/dev/null 2>&1; then
         echo -e "${bright}cert-manager already present, skipping install.${reset}"
     else
-        echo -e "${bright}Installing cert-manager ${CERT_MANAGER_VERSION}...${reset}"
+        echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
         # Download once, then retry only the apply, as deploy_operator_from_manifest does.
         local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
         if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" \
-            "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"; then
+            "https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml"; then
             printf '%bError: could not download the cert-manager %s manifest%b\n' \
-                "${bright}" "${CERT_MANAGER_VERSION}" "${reset}" >&2
+                "${bright}" "${cert_manager_version}" "${reset}" >&2
             return 1
         fi
         retry 5 "${K8S_CLI}" apply --server-side --force-conflicts -f "${manifest_file}"
