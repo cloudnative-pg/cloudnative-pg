@@ -1629,6 +1629,7 @@ unmanaged
 unsatisfiable
 unschedulable
 unsetting
+unsuffixed
 unusablePVC
 updateInterval
 updateStrategy

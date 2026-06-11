@@ -180,8 +180,8 @@ type Data struct {
 	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
 
 	// EnableWebhookNamespaceSuffix when true appends "-<OperatorNamespace>" to the default
-	// webhook configuration names. This is required when deploying multiple operator instances
-	// in namespaced mode on the same cluster to avoid webhook configuration name collisions.
+	// webhook configuration names. Use this when running multiple namespaced operator
+	// instances on the same cluster to avoid webhook configuration name collisions.
 	EnableWebhookNamespaceSuffix bool `json:"enableWebhookNamespaceSuffix" env:"ENABLE_WEBHOOK_NAMESPACE_SUFFIX"`
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
