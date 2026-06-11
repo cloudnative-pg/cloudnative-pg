@@ -20,6 +20,14 @@
 
 # This file contains functions for interacting with the Kubernetes API using $K8S_CLI.
 
+# _github_auth_header: returns curl auth flags when GITHUB_TOKEN is set.
+# Avoids 403 rate-limiting on unauthenticated downloads from GitHub Actions.
+function _github_auth_header() {
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        echo "-H" "Authorization: Bearer ${GITHUB_TOKEN}"
+    fi
+}
+
 # wait_for(type, namespace, name, interval, retries)
 # Waits until a specified Kubernetes object exists.
 function wait_for() {
@@ -236,7 +244,8 @@ function deploy_operator_from_manifest() {
     fi
 
     local manifest_file="${TEMP_DIR}/cnpg-operator-manifest.yaml"
-    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    # shellcheck disable=SC2046
+    if ! curl -fsSL --retry 5 --retry-delay 2 $(_github_auth_header) -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: Manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         printf '%bInterpreted %s as a %s.%b\n' "${bright}" "${operator}" "${mode}" "${reset}" >&2
         exit 1
@@ -286,7 +295,8 @@ function deploy_csi_host_path() {
 
   ## Create a temporary file for the modified plugin deployment. This updates the image tag.
   local plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
-  curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
+  # shellcheck disable=SC2046
+  curl -fsSL --retry 5 --retry-delay 2 $(_github_auth_header) "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
     sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
 
   # Apply driver info and plugin deployment
@@ -449,7 +459,8 @@ function ensure_cert_manager() {
         echo -e "${bright}Installing cert-manager ${cert_manager_version}...${reset}"
         # Download once, then retry only the apply, as deploy_operator_from_manifest does.
         local manifest_file="${TEMP_DIR:-/tmp}/cert-manager-manifest.yaml"
-        if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" \
+        # shellcheck disable=SC2046
+        if ! curl -fsSL --retry 5 --retry-delay 2 $(_github_auth_header) -o "${manifest_file}" \
             "https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml"; then
             printf '%bError: could not download the cert-manager %s manifest%b\n' \
                 "${bright}" "${cert_manager_version}" "${reset}" >&2
@@ -503,7 +514,8 @@ function install_barman_cloud_plugin() {
     # does. The retry absorbs the cert-manager webhook readiness race: the
     # plugin manifest creates cert-manager Issuer/Certificate resources.
     local manifest_file="${TEMP_DIR:-/tmp}/plugin-barman-cloud-manifest.yaml"
-    if ! curl -fsSL --retry 5 --retry-delay 2 -o "${manifest_file}" "${manifest_url}"; then
+    # shellcheck disable=SC2046
+    if ! curl -fsSL --retry 5 --retry-delay 2 $(_github_auth_header) -o "${manifest_file}" "${manifest_url}"; then
         printf '%bError: manifest not found at %s%b\n' "${bright}" "${manifest_url}" "${reset}" >&2
         return 1
     fi
