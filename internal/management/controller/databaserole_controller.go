@@ -298,6 +298,13 @@ func (r *DatabaseRoleReconciler) isAlreadyReconciled(role *apiv1.DatabaseRole) b
 		role.Status.SecretResourceVersion == latestObservedSecretPasswordResourceVersion
 }
 
+// The status helpers below intentionally bypass the shared markAsReady /
+// markAsFailed / markAsUnknown functions: those replace the whole status with
+// Status().Update, but a DatabaseRole has two status writers. The operator
+// maintains the PasswordSecretChange condition while the instance manager owns
+// the other fields, so each side must merge-patch only the fields it touches
+// or it would clobber the other writer's update.
+
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
 func (r *DatabaseRoleReconciler) failedReconciliation(
 	ctx context.Context,
@@ -370,7 +377,7 @@ func (r *DatabaseRoleReconciler) succeededReconciliation(
 	passVersion string,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
-	role.SetAsApplied()
+	role.SetAsReady()
 	role.Status.SecretResourceVersion = passVersion
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {

@@ -30,8 +30,8 @@ func (r *DatabaseRole) SetAsFailed(err error) {
 	r.Status.Message = err.Error()
 }
 
-// SetAsApplied sets the role as working correctly
-func (r *DatabaseRole) SetAsApplied() {
+// SetAsReady sets the role as working correctly
+func (r *DatabaseRole) SetAsReady() {
 	r.Status.Message = ""
 	r.Status.Applied = ptr.To(true)
 	r.Status.ObservedGeneration = r.Generation
