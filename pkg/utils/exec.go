@@ -202,7 +202,7 @@ func execCommandOnce(
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	executor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
+	executor, err := remotecommand.NewWebSocketExecutor(&newConfig, "POST", req.URL().String())
 	if err != nil {
 		return "", "", err
 	}
