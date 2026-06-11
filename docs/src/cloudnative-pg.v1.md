@@ -867,8 +867,8 @@ _Appears in:_
 | `apiVersion` _string_ | `postgresql.cnpg.io/v1` | True | | |
 | `kind` _string_ | `DatabaseRole` | True | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. | True |  |  |
-| `spec` _[DatabaseRoleSpec](#databaserolespec)_ |  | True |  |  |
-| `status` _[DatabaseRoleStatus](#databaserolestatus)_ |  | True |  |  |
+| `spec` _[DatabaseRoleSpec](#databaserolespec)_ | Specification of the desired DatabaseRole.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | True |  |  |
+| `status` _[DatabaseRoleStatus](#databaserolestatus)_ | Most recently observed status of the DatabaseRole. This data may not be up<br />to date. Populated by the system. Read-only.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status |  |  |  |
 
 
 

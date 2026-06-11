@@ -27,7 +27,7 @@ spec:
     - jsonPath: .status.applied
       name: Applied
       type: boolean
-    - description: Latest message
+    - description: Latest reconciliation message
       jsonPath: .status.message
       name: Message
       type: string
@@ -54,7 +54,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: DatabaseRoleSpec represents a role in Postgres
+            description: |-
+              Specification of the desired DatabaseRole.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               bypassrls:
                 description: |-
@@ -202,7 +204,10 @@ spec:
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
           status:
-            description: DatabaseRoleStatus defines the observed state of a DatabaseRole
+            description: |-
+              Most recently observed status of the DatabaseRole. This data may not be up
+              to date. Populated by the system. Read-only.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               applied:
                 description: Applied is true if the role was reconciled correctly
@@ -279,6 +284,9 @@ spec:
                   last applied to the role; a change to it triggers reconciliation.
                 type: string
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

@@ -97,20 +97,28 @@ type DatabaseRoleStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
-// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest message"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
 
 // DatabaseRole is the Schema for the databaseroles API
 type DatabaseRole struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   DatabaseRoleSpec   `json:"spec,omitempty"`
+	// Specification of the desired DatabaseRole.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec DatabaseRoleSpec `json:"spec"`
+	// Most recently observed status of the DatabaseRole. This data may not be up
+	// to date. Populated by the system. Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
 	Status DatabaseRoleStatus `json:"status,omitempty"`
 }
 
