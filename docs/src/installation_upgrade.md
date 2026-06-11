@@ -317,6 +317,26 @@ according to its own `password_encryption` GUC.
 See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
 for details.
 
+Also starting from versions 1.30.0 and 1.29.2, for security reasons,
+CloudNativePG pins the `search_path` to a fixed `pg_catalog, public,
+pg_temp` on every connection it opens to PostgreSQL, so that a
+tenant-controlled `ALTER DATABASE`/`ALTER ROLE` setting can no longer
+influence how operator-issued queries resolve unqualified object names.
+The `SECURITY DEFINER` lookup function used by the PgBouncer integration
+is recreated automatically with its own pinned `search_path` during the
+first reconciliation after the upgrade.
+See [Schema resolution and `search_path` hardening](security.md#schema-resolution-and-search_path-hardening)
+for the rationale.
+
+This change also affects custom monitoring queries, which now run inside
+a transaction whose `search_path` is pinned to `pg_catalog, public,
+pg_temp`. If any of your custom metrics reference objects that live in
+other user-defined schemas through an unqualified name, schema-qualify
+them (for example `myschema.mytable`) so they keep resolving after the
+upgrade. User-authored bootstrap (`postInit*`) and logical-import
+post-import SQL are unaffected: they continue to run with the standard
+`"$user", public` resolution.
+
 -->
 
 ### Upgrading to 1.29.1 or 1.28.3
