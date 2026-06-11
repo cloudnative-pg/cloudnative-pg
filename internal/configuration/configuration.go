@@ -175,6 +175,9 @@ type Data struct {
 
 	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
+
+	// EnableWebhookServer is true when the webhook server should be started.
+	EnableWebhookServer bool `json:"enableWebhookServer" env:"ENABLE_WEBHOOK_SERVER"`
 }
 
 // Current is the configuration used by the operator
@@ -194,6 +197,7 @@ func newDefaultConfig() *Data {
 		StandbyTCPUserTimeout:   nil,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 		DrainTaints:             DefaultDrainTaints,
+		EnableWebhookServer:     true,
 	}
 }
 
