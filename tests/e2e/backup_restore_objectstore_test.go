@@ -31,15 +31,15 @@ import (
 	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	metricsasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/metrics"
-	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	objectstoreasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/objectstore"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
 	replicationasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objectstore"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -50,7 +50,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("Object storage - Backup and restore", Label(tests.LabelBackupRestore), func() {
 	const (
 		tableName                 = "to_restore"
 		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
@@ -61,43 +61,44 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		}
 	})
 
-	Context("using minio as object storage for backup", Ordered, func() {
-		// This is a set of tests using a minio server deployed in the same
+	Context("using the object store for backup", Ordered, func() {
+		// This is a set of tests using an object store server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
 		var namespace, clusterName string
 		const (
-			backupFile              = fixturesDir + "/backup/minio/backup-minio.yaml"
+			backupFile              = fixturesDir + "/backup/object_store/backup-object-store.yaml"
 			customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 		)
 
-		clusterWithMinioSampleFile := fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
+		clusterWithObjectStoreSampleFile := fixturesDir +
+			"/backup/object_store/cluster-with-backup-object-store.yaml.template"
 
 		BeforeAll(func() {
 			if !(IsKind() || IsK3D()) {
 				Skip("This test only runs on kind or k3d clusters")
 			}
-			const namespacePrefix = "cluster-backup-minio"
+			const namespacePrefix = "cluster-backup-object-store"
 			var err error
-			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -106,15 +107,15 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			metricsasserts.AssertCustomMetricsResourcesExist(env, namespace, customQueriesSampleFile, 1, 1)
 
 			// Create the cluster
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithMinioSampleFile)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterWithObjectStoreSampleFile)
 
-			By("verify connectivity of barman to minio", func() {
+			By("verify connectivity of barman to the object store", func() {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestBarmanConnectivity(
+					connectionStatus, err := objectstore.TestBarmanConnectivity(
 						namespace, clusterName, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
@@ -129,13 +130,13 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			// While namespace deletion would handle this implicitly, explicit deletion helps:
 			// - Identify any deletion issues early and in a more clear way rather than waiting for namespace cleanup
-			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
+			err := resources.DeleteResourcesFromFile(env, namespace, clusterWithObjectStoreSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// We back up and restore a cluster, and verify some expected data to
 		// be there
-		It("backs up and restores a cluster using minio", func() {
+		It("backs up and restores a cluster using the object store", func() {
 			const (
 				targetDBOne              = "test"
 				targetDBTwo              = "test1"
@@ -144,7 +145,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml.template"
 			)
 			var backup *apiv1.Backup
-			restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
+			restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -162,17 +163,18 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-			latestTar := minio.GetFilePath(clusterName, "data.tar")
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				namespace, clusterName, clusterName)
+			latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 
 			// There should be a backup resource and
-			By(fmt.Sprintf("backing up a cluster and verifying it exists on minio, backup path is %v", latestTar),
+			By(fmt.Sprintf("backing up a cluster and verifying it exists on the object store, backup path is %v", latestTar),
 				func() {
 					backup = backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
 						testTimeouts[timeouts.BackupIsReady])
 					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
+						return objectstore.CountFiles(objectStoreEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(1))
 					Eventually(func() (string, error) {
 						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -221,9 +223,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				Expect(result).To(BeTrue())
 			})
 
-			By("executing a second backup and verifying the number of backups on minio", func() {
+			By("executing a second backup and verifying the number of backups on the object store", func() {
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return objectstore.CountFiles(objectStoreEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 
 				// delete the first backup and create a second backup
@@ -240,9 +242,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					namespace, backupFile, false,
 					testTimeouts[timeouts.BackupIsReady],
 				)
-				latestTar = minio.GetFilePath(clusterName, "data.tar")
+				latestTar = objectstore.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return objectstore.CountFiles(objectStoreEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(2))
 			})
 
@@ -271,9 +273,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
-			By(fmt.Sprintf("checking the previous number of .history files in minio, history file name is %v",
+			By(fmt.Sprintf("checking the previous number of .history files in the object store, history file name is %v",
 				latestGZ), func() {
-				previous, err = minio.CountFiles(minioEnv, latestGZ)
+				previous, err = objectstore.CountFiles(objectStoreEnv, latestGZ)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -281,7 +283,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestGZ)
+					return objectstore.CountFiles(objectStoreEnv, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
 			})
 
@@ -295,15 +297,16 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		// be there
 		It("backs up and restore a cluster from standby", func() {
 			const (
-				targetDBOne                       = "test"
-				targetDBTwo                       = "test1"
-				targetDBSecret                    = "secret_test"
-				testTableName                     = "test_table"
-				clusterWithMinioStandbySampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standby.yaml.template"
-				backupStandbyFile                 = fixturesDir + "/backup/minio/backup-minio-standby.yaml"
+				targetDBOne                             = "test"
+				targetDBTwo                             = "test1"
+				targetDBSecret                          = "secret_test"
+				testTableName                           = "test_table"
+				clusterWithObjectStoreStandbySampleFile = fixturesDir +
+					"/backup/object_store/cluster-with-backup-object-store-standby.yaml.template"
+				backupStandbyFile = fixturesDir + "/backup/object_store/backup-object-store-standby.yaml"
 			)
 
-			targetClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioStandbySampleFile)
+			targetClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreStandbySampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
@@ -312,7 +315,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				testTimeouts,
 				namespace,
 				targetClusterName,
-				clusterWithMinioStandbySampleFile,
+				clusterWithObjectStoreStandbySampleFile,
 			)
 
 			// Create required test data
@@ -329,11 +332,12 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
-			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				namespace, targetClusterName, targetClusterName)
+			latestTar := objectstore.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
-			By(fmt.Sprintf("backing up a cluster from standby and verifying it exists on minio, backup path is %v",
+			By(fmt.Sprintf("backing up a cluster from standby and verifying it exists on the object store, backup path is %v",
 				latestTar), func() {
 				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
@@ -342,7 +346,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				)
 				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return objectstore.CountFiles(objectStoreEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
@@ -351,7 +355,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the standby cluster", func() {
-				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioStandbySampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithObjectStoreStandbySampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -360,19 +364,20 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		// be there
 		It("backs up a cluster from standby with backup target defined in backup", func() {
 			const (
-				targetDBOne                = "test"
-				targetDBTwo                = "test1"
-				targetDBSecret             = "secret_test"
-				testTableName              = "test_table"
-				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-primary.yaml.template"
-				backupWithTargetFile       = fixturesDir + "/backup/minio/backup-minio-override-target.yaml"
+				targetDBOne                      = "test"
+				targetDBTwo                      = "test1"
+				targetDBSecret                   = "secret_test"
+				testTableName                    = "test_table"
+				clusterWithObjectStoreSampleFile = fixturesDir +
+					"/backup/object_store/cluster-with-backup-object-store-primary.yaml.template"
+				backupWithTargetFile = fixturesDir + "/backup/object_store/backup-object-store-override-target.yaml"
 			)
 
-			targetClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
+			targetClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, targetClusterName, clusterWithMinioSampleFile)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, targetClusterName, clusterWithObjectStoreSampleFile)
 
 			// Create required test data
 			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBOne, testTableName)
@@ -388,12 +393,13 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, targetClusterName, targetClusterName)
-			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				namespace, targetClusterName, targetClusterName)
+			latestTar := objectstore.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
-			By(fmt.Sprintf("backing up a cluster from standby (defined in backup file) and verifying it exists on minio,"+
-				" backup path is %v", latestTar), func() {
+			By(fmt.Sprintf("backing up a cluster from standby (defined in backup file) and verifying it exists"+
+				" on the object store, backup path is %v", latestTar), func() {
 				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupWithTargetFile, true,
@@ -401,7 +407,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				)
 				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, targetClusterName)
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return objectstore.CountFiles(objectStoreEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
@@ -410,7 +416,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("deleting the cluster", func() {
-				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithObjectStoreSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -424,18 +430,19 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				targetDBSecret           = "secret_test"
 				testTableName            = "test_table"
 				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml.template"
-				// clusterWithMinioCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
-				clusterWithMinioCustomSampleFile = fixturesDir +
-					"/backup/minio/cluster-with-backup-minio-custom-servername.yaml.template"
-				backupFileCustom  = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
-				clusterServerName = "pg-backup-minio-Custom-Name"
+				// clusterWithObjectStoreCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
+				clusterWithObjectStoreCustomSampleFile = fixturesDir +
+					"/backup/object_store/cluster-with-backup-object-store-custom-servername.yaml.template"
+				backupFileCustom  = fixturesDir + "/backup/object_store/backup-object-store-custom-servername.yaml"
+				clusterServerName = "pg-backup-object-store-Custom-Name"
 			)
 
-			customClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioCustomSampleFile)
+			customClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithObjectStoreCustomSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, customClusterName, clusterWithMinioCustomSampleFile)
+			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, customClusterName,
+				clusterWithObjectStoreCustomSampleFile)
 
 			// Create required test data
 			pgasserts.AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBOne, testTableName)
@@ -451,19 +458,20 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			pgasserts.AssertCreateTestData(env, tableLocator)
 
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, customClusterName, clusterServerName)
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				namespace, customClusterName, clusterServerName)
 
 			// There should be a backup resource and
-			By("backing up a cluster and verifying it exists on minio", func() {
+			By("backing up a cluster and verifying it exists on the object store", func() {
 				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupFileCustom, false,
 					testTimeouts[timeouts.BackupIsReady],
 				)
 				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, customClusterName)
-				latestBaseTar := minio.GetFilePath(clusterServerName, "data.tar")
+				latestBaseTar := objectstore.GetFilePath(clusterServerName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestBaseTar)
+					return objectstore.CountFiles(objectStoreEnv, latestBaseTar)
 				}, 60).Should(BeEquivalentTo(1),
 					fmt.Sprintf("verify the number of backup %v is equals to 1", latestBaseTar))
 				// this is the second backup we take on the bucket
@@ -477,7 +485,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			backupasserts.AssertClusterRestore(env, testTimeouts, namespace, clusterRestoreSampleFile, tableName)
 
 			By("deleting the primary cluster", func() {
-				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithMinioCustomSampleFile)
+				err = resources.DeleteResourcesFromFile(env, namespace, clusterWithObjectStoreCustomSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -490,27 +498,27 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
 		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
 			const scheduledBackupSampleFile = fixturesDir +
-				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-minio.yaml"
+				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-object-store.yaml"
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			backupasserts.AssertScheduledBackupsImmediate(env, namespace, scheduledBackupSampleFile, scheduledBackupName)
-			latestBaseTar := minio.GetFilePath(clusterName, "data.tar")
+			latestBaseTar := objectstore.GetFilePath(clusterName, "data.tar")
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
-				return minio.CountFiles(minioEnv, latestBaseTar)
+				return objectstore.CountFiles(objectStoreEnv, latestBaseTar)
 			}, 60).Should(BeNumerically(">=", 2),
 				fmt.Sprintf("verify the number of backup %v is >= 2", latestBaseTar))
 		})
 
-		It("backs up and restore a cluster with PITR MinIO", func() {
+		It("backs up and restore a cluster with PITR on the object store", func() {
 			const (
-				restoredClusterName = "restore-cluster-pitr-minio"
-				backupFilePITR      = fixturesDir + "/backup/minio/backup-minio-pitr.yaml"
+				restoredClusterName = "restore-cluster-pitr-object-store"
+				backupFilePITR      = fixturesDir + "/backup/object_store/backup-object-store-pitr.yaml"
 			)
 			currentTimestamp := new(string)
-			prepareClusterForPITROnMinio(
+			prepareClusterForPITROnObjectStore(
 				namespace,
 				clusterName,
 				backupFilePITR,
@@ -546,15 +554,15 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		// the amount of backups keeps increasing again
 		It("verifies that scheduled backups can be suspended", func() {
 			const scheduledBackupSampleFile = fixturesDir +
-				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-minio.yaml"
+				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-object-store.yaml"
 			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
 				backupasserts.AssertScheduledBackupsAreScheduled(env, namespace, scheduledBackupSampleFile, 300)
-				latestTar := minio.GetFilePath(clusterName, "data.tar")
+				latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return objectstore.CountFiles(objectStoreEnv, latestTar)
 				}, 60).Should(BeNumerically(">=", 2),
 					fmt.Sprintf("verify the number of backup %v is great than 2", latestTar))
 			})
@@ -563,8 +571,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		It("verify tags in backed files", func() {
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-			tags, err := minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*1.gz"))
+			objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+				namespace, clusterName, clusterName)
+			tags, err := objectstore.GetFileTags(objectStoreEnv, objectstore.GetFilePath(clusterName, "*1.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 
@@ -580,7 +589,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			clusterasserts.AssertNewPrimary(env, namespace, clusterName, oldPrimary)
 
-			tags, err = minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*.history.gz"))
+			tags, err = objectstore.GetFileTags(objectStoreEnv, objectstore.GetFilePath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 		})
@@ -599,28 +608,28 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("create the certificates for the object store", func() {
+				err := objectStoreEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("creating the credentials for minio", func() {
+			By("creating the credentials for the object store", func() {
 				_, err = secrets.CreateObjectStorageSecret(
 					env.Ctx,
 					env.Client,
 					namespace,
 					"backup-storage-creds",
-					"minio",
-					"minio123",
+					objectstore.AccessKeyID,
+					objectstore.SecretAccessKey,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
 		It("protects replicas from downloading future timeline history files", func() {
-			firstClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-1.yaml.template"
-			secondClusterFile := fixturesDir + "/backup/minio/cluster-timeline-divergence-2.yaml.template"
-			backupFile := fixturesDir + "/backup/minio/backup-timeline-test.yaml"
+			firstClusterFile := fixturesDir + "/backup/object_store/cluster-timeline-divergence-1.yaml.template"
+			secondClusterFile := fixturesDir + "/backup/object_store/cluster-timeline-divergence-2.yaml.template"
+			backupFile := fixturesDir + "/backup/object_store/backup-timeline-test.yaml"
 
 			firstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, firstClusterFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -648,11 +657,11 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("verifying timeline 2 history file is archived", func() {
-				minioasserts.AssertArchiveWalOnMinio(
-					env, testTimeouts, minioEnv, namespace, secondClusterName, "shared-timeline-test",
+				objectstoreasserts.AssertArchiveWalOnObjectStore(
+					env, testTimeouts, objectStoreEnv, namespace, secondClusterName, "shared-timeline-test",
 				)
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, minio.GetFilePath("shared-timeline-test", "00000002.history*"))
+					return objectstore.CountFiles(objectStoreEnv, objectstore.GetFilePath("shared-timeline-test", "00000002.history*"))
 				}, 60).Should(BeNumerically(">", 0))
 			})
 
@@ -696,232 +705,236 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 	})
 })
 
-var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tests.LabelBackupRestore), func() {
-	const (
-		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
-		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml.template"
-		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml.template"
-		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml.template"
-		sourceTakeFirstBackupFileMinio  = fixturesBackupDir + "backup-minio-02.yaml"
-		sourceTakeSecondBackupFileMinio = fixturesBackupDir + "backup-minio-03.yaml"
-		sourceTakeThirdBackupFileMinio  = fixturesBackupDir + "backup-minio-04.yaml"
-		tableName                       = "to_restore"
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(tests.High) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
-	// Restore cluster using a recovery object store, that is a backup of another cluster,
-	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
-	Context("using minio as object storage", Ordered, func() {
-		var namespace, clusterName string
-
-		BeforeAll(func() {
-			if !(IsKind() || IsK3D()) {
-				Skip("This test only runs on kind or k3d clusters")
+var _ = Describe("Object storage - Clusters Recovery from Barman Object Store",
+	Label(tests.LabelBackupRestore), func() {
+		const (
+			fixturesBackupDir                     = fixturesDir + "/backup/recovery_external_clusters/"
+			externalClusterFileObjectStoreReplica = fixturesBackupDir + "external-clusters-object-store-replica-04.yaml.template"
+			clusterSourceFileObjectStore          = fixturesBackupDir + "source-cluster-object-store-01.yaml.template"
+			externalClusterFileObjectStore        = fixturesBackupDir + "external-clusters-object-store-03.yaml.template"
+			sourceTakeFirstBackupFileObjectStore  = fixturesBackupDir + "backup-object-store-02.yaml"
+			sourceTakeSecondBackupFileObjectStore = fixturesBackupDir + "backup-object-store-03.yaml"
+			sourceTakeThirdBackupFileObjectStore  = fixturesBackupDir + "backup-object-store-04.yaml"
+			tableName                             = "to_restore"
+		)
+		BeforeEach(func() {
+			if testLevelEnv.Depth < int(tests.High) {
+				Skip("Test depth is lower than the amount requested for this test")
 			}
-			const namespacePrefix = "recovery-barman-object-minio"
-			var err error
-			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterSourceFileMinio)
-			Expect(err).ToNot(HaveOccurred())
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			// Create the cluster
-			clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileMinio)
-
-			By("verify connectivity of barman to minio", func() {
-				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(func() (bool, error) {
-					connectionStatus, err := minio.TestBarmanConnectivity(
-						namespace, clusterName, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
-					return connectionStatus, err
-				}, 60).Should(BeTrue())
-			})
 		})
 
-		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
-			func() {
-				externalClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, externalClusterFileMinio)
+		// Restore cluster using a recovery object store, that is a backup of another cluster,
+		// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
+		Context("using the object store", Ordered, func() {
+			var namespace, clusterName string
+
+			BeforeAll(func() {
+				if !(IsKind() || IsK3D()) {
+					Skip("This test only runs on kind or k3d clusters")
+				}
+				const namespacePrefix = "recovery-barman-object-store"
+				var err error
+				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterSourceFileObjectStore)
+				Expect(err).ToNot(HaveOccurred())
+				// Create a cluster in a namespace we'll delete after the test
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
+				By("creating the credentials for the object store", func() {
+					_, err = secrets.CreateObjectStorageSecret(
+						env.Ctx,
+						env.Client,
+						namespace,
+						"backup-storage-creds",
+						objectstore.AccessKeyID,
+						objectstore.SecretAccessKey,
+					)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("create the certificates for the object store", func() {
+					err := objectStoreEnv.CreateCaSecret(env, namespace)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				// Create the cluster
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, clusterSourceFileObjectStore)
+
+				By("verify connectivity of barman to the object store", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(func() (bool, error) {
+						connectionStatus, err := objectstore.TestBarmanConnectivity(
+							namespace, clusterName, primaryPod.Name,
+							objectstore.AccessKeyID, objectstore.SecretAccessKey, objectStoreEnv.ServiceName)
+						return connectionStatus, err
+					}, 60).Should(BeTrue())
+				})
+			})
+
+			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
+				func() {
+					externalClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, externalClusterFileObjectStore)
+					Expect(err).ToNot(HaveOccurred())
+
+					// Write a table and some data on the "app" database
+					tableLocator := pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    tableName,
+					}
+					pgasserts.AssertCreateTestData(env, tableLocator)
+
+					objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+						namespace, clusterName, clusterName)
+
+					// There should be a backup resource and
+					By("backing up a cluster and verifying it exists on the object store", func() {
+						backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileObjectStore,
+							false,
+							testTimeouts[timeouts.BackupIsReady])
+						backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+
+						// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+						// This should be better handled inside Execute
+						objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+							namespace, clusterName, clusterName)
+
+						latestTar := objectstore.GetFilePath(clusterName, "data.tar")
+						Eventually(func() (int, error) {
+							return objectstore.CountFiles(objectStoreEnv, latestTar)
+						}, 60).Should(BeEquivalentTo(1),
+							fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
+						Eventually(func() (string, error) {
+							cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+							if err != nil {
+								return "", err
+							}
+							return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
+						}, 30).ShouldNot(BeEmpty())
+					})
+
+					// Restoring cluster using a recovery barman object store, which is defined
+					// in the externalClusters section
+					backupasserts.AssertClusterRestore(env, testTimeouts, namespace, externalClusterFileObjectStore, tableName)
+
+					// verify test data on restored external cluster
+					tableLocator = pgasserts.TableLocator{
+						Namespace:    namespace,
+						ClusterName:  externalClusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    tableName,
+					}
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
+
+					By("deleting the restored cluster", func() {
+						err = resources.DeleteResourcesFromFile(env, namespace, externalClusterFileObjectStore)
+						Expect(err).ToNot(HaveOccurred())
+					})
+				})
+
+			It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
+				" option in 'externalClusters' section", func() {
+				externalClusterRestoreName := "restore-external-cluster-pitr"
+
+				currentTimestamp := new(string)
+				// We have already written 2 rows in test table 'to_restore' in above test now we will take current
+				// timestamp. It will use to restore cluster from source using PITR
+				By("getting currentTimestamp", func() {
+					ts, err := postgres.GetCurrentTimestamp(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						namespace, clusterName,
+					)
+					*currentTimestamp = ts
+					Expect(err).ToNot(HaveOccurred())
+				})
+				By(fmt.Sprintf("writing 2 more entries in table '%v'", tableName), func() {
+					forward, conn, err := postgres.ForwardPSQLConnection(
+						env.Ctx,
+						env.Client,
+						env.Interface,
+						env.RestClientConfig,
+						namespace,
+						clusterName,
+						postgres.AppDBName,
+						apiv1.ApplicationUserSecretSuffix,
+					)
+					defer func() {
+						_ = conn.Close()
+						forward.Close()
+					}()
+					Expect(err).ToNot(HaveOccurred())
+					// insert 2 more rows entries 3,4 on the "app" database
+					pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
+				})
+				By("creating second backup and verifying it exists on the object store", func() {
+					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileObjectStore,
+						false,
+						testTimeouts[timeouts.BackupIsReady])
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+					latestTar := objectstore.GetFilePath(clusterName, "data.tar")
+					Eventually(func() (int, error) {
+						return objectstore.CountFiles(objectStoreEnv, latestTar)
+					}, 60).Should(BeEquivalentTo(2),
+						fmt.Sprintf("verify the number of backup %v is equals to 2", latestTar))
+				})
+				var restoredCluster *apiv1.Cluster
+				By("create a cluster from backup with PITR", func() {
+					var err error
+					restoredCluster, err = backups.CreateClusterFromExternalClusterBackupWithPITROnObjectStore(
+						env.Ctx, env.Client,
+						namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
+					Expect(err).NotTo(HaveOccurred())
+				})
+				backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
+					namespace,
+					externalClusterRestoreName,
+					tableName,
+					"00000002")
+
+				By("delete restored cluster", func() {
+					Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
+				})
+			})
+
+			It("restore cluster from barman object using replica option in spec", func() {
 				// Write a table and some data on the "app" database
 				tableLocator := pgasserts.TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
 					DatabaseName: postgres.AppDBName,
-					TableName:    tableName,
+					TableName:    "for_restore_repl",
 				}
 				pgasserts.AssertCreateTestData(env, tableLocator)
 
-				minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+				objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+					namespace, clusterName, clusterName)
 
-				// There should be a backup resource and
-				By("backing up a cluster and verifying it exists on minio", func() {
-					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileMinio,
-						false,
+				By("backing up a cluster and verifying it exists on the object store", func() {
+					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileObjectStore, false,
 						testTimeouts[timeouts.BackupIsReady])
 					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
-
-					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
-					// This should be better handled inside Execute
-					minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-
-					latestTar := minio.GetFilePath(clusterName, "data.tar")
+					latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
-					}, 60).Should(BeEquivalentTo(1),
-						fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
-					Eventually(func() (string, error) {
-						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-						if err != nil {
-							return "", err
-						}
-						return cluster.Status.FirstRecoverabilityPoint, err //nolint:staticcheck
-					}, 30).ShouldNot(BeEmpty())
+						return objectstore.CountFiles(objectStoreEnv, latestTar)
+					}, 60).Should(BeEquivalentTo(3),
+						fmt.Sprintf("verify the number of backup %v is great than 3", latestTar))
 				})
 
-				// Restoring cluster using a recovery barman object store, which is defined
-				// in the externalClusters section
-				backupasserts.AssertClusterRestore(env, testTimeouts, namespace, externalClusterFileMinio, tableName)
-
-				// verify test data on restored external cluster
-				tableLocator = pgasserts.TableLocator{
-					Namespace:    namespace,
-					ClusterName:  externalClusterName,
-					DatabaseName: postgres.AppDBName,
-					TableName:    tableName,
-				}
-				pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
-
-				By("deleting the restored cluster", func() {
-					err = resources.DeleteResourcesFromFile(env, namespace, externalClusterFileMinio)
-					Expect(err).ToNot(HaveOccurred())
-				})
-			})
-
-		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
-			" option in 'externalClusters' section", func() {
-			externalClusterRestoreName := "restore-external-cluster-pitr"
-
-			currentTimestamp := new(string)
-			// We have already written 2 rows in test table 'to_restore' in above test now we will take current
-			// timestamp. It will use to restore cluster from source using PITR
-			By("getting currentTimestamp", func() {
-				ts, err := postgres.GetCurrentTimestamp(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-					namespace, clusterName,
-				)
-				*currentTimestamp = ts
-				Expect(err).ToNot(HaveOccurred())
-			})
-			By(fmt.Sprintf("writing 2 more entries in table '%v'", tableName), func() {
-				forward, conn, err := postgres.ForwardPSQLConnection(
-					env.Ctx,
-					env.Client,
-					env.Interface,
-					env.RestClientConfig,
+				// Replicating a cluster with asynchronous replication
+				AssertClusterAsyncReplica(
 					namespace,
-					clusterName,
-					postgres.AppDBName,
-					apiv1.ApplicationUserSecretSuffix,
+					clusterSourceFileObjectStore,
+					externalClusterFileObjectStoreReplica,
+					"for_restore_repl",
 				)
-				defer func() {
-					_ = conn.Close()
-					forward.Close()
-				}()
-				Expect(err).ToNot(HaveOccurred())
-				// insert 2 more rows entries 3,4 on the "app" database
-				pgasserts.InsertRecordIntoTable(tableName, 3, conn)
-				pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 			})
-			By("creating second backup and verifying it exists on minio", func() {
-				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio,
-					false,
-					testTimeouts[timeouts.BackupIsReady])
-				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
-				latestTar := minio.GetFilePath(clusterName, "data.tar")
-				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
-				}, 60).Should(BeEquivalentTo(2),
-					fmt.Sprintf("verify the number of backup %v is equals to 2", latestTar))
-			})
-			var restoredCluster *apiv1.Cluster
-			By("create a cluster from backup with PITR", func() {
-				var err error
-				restoredCluster, err = backups.CreateClusterFromExternalClusterBackupWithPITROnMinio(
-					env.Ctx, env.Client,
-					namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
-				Expect(err).NotTo(HaveOccurred())
-			})
-			backupasserts.AssertClusterWasRestoredWithPITRAndApplicationDB(env, testTimeouts,
-				namespace,
-				externalClusterRestoreName,
-				tableName,
-				"00000002")
-
-			By("delete restored cluster", func() {
-				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
-			})
-		})
-
-		It("restore cluster from barman object using replica option in spec", func() {
-			// Write a table and some data on the "app" database
-			tableLocator := pgasserts.TableLocator{
-				Namespace:    namespace,
-				ClusterName:  clusterName,
-				DatabaseName: postgres.AppDBName,
-				TableName:    "for_restore_repl",
-			}
-			pgasserts.AssertCreateTestData(env, tableLocator)
-
-			minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
-
-			By("backing up a cluster and verifying it exists on minio", func() {
-				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
-					testTimeouts[timeouts.BackupIsReady])
-				backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
-				latestTar := minio.GetFilePath(clusterName, "data.tar")
-				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
-				}, 60).Should(BeEquivalentTo(3),
-					fmt.Sprintf("verify the number of backup %v is great than 3", latestTar))
-			})
-
-			// Replicating a cluster with asynchronous replication
-			AssertClusterAsyncReplica(
-				namespace,
-				clusterSourceFileMinio,
-				externalClusterFileMinioReplica,
-				"for_restore_repl",
-			)
 		})
 	})
-})
 
-func prepareClusterForPITROnMinio(
+func prepareClusterForPITROnObjectStore(
 	namespace,
 	clusterName,
 	backupSampleFile string,
@@ -930,15 +943,15 @@ func prepareClusterForPITROnMinio(
 ) {
 	const tableNamePitr = "for_restore"
 
-	By("backing up a cluster and verifying it exists on minio", func() {
+	By("backing up a cluster and verifying it exists on the object store", func() {
 		backups.Execute(
 			env.Ctx, env.Client, env.Scheme,
 			namespace, backupSampleFile, false,
 			testTimeouts[timeouts.BackupIsReady],
 		)
-		latestTar := minio.GetFilePath(clusterName, "data.tar")
+		latestTar := objectstore.GetFilePath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
-			return minio.CountFiles(minioEnv, latestTar)
+			return objectstore.CountFiles(objectStoreEnv, latestTar)
 		}, 60).Should(BeNumerically(">=", expectedVal),
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
@@ -985,7 +998,8 @@ func prepareClusterForPITROnMinio(
 
 		pgasserts.InsertRecordIntoTable(tableNamePitr, 3, conn)
 	})
-	minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, clusterName, clusterName)
+	objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+		namespace, clusterName, clusterName)
 	backupasserts.AssertArchiveConditionMet(env, namespace, clusterName, 300)
 	backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
@@ -1057,7 +1071,8 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 
 		// Insert new data in the source cluster
 		pgasserts.InsertRecordIntoTable(tableName, 3, connSource)
-		minioasserts.AssertArchiveWalOnMinio(env, testTimeouts, minioEnv, namespace, sourceClusterName, sourceClusterName)
+		objectstoreasserts.AssertArchiveWalOnObjectStore(env, testTimeouts, objectStoreEnv,
+			namespace, sourceClusterName, sourceClusterName)
 		tableLocator := pgasserts.TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,

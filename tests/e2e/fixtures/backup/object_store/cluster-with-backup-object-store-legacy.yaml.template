@@ -1,7 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: backup-wal-max-parallel
+  name: pg-backup-object-store
+  annotations:
+    cnpg.io/forceLegacyBackup: "true"
 spec:
   instances: 2
 
@@ -35,28 +37,38 @@ spec:
       database: app
       owner: app
 
+  monitoring:
+    customQueriesConfigMap:
+      - name: monitoring-01
+        key: additional-queries
+    customQueriesSecret:
+      - name: monitoring-01
+        key: additional-queries
+
   backup:
     target: primary
     barmanObjectStore:
-      destinationPath: s3://backup-wal-max-parallel/
-      endpointURL: https://minio-service.minio:9000/
-      endpointCA:
-        key: ca.crt
-        name: minio-server-ca-secret
-      s3Credentials:
-        accessKeyId:
-          name: backup-storage-creds
-          key: ID
-        secretAccessKey:
-          name: backup-storage-creds
-          key: KEY
-      wal:
-        maxParallel: 3
-        compression: gzip
-      data:
-        immediateCheckpoint: true
-      tags:
-        retention: "30days"
-      historyTags:
-        retention: "30days"
+        destinationPath: s3://cluster-backups/
+        endpointURL: https://object-store.object-store:9000
+        endpointCA:
+          key: ca.crt
+          name: object-store-ca-secret
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY
+        wal:
+          compression: gzip
+        data:
+          immediateCheckpoint: true
+          additionalCommandArgs:
+            - "--min-chunk-size=5MB"
+            - "--read-timeout=59"
+        tags:
+          retention: "30days"
+        historyTags:
+          retention: "30days"
     retentionPolicy: "30d"

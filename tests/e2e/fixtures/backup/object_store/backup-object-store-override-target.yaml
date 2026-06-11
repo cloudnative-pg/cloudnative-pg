@@ -4,5 +4,5 @@ metadata:
   name: cluster-backup-override
 spec:
   cluster:
-    name: pg-backup-minio-primary
+    name: pg-backup-object-store-primary
   target: prefer-standby
