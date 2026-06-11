@@ -1105,7 +1105,7 @@ var _ = DescribeTable("getPassword test",
 			WithObjects(&secret, &secretNoUser, &secretNoPass, &secretPassthrough).
 			Build()
 		ctx := context.Background()
-		decoded, err := getPassword(ctx, cl, &(roleConfigurationAdapter{RoleConfiguration: *roleConfig}), namespace)
+		decoded, err := getPassword(ctx, cl, roleConfig, namespace)
 		if expectError {
 			Expect(err).To(HaveOccurred())
 		} else {

@@ -533,7 +533,7 @@ func (r *DatabaseRoleReconciler) reconcileRole(ctx context.Context, role *apiv1.
 	dbRole := roles.DatabaseRoleFromConfiguration(role.Spec.RoleConfiguration, validUntilNullIsInfinity)
 
 	passwordVersion, err := dbRole.ApplyPassword(
-		ctx, r.Client, &role.Spec, r.instance.GetNamespaceName(),
+		ctx, r.Client, &role.Spec.RoleConfiguration, r.instance.GetNamespaceName(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("while getting the role password: %w", err)

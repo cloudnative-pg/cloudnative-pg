@@ -303,7 +303,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 ) (apiv1.PasswordState, error) {
 	databaseRole := role.toDatabaseRole()
 	passVersion, err := databaseRole.ApplyPassword(ctx, sr.client,
-		&role, sr.instance.GetNamespaceName())
+		&role.RoleConfiguration, sr.instance.GetNamespaceName())
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}
@@ -337,22 +337,16 @@ type passwordSecret struct {
 	passthrough bool
 }
 
-type passwordManager interface {
-	GetRoleSecretName() string
-	GetRoleName() string
-	ShouldDisablePassword() bool
-}
-
 // getPassword retrieves the password stored in the Kubernetes secret for the
 // RoleConfiguration
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	rolePassword passwordManager,
+	config *apiv1.RoleConfiguration,
 	namespace string,
 ) (passwordSecret, error) {
-	secretName := rolePassword.GetRoleSecretName()
-	// no secrets defined, will keep rolePassword.Password nil
+	secretName := config.GetRoleSecretName()
+	// no secrets defined, will keep the role password nil
 	if secretName == "" {
 		return passwordSecret{}, nil
 	}
@@ -369,9 +363,9 @@ func getPassword(
 	if err != nil {
 		return passwordSecret{}, err
 	}
-	if strings.TrimSpace(rolePassword.GetRoleName()) != strings.TrimSpace(usernameFromSecret) {
+	if strings.TrimSpace(config.Name) != strings.TrimSpace(usernameFromSecret) {
 		return passwordSecret{},
-			fmt.Errorf("the username in secret %q does not match role %q", secretName, rolePassword.GetRoleName())
+			fmt.Errorf("the username in secret %q does not match role %q", secretName, config.Name)
 	}
 	return passwordSecret{
 			username:    strings.TrimSpace(usernameFromSecret),
@@ -398,7 +392,7 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, cl, &roleConfigurationAdapter{RoleConfiguration: role}, namespace)
+		passwordSecret, err := getPassword(ctx, cl, &role, namespace)
 		if err != nil {
 			contextLog.Debug("could not fetch password secret for role; will be flagged for reconciliation",
 				"role", role.Name, "secret", role.PasswordSecret.Name, "err", err.Error())

@@ -422,17 +422,6 @@ func (roleConfiguration *RoleConfiguration) GetRoleSecretName() string {
 	return ""
 }
 
-// GetRoleName gets the name of the role
-func (roleConfiguration *RoleConfiguration) GetRoleName() string {
-	return roleConfiguration.Name
-}
-
-// ShouldDisablePassword determines if the role password should be dropped in
-// the database
-func (roleConfiguration *RoleConfiguration) ShouldDisablePassword() bool {
-	return roleConfiguration.DisablePassword
-}
-
 // GetRoleInherit return the inherit attribute of a roleConfiguration
 func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 	if roleConfiguration.Inherit != nil {

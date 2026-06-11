@@ -138,24 +138,24 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 func (d *DatabaseRole) ApplyPassword(
 	ctx context.Context,
 	cl client.Client,
-	rolePassword passwordManager,
+	config *apiv1.RoleConfiguration,
 	namespace string,
 ) (string, error) {
 	switch {
-	case rolePassword.GetRoleSecretName() == "" && !rolePassword.ShouldDisablePassword():
+	case config.GetRoleSecretName() == "" && !config.DisablePassword:
 		d.ignorePassword = true
 		return "", nil
-	case rolePassword.GetRoleSecretName() == "" && rolePassword.ShouldDisablePassword():
+	case config.GetRoleSecretName() == "" && config.DisablePassword:
 		d.password = sql.NullString{}
 		return "", nil
-	case rolePassword.GetRoleSecretName() != "" && rolePassword.ShouldDisablePassword():
+	case config.GetRoleSecretName() != "" && config.DisablePassword:
 		// For DatabaseRole CRDs this is prevented by CEL validation.
 		// For inline managed roles this is a runtime error.
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				rolePassword.GetRoleSecretName())
+				config.GetRoleSecretName())
 	default:
-		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
+		passwordSecret, err := getPassword(ctx, cl, config, namespace)
 		if err != nil {
 			return "", err
 		}
