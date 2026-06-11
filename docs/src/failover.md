@@ -55,17 +55,52 @@ During the time the failing primary is being shut down:
 
 ## Safe primary election
 
-To guarantee that at most one instance promotes itself to primary at any given
-time, CloudNativePG backs the election described above with a Kubernetes
-`Lease` object, named after the `Cluster` and living in its namespace. An
-instance must acquire and hold this lease before it promotes to primary. On a
-clean shutdown the former primary releases the lease, so an eligible replica
-can take over without waiting for the lease to expire.
+To ensure that at most one instance promotes itself to primary at any
+given time, CloudNativePG backs the election described above with a
+Kubernetes `Lease` object, named after the `Cluster` and living in
+its namespace. An instance must acquire and hold this lease before
+it promotes to primary. On a clean shutdown the former primary
+releases the lease, so an eligible replica can take over without
+waiting for the lease to expire.
 
-This mechanism is independent of the operator's own controller-manager leader
-election, and complements the [primary isolation](instance_manager.md#primary-isolation)
-check performed by the liveness probe: the lease coordinates *who is allowed to
-promote*, while the isolation check fences a primary that has lost connectivity.
+### What the primary lease protects against
+
+Consider a replica catching up by reading WAL files from the archive
+rather than streaming from the previous primary. PostgreSQL stops
+replaying as soon as the archive returns "file not found" for the
+next expected segment, treating it as the end of the WAL stream. If
+a replica promotes while the previous primary still has WAL it has
+not finished archiving, that signal arrives before the true end of
+the stream: the replica forks a new timeline at an LSN earlier than
+the last writes the previous primary acknowledged, and those writes
+are lost.
+
+The lease holds promotion back until the previous primary releases
+it. On a clean shutdown the release happens after PostgreSQL has
+flushed and archived its remaining WAL, so the replica that takes
+over sees the archive at its definitive end. If the previous primary
+cannot release the lease (crash, node failure, or the instance
+manager itself unreachable), the lease expires after
+`leaseDurationSeconds` elapses and the replica can promote. In that
+path the archive may not have caught up, and any writes the previous
+primary did not finish archiving are lost.
+
+### Relationship with the primary isolation check
+
+The lease does not fence a primary that has lost connectivity to the
+Kubernetes API server but is still running; that is the job of the
+[primary isolation](instance_manager.md#primary-isolation) check.
+The two mechanisms are complementary and both are enabled by default:
+
+* The lease prevents *premature* promotion: a replica cannot promote
+  while the former primary still holds the lease.
+* The isolation check stops an *isolated* primary from continuing to
+  accept writes.
+
+Keep both enabled. Disabling the isolation check leaves the lease
+alone responsible for primary safety, and the lease alone cannot
+prevent split-brain when the former primary cannot reach the API
+server but remains otherwise healthy.
 
 ### Inspecting the primary lease
 
@@ -84,8 +119,8 @@ NAME              HOLDER              AGE
 cluster-example   cluster-example-1   5m
 ```
 
-For the full picture — including the lease duration in effect and the last
-renewal time — use:
+For the full picture, including the lease duration in effect and the
+last renewal time, use:
 
 ```sh
 kubectl get lease cluster-example -o yaml
