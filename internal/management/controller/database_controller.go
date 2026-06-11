@@ -185,6 +185,12 @@ func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1
 	if db.Spec.ReclaimPolicy != apiv1.DatabaseReclaimDelete {
 		return nil
 	}
+	// An object that never reconciled does not own the database: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the database owned by the surviving object.
+	if !db.HasReconciliations() {
+		return nil
+	}
 	sqlDB, err := r.getSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)

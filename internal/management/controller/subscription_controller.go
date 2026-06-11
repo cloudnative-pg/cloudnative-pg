@@ -173,6 +173,13 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 		return nil
 	}
 
+	// An object that never reconciled does not own the subscription: a
+	// conflicting duplicate is blocked before applying anything, and its
+	// deletion must not drop the subscription owned by the surviving object.
+	if !sub.HasReconciliations() {
+		return nil
+	}
+
 	db, err := r.getDB(sub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)

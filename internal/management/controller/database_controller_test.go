@@ -204,6 +204,22 @@ var _ = Describe("Managed Database status", func() {
 		})
 	})
 
+	When("reclaim policy is delete but the object never reconciled", func() {
+		It("on deletion it removes finalizers and does NOT drop the DB", func(ctx SpecContext) {
+			// Model the state of a conflicting duplicate: it carries the
+			// finalizer, but the exclusivity check blocked it before it could
+			// apply anything, so it has no recorded reconciliation.
+			database.Finalizers = []string{utils.DatabaseFinalizerName}
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
+			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+
+			// No SQL is expected: dbMock would fail on any statement.
+			err := reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	When("reclaim policy is retain", func() {
 		It("on deletion it removes finalizers and does NOT drop the DB", func(ctx SpecContext) {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
