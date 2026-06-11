@@ -92,6 +92,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
+		// A reconciled publication keeps its status: the cluster may be
+		// gone or unreadable while it is being deleted.
+		if publication.Generation == publication.Status.ObservedGeneration {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &publication, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 

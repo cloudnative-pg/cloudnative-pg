@@ -504,6 +504,27 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(publication.Status.Applied).To(HaveValue(BeTrue()))
 		Expect(publication.Status.ObservedGeneration).NotTo(BeZero())
 	})
+
+	// The cluster-fetch behavior is identical across the three
+	// managed-object controllers, and so are its tests.
+	It("keeps a reconciled publication status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
+		publication.Status.Applied = ptr.To(true)
+		publication.Status.ObservedGeneration = publication.Generation
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.GetNamespace(),
+			Name:      publication.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
+		Expect(publication.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(publication.Status.Message).To(BeEmpty())
+	})
 })
 
 func reconcilePublication(

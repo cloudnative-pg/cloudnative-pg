@@ -121,6 +121,11 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
+		// A reconciled database keeps its status: the cluster may be gone
+		// or unreadable while it is being deleted.
+		if database.Generation == database.Status.ObservedGeneration {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &database, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 

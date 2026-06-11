@@ -596,6 +596,37 @@ var _ = Describe("Managed Database status", func() {
 		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
 	})
 
+	// The cluster-fetch behavior is identical across the three
+	// managed-object controllers, and so are its tests.
+	It("keeps a reconciled database status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
+		database.Status.Applied = ptr.To(true)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.GetNamespace(),
+			Name:      database.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(database), database)).To(Succeed())
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
+	})
+
+	It("marks an unreconciled database as failed when the cluster cannot be fetched", func(ctx SpecContext) {
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(database.Status.Message).To(ContainSubstring("while fetching the cluster"))
+	})
+
 	It("enqueues only the Databases of this instance's cluster on cluster events", func(ctx SpecContext) {
 		mapFn := mapClusterToManagedResources(r.instance, fakeClient,
 			func() client.ObjectList { return &apiv1.DatabaseList{} })

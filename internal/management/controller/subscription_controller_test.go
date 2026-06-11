@@ -503,6 +503,27 @@ var _ = Describe("Managed subscription controller tests", func() {
 		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))
 		Expect(subscription.Status.ObservedGeneration).NotTo(BeZero())
 	})
+
+	// The cluster-fetch behavior is identical across the three
+	// managed-object controllers, and so are its tests.
+	It("keeps a reconciled subscription status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(subscription.Status.Message).To(BeEmpty())
+	})
 })
 
 func reconcileSubscription(
