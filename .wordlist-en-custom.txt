@@ -453,8 +453,6 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
-RoleReclaimDelete
-RoleReclaimRetain
 RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
@@ -827,6 +825,7 @@ dataChecksums
 dataDurability
 databackupconfiguration
 databaseReclaimPolicy
+databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
@@ -1403,11 +1402,9 @@ retryable
 reusePVC
 ro
 robfig
-roleReclaimPolicy
 roleRef
 roleconfiguration
 rolelist
-rolereclaimpolicy
 rolespec
 rolestate
 rolestatus
