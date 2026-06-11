@@ -89,7 +89,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Fetch the Cluster once; shared by shouldReconcile and handleDeletion.
-	cluster, err := r.GetCluster(ctx)
+	cluster, err := getClusterFromInstance(ctx, r.Client, r.instance)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
@@ -435,22 +435,6 @@ func (r *DatabaseRoleReconciler) mapClusterToDatabaseRoles(
 	}
 
 	return requests
-}
-
-// GetCluster gets the managed cluster through the client
-func (r *DatabaseRoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.GetNamespaceName(),
-			Name:      r.instance.GetClusterName(),
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
 }
 
 // isClusterManagingRole checks if the given role is already managed by the
