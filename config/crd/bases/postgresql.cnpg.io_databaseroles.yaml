@@ -99,6 +99,13 @@ spec:
                   on, change the security label for, and grant or revoke membership in
                   other roles. Default is `false`.
                 type: boolean
+              databaseRoleReclaimPolicy:
+                default: retain
+                description: The policy for end-of-life maintenance of this role
+                enum:
+                - delete
+                - retain
+                type: string
               disablePassword:
                 description: DisablePassword indicates that a role's password should
                   be set to NULL in Postgres
@@ -159,13 +166,6 @@ spec:
                   should only be used on roles actually used for replication. Default
                   is `false`.
                 type: boolean
-              roleReclaimPolicy:
-                default: retain
-                description: The policy for end-of-life maintenance of this role
-                enum:
-                - delete
-                - retain
-                type: string
               superuser:
                 description: |-
                   Whether the role is a `superuser` who can override all access
@@ -189,7 +189,7 @@ spec:
             - message: cluster is immutable
               rule: self.cluster == oldSelf.cluster
             - message: 'ensure: absent is not supported for DatabaseRole; delete the
-                resource with roleReclaimPolicy: delete instead'
+                resource with databaseRoleReclaimPolicy: delete instead'
               rule: '!has(self.ensure) || self.ensure != ''absent'''
             - message: the role name postgres is reserved
               rule: self.name != 'postgres'

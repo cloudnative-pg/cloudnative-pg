@@ -1027,7 +1027,7 @@ spec:
         - path: cluster
           displayName: Cluster requested to create the role
           description: Cluster in which to create the role
-        - path: roleReclaimPolicy
+        - path: databaseRoleReclaimPolicy
           displayName: Role reclaim policy
           description: Specifies the action to take for the role inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the role or retain it for future management.
         - path: passwordSecret.name

@@ -20,4 +20,4 @@ spec:
   inRoles:
     - pg_monitor
     - pg_signal_backend
-  roleReclaimPolicy: delete
+  databaseRoleReclaimPolicy: delete

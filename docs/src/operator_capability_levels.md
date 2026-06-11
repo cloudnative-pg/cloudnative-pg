@@ -204,7 +204,7 @@ CloudNativePG supports
 through two declarative methods:
 
 - The `DatabaseRole` CRD (Recommended): A standalone resource for granular lifecycle
-  management. It includes a `roleReclaimPolicy` (supporting `retain` or
+  management. It includes a `databaseRoleReclaimPolicy` (supporting `retain` or
   `delete`) to define whether the database role should be dropped when the
   Kubernetes resource is removed.
 

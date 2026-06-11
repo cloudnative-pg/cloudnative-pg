@@ -120,11 +120,11 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// ensure: absent is not supported for DatabaseRole CRDs. Users should
-	// delete the K8s object with roleReclaimPolicy: delete instead.
+	// delete the K8s object with databaseRoleReclaimPolicy: delete instead.
 	if role.Spec.Ensure == apiv1.EnsureAbsent {
 		return r.failedReconciliation(ctx, &role, fmt.Errorf(
 			"ensure: absent is not supported for DatabaseRole;"+
-				" delete the resource with roleReclaimPolicy: delete instead"))
+				" delete the resource with databaseRoleReclaimPolicy: delete instead"))
 	}
 
 	if res, err := detectConflictingManagers(ctx, r.Client, &role, &apiv1.DatabaseRoleList{}); err != nil ||

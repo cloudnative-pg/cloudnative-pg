@@ -41,7 +41,7 @@ A few points are worth noting:
     The two possible values are `present` (the default) and `absent`.
     Note: `ensure: absent` is only supported for
     [inline managed roles](#inline-managed-roles). For `DatabaseRole` CRDs,
-    delete the Kubernetes resource with `roleReclaimPolicy: delete` instead.
+    delete the Kubernetes resource with `databaseRoleReclaimPolicy: delete` instead.
 2.  The `inherit` attribute is true by default, following PostgreSQL
     conventions.
 3.  The `connectionLimit` attribute defaults to -1, in line with PostgreSQL
@@ -85,7 +85,7 @@ spec:
   login: true
   superuser: false
   createdb: true
-  roleReclaimPolicy: delete
+  databaseRoleReclaimPolicy: delete
   inRoles:
     - pg_monitor
   passwordSecret:
@@ -97,7 +97,7 @@ An example manifest for a role definition can be found in the file
 
 ### Role Reclaim Policy
 
-The `roleReclaimPolicy` field defines the "final act" of the operator when a
+The `databaseRoleReclaimPolicy` field defines the "final act" of the operator when a
 `DatabaseRole` Custom Resource is removed from the Kubernetes API.
 This mirrors the behavior of Kubernetes Persistent Volumes.
 
@@ -120,7 +120,7 @@ deletion complete.
 
 How you remove a role depends on how it was created:
 
-- **Created through a `DatabaseRole`:** set `roleReclaimPolicy: delete` and delete
+- **Created through a `DatabaseRole`:** set `databaseRoleReclaimPolicy: delete` and delete
   the Custom Resource; the operator then drops the role (subject to the note
   above). With the default `retain`, deleting the resource leaves the role in
   place.
