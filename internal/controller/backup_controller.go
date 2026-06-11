@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"reflect"
@@ -77,9 +78,10 @@ type BackupReconciler struct {
 	client.Client
 	DiscoveryClient discovery.DiscoveryInterface
 
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Plugins  repository.Interface
+	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
+	Plugins            repository.Interface
+	OperatorClientCert *tls.Certificate
 
 	instanceStatusClient remote.InstanceClient
 	vsr                  *volumesnapshot.Reconciler
@@ -90,6 +92,7 @@ func NewBackupReconciler(
 	mgr manager.Manager,
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
+	operatorClientCert *tls.Certificate,
 ) *BackupReconciler {
 	cli := mgr.GetClient()
 	recorder := mgr.GetEventRecorderFor("cloudnative-pg-backup") //nolint:staticcheck
@@ -98,6 +101,7 @@ func NewBackupReconciler(
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             recorder,
+		OperatorClientCert:   operatorClientCert,
 		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
 		vsr:                  volumesnapshot.NewReconcilerBuilder(cli, recorder).Build(),
@@ -170,12 +174,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug("Found cluster for backup", "cluster", cluster.Name)
 
-	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err = certs.NewTLSConfigForContext(
-		ctx,
-		r.Client,
-		cluster.GetServerCASecretObjectKey(),
-	)
+	// Store in the context the TLS configuration required communicating with the Pods.
+	// The operator client certificate is presented to authenticate with the instance manager.
+	ctx, err = certs.NewTLSConfigForContext(ctx, certs.TLSConfigOptions{
+		Client:     r.Client,
+		CASecret:   cluster.GetServerCASecretObjectKey(),
+		ClientCert: r.OperatorClientCert,
+	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
