@@ -450,7 +450,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 	// The demotion behavior is identical across the three managed-object
 	// controllers, and so are its tests.
-	It("voids the recorded reconciliation when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
 		subscription.Status.Applied = ptr.To(true)
 		subscription.Status.ObservedGeneration = subscription.Generation
 		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
@@ -471,7 +471,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
 		Expect(subscription.Status.Applied).To(BeNil())
 		Expect(subscription.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
-		Expect(subscription.Status.ObservedGeneration).To(BeZero())
+		// the recorded reconciliation is kept, so the subscription retains
+		// the ownership of the managed Postgres subscription
+		Expect(subscription.Status.ObservedGeneration).To(Equal(subscription.Generation))
 	})
 
 	It("keeps an applied subscription untouched on pods other than the designated primary", func(ctx SpecContext) {
@@ -493,7 +495,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 			Name:      subscription.GetName(),
 		}})
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(ctrl.Result{}))
+		// the demotion may be racing a failover: poll until the designated
+		// primary has reported the replica condition
+		Expect(result.RequeueAfter).To(Equal(subscriptionReconciliationInterval))
 
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
 		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))

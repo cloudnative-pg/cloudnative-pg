@@ -451,7 +451,7 @@ var _ = Describe("Managed publication controller tests", func() {
 
 	// The demotion behavior is identical across the three managed-object
 	// controllers, and so are its tests.
-	It("voids the recorded reconciliation when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
 		publication.Status.Applied = ptr.To(true)
 		publication.Status.ObservedGeneration = publication.Generation
 		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
@@ -472,7 +472,9 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
 		Expect(publication.Status.Applied).To(BeNil())
 		Expect(publication.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
-		Expect(publication.Status.ObservedGeneration).To(BeZero())
+		// the recorded reconciliation is kept, so the publication retains
+		// the ownership of the managed Postgres publication
+		Expect(publication.Status.ObservedGeneration).To(Equal(publication.Generation))
 	})
 
 	It("keeps an applied publication untouched on pods other than the designated primary", func(ctx SpecContext) {
@@ -494,7 +496,9 @@ var _ = Describe("Managed publication controller tests", func() {
 			Name:      publication.GetName(),
 		}})
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(ctrl.Result{}))
+		// the demotion may be racing a failover: poll until the designated
+		// primary has reported the replica condition
+		Expect(result.RequeueAfter).To(Equal(publicationReconciliationInterval))
 
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
 		Expect(publication.Status.Applied).To(HaveValue(BeTrue()))

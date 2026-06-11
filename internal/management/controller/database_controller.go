@@ -126,19 +126,14 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// If everything is reconciled, we're done here
 	if database.Generation == database.Status.ObservedGeneration {
-		// ...unless the cluster was demoted to a replica after the database
-		// was applied: report the replica condition and void the recorded
-		// reconciliation, so the database is evaluated again once the
-		// cluster is promoted back to primary.
-		if database.DeletionTimestamp.IsZero() &&
-			cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
-			cluster.IsReplica() {
-			if err := markAsUnknownAndForget(ctx, r.Client, &database, errClusterIsReplica); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		// ...unless the cluster moved in or out of the replica role after
+		// the database was applied: report the demotion on the status, and
+		// evaluate the database again after the promotion.
+		result, proceed, err := handleReplicaRoleTransition(
+			ctx, r.Client, r.instance, cluster, &database, databaseReconciliationInterval)
+		if err != nil || !proceed {
+			return result, err
 		}
-		return ctrl.Result{}, nil
 	}
 
 	contextLogger.Info("Reconciling database")

@@ -86,24 +86,57 @@ func markAsUnknown(
 	return cli.Status().Update(ctx, resource)
 }
 
-type markableAsUnknownAndForgettable interface {
+type replicaTransitionAware interface {
 	markableAsUnknown
-	SetStatusObservedGeneration(obsGeneration int64)
+	GetStatusApplied() *bool
 }
 
-// markAsUnknownAndForget reports the replica condition on an object that was
-// applied before its cluster was demoted, and voids the recorded
-// reconciliation so the object is evaluated again once the cluster is
-// promoted back to primary.
-func markAsUnknownAndForget(
+// handleReplicaRoleTransition decides what to do with a resource whose
+// current generation has already been reconciled, reacting to its cluster
+// moving in or out of the replica role.
+//
+// When the cluster is demoted, the designated primary reports the replica
+// condition on the resource, keeping the recorded reconciliation so the
+// resource retains the ownership of the Postgres object it manages. When the
+// cluster is promoted back (or the last evaluation didn't succeed), it asks
+// the caller to evaluate the resource again by returning proceed=true; the
+// regular reconciliation flow then decides which pod acts.
+func handleReplicaRoleTransition(
 	ctx context.Context,
 	cli client.Client,
-	resource markableAsUnknownAndForgettable,
-	err error,
-) error {
-	resource.SetAsUnknown(err)
-	resource.SetStatusObservedGeneration(0)
-	return cli.Status().Update(ctx, resource)
+	instance instanceInterface,
+	cluster *apiv1.Cluster,
+	resource replicaTransitionAware,
+	requeueAfter time.Duration,
+) (result ctrl.Result, proceed bool, err error) {
+	if !resource.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, false, nil
+	}
+
+	applied := resource.GetStatusApplied()
+
+	if !cluster.IsReplica() {
+		proceed := applied == nil || !*applied
+		return ctrl.Result{}, proceed, nil
+	}
+
+	isDesignatedPrimary := cluster.Status.CurrentPrimary == instance.GetPodName()
+
+	if isDesignatedPrimary && applied != nil {
+		if err := markAsUnknown(ctx, cli, resource, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, false, err
+		}
+	}
+
+	// Keep polling while the designated primary awaits the promotion, or
+	// while the primary recorded in the cluster status is still settling
+	// (e.g. a failover concurrent with the demotion): status-only updates
+	// don't retrigger the cluster watch.
+	if isDesignatedPrimary || applied != nil {
+		return ctrl.Result{RequeueAfter: requeueAfter}, false, nil
+	}
+
+	return ctrl.Result{}, false, nil
 }
 
 type markableAsReady interface {

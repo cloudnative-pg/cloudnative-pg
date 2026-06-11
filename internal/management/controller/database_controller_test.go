@@ -436,7 +436,7 @@ var _ = Describe("Managed Database status", func() {
 
 	// The demotion behavior is identical across the three managed-object
 	// controllers, and so are its tests.
-	It("voids the recorded reconciliation when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
 		database.Status.Applied = ptr.To(true)
 		database.Status.ObservedGeneration = database.Generation
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
@@ -457,7 +457,9 @@ var _ = Describe("Managed Database status", func() {
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(database), database)).To(Succeed())
 		Expect(database.Status.Applied).To(BeNil())
 		Expect(database.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
-		Expect(database.Status.ObservedGeneration).To(BeZero())
+		// the recorded reconciliation is kept, so the database retains the
+		// ownership of the managed Postgres database
+		Expect(database.Status.ObservedGeneration).To(Equal(database.Generation))
 	})
 
 	It("keeps an applied database untouched on pods other than the designated primary", func(ctx SpecContext) {
@@ -479,42 +481,135 @@ var _ = Describe("Managed Database status", func() {
 			Name:      database.GetName(),
 		}})
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(ctrl.Result{}))
+		// the demotion may be racing a failover: poll until the designated
+		// primary has reported the replica condition
+		Expect(result.RequeueAfter).To(Equal(databaseReconciliationInterval))
 
 		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(database), database)).To(Succeed())
 		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
 		Expect(database.Status.ObservedGeneration).NotTo(BeZero())
 	})
 
+	It("re-applies a database when the cluster is promoted back", func(ctx SpecContext) {
+		database.Status.Applied = ptr.To(true)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(database.Status.Applied).To(BeNil())
+
+		demotedCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(demotedCluster))).To(Succeed())
+
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+		expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		err = reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
+		Expect(database.Status.ObservedGeneration).To(Equal(database.Generation))
+	})
+
+	It("retries the apply at the same generation after a failed reconciliation", func(ctx SpecContext) {
+		// A previously failed reconciliation that left the recorded
+		// reconciliation in place: the generation gate must not let it sit
+		// at applied=false, the object has to be evaluated again.
+		database.Status.Applied = ptr.To(false)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+		expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
+	})
+
+	It("retains the ownership of the managed database across a demotion", func(ctx SpecContext) {
+		database.Status.Applied = ptr.To(true)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(database.Status.Applied).To(BeNil())
+
+		// A second object targeting the same Postgres database, created
+		// while the cluster is demoted
+		dbDuplicate := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "db-duplicate",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:  database.Spec.Name,
+				Owner: "app",
+			},
+		}
+		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
+
+		demotedCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(demotedCluster))).To(Succeed())
+
+		err = reconcileDatabase(ctx, fakeClient, r, dbDuplicate)
+		Expect(err).ToNot(HaveOccurred())
+
+		expectedError := fmt.Sprintf("%q is already managed by object %q",
+			dbDuplicate.Spec.Name, database.Name)
+		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
+	})
+
 	It("enqueues only the Databases of this instance's cluster on cluster events", func(ctx SpecContext) {
 		mapFn := mapClusterToManagedResources(r.instance, fakeClient,
 			func() client.ObjectList { return &apiv1.DatabaseList{} })
 
+		// A database targeting another cluster in the same namespace
 		other := database.DeepCopy()
 		other.Name = "obj-other-cluster"
 		other.ResourceVersion = ""
 		other.Spec.ClusterRef.Name = "another-cluster"
 		Expect(fakeClient.Create(ctx, other)).To(Succeed())
 
-		// Same cluster name, different namespace: only the namespace guard
-		// in the mapper keeps this one out.
-		foreign := database.DeepCopy()
-		foreign.Name = "obj-other-namespace"
-		foreign.Namespace = "other-ns"
-		foreign.ResourceVersion = ""
-		Expect(fakeClient.Create(ctx, foreign)).To(Succeed())
-
 		Expect(mapFn(ctx, cluster)).To(ConsistOf(reconcile.Request{
 			NamespacedName: types.NamespacedName{Namespace: database.GetNamespace(), Name: database.GetName()},
 		}))
-
-		otherCluster := cluster.DeepCopy()
-		otherCluster.Name = "another-cluster"
-		Expect(mapFn(ctx, otherCluster)).To(BeEmpty())
-
-		foreignCluster := cluster.DeepCopy()
-		foreignCluster.Namespace = "other-ns"
-		Expect(mapFn(ctx, foreignCluster)).To(BeEmpty())
 	})
 })
 

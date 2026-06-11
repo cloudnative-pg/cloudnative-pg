@@ -91,19 +91,14 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// If everything is reconciled, we're done here
 	if subscription.Generation == subscription.Status.ObservedGeneration {
-		// ...unless the cluster was demoted to a replica after the
-		// subscription was applied: report the replica condition and void
-		// the recorded reconciliation, so the subscription is evaluated
-		// again once the cluster is promoted back to primary.
-		if subscription.DeletionTimestamp.IsZero() &&
-			cluster.Status.CurrentPrimary == r.instance.GetPodName() &&
-			cluster.IsReplica() {
-			if err := markAsUnknownAndForget(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
+		// ...unless the cluster moved in or out of the replica role after
+		// the subscription was applied: report the demotion on the status,
+		// and evaluate the subscription again after the promotion.
+		result, proceed, err := handleReplicaRoleTransition(
+			ctx, r.Client, r.instance, cluster, &subscription, subscriptionReconciliationInterval)
+		if err != nil || !proceed {
+			return result, err
 		}
-		return ctrl.Result{}, nil
 	}
 
 	// Still not for me, we're waiting for a switchover
