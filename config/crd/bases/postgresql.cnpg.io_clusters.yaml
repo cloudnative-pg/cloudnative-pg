@@ -3300,6 +3300,8 @@ spec:
                           description: |-
                             List of one or more existing roles to which this role will be
                             immediately added as a new member. Default empty.
+                            Changes to the list are applied to an existing role through
+                            `GRANT` and `REVOKE` statements, not only at role creation.
                           items:
                             type: string
                           type: array

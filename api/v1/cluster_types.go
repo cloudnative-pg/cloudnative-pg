@@ -2599,6 +2599,8 @@ type RoleConfiguration struct {
 
 	// List of one or more existing roles to which this role will be
 	// immediately added as a new member. Default empty.
+	// Changes to the list are applied to an existing role through
+	// `GRANT` and `REVOKE` statements, not only at role creation.
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
 
