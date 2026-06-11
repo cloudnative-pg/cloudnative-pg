@@ -792,6 +792,7 @@ jobs:
         name: Run Kind End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run:
           make e2e-test-kind
       -
@@ -988,6 +989,7 @@ jobs:
       - name: Run K3D End-to-End tests
         env:
           ENABLE_APISERVER_AUDIT: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           make e2e-test-k3d
       - # Summarize the failed E2E test cases if there are any
