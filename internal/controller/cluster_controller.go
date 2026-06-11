@@ -73,7 +73,7 @@ const (
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
-	roleKey                       = ".spec.cluster.name"
+	databaseRoleClusterKey        = ".spec.cluster.name"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
@@ -1423,7 +1423,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&apiv1.DatabaseRole{},
-		roleKey,
+		databaseRoleClusterKey,
 		func(rawObj client.Object) []string {
 			role := rawObj.(*apiv1.DatabaseRole)
 			if role.Spec.ClusterRef.Name == "" {

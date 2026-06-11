@@ -524,8 +524,8 @@ func managedRolesSecrets(cluster *apiv1.Cluster) []string {
 func customResourceRolesSecrets(roles []apiv1.DatabaseRole) []string {
 	result := make([]string, 0, len(roles))
 
-	for _, r := range roles {
-		if secretName := crdRoleSecretName(r); secretName != "" {
+	for i := range roles {
+		if secretName := crdRoleSecretName(&roles[i]); secretName != "" {
 			result = append(result, secretName)
 		}
 	}
@@ -533,7 +533,7 @@ func customResourceRolesSecrets(roles []apiv1.DatabaseRole) []string {
 	return result
 }
 
-func crdRoleSecretName(role apiv1.DatabaseRole) string {
+func crdRoleSecretName(role *apiv1.DatabaseRole) string {
 	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
 		return ""
 	}

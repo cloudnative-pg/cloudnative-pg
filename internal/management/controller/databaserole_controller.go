@@ -451,8 +451,8 @@ func isClusterManagingRole(cluster *apiv1.Cluster, roleName string) bool {
 		return false
 	}
 
-	for _, role := range cluster.Spec.Managed.Roles {
-		if role.Name == roleName {
+	for i := range cluster.Spec.Managed.Roles {
+		if cluster.Spec.Managed.Roles[i].Name == roleName {
 			return true
 		}
 	}

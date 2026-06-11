@@ -388,14 +388,14 @@ var _ = Describe("CRD database role secret name", func() {
 				},
 			},
 		}
-		secrets := crdRoleSecretName(role)
+		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret is nil", func() {
 		role := apiv1.DatabaseRole{
 			Spec: apiv1.DatabaseRoleSpec{},
 		}
-		secrets := crdRoleSecretName(role)
+		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should be empty when password secret name is empty", func() {
@@ -406,7 +406,7 @@ var _ = Describe("CRD database role secret name", func() {
 				},
 			},
 		}
-		secrets := crdRoleSecretName(role)
+		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeEmpty())
 	})
 	It("should work properly when the password secret name is set", func() {
@@ -419,7 +419,7 @@ var _ = Describe("CRD database role secret name", func() {
 				},
 			},
 		}
-		secrets := crdRoleSecretName(role)
+		secrets := crdRoleSecretName(&role)
 		Expect(secrets).To(BeIdenticalTo("secret-name"))
 	})
 })

@@ -188,14 +188,14 @@ func (r *DatabaseRoleReconciler) mapSecretToRole() handler.MapFunc {
 
 // getRolesUsingSecret get a list of roles which are using the passed secret
 func getRolesUsingSecret(roles apiv1.DatabaseRoleList, secret *corev1.Secret) (requests []types.NamespacedName) {
-	for _, role := range roles.Items {
+	for i := range roles.Items {
+		role := &roles.Items[i]
 		if role.Spec.PasswordSecret != nil && role.Spec.PasswordSecret.Name == secret.Name {
 			requests = append(requests,
 				types.NamespacedName{
 					Name:      role.Name,
 					Namespace: role.Namespace,
 				})
-			continue
 		}
 	}
 	return requests

@@ -757,7 +757,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		&roleList,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingFields{
-			roleKey: cluster.Name,
+			databaseRoleClusterKey: cluster.Name,
 		},
 	); err != nil {
 		return fmt.Errorf("while listing database roles: %w", err)
