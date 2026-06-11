@@ -49,7 +49,6 @@ const (
 
 // DatabaseRoleSpec represents a role in Postgres
 // +kubebuilder:validation:XValidation:rule="self.name == oldSelf.name",message="name is immutable"
-// +kubebuilder:validation:XValidation:rule="self.cluster == oldSelf.cluster",message="cluster is immutable"
 // +kubebuilder:validation:XValidation:rule="!has(self.ensure) || self.ensure != 'absent'",message="ensure: absent is not supported for DatabaseRole; delete the resource with databaseRoleReclaimPolicy: delete instead"
 // +kubebuilder:validation:XValidation:rule="self.name != 'postgres'",message="the role name postgres is reserved"
 // +kubebuilder:validation:XValidation:rule="self.name != 'streaming_replica'",message="the role name streaming_replica is reserved"
@@ -63,6 +62,7 @@ type DatabaseRoleSpec struct {
 	RoleConfiguration `json:",inline"`
 
 	// The corresponding cluster
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="cluster reference is immutable after creation"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
 	// The policy for end-of-life maintenance of this role

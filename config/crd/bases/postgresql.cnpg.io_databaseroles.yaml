@@ -77,6 +77,9 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: cluster reference is immutable after creation
+                  rule: self == oldSelf
               comment:
                 description: Description of the role
                 type: string
@@ -186,8 +189,6 @@ spec:
             x-kubernetes-validations:
             - message: name is immutable
               rule: self.name == oldSelf.name
-            - message: cluster is immutable
-              rule: self.cluster == oldSelf.cluster
             - message: 'ensure: absent is not supported for DatabaseRole; delete the
                 resource with databaseRoleReclaimPolicy: delete instead'
               rule: '!has(self.ensure) || self.ensure != ''absent'''
