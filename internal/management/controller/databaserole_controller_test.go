@@ -288,6 +288,25 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		Expect(got.Status.ObservedGeneration).To(BeZero())
 	})
 
+	It("voids the recorded reconciliation when the cluster is demoted after a successful apply", func() {
+		role := newTestDatabaseRole()
+		markReconciled(role)
+		role.Status.Applied = ptr.To(true)
+		cluster := newTestCluster()
+		makeReplica(cluster)
+		r := reconcilerFor(role)
+
+		result, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(requeue))
+
+		got := &apiv1.DatabaseRole{}
+		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Applied).To(BeNil())
+		Expect(got.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
+		Expect(got.Status.ObservedGeneration).To(BeZero())
+	})
+
 	It("persists Applied=Unknown (nil) on a replica cluster", func() {
 		role := newTestDatabaseRole()
 		role.Status.Applied = ptr.To(true)
