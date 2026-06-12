@@ -148,7 +148,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 "+
 			"PASSWORD '%s' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name, wantedRolePassword)
-	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
+	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", unWantedRole.Name)
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {

@@ -53,39 +53,47 @@ func roleAdapterFromName(name string) roleConfigurationAdapter {
 }
 
 // toDatabaseRole converts the contained apiv1.RoleConfiguration into the equivalent DatabaseRole
-//
-// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
-// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
 func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
+	return DatabaseRoleFromConfiguration(role.RoleConfiguration, role.validUntilNullIsInfinity)
+}
+
+// DatabaseRoleFromConfiguration builds the DatabaseRole equivalent of a RoleConfiguration.
+// When validUntilNullIsInfinity is true, a nil ValidUntil is translated to
+// VALID UNTIL 'infinity', because PostgreSQL cannot restore a NULL ValidUntil
+// once it has been changed.
+//
+// NOTE: for passwords, the default behavior, if the RoleConfiguration neither
+// provides a PasswordSecret nor sets DisablePassword, is to IGNORE the password.
+func DatabaseRoleFromConfiguration(config apiv1.RoleConfiguration, validUntilNullIsInfinity bool) DatabaseRole {
 	dbRole := DatabaseRole{
-		Name:            role.Name,
-		Comment:         role.Comment,
-		Superuser:       role.Superuser,
-		CreateDB:        role.CreateDB,
-		CreateRole:      role.CreateRole,
-		Inherit:         role.GetRoleInherit(),
-		Login:           role.Login,
-		Replication:     role.Replication,
-		BypassRLS:       role.BypassRLS,
-		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
+		Name:            config.Name,
+		Comment:         config.Comment,
+		Superuser:       config.Superuser,
+		CreateDB:        config.CreateDB,
+		CreateRole:      config.CreateRole,
+		Inherit:         config.GetRoleInherit(),
+		Login:           config.Login,
+		Replication:     config.Replication,
+		BypassRLS:       config.BypassRLS,
+		ConnectionLimit: config.ConnectionLimit,
+		InRoles:         config.InRoles,
 	}
 	switch {
-	case role.ValidUntil != nil:
+	case config.ValidUntil != nil:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid: true,
-			Time:  role.ValidUntil.Time,
+			Time:  config.ValidUntil.Time,
 		}
-	case role.ValidUntil == nil && role.validUntilNullIsInfinity:
+	case config.ValidUntil == nil && validUntilNullIsInfinity:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid:            true,
 			InfinityModifier: pgtype.Infinity,
 		}
 	}
 	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
+	case config.PasswordSecret == nil && !config.DisablePassword:
 		dbRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
+	case config.PasswordSecret == nil && config.DisablePassword:
 		dbRole.password = sql.NullString{}
 	}
 	return dbRole

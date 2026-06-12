@@ -73,6 +73,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Database{}, &DatabaseList{},
 		&FailoverQuorum{}, &FailoverQuorumList{},
 		&ImageCatalog{}, &ImageCatalogList{},
+		&DatabaseRole{}, &DatabaseRoleList{},
 
 		// Util types
 		&Pooler{}, &PoolerList{},

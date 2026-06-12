@@ -197,6 +197,22 @@ var _ = Describe("DatabaseRole implementation test", func() {
 		Expect(res).To(BeTrue())
 	})
 
+	It("translates a removed validUntil to infinity when the role already had one", func() {
+		role := roleConfigurationAdapter{
+			RoleConfiguration:        apiv1.RoleConfiguration{Name: "foo"},
+			validUntilNullIsInfinity: true,
+		}.toDatabaseRole()
+		Expect(role.ValidUntil.Valid).To(BeTrue())
+		Expect(role.ValidUntil.InfinityModifier).To(Equal(pgtype.Infinity))
+	})
+
+	It("leaves a removed validUntil unset when the role had none", func() {
+		role := roleConfigurationAdapter{
+			RoleConfiguration: apiv1.RoleConfiguration{Name: "foo"},
+		}.toDatabaseRole()
+		Expect(role.ValidUntil.Valid).To(BeFalse())
+	})
+
 	It("should return Correct Role to grant/revoke", func() {
 		rolesInDB := []string{"role1", "DBRole1", "DBRoleABC"}
 		rolesInSpec := []string{"role1", "role2", "roleabc"}

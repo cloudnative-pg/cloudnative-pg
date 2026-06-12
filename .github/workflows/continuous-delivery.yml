@@ -20,8 +20,8 @@ on:
         default: '4'
       feature_type:
         description: >
-          Feature Type (backup-restore, basic, cluster-metadata, declarative-databases, disruptive,
-          image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
+          Feature Type (backup-restore, basic, cluster-metadata, declarative-database-roles, declarative-databases,
+          disruptive, image-volume-extensions, importing-databases, maintenance, no-openshift, observability, operator,
           performance, plugin, pod-scheduling, postgres-configuration, postgres-major-upgrade, publication-subscription,
           recovery, replication, security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces,
           upgrade)

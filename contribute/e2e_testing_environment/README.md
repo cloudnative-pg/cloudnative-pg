@@ -242,6 +242,7 @@ type provided.
 | `tablespaces`                     |
 | `publication-subscription`        |
 | `declarative-databases`           |
+| `declarative-database-roles`      |
 | `postgres-major-upgrade`          |
 | `image-volume-extensions`         |
 

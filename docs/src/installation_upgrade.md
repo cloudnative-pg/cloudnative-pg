@@ -276,6 +276,13 @@ only the operator itself.
     (e.g., 1.29.2).
 :::
 
+Versions 1.30.0 and 1.29.2 introduce three changes worth reviewing before you
+upgrade: operator-side password encoding, `search_path` hardening, and the new
+`DatabaseRole` resource for declarative role management. Each is covered in its
+own subsection below.
+
+#### Operator-side password encoding
+
 Starting from versions 1.30.0 and 1.29.2, for security reasons,
 CloudNativePG SCRAM-SHA-256 encodes role passwords **operator-side**
 (client-side from PostgreSQL's point of view) before issuing
@@ -317,6 +324,8 @@ according to its own `password_encryption` GUC.
 See ["Opting out of operator-side encoding"](declarative_role_management.md#opting-out-of-operator-side-encoding)
 for details.
 
+#### `search_path` hardening
+
 Also starting from versions 1.30.0 and 1.29.2, for security reasons,
 CloudNativePG pins the `search_path` to a fixed `pg_catalog, public,
 pg_temp` on every connection it opens to PostgreSQL, so that a
@@ -336,6 +345,28 @@ them (for example `myschema.mytable`) so they keep resolving after the
 upgrade. User-authored bootstrap (`postInit*`) and logical-import
 post-import SQL are unaffected: they continue to run with the standard
 `"$user", public` resolution.
+
+#### Declarative role management with the `DatabaseRole` resource
+
+Starting from version 1.30.0, you can also manage a PostgreSQL role as a
+standalone [`DatabaseRole`](declarative_role_management.md) resource instead
+of declaring it inline in the Cluster's `.spec.managed.roles` stanza. This is
+an opt-in enhancement and requires no action on upgrade: existing inline roles
+keep working unchanged, and the inline `managed.roles` method remains fully
+supported.
+
+To move an existing inline role under a `DatabaseRole` without disruption,
+create the `DatabaseRole` first and only then remove the matching entry from
+`.spec.managed.roles`. While both exist the Cluster spec always takes
+precedence, so management is handed over only once the inline entry is gone.
+See [Migrating from inline managed roles](declarative_role_management.md#migrating-from-inline-managed-roles-to-a-databaserole)
+for the full procedure.
+
+A `DatabaseRole` does not support `ensure: absent`: where the inline
+`managed.roles` stanza drops a role by setting `ensure: absent`, a
+`DatabaseRole` instead relies on the `databaseRoleReclaimPolicy` field. Delete
+the resource with `databaseRoleReclaimPolicy: delete` to drop the role from
+PostgreSQL, or keep the default `retain` to leave the role in place.
 
 -->
 

@@ -130,7 +130,15 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
+DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleStatus
+DatabaseRoles
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -481,6 +489,7 @@ Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
+SecretResourceVersion
 SecretStore
 SecretVersion
 SecretsResourceVersion
@@ -816,10 +825,17 @@ dataChecksums
 dataDurability
 databackupconfiguration
 databaseReclaimPolicy
+databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaseroles
+databaserolespec
+databaserolestatus
 databasespec
 databasestatus
 datacenter
@@ -1194,6 +1210,7 @@ passfile
 passthrough
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
@@ -1387,6 +1404,9 @@ ro
 robfig
 roleRef
 roleconfiguration
+rolelist
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
@@ -1591,6 +1611,7 @@ unencrypted
 unfence
 unfencing
 unix
+unmanaged
 unsatisfiable
 unschedulable
 unsetting
