@@ -458,14 +458,33 @@ func InheritLabels(
 	}
 
 	for key, value := range fixedLabels {
+		// The managed-by label is owned by the operator (see below) and must
+		// never be inherited from the Cluster's metadata.
+		if key == KubernetesAppManagedByLabelName {
+			continue
+		}
 		object.Labels[key] = value
 	}
 
 	for key, value := range labels {
+		// The managed-by label is owned by the operator (see below) and must
+		// never be inherited from the Cluster's metadata.
+		if key == KubernetesAppManagedByLabelName {
+			continue
+		}
 		if controller.IsLabelInherited(key) {
 			object.Labels[key] = value
 		}
 	}
+
+	// The app.kubernetes.io/managed-by label must always identify the operator
+	// as the manager of the resources it creates. It is intentionally never
+	// inherited from the Cluster's own labels: when the Cluster is deployed
+	// through a Helm chart (or any other tool) this label is set to a different
+	// value (e.g. "Helm"), and inheriting it would break the label selectors
+	// that rely on it — most notably the one used to find the PVCs to include
+	// in a volume snapshot backup, which would silently match nothing.
+	object.Labels[KubernetesAppManagedByLabelName] = ManagerName
 }
 
 func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
