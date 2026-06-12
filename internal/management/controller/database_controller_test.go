@@ -111,6 +111,7 @@ var _ = Describe("Managed Database status", func() {
 			fakeClient,
 			utils.DatabaseFinalizerName,
 			r.evaluateDropDatabase,
+			func(db *apiv1.Database) bool { return db.Spec.ReclaimPolicy == apiv1.DatabaseReclaimDelete },
 		)
 	})
 
@@ -205,7 +206,7 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	When("reclaim policy is retain", func() {
-		It("on deletion it removes finalizers and does NOT drop the DB", func(ctx SpecContext) {
+		It("on deletion it does NOT add a finalizer and does NOT drop the DB", func(ctx SpecContext) {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
 			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
@@ -226,19 +227,12 @@ var _ = Describe("Managed Database status", func() {
 			err := reconcileDatabase(ctx, fakeClient, r, database)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Plain successful reconciliation, finalizers have been created
-			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+			// No finalizer added — retain policy means the DB is not owned by the operator lifecycle
+			Expect(database.GetFinalizers()).To(BeEmpty())
 			Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(database.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			database.SetGeneration(database.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, database)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Deleting the k8s object succeeds immediately with no finalizer blocking it
 			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
 
 			err = reconcileDatabase(ctx, fakeClient, r, database)

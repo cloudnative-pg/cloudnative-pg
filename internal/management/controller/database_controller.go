@@ -213,6 +213,7 @@ func NewDatabaseReconciler(
 		mgr.GetClient(),
 		utils.DatabaseFinalizerName,
 		dr.evaluateDropDatabase,
+		func(db *apiv1.Database) bool { return db.Spec.ReclaimPolicy == apiv1.DatabaseReclaimDelete },
 	)
 
 	return dr

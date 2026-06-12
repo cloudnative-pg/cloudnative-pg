@@ -133,6 +133,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 			fakeClient,
 			utils.SubscriptionFinalizerName,
 			r.evaluateDropSubscription,
+			func(sub *apiv1.Subscription) bool { return sub.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete },
 		)
 	})
 
@@ -237,7 +238,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 	})
 
 	When("reclaim policy is retain", func() {
-		It("on deletion it removes finalizers and does NOT drop the subscription", func(ctx SpecContext) {
+		It("on deletion it does NOT add a finalizer and does NOT drop the subscription", func(ctx SpecContext) {
 			subscription.Spec.ReclaimPolicy = apiv1.SubscriptionReclaimRetain
 			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
@@ -259,19 +260,12 @@ var _ = Describe("Managed subscription controller tests", func() {
 			err = reconcileSubscription(ctx, fakeClient, r, subscription)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Plain successful reconciliation, finalizers have been created
-			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+			// No finalizer added — retain policy means the subscription is not owned by the operator lifecycle
+			Expect(subscription.GetFinalizers()).To(BeEmpty())
 			Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(subscription.Status.Message).Should(BeEmpty())
 
-			// The next 2 lines are a hacky bit to make sure the next reconciler
-			// call doesn't skip on account of Generation == ObservedGeneration.
-			// See fake.Client known issues with `Generation`
-			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-			subscription.SetGeneration(subscription.GetGeneration() + 1)
-			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
-
-			// We now look at the behavior when we delete the Database object
+			// Deleting the k8s object succeeds immediately with no finalizer blocking it
 			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
 
 			err = reconcileSubscription(ctx, fakeClient, r, subscription)

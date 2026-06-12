@@ -183,6 +183,7 @@ func NewPublicationReconciler(
 		mgr.GetClient(),
 		utils.PublicationFinalizerName,
 		pr.evaluateDropPublication,
+		func(pub *apiv1.Publication) bool { return pub.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete },
 	)
 
 	return pr
