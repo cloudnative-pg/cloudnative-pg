@@ -252,25 +252,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
       - name: Get k8s versions for unit test
         id: get-k8s-versions
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          k8s_versions=$(jq -c '
-            .unit_test.max as $max |
-            .unit_test.min as $min |
-            $min | [ while(. <= $max;
-                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
-              )
-            ] |
-            .[] |= .+".x"
-          ' < .github/k8s_versions_scope.json)
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            # On pull requests, only test against the lowest and highest supported
+            # versions to bracket the support window, keeping CI fast.
+            k8s_versions=$(jq -c '
+              [.unit_test.min + ".x", .unit_test.max + ".x"]
+            ' < .github/k8s_versions_scope.json)
+          else
+            # On pushes to main/release branches and scheduled runs, run the full
+            # matrix so cross-version regressions are caught before a release.
+            k8s_versions=$(jq -c '
+              .unit_test.max as $max |
+              .unit_test.min as $min |
+              $min | [ while(. <= $max;
+                  . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
+                )
+              ] |
+              .[] |= .+".x"
+            ' < .github/k8s_versions_scope.json)
+          fi
           echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
-
           latest_k8s_version=$(jq -r '.|last' <<< $k8s_versions)
           echo "latest_k8s_version=${latest_k8s_version}" >> $GITHUB_OUTPUT
-
   tests:
     name: Run unit tests
     needs:
