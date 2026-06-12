@@ -24,7 +24,27 @@ You can define roles either:
 1. as [standalone `DatabaseRole` resources](#the-databaserole-resource) (recommended), or
 2. via [the `managed` stanza within the `Cluster` spec](#inline-managed-roles).
 
-## General Role Configuration Notes
+## Coexistence and precedence
+
+The two methods are not mutually exclusive: you can manage different roles with
+each one at the same time, which is what makes a gradual migration from the
+inline stanza to `DatabaseRole` resources possible. They only need a rule for
+the case where the same role name is defined in both places.
+
+In that case, **the Cluster specification (`managed.roles`) always takes
+precedence**: the `DatabaseRole` is not reconciled and reports the conflict in
+its status (see [Status of `DatabaseRole` resources](#status-of-databaserole-resources)).
+
+:::important
+Declarative role management ignores roles that exist in the database but are
+not included in either the Cluster spec or a `DatabaseRole`. The lifecycle of
+those roles continues to be managed within PostgreSQL, allowing you to adopt
+this feature at your convenience.
+:::
+
+-----
+
+## General role configuration notes
 
 Regardless of the management method used, the role specification adheres to the
 [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
@@ -36,12 +56,12 @@ for the full list of attributes.
 
 A few points are worth noting:
 
-1.  The `ensure` attribute is **not** part of PostgreSQL.
-    It enables declarative role management to create and remove roles.
-    The two possible values are `present` (the default) and `absent`.
-    Note: `ensure: absent` is only supported for
-    [inline managed roles](#inline-managed-roles). For `DatabaseRole` CRDs,
-    delete the Kubernetes resource with `databaseRoleReclaimPolicy: delete` instead.
+1.  The `ensure` attribute is **not** part of PostgreSQL. It enables
+    declarative role management to create (`present`, the default) or remove
+    (`absent`) a role, and is available **only** in the inline
+    [`managed.roles`](#inline-managed-roles) stanza. A `DatabaseRole` does not
+    support `ensure`; it expresses role removal through its
+    [reclaim policy](#role-reclaim-policy) instead.
 2.  The `inherit` attribute is true by default, following PostgreSQL
     conventions.
 3.  The `connectionLimit` attribute defaults to -1, in line with PostgreSQL
@@ -50,9 +70,9 @@ A few points are worth noting:
 
 -----
 
-## The `DatabaseRole` Resource
+## The `DatabaseRole` resource
 
-The `DatabaseRole` Custom Resource provides a dedicated, Kubernetes-native way to
+The `DatabaseRole` custom resource provides a dedicated, Kubernetes-native way to
 manage PostgreSQL database roles.
 
 This is the recommended approach for modern environments and
@@ -70,7 +90,11 @@ with the database catalog and brought back to their specification.
 See [Security](security.md#rbac-on-custom-resources) for the RBAC
 implications of granting access to `DatabaseRole` resources.
 
-### Example Manifest
+A `DatabaseRole` is namespace-scoped: the resource, the `Cluster` it references
+through `spec.cluster`, and the `passwordSecret` it consumes must all live in
+the same namespace.
+
+### Example manifest
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -95,7 +119,7 @@ spec:
 An example manifest for a role definition can be found in the file
 [`role-examples.yaml`](samples/role-examples.yaml).
 
-### Role Reclaim Policy
+### Role reclaim policy
 
 The `databaseRoleReclaimPolicy` field defines the "final act" of the operator when a
 `DatabaseRole` Custom Resource is removed from the Kubernetes API.
@@ -120,10 +144,9 @@ deletion complete.
 
 How you remove a role depends on how it was created:
 
-- **Created through a `DatabaseRole`:** set `databaseRoleReclaimPolicy: delete` and delete
-  the Custom Resource; the operator then drops the role (subject to the note
-  above). With the default `retain`, deleting the resource leaves the role in
-  place.
+- **Created through a `DatabaseRole`:** delete the resource. Whether the role is
+  also dropped from PostgreSQL is governed by its
+  [reclaim policy](#role-reclaim-policy).
 - **Pre-existing, or managed elsewhere:** a `DatabaseRole` is not the tool to drop
   it. Declare it `absent` through the inline [`managed.roles`](#inline-managed-roles)
   stanza, or run `DROP ROLE` directly.
@@ -164,23 +187,30 @@ change in that value triggers the re-application of the password. The
 condition appears once a password Secret is in use and is removed when
 `passwordSecret` is removed from the specification.
 
-If a `DatabaseRole` CRD targets a name already managed in the Cluster spec, the
-`applied` field will be `false` with the message:
+If a `DatabaseRole` targets a name already managed in the Cluster spec
+(see [Coexistence and precedence](#coexistence-and-precedence)), the `applied`
+field will be `false` with the message:
 
 ```
 database role is already managed by the CNPG cluster
 ```
 
+On a [replica cluster](replica_cluster.md) the role is owned by the primary
+cluster, not reconciled locally. In that case the instance manager reports the
+role as *unknown* rather than failed: the `applied` field is left unset (`nil`)
+with an explanatory message. The role is reconciled normally once the cluster
+is promoted to primary.
+
 ---
 
-## Inline Managed Roles
+## Inline managed roles
 
 With the `managed` stanza in the cluster spec, CloudNativePG provides
 management for roles specified in `.spec.managed.roles`.
 This feature enables declarative management of existing roles, as well as the
 creation of new roles if they are not already present.
 
-### Example Manifest
+### Example manifest
 
 An example manifest for a cluster with declarative role management can be found
 in the file [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml).
@@ -203,7 +233,7 @@ spec:
         - pg_signal_backend
 ```
 
-### Status of Inline Managed Roles
+### Status of inline managed roles
 
 When using the inline method, the `Cluster` status includes a comprehensive
 summary:
@@ -248,35 +278,37 @@ petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" do
 
 ---
 
-## Precedence and Coexistence
+## Migrating from inline managed roles to a `DatabaseRole`
 
-You can use both methods simultaneously for different roles.
+You can move a role from the inline `managed.roles` stanza to a standalone
+`DatabaseRole` without disruption:
 
-However, **the Cluster specification (`managed.roles`) always takes precedence.**
-If a role name exists in both the Cluster spec and a `DatabaseRole` CRD, the CRD will
-not be reconciled.
+1.  Create the `DatabaseRole` with the desired specification. Both methods
+    share the same [`RoleConfiguration`](cloudnative-pg.v1.md#roleconfiguration)
+    structure, so the stanza can be copied across as-is.
+2.  Remove the matching entry from `.spec.managed.roles` in the `Cluster`
+    manifest.
+3.  The operator detects the change and hands management over to the
+    `DatabaseRole`.
 
-To migrate an inline role to a `DatabaseRole` CRD:
+Because the Cluster spec takes precedence while both exist (see
+[Coexistence and precedence](#coexistence-and-precedence)), the handover
+happens only once the inline entry is gone, so there is no window in which the
+role is left unmanaged.
 
-1.  Create the `DatabaseRole` CRD with the desired specification.
-2.  Remove the entry from `.spec.managed.roles` in the `Cluster` manifest.
-3.  The operator will automatically detect the change and hand over management
-    to the standalone `DatabaseRole` resource.
-
-:::important
-In terms of backward compatibility, declarative role management is designed to
-ignore roles that exist in the database but are not included in the spec or a
-`DatabaseRole` CRD. The lifecycle of these roles will continue to be managed within
-PostgreSQL, allowing CloudNativePG users to adopt this feature at their
-convenience.
-:::
+When converting a role that the inline stanza removed with `ensure: absent`,
+note that a `DatabaseRole` does not support `ensure: absent`. Express removal
+through the [reclaim policy](#role-reclaim-policy) instead: delete the resource
+with `databaseRoleReclaimPolicy: delete` to drop the role, or keep the default
+`retain` to leave it in place. See [Removing a role](#removing-a-role) for the
+full behavior.
 
 ---
 
 ## Password management
 
-The declarative role management feature (both via CRD and Cluster spec)
-includes reconciling of role passwords.
+The declarative role management feature (both with a `DatabaseRole` and the
+inline `managed.roles` stanza) includes reconciling of role passwords.
 Managed role configurations may optionally specify the name of a **Secret**
 where the username and password are stored:
 
@@ -318,7 +350,7 @@ PostgreSQL.
 :::
 
 
-### Disabling Passwords
+### Disabling passwords
 
 To explicitly set a password to `NULL` in PostgreSQL (distinguished from simply
 omitting a password update), use the `disablePassword` field:
@@ -360,7 +392,7 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
   UNTIL` was not set to `NULL` in the database (this is due to PostgreSQL not
   allowing `VALID UNTIL NULL` in the `ALTER ROLE` SQL statement)
 
-### Password hashed
+### Pre-hashed passwords
 
 You can also provide pre-encrypted passwords by specifying the password
 in MD5/SCRAM-SHA-256 hash format:
@@ -469,4 +501,4 @@ in such case, the "fix" proposed might be the wrong thing to do.
 
 CloudNativePG will record when such fundamental errors occur, and will display
 them in the cluster Status, as described in
-[Status of Inline Managed Roles](#status-of-inline-managed-roles).
+[Status of inline managed roles](#status-of-inline-managed-roles).
