@@ -69,3 +69,14 @@ spec:
       for: 1m
       labels:
         severity: warning
+  - name: cnp-operator.rules
+    rules:
+    - alert: CNPGReconcileErrors
+      annotations:
+        description: The {{ $labels.controller }} controller of the CloudNativePG operator is failing to reconcile its resources.
+        summary: The CloudNativePG operator is failing to reconcile.
+      expr: |-
+        rate(controller_runtime_reconcile_errors_total{controller=~"cluster|backup|scheduled-backup|pooler|database|publication|subscription|plugin|imagecatalog|clusterimagecatalog"}[10m]) > 0
+      for: 10m
+      labels:
+        severity: warning
