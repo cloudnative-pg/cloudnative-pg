@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -56,6 +57,10 @@ type PluginReconciler struct {
 	Plugins  repository.Interface
 
 	OperatorNamespace string
+
+	// pluginNames maps service keys ("namespace/name") to plugin names
+	// for cleanup when the service is deleted without a finalizer
+	pluginNames sync.Map
 }
 
 // NewPluginReconciler creates a new PluginReconciler initializing it
@@ -86,6 +91,11 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
 		// This also happens when you delete a resource in k8s
 		if apierrs.IsNotFound(err) {
+			if name, ok := r.pluginNames.LoadAndDelete(req.NamespacedName.String()); ok {
+				contextLogger.Info("Plugin service deleted, removing from pool",
+					"pluginName", name)
+				r.Plugins.ForgetPlugin(name.(string))
+			}
 			return ctrl.Result{}, nil
 		}
 
@@ -105,21 +115,21 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Cache the service→plugin mapping for cleanup on deletion without finalizer
+	r.pluginNames.Store(req.NamespacedName.String(), pluginName)
+
 	// Handle deletion
 	if !service.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.handleDeletion(ctx, &service, pluginName)
 	}
 
-	// Add finalizer if not present
-	if !controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
-		contextLogger.Debug("Adding finalizer to plugin service")
-		controllerutil.AddFinalizer(&service, utils.PluginFinalizerName)
+	// Remove finalizer if still present (e.g., after upgrade from older version)
+	if controllerutil.ContainsFinalizer(&service, utils.PluginFinalizerName) {
+		contextLogger.Debug("Removing legacy finalizer from plugin service")
+		controllerutil.RemoveFinalizer(&service, utils.PluginFinalizerName)
 		if err := r.Update(ctx, &service); err != nil {
-			contextLogger.Error(err, "Error while adding finalizer to plugin service")
 			return ctrl.Result{}, err
 		}
-		r.Recorder.Eventf(&service, "Normal", "FinalizerAdded",
-			"Added finalizer to manage plugin %s lifecycle", pluginName)
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
