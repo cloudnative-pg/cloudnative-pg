@@ -276,10 +276,10 @@ only the operator itself.
     (e.g., 1.29.2).
 :::
 
-Versions 1.30.0 and 1.29.2 introduce three changes worth reviewing before you
-upgrade: operator-side password encoding, `search_path` hardening, and the new
-`DatabaseRole` resource for declarative role management. Each is covered in its
-own subsection below.
+Versions 1.30.0 and 1.29.2 introduce four changes worth reviewing before you
+upgrade: operator-side password encoding, `search_path` hardening, the new
+`DatabaseRole` resource for declarative role management, and safe primary
+election via a per-cluster Lease. Each is covered in its own subsection below.
 
 #### Operator-side password encoding
 
@@ -367,6 +367,23 @@ A `DatabaseRole` does not support `ensure: absent`: where the inline
 `DatabaseRole` instead relies on the `databaseRoleReclaimPolicy` field. Delete
 the resource with `databaseRoleReclaimPolicy: delete` to drop the role from
 PostgreSQL, or keep the default `retain` to leave the role in place.
+
+#### Safe primary election
+
+Starting from version 1.30.0, CloudNativePG coordinates primary promotion
+through a per-cluster Kubernetes `Lease`, ensuring that at most one instance
+promotes itself at any given time. The behavior is enabled automatically and
+requires no configuration; the lease timings can optionally be tuned via
+`.spec.primaryLease` (see ["Safe primary election"](failover.md#safe-primary-election)).
+
+:::warning
+This feature requires the operator to manage `Lease` objects in the
+`coordination.k8s.io` API group. The bundled operator manifest and the Helm
+chart grant the required permissions automatically. If you manage the
+operator's RBAC yourself, you must add the `create`, `get`, `list`, `update`
+and `watch` verbs on `leases` in the `coordination.k8s.io` API group before
+upgrading, otherwise primaries will be unable to promote.
+:::
 
 -->
 

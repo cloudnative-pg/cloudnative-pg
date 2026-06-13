@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-primary-lease
+spec:
+  instances: 3
+
+  # Non-default primary lease timings, so the test can observe that the
+  # configured values flow all the way down to the Lease object. They are set
+  # at creation time on purpose: the instance manager captures them on its first
+  # lease acquisition, so editing them on a running primary would not take
+  # effect until the pod restarts.
+  primaryLease:
+    leaseDurationSeconds: 30
+    renewDeadlineSeconds: 20
+    retryPeriodSeconds: 4
+    releasedLeaseDurationSeconds: 2
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

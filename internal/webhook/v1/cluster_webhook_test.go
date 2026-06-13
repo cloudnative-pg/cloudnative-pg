@@ -1997,6 +1997,121 @@ var _ = Describe("Number of synchronous replicas", func() {
 	})
 })
 
+var _ = Describe("validatePrimaryLease", func() {
+	var v *ClusterCustomValidator
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+	})
+
+	It("is valid when the stanza is omitted", func() {
+		cluster := &apiv1.Cluster{}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("is valid with the default timings", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("rejects a lease duration not greater than the renew deadline", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("validates a partially-specified stanza against the defaults", func() {
+		// Only renewDeadline is set; leaseDuration falls back to the default (15),
+		// which is still greater than the configured renew deadline.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					RenewDeadlineSeconds: ptr.To(int32(12)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+
+		// A renew deadline at or above the default lease duration is rejected.
+		cluster.Spec.PrimaryLease.RenewDeadlineSeconds = ptr.To(int32(20))
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline that is not greater than retryPeriod*1.2", func() {
+		// renewDeadline == retryPeriod: leaseDuration > renewDeadline holds, so the
+		// gap this guards is the one client-go's NewLeaderElector would reject at
+		// runtime (renewDeadline must exceed retryPeriod*1.2), crash-looping the
+		// primary. The webhook must catch it before it ever reaches the instance.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(10)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("rejects a renew deadline just below the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=11 is below it and must
+		// be rejected even though leaseDuration (15) > renewDeadline (11).
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(11)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).ToNot(BeEmpty())
+	})
+
+	It("accepts a renew deadline just above the retryPeriod*1.2 boundary", func() {
+		// retryPeriod=10 => boundary is 12. renewDeadline=13 clears it.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds: ptr.To(int32(15)),
+					RenewDeadlineSeconds: ptr.To(int32(13)),
+					RetryPeriodSeconds:   ptr.To(int32(10)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+
+	It("accepts the documented non-default tuning example", func() {
+		// Mirrors the failover.md example (30/20/4) plus the fixture's released TTL.
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
+					LeaseDurationSeconds:         ptr.To(int32(30)),
+					RenewDeadlineSeconds:         ptr.To(int32(20)),
+					RetryPeriodSeconds:           ptr.To(int32(4)),
+					ReleasedLeaseDurationSeconds: ptr.To(int32(2)),
+				},
+			},
+		}
+		Expect(v.validatePrimaryLease(cluster)).To(BeEmpty())
+	})
+})
+
 var _ = Describe("validateSynchronousReplicaConfiguration", func() {
 	var v *ClusterCustomValidator
 	BeforeEach(func() {
