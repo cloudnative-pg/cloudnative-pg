@@ -300,6 +300,20 @@ type PgBouncerSpec struct {
 	// Mutually exclusive with Image.
 	// +optional
 	ImageCatalogRef *ImageCatalogComponentRef `json:"imageCatalogRef,omitempty"`
+
+	// PauseDuringSwitchover when true, automatically pauses this pooler
+	// during switchover/failover operations on the referenced cluster
+	// to minimize client connection failures.
+	// +kubebuilder:default:=false
+	// +optional
+	PauseDuringSwitchover *bool `json:"pauseDuringSwitchover,omitempty"`
+
+	// PauseDuringSwitchoverTimeout is the maximum duration to keep the pooler
+	// paused during switchover. If the switchover doesn't complete within
+	// this time, the pooler will be automatically resumed.
+	// +kubebuilder:default:="120s"
+	// +optional
+	PauseDuringSwitchoverTimeout *metav1.Duration `json:"pauseDuringSwitchoverTimeout,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler
@@ -328,6 +342,14 @@ type PoolerStatus struct {
 	// successfully).
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// PausedForSwitchover indicates this pooler was automatically paused for switchover
+	// +optional
+	PausedForSwitchover bool `json:"pausedForSwitchover,omitempty"`
+
+	// PausedForSwitchoverTimestamp is when this pooler was paused (RFC3339Micro)
+	// +optional
+	PausedForSwitchoverTimestamp string `json:"pausedForSwitchoverTimestamp,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used

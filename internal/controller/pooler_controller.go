@@ -118,6 +118,13 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *res, nil
 	}
 
+	// Reconcile automatic pause/resume during switchover
+	if resources.Cluster != nil {
+		if err := r.reconcileSwitchoverPause(ctx, &pooler, resources.Cluster); err != nil {
+			contextLogger.Error(err, "while reconciling switchover pause")
+		}
+	}
+
 	if res := r.ensureManagedResourcesAreOwned(ctx, pooler, resources); !res.IsZero() {
 		return res, nil
 	}
@@ -171,6 +178,11 @@ func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			&apiv1.ClusterImageCatalog{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogToPoolers()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterToPoolers()),
+			builder.WithPredicates(clusterSwitchoverPredicate),
 		).
 		Complete(r)
 }
@@ -380,6 +392,38 @@ func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
 		result = make([]reconcile.Request, len(filteredPoolersList))
 		for idx, value := range filteredPoolersList {
 			result[idx] = reconcile.Request{NamespacedName: value}
+		}
+
+		return result
+	}
+}
+
+// mapClusterToPoolers returns a function mapping cluster events to the poolers referencing them
+func (r *PoolerReconciler) mapClusterToPoolers() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) (result []reconcile.Request) {
+		cluster, ok := obj.(*apiv1.Cluster)
+		if !ok {
+			return nil
+		}
+
+		var poolers apiv1.PoolerList
+		if err := r.List(ctx, &poolers,
+			client.InNamespace(cluster.Namespace),
+		); err != nil {
+			log.FromContext(ctx).Error(err, "while getting pooler list for cluster",
+				"namespace", cluster.Namespace, "cluster", cluster.Name)
+			return nil
+		}
+
+		for idx := range poolers.Items {
+			if poolers.Items[idx].Spec.Cluster.Name == cluster.Name {
+				result = append(result, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      poolers.Items[idx].Name,
+						Namespace: poolers.Items[idx].Namespace,
+					},
+				})
+			}
 		}
 
 		return result
