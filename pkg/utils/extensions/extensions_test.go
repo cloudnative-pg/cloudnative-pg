@@ -20,10 +20,12 @@ SPDX-License-Identifier: Apache-2.0
 package extensions
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/envmap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -345,5 +347,254 @@ var _ = Describe("ValidateWithoutCatalog", func() {
 		_, err := ValidateWithoutCatalog(cluster)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("postgis"))
+	})
+})
+
+var _ = Describe("SetEnvVars", func() {
+	var envMap envmap.EnvironmentMap
+	BeforeEach(func() {
+		envMap = envmap.EnvironmentMap{
+			"BAR_ENV": "bar_value",
+			"BAZ_ENV": "baz_value",
+		}
+	})
+
+	It("should add the extension's env variables", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "foo_value",
+					},
+				},
+			},
+		}
+
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "foo_value"))
+	})
+
+	It("should expand placeholders", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "FOO_ENV",
+						Value: "${image_root}/foo_value",
+					},
+				},
+			},
+		}
+
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
+		Expect(envMap).To(HaveKeyWithValue("BAR_ENV", "bar_value"))
+		Expect(envMap).To(HaveKeyWithValue("BAZ_ENV", "baz_value"))
+		Expect(envMap).To(HaveKeyWithValue("FOO_ENV", "/extensions/foo/foo_value"))
+	})
+
+	It("should unescape $${...} to literal ${...}", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{
+						Name:  "ESCAPED",
+						Value: "$${not_expanded}",
+					},
+					{
+						Name:  "MIXED",
+						Value: "${image_root}/$${literal}",
+					},
+				},
+			},
+		}
+
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
+		Expect(envMap).To(HaveKeyWithValue("ESCAPED", "${not_expanded}"))
+		Expect(envMap).To(HaveKeyWithValue("MIXED", "/extensions/foo/${literal}"))
+	})
+
+	It("should skip reserved environment variables", func() {
+		envMap["PATH"] = "/usr/bin"
+		envMap["LD_LIBRARY_PATH"] = "/usr/lib"
+
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "foo",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "foo:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PATH", Value: "/evil/path"},
+					{Name: "LD_LIBRARY_PATH", Value: "/evil/lib"},
+					{Name: "PGDATA", Value: "/evil/data"},
+					{Name: "CNPG_SECRET", Value: "stolen"},
+					{Name: "POD_NAME", Value: "fake"},
+					{Name: "NAMESPACE", Value: "fake"},
+					{Name: "CLUSTER_NAME", Value: "fake"},
+					{Name: "SAFE_VAR", Value: "allowed"},
+				},
+			},
+		}
+
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
+		Expect(envMap).To(HaveKeyWithValue("PATH", "/usr/bin"))
+		Expect(envMap).To(HaveKeyWithValue("LD_LIBRARY_PATH", "/usr/lib"))
+		Expect(envMap).NotTo(HaveKey("PGDATA"))
+		Expect(envMap).NotTo(HaveKey("CNPG_SECRET"))
+		Expect(envMap).NotTo(HaveKey("POD_NAME"))
+		Expect(envMap).NotTo(HaveKey("NAMESPACE"))
+		Expect(envMap).NotTo(HaveKey("CLUSTER_NAME"))
+		Expect(envMap).To(HaveKeyWithValue("SAFE_VAR", "allowed"))
+	})
+
+	It("should let the last extension win when multiple define the same variable", func() {
+		extensionsConfig := []apiv1.ExtensionConfiguration{
+			{
+				Name: "ext1",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext1:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext1"},
+					{Name: "ONLY_EXT1", Value: "ext1_value"},
+				},
+			},
+			{
+				Name: "ext2",
+				ImageVolumeSource: corev1.ImageVolumeSource{
+					Reference: "ext2:dev",
+				},
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "SHARED", Value: "from_ext2"},
+					{Name: "ONLY_EXT2", Value: "ext2_value"},
+				},
+			},
+		}
+
+		SetEnvVars(extensionsConfig, envMap, postgres.ExtensionsBaseDirectory)
+		Expect(envMap).To(HaveKeyWithValue("SHARED", "from_ext2"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT1", "ext1_value"))
+		Expect(envMap).To(HaveKeyWithValue("ONLY_EXT2", "ext2_value"))
+	})
+
+	// During a major upgrade the operator calls SetEnvVars twice: once for the
+	// source-version extensions mounted under ExtensionsBaseDirectory and once
+	// for the target-version copies under UpgradeTargetExtensionsBaseDirectory.
+	// The merge across the two calls is what the upgrade pod actually applies
+	// to its process environment, so it is worth pinning here even though
+	// "last writer wins" is the same rule SetEnvVars uses within a single call.
+	Context("when applied across source and target extension sets (major upgrade)", func() {
+		It("expands ${image_root} against the call-specific baseDir", func() {
+			oldExt := []apiv1.ExtensionConfiguration{{
+				Name: "plpython3",
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "OLD_PYPATH", Value: "${image_root}/lib"},
+				},
+			}}
+			newExt := []apiv1.ExtensionConfiguration{{
+				Name: "plpython3",
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "NEW_PYPATH", Value: "${image_root}/lib"},
+				},
+			}}
+
+			SetEnvVars(oldExt, envMap, postgres.ExtensionsBaseDirectory)
+			SetEnvVars(newExt, envMap, postgres.UpgradeTargetExtensionsBaseDirectory)
+
+			Expect(envMap).To(HaveKeyWithValue("OLD_PYPATH", "/extensions/plpython3/lib"))
+			Expect(envMap).To(HaveKeyWithValue("NEW_PYPATH", "/new-extensions/plpython3/lib"))
+		})
+
+		It("lets the target-version value override a same-named source-version value", func() {
+			oldExt := []apiv1.ExtensionConfiguration{{
+				Name: "plpython3",
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PYTHONPATH", Value: "${image_root}/lib"},
+				},
+			}}
+			newExt := []apiv1.ExtensionConfiguration{{
+				Name: "plpython3",
+				Env: []apiv1.ExtensionEnvVar{
+					{Name: "PYTHONPATH", Value: "${image_root}/lib"},
+				},
+			}}
+
+			SetEnvVars(oldExt, envMap, postgres.ExtensionsBaseDirectory)
+			Expect(envMap).To(HaveKeyWithValue("PYTHONPATH", "/extensions/plpython3/lib"))
+
+			SetEnvVars(newExt, envMap, postgres.UpgradeTargetExtensionsBaseDirectory)
+			Expect(envMap).To(HaveKeyWithValue("PYTHONPATH", "/new-extensions/plpython3/lib"))
+		})
+	})
+})
+
+var _ = Describe("AppendPaths", func() {
+	It("returns existing unchanged when extra is empty", func() {
+		Expect(AppendPaths("/usr/lib", nil)).To(Equal("/usr/lib"))
+	})
+
+	It("returns extra joined when existing is empty", func() {
+		Expect(AppendPaths("", []string{"/a", "/b"})).To(Equal("/a:/b"))
+	})
+
+	It("appends extra after existing with a single colon separator", func() {
+		Expect(AppendPaths("/usr/lib", []string{"/a", "/b"})).To(Equal("/usr/lib:/a:/b"))
+	})
+})
+
+var _ = Describe("CollectLibraryPaths and CollectBinPaths", func() {
+	It("normalize user-supplied paths via filepath.Join under baseDir", func() {
+		// "/lib", "./lib", and "lib" are all equivalent once joined; this
+		// guards against accidental user-supplied absolute paths leaking
+		// outside the extension mount.
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:          "ext1",
+			LdLibraryPath: []string{"/lib", "./lib", "lib"},
+			BinPath:       []string{"/bin", "./bin", "bin"},
+		}}
+
+		libs := CollectLibraryPaths(exts, postgres.ExtensionsBaseDirectory)
+		Expect(libs).To(HaveLen(3))
+		for _, p := range libs {
+			Expect(p).To(Equal("/extensions/ext1/lib"))
+		}
+
+		bins := CollectBinPaths(exts, postgres.ExtensionsBaseDirectory)
+		Expect(bins).To(HaveLen(3))
+		for _, p := range bins {
+			Expect(p).To(Equal("/extensions/ext1/bin"))
+		}
+	})
+
+	It("returns the empty slice when no extensions declare paths", func() {
+		Expect(CollectLibraryPaths(nil, postgres.ExtensionsBaseDirectory)).To(BeEmpty())
+		Expect(CollectBinPaths(nil, postgres.ExtensionsBaseDirectory)).To(BeEmpty())
+	})
+
+	It("uses the upgrade-target baseDir when supplied", func() {
+		exts := []apiv1.ExtensionConfiguration{{
+			Name:          "ext1",
+			LdLibraryPath: []string{"lib"},
+			BinPath:       []string{"bin"},
+		}}
+		Expect(CollectLibraryPaths(exts, postgres.UpgradeTargetExtensionsBaseDirectory)).
+			To(ConsistOf("/new-extensions/ext1/lib"))
+		Expect(CollectBinPaths(exts, postgres.UpgradeTargetExtensionsBaseDirectory)).
+			To(ConsistOf("/new-extensions/ext1/bin"))
 	})
 })
