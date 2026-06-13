@@ -49,6 +49,8 @@ DIST_PATH := $(shell pwd)/dist
 OPERATOR_MANIFEST_PATH ?= ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
+export GOFIPS140 ?= latest
+
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 PGBOUNCER_IMAGE_NAME ?= $(shell grep 'DefaultPgbouncerImage.*=' "pkg/versions/versions.go" | cut -f 2 -d \")

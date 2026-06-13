@@ -9,6 +9,7 @@ release:
 env:
   - GO111MODULE=on
   - CGO_ENABLED=0
+  - GOFIPS140=latest
 
 before:
   hooks:
