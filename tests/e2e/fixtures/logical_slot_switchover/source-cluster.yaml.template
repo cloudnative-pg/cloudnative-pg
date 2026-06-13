@@ -1,0 +1,51 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: logical-slot-source
+spec:
+  instances: 3
+
+  enableSuperuserAccess: true
+
+  replicationSlots:
+    highAvailability:
+      enabled: true
+      synchronizeLogicalDecoding: true
+
+  postgresql:
+    parameters:
+      max_connections: "110"
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+      wal_level: logical
+      hot_standby_feedback: "on"
+      sync_replication_slots: "on"
+    pg_hba:
+      - hostssl replication app all scram-sha-256
+
+  managed:
+    roles:
+    - name: app
+      ensure: present
+      login: true
+      replication: true
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
