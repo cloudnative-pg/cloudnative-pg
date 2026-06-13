@@ -254,7 +254,7 @@ kubectl create secret generic azure-creds \
   --from-literal=AZURE_STORAGE_ACCOUNT=<storage account name> \
   --from-literal=AZURE_STORAGE_KEY=<storage account key> \
   --from-literal=AZURE_STORAGE_SAS_TOKEN=<SAS token> \
-  --from-literal=AZURE_STORAGE_CONNECTION_STRING=<connection string>
+  --from-literal=AZURE_CONNECTION_STRING=<connection string>
 ```
 
 The credentials will be encrypted at rest, if this feature is enabled in the used
