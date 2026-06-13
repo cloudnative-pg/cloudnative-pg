@@ -275,3 +275,36 @@ var _ = Describe("getRestoreWalConfig", func() {
 				`''s3://bucket"; rm -rf /; "''`))
 		})
 })
+
+var _ = Describe("recovery target failure classification", func() {
+	DescribeTable("recoveryEndedInRecoveryState classifies the pg_controldata cluster state",
+		func(state string, expected bool) {
+			Expect(recoveryEndedInRecoveryState(state)).To(Equal(expected))
+		},
+		// A clone that never promoted is left in a recovery state.
+		Entry("shut down in recovery -> target not reached", "shut down in recovery", true),
+		Entry("in archive recovery -> target not reached", "in archive recovery", true),
+		// A clone that reached its target promotes and is then cleanly stopped.
+		Entry("shut down -> promoted then stopped", "shut down", false),
+		Entry("in production -> promoted and running", "in production", false),
+		// Transient/unknown states are inconclusive.
+		Entry("starting up -> inconclusive", "starting up", false),
+		Entry("empty -> inconclusive", "", false),
+	)
+
+	DescribeTable("hasRecoveryTarget detects an explicit recovery target",
+		func(cluster *apiv1.Cluster, expected bool) {
+			Expect(hasRecoveryTarget(cluster)).To(Equal(expected))
+		},
+		Entry("nil cluster", (*apiv1.Cluster)(nil), false),
+		Entry("no bootstrap", &apiv1.Cluster{}, false),
+		Entry("recovery without target", &apiv1.Cluster{Spec: apiv1.ClusterSpec{
+			Bootstrap: &apiv1.BootstrapConfiguration{Recovery: &apiv1.BootstrapRecovery{}},
+		}}, false),
+		Entry("recovery with target", &apiv1.Cluster{Spec: apiv1.ClusterSpec{
+			Bootstrap: &apiv1.BootstrapConfiguration{Recovery: &apiv1.BootstrapRecovery{
+				RecoveryTarget: &apiv1.RecoveryTarget{TargetTime: "2026-06-01 00:00:00"},
+			}},
+		}}, true),
+	)
+})

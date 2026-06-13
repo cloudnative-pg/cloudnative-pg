@@ -437,6 +437,7 @@ RPO
 RTO
 RUNTIME
 ReadWriteOnce
+RecoveryTargetReached
 RedHat
 RelabelConfig
 ReplicaClusterConfiguration
