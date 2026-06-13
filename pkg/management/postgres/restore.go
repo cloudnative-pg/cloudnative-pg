@@ -31,7 +31,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	barmanArchiver "github.com/cloudnative-pg/barman-cloud/pkg/archiver"
@@ -962,19 +961,8 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 }
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
-func (info InitInfo) GetPrimaryConnInfo() string {
-	result := buildPrimaryConnInfo(info.ClusterName+"-rw", info.PodName) + " dbname=postgres"
-
-	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
-	if len(standbyTCPUserTimeout) == 0 {
-		// Default to 5000ms (5 seconds) if not explicitly set
-		standbyTCPUserTimeout = "5000"
-	}
-
-	result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
-		strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
-
-	return result
+func (info *InitInfo) GetPrimaryConnInfo() string {
+	return buildPrimaryConnInfo(info.ParentNode, info.PodName)
 }
 
 func (info *InitInfo) checkBackupDestination(
