@@ -69,6 +69,7 @@ CSV
 CSVs
 CVE
 CVEs
+CWE
 CannotReconcile
 Canovai
 CatalogComponentImage
@@ -129,7 +130,15 @@ DatabaseObjectStatus
 DatabaseReclaimDelete
 DatabaseReclaimPolicy
 DatabaseReclaimRetain
+DatabaseRole
+DatabaseRoleList
+DatabaseRoleReclaimDelete
+DatabaseRoleReclaimPolicy
+DatabaseRoleReclaimRetain
 DatabaseRoleRef
+DatabaseRoleSpec
+DatabaseRoleStatus
+DatabaseRoles
 DatabaseSpec
 DatabaseStatus
 DefaultAzureCredential
@@ -203,6 +212,7 @@ GoogleCredentials
 Grafana
 GrantUsageSpecType
 HH
+HPA
 HashiCorp
 HistoryTags
 Homebrew
@@ -332,6 +342,7 @@ PGSQL
 PKI
 PODNAME
 PPROF
+PSA
 PV
 PVCs
 PascalBourdier
@@ -478,6 +489,7 @@ Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
+SecretResourceVersion
 SecretStore
 SecretVersion
 SecretsResourceVersion
@@ -555,6 +567,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+Untrusted
 UpdateStrategy
 UsageSpec
 UsageSpecType
@@ -563,6 +576,7 @@ VLDBs
 VM
 VMs
 VOLNAME
+VPA
 ValidationError
 VirtualBox
 VolumeSnapshot
@@ -635,6 +649,7 @@ authn
 authz
 autocompletion
 autoscaler
+autoscalers
 autovacuum
 availableArchitectures
 availablearchitecture
@@ -810,10 +825,17 @@ dataChecksums
 dataDurability
 databackupconfiguration
 databaseReclaimPolicy
+databaseRoleReclaimPolicy
 databaseobjectspec
 databaseobjectstatus
 databasereclaimpolicy
+databaserole
+databaserolelist
+databaserolereclaimpolicy
 databaseroleref
+databaseroles
+databaserolespec
+databaserolestatus
 databasespec
 databasestatus
 datacenter
@@ -956,6 +978,7 @@ historyTags
 hostPort
 hostname
 hostssl
+hpa
 href
 html
 http
@@ -1062,6 +1085,7 @@ le
 leonardoce
 li
 libpq
+libpq's
 lifecycle
 lifecycles
 linodeobjects
@@ -1183,8 +1207,10 @@ ownerReference
 parseable
 paru
 passfile
+passthrough
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
@@ -1378,6 +1404,9 @@ ro
 robfig
 roleRef
 roleconfiguration
+rolelist
+rolespec
+rolestate
 rolestatus
 rollout
 rollouts
@@ -1582,6 +1611,7 @@ unencrypted
 unfence
 unfencing
 unix
+unmanaged
 unsatisfiable
 unschedulable
 unsetting
@@ -1602,6 +1632,7 @@ validUntil
 validatingwebhookconfigurations
 validator
 valueFrom
+verifier
 virtualized
 virtualxid
 volumeMode
@@ -1610,6 +1641,7 @@ volumeSnapshot
 volumeSnapshots
 volumesnapshot
 volumesnapshotconfiguration
+vpa
 waitForArchive
 wal
 walCapabilities

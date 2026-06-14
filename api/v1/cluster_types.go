@@ -795,8 +795,10 @@ type ManagedRoles struct {
 	// +optional
 	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
 
-	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-	// with an explanation of the cause
+	// CannotReconcile lists roles that cannot be reconciled, with an
+	// explanation of the cause. Failures may originate in PostgreSQL
+	// (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+	// the referenced password Secret cannot be fetched).
 	// +optional
 	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
 
@@ -852,6 +854,13 @@ type ClusterStatus struct {
 	// The total number of ready instances in the cluster. It is equal to the number of ready instance pods.
 	// +optional
 	ReadyInstances int `json:"readyInstances,omitempty"`
+
+	// Selector is the serialized form of the label selector that identifies
+	// the pods managed by this cluster. Populated by the operator and exposed
+	// through the scale sub-resource so an autoscaler (such as HPA or VPA)
+	// can discover the managed instance pods.
+	// +optional
+	Selector string `json:"selector,omitempty"`
 
 	// InstancesStatus indicates in which status the instances are
 	// +optional
@@ -2559,6 +2568,7 @@ type PluginStatus struct {
 type RoleConfiguration struct {
 	// Name of the role
 	Name string `json:"name"`
+
 	// Description of the role
 	// +optional
 	Comment string `json:"comment,omitempty"`
@@ -2569,8 +2579,10 @@ type RoleConfiguration struct {
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	// Secret containing the password of the role (if present)
-	// If null, the password will be ignored unless DisablePassword is set
+	// Secret containing the password of the role (if present).
+	// If null, the password will be ignored unless DisablePassword is set.
+	// When set, the secret must follow the `kubernetes.io/basic-auth` format
+	// and contain both a `username` and a `password` field.
 	// +optional
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
 
@@ -2587,11 +2599,13 @@ type RoleConfiguration struct {
 
 	// List of one or more existing roles to which this role will be
 	// immediately added as a new member. Default empty.
+	// Changes to the list are applied to an existing role through
+	// `GRANT` and `REVOKE` statements, not only at role creation.
 	// +optional
 	InRoles []string `json:"inRoles,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
-	// Defaults is `true`.
+	// Default is `true`.
 	// +kubebuilder:default:=true
 	// +optional
 	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
@@ -2646,7 +2660,7 @@ type RoleConfiguration struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
-// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
+// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances,selectorpath=.status.selector
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Instances",type="integer",JSONPath=".status.instances",description="Number of instances"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"

@@ -3300,6 +3300,8 @@ spec:
                           description: |-
                             List of one or more existing roles to which this role will be
                             immediately added as a new member. Default empty.
+                            Changes to the list are applied to an existing role through
+                            `GRANT` and `REVOKE` statements, not only at role creation.
                           items:
                             type: string
                           type: array
@@ -3307,7 +3309,7 @@ spec:
                           default: true
                           description: |-
                             Whether a role "inherits" the privileges of roles it is a member of.
-                            Defaults is `true`.
+                            Default is `true`.
                           type: boolean
                         login:
                           description: |-
@@ -3321,8 +3323,10 @@ spec:
                           type: string
                         passwordSecret:
                           description: |-
-                            Secret containing the password of the role (if present)
-                            If null, the password will be ignored unless DisablePassword is set
+                            Secret containing the password of the role (if present).
+                            If null, the password will be ignored unless DisablePassword is set.
+                            When set, the secret must follow the `kubernetes.io/basic-auth` format
+                            and contain both a `username` and a `password` field.
                           properties:
                             name:
                               description: Name of the referent.
@@ -7093,8 +7097,10 @@ spec:
                         type: string
                       type: array
                     description: |-
-                      CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
-                      with an explanation of the cause
+                      CannotReconcile lists roles that cannot be reconciled, with an
+                      explanation of the cause. Failures may originate in PostgreSQL
+                      (e.g. dropping a role that owns objects) or in Kubernetes (e.g.
+                      the referenced password Secret cannot be fetched).
                     type: object
                   passwordStatus:
                     additionalProperties:
@@ -7407,6 +7413,13 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              selector:
+                description: |-
+                  Selector is the serialized form of the label selector that identifies
+                  the pods managed by this cluster. Populated by the operator and exposed
+                  through the scale sub-resource so an autoscaler (such as HPA or VPA)
+                  can discover the managed instance pods.
+                type: string
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
                   to replica cluster
@@ -7500,6 +7513,7 @@ spec:
     storage: true
     subresources:
       scale:
+        labelSelectorPath: .status.selector
         specReplicasPath: .spec.instances
         statusReplicasPath: .status.instances
       status: {}

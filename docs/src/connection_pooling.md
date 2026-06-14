@@ -59,6 +59,12 @@ spec:
     The pooler name can't be the same as any cluster name in the same namespace.
 :::
 
+:::warning
+    The `spec.cluster` field is immutable after creation. To point a pooler at
+    a different `Cluster`, create a new `Pooler` resource instead of updating
+    an existing one.
+:::
+
 This example creates a `Pooler` resource called `pooler-example-rw`
 that's strictly associated with the Postgres `Cluster` resource called
 `cluster-example`. It points to the primary, identified by the read/write
@@ -192,14 +198,25 @@ GRANT CONNECT ON DATABASE postgres TO cnpg_pooler_pgbouncer;
 
 Create the lookup function for password verification. This function is created
 in the `postgres` database with `SECURITY DEFINER` privileges and is used by
-PgBouncer’s `auth_query` option:
+PgBouncer’s `auth_query` option. Because it runs as the function owner, its
+`search_path` is pinned to `pg_catalog, pg_temp` so that the function body
+cannot resolve operators or objects through a caller- or
+tenant-controlled `search_path`:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
   RETURNS TABLE (usename name, passwd text)
-  LANGUAGE sql SECURITY DEFINER AS
+  LANGUAGE sql SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp AS
   'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
 ```
+
+:::note
+Clusters created with an earlier version of CloudNativePG carry a
+`user_search` function without the pinned `search_path`. The operator
+recreates the function with the `SET search_path` clause automatically
+during reconciliation when the cluster is upgraded.
+:::
 
 Restrict and grant permissions on the lookup function:
 

@@ -384,6 +384,16 @@ Objects in each list will be processed sequentially.
     leaving the cluster incomplete and requiring manual intervention.
 :::
 
+:::note
+These queries run with the standard `"$user", public` `search_path`, even
+though operator-issued connections otherwise pin a fixed `search_path` for
+security reasons.
+See [Schema resolution and `search_path` hardening](security.md#schema-resolution-and-search_path-hardening)
+for details.
+Schema-qualify object references if you need them to be independent of the
+`search_path`.
+:::
+
 :::info[Important]
     Ensure the existence of entries inside the ConfigMaps or Secrets specified
     in `postInitSQLRefs`, `postInitTemplateSQLRefs`, and

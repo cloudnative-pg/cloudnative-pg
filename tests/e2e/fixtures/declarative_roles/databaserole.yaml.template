@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: role-dante
+spec:
+  cluster:
+    name: cluster-with-declarative-roles
+  name: dante
+  ensure: present
+  comment: my database-side comment
+  login: true
+  superuser: false
+  createdb: true
+  createrole: false
+  inherit: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  validUntil: "2053-04-12T15:04:05Z"
+  inRoles:
+    - pg_monitor
+    - pg_signal_backend

@@ -35,6 +35,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	storageasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/storage"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
@@ -133,7 +135,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
 
 		// Setting up a cluster with three podutils is slow, usually 200-600s
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 	}
 
 	// Verify that the pod name changes amount to an expected number
@@ -231,7 +233,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var originalPodUID []types.UID
 		var originalPVCUID []types.UID
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 
 		// Gather the number of instances in this Cluster
 		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -266,14 +268,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimaryUpdateMethod(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -382,7 +384,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		clusterutils.AddTopologySpreadConstraint(cluster)
 		err = env.Client.Create(env.Ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Gather the number of instances in this Cluster
 		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -404,7 +406,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			Expect(err).ToNot(HaveOccurred())
 		})
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
+		clusterasserts.AssertClusterIsReady(env, namespace, clusterName, testTimeouts[timeouts.ClusterIsReady])
 
 		// Since we're using a pvc, after the update the podutils should
 		// have been created with the same name using the same pvc.
@@ -423,14 +425,14 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			AssertPvcHasLabels(namespace, clusterName)
+			storageasserts.AssertPvcHasLabels(env, namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimaryUpdateMethod(namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
+			clusterasserts.AssertPrimaryUpdateMethod(env, namespace, clusterName, originalPrimaryPod, primaryUpdateMethod)
 		})
 		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {

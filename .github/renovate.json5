@@ -176,7 +176,6 @@
         'major',
       ],
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
@@ -193,7 +192,6 @@
       ],
       groupName: 'all non-major go dependencies',
       matchPackageNames: [
-        '*',
         '!k8s.io{/,}**',
         '!sigs.k8s.io{/,}**',
         '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',

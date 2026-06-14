@@ -45,9 +45,17 @@ operator and a PostgreSQL cluster configuration.
 
 ### Operator deployment via declarative configuration
 
-The operator is installed in a declarative way using a Kubernetes manifest
-that defines four major `CustomResourceDefinition` objects: `Cluster`, `Pooler`,
-`Backup`, and `ScheduledBackup`.
+The operator is installed in a declarative way using a Kubernetes manifest that
+defines the core `CustomResourceDefinition` objects required to manage the
+PostgreSQL lifecycle. These include:
+
+- **Configuration & Topology:** `Cluster`, `Pooler`, `ImageCatalog`, and
+  `ClusterImageCatalog`.
+- **Identity & Schema:** `DatabaseRole` and `Database`.
+- **Business Continuity:** `Backup`, `ScheduledBackup`, `Publication`, and
+  `Subscription`.
+- **Runtime Orchestration:** `FailoverQuorum` (used by the operator for
+  consensus during automated failover).
 
 ### PostgreSQL cluster deployment via declarative configuration
 
@@ -55,9 +63,13 @@ You define a PostgreSQL cluster (operand) using the `Cluster` custom resource
 in a fully declarative way. The PostgreSQL version is determined by the operand
 container image defined in the CR, which is automatically fetched from the
 requested registry.
-When deploying an operand, the operator also creates the following resources:
-`Pod`, `Service`, `Secret`, `ConfigMap`, `PersistentVolumeClaim`,
-`PodDisruptionBudget`, `ServiceAccount`, `RoleBinding`, and `Role`.
+
+The operator orchestrates the deployment by creating and managing standard
+Kubernetes resources (`Pod`, `Service`, `Secret`, `ConfigMap`,
+`PersistentVolumeClaim`, `PodDisruptionBudget`, `ServiceAccount`,
+`RoleBinding`, and `Role`), and reconciles user-defined CNPG resources such as
+`Database` and `DatabaseRole` to ensure the database environment matches the
+desired state.
 
 You can optionally provide a pre-existing ServiceAccount for both `Cluster` and
 `Pooler` resources. This shared ServiceAccount support enables seamless
@@ -189,8 +201,20 @@ authentication rules in the `postgresql` section of the CR.
 ### Configuration of Postgres roles, users, and groups
 
 CloudNativePG supports
-[management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
-using the `.spec.managed.roles` stanza.
+[comprehensive management of PostgreSQL roles, users, and groups](declarative_role_management.md)
+through two declarative methods:
+
+- The `DatabaseRole` CRD (Recommended): A standalone resource for granular lifecycle
+  management. It includes a `databaseRoleReclaimPolicy` (supporting `retain` or
+  `delete`) to define whether the database role should be dropped when the
+  Kubernetes resource is removed.
+
+- The `managed` stanza: For simpler requirements, roles can be defined inline
+  within the `.spec.managed.roles` section of the `Cluster` resource.
+
+Both methods provide automated reconciliation of role attributes (e.g.,
+`login`, `superuser`, `connectionLimit`) and secure, versioned password
+management via Kubernetes Secrets.
 
 ### Configuration of Postgres extensions
 
@@ -589,7 +613,12 @@ The operator allows you to scale up and down the number of instances in a
 PostgreSQL cluster. New replicas are started up from the
 primary server and participate in the cluster's HA infrastructure.
 The CRD declares a "scale" subresource that allows you to use the
-`kubectl scale` command.
+`kubectl scale` command. The scale subresource also publishes the label
+selector of the managed instance pods, which lets autoscalers discover them.
+See the [Vertical Pod Autoscaler integration](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+for the recommended use, and the
+[Horizontal Pod Autoscaler integration](resource_management.md#integration-with-the-horizontal-pod-autoscaler-hpa)
+for the caveats that apply to HPA.
 
 ### Maintenance window and PodDisruptionBudget for Kubernetes nodes
 
@@ -638,6 +667,10 @@ to clone the data from the primary again.
 The operator allows administrators to control and manage resource usage by
 the cluster's pods in the `resources` section of the manifest. In
 particular, you can set `requests` and `limits` values for both CPU and RAM.
+Because the `Cluster` exposes a label selector through its scale subresource,
+it can also be used as a target for the
+[Vertical Pod Autoscaler](resource_management.md#integration-with-the-vertical-pod-autoscaler-vpa)
+in recommendation-only mode, to obtain sizing suggestions for these values.
 
 ### Connection pooling with PgBouncer
 
@@ -653,11 +686,16 @@ connect to the PgBouncer service and start reusing any existing connection.
 ### Logical Replication
 
 CloudNativePG supports PostgreSQL's logical replication in a declarative manner
-using `Publication` and `Subscription` custom resource definitions.
+using the `Publication` and `Subscription` custom resource definitions.
 
-Logical replication is particularly useful together with the import facility
-for online data migrations (even from public DBaaS solutions) and major
-PostgreSQL upgrades.
+Logical replication is particularly useful for:
+
+- Online data migrations: Moving data from external PostgreSQL instances or
+  public DBaaS solutions with minimal downtime.
+- Major PostgreSQL upgrades: Facilitating near-zero-downtime upgrades between
+  major versions.
+- Selective Data Distribution: Replicating specific tables or data sets across
+  different clusters for reporting or localized workloads.
 
 ## Level 4: Deep insights
 
@@ -737,6 +775,11 @@ the cluster. It does this by either becoming the new primary or by following it.
 In case the former primary comes back up, the same mechanism avoids a
 split-brain by preventing applications from reaching it, running `pg_rewind` on
 the server and restarting it as a standby.
+If synchronous failover quorum is enabled, the operator's "Auto Pilot" logic
+becomes even more sophisticated: it will actively block a promotion if a quorum
+of replicas cannot verify the transaction state. This prevents accidental data
+loss during complex failure scenarios, such as network partitions affecting
+both the primary and its synchronous standby.
 
 ### Automated recreation of a standby
 

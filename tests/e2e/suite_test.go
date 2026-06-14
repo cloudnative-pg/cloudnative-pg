@@ -87,7 +87,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		}
 		return s
 	}
-	_, _ = fmt.Fprintf(GinkgoWriter, `
+	_, _ = fmt.Fprintf(
+		GinkgoWriter, `
 E2E test configuration:
   Postgres image:                %s:%s
   Postgres version:              %d

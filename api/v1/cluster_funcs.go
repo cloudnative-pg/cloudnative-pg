@@ -37,6 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -413,8 +414,8 @@ func (config *PluginConfiguration) IsEnabled() bool {
 	return *config.Enabled
 }
 
-// GetRoleSecretsName gets the name of the secret which is used to store the role's password
-func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
+// GetRoleSecretName gets the name of the secret which is used to store the role's password
+func (roleConfiguration *RoleConfiguration) GetRoleSecretName() string {
 	if roleConfiguration.PasswordSecret != nil {
 		return roleConfiguration.PasswordSecret.Name
 	}
@@ -713,6 +714,17 @@ func (cluster *Cluster) GetServiceReadOnlyName() string {
 // read-write transactions
 func (cluster *Cluster) GetServiceReadWriteName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadWriteSuffix)
+}
+
+// GetInstancesSelector returns the serialized label selector that matches all
+// the instance pods managed by this cluster. It is published in the status and
+// exposed through the scale sub-resource so that autoscalers (such as HPA or
+// VPA) can discover the managed pods.
+func (cluster *Cluster) GetInstancesSelector() string {
+	return labels.SelectorFromSet(labels.Set{
+		utils.ClusterLabelName: cluster.Name,
+		utils.PodRoleLabelName: string(utils.PodRoleInstance),
+	}).String()
 }
 
 // GetMaxStartDelay get the amount of time of startDelay config option

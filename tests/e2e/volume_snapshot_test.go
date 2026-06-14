@@ -37,6 +37,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	backupasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/backup"
+	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
+	minioasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/minio"
+	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/internal/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
@@ -108,7 +113,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				// Creating a cluster with three nodes
-				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+				clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterName, sampleFile)
 			})
 
 			It("can create a Volume Snapshot", func() {
@@ -125,7 +130,7 @@ var _ = Describe("Verify Volume Snapshot",
 					}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 					// trigger a checkpoint as the backup may run on standby
-					CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
+					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterName)
 					Eventually(func(g Gomega) {
 						backupList, err := backups.List(env.Ctx, env.Client, namespace)
 						g.Expect(err).ToNot(HaveOccurred())
@@ -224,7 +229,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("creating the cluster to snapshot", func() {
-					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
 				By("verify connectivity of barman to minio", func() {
@@ -259,7 +264,7 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 					// trigger a checkpoint
-					CheckPointAndSwitchWalOnPrimary(namespace, clusterToSnapshotName)
+					minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToSnapshotName)
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -289,13 +294,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Create a "test" table with values 1,2
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
@@ -330,11 +335,18 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 3, conn)
-					insertRecordIntoTable(tableName, 4, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				assertRecoveryIsAtExpectedPointInTime := func(restoreFile string) {
@@ -342,19 +354,23 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 
 					By("creating the cluster to be restored through snapshot and PITR", func() {
-						AssertCreateCluster(namespace, clusterToRestoreName, restoreFile, env)
-						AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-							env)
+						clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, restoreFile)
+						clusterasserts.AssertClusterIsReady(
+							env,
+							namespace,
+							clusterToRestoreName,
+							testTimeouts[timeouts.ClusterIsReadySlow],
+						)
 					})
 
 					By("verifying the correct data exists in the restored cluster", func() {
-						tableLocator := TableLocator{
+						tableLocator := pgasserts.TableLocator{
 							Namespace:    namespace,
 							ClusterName:  clusterToRestoreName,
 							DatabaseName: postgres.AppDBName,
 							TableName:    tableName,
 						}
-						AssertDataExpectedCount(env, tableLocator, 2)
+						pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 					})
 				}
 
@@ -438,27 +454,27 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster on which to execute the backup", func() {
-					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackupFilePath, env)
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToBackupName, clusterToBackupFilePath)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadySlow])
 				})
 			})
 
 			It("can create a declarative cold backup and restoring using it", func() {
 				By("inserting test data", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToBackupName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 				})
 
 				backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFileFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the backup", func() {
-					err := CreateResourcesFromFileWithError(namespace, backupFileFilePath)
+					err := resources.CreateResourcesFromFileWithError(env, namespace, backupFileFilePath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -472,7 +488,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -503,22 +519,19 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the restore", func() {
-					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
-					AssertClusterIsReady(namespace,
+					resources.CreateResourceFromFile(env, namespace, clusterToRestoreFilePath)
+					clusterasserts.AssertClusterIsReady(env, namespace,
 						clusterToRestoreName,
-						testTimeouts[timeouts.ClusterIsReady],
-						env,
-					)
+						testTimeouts[timeouts.ClusterIsReady])
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
-					tableLocator := TableLocator{
-						Namespace:    namespace,
-						ClusterName:  clusterToRestoreName,
-						DatabaseName: postgres.AppDBName,
-						TableName:    tableName,
+					tableLocator := pgasserts.TableLocator{
+						Namespace:   namespace,
+						ClusterName: clusterToRestoreName,
+						TableName:   tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 2)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 			It("can take a snapshot targeting the primary", func() {
@@ -526,7 +539,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the backup", func() {
-					err := CreateResourcesFromFileWithError(namespace, backupPrimaryFilePath)
+					err := resources.CreateResourcesFromFileWithError(env, namespace, backupPrimaryFilePath)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -541,7 +554,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -563,8 +576,9 @@ var _ = Describe("Verify Volume Snapshot",
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
-						env)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+					)
 				})
 			})
 
@@ -607,7 +621,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).NotTo(HaveOccurred())
 				})
 
-				CheckPointAndSwitchWalOnPrimary(namespace, clusterToBackupName)
+				minioasserts.CheckPointAndSwitchWalOnPrimary(env, namespace, clusterToBackupName)
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
@@ -618,7 +632,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterToBackupName)
+					backupasserts.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -640,8 +654,9 @@ var _ = Describe("Verify Volume Snapshot",
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
-						env)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+					)
 				})
 			})
 		})
@@ -694,7 +709,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("creating the cluster to snapshot", func() {
-					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToSnapshotName, clusterToSnapshot)
 				})
 
 				By("verify connectivity of barman to minio", func() {
@@ -735,20 +750,27 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Create a "test" table with values 1,2
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertCreateTestData(env, tableLocator)
+					pgasserts.AssertCreateTestData(env, tableLocator)
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 3, conn)
-					insertRecordIntoTable(tableName, 4, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 3, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				By("creating a snapshot and waiting until it's completed", func() {
@@ -801,19 +823,20 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
-						env)
+					clusterasserts.AssertCreateCluster(env, testTimeouts, namespace, clusterToRestoreName, clusterSnapshotRestoreFile)
+					clusterasserts.AssertClusterIsReady(
+						env, namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+					)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToRestoreName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 4)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 4)
 				})
 			})
 
@@ -837,11 +860,18 @@ var _ = Describe("Verify Volume Snapshot",
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(tableName, 5, conn)
-					insertRecordIntoTable(tableName, 6, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 5, conn)
+					pgasserts.InsertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+					minioasserts.AssertArchiveWalOnMinio(
+						env,
+						testTimeouts,
+						minioEnv,
+						namespace,
+						clusterToSnapshotName,
+						clusterToSnapshotName,
+					)
 				})
 
 				// reuse the snapshot taken from the clusterToSnapshot cluster
@@ -865,7 +895,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("checking the cluster is working", func() {
 					// Setting up a cluster with three pods is slow, usually 200-600s
-					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady], env)
+					clusterasserts.AssertClusterIsReady(env, namespace, clusterToSnapshotName, testTimeouts[timeouts.ClusterIsReady])
 				})
 
 				By("checking the new replicas have been created using the snapshot", func() {
@@ -886,13 +916,13 @@ var _ = Describe("Verify Volume Snapshot",
 						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					tableLocator := TableLocator{
+					tableLocator := pgasserts.TableLocator{
 						Namespace:    namespace,
 						ClusterName:  clusterToSnapshotName,
 						DatabaseName: postgres.AppDBName,
 						TableName:    tableName,
 					}
-					AssertDataExpectedCount(env, tableLocator, 6)
+					pgasserts.AssertDataExpectedCount(env, tableLocator, 6)
 				})
 			})
 
