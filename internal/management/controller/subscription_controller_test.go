@@ -384,6 +384,58 @@ var _ = Describe("Managed subscription controller tests", func() {
 		Expect(subscription.Status.Applied).Should(BeNil())
 		Expect(subscription.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
+
+	// The demotion behavior is identical across the three managed-object
+	// controllers, and so are its tests.
+	It("voids the recorded reconciliation when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(subscriptionReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(BeNil())
+		Expect(subscription.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
+		Expect(subscription.Status.ObservedGeneration).To(BeZero())
+	})
+
+	It("keeps an applied subscription untouched on pods other than the designated primary", func(ctx SpecContext) {
+		subscription.Status.Applied = ptr.To(true)
+		subscription.Status.ObservedGeneration = subscription.Generation
+		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+		cluster.Status.CurrentPrimary = "another-pod"
+		cluster.Status.TargetPrimary = "another-pod"
+		Expect(fakeClient.Status().Update(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(subscription), subscription)).To(Succeed())
+		Expect(subscription.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(subscription.Status.ObservedGeneration).NotTo(BeZero())
+	})
 })
 
 func reconcileSubscription(

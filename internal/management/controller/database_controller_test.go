@@ -34,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -369,6 +370,89 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(database.Status.Applied).Should(BeNil())
 		Expect(database.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+	})
+
+	// The demotion behavior is identical across the three managed-object
+	// controllers, and so are its tests.
+	It("voids the recorded reconciliation when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+		database.Status.Applied = ptr.To(true)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.GetNamespace(),
+			Name:      database.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(databaseReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(database), database)).To(Succeed())
+		Expect(database.Status.Applied).To(BeNil())
+		Expect(database.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
+		Expect(database.Status.ObservedGeneration).To(BeZero())
+	})
+
+	It("keeps an applied database untouched on pods other than the designated primary", func(ctx SpecContext) {
+		database.Status.Applied = ptr.To(true)
+		database.Status.ObservedGeneration = database.Generation
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+		cluster.Status.CurrentPrimary = "another-pod"
+		cluster.Status.TargetPrimary = "another-pod"
+		Expect(fakeClient.Status().Update(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.GetNamespace(),
+			Name:      database.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(database), database)).To(Succeed())
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.ObservedGeneration).NotTo(BeZero())
+	})
+
+	It("enqueues only the Databases of this instance's cluster on cluster events", func(ctx SpecContext) {
+		mapFn := mapClusterToManagedResources(r.instance, fakeClient,
+			func() client.ObjectList { return &apiv1.DatabaseList{} })
+
+		other := database.DeepCopy()
+		other.Name = "obj-other-cluster"
+		other.ResourceVersion = ""
+		other.Spec.ClusterRef.Name = "another-cluster"
+		Expect(fakeClient.Create(ctx, other)).To(Succeed())
+
+		// Same cluster name, different namespace: only the namespace guard
+		// in the mapper keeps this one out.
+		foreign := database.DeepCopy()
+		foreign.Name = "obj-other-namespace"
+		foreign.Namespace = "other-ns"
+		foreign.ResourceVersion = ""
+		Expect(fakeClient.Create(ctx, foreign)).To(Succeed())
+
+		Expect(mapFn(ctx, cluster)).To(ConsistOf(reconcile.Request{
+			NamespacedName: types.NamespacedName{Namespace: database.GetNamespace(), Name: database.GetName()},
+		}))
+
+		otherCluster := cluster.DeepCopy()
+		otherCluster.Name = "another-cluster"
+		Expect(mapFn(ctx, otherCluster)).To(BeEmpty())
+
+		foreignCluster := cluster.DeepCopy()
+		foreignCluster.Namespace = "other-ns"
+		Expect(mapFn(ctx, foreignCluster)).To(BeEmpty())
 	})
 })
 
