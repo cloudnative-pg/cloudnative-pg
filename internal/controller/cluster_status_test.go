@@ -618,3 +618,58 @@ var _ = Describe("updateClusterStatusThatRequiresInstancesState tests", func() {
 		})
 	})
 })
+
+var _ = Describe("refreshSecretResourceVersions tests", func() {
+	var (
+		env     *testingEnvironment
+		cluster *apiv1.Cluster
+	)
+
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+		cluster = newFakeCNPGCluster(env.client, newFakeNamespace(env.client))
+	})
+
+	It("should set superuser secret version", func(ctx SpecContext) {
+		// set up superuser secret and grab the resource version from it
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-secret",
+				Namespace: cluster.Namespace,
+			},
+		}
+		err := env.clusterReconciler.Client.Create(context.TODO(), secret)
+		Expect(err).To(BeNil())
+		err = env.clusterReconciler.Client.Get(context.TODO(), types.NamespacedName{Name: "test-secret", Namespace: cluster.Namespace}, secret)
+		Expect(err).To(BeNil())
+		expectedResourceVersion := secret.ObjectMeta.ResourceVersion
+		Expect(expectedResourceVersion).NotTo(BeEmpty())
+
+		cluster.Status.SecretsResourceVersion = apiv1.SecretsResourceVersion{
+			SuperuserSecretVersion: "",
+		}
+		val := true
+		cluster.Spec.EnableSuperuserAccess = &val
+		cluster.Spec.SuperuserSecret = &apiv1.LocalObjectReference{
+			Name: "test-secret",
+		}
+
+		err = env.clusterReconciler.refreshSecretResourceVersions(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.SecretsResourceVersion.SuperuserSecretVersion).To(Equal(expectedResourceVersion))
+	})
+
+	It("should reset superuser secret version", func(ctx SpecContext) {
+		cluster.Status.SecretsResourceVersion = apiv1.SecretsResourceVersion{
+			SuperuserSecretVersion: "42",
+		}
+		val := false
+		cluster.Spec.EnableSuperuserAccess = &val
+
+		err := env.clusterReconciler.refreshSecretResourceVersions(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.SecretsResourceVersion.SuperuserSecretVersion).To(BeEmpty())
+	})
+})
