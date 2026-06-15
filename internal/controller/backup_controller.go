@@ -235,12 +235,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return hookResult.Result, hookResult.Err
 	}
 
-	// A backup in the "started" phase has been handed over to the instance
-	// manager, and only its progress updates will generate new reconciliations.
-	// If the instance manager is restarted before the backup moves forward, no
-	// update will ever arrive, so check back to give isValidBackupRunning a
-	// chance to detect the lost backup; from then on the running-backup branch
-	// above keeps requeuing.
+	// A backup in the "started" phase advances only through the instance
+	// manager's progress updates. If the instance manager is restarted before
+	// the backup moves forward, for example during an operator in-place
+	// upgrade, no update arrives, so requeue to re-enter Reconcile. The
+	// isCurrentBackupRunning check above then re-validates the session and
+	// fails the backup if the instance manager is gone; otherwise the
+	// running-backup branch above takes over the requeuing. This relies on that
+	// check running before the start switch, and it is the only re-check for
+	// plugin backups, which never transition to the "running" phase.
 	if backup.Status.Phase == apiv1.BackupPhaseStarted {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
