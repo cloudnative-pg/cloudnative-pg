@@ -75,23 +75,58 @@ func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *
 	if err := r.Get(ctx, client.ObjectKeyFromObject(&lease), existing); err != nil {
 		return err
 	}
-	if metav1.IsControlledBy(existing, cluster) {
+	switch classifyLeaseAdoption(existing, cluster) {
+	case adoptAlreadyOurs:
 		return nil
-	}
-	if owner := metav1.GetControllerOf(existing); owner != nil &&
-		(owner.Kind != apiv1.ClusterKind ||
-			owner.APIVersion != apiv1.SchemeGroupVersion.String() ||
-			owner.Name != cluster.Name) {
+	case adoptRefuseForeign:
+		owner := metav1.GetControllerOf(existing)
 		err := fmt.Errorf("primary lease %s/%s is controlled by %s %q, refusing to adopt",
 			existing.Namespace, existing.Name, owner.Kind, owner.Name)
 		r.Recorder.Eventf(cluster, "Warning", "PrimaryLeaseConflict", "%v", err)
 		return err
+	case adoptOrphan:
+		cluster.SetInheritedDataAndOwnership(&existing.ObjectMeta)
+		if err := r.Update(ctx, existing); err != nil {
+			return err
+		}
+		contextLogger.Info("Adopted orphan primary lease", "leaseName", existing.Name)
 	}
-
-	cluster.SetInheritedDataAndOwnership(&existing.ObjectMeta)
-	if err := r.Update(ctx, existing); err != nil {
-		return err
-	}
-	contextLogger.Info("Adopted orphan primary lease", "leaseName", existing.Name)
 	return nil
+}
+
+// leaseAdoption is the decision made about an existing Lease named after the
+// cluster but not (yet) controlled by it.
+type leaseAdoption int
+
+const (
+	// adoptAlreadyOurs means the lease is already controlled by this cluster
+	// (UID match). No write is needed.
+	adoptAlreadyOurs leaseAdoption = iota
+	// adoptOrphan means the lease has no controllerRef, or its controllerRef
+	// points at a previous incarnation of this same cluster (same Kind, same
+	// APIVersion, same name, different UID). Safe to rewrite ownership.
+	adoptOrphan
+	// adoptRefuseForeign means the lease is genuinely controlled by something
+	// else (different kind, different apiVersion, or different name). We must
+	// not take it over.
+	adoptRefuseForeign
+)
+
+// classifyLeaseAdoption decides what to do with an existing Lease named after
+// the cluster. It is pure so the three branches can be unit-tested without an
+// apiserver.
+func classifyLeaseAdoption(existing *coordinationv1.Lease, cluster *apiv1.Cluster) leaseAdoption {
+	if metav1.IsControlledBy(existing, cluster) {
+		return adoptAlreadyOurs
+	}
+	owner := metav1.GetControllerOf(existing)
+	if owner == nil {
+		return adoptOrphan
+	}
+	if owner.Kind == apiv1.ClusterKind &&
+		owner.APIVersion == apiv1.SchemeGroupVersion.String() &&
+		owner.Name == cluster.Name {
+		return adoptOrphan
+	}
+	return adoptRefuseForeign
 }

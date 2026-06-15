@@ -204,4 +204,102 @@ var _ = Describe("reconcilePrimaryLease", func() {
 		events := r.Recorder.(*record.FakeRecorder).Events
 		Expect(events).To(Receive(ContainSubstring("PrimaryLeaseConflict")))
 	})
+
+	It("refuses to adopt a lease controlled by a different cluster", func(ctx context.Context) {
+		cluster := newCluster()
+		foreign := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clusterName,
+				Namespace: namespace,
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: apiv1.SchemeGroupVersion.String(),
+					Kind:       apiv1.ClusterKind,
+					Name:       "other-cluster",
+					UID:        "other-cluster-uid",
+					Controller: ptr.To(true),
+				}},
+			},
+		}
+		r := newReconciler(cluster, foreign)
+		before := getLease(ctx, r)
+
+		Expect(r.reconcilePrimaryLease(ctx, cluster)).To(MatchError(ContainSubstring("refusing to adopt")))
+
+		after := getLease(ctx, r)
+		Expect(after.ResourceVersion).To(Equal(before.ResourceVersion))
+		Expect(after.OwnerReferences).To(Equal(before.OwnerReferences))
+	})
+})
+
+var _ = Describe("classifyLeaseAdoption", func() {
+	const (
+		clusterName = "test-cluster"
+		namespace   = "default"
+	)
+
+	cluster := &apiv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: apiv1.SchemeGroupVersion.String(),
+			Kind:       apiv1.ClusterKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+			UID:       "new-cluster-uid",
+		},
+	}
+
+	leaseWithOwner := func(refs ...metav1.OwnerReference) *coordinationv1.Lease {
+		return &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            clusterName,
+				Namespace:       namespace,
+				OwnerReferences: refs,
+			},
+		}
+	}
+
+	ourRef := metav1.OwnerReference{
+		APIVersion: apiv1.SchemeGroupVersion.String(),
+		Kind:       apiv1.ClusterKind,
+		Name:       clusterName,
+		UID:        cluster.UID,
+		Controller: ptr.To(true),
+	}
+
+	It("treats a lease controlled by this cluster (UID match) as already ours", func() {
+		Expect(classifyLeaseAdoption(leaseWithOwner(ourRef), cluster)).To(Equal(adoptAlreadyOurs))
+	})
+
+	It("treats a lease with no controllerRef as an orphan", func() {
+		Expect(classifyLeaseAdoption(leaseWithOwner(), cluster)).To(Equal(adoptOrphan))
+	})
+
+	It("treats a stale ref to a previous incarnation of this cluster as an orphan", func() {
+		stale := ourRef
+		stale.UID = "previous-cluster-uid"
+		Expect(classifyLeaseAdoption(leaseWithOwner(stale), cluster)).To(Equal(adoptOrphan))
+	})
+
+	It("refuses a controllerRef of a different kind", func() {
+		differentKind := metav1.OwnerReference{
+			APIVersion: "v1", Kind: "Pod", Name: clusterName,
+			UID: "pod-uid", Controller: ptr.To(true),
+		}
+		Expect(classifyLeaseAdoption(leaseWithOwner(differentKind), cluster)).To(Equal(adoptRefuseForeign))
+	})
+
+	It("refuses a controllerRef of a different apiVersion", func() {
+		differentAPIVersion := ourRef
+		differentAPIVersion.UID = "previous-cluster-uid"
+		differentAPIVersion.APIVersion = "postgresql.cnpg.io/v1beta1"
+		Expect(classifyLeaseAdoption(leaseWithOwner(differentAPIVersion), cluster)).To(Equal(adoptRefuseForeign))
+	})
+
+	It("refuses a controllerRef of a different name", func() {
+		differentName := ourRef
+		differentName.Name = "other-cluster"
+		differentName.UID = "other-cluster-uid"
+		Expect(classifyLeaseAdoption(leaseWithOwner(differentName), cluster)).To(Equal(adoptRefuseForeign))
+	})
 })
