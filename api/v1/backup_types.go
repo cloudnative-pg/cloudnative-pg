@@ -55,7 +55,7 @@ const (
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 
 	// BackupPhaseDefinitionInvalid means the backup definition is invalid
-	BackupPhaseDefinitionInvalid = "invalid cluster definition"
+	BackupPhaseDefinitionInvalid = "invalid backup definition"
 )
 
 // BarmanCredentials an object containing the potential credentials for each cloud provider
