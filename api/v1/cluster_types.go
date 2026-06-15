@@ -565,8 +565,8 @@ type PrimaryLeaseConfiguration struct {
 
 	// How frequently, in seconds, a non-holder instance retries acquiring or
 	// renewing the lease.
-	// Defaults to 2.
-	// +kubebuilder:default:=2
+	// Defaults to 5.
+	// +kubebuilder:default:=5
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	RetryPeriodSeconds *int32 `json:"retryPeriodSeconds,omitempty"`
@@ -1447,7 +1447,7 @@ const (
 
 	// DefaultPrimaryLeaseRetryPeriodSeconds is the default interval, in seconds, between lease
 	// acquisition or renewal attempts.
-	DefaultPrimaryLeaseRetryPeriodSeconds = 2
+	DefaultPrimaryLeaseRetryPeriodSeconds = 5
 
 	// DefaultPrimaryLeaseReleasedDurationSeconds is the default TTL, in seconds, written when the
 	// primary explicitly releases its lease on a clean shutdown.

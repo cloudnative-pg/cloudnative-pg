@@ -43,7 +43,7 @@ var _ = Describe("Primary lease", Label(tests.LabelSelfHealing), func() {
 		level       = tests.Medium
 
 		// Must match .spec.primaryLease.leaseDurationSeconds in the fixture.
-		expectedLeaseDurationSeconds int32 = 30
+		expectedLeaseDurationSeconds int32 = 45
 	)
 	var namespace string
 

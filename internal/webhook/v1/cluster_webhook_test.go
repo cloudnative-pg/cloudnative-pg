@@ -2013,8 +2013,8 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds: ptr.To(int32(15)),
-					RenewDeadlineSeconds: ptr.To(int32(10)),
+					LeaseDurationSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseDurationSeconds)),
+					RenewDeadlineSeconds: ptr.To(int32(apiv1.DefaultPrimaryLeaseRenewDeadlineSeconds)),
 				},
 			},
 		}
@@ -2039,7 +2039,7 @@ var _ = Describe("validatePrimaryLease", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					RenewDeadlineSeconds: ptr.To(int32(12)),
+					RenewDeadlineSeconds: ptr.To(int32(8)),
 				},
 			},
 		}
@@ -2097,13 +2097,13 @@ var _ = Describe("validatePrimaryLease", func() {
 	})
 
 	It("accepts the documented non-default tuning example", func() {
-		// Mirrors the failover.md example (30/20/4) plus the fixture's released TTL.
+		// Mirrors the failover.md example (60/40/15) plus the fixture's released TTL.
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PrimaryLease: &apiv1.PrimaryLeaseConfiguration{
-					LeaseDurationSeconds:         ptr.To(int32(30)),
-					RenewDeadlineSeconds:         ptr.To(int32(20)),
-					RetryPeriodSeconds:           ptr.To(int32(4)),
+					LeaseDurationSeconds:         ptr.To(int32(60)),
+					RenewDeadlineSeconds:         ptr.To(int32(40)),
+					RetryPeriodSeconds:           ptr.To(int32(15)),
 					ReleasedLeaseDurationSeconds: ptr.To(int32(2)),
 				},
 			},

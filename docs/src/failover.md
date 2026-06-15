@@ -136,7 +136,7 @@ leader-election parameters.
 | ------------------------------ | ------- | -------------------------------------------------------------------------- |
 | `leaseDurationSeconds`         | `15`    | How long the lease is valid before another instance may acquire it.        |
 | `renewDeadlineSeconds`         | `10`    | How long the primary keeps retrying to renew the lease before giving up.   |
-| `retryPeriodSeconds`           | `2`     | How frequently a non-holder retries acquiring or renewing the lease.       |
+| `retryPeriodSeconds`           | `5`     | How frequently a non-holder retries acquiring or renewing the lease.       |
 | `releasedLeaseDurationSeconds` | `1`     | TTL written when the primary releases the lease on a clean shutdown.       |
 
 For example, to make the cluster more tolerant of a slow or briefly unreachable
@@ -145,9 +145,9 @@ API server:
 ```yaml
 spec:
   primaryLease:
-    leaseDurationSeconds: 30
-    renewDeadlineSeconds: 20
-    retryPeriodSeconds: 4
+    leaseDurationSeconds: 60
+    renewDeadlineSeconds: 40
+    retryPeriodSeconds: 15
 ```
 
 :::warning

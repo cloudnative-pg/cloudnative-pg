@@ -70,10 +70,6 @@ const (
 	userSearchFunctionSchema = "public"
 	userSearchFunctionName   = "user_search"
 	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
-
-	// primaryLeaseAcquireTimeout is how long reconcilePrimary waits to acquire
-	// the primary lease before giving up and requeueing.
-	primaryLeaseAcquireTimeout = 10 * time.Second
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -1188,10 +1184,14 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		return reconcile.Result{}, nil
 	}
 
-	acquireCtx, acquireCancel := context.WithTimeout(ctx, primaryLeaseAcquireTimeout)
+	// Wait up to one full lease duration so a candidate primary can acquire in
+	// a single Acquire call rather than across multiple reconciles when the
+	// previous holder's lease has not yet expired.
+	acquireTimeout := cluster.GetPrimaryLeaseDuration()
+	acquireCtx, acquireCancel := context.WithTimeout(ctx, acquireTimeout)
 	defer acquireCancel()
 	leaseConfig := lease.Config{
-		LeaseDuration:         cluster.GetPrimaryLeaseDuration(),
+		LeaseDuration:         acquireTimeout,
 		RenewDeadline:         cluster.GetPrimaryLeaseRenewDeadline(),
 		RetryPeriod:           cluster.GetPrimaryLeaseRetryPeriod(),
 		ReleasedLeaseDuration: cluster.GetPrimaryLeaseReleasedDuration(),
@@ -1199,7 +1199,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	if err := r.primaryLeaseAcquirer.Acquire(acquireCtx, leaseConfig); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			contextLogger.Warning("Primary lease not yet acquired, retrying")
-			return reconcile.Result{RequeueAfter: primaryLeaseAcquireTimeout}, nil
+			return reconcile.Result{RequeueAfter: acquireTimeout}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("acquiring primary lease: %w", err)
 	}

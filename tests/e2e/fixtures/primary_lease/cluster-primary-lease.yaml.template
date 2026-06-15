@@ -11,9 +11,9 @@ spec:
   # lease acquisition, so editing them on a running primary would not take
   # effect until the pod restarts.
   primaryLease:
-    leaseDurationSeconds: 30
-    renewDeadlineSeconds: 20
-    retryPeriodSeconds: 4
+    leaseDurationSeconds: 45
+    renewDeadlineSeconds: 30
+    retryPeriodSeconds: 8
     releasedLeaseDurationSeconds: 2
 
   primaryUpdateStrategy: unsupervised

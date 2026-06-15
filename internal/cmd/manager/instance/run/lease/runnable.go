@@ -43,7 +43,7 @@ const (
 	defaultRenewDeadline = 10 * time.Second
 
 	// defaultRetryPeriod is how frequently a non-holder retries acquiring the lease.
-	defaultRetryPeriod = 2 * time.Second
+	defaultRetryPeriod = 5 * time.Second
 
 	// defaultReleasedLeaseDuration is the TTL written when explicitly releasing
 	// the lease. An empty HolderIdentity already marks the lease as free, but
@@ -250,11 +250,11 @@ func classifyLeaseAfterRun(
 //     called by the deferred shutdown path in cmd.go.
 //
 //  2. Transient renewal failure: the primary cannot reach the Kubernetes API
-//     server for renewDeadline (10s) and le.Run returns, but the lease TTL
-//     (15s from last renewal) has not yet expired — no other pod has promoted.
-//     We detect this by reading the lease after le.Run returns: if our pod is
-//     still the HolderIdentity, the lease is intact and we loop back into
-//     le.Run to resume renewal.
+//     server for renewDeadline (10s by default) and le.Run returns, but the
+//     lease TTL (15s from last renewal by default) has not yet expired and no
+//     other pod has promoted. We detect this by reading the lease after le.Run
+//     returns: if our pod is still the HolderIdentity, the lease is intact and
+//     we loop back into le.Run to resume renewal.
 //
 //  3. Preemption: the lease has expired and another pod has acquired it, or the
 //     lease object no longer exists. In this case reading the lease reveals a
