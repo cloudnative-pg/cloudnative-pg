@@ -216,9 +216,10 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		},
 		Entry("proceeds for a fresh role on the primary",
 			func(_ *apiv1.DatabaseRole, _ *apiv1.Cluster) {}, nil),
-		Entry("stops when the role is already reconciled",
+		Entry("stops when the role is already reconciled and applied",
 			func(role *apiv1.DatabaseRole, _ *apiv1.Cluster) {
 				role.Status.ObservedGeneration = role.Generation
+				role.Status.Applied = ptr.To(true)
 			}, &ctrl.Result{}),
 		Entry("requeues when this pod is not the primary",
 			func(_ *apiv1.DatabaseRole, cluster *apiv1.Cluster) {
@@ -269,7 +270,7 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
 	})
 
-	It("voids the recorded reconciliation when shadowed after a successful apply", func() {
+	It("reports the conflict but keeps the recorded reconciliation when shadowed after a successful apply", func() {
 		role := newTestDatabaseRole()
 		markReconciled(role)
 		role.Status.Applied = ptr.To(true)
@@ -285,10 +286,12 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(Equal(ptr.To(false)))
 		Expect(got.Status.Message).To(ContainSubstring("managed by the CNPG cluster"))
-		Expect(got.Status.ObservedGeneration).To(BeZero())
+		// The reconciliation is kept so a conflicting DatabaseRole cannot take
+		// over the role while it is shadowed.
+		Expect(got.Status.ObservedGeneration).To(Equal(got.Generation))
 	})
 
-	It("voids the recorded reconciliation when the cluster is demoted after a successful apply", func() {
+	It("reports the replica condition but keeps the recorded reconciliation when the cluster is demoted", func() {
 		role := newTestDatabaseRole()
 		markReconciled(role)
 		role.Status.Applied = ptr.To(true)
@@ -304,7 +307,42 @@ var _ = Describe("DatabaseRole shouldReconcile", func() {
 		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
 		Expect(got.Status.Applied).To(BeNil())
 		Expect(got.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
-		Expect(got.Status.ObservedGeneration).To(BeZero())
+		// Ownership is retained across the demotion: the role still counts as
+		// reconciled, so a conflicting DatabaseRole created meanwhile cannot
+		// take it over once the cluster is promoted back.
+		Expect(got.Status.ObservedGeneration).To(Equal(got.Generation))
+	})
+
+	It("re-applies after a promotion, when a previous demotion left the role unapplied", func() {
+		role := newTestDatabaseRole()
+		markReconciled(role)
+		role.Status.Applied = nil // left as Unknown by a previous demotion
+		cluster := newTestCluster()
+		r := reconcilerFor(role)
+
+		result, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		// A nil result asks the caller to proceed with the regular apply flow.
+		Expect(result).To(BeNil())
+	})
+
+	It("keeps polling without writing on a replica while the cluster status is still settling", func() {
+		role := newTestDatabaseRole()
+		markReconciled(role)
+		role.Status.Applied = ptr.To(true) // stale, not yet cleared
+		cluster := newTestCluster()
+		makeReplica(cluster)
+		cluster.Status.CurrentPrimary = "other-pod" // this pod is not (yet) the designated primary
+		r := reconcilerFor(role)
+
+		result, err := r.shouldReconcile(context.Background(), role, cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(requeue))
+
+		// A non-designated pod must not write the status.
+		got := &apiv1.DatabaseRole{}
+		Expect(r.Get(context.Background(), client.ObjectKeyFromObject(role), got)).To(Succeed())
+		Expect(got.Status.Applied).To(Equal(ptr.To(true)))
 	})
 
 	It("persists Applied=Unknown (nil) on a replica cluster", func() {
