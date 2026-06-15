@@ -60,7 +60,7 @@ func createMajorUpgradeJobDefinition(
 	cluster *apiv1.Cluster,
 	nodeSerial int,
 	extensions []apiv1.ExtensionConfiguration,
-) *batchv1.Job {
+) (*batchv1.Job, error) {
 	// The init container runs the old image and needs old extensions
 	var oldExtensions []apiv1.ExtensionConfiguration
 	if cluster.Status.PGDataImageInfo != nil {
@@ -91,10 +91,13 @@ func createMajorUpgradeJobDefinition(
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, extensions)
+	job, err := specs.CreatePrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand, extensions)
+	if err != nil {
+		return nil, err
+	}
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 	// A failed pg_upgrade will not succeed on retry.
 	job.Spec.BackoffLimit = ptr.To(int32(0))
 
-	return job
+	return job, nil
 }
