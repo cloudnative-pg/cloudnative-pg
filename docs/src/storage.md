@@ -345,32 +345,51 @@ cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
 
-## Volume decrease
+## Volume reduction
 
-Kubernetes does not provide an API allowing decreasing PVC's and CloudNativePG's validating webhook prohibit to decrease the value of `.spec.storage.size` / `.spec.walStorage.size`.
-However there is a procedure that allows you to decrese the size of your PVC's.
+Kubernetes does not provide an API to shrink a PVC, and CloudNativePG's
+validating webhook rejects any attempt to decrease `.spec.storage.size` or
+`.spec.walStorage.size`. You can still reduce the storage of a cluster, but
+only by recreating each instance with a smaller volume, as described below.
 
-:::info[Important]
-    ⚠️ WARNING: If you follow this procedure, you will temporarily disable the validating webhook. Disabling validation may permit unsafe or destructive operations. Use this setting with caution and at your own risk.
+:::warning
+This procedure requires you to temporarily disable the validating webhook.
+While validation is disabled, the operator accepts spec changes that would
+normally be rejected, including unsafe or destructive ones. Proceed with
+caution and at your own risk, and re-enable validation as soon as possible.
 :::
 
-To decrease the persistent volume:
+To reduce the size of the persistent volumes:
 
-1. disable the validating webhook by setting `.metadata.annotations:cnpg.io/validation: disabled`, change `.spec.storage.size` / `.spec.walStorage.size` to the new value and increase `.spec.instnaces` by 1.
-2. enable the validation webhook
-3. remove one standby instance that has the old PVC size
-```
-kubectl-cnpg destroy CLUSTER INSTANCE
-```
-4. wait for the operator create a new instance
-5. repeate this step for every other standby instance
-6. promote one of the new standby instances
-```
-kubectl-cnpg promote CLUSTER INSTANCE
-```
-7. wait until all instances are healthy
-8. decrease `.spec.instnaces` to the initial value
+1. Disable the validating webhook by setting the `cnpg.io/validation: disabled`
+   annotation on the `Cluster`, set `.spec.storage.size` (and, if present,
+   `.spec.walStorage.size`) to the new, smaller value, and increase
+   `.spec.instances` by 1 to provide a spare instance during the rollout.
+2. Re-enable validation by removing the `cnpg.io/validation` annotation (or
+   setting it to `enabled`). The new, smaller size is now stored in the spec
+   and is applied to every instance the operator recreates from this point on.
+3. Destroy one standby that still has a volume of the old size. The operator
+   recreates it with the new, smaller volume:
 
+   ```sh
+   kubectl-cnpg destroy CLUSTER INSTANCE
+   ```
+
+4. Wait for the operator to create the replacement instance and for it to
+   become healthy.
+5. Repeat steps 3 and 4 for every remaining standby that still has an
+   old-size volume.
+6. Promote one of the newly created standbys so that the current primary —
+   which still has an old-size volume — is demoted to a standby:
+
+   ```sh
+   kubectl-cnpg promote CLUSTER INSTANCE
+   ```
+
+7. Destroy the former primary (now a standby with an old-size volume) so the
+   operator recreates it with the new, smaller volume, and wait until all
+   instances are healthy.
+8. Decrease `.spec.instances` back to its original value.
 
 ## Static provisioning of persistent volumes
 
