@@ -116,6 +116,10 @@ func New(
 			},
 			Client: kubeClient.CoordinationV1(),
 			LockConfig: resourcelock.ResourceLockConfig{
+				// Identity is the pod name alone. The operator creates Pods
+				// directly and reuses a pod name only after the previous
+				// incarnation is confirmed dead, so any process running under
+				// this Identity is the legitimate holder.
 				Identity: instance.GetPodName(),
 			},
 		},
@@ -265,6 +269,11 @@ func classifyLeaseAfterRun(
 // This design keeps the lease as a pure promotion synchronization mechanism.
 // Network isolation fencing is left entirely to the liveness probe, which has
 // access to replica connectivity information the lease mechanism lacks.
+//
+// Instance-level fencing (cnpg.io/fencedInstances) does not release the lease
+// either: the operator deliberately skips switchover while the current primary
+// is fenced, so holding the lease aligns with the freeze-the-cluster intent.
+// Unfencing resumes the same primary without any lease transition.
 func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
