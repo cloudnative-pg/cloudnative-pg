@@ -309,28 +309,42 @@ func majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
-	// Resolve extensions for the new major version.
-	// This ensures that extension images match the upgraded PostgreSQL version.
-	// If extension resolution fails (e.g., catalog doesn't have extensions for new version),
-	// we fail the major upgrade completion to avoid leaving the cluster in an inconsistent state.
-	exts, err := resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
-	if err != nil {
-		contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
-			"requestedMajor", requestedMajor)
+	// Carry forward the extension set that was resolved and persisted when the
+	// upgrade started, rather than re-resolving it from the catalog. The upgrade
+	// Job mounted exactly this set and pg_upgrade built the new PGDATA against
+	// it, so it — not a fresh catalog lookup — is authoritative. Re-resolving
+	// here would let a catalog change made after the Job started (e.g. an
+	// ImageCatalog edit) fail resolution and push the cluster into
+	// PhaseImageCatalogError, even though the upgrade has already physically
+	// succeeded on disk.
+	//
+	// Reconcile sets TargetPGDataImageInfo before creating the Job, so it is
+	// normally present here. It can be nil only for a Job that predates this
+	// field, e.g. one created by an older operator and completing across an
+	// operator upgrade; in that case we fall back to resolving from the catalog,
+	// preserving the previous behavior.
+	var exts []apiv1.ExtensionConfiguration
+	if cluster.Status.TargetPGDataImageInfo != nil {
+		exts = cluster.Status.TargetPGDataImageInfo.Extensions
+	} else {
+		exts, err = resolveExtensionsForMajorVersion(ctx, c, cluster, requestedMajor)
+		if err != nil {
+			contextLogger.Error(err, "Unable to resolve extensions for upgraded PostgreSQL version",
+				"requestedMajor", requestedMajor)
 
-		// Set the cluster phase to indicate image catalog error
-		if regErr := registerPhase(
-			ctx,
-			c,
-			cluster,
-			apiv1.PhaseImageCatalogError,
-			fmt.Sprintf("Cannot resolve extensions after major upgrade to version %d: %v", requestedMajor, err),
-		); regErr != nil {
-			contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+			if regErr := registerPhase(
+				ctx,
+				c,
+				cluster,
+				apiv1.PhaseImageCatalogError,
+				fmt.Sprintf("Cannot resolve extensions after major upgrade to version %d: %v", requestedMajor, err),
+			); regErr != nil {
+				contextLogger.Error(regErr, "Unable to register phase after extension resolution failure")
+			}
+
+			return nil, fmt.Errorf("cannot resolve extensions after major upgrade to version %d: %w",
+				requestedMajor, err)
 		}
-
-		return nil, fmt.Errorf("cannot resolve extensions after major upgrade to version %d: %w",
-			requestedMajor, err)
 	}
 
 	// Reset timeline ID to 1 after major upgrade to match pg_upgrade behavior.

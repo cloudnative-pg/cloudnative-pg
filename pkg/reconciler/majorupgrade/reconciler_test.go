@@ -55,6 +55,13 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 			},
 			Status: apiv1.ClusterStatus{
 				TimelineID: 5, // Simulating pre-upgrade timeline
+				// Persisted by Reconcile before the Job was created; completion
+				// carries this set forward instead of re-resolving the catalog.
+				TargetPGDataImageInfo: &apiv1.ImageInfo{
+					Image:        "postgres:16",
+					MajorVersion: 16,
+					Extensions:   []apiv1.ExtensionConfiguration{{Name: "postgis"}},
+				},
 			},
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
@@ -97,6 +104,14 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
 		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
 
+		// the extension set is carried forward from TargetPGDataImageInfo
+		// rather than re-resolved from the catalog
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(HaveLen(1))
+		Expect(cluster.Status.PGDataImageInfo.Extensions[0].Name).To(Equal("postgis"))
+
+		// the target marker is cleared on completion
+		Expect(cluster.Status.TargetPGDataImageInfo).To(BeNil())
+
 		// the timeline ID has been reset to 1 to match pg_upgrade behavior
 		Expect(cluster.Status.TimelineID).To(Equal(1))
 
@@ -104,6 +119,43 @@ var _ = Describe("Major upgrade job status reconciliation", func() {
 		var tempJob batchv1.Job
 		err = fakeClient.Get(ctx, client.ObjectKeyFromObject(job), &tempJob)
 		Expect(err).To(MatchError(errors.IsNotFound, "is not found"))
+	})
+
+	It("falls back to resolving extensions when TargetPGDataImageInfo is absent", func(ctx SpecContext) {
+		// A Job that predates the TargetPGDataImageInfo field (e.g. created by
+		// an older operator and completing across an operator upgrade) has no
+		// persisted target set, so completion re-resolves from the cluster.
+		job := buildCompletedUpgradeJob()
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-example",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:16",
+			},
+			Status: apiv1.ClusterStatus{
+				TimelineID: 5,
+				// TargetPGDataImageInfo intentionally left nil.
+			},
+		}
+		pvcs := []corev1.PersistentVolumeClaim{buildPrimaryPVC(1)}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithRuntimeObjects(job, cluster).
+			WithStatusSubresource(cluster).
+			Build()
+
+		result, err := majorVersionUpgradeHandleCompletion(ctx, fakeClient, cluster, job, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+
+		// The upgrade still completes, resolving the (empty) extension set from
+		// the spec since the cluster uses an image name without extensions.
+		Expect(cluster.Status.PGDataImageInfo.Image).To(Equal("postgres:16"))
+		Expect(cluster.Status.PGDataImageInfo.MajorVersion).To(Equal(16))
+		Expect(cluster.Status.PGDataImageInfo.Extensions).To(BeEmpty())
+		Expect(cluster.Status.TargetPGDataImageInfo).To(BeNil())
 	})
 })
 
