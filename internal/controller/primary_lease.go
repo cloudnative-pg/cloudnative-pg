@@ -21,11 +21,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -55,18 +57,41 @@ func (r *ClusterReconciler) reconcilePrimaryLease(ctx context.Context, cluster *
 	}
 	cluster.SetInheritedDataAndOwnership(&lease.ObjectMeta)
 
-	switch err := r.Create(ctx, &lease); {
-	case apierrs.IsAlreadyExists(err):
-		// Steady state: the lease already exists, nothing to do. This is the
-		// common path on every reconcile, so it is intentionally not logged.
+	err := r.Create(ctx, &lease)
+	switch {
+	case err == nil:
+		contextLogger.Info("Created primary lease", "leaseName", lease.Name)
 		return nil
-	case err != nil:
+	case !apierrs.IsAlreadyExists(err):
 		return err
 	}
 
-	// The Create succeeded, meaning the lease was absent: either the cluster was
-	// just bootstrapped, or the lease was deleted and this reconcile (triggered by
-	// the deletion watch) is recreating it.
-	contextLogger.Info("Created primary lease", "leaseName", lease.Name)
+	// A lease with our name already exists. Either we already own it (common
+	// path, every reconcile) or it is a leftover from a previous incarnation
+	// of this cluster that Kubernetes GC has not yet cleaned up. In the second
+	// case we adopt it so the current Cluster's deletion eventually cascades
+	// to it; if it is controlled by anything else we refuse to take over.
+	existing := &coordinationv1.Lease{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(&lease), existing); err != nil {
+		return err
+	}
+	if metav1.IsControlledBy(existing, cluster) {
+		return nil
+	}
+	if owner := metav1.GetControllerOf(existing); owner != nil &&
+		(owner.Kind != apiv1.ClusterKind ||
+			owner.APIVersion != apiv1.SchemeGroupVersion.String() ||
+			owner.Name != cluster.Name) {
+		err := fmt.Errorf("primary lease %s/%s is controlled by %s %q, refusing to adopt",
+			existing.Namespace, existing.Name, owner.Kind, owner.Name)
+		r.Recorder.Eventf(cluster, "Warning", "PrimaryLeaseConflict", "%v", err)
+		return err
+	}
+
+	cluster.SetInheritedDataAndOwnership(&existing.ObjectMeta)
+	if err := r.Update(ctx, existing); err != nil {
+		return err
+	}
+	contextLogger.Info("Adopted orphan primary lease", "leaseName", existing.Name)
 	return nil
 }
