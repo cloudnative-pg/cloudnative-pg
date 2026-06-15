@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -671,11 +673,28 @@ var _ = Describe("ImageVolume Extensions", func() {
 		})
 
 		It("cannot collide with a steady-state volume name", func() {
-			// No user-chosen extension name can produce a volume starting with
-			// "new-" through SanitizeExtensionNameForVolume (which always
-			// prepends "ext-"), so the two prefixes are disjoint by construction.
-			Expect(SanitizeExtensionNameForVolume("new-foo")).
-				NotTo(Equal(SanitizeExtensionNameForUpgradeTargetVolume("foo")))
+			// Disjointness rests on the prefixes, not on any particular name:
+			// steady-state volumes always start with "ext-" and upgrade-target
+			// volumes always start with "new-". Even a name that itself looks
+			// like the other prefix (e.g. "new-foo") still gets "ext-" prepended.
+			Expect(SanitizeExtensionNameForVolume("new-foo")).To(HavePrefix("ext-"))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume("ext-foo")).To(HavePrefix("new-"))
+		})
+
+		It("keeps volume names within the RFC 1123 limit for a max-length name", func() {
+			// ExtensionConfiguration.Name is bounded by MaxLength=59 precisely so
+			// that the 4-character volume-name prefix keeps the result within the
+			// RFC 1123 label limit of 63. Both sanitizers must share that budget,
+			// so their prefixes must be the same length; if either prefix changes
+			// length, the API MaxLength must change with it.
+			const rfc1123LabelMaxLength = 63
+			const maxExtensionNameLength = 59
+			maxName := strings.Repeat("a", maxExtensionNameLength)
+
+			Expect(SanitizeExtensionNameForVolume(maxName)).
+				To(HaveLen(rfc1123LabelMaxLength))
+			Expect(SanitizeExtensionNameForUpgradeTargetVolume(maxName)).
+				To(HaveLen(rfc1123LabelMaxLength))
 		})
 	})
 })
