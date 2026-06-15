@@ -160,7 +160,7 @@ version.
 
 #### Extensions during a major upgrade
 
-When a cluster declares image-volume extensions, the upgrade Job mounts both
+When a cluster declares image-volume extensions, the upgrade `Job` mounts both
 the source-version and the target-version extension images side by side.
 Source-version extensions are needed so the old server can start with its
 existing shared libraries already in place.
@@ -169,28 +169,32 @@ present so that `pg_upgrade` can properly perform the upgrade to the new major:
 
 - Source-version extensions are mounted at `/extensions/<name>` (the
   steady-state path), so `dynamic_library_path` and `extension_control_path`
-  GUCs in the old PGDATA keep the existing values.
+  GUCs in the old `PGDATA` keep the existing values.
   This ensures that, in case of major upgrade failure, a revert to the old
   major version will work seamlessly.
 - Target-version extensions are temporarily mounted at `/new-extensions/<name>`
   just during the upgrade job, and `dynamic_library_path` and `extension_control_path`
-  are configured accordingly for the PGDATA of the new major.
+  are configured accordingly for the `PGDATA` of the new major.
 
 `LD_LIBRARY_PATH` and `PATH` are extended with both sets, so binaries and
 shared objects from either version are reachable.
 Environment variables declared via `extensions[].env` obey the rules
 described in [Precedence and Conflict Resolution](imagevolume_extensions.md#precedence-and-conflict-resolution).
-Note that target-version entries are applied after source-version entries.
 
-#### When pg_upgrade emits `update_extensions.sql`
+:::note
+Target-version entries are applied **after** source-version entries. When the
+same variable is defined for both, the target-version value takes precedence.
+:::
 
-`pg_upgrade` emits an `update_extensions.sql` script inside the PGDATA
+#### When `pg_upgrade` emits `update_extensions.sql`
+
+`pg_upgrade` emits an `update_extensions.sql` script inside the `PGDATA`
 when a target cluster contains extensions whose `default_version` is
 newer than the version `pg_upgrade` left installed. Until that script is
 applied, the SQL-level extension metadata in `pg_catalog` lags the
 shared libraries actually loaded by the running server.
 
-The script lives inside the primary pod's PGDATA.
+The script lives inside the primary pod's `PGDATA`.
 You can execute it using the database superuser (`postgres`) to
 update those extensions in all databases:
 
@@ -200,6 +204,13 @@ SCRIPT=/var/lib/postgresql/data/pgdata/update_extensions.sql
 
 kubectl exec -i "$PRIMARY" -- psql -f "$SCRIPT"
 ```
+
+:::note
+The script path above assumes the default `PGDATA` location used by the
+CloudNativePG operand images. The operator also logs the resolved path when
+`pg_upgrade` emits the script, so check the operator logs if your operand image
+uses a different `PGDATA`.
+:::
 
 ### Backup and WAL Archive Considerations
 
