@@ -248,6 +248,48 @@ var _ = Describe("Managed publication controller tests", func() {
 		})
 	})
 
+	When("the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the Publication", func(ctx SpecContext) {
+			// Mocking Detect publication
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking Create publication
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE PUBLICATION %s FOR ALL TABLES",
+				pgx.Identifier{publication.Spec.Name}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			err := reconcilePublication(ctx, fakeClient, r, publication)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(publication.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Update(ctx, cluster)).To(Succeed())
+
+			// A real apiserver bumps the generation when deletionTimestamp is
+			// set, which the fake client does not; simulate it so the reconciler
+			// does not skip on Generation == ObservedGeneration.
+			publication.SetGeneration(publication.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
+
+			err = reconcilePublication(ctx, fakeClient, r, publication)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// Since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
@@ -335,6 +377,43 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(pubDuplicate.Status.Applied).To(HaveValue(BeFalse()))
 		Expect(pubDuplicate.Status.Message).To(ContainSubstring(expectedError))
 		Expect(pubDuplicate.Status.ObservedGeneration).To(BeZero())
+		// The conflicting managers detection runs before the finalizer
+		// reconciler, so a conflicting publication never acquires the
+		// finalizer and its deletion never drops the contested publication.
+		Expect(pubDuplicate.GetFinalizers()).To(BeEmpty())
+	})
+
+	It("releases the finalizer on deletion even if the publication is managed by another object", func(ctx SpecContext) {
+		// Let's force the publication to have a past reconciliation
+		publication.Status.ObservedGeneration = 2
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		// A conflicting Publication targeting the same "pub-all": it carries
+		// the finalizer but was never reconciled, so it doesn't short-circuit
+		// the conflicting managers detection.
+		pubDuplicate := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pub-duplicate",
+				Namespace:  "default",
+				Generation: 1,
+				Finalizers: []string{utils.PublicationFinalizerName},
+			},
+			Spec: apiv1.PublicationSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:          "pub-all",
+				ReclaimPolicy: apiv1.PublicationReclaimRetain,
+			},
+		}
+		Expect(fakeClient.Create(ctx, pubDuplicate)).To(Succeed())
+		Expect(fakeClient.Delete(ctx, pubDuplicate)).To(Succeed())
+
+		// Deletion must release the finalizer instead of being re-marked as
+		// failed by the conflicting managers detection.
+		err := reconcilePublication(ctx, fakeClient, r, pubDuplicate)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
 	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
@@ -349,6 +428,9 @@ var _ = Describe("Managed publication controller tests", func() {
 
 		Expect(publication.Status.Applied).Should(BeNil())
 		Expect(publication.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		// The replica gate runs before the finalizer reconciler, so no
+		// finalizer is added while the cluster is a replica.
+		Expect(publication.GetFinalizers()).Should(BeEmpty())
 	})
 })
 

@@ -246,6 +246,49 @@ var _ = Describe("Managed Database status", func() {
 		})
 	})
 
+	When("the cluster is a replica", func() {
+		It("on deletion it releases the finalizer without dropping the DB", func(ctx SpecContext) {
+			// Mocking DetectDB
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking CreateDB
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+			err := reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+
+			// Demote the cluster to a replica after the finalizer was added.
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			}
+			Expect(fakeClient.Update(ctx, cluster)).To(Succeed())
+
+			// A real apiserver bumps the generation when deletionTimestamp is
+			// set, which the fake client does not; simulate it so the reconciler
+			// does not skip on Generation == ObservedGeneration.
+			database.SetGeneration(database.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
+
+			// Deleting on a replica must release the finalizer without issuing a
+			// DROP: no DROP is mocked, so any attempt would fail the AfterEach
+			// ExpectationsWereMet check.
+			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+
+			err = reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// Since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
@@ -369,6 +412,9 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(database.Status.Applied).Should(BeNil())
 		Expect(database.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		// The replica gate runs before the finalizer reconciler, so no
+		// finalizer is added while the cluster is a replica.
+		Expect(database.GetFinalizers()).Should(BeEmpty())
 	})
 })
 
