@@ -328,7 +328,7 @@ func (backup *Backup) SetAdmissionError(msg string) {
 	if len(msg) > 0 {
 		backup.Status.Phase = BackupPhaseDefinitionInvalid
 		backup.Status.Error = msg
-	}  else {
+	} else {
 		backup.Status.Error = ""
 	}
 }
