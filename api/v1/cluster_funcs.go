@@ -1653,5 +1653,7 @@ func (cluster *Cluster) SetAdmissionError(msg string) {
 	if len(msg) > 0 {
 		cluster.Status.Phase = PhaseDefinitionInvalid
 		cluster.Status.PhaseReason = msg
+	} else {
+		cluster.Status.PhaseReason = ""
 	}
 }
