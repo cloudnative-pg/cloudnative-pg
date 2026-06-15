@@ -70,7 +70,7 @@ OPERATOR_SDK_VERSION ?= v1.42.2
 OPM_VERSION ?= v1.69.0
 # renovate: datasource=github-tags depName=redhat-openshift-ecosystem/openshift-preflight
 PREFLIGHT_VERSION ?= 1.19.0
-OPENSHIFT_VERSIONS ?= v4.16-v4.21
+OPENSHIFT_VERSIONS ?= v4.18-v4.21
 ARCH ?= amd64
 FUZZ_TIME ?= 30s
 
