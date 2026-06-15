@@ -1358,16 +1358,8 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		return err
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), db)
-		if err != nil {
-			return err
-		}
-	} else {
-		err = postgresutils.DisableSuperuserPassword(db)
-		if err != nil {
-			return err
-		}
+	if err = r.reconcileSuperuserPassword(ctx, cluster, db); err != nil {
+		return err
 	}
 
 	if cluster.ShouldCreateApplicationDatabase() {
@@ -1376,6 +1368,30 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 			return err
 		}
 	}
+
+	return nil
+}
+
+// reconcileSuperuserPassword applies or disables the `postgres` superuser
+// password according to the cluster configuration.
+func (r *InstanceReconciler) reconcileSuperuserPassword(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	db *sql.DB,
+) error {
+	if cluster.GetEnableSuperuserAccess() {
+		return r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), db)
+	}
+
+	if err := postgresutils.DisableSuperuserPassword(db); err != nil {
+		return err
+	}
+
+	// Invalidate the cached resource version of the superuser secret. The secret
+	// is left untouched while access is disabled, so without this its resource
+	// version would still match the cache on re-enable and reconcileUser would
+	// skip re-applying the password, leaving the user locked out (see #9721).
+	delete(r.secretVersions, cluster.GetSuperuserSecretName())
 
 	return nil
 }
