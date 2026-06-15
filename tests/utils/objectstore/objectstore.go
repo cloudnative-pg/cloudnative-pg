@@ -435,7 +435,7 @@ func defaultClient(namespace string) corev1.Pod {
 						AllowPrivilegeEscalation: ptr.To(false),
 						SeccompProfile:           seccompProfile,
 					},
-					Command: []string{"sleep", "3600"},
+					Command: []string{"sleep", "infinity"},
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
