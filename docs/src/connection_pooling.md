@@ -390,6 +390,8 @@ documentation for each parameter. Unless stated otherwise, the default values
 are the ones directly set by PgBouncer.
 
 - [`auth_type`](https://www.pgbouncer.org/config.html#auth_type)
+- [`auth_user`](https://www.pgbouncer.org/config.html#auth_user): by default
+  exctracted from AuthQuerySecret.
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
 - [`cancel_wait_timeout`](https://www.pgbouncer.org/config.html#cancel_wait_timeout)
