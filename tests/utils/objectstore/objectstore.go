@@ -54,7 +54,7 @@ const (
 	// rustfsImage is the image used to run a RustFS server
 	rustfsImage = "docker.io/rustfs/rustfs:1.0.0-beta.8"
 	// awsCliImage is the image used to run the AWS CLI S3 client
-	awsCliImage = "docker.io/amazon/aws-cli:2.35.1"
+	awsCliImage = "docker.io/amazon/aws-cli:2.35.4"
 
 	// AccessKeyID is the access key used to authenticate against the object store
 	AccessKeyID = "objectstore"
