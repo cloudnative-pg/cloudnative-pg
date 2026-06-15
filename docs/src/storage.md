@@ -345,6 +345,66 @@ cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
 
+## Volume reduction
+
+Kubernetes does not provide an API to shrink a PVC, and CloudNativePG's
+validating webhook rejects any attempt to decrease `.spec.storage.size`,
+`.spec.walStorage.size` or any tablespace storage size in `.spec.tablespaces`.
+You can still reduce the storage of a cluster, but only by recreating
+each instance with a smaller volume, as described below.
+
+:::warning
+CloudNativePG does not support automated volume shrinking, as it is a
+delicate operation that can lead to data loss if performed incorrectly. For
+the time being, it can only be achieved manually, through the supervised
+procedure described below.
+This procedure requires you to temporarily disable the validating webhook.
+While validation is disabled, the operator accepts spec changes that would
+normally be rejected, including unsafe or destructive ones. Proceed with
+caution and at your own risk, and re-enable validation as soon as possible.
+
+Before you start, make sure the cluster's current data, WAL, and any tablespace
+data comfortably fit within the new, smaller sizes. If they don't, the instances
+recreated on smaller volumes can fail to rejoin or quickly run out of space.
+:::
+
+To reduce the size of the persistent volumes:
+
+1. Disable the validating webhook by setting the `cnpg.io/validation: disabled`
+   annotation on the `Cluster`, set `.spec.storage.size` (and, if present,
+   `.spec.walStorage.size` or tablespace storage size in `.spec.tablespaces`)
+   to the new, smaller value, and increase `.spec.instances` by 1 to provide a
+   spare instance during the rollout.
+2. Re-enable validation by removing the `cnpg.io/validation` annotation (or
+   setting it to `enabled`). The new, smaller size is now stored in the spec
+   and is applied to every instance the operator recreates from this point on.
+   Existing instances keep their current volumes; for each one, the operator
+   logs an informational `cannot decrease storage requirement` message until
+   that instance is recreated. This is expected and harmless.
+3. Destroy one standby that still has a volume of the old size. The operator
+   provisions a replacement instance — created with the next available name,
+   not the one you destroyed — on the new, smaller volume:
+
+   ```sh
+   kubectl-cnpg destroy CLUSTER INSTANCE
+   ```
+
+4. Wait for the operator to create the replacement instance and for it to
+   become healthy.
+5. Repeat steps 3 and 4 for every remaining standby that still has an
+   old-size volume.
+6. Promote one of the newly created standbys so that the current primary —
+   which still has an old-size volume — is demoted to a standby:
+
+   ```sh
+   kubectl-cnpg promote CLUSTER INSTANCE
+   ```
+
+7. Destroy the former primary (now a standby with an old-size volume) so the
+   operator provisions its replacement on the new, smaller volume, and wait
+   until all instances are healthy.
+8. Decrease `.spec.instances` back to its original value.
+
 ## Static provisioning of persistent volumes
 
 CloudNativePG was designed to work with dynamic volume provisioning. This
