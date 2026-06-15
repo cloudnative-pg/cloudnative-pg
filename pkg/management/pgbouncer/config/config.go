@@ -201,6 +201,10 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		parameters["auth_file"] = authFilePath
 	}
 
+	if explicitAuthUser, ok := parameters["auth_user"]; ok {
+		authQueryUser = explicitAuthUser
+	}
+
 	if secrets.ServerTLS != nil {
 		parameters["server_tls_cert_file"] = serverTLSCertPath
 		parameters["server_tls_key_file"] = serverTLSKeyPath
