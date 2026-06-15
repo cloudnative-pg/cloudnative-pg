@@ -143,6 +143,32 @@ var _ = Describe("Runnable.Release", func() {
 		Expect(getHolder(ctx, kubeClient)).To(BeEmpty())
 		Expect(getDuration(ctx, kubeClient)).To(Equal(ptr.To(int32(5))))
 	})
+
+	It("preserves leaseTransitions across release", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		// Seed a lease with a non-zero transition counter, as a steady-state
+		// cluster that has experienced several primary handovers would.
+		lease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterName,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       ptr.To(thisPod),
+				LeaseDurationSeconds: ptr.To(int32(15)),
+				LeaseTransitions:     ptr.To(int32(7)),
+			},
+		}
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(r.Release(ctx)).To(Succeed())
+
+		released, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(released.Spec.LeaseTransitions).To(Equal(ptr.To(int32(7))))
+	})
 })
 
 var _ = Describe("Runnable.Acquire", func() {

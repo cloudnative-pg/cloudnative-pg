@@ -181,8 +181,16 @@ func (r *Runnable) Release(ctx context.Context) error {
 	}
 
 	contextLogger.Info("Releasing primary lease")
+	// Mirror client-go's leaderelection.release(): preserve LeaderTransitions
+	// so the lease's hand-over counter stays accurate, and write a current
+	// RenewTime/AcquireTime so any acquirer that does fall back to TTL-based
+	// expiry observes a defined moment rather than a zero timestamp.
+	now := metav1.NewTime(time.Now())
 	return r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
+		LeaderTransitions:    record.LeaderTransitions,
 		LeaseDurationSeconds: int(r.config.ReleasedLeaseDuration / time.Second),
+		RenewTime:            now,
+		AcquireTime:          now,
 	})
 }
 
