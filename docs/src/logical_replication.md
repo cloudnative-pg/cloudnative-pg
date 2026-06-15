@@ -188,6 +188,11 @@ spec:
 In this case, deleting the `Publication` object also removes the `publisher`
 publication from the `app` database of the `freddie` cluster.
 
+On a replica cluster the database is read-only, so deleting a `Publication`
+object releases its finalizer and removes the Kubernetes object without dropping
+the publication in PostgreSQL, even with `publicationReclaimPolicy: delete`.
+Dropping the publication is left to the primary cluster, which owns it.
+
 ## Subscriptions
 
 In PostgreSQL's publish-and-subscribe replication model, a
@@ -331,6 +336,11 @@ spec:
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
+
+On a replica cluster the database is read-only, so deleting a `Subscription`
+object releases its finalizer and removes the Kubernetes object without dropping
+the subscription in PostgreSQL, even with `subscriptionReclaimPolicy: delete`.
+Dropping the subscription is left to the primary cluster, which owns it.
 
 ## Limitations
 

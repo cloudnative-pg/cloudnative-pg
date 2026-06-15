@@ -112,17 +112,26 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		contextLogger.Info("Reconciliation loop of publication exited")
 	}()
 
-	// Cannot do anything on a replica cluster
-	if cluster.IsReplica() {
+	// A replica cluster is read-only, so the apply path is gated here. Deletion
+	// is still allowed through: an object that acquired its finalizer while this
+	// cluster was primary must release it after a demotion. The drop itself is
+	// skipped on a replica (see evaluateDropPublication).
+	if cluster.IsReplica() && publication.GetDeletionTimestamp().IsZero() {
 		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
-		!res.IsZero() {
-		return res, err
+	// The detection only gates the apply path: a publication being deleted
+	// must release its finalizer regardless of conflicting managers. It stays
+	// ahead of the finalizer reconciler so that a conflicting publication
+	// never acquires the finalizer.
+	if publication.GetDeletionTimestamp().IsZero() {
+		if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
+			!res.IsZero() {
+			return res, err
+		}
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
@@ -156,6 +165,16 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub *apiv1.Publication) error {
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
+		return nil
+	}
+	// On a replica we cannot drop the publication: return without touching
+	// PostgreSQL so the finalizer is released. Dropping it is left to the
+	// primary cluster's own Publication object, if any.
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("while fetching the cluster: %w", err)
+	}
+	if cluster.IsReplica() {
 		return nil
 	}
 	db, err := r.getDB(pub.Spec.DBName)

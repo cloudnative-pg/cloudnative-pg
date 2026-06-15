@@ -153,6 +153,11 @@ spec:
 Deleting this `Database` object will automatically remove the `two` database
 from the `cluster-example` cluster.
 
+On a replica cluster the database is read-only, so deleting a `Database` object
+releases its finalizer and removes the Kubernetes object without dropping the
+PostgreSQL database, even with `databaseReclaimPolicy: delete`. Dropping the
+database is left to the primary cluster, which owns it.
+
 ### Declaratively Setting `ensure: absent`
 
 To remove a database, set the `ensure` field to `absent` like in the following
