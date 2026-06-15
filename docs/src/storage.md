@@ -361,6 +361,10 @@ This procedure requires you to temporarily disable the validating webhook.
 While validation is disabled, the operator accepts spec changes that would
 normally be rejected, including unsafe or destructive ones. Proceed with
 caution and at your own risk, and re-enable validation as soon as possible.
+
+Before you start, make sure the cluster's current data and WAL comfortably fit
+within the new, smaller size. If they don't, the instances recreated on the
+smaller volumes will fail to rejoin or will quickly run out of space.
 :::
 
 To reduce the size of the persistent volumes:
@@ -372,8 +376,12 @@ To reduce the size of the persistent volumes:
 2. Re-enable validation by removing the `cnpg.io/validation` annotation (or
    setting it to `enabled`). The new, smaller size is now stored in the spec
    and is applied to every instance the operator recreates from this point on.
+   Existing instances keep their current volumes; for each one, the operator
+   logs an informational `cannot decrease storage requirement` message until
+   that instance is recreated. This is expected and harmless.
 3. Destroy one standby that still has a volume of the old size. The operator
-   recreates it with the new, smaller volume:
+   provisions a replacement instance — created with the next available name,
+   not the one you destroyed — on the new, smaller volume:
 
    ```sh
    kubectl-cnpg destroy CLUSTER INSTANCE
@@ -391,8 +399,8 @@ To reduce the size of the persistent volumes:
    ```
 
 7. Destroy the former primary (now a standby with an old-size volume) so the
-   operator recreates it with the new, smaller volume, and wait until all
-   instances are healthy.
+   operator provisions its replacement on the new, smaller volume, and wait
+   until all instances are healthy.
 8. Decrease `.spec.instances` back to its original value.
 
 ## Static provisioning of persistent volumes
