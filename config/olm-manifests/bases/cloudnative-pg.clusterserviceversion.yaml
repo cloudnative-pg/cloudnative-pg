@@ -105,8 +105,8 @@ spec:
   - name: Documentation
     url: https://cloudnative-pg.io/docs/
   maintainers:
-    - email: jonathan.gonzalez@enterprisedb.com
-      name: Jonathan Gonzalez V.
+    - email: marco.nenciarini@enterprisedb.com
+      name: Marco Nenciarini
     - email: jonathan.battiato@enterprisedb.com
       name: Jonathan Battiato
     - email: niccolo.fei@enterprisedb.com
