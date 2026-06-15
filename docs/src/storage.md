@@ -353,6 +353,10 @@ validating webhook rejects any attempt to decrease `.spec.storage.size` or
 only by recreating each instance with a smaller volume, as described below.
 
 :::warning
+CloudNativePG does not support automated volume shrinking, as it is a
+delicate operation that can lead to data loss if performed incorrectly. For
+the time being, it can only be achieved manually, through the supervised
+procedure described below.
 This procedure requires you to temporarily disable the validating webhook.
 While validation is disabled, the operator accepts spec changes that would
 normally be rejected, including unsafe or destructive ones. Proceed with
