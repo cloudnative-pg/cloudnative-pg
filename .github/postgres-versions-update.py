@@ -104,6 +104,7 @@ def write_json(repo_url, version_re, output_file):
 
     with open(output_file, "w") as json_file:
         json.dump(results, json_file, indent=2)
+        json_file.write("\n")
 
 
 if __name__ == "__main__":
