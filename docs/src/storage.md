@@ -348,9 +348,10 @@ cluster-example-4              1/1     Running     0          10s
 ## Volume reduction
 
 Kubernetes does not provide an API to shrink a PVC, and CloudNativePG's
-validating webhook rejects any attempt to decrease `.spec.storage.size` or
-`.spec.walStorage.size`. You can still reduce the storage of a cluster, but
-only by recreating each instance with a smaller volume, as described below.
+validating webhook rejects any attempt to decrease `.spec.storage.size`,
+`.spec.walStorage.size` or any tablespace storage size in `.spec.tablespaces`.
+You can still reduce the storage of a cluster, but only by recreating
+each instance with a smaller volume, as described below.
 
 :::warning
 CloudNativePG does not support automated volume shrinking, as it is a
@@ -362,17 +363,18 @@ While validation is disabled, the operator accepts spec changes that would
 normally be rejected, including unsafe or destructive ones. Proceed with
 caution and at your own risk, and re-enable validation as soon as possible.
 
-Before you start, make sure the cluster's current data and WAL comfortably fit
-within the new, smaller size. If they don't, the instances recreated on the
-smaller volumes will fail to rejoin or will quickly run out of space.
+Before you start, make sure the cluster's current data, WAL, and any tablespace
+data comfortably fit within the new, smaller sizes. If they don't, the instances
+recreated on smaller volumes can fail to rejoin or quickly run out of space.
 :::
 
 To reduce the size of the persistent volumes:
 
 1. Disable the validating webhook by setting the `cnpg.io/validation: disabled`
    annotation on the `Cluster`, set `.spec.storage.size` (and, if present,
-   `.spec.walStorage.size`) to the new, smaller value, and increase
-   `.spec.instances` by 1 to provide a spare instance during the rollout.
+   `.spec.walStorage.size` or tablespace storage size in `.spec.tablespaces`)
+   to the new, smaller value, and increase `.spec.instances` by 1 to provide a
+   spare instance during the rollout.
 2. Re-enable validation by removing the `cnpg.io/validation` annotation (or
    setting it to `enabled`). The new, smaller size is now stored in the spec
    and is applied to every instance the operator recreates from this point on.
