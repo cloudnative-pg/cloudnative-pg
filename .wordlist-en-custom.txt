@@ -530,6 +530,7 @@ TLS
 TLSv
 TOC
 TODO
+TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
@@ -539,6 +540,7 @@ TablespaceStatus
 TablespaceStatusPendingReconciliation
 TablespaceStatusReconciled
 Tablespaces
+TargetPGDataImageInfo
 TemporaryData
 TimelineId
 TopologyKey
@@ -1291,6 +1293,7 @@ preferredDuringSchedulingIgnoredDuringExecution
 prefetched
 preload
 prepended
+prepends
 primaryUpdateMethod
 primaryUpdateStrategy
 primaryupdatemethod

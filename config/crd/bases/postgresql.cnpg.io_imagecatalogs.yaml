@@ -174,7 +174,11 @@ spec:
                               type: string
                             type: array
                           name:
-                            description: The name of the extension, required
+                            description: |-
+                              The name of the extension, required. The limit of 59 characters
+                              leaves room for the prefix the operator adds when deriving the
+                              extension's Kubernetes Volume name (capped at 63 characters).
+                            maxLength: 59
                             minLength: 1
                             pattern: ^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$
                             type: string
