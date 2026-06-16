@@ -206,6 +206,22 @@ var _ = Describe("Managed publication controller tests", func() {
 		})
 	})
 
+	When("reclaim policy is delete but the object never reconciled", func() {
+		It("on deletion it removes finalizers and does NOT drop the Publication", func(ctx SpecContext) {
+			// Model the state of a conflicting duplicate: it carries the
+			// finalizer, but the exclusivity check blocked it before it could
+			// apply anything, so it has no recorded reconciliation.
+			publication.Finalizers = []string{utils.PublicationFinalizerName}
+			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+			Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
+
+			// No SQL is expected: dbMock would fail on any statement.
+			err := reconcilePublication(ctx, fakeClient, r, publication)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	When("reclaim policy is retain", func() {
 		It("on deletion it removes finalizers and does NOT drop the Publication", func(ctx SpecContext) {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
