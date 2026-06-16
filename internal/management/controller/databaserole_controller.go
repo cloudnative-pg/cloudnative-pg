@@ -337,85 +337,60 @@ func (r *DatabaseRoleReconciler) unknownReconciliation(
 	}, nil
 }
 
-// shadowedReconciliation marks a previously-applied role as taken over by an
-// inline managed.roles entry, voiding the recorded reconciliation so the
-// DatabaseRole reconciles again (and can adopt the role back) once the
-// inline entry is removed.
-func (r *DatabaseRoleReconciler) shadowedReconciliation(
-	ctx context.Context,
-	role *apiv1.DatabaseRole,
-) (ctrl.Result, error) {
-	oldRole := role.DeepCopy()
-	role.SetAsFailed(errClusterIsManagingRole)
-	role.Status.ObservedGeneration = 0
-
-	if patchErr := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); patchErr != nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"while setting the shadowed status: %w, original error: %w",
-			patchErr, errClusterIsManagingRole)
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseRoleReconciliationInterval,
-	}, nil
-}
-
 // reconcileAppliedRole re-evaluates the status of an already-reconciled role
-// when the cluster changed underneath it. Only the designated primary writes
-// status, and only while the role is not being deleted; otherwise it is a
-// no-op.
+// when its cluster moved in or out of the replica role, or an inline
+// managed.roles entry took it over. The recorded reconciliation is always
+// kept, so the object retains ownership of the PostgreSQL role it manages and
+// a conflicting DatabaseRole cannot take over while the role is reported as not
+// applied. A nil result asks the caller to re-apply the role through the
+// regular flow.
 func (r *DatabaseRoleReconciler) reconcileAppliedRole(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
 	cluster *apiv1.Cluster,
 ) (*ctrl.Result, error) {
-	if !role.DeletionTimestamp.IsZero() ||
-		cluster.Status.CurrentPrimary != r.instance.GetPodName() {
+	// Deletion is handled by the caller.
+	if !role.DeletionTimestamp.IsZero() {
 		return &ctrl.Result{}, nil
 	}
 
-	switch {
-	case isClusterManagingRole(cluster, role.Spec.Name):
-		// The role was added to cluster.spec.managed.roles after the apply:
-		// the inline synchronizer takes over, so surface the conflict and void
-		// the recorded reconciliation instead of keeping a stale Applied=true.
-		// Voiding it lets the normal flow re-apply (adopt the role back) once
-		// the inline entry is removed.
-		result, err := r.shadowedReconciliation(ctx, role)
+	isDesignatedPrimary := cluster.Status.CurrentPrimary == r.instance.GetPodName()
+	applied := role.Status.Applied
+
+	// An inline managed.roles entry took over the role after it was applied:
+	// the designated primary reports the conflict. Re-applying (adopting the
+	// role back) once the inline entry is removed is handled by the re-apply
+	// path below.
+	if isDesignatedPrimary && isClusterManagingRole(cluster, role.Spec.Name) {
+		result, err := r.failedReconciliation(ctx, role, errClusterIsManagingRole)
 		return &result, err
-	case cluster.IsReplica():
+	}
+
+	if cluster.IsReplica() {
 		// The cluster was demoted to a replica after the apply: the role is
-		// now owned by the primary cluster. Report Unknown and void the
-		// recorded reconciliation, so the role is re-applied once the cluster
-		// is promoted back to primary.
-		result, err := r.demotedReconciliation(ctx, role)
-		return &result, err
-	default:
+		// owned by the primary cluster. The designated primary reports the
+		// replica condition (Applied=nil).
+		if isDesignatedPrimary && applied != nil {
+			result, err := r.unknownReconciliation(ctx, role, errClusterIsReplica)
+			return &result, err
+		}
+		// Keep polling while the designated primary awaits promotion, or while
+		// the cluster status is still settling (for example a failover
+		// concurrent with the demotion): status-only updates don't retrigger
+		// the cluster watch.
+		if isDesignatedPrimary || applied != nil {
+			return &ctrl.Result{RequeueAfter: databaseRoleReconciliationInterval}, nil
+		}
 		return &ctrl.Result{}, nil
 	}
-}
 
-// demotedReconciliation marks a previously-applied role as Unknown because its
-// cluster was demoted to a replica, voiding the recorded reconciliation so the
-// DatabaseRole reconciles again (and re-applies the role) once the cluster is
-// promoted back to primary.
-func (r *DatabaseRoleReconciler) demotedReconciliation(
-	ctx context.Context,
-	role *apiv1.DatabaseRole,
-) (ctrl.Result, error) {
-	oldRole := role.DeepCopy()
-	role.SetAsUnknown(errClusterIsReplica)
-	role.Status.ObservedGeneration = 0
-
-	if patchErr := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); patchErr != nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"while setting the demoted status: %w, original error: %w",
-			patchErr, errClusterIsReplica)
+	// Primary and not shadowed: if a previous transition (the replica
+	// condition or an inline takeover) left the role not applied, re-apply it
+	// through the regular flow.
+	if isDesignatedPrimary && (applied == nil || !*applied) {
+		return nil, nil
 	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseRoleReconciliationInterval,
-	}, nil
+	return &ctrl.Result{}, nil
 }
 
 // succeededReconciliation marks the reconciliation as succeeded
