@@ -9,15 +9,15 @@ title: PostgreSQL upgrades
 
 PostgreSQL upgrades fall into two categories:
 
-- [Minor version upgrades](#minor-version-upgrades) (e.g., from 17.0 to 17.1)
-- [Major version upgrades](#major-version-upgrades) (e.g., from 16.x to 17.0)
+- [Minor version upgrades](#minor-version-upgrades) (e.g., from 18.0 to 18.1)
+- [Major version upgrades](#major-version-upgrades) (e.g., from 16.x to 18.0)
 
 ## Minor Version Upgrades
 
 PostgreSQL version numbers follow a `major.minor` format. For instance, in
-version 17.1:
+version 18.1:
 
-- `17` is the major version
+- `18` is the major version
 - `1` is the minor version
 
 Minor releases are fully compatible with earlier and later minor releases of
@@ -70,7 +70,7 @@ requested for a cluster.
     There is a bug in PostgreSQL 17.0 through 17.5 that prevents successful upgrades
     if the `max_slot_wal_keep_size` parameter is set to any value other than `-1`.
     The upgrade process will fail with an error related to replication slot configuration.
-    This issue has been [fixed in PostgreSQL 17.6 and 18beta2 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
+    This issue has been [fixed in PostgreSQL 17.6 and 18 or later versions](https://github.com/postgres/postgres/commit/f36e5774).
     If you are using PostgreSQL 17.0 through 17.5, ensure that you upgrade to at least
     PostgreSQL 17.6 before attempting a major upgrade, or make sure to temporarily set
     the `max_slot_wal_keep_size` parameter to `-1` in your cluster configuration.
@@ -205,18 +205,18 @@ To trigger the upgrade, change both `imageName` and `serverName` together:
 
 ```yaml
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie
   plugins:
     - name: plugin-barman-cloud
       enabled: true
       parameters:
         destinationPath: s3://my-bucket/
-        serverName: cluster-example-pg17
+        serverName: cluster-example-pg18
 ```
 
 With this configuration, the old archive at `cluster-example-pg16` remains
 intact for pre-upgrade recovery, while the upgraded cluster writes to
-`cluster-example-pg17`.
+`cluster-example-pg18`.
 
 :::info
 The deprecated in-tree `barmanObjectStore` implementation also requires manual
@@ -251,8 +251,8 @@ This will return output similar to:
 PostgreSQL 16.x ...
 ```
 
-To upgrade the cluster to version 17, update the `imageName` field by changing
-the major version tag from `16` to `17`:
+To upgrade the cluster to version 18, update the `imageName` field by changing
+the major version tag from `16` to `18`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -260,7 +260,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie
   instances: 3
   storage:
     size: 1Gi
@@ -290,7 +290,7 @@ kubectl cnpg psql cluster-example -- -qAt -c 'SELECT version()'
 This should now return output similar to:
 
 ```console
-PostgreSQL 17.x ...
+PostgreSQL 18.x ...
 ```
 
 You can now update the statistics by running `ANALYZE` on the `app` database:
