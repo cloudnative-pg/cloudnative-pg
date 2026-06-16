@@ -75,27 +75,28 @@ SPDX-License-Identifier: Apache-2.0
 //     practical difference is that longer recoveries raise the probability of
 //     encountering a transient error, not the severity of the outcome.
 //
-// The steady-state designated primary of a replica cluster is not affected
-// either: it replicates from an external primary and runs in standby mode, so
-// a restore_command failure falls back to streaming rather than triggering
-// XLREAD_FAIL. Note that the first-pod bootstrap of a replica cluster *is*
-// affected — it replays the base backup in non-standby mode before
-// transitioning into standby, which is why the retry loop still covers the
-// bootstrap case for replica clusters (see below).
+// Replica clusters are not affected in any of their pods. The designated
+// primary replicates from an external primary in standby mode, so a
+// restore_command failure falls back to streaming rather than triggering
+// XLREAD_FAIL. The first-pod bootstrap of a replica cluster also stays in
+// standby mode: it is a replica from the start, so a transient archive
+// failure is harmless — PG will get the WAL later via streaming from the
+// external source.
 //
 // # Retry loop
 //
 // To prevent the silent data-loss outcome, this package retries transient
 // restore_command failures instead of returning immediately to PostgreSQL.
-// The retry loop applies in two situations, which together cover the
-// dangerous scenarios above and exclude normal standby replicas:
+// The retry loop applies in two situations on standard (non-replica)
+// clusters, which together cover the dangerous scenarios above and exclude
+// normal standby replicas:
 //
-//   - Bootstrap (cluster.Status.CurrentPrimary == ""): the first pod is
-//     replaying a base backup in non-standby mode, regardless of whether the
-//     cluster is standard or a replica cluster. setPrimaryInstance
-//     (cluster_create.go) sets TargetPrimary before the restore job is
-//     created, well before the PostgreSQL pod starts calling restore_command.
-//   - Designated primary of a non-replica cluster
+//   - Bootstrap of a standard cluster (cluster.Status.CurrentPrimary == ""):
+//     the first pod is replaying a base backup in non-standby mode.
+//     setPrimaryInstance (cluster_create.go) sets TargetPrimary before the
+//     restore job is created, well before the PostgreSQL pod starts calling
+//     restore_command.
+//   - New primary of a standard cluster being promoted
 //     (cluster.Status.TargetPrimary == podName && !cluster.IsReplica()):
 //     this pod is draining the archive in preparation for promotion. CNPG
 //     sets TargetPrimary to the promoted pod before the instance manager
