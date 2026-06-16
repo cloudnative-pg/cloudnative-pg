@@ -70,17 +70,6 @@ func (e *retryTimeoutError) Unwrap() []error {
 	return out
 }
 
-// LastError extracts the last attempt error captured by retryUntilDeadline
-// when the retry budget was exhausted. Returns nil if err is not a
-// retry-timeout error produced by this package.
-func LastError(err error) error {
-	var rt *retryTimeoutError
-	if errors.As(err, &rt) {
-		return rt.lastErr
-	}
-	return nil
-}
-
 // ErrTransientRestore marks a wal-restore failure that the retry loop should
 // treat as transient and retry. We use an explicit opt-in marker rather than
 // "anything not in a sentinel list is transient": the latter would loop on

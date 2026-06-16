@@ -166,33 +166,27 @@ func runWalRestore(
 	// We opt into the retry budget only when a failed WAL restore could lead
 	// to this pod being promoted to primary — that is the only situation in
 	// which surfacing a transient failure to PostgreSQL is dangerous, because
-	// PG would otherwise open the database with unapplied WAL. Two cases
-	// qualify:
+	// PG would otherwise open the database with unapplied WAL. Replica
+	// clusters are excluded from both cases below: their pods never
+	// auto-promote (the designated primary stays in standby; the first-pod
+	// bootstrap stays in standby too, falling back to streaming from the
+	// external source if the archive fails). Two cases qualify:
 	//
-	//   - Bootstrapping: we are replaying a physical base backup and there is
-	//     no live primary yet (cluster.Status.CurrentPrimary == ""). Giving
-	//     up on a transient archive failure here would promote a pod whose
-	//     WAL chain is incomplete. This applies to both standard and replica
-	//     clusters: the first pod of a replica cluster also replays the base
-	//     backup in non-standby mode before transitioning into standby.
-	//   - Designated primary of a standard cluster: this pod is the cluster's
-	//     TargetPrimary, so it is draining the WAL archive in preparation for
-	//     promotion. Same hazard as bootstrap.
+	//   - Bootstrapping a standard cluster: we are replaying a physical base
+	//     backup and there is no live primary yet
+	//     (cluster.Status.CurrentPrimary == ""). Giving up on a transient
+	//     archive failure here would promote a pod whose WAL chain is
+	//     incomplete.
+	//   - New primary of a standard cluster being promoted: this pod is the
+	//     cluster's TargetPrimary and is draining the WAL archive in
+	//     preparation for promotion. Same hazard as bootstrap.
 	//
-	// The designated primary of a replica cluster (cluster.IsReplica()) is
-	// explicitly excluded: it stays in standby mode indefinitely, replicating
-	// from the external source, and is never auto-promoted by PostgreSQL. A
-	// transient restore_command failure there falls back to streaming, so the
-	// retry budget is unnecessary and the legacy single-attempt behavior is
-	// safe.
-	//
-	// A genuine replica (live primary exists and it isn't us) likewise keeps
-	// the legacy behavior: streaming replication from the primary is the
-	// natural fallback, so there is no need to block PG on retries.
-	isBootstrapping := cluster != nil && cluster.Status.CurrentPrimary == ""
-	isTargetPrimary := cluster != nil &&
-		cluster.Status.TargetPrimary == podName &&
-		!cluster.IsReplica()
+	// A genuine replica (live primary exists and it isn't us) keeps the
+	// legacy behavior: streaming replication from the primary is the natural
+	// fallback, so there is no need to block PG on retries.
+	isStandard := cluster != nil && !cluster.IsReplica()
+	isBootstrapping := isStandard && cluster.Status.CurrentPrimary == ""
+	isTargetPrimary := isStandard && cluster.Status.TargetPrimary == podName
 
 	if cluster == nil || (!isBootstrapping && !isTargetPrimary) {
 		err := run(ctx, pgData, podName, args)
@@ -200,32 +194,12 @@ func runWalRestore(
 	}
 
 	timeout := resolveMaxRetryTimeout(cluster)
-	err := retryUntilDeadline(ctx,
+	return retryUntilDeadline(ctx,
 		func(ctx context.Context) error {
 			return run(ctx, pgData, podName, args)
 		},
 		time.Now().Add(timeout),
 	)
-
-	// Carve-out: the designated primary of a standard cluster in steady-state
-	// operation must not be permanently blocked by the retry budget. Returning
-	// the last transient error (instead of ErrRetryTimeoutReached) lets RunE
-	// exit 1 so PostgreSQL can either fall back to streaming or — if streaming
-	// is gone too — promote with whatever WAL is on disk. We accept the
-	// possibility of data loss here in exchange for availability.
-	//
-	// Replica clusters never reach this branch: their designated primary is
-	// filtered out of isTargetPrimary above. Bootstrap is explicitly excluded
-	// (!isBootstrapping) because at first-pod startup TargetPrimary already
-	// equals podName, and promoting on a partial archive there is the
-	// unambiguously unsafe case the exit-143 path was designed to prevent.
-	if isTargetPrimary && !isBootstrapping && errors.Is(err, ErrRetryTimeoutReached) {
-		if last := LastError(err); last != nil {
-			return last
-		}
-	}
-
-	return err
 }
 
 // isTransientRestoreError reports whether the caller should retry.
