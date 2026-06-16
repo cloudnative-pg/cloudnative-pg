@@ -171,3 +171,15 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
 })
+
+var _ = Describe("Operator Deployment Label Selector", func() {
+	It("should have the correct default value", func() {
+		config := newDefaultConfig()
+		Expect(config.OperatorDeploymentLabelSelector).To(Equal(DefaultOperatorDeploymentLabelSelector))
+	})
+
+	It("should allow overriding the field", func() {
+		config := Data{OperatorDeploymentLabelSelector: "custom"}
+		Expect(config.OperatorDeploymentLabelSelector).To(Equal("custom"))
+	})
+})
