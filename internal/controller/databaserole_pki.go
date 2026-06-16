@@ -41,26 +41,37 @@ import (
 func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
-	cluster *apiv1.Cluster,
 ) error {
-	if role.Spec.IssueClientCertificate {
-		return r.issueClientCertificate(ctx, role, cluster)
+	secretKey := client.ObjectKey{
+		Namespace: role.Namespace,
+		Name:      role.GetClientCertSecretName(),
 	}
 
-	return r.deleteOwnedCertSecret(
-		ctx,
-		role,
-		client.ObjectKey{
-			Namespace: role.Namespace,
-			Name:      role.GetClientCertSecretName(),
-		},
-	)
+	// When issuance is disabled we only need to clean up a previously generated
+	// Secret; the cluster is not required for that.
+	if !role.Spec.IssueClientCertificate {
+		return r.deleteOwnedCertSecret(ctx, role, secretKey)
+	}
+
+	var cluster apiv1.Cluster
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: role.Namespace,
+		Name:      role.Spec.ClusterRef.Name,
+	}, &cluster); apierrs.IsNotFound(err) {
+		log.FromContext(ctx).Info("cluster not found, will retry when it appears",
+			"cluster", role.Spec.ClusterRef.Name)
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
+	}
+
+	return r.issueClientCertificate(ctx, role, &cluster)
 }
 
 // issueClientCertificate ensures the TLS client certificate Secret for the
 // role is present and up to date. The cluster must already be fetched by the
-// caller. It modifies role.Status.ClientCertificateExpiration in memory; the
-// caller is responsible for persisting the status.
+// caller. It modifies role.Status.ClientCertificate in memory; the caller is
+// responsible for persisting the status.
 func (r *DatabaseRoleReconciler) issueClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -96,6 +107,18 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 	err := r.Get(ctx, secretKey, &certSecret)
 	switch {
 	case err == nil:
+		// Never touch a same-named Secret the operator does not own: it may
+		// belong to the user or another component. Report the conflict in the
+		// status rather than overwriting it.
+		if !metav1.IsControlledBy(&certSecret, role) {
+			contextLogger.Warning("cert secret exists but is not owned by this DatabaseRole, skipping issuance",
+				"secret", secretKey.Name)
+			role.Status.ClientCertificate = &apiv1.ClientCertificateState{
+				Message: fmt.Sprintf("Secret %q already exists and is not owned by this DatabaseRole", secretKey.Name),
+			}
+			return nil
+		}
+
 		origSecret := certSecret.DeepCopy()
 		renewed, err := certs.RenewLeafCertificate(&caSecret, &certSecret, nil)
 		if err != nil {
@@ -108,17 +131,10 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 		}
 
 	case apierrs.IsNotFound(err):
-		caPair, err := certs.ParseCASecret(&caSecret)
-		if err != nil {
-			return fmt.Errorf("while parsing client CA secret: %w", err)
-		}
-
-		pair, err := caPair.CreateAndSignPair(role.Spec.Name, certs.CertTypeClient, nil)
+		newSecret, err := generateCertificateFromCA(&caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
 		if err != nil {
 			return fmt.Errorf("while signing client cert for role %q: %w", role.Spec.Name, err)
 		}
-
-		newSecret := pair.GenerateCertificateSecret(role.Namespace, secretKey.Name)
 		if err := ctrl.SetControllerReference(role, newSecret, r.Scheme); err != nil {
 			return fmt.Errorf("while setting owner reference on cert secret %q: %w", secretKey.Name, err)
 		}
@@ -178,12 +194,9 @@ func clientCertExpiration(secret *corev1.Secret) (string, error) {
 		return "", fmt.Errorf("secret %q missing key %q", secret.Name, certs.TLSCertKey)
 	}
 	pair := certs.KeyPair{Certificate: certPEM}
-	_, notAfter, err := pair.IsExpiring()
+	cert, err := pair.ParseCertificate()
 	if err != nil {
 		return "", fmt.Errorf("while reading expiration from cert secret %q: %w", secret.Name, err)
 	}
-	if notAfter == nil {
-		return "", nil
-	}
-	return notAfter.UTC().Format(time.RFC3339), nil
+	return cert.NotAfter.UTC().Format(time.RFC3339), nil
 }

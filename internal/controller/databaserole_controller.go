@@ -51,6 +51,11 @@ type DatabaseRoleReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// clientCertReconcileInterval is the requeue period for roles with client
+// certificate issuance enabled, ensuring the certificate is renewed before
+// expiry even in the absence of a triggering event.
+const clientCertReconcileInterval = time.Hour
+
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databaseroles/status,verbs=get;update;patch;watch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get;list;watch
@@ -73,40 +78,32 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	var cluster apiv1.Cluster
-	if err := r.Get(ctx, client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      role.Spec.ClusterRef.Name,
-	}, &cluster); apierrs.IsNotFound(err) {
-		contextLogger.Info("cluster not found, will retry when it appears",
-			"cluster", role.Spec.ClusterRef.Name)
-		return ctrl.Result{}, nil
-	} else if err != nil {
-		return ctrl.Result{}, fmt.Errorf("while getting cluster %q: %w", role.Spec.ClusterRef.Name, err)
-	}
-
 	origRole := role.DeepCopy()
 
-	if err := r.reconcileClientCertificate(ctx, &role, &cluster); err != nil {
+	if err := r.reconcileClientCertificate(ctx, &role); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	// A DatabaseRole has two status writers: the instance manager owns every
+	// field except the PasswordSecretChange condition (handled above) and the
+	// ClientCertificate state set here. Merge-patch so we only touch our own
+	// fields and never clobber the instance manager's update.
 	if !reflect.DeepEqual(origRole.Status, role.Status) {
-		if err := r.Status().Update(ctx, &role); err != nil {
-			return ctrl.Result{}, fmt.Errorf("while updating role status: %w", err)
+		if err := r.Status().Patch(ctx, &role, client.MergeFrom(origRole)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("while patching role status: %w", err)
 		}
 	}
 
 	if role.Spec.IssueClientCertificate {
-		return ctrl.Result{RequeueAfter: time.Hour}, nil
+		return ctrl.Result{RequeueAfter: clientCertReconcileInterval}, nil
 	}
 	return ctrl.Result{}, nil
 }
 
 // reconcilePasswordCondition manages the ConditionPasswordSecretChange status condition.
 // If the role has no password secret, the condition is removed. If the secret is found,
-// the condition is set with the secret's ResourceVersion so downstream reconcilers can
-// detect changes.
+// the condition is set with the secret's ResourceVersion so the instance manager can
+// detect when the password changed.
 func (r *DatabaseRoleReconciler) reconcilePasswordCondition(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
