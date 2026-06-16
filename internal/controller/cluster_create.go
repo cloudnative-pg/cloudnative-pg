@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
@@ -1126,14 +1125,10 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 // A serial is considered free when no instance currently listed in
 // cluster.Status.InstanceNames is using it.
 func (r *ClusterReconciler) generateNodeSerial(cluster *apiv1.Cluster) (int, error) {
-	instanceNames := stringset.From(cluster.Status.InstanceNames)
-
 	for i := 1; i < maxInstanceSerial; i++ {
-		if instanceNames.Has(specs.GetInstanceName(cluster.Name, i)) {
-			continue
+		if !slices.Contains(cluster.Status.InstanceNames, specs.GetInstanceName(cluster.Name, i)) {
+			return i, nil
 		}
-
-		return i, nil
 	}
 
 	return 0, fmt.Errorf("no free instance serial found below %d", maxInstanceSerial)
@@ -1200,6 +1195,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
+	log.FromContext(ctx).Debug("allocated node serial", "serial", nodeSerial)
 
 	// Create the PVCs from the cluster definition, and if bootstrapping from
 	// recoverySnapshot, use that as the source
