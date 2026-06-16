@@ -21,7 +21,6 @@ package controller
 
 import (
 	"context"
-	"crypto/tls"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -40,7 +39,7 @@ var _ = Describe("reconcileOperatorCertificateFingerprint", func() {
 		cluster *apiv1.Cluster
 	)
 
-	newReconcilerWithCert := func() (*ClusterReconciler, *tls.Certificate) {
+	newReconcilerWithCert := func() *ClusterReconciler {
 		pair, err := certs.GenerateSelfSignedClientCertificate("test-operator")
 		Expect(err).ToNot(HaveOccurred())
 		tlsCert, err := pair.TLSCertificate()
@@ -52,13 +51,11 @@ var _ = Describe("reconcileOperatorCertificateFingerprint", func() {
 		return &ClusterReconciler{
 			Client:             fakeClient,
 			OperatorClientCert: &tlsCert,
-		}, &tlsCert
+		}
 	}
 
 	BeforeEach(func() {
-		var tlsCert *tls.Certificate
-		r, tlsCert = newReconcilerWithCert()
-		_ = tlsCert
+		r = newReconcilerWithCert()
 
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
