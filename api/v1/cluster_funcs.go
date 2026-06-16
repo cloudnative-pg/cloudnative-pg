@@ -1636,11 +1636,12 @@ func (cluster *Cluster) GetServiceAccountName() string {
 }
 
 // IsInitialized is true when the cluster has been running once.
-// Falls back to LatestGeneratedNode for clusters upgraded from operator
-// versions that predate the Initialized condition.
+// Falls back to LatestGeneratedNode when the condition is absent or False,
+// to handle clusters upgraded from operator versions that predate the
+// Initialized condition.
 func (cluster *Cluster) IsInitialized() bool {
 	c := meta.FindStatusCondition(cluster.Status.Conditions, string(ConditionInitialized))
-	if c == nil {
+	if c == nil || c.Status == metav1.ConditionFalse {
 		return cluster.Status.LatestGeneratedNode != 0
 	}
 

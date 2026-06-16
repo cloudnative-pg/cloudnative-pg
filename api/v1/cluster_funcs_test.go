@@ -1928,7 +1928,7 @@ var _ = Describe("IsInitialized", func() {
 		Expect(cluster.IsInitialized()).To(BeTrue())
 	})
 
-	It("returns false when the Initialized condition is False", func() {
+	It("returns false when the Initialized condition is False and LatestGeneratedNode is zero", func() {
 		cluster := &Cluster{
 			Status: ClusterStatus{
 				Conditions: []metav1.Condition{
@@ -1947,6 +1947,22 @@ var _ = Describe("IsInitialized", func() {
 		cluster := &Cluster{
 			Status: ClusterStatus{
 				LatestGeneratedNode: 3,
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
+	It("returns true when condition is False but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(ConditionInitialized),
+						Status: metav1.ConditionFalse,
+						Reason: string(ClusterInitialized),
+					},
+				},
 			},
 		}
 		Expect(cluster.IsInitialized()).To(BeTrue())

@@ -1175,7 +1175,9 @@ const (
 	// ConditionConsistentSystemID is true when the all the instances of the
 	// cluster report the same System ID.
 	ConditionConsistentSystemID ClusterConditionType = "ConsistentSystemID"
-	// ConditionInitialized is true when the cluster has been bootstrapped.
+	// ConditionInitialized is False from the first reconcile until the cluster
+	// has had at least one running instance, at which point it is set to True
+	// and never cleared.
 	ConditionInitialized ClusterConditionType = "Initialized"
 )
 
