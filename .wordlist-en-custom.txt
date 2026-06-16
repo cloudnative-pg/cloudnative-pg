@@ -547,8 +547,8 @@ TLS
 TLSv
 TOC
 TODO
-TTY
 TTL
+TTY
 TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile

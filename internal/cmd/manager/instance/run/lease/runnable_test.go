@@ -27,8 +27,10 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/utils/ptr"
 
@@ -245,6 +247,192 @@ var _ = Describe("Runnable.Acquire", func() {
 			defer cancel()
 
 			Expect(r.Acquire(acquireCtx, first)).To(MatchError(context.DeadlineExceeded))
+		})
+})
+
+var _ = Describe("Runnable.tryTakeOver", func() {
+	const (
+		namespace   = "test-ns"
+		clusterName = "test-cluster"
+		thisPod     = "test-cluster-1"
+		otherPod    = "test-cluster-2"
+	)
+
+	newRunnable := func(kubeClient *fake.Clientset) *Runnable {
+		instance := postgres.NewInstance().
+			WithNamespace(namespace).
+			WithPodName(thisPod).
+			WithClusterName(clusterName)
+		r := New(kubeClient, instance)
+		// Set a realistic lease duration so the expiry math is exercised.
+		r.config.LeaseDuration = 15 * time.Second
+		return r
+	}
+
+	// putLease writes a lease object with the given holder, renew time and TTL.
+	putLease := func(
+		ctx context.Context,
+		kubeClient *fake.Clientset,
+		holder string,
+		renewedAt time.Time,
+		ttlSeconds int32,
+	) {
+		lease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterName,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       ptr.To(holder),
+				LeaseDurationSeconds: ptr.To(ttlSeconds),
+				RenewTime:            ptr.To(metav1.NewMicroTime(renewedAt)),
+				LeaseTransitions:     ptr.To(int32(3)),
+			},
+		}
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Create(ctx, lease, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	getLease := func(ctx context.Context, kubeClient *fake.Clientset) *coordinationv1.Lease {
+		lease, err := kubeClient.CoordinationV1().Leases(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		return lease
+	}
+
+	// renewLease rewrites the holder and renew time of an existing lease, as a
+	// live holder renewing its lease would.
+	renewLease := func(ctx context.Context, kubeClient *fake.Clientset, holder string, renewedAt time.Time) {
+		lease := getLease(ctx, kubeClient)
+		lease.Spec.HolderIdentity = ptr.To(holder)
+		lease.Spec.RenewTime = ptr.To(metav1.NewMicroTime(renewedAt))
+		_, err := kubeClient.CoordinationV1().Leases(namespace).Update(ctx, lease, metav1.UpdateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// observe drives a first tryTakeOver so the runnable records the current
+	// lease, then backdates the observation so the next call sees the
+	// LeaseDuration window as already elapsed.
+	observe := func(ctx context.Context, r *Runnable) {
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeFalse())
+		r.observedTime = time.Now().Add(-r.config.LeaseDuration - time.Second)
+	}
+
+	It("returns false and clears the observation when the lease object does not exist",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			// Pre-seed an observation to prove a missing lease resets it.
+			r.observedRecord = &resourcelock.LeaderElectionRecord{HolderIdentity: otherPod}
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(r.observedRecord).To(BeNil())
+		})
+
+	It("returns true and does not write when this pod is already the holder", func(ctx context.Context) {
+		kubeClient := fake.NewClientset()
+		r := newRunnable(kubeClient)
+		putLease(ctx, kubeClient, thisPod, time.Now(), 15)
+		before := getLease(ctx, kubeClient).ResourceVersion
+
+		acquired, err := r.tryTakeOver(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(acquired).To(BeTrue())
+		// No write happened: ResourceVersion is unchanged.
+		Expect(getLease(ctx, kubeClient).ResourceVersion).To(Equal(before))
+	})
+
+	It("refuses on the first sighting of another holder and records the observation",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			// The observation is recorded but no write happened.
+			Expect(r.observedRecord).NotTo(BeNil())
+			Expect(*getLease(ctx, kubeClient).Spec.HolderIdentity).To(Equal(otherPod))
+		})
+
+	It("takes over another holder only after observing it unchanged for LeaseDuration",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+
+			observe(ctx, r)
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+
+			lease := getLease(ctx, kubeClient)
+			Expect(*lease.Spec.HolderIdentity).To(Equal(thisPod))
+			// LeaseTransitions must be bumped to record the hand-over.
+			Expect(*lease.Spec.LeaseTransitions).To(Equal(int32(4)))
+			// LeaseDurationSeconds is rewritten to our configured value.
+			Expect(*lease.Spec.LeaseDurationSeconds).To(Equal(int32(15)))
+		})
+
+	It("never takes over a holder that keeps renewing, however long we wait",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+
+			observe(ctx, r)
+			// The holder renews just before our next look: the record changes,
+			// so the observation must reset and we must not preempt it.
+			renewLease(ctx, kubeClient, otherPod, time.Now())
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeFalse())
+			Expect(*getLease(ctx, kubeClient).Spec.HolderIdentity).To(Equal(otherPod))
+		})
+
+	It("takes over immediately when the lease has an empty holder (cleanly released)",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			// An empty holder marks the lease as free regardless of RenewTime,
+			// with no observation window.
+			putLease(ctx, kubeClient, "", time.Now(), 1)
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(acquired).To(BeTrue())
+
+			lease := getLease(ctx, kubeClient)
+			Expect(*lease.Spec.HolderIdentity).To(Equal(thisPod))
+			Expect(*lease.Spec.LeaseTransitions).To(Equal(int32(4)))
+		})
+
+	It("reports not-acquired when a competing candidate wins the take-over race",
+		func(ctx context.Context) {
+			kubeClient := fake.NewClientset()
+			r := newRunnable(kubeClient)
+			putLease(ctx, kubeClient, otherPod, time.Now().Add(-20*time.Second), 15)
+
+			observe(ctx, r)
+
+			// Simulate the other candidate winning the optimistic-concurrency
+			// race: our conditional Update fails with a conflict.
+			kubeClient.PrependReactor("update", "leases",
+				func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewConflict(
+						schema.GroupResource{Resource: "leases"}, clusterName,
+						errors.New("the object has been modified"))
+				})
+
+			acquired, err := r.tryTakeOver(ctx)
+			Expect(apierrors.IsConflict(err)).To(BeTrue())
+			Expect(acquired).To(BeFalse())
 		})
 })
 

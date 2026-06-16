@@ -99,6 +99,14 @@ type Runnable struct {
 	// heldCh is closed once the lease has been successfully acquired for the first time.
 	heldCh   chan struct{}
 	heldOnce sync.Once
+
+	// observedRecord is the lease state tryTakeOver is timing for liveness and
+	// observedTime is when it first saw that state; see tryTakeOver for how they
+	// detect a holder that has stopped renewing without comparing against the
+	// holder's clock. Accessed only from the single preAcquire goroutine, so
+	// they need no synchronisation.
+	observedRecord *resourcelock.LeaderElectionRecord
+	observedTime   time.Time
 }
 
 // New creates a new Runnable.
@@ -250,8 +258,135 @@ func classifyLeaseAfterRun(
 	}
 }
 
-// runLeaderElection runs the leader election loop. It is the core of the
-// primary lease mechanism and handles three distinct exit scenarios:
+// tryTakeOver attempts a single take-over of the primary lease, run by
+// preAcquire before each renewal loop. It returns true if the lease is now
+// held by this pod (either it already was, or we just won it).
+//
+// A cleanly released lease (empty holder) is taken immediately. A lease still
+// naming another holder is taken over only after we have locally observed the
+// record unchanged for a full LeaseDuration, mirroring client-go's observedTime
+// check: a live holder renews within that window, so an unchanged record proves
+// it has stopped. The comparison is local and equality-only, so clock skew
+// between this pod and the previous holder cannot trigger a take-over.
+//
+// The window is timed in process memory, so a restart of this process re-times
+// it from scratch. That is the inherent cost of not trusting the holder's
+// clock (the same limitation client-go's elector has); it only adds latency in
+// the rare case of a restart mid-take-over, never correctness.
+func (r *Runnable) tryTakeOver(ctx context.Context) (bool, error) {
+	record, _, err := r.lock.Get(ctx)
+	if errors.IsNotFound(err) {
+		// The cluster controller owns lease creation; nothing to take over yet.
+		r.observedRecord = nil
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	identity := r.lock.LockConfig.Identity
+
+	// Already ours: nothing to do here, le.Run will refresh the RenewTime.
+	if record.HolderIdentity == identity {
+		return true, nil
+	}
+
+	// Empty holder: the previous primary released cleanly. An empty identity is
+	// unambiguous regardless of clocks, so claim it immediately. A switchover or
+	// a clean shutdown takes this path, keeping that hand-over fast.
+	if record.HolderIdentity == "" {
+		return r.claim(ctx, record)
+	}
+
+	// Another pod still holds the lease. Take over only once the record has sat
+	// unchanged for a full LeaseDuration: a live holder renews well within that
+	// window, so an unchanged record means it has stopped. RenewTime is compared
+	// for equality only (did the holder write since we last looked), never
+	// ordering, so this never trusts the holder's clock.
+	now := time.Now()
+	if r.observedRecord == nil || !sameHolder(r.observedRecord, record) {
+		r.observedRecord = record
+		r.observedTime = now
+		return false, nil
+	}
+	if now.Sub(r.observedTime) < r.config.LeaseDuration {
+		return false, nil
+	}
+	return r.claim(ctx, record)
+}
+
+// sameHolder reports whether two reads describe the same un-renewed lease
+// state. RenewTime advances on every renew, so an equal holder and RenewTime
+// means the holder has not written since we last looked.
+func sameHolder(a, b *resourcelock.LeaderElectionRecord) bool {
+	return a.HolderIdentity == b.HolderIdentity && a.RenewTime.Equal(&b.RenewTime)
+}
+
+// claim writes this pod as the lease holder, bumping the transition counter.
+// The Update is a ResourceVersion-conditional write (the preceding Get
+// populated it), so a competing candidate that wins the race makes it fail with
+// a conflict; we report not-acquired and let the caller retry on the next poll.
+func (r *Runnable) claim(ctx context.Context, current *resourcelock.LeaderElectionRecord) (bool, error) {
+	now := metav1.NewTime(time.Now())
+	if err := r.lock.Update(ctx, resourcelock.LeaderElectionRecord{
+		HolderIdentity:       r.lock.LockConfig.Identity,
+		LeaseDurationSeconds: int(r.config.LeaseDuration / time.Second),
+		RenewTime:            now,
+		AcquireTime:          now,
+		LeaderTransitions:    current.LeaderTransitions + 1,
+	}); err != nil {
+		return false, err
+	}
+	r.observedRecord = nil
+	return true, nil
+}
+
+// preAcquire polls tryTakeOver at a deterministic RetryPeriod cadence (no
+// jitter) until this pod holds the primary lease or ctx is cancelled. Polling
+// without jitter keeps the take-over cadence bounded by RetryPeriod rather than
+// client-go's jittered 2.2*RetryPeriod, and tryTakeOver adopts a cleanly
+// released lease on the first poll instead of waiting out an observation
+// window, so a graceful failover stays quick without having to inflate
+// LeaseDuration.
+func (r *Runnable) preAcquire(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx).WithName("primary-lease")
+
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+
+		acquired, err := r.tryTakeOver(ctx)
+		switch {
+		case err != nil:
+			// A cancelled ctx surfaces here as a context error: return it
+			// rather than logging a misleading take-over failure on shutdown.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			contextLogger.Debug("Primary lease take-over attempt failed, retrying", "error", err)
+		case acquired:
+			return nil
+		default:
+			contextLogger.Debug("Primary lease not yet available, retrying")
+		}
+		timer.Reset(r.config.RetryPeriod)
+	}
+}
+
+// runLeaderElection acquires the primary lease and then keeps it renewed. It
+// is the core of the primary lease mechanism.
+//
+// Each iteration first calls preAcquire, a jitter-free loop that takes the
+// lease over (or confirms we still hold it), then hands off to client-go's
+// elector for renewal. The jitter inside the elector is harmless there
+// because a lease we already hold is uncontended. The elector's le.Run can
+// then return in three distinct ways:
 //
 //  1. Clean shutdown: ctx is cancelled (e.g. manager shutting down). le.Run
 //     returns because it detects ctx.Done(). We return nil — Release() will be
@@ -286,6 +421,15 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithName("primary-lease")
 
 	for {
+		if err := r.preAcquire(ctx); err != nil {
+			// preAcquire only returns ctx.Err(); treat as clean shutdown.
+			return nil
+		}
+		r.heldOnce.Do(func() {
+			contextLogger.Info("Acquired primary lease")
+			close(r.heldCh)
+		})
+
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            r.lock,
 			LeaseDuration:   r.config.LeaseDuration,
@@ -295,8 +439,10 @@ func (r *Runnable) runLeaderElection(ctx context.Context) error {
 			Name:            r.instance.GetClusterName(),
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(context.Context) {
-					contextLogger.Info("Acquired primary lease")
-					r.heldOnce.Do(func() { close(r.heldCh) })
+					// preAcquire has already taken the lease, so the elector
+					// always starts as leader; this is just the renewal loop
+					// starting. The acquisition itself is logged above.
+					contextLogger.Debug("Primary lease renewal loop started")
 				},
 				OnStoppedLeading: func() {
 					// leaderelection invokes this on every Run exit, including
