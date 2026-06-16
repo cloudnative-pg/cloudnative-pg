@@ -62,7 +62,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!self.name.startsWith('cnpg_')",message="role names starting with cnpg_ are reserved by the operator"
 // +kubebuilder:validation:XValidation:rule="self.name.size() != 0",message="role name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword",message="passwordSecret and disablePassword are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!has(self.issueClientCertificate) || !self.issueClientCertificate || self.login",message="issueClientCertificate requires the role to have login enabled"
+// +kubebuilder:validation:XValidation:rule="!has(self.issueClientCertificate) || !self.issueClientCertificate || (has(self.login) && self.login)",message="issueClientCertificate requires the role to have login enabled"
 type DatabaseRoleSpec struct {
 	// The Kubernetes representation of a PostgreSQL role
 	// in the `cluster.spec.managed.roles` definition.

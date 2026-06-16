@@ -213,7 +213,7 @@ spec:
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
             - message: issueClientCertificate requires the role to have login enabled
               rule: '!has(self.issueClientCertificate) || !self.issueClientCertificate
-                || self.login'
+                || (has(self.login) && self.login)'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
