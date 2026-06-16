@@ -217,7 +217,7 @@ func restoreClusterStatus(
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 		Type:    string(apiv1.ConditionInitialized),
 		Status:  metav1.ConditionTrue,
-		Reason:  string(apiv1.ClusterInitialized),
+		Reason:  string(apiv1.BootstrapCompleted),
 		Message: "Cluster has been bootstrapped",
 	})
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))

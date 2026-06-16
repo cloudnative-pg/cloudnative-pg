@@ -1228,8 +1228,13 @@ const (
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
 
-	// ClusterInitialized is the reason that is set when the cluster has been bootstrapped
-	ClusterInitialized ConditionReason = "ClusterInitialized"
+	// BootstrapCompleted is the reason set on ConditionInitialized=True once the
+	// cluster has completed its first bootstrap.
+	BootstrapCompleted ConditionReason = "BootstrapCompleted"
+
+	// BootstrapPending is the reason set on ConditionInitialized=False while the
+	// cluster has not yet completed its first bootstrap.
+	BootstrapPending ConditionReason = "BootstrapPending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

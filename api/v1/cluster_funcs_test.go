@@ -1920,7 +1920,7 @@ var _ = Describe("IsInitialized", func() {
 					{
 						Type:   string(ConditionInitialized),
 						Status: metav1.ConditionTrue,
-						Reason: string(ClusterInitialized),
+						Reason: string(BootstrapCompleted),
 					},
 				},
 			},
@@ -1935,7 +1935,7 @@ var _ = Describe("IsInitialized", func() {
 					{
 						Type:   string(ConditionInitialized),
 						Status: metav1.ConditionFalse,
-						Reason: string(ClusterInitialized),
+						Reason: string(BootstrapPending),
 					},
 				},
 			},
@@ -1960,7 +1960,7 @@ var _ = Describe("IsInitialized", func() {
 					{
 						Type:   string(ConditionInitialized),
 						Status: metav1.ConditionFalse,
-						Reason: string(ClusterInitialized),
+						Reason: string(BootstrapPending),
 					},
 				},
 			},
@@ -1980,7 +1980,7 @@ var _ = Describe("IsInitialized", func() {
 					{
 						Type:   string(ConditionInitialized),
 						Status: metav1.ConditionFalse,
-						Reason: string(ClusterInitialized),
+						Reason: string(BootstrapPending),
 					},
 				},
 			},
