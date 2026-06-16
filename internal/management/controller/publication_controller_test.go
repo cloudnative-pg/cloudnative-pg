@@ -448,6 +448,83 @@ var _ = Describe("Managed publication controller tests", func() {
 		// finalizer is added while the cluster is a replica.
 		Expect(publication.GetFinalizers()).Should(BeEmpty())
 	})
+
+	// The demotion behavior is identical across the three managed-object
+	// controllers, and so are its tests.
+	It("reports the replica condition when the cluster is demoted after apply", func(ctx SpecContext) { //nolint:dupl
+		publication.Status.Applied = ptr.To(true)
+		publication.Status.ObservedGeneration = publication.Generation
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.GetNamespace(),
+			Name:      publication.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(publicationReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
+		Expect(publication.Status.Applied).To(BeNil())
+		Expect(publication.Status.Message).To(ContainSubstring("waiting for the cluster to become primary"))
+		// the recorded reconciliation is kept, so the publication retains
+		// the ownership of the managed Postgres publication
+		Expect(publication.Status.ObservedGeneration).To(Equal(publication.Generation))
+	})
+
+	It("keeps an applied publication untouched on pods other than the designated primary", func(ctx SpecContext) {
+		publication.Status.Applied = ptr.To(true)
+		publication.Status.ObservedGeneration = publication.Generation
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+		cluster.Status.CurrentPrimary = "another-pod"
+		cluster.Status.TargetPrimary = "another-pod"
+		Expect(fakeClient.Status().Update(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.GetNamespace(),
+			Name:      publication.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		// the demotion may be racing a failover: poll until the designated
+		// primary has reported the replica condition
+		Expect(result.RequeueAfter).To(Equal(publicationReconciliationInterval))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
+		Expect(publication.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(publication.Status.ObservedGeneration).NotTo(BeZero())
+	})
+
+	// The cluster-fetch behavior is identical across the three
+	// managed-object controllers, and so are its tests.
+	It("keeps a reconciled publication status when the cluster cannot be fetched", func(ctx SpecContext) { //nolint:dupl
+		publication.Status.Applied = ptr.To(true)
+		publication.Status.ObservedGeneration = publication.Generation
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		Expect(fakeClient.Delete(ctx, cluster)).To(Succeed())
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.GetNamespace(),
+			Name:      publication.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(ctrl.Result{}))
+
+		Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(publication), publication)).To(Succeed())
+		Expect(publication.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(publication.Status.Message).To(BeEmpty())
+	})
 })
 
 func reconcilePublication(

@@ -48,6 +48,11 @@ func (sub *Subscription) GetStatusMessage() string {
 	return sub.Status.Message
 }
 
+// GetStatusApplied returns the applied status of the subscription
+func (sub *Subscription) GetStatusApplied() *bool {
+	return sub.Status.Applied
+}
+
 // GetClusterRef returns the cluster reference of the subscription
 func (sub *Subscription) GetClusterRef() corev1.LocalObjectReference {
 	return sub.Spec.ClusterRef
