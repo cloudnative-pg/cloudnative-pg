@@ -87,7 +87,7 @@ var _ = Describe("isTransientBarmanError", func() {
 		Entry("ErrWALNotFound is not transient",
 			fmt.Errorf("ctx: %w", barmanRestorer.ErrWALNotFound), false),
 		Entry("ErrInvalidWalName is not transient",
-			fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName), false),
+			fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWALName), false),
 		Entry("ErrUnrecognizedExitCode is not transient",
 			fmt.Errorf("ctx: %w", barmanRestorer.ErrUnrecognizedExitCode), false),
 		// Anti-regression: we must not pattern-match on the message.
@@ -219,7 +219,7 @@ var _ = Describe("combineBarmanFailureWithPluginContext", func() {
 		// must surface unwrapped so RunE returns exit 1 and PostgreSQL falls
 		// back to streaming. The first-cut design retried for 5 minutes
 		// here, blocking PG on every WAL replay.
-		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName)
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWALName)
 		err := combineBarmanFailureWithPluginContext(nil, barmanErr)
 		Expect(err).To(Equal(barmanErr))
 		Expect(isTransientRestoreError(err)).To(BeFalse())
@@ -227,7 +227,7 @@ var _ = Describe("combineBarmanFailureWithPluginContext", func() {
 
 	It("opts into retry when plugin reports a known-transient error", func() {
 		pluginErr := status.Error(codes.Unavailable, "blip")
-		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWalName)
+		barmanErr := fmt.Errorf("ctx: %w", barmanRestorer.ErrInvalidWALName)
 		err := combineBarmanFailureWithPluginContext(pluginErr, barmanErr)
 		Expect(isTransientRestoreError(err)).To(BeTrue())
 	})
