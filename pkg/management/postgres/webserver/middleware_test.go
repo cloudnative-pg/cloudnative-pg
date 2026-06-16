@@ -104,7 +104,7 @@ var _ = Describe("withOperatorAuth", func() {
 		Expect(nextCalled).To(BeFalse())
 	})
 
-	It("rejects a request whose certificate fingerprint does not match", func() {
+	It("returns 503 for a request whose certificate fingerprint does not match", func() {
 		ws = remoteWebserverEndpoints{instance: newInstance("wrong-fingerprint")}
 
 		leaf := parsedCert("test")
@@ -114,7 +114,7 @@ var _ = Describe("withOperatorAuth", func() {
 
 		ws.withOperatorAuth(nextHandler)(w, req)
 
-		Expect(w.Code).To(Equal(http.StatusUnauthorized))
+		Expect(w.Code).To(Equal(http.StatusServiceUnavailable))
 		Expect(nextCalled).To(BeFalse())
 	})
 

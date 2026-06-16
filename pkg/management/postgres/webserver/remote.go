@@ -66,6 +66,12 @@ func IsRetryableError(err *Error) bool {
 // It reads the expected fingerprint from the instance's cached cluster (updated by
 // the reconciliation loop) and compares it against the SHA-256 public key fingerprint
 // of the peer certificate presented by the caller.
+//
+// Rejections use distinct status codes so callers can tell permanent from transient
+// failures: 401 means no usable client certificate was presented (for example the
+// status port is not served over TLS) and is permanent; 503 means a certificate was
+// presented but is not (yet) recognized, which is transient while the operator
+// certificate fingerprint propagates to the instance's cached cluster.
 func (ws *remoteWebserverEndpoints) withOperatorAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		contextLogger := log.FromContext(r.Context())
@@ -91,7 +97,7 @@ func (ws *remoteWebserverEndpoints) withOperatorAuth(next http.HandlerFunc) http
 			contextLogger.Debug("Rejecting request with unknown operator certificate",
 				"path", r.URL.Path,
 				"fingerprint", actualFingerprint)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "operator certificate not recognized", http.StatusServiceUnavailable)
 			return
 		}
 
