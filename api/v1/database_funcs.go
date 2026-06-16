@@ -48,6 +48,11 @@ func (db *Database) GetStatusMessage() string {
 	return db.Status.Message
 }
 
+// GetStatusApplied returns the applied status of the database
+func (db *Database) GetStatusApplied() *bool {
+	return db.Status.Applied
+}
+
 // GetClusterRef returns the cluster reference of the database
 func (db *Database) GetClusterRef() corev1.LocalObjectReference {
 	return db.Spec.ClusterRef

@@ -28,8 +28,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -78,15 +81,27 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// If everything is reconciled, we're done here
-	if database.Generation == database.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
+		// A reconciled database keeps its status: the cluster may be gone
+		// or unreadable while it is being deleted.
+		if database.Generation == database.Status.ObservedGeneration {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &database, fmt.Errorf("while fetching the cluster: %w", err))
+	}
+
+	// If everything is reconciled, we're done here
+	if database.Generation == database.Status.ObservedGeneration {
+		// ...unless the cluster moved in or out of the replica role after
+		// the database was applied: report the demotion on the status, and
+		// evaluate the database again after the promotion.
+		result, proceed, err := handleReplicaRoleTransition(
+			ctx, r.Client, r.instance, cluster, &database, databaseReconciliationInterval)
+		if err != nil || !proceed {
+			return result, err
+		}
 	}
 
 	contextLogger.Info("Reconciling database")
@@ -204,6 +219,13 @@ func NewDatabaseReconciler(
 func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Database{}).
+		Watches(
+			&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(mapClusterToManagedResources(
+				r.instance, mgr.GetClient(),
+				func() client.ObjectList { return &apiv1.DatabaseList{} })),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Named("instance-database").
 		Complete(r)
 }
