@@ -21,6 +21,7 @@ package controller
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -107,27 +108,12 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 	err := r.Get(ctx, secretKey, &certSecret)
 	switch {
 	case err == nil:
-		// Never touch a same-named Secret the operator does not own: it may
-		// belong to the user or another component. Report the conflict in the
-		// status rather than overwriting it.
-		if !metav1.IsControlledBy(&certSecret, role) {
-			contextLogger.Warning("cert secret exists but is not owned by this DatabaseRole, skipping issuance",
-				"secret", secretKey.Name)
-			role.Status.ClientCertificate = &apiv1.ClientCertificateState{
-				Message: fmt.Sprintf("Secret %q already exists and is not owned by this DatabaseRole", secretKey.Name),
-			}
-			return nil
-		}
-
-		origSecret := certSecret.DeepCopy()
-		renewed, err := certs.RenewLeafCertificate(&caSecret, &certSecret, nil)
+		owned, err := r.ensureOwnedCertSecretUpToDate(ctx, role, &caSecret, &certSecret, secretKey)
 		if err != nil {
-			return fmt.Errorf("while renewing client cert for role %q: %w", role.Spec.Name, err)
+			return err
 		}
-		if renewed {
-			if err := r.Patch(ctx, &certSecret, client.MergeFrom(origSecret)); err != nil {
-				return fmt.Errorf("while patching cert secret %q: %w", secretKey.Name, err)
-			}
+		if !owned {
+			return nil
 		}
 
 	case apierrs.IsNotFound(err):
@@ -158,6 +144,64 @@ func (r *DatabaseRoleReconciler) issueClientCertificate(
 	return nil
 }
 
+// ensureOwnedCertSecretUpToDate reconciles an already-existing cert Secret. It
+// refuses to touch a Secret the role does not own, re-issues the certificate
+// when the cluster's client CA has been rotated, and otherwise renews it as it
+// approaches expiry. The returned owned flag is false when the Secret is not
+// controlled by the role, in which case the caller must not record certificate
+// status.
+func (r *DatabaseRoleReconciler) ensureOwnedCertSecretUpToDate(
+	ctx context.Context,
+	role *apiv1.DatabaseRole,
+	caSecret, certSecret *corev1.Secret,
+	secretKey client.ObjectKey,
+) (owned bool, err error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Never touch a same-named Secret the operator does not own: it may belong
+	// to the user or another component. Report the conflict in the status
+	// rather than overwriting it.
+	if !metav1.IsControlledBy(certSecret, role) {
+		contextLogger.Warning("cert secret exists but is not owned by this DatabaseRole, skipping issuance",
+			"secret", secretKey.Name)
+		role.Status.ClientCertificate = &apiv1.ClientCertificateState{
+			Message: fmt.Sprintf("Secret %q already exists and is not owned by this DatabaseRole", secretKey.Name),
+		}
+		return false, nil
+	}
+
+	origSecret := certSecret.DeepCopy()
+
+	// RenewLeafCertificate only re-signs on expiry or altDNSName changes, not
+	// on a CA rotation, so detect a CA change explicitly and re-issue.
+	signedByCurrentCA, err := clientCertSignedByCurrentCA(caSecret, certSecret)
+	if err != nil {
+		return false, fmt.Errorf("while validating client cert for role %q: %w", role.Spec.Name, err)
+	}
+
+	if signedByCurrentCA {
+		renewed, err := certs.RenewLeafCertificate(caSecret, certSecret, nil)
+		if err != nil {
+			return false, fmt.Errorf("while renewing client cert for role %q: %w", role.Spec.Name, err)
+		}
+		if !renewed {
+			return true, nil
+		}
+	} else {
+		contextLogger.Info("client CA changed, re-issuing client certificate", "secret", secretKey.Name)
+		newSecret, err := generateCertificateFromCA(caSecret, role.Spec.Name, certs.CertTypeClient, nil, secretKey)
+		if err != nil {
+			return false, fmt.Errorf("while re-signing client cert for role %q: %w", role.Spec.Name, err)
+		}
+		certSecret.Data = newSecret.Data
+	}
+
+	if err := r.Patch(ctx, certSecret, client.MergeFrom(origSecret)); err != nil {
+		return false, fmt.Errorf("while patching cert secret %q: %w", secretKey.Name, err)
+	}
+	return true, nil
+}
+
 // deleteOwnedCertSecret deletes the cert Secret if it exists and is owned by
 // the given role. Unowned Secrets with the same name are left untouched.
 func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
@@ -184,6 +228,41 @@ func (r *DatabaseRoleReconciler) deleteOwnedCertSecret(
 
 	role.Status.ClientCertificate = nil
 	return nil
+}
+
+// clientCertSignedByCurrentCA reports whether the leaf certificate in certSecret
+// is signed by, and chains to, the CA currently stored in caSecret. The check is
+// performed at the certificate's own NotBefore time so that an imminent expiry
+// does not mask a CA change; expiry is handled separately by renewal. A false
+// result with no error means the certificate must be re-issued, typically
+// because the cluster's client CA was rotated.
+func clientCertSignedByCurrentCA(caSecret, certSecret *corev1.Secret) (bool, error) {
+	caPair, err := certs.ParseCASecret(caSecret)
+	if err != nil {
+		return false, fmt.Errorf("while parsing client CA secret %q: %w", caSecret.Name, err)
+	}
+
+	certPEM, ok := certSecret.Data[certs.TLSCertKey]
+	if !ok {
+		return false, fmt.Errorf("cert secret %q missing key %q", certSecret.Name, certs.TLSCertKey)
+	}
+	certPair := certs.KeyPair{Certificate: certPEM}
+	leaf, err := certPair.ParseCertificate()
+	if err != nil {
+		return false, fmt.Errorf("while parsing client cert in secret %q: %w", certSecret.Name, err)
+	}
+
+	// Pin verification time to the certificate's NotBefore and require client
+	// auth usage: an empty KeyUsages would default to server-auth and reject a
+	// correctly signed client certificate.
+	opts := &x509.VerifyOptions{
+		KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		CurrentTime: leaf.NotBefore,
+	}
+	if err := certPair.IsValid(caPair, opts); err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 // clientCertExpiration returns the NotAfter time of the certificate stored in

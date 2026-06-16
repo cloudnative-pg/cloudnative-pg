@@ -313,10 +313,12 @@ status:
 In this case, you must issue and renew client certificates manually.
 
 :::note
-CNPG does not manage Certificate Revocation Lists (CRLs). If a certificate
-must be invalidated before it expires, rotate the cluster's client CA. This
-will trigger re-issuance of all managed client certificates on the next
-reconcile.
+CNPG does not manage Certificate Revocation Lists (CRLs). If a certificate must
+be invalidated before it expires, rotate the cluster's client CA: on the next
+reconcile the operator detects that the existing certificates are no longer
+signed by the current CA and re-issues all managed client certificates.
+Alternatively, delete the certificate's Secret to have the operator issue a
+fresh one signed by the current CA.
 :::
 
 ---

@@ -129,6 +129,48 @@ var _ = Describe("databaserole_pki", func() {
 			},
 		)
 
+		It("re-issues the cert when the cluster's client CA is rotated", func(ctx SpecContext) {
+			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
+			role := newRole("ada", true)
+
+			// First reconcile: creates the cert signed by the original CA.
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+			var firstSecret corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &firstSecret)).To(Succeed())
+			firstCert := firstSecret.Data[certs.TLSCertKey]
+
+			// Rotate the cluster's client CA: overwrite it with a brand new CA keypair.
+			newCAPair, err := certs.CreateRootCA("test.example.com", namespace)
+			Expect(err).NotTo(HaveOccurred())
+			var caSecret corev1.Secret
+			Expect(r.Get(ctx, types.NamespacedName{
+				Name: cluster.GetClientCASecretName(), Namespace: namespace,
+			}, &caSecret)).To(Succeed())
+			caSecret.Data[certs.CACertKey] = newCAPair.Certificate
+			caSecret.Data[certs.CAPrivateKeyKey] = newCAPair.Private
+			Expect(r.Update(ctx, &caSecret)).To(Succeed())
+
+			// Second reconcile: detects the CA change and re-issues.
+			Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
+
+			var secondSecret corev1.Secret
+			Expect(r.Get(ctx, certSecretKey(role), &secondSecret)).To(Succeed())
+			secondCert := secondSecret.Data[certs.TLSCertKey]
+
+			// The certificate must have been re-signed (bytes differ) and must
+			// now validate against the rotated CA, preserving the CN.
+			Expect(secondCert).NotTo(Equal(firstCert))
+			signed, err := clientCertSignedByCurrentCA(&caSecret, &secondSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signed).To(BeTrue())
+
+			block, _ := pem.Decode(secondCert)
+			Expect(block).NotTo(BeNil())
+			cert, err := x509.ParseCertificate(block.Bytes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cert.Subject.CommonName).To(Equal("ada"))
+		})
+
 		It("sets status.clientCertificate.message and returns nil when CA has no private key", func(ctx SpecContext) {
 			// Create a CA secret with only the certificate, no private key.
 			_, caPair := generateFakeCASecret(r.Client, "tmp-ca", namespace, "test.example.com")
