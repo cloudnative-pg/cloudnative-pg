@@ -222,7 +222,7 @@ spec:
   name: dante
   login: true
   issueClientCertificate: true
-  roleReclaimPolicy: retain
+  databaseRoleReclaimPolicy: retain
 ```
 
 :::important
@@ -283,10 +283,10 @@ is enabled. The current expiration is always reflected in
 | Scenario | Result |
 |---|---|
 | `issueClientCertificate` set to `false` | The cert Secret is deleted; `status.clientCertificate` is cleared |
-| `DatabaseRole` deleted | The cert Secret is garbage-collected via owner reference, regardless of `roleReclaimPolicy` |
+| `DatabaseRole` deleted | The cert Secret is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
 
 :::note
-`roleReclaimPolicy: retain` retains the PostgreSQL role, not the generated
+`databaseRoleReclaimPolicy: retain` retains the PostgreSQL role, not the generated
 Secret. The Secret is only meaningful while the operator is managing the role,
 so it is always cleaned up on deletion.
 :::
