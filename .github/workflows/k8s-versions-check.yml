@@ -45,19 +45,23 @@ jobs:
             jq -Rn '[inputs]' | tee .github/eks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
       -
-        name: Azure Login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
-      -
         name: Get updated AKS versions
         run: |
-          az aks get-versions --location westeurope  \
-            --query "reverse(sort(values[? isPreview != 'true' && contains(capabilities.supportPlan, 'KubernetesOfficial')].patchVersions.keys(@)[]))" -o tsv | \
-            sort -urk 1,1.5 | \
-            awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
-            jq -Rn '[inputs]' | tee .github/aks_versions.json
+          curl -fsSL https://releases.aks.azure.com/parsed_data.json | \
+            jq --arg min "$MINIMAL_K8S" --arg region "West Europe" '
+              def ver: split("(")[0] | split(".") | map(tonumber);    # "1.33.12" -> [1,33,12]
+              [ .Sections.KubernetesSupportedVersions.Components[].ByRegion[]
+                | select(.Regions | index($region))    # the bucket that contains West Europe
+                | .KubernetesVersionList[]
+                | select(.IsPreview == false and .IsLTS == false)    # GA, standard tier only
+                | .VersionName | split("(")[0]
+              ]
+              | unique
+              | map(select((ver)[0:2] >= ($min | split(".") | map(tonumber))))
+              | group_by(ver[0:2])      # one bucket per minor
+              | map(max_by(ver))        # latest patch per minor
+              | sort_by(ver) | reverse
+            ' | tee .github/aks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
         name: 'Auth GKE'
