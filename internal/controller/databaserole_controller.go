@@ -215,11 +215,13 @@ func (r *DatabaseRoleReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 			handler.EnqueueRequestsFromMapFunc(r.mapClientCASecretToRoles()),
 			builder.WithPredicates(caSecretPredicate),
 		).
-		// Cluster: when a cluster becomes available, unblock roles that were waiting
-		// for it to appear.
+		// Cluster: when a cluster appears or its spec changes, (re)evaluate the
+		// roles that reference it. The generation predicate skips the frequent
+		// status-only updates that would otherwise churn every referencing role.
 		Watches(
 			&apiv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterToRoles()),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Complete(r)
 }
@@ -265,21 +267,33 @@ func (r *DatabaseRoleReconciler) mapClientCASecretToRoles() handler.MapFunc {
 			return nil
 		}
 
-		var result []reconcile.Request
+		// Collect the clusters whose client CA is the changed Secret.
+		matchingClusters := make(map[string]struct{})
 		for i := range clusters.Items {
-			if clusters.Items[i].GetClientCASecretName() != secret.Name {
+			if clusters.Items[i].GetClientCASecretName() == secret.Name {
+				matchingClusters[clusters.Items[i].Name] = struct{}{}
+			}
+		}
+		if len(matchingClusters) == 0 {
+			return nil
+		}
+
+		var roles apiv1.DatabaseRoleList
+		if err := r.List(ctx, &roles, client.InNamespace(secret.Namespace)); err != nil {
+			log.FromContext(ctx).Error(err, "while listing roles for CA secret", "secret", secret.Name)
+			return nil
+		}
+
+		var result []reconcile.Request
+		for i := range roles.Items {
+			role := &roles.Items[i]
+			if !role.Spec.IssueClientCertificate {
 				continue
 			}
-			var roles apiv1.DatabaseRoleList
-			if err := r.List(ctx, &roles, client.InNamespace(secret.Namespace)); err != nil {
-				continue
-			}
-			for _, role := range roles.Items {
-				if role.Spec.ClusterRef.Name == clusters.Items[i].Name && role.Spec.IssueClientCertificate {
-					result = append(result, reconcile.Request{
-						NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
-					})
-				}
+			if _, ok := matchingClusters[role.Spec.ClusterRef.Name]; ok {
+				result = append(result, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
+				})
 			}
 		}
 		return result
@@ -302,7 +316,8 @@ func (r *DatabaseRoleReconciler) mapClusterToRoles() handler.MapFunc {
 		}
 
 		var result []reconcile.Request
-		for _, role := range roles.Items {
+		for i := range roles.Items {
+			role := &roles.Items[i]
 			if role.Spec.ClusterRef.Name == cluster.Name {
 				result = append(result, reconcile.Request{
 					NamespacedName: types.NamespacedName{Name: role.Name, Namespace: role.Namespace},
