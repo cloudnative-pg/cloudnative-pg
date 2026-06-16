@@ -1317,6 +1317,31 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 	return &backup, nil
 }
 
+// ensureJobAdoptable verifies that an existing bootstrap Job is owned by this
+// cluster. A NotFound result means the cache lags behind the AlreadyExists
+// error just returned by Create; requeue briefly rather than proceed with
+// unverified adoption.
+func (r *ClusterReconciler) ensureJobAdoptable(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	jobName string,
+) (ctrl.Result, error) {
+	var existing batchv1.Job
+	if err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      jobName,
+	}, &existing); err != nil {
+		if apierrs.IsNotFound(err) {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot get existing job %q for adoption: %w", jobName, err)
+	}
+	if owner, ok := IsOwnedByCluster(&existing); !ok || owner != cluster.Name {
+		return ctrl.Result{}, fmt.Errorf("refusing to adopt job %q: not owned by cluster %q", jobName, cluster.Name)
+	}
+	return ctrl.Result{}, nil
+}
+
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int,
@@ -1372,14 +1397,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
 	if err := r.Create(ctx, job); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			// This Job was already created, maybe the cache is stale.
-			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
+		if !apierrs.IsAlreadyExists(err) {
+			contextLogger.Error(err, "Unable to create Job", "job", job)
+			return ctrl.Result{}, err
 		}
-
-		contextLogger.Error(err, "Unable to create Job", "job", job)
-		return ctrl.Result{}, err
+		// A previous reconcile created the Job but may not have finished
+		// creating the PVCs. Adopt it if owned by this cluster, then fall
+		// through to CreateInstancePVCs so any missing PVCs are created on
+		// this pass.
+		if result, adoptErr := r.ensureJobAdoptable(ctx, cluster, job.Name); adoptErr != nil || !result.IsZero() {
+			return result, adoptErr
+		}
+		contextLogger.Info("Job already exists, adopting it", "job", job.Name)
 	}
 
 	if err := persistentvolumeclaim.CreateInstancePVCs(
