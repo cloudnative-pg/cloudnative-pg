@@ -28,6 +28,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -212,6 +214,12 @@ func restoreClusterStatus(
 ) error {
 	clusterOrig := cluster.DeepCopy()
 	cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    string(apiv1.ConditionInitialized),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ClusterInitialized),
+		Message: "Cluster has been bootstrapped",
+	})
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }
 
