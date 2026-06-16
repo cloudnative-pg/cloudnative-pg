@@ -1943,6 +1943,15 @@ var _ = Describe("IsInitialized", func() {
 		Expect(cluster.IsInitialized()).To(BeFalse())
 	})
 
+	It("returns true when the condition is absent but LatestGeneratedNode is non-zero (upgrade bridge)", func() {
+		cluster := &Cluster{
+			Status: ClusterStatus{
+				LatestGeneratedNode: 3,
+			},
+		}
+		Expect(cluster.IsInitialized()).To(BeTrue())
+	})
+
 	It("ignores the LastBackupSucceeded condition (regression guard)", func() {
 		cluster := &Cluster{
 			Status: ClusterStatus{
