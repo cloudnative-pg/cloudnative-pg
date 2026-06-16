@@ -277,11 +277,17 @@ psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
 
 #### Renewal
 
-Certificates are renewed automatically on every reconcile cycle. The operator
-checks whether the certificate is approaching expiry and re-signs it if needed.
-Reconciles are scheduled at least once per hour when `clientCertificate`
-issuance is enabled. The current expiration is always reflected in
-`status.clientCertificate.expiration`.
+Client certificates inherit the operator's global certificate settings: they
+are issued with a **90-day** lifetime by default and renewed automatically once
+they fall within **7 days** of expiry. Both values are operator-wide and
+configurable via the `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD`
+operator settings; they are not configurable per `DatabaseRole`.
+
+Renewal is driven by the reconcile loop: the operator checks whether the
+certificate is approaching expiry and re-signs it if needed. Reconciles are
+scheduled at least once per hour when `clientCertificate` issuance is enabled,
+so renewal happens well before expiry even without a triggering event. The
+current expiration is always reflected in `status.clientCertificate.expiration`.
 
 #### Deletion and opt-out
 
