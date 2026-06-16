@@ -209,7 +209,7 @@ Secret. This enables [PostgreSQL `cert` authentication](https://www.postgresql.o
 as an alternative to passwords: no passwords to rotate manually, and private
 keys never leave the cluster.
 
-To enable it, set `issueClientCertificate: true` in the spec:
+To enable it, add a `clientCertificate` block to the spec:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -221,13 +221,18 @@ spec:
     name: cluster-example
   name: dante
   login: true
-  issueClientCertificate: true
+  clientCertificate:
+    enabled: true
   databaseRoleReclaimPolicy: retain
 ```
 
+`clientCertificate.enabled` defaults to `true` when the block is present, so
+`clientCertificate: {}` is equivalent to enabling it. Set `enabled: false` to
+turn issuance off while keeping the block in place.
+
 :::important
-`login: true` is required when `issueClientCertificate: true`. The operator
-enforces this via validation and will reject the resource otherwise.
+`login: true` is required when `clientCertificate` issuance is enabled. The
+operator enforces this via validation and will reject the resource otherwise.
 :::
 
 #### Generated Secret
@@ -274,15 +279,15 @@ psql "host=<cluster>-rw.<namespace>.svc port=5432 dbname=<db> user=dante \
 
 Certificates are renewed automatically on every reconcile cycle. The operator
 checks whether the certificate is approaching expiry and re-signs it if needed.
-Reconciles are scheduled at least once per hour when `issueClientCertificate`
-is enabled. The current expiration is always reflected in
+Reconciles are scheduled at least once per hour when `clientCertificate`
+issuance is enabled. The current expiration is always reflected in
 `status.clientCertificate.expiration`.
 
 #### Deletion and opt-out
 
 | Scenario | Result |
 |---|---|
-| `issueClientCertificate` set to `false` | The cert Secret is deleted; `status.clientCertificate` is cleared |
+| `clientCertificate.enabled` set to `false`, or the `clientCertificate` block removed | The cert Secret is deleted; `status.clientCertificate` is cleared |
 | `DatabaseRole` deleted | The cert Secret is garbage-collected via owner reference, regardless of `databaseRoleReclaimPolicy` |
 
 :::note

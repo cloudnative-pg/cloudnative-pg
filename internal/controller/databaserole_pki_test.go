@@ -67,9 +67,12 @@ var _ = Describe("databaserole_pki", func() {
 					Name:  name,
 					Login: true,
 				},
-				ClusterRef:             corev1.LocalObjectReference{Name: cluster.Name},
-				IssueClientCertificate: issueClientCert,
+				ClusterRef: corev1.LocalObjectReference{Name: cluster.Name},
 			},
+		}
+		if issueClientCert {
+			// An unset enabled field defaults to true (IsClientCertificateEnabled).
+			role.Spec.ClientCertificate = &apiv1.ClientCertificateConfiguration{}
 		}
 		// TypeMeta is needed for SetControllerReference to resolve the GVK.
 		role.TypeMeta = metav1.TypeMeta{
@@ -200,7 +203,7 @@ var _ = Describe("databaserole_pki", func() {
 	})
 
 	Describe("deleteOwnedCertSecret", func() {
-		It("deletes the owned cert Secret and clears status when issueClientCertificate is set to false",
+		It("deletes the owned cert Secret and clears status when clientCertificate is disabled",
 			func(ctx SpecContext) {
 				_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
 				role := newRole("eve", true)
@@ -210,7 +213,7 @@ var _ = Describe("databaserole_pki", func() {
 				Expect(r.Get(ctx, certSecretKey(role), &corev1.Secret{})).To(Succeed())
 
 				// Now opt out.
-				role.Spec.IssueClientCertificate = false
+				role.Spec.ClientCertificate = nil
 				Expect(r.reconcileClientCertificate(ctx, role)).To(Succeed())
 
 				err := r.Get(ctx, certSecretKey(role), &corev1.Secret{})
@@ -249,7 +252,7 @@ var _ = Describe("databaserole_pki", func() {
 		})
 	})
 
-	Describe("issueClientCertificate not set (default)", func() {
+	Describe("clientCertificate not set (default)", func() {
 		It("creates no Secret and sets no status", func(ctx SpecContext) {
 			_, _ = generateFakeCASecret(r.Client, cluster.GetClientCASecretName(), namespace, "test.example.com")
 			role := newRole("heidi", false)

@@ -94,7 +94,7 @@ func (r *DatabaseRoleReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	if role.Spec.IssueClientCertificate {
+	if role.IsClientCertificateEnabled() {
 		return ctrl.Result{RequeueAfter: clientCertReconcileInterval}, nil
 	}
 	return ctrl.Result{}, nil
@@ -287,7 +287,7 @@ func (r *DatabaseRoleReconciler) mapClientCASecretToRoles() handler.MapFunc {
 		var result []reconcile.Request
 		for i := range roles.Items {
 			role := &roles.Items[i]
-			if !role.Spec.IssueClientCertificate {
+			if !role.IsClientCertificateEnabled() {
 				continue
 			}
 			if _, ok := matchingClusters[role.Spec.ClusterRef.Name]; ok {

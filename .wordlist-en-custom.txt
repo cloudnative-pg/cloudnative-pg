@@ -85,6 +85,7 @@ CiliumNetworkPolicy
 ClassName
 ClientCASecret
 ClientCertificate
+ClientCertificateConfiguration
 ClientCertificateState
 ClientTLSSecret
 CloudNativePG
@@ -242,7 +243,6 @@ InstanceID
 InstanceReportedState
 IsolationCheckConfiguration
 Isovalent
-IssueClientCertificate
 Istio
 Istio's
 JSON
@@ -753,6 +753,7 @@ clientCASecret
 clientCaSecretVersion
 clientTLS
 clientTLSSecret
+clientcertificateconfiguration
 clientcertificatestate
 cloudNativePGCommitHash
 cloudNativePGOperatorHash
@@ -1050,7 +1051,6 @@ isWALArchiver
 isolationCheck
 isolationcheckconfiguration
 isready
-issueClientCertificate
 issuecomment
 italy
 jdbc

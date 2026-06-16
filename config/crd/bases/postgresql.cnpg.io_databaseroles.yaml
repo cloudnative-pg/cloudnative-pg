@@ -63,6 +63,20 @@ spec:
                   Whether a role bypasses every row-level security (RLS) policy.
                   Default is `false`.
                 type: boolean
+              clientCertificate:
+                description: |-
+                  ClientCertificate configures the operator to generate and renew a TLS client
+                  certificate for this role, signed by the cluster's client CA. The certificate
+                  is stored in a Secret named `<databaserole-name>-client-cert`.
+                  Requires login to be true.
+                properties:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled turns on client certificate issuance for this role. When true,
+                      the role must have login enabled. Defaults to true when the block is present.
+                    type: boolean
+                type: object
               cluster:
                 description: The corresponding cluster
                 properties:
@@ -136,13 +150,6 @@ spec:
                   Whether a role "inherits" the privileges of roles it is a member of.
                   Default is `true`.
                 type: boolean
-              issueClientCertificate:
-                description: |-
-                  IssueClientCertificate enables the operator to generate and renew a TLS client
-                  certificate for this role, signed by the cluster's client CA. The certificate
-                  is stored in a Secret named `<databaserole-name>-client-cert`.
-                  Requires login to be true.
-                type: boolean
               login:
                 description: |-
                   Whether the role is allowed to log in. A role having the `login`
@@ -211,9 +218,9 @@ spec:
               rule: self.name.size() != 0
             - message: passwordSecret and disablePassword are mutually exclusive
               rule: '!has(self.passwordSecret) || !has(self.disablePassword) || !self.disablePassword'
-            - message: issueClientCertificate requires the role to have login enabled
-              rule: '!has(self.issueClientCertificate) || !self.issueClientCertificate
-                || (has(self.login) && self.login)'
+            - message: clientCertificate requires the role to have login enabled
+              rule: '!has(self.clientCertificate) || !has(self.clientCertificate.enabled)
+                || !self.clientCertificate.enabled || (has(self.login) && self.login)'
           status:
             description: |-
               Most recently observed status of the DatabaseRole. This data may not be up
@@ -226,7 +233,7 @@ spec:
               clientCertificate:
                 description: |-
                   ClientCertificate holds the observed state of the generated TLS client
-                  certificate, when issueClientCertificate is true.
+                  certificate, when client certificate issuance is enabled.
                 properties:
                   expiration:
                     description: Expiration is the expiration time of the generated
@@ -235,7 +242,7 @@ spec:
                   message:
                     description: |-
                       Message contains a human-readable explanation of the current certificate status,
-                      such as why issuance was skipped.
+                      such as why issuance was skipped or why an existing Secret was left untouched.
                     type: string
                 type: object
               conditions:

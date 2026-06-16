@@ -37,7 +37,7 @@ import (
 
 // reconcileClientCertificate is the top-level entry point for certificate
 // lifecycle management. It either issues/renews the certificate or deletes it,
-// depending on spec.issueClientCertificate.
+// depending on whether clientCertificate issuance is enabled.
 func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 	ctx context.Context,
 	role *apiv1.DatabaseRole,
@@ -49,7 +49,7 @@ func (r *DatabaseRoleReconciler) reconcileClientCertificate(
 
 	// When issuance is disabled we only need to clean up a previously generated
 	// Secret; the cluster is not required for that.
-	if !role.Spec.IssueClientCertificate {
+	if !role.IsClientCertificateEnabled() {
 		return r.deleteOwnedCertSecret(ctx, role, secretKey)
 	}
 

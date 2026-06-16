@@ -662,7 +662,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 		})
 	})
 
-	Context("with issueClientCertificate enabled", Ordered, func() {
+	Context("with clientCertificate enabled", Ordered, func() {
 		const (
 			certClusterManifest = fixturesDir + "/declarative_roles/cluster-with-cert-auth.yaml.template"
 			namespacePrefix     = "declarative-roles-cert"
@@ -689,7 +689,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 				const roleCRName = "role-app"
 
 				var role *apiv1.DatabaseRole
-				By("creating a DatabaseRole for the 'app' user with issueClientCertificate: true", func() {
+				By("creating a DatabaseRole for the 'app' user with clientCertificate enabled", func() {
 					role = &apiv1.DatabaseRole{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      roleCRName,
@@ -700,9 +700,11 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 								Name:  "app",
 								Login: true,
 							},
-							ClusterRef:             corev1.LocalObjectReference{Name: clusterName},
-							ReclaimPolicy:          apiv1.DatabaseRoleReclaimRetain,
-							IssueClientCertificate: true,
+							ClusterRef:    corev1.LocalObjectReference{Name: clusterName},
+							ReclaimPolicy: apiv1.DatabaseRoleReclaimRetain,
+							ClientCertificate: &apiv1.ClientCertificateConfiguration{
+								Enabled: ptr.To(true),
+							},
 						},
 					}
 					Expect(env.Client.Create(env.Ctx, role)).To(Succeed())
@@ -782,11 +784,11 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					secretsasserts.AssertSSLVerifyFullDBConnectionFromAppPod(env, namespace, clusterName, pod)
 				})
 
-				By("deleting the cert Secret when issueClientCertificate is set to false", func() {
+				By("deleting the cert Secret when clientCertificate is disabled", func() {
 					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.IssueClientCertificate = false
+					role.Spec.ClientCertificate.Enabled = ptr.To(false)
 					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
@@ -806,7 +808,7 @@ var _ = Describe("Declarative role management", Label(tests.LabelSmoke, tests.La
 					roleKey := types.NamespacedName{Namespace: namespace, Name: roleCRName}
 					Expect(env.Client.Get(env.Ctx, roleKey, role)).To(Succeed())
 					oldRole := role.DeepCopy()
-					role.Spec.IssueClientCertificate = true
+					role.Spec.ClientCertificate.Enabled = ptr.To(true)
 					Expect(env.Client.Patch(env.Ctx, role, client.MergeFrom(oldRole))).To(Succeed())
 
 					Eventually(func(g Gomega) {
