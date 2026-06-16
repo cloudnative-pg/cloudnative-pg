@@ -44,9 +44,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 )
 
@@ -65,7 +65,7 @@ const (
 // Env contains all the information related or required by the object storage
 // deployment and used by the functions on every test
 type Env struct {
-	Client       *corev1.Pod
+	Client       *appsv1.Deployment
 	CaPair       *certs.KeyPair
 	CaSecretObj  corev1.Secret
 	ServiceName  string
@@ -385,71 +385,83 @@ func sslSetup(namespace string) (Setup, error) {
 	return setup, nil
 }
 
-// defaultClient returns the default Pod definition for the S3 client
-func defaultClient(namespace string) corev1.Pod {
+// defaultClient returns the default Deployment definition for the S3 client.
+func defaultClient(namespace string) appsv1.Deployment {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
+	labels := map[string]string{"run": "s3-client"}
 
-	clientPod := corev1.Pod{
+	clientDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "s3-client",
-			Labels:    map[string]string{"run": "s3-client"},
+			Labels:    labels,
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "s3-client",
-					Image: awsCliImage,
-					Env: []corev1.EnvVar{
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(1)),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
 						{
-							Name:  "AWS_ENDPOINT_URL",
-							Value: "http://object-store.object-store:9000",
-						},
-						{
-							Name:  "AWS_ACCESS_KEY_ID",
-							Value: AccessKeyID,
-						},
-						{
-							Name:  "AWS_SECRET_ACCESS_KEY",
-							Value: SecretAccessKey,
-						},
-						{
-							Name:  "AWS_DEFAULT_REGION",
-							Value: "us-east-1",
-						},
-						// The CRC-based default checksums introduced in
-						// AWS CLI 2.23 are not supported by every
-						// S3-compatible object store
-						{
-							Name:  "AWS_REQUEST_CHECKSUM_CALCULATION",
-							Value: "when_required",
-						},
-						{
-							Name:  "AWS_RESPONSE_CHECKSUM_VALIDATION",
-							Value: "when_required",
+							Name:  "s3-client",
+							Image: awsCliImage,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "AWS_ENDPOINT_URL",
+									Value: "http://object-store.object-store:9000",
+								},
+								{
+									Name:  "AWS_ACCESS_KEY_ID",
+									Value: AccessKeyID,
+								},
+								{
+									Name:  "AWS_SECRET_ACCESS_KEY",
+									Value: SecretAccessKey,
+								},
+								{
+									Name:  "AWS_DEFAULT_REGION",
+									Value: "us-east-1",
+								},
+								// The CRC-based default checksums introduced in
+								// AWS CLI 2.23 are not supported by every
+								// S3-compatible object store
+								{
+									Name:  "AWS_REQUEST_CHECKSUM_CALCULATION",
+									Value: "when_required",
+								},
+								{
+									Name:  "AWS_RESPONSE_CHECKSUM_VALIDATION",
+									Value: "when_required",
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								SeccompProfile:           seccompProfile,
+							},
+							Command: []string{"sleep", "infinity"},
 						},
 					},
-					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To(false),
-						SeccompProfile:           seccompProfile,
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: seccompProfile,
 					},
-					Command: []string{"sleep", "infinity"},
+					DNSPolicy:     corev1.DNSClusterFirst,
+					RestartPolicy: corev1.RestartPolicyAlways,
 				},
 			},
-			SecurityContext: &corev1.PodSecurityContext{
-				SeccompProfile: seccompProfile,
-			},
-			DNSPolicy:     corev1.DNSClusterFirst,
-			RestartPolicy: corev1.RestartPolicyAlways,
 		},
 	}
-	return clientPod
+	return clientDeployment
 }
 
-// sslClient returns the Pod definition for an S3 client using SSL
-func sslClient(namespace string) corev1.Pod {
+// sslClient returns the Deployment definition for an S3 client using SSL
+func sslClient(namespace string) appsv1.Deployment {
 	const (
 		caSecretName       = "object-store-ca-secret"
 		tlsVolumeName      = "secret-volume"
@@ -457,8 +469,9 @@ func sslClient(namespace string) corev1.Pod {
 	)
 	var secretMode int32 = 0o600
 
-	clientPod := defaultClient(namespace)
-	clientPod.Spec.Volumes = append(clientPod.Spec.Volumes,
+	clientDeployment := defaultClient(namespace)
+	podSpec := &clientDeployment.Spec.Template.Spec
+	podSpec.Volumes = append(podSpec.Volumes,
 		corev1.Volume{
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -469,27 +482,27 @@ func sslClient(namespace string) corev1.Pod {
 			},
 		},
 	)
-	clientPod.Spec.Containers[0].VolumeMounts = append(
-		clientPod.Spec.Containers[0].VolumeMounts,
+	podSpec.Containers[0].VolumeMounts = append(
+		podSpec.Containers[0].VolumeMounts,
 		corev1.VolumeMount{
 			Name:      tlsVolumeName,
 			MountPath: tlsVolumeMountPath,
 		},
 	)
-	clientPod.Spec.Containers[0].Env[0].Value = "https://object-store.object-store:9000"
-	clientPod.Spec.Containers[0].Env = append(
-		clientPod.Spec.Containers[0].Env,
+	podSpec.Containers[0].Env[0].Value = "https://object-store.object-store:9000"
+	podSpec.Containers[0].Env = append(
+		podSpec.Containers[0].Env,
 		corev1.EnvVar{
 			Name:  "AWS_CA_BUNDLE",
 			Value: tlsVolumeMountPath + "/ca.crt",
 		},
 	)
 
-	return clientPod
+	return clientDeployment
 }
 
 // Deploy will create a full object storage deployment defined in the storeEnv variable
-func Deploy(storeEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, error) {
+func Deploy(storeEnv *Env, env *environment.TestingEnvironment) (*appsv1.Deployment, error) {
 	var err error
 	storeEnv.CaPair, err = certs.CreateRootCA(storeEnv.Namespace, "object-store")
 	if err != nil {
@@ -522,9 +535,23 @@ func Deploy(storeEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, er
 		return nil, err
 	}
 
-	clientPod := sslClient(storeEnv.Namespace)
+	clientDeployment := sslClient(storeEnv.Namespace)
+	if err = env.Client.Create(env.Ctx, &clientDeployment); err != nil {
+		return nil, err
+	}
+	if err = deployments.WaitForReady(env.Ctx, env.Client, &clientDeployment, 240); err != nil {
+		return nil, err
+	}
 
-	return &clientPod, pods.CreateAndWaitForReady(env.Ctx, env.Client, &clientPod, 240)
+	return &clientDeployment, nil
+}
+
+// ClientPodRef returns the kubectl resource reference used to exec commands
+// against the S3 client. It targets the Deployment rather than a fixed Pod
+// name so the command is routed to the current Pod even after the original
+// one is rescheduled (e.g. following a node drain).
+func (m *Env) ClientPodRef() string {
+	return "deployment/" + m.Client.Name
 }
 
 func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string) (*corev1.Secret, error) {
@@ -564,7 +591,7 @@ func CountFiles(storeEnv *Env, path string) (value int, err error) {
 	stdout, _, err = run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		storeEnv.Namespace,
-		storeEnv.Client.Name,
+		storeEnv.ClientPodRef(),
 		composeFindCmd(path)))
 	if err != nil {
 		return -1, err
@@ -579,7 +606,7 @@ func ListFiles(storeEnv *Env, path string) (string, error) {
 	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		storeEnv.Namespace,
-		storeEnv.Client.Name,
+		storeEnv.ClientPodRef(),
 		composeListFiles(path)))
 	if err != nil {
 		return "", err
@@ -640,7 +667,7 @@ func GetFileTags(storeEnv *Env, path string) (TagSet, error) {
 	out, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c '%v | head -n1'",
 		storeEnv.Namespace,
-		storeEnv.Client.Name,
+		storeEnv.ClientPodRef(),
 		listFilesScript(path)))
 	if err != nil {
 		return output, err
@@ -655,7 +682,7 @@ func GetFileTags(storeEnv *Env, path string) (TagSet, error) {
 	stdout, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- aws s3api get-object-tagging --bucket %v --key %v",
 		storeEnv.Namespace,
-		storeEnv.Client.Name,
+		storeEnv.ClientPodRef(),
 		bucket,
 		key))
 	if err != nil {
@@ -714,7 +741,7 @@ func CleanFiles(storeEnv *Env, path string) (string, error) {
 	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		storeEnv.Namespace,
-		storeEnv.Client.Name,
+		storeEnv.ClientPodRef(),
 		composeCleanFiles(path)))
 	if err != nil {
 		return "", err

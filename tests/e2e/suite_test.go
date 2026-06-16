@@ -158,7 +158,7 @@ E2E test configuration:
 
 	caSecret := objectStoreEnv.CaPair.GenerateCASecret(objectStoreEnv.Namespace, objectStoreEnv.CaSecretName)
 	objectStoreEnv.CaSecretObj = *caSecret
-	objs := map[string]corev1.Pod{
+	objs := map[string]appsv1.Deployment{
 		"object-store": *objectStoreClient,
 	}
 
@@ -204,7 +204,7 @@ E2E test configuration:
 		panic(err)
 	}
 
-	var objs map[string]*corev1.Pod
+	var objs map[string]*appsv1.Deployment
 	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
 		panic(err)
 	}

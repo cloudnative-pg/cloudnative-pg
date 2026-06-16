@@ -137,23 +137,23 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile1)).
 				ShouldNot(HaveOccurred())
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile2)).
 				ShouldNot(HaveOccurred())
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile3)).
 				ShouldNot(HaveOccurred())
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile4)).
 				ShouldNot(HaveOccurred())
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile5)).
 				ShouldNot(HaveOccurred())
 		})
@@ -293,7 +293,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
 			Expect(testUtils.ForgeArchiveWalOnObjectStore(
-				objectStoreEnv.Namespace, clusterName, objectStoreEnv.Client.Name, latestWAL,
+				objectStoreEnv.Namespace, clusterName, objectStoreEnv.ClientPodRef(), latestWAL,
 				walFile6)).
 				ShouldNot(HaveOccurred())
 		})
