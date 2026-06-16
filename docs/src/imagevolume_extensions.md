@@ -103,7 +103,10 @@ must be unique within the cluster.
 
 :::important
 The `name` must consist of lowercase alphanumeric characters, underscores (`_`)
-or hyphens (`-`) and must start and end with an alphanumeric character.
+or hyphens (`-`) and must start and end with an alphanumeric character. It is
+limited to 59 characters, leaving room for the prefix CloudNativePG adds when
+deriving the extension's Kubernetes volume name (capped at the RFC 1123 limit of
+63 characters).
 :::
 
 Each entry defines the configuration for a container image and specifies the

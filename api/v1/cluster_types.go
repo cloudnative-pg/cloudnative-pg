@@ -1055,6 +1055,12 @@ type ClusterStatus struct {
 	// +optional
 	PGDataImageInfo *ImageInfo `json:"pgDataImageInfo,omitempty"`
 
+	// TargetPGDataImageInfo contains the details of the target image for an
+	// in-progress major upgrade. It is set before the upgrade Job is created,
+	// and cleared on successful completion or when the upgrade is rolled back.
+	// +optional
+	TargetPGDataImageInfo *ImageInfo `json:"targetPgDataImageInfo,omitempty"`
+
 	// PluginStatus is the status of the loaded plugins
 	// +optional
 	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
@@ -1549,8 +1555,11 @@ type PostgresConfiguration struct {
 // ExtensionConfiguration is the configuration used to add
 // PostgreSQL extensions to the Cluster.
 type ExtensionConfiguration struct {
-	// The name of the extension, required
+	// The name of the extension, required. The limit of 59 characters
+	// leaves room for the prefix the operator adds when deriving the
+	// extension's Kubernetes Volume name (capped at 63 characters).
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=59
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9_]*[a-z0-9])?$`
 	Name string `json:"name"`
 
