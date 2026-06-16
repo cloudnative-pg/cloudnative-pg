@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	clusterasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/cluster"
 	pgasserts "github.com/cloudnative-pg/cloudnative-pg/tests/internal/asserts/postgres"
@@ -64,6 +67,14 @@ var _ = Describe("ImageVolume Extensions", Label(tests.LabelImageVolumeExtension
 		}
 		if env.PostgresVersion < 18 {
 			Skip("This test is only run on PostgreSQL v18 or greater")
+		}
+		// Require a stable PostgreSQL version
+		// Image volume extensions are not available for Beta/RC versions
+		// of PostgreSQL
+		defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
+		Expect(err).NotTo(HaveOccurred())
+		if env.PostgresVersion > defaultVersion.Major() {
+			Skip("Running on a version newer than the default image, skipping this test")
 		}
 		// Require K8S 1.33 or greater
 		versionInfo, err := env.Interface.Discovery().ServerVersion()
