@@ -1260,7 +1260,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
@@ -1314,8 +1314,10 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			// The cluster only consumes spec.passwordSecret (to maintain the
 			// instance RBAC), so status-only changes are irrelevant here.
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
-		).
-		Watches(
+		)
+
+	if configuration.Current.OperatorNamespace != "" {
+		ctrlBuilder = ctrlBuilder.Watches(
 			&discoveryv1.EndpointSlice{},
 			handler.EnqueueRequestsFromMapFunc(
 				r.mapPluginEndpointSlicesToClusters(configuration.Current.OperatorNamespace),
@@ -1324,8 +1326,10 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				predicate.GenerationChangedPredicate{},
 				operatorNamespaceServiceEndpointSlicePredicate(configuration.Current.OperatorNamespace),
 			),
-		).
-		Complete(r)
+		)
+	}
+
+	return ctrlBuilder.Complete(r)
 }
 
 // jobOwnerIndexFunc maps a job definition to its owning cluster and
