@@ -23,6 +23,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,7 +32,11 @@ import (
 var _ = Describe("operatorNamespaceServiceEndpointSlicePredicate", func() {
 	const operatorNamespace = "cnpg-system"
 
-	predicate := operatorNamespaceServiceEndpointSlicePredicate(operatorNamespace)
+	var slicePredicate predicate.Predicate
+
+	BeforeEach(func() {
+		slicePredicate = operatorNamespaceServiceEndpointSlicePredicate(operatorNamespace)
+	})
 
 	newSlice := func(namespace, serviceName string) *discoveryv1.EndpointSlice {
 		slice := &discoveryv1.EndpointSlice{
@@ -50,23 +55,23 @@ var _ = Describe("operatorNamespaceServiceEndpointSlicePredicate", func() {
 
 	It("accepts slices in the operator namespace that back a Service", func() {
 		slice := newSlice(operatorNamespace, "some-plugin")
-		Expect(predicate.Create(event.CreateEvent{Object: slice})).To(BeTrue())
+		Expect(slicePredicate.Create(event.CreateEvent{Object: slice})).To(BeTrue())
 	})
 
 	It("rejects slices outside the operator namespace", func() {
 		slice := newSlice("other-namespace", "some-plugin")
-		Expect(predicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
+		Expect(slicePredicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
 	})
 
 	It("rejects slices without the kubernetes.io/service-name label", func() {
 		slice := newSlice(operatorNamespace, "")
-		Expect(predicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
+		Expect(slicePredicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
 	})
 
 	It("rejects slices whose kubernetes.io/service-name label is empty", func() {
 		slice := newSlice(operatorNamespace, "")
 		slice.Labels = map[string]string{discoveryv1.LabelServiceName: ""}
-		Expect(predicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
+		Expect(slicePredicate.Create(event.CreateEvent{Object: slice})).To(BeFalse())
 	})
 
 	// A plugin rollout does not create the EndpointSlice from scratch: the
@@ -74,14 +79,14 @@ var _ = Describe("operatorNamespaceServiceEndpointSlicePredicate", func() {
 	// production the triggering event is almost always an Update. These cases
 	// lock in that the predicate is evaluated against the updated object.
 	It("accepts an update when the new slice is in the operator namespace and backs a Service", func() {
-		Expect(predicate.Update(event.UpdateEvent{
+		Expect(slicePredicate.Update(event.UpdateEvent{
 			ObjectOld: newSlice(operatorNamespace, "some-plugin"),
 			ObjectNew: newSlice(operatorNamespace, "some-plugin"),
 		})).To(BeTrue())
 	})
 
 	It("rejects an update when the new slice is outside the operator namespace", func() {
-		Expect(predicate.Update(event.UpdateEvent{
+		Expect(slicePredicate.Update(event.UpdateEvent{
 			ObjectOld: newSlice("other-namespace", "some-plugin"),
 			ObjectNew: newSlice("other-namespace", "some-plugin"),
 		})).To(BeFalse())
